@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  title: MyString
+  url_name: MyString
+  date: 2026-02-20
+  author: MyString
+  file_path: MyString
+  content: MyText
+
+two:
+  title: MyString
+  url_name: MyString
+  date: 2026-02-20
+  author: MyString
+  file_path: MyString
+  content: MyText

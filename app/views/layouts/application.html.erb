@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Roe CMS</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <!-- Public site theme -->
+    <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+
+    <!-- App/Admin UI (currently empty, for future use) -->
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+
+    <!-- Tailwind for admin UI (future) -->
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+  </head>
+
+  <body>
+    <header class="site-header">
+      <%= render_layout_file('header') %>
+    </header>
+
+    <main>
+      <%= yield %>
+    </main>
+
+    <footer class="site-footer">
+      <%= render_layout_file('footer') %>
+    </footer>
+  </body>
+</html>
