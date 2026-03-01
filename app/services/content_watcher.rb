@@ -53,23 +53,30 @@ class ContentWatcher
       when :warning
         puts "\n   ⚠ Saved with warnings: #{File.basename(file)}\n"
       when nil
-        # Error already logged by Post model
+        # Error already logged
       else
-        # It's a Post object
-        puts "\n   ✓ Saved: #{result.title || File.basename(file)}\n"
+        puts "\n   ✓ Post saved: #{result.title || File.basename(file)}\n"
       end
+
     elsif absolute_file.include?('content/pages')
-      puts "\n   ⚠ Pages not yet implemented\n"
+      result = Page.create_or_update_from_file(absolute_file)
+
+      if result
+        puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
+      end
+      # Errors already logged
     end
   end
 
   def self.remove_file(file)
-    if file.include?('content/posts')
-      Post.remove_by_file_path(file)
-      puts "   Removed from database"
-    elsif file.include?('content/pages')
-      # Future: Page.remove_by_file_path(file)
-      puts "   Pages not yet implemented"
+    absolute_file = File.expand_path(file)
+
+    if absolute_file.include?('content/posts')
+      Post.remove_by_file_path(absolute_file)
+      puts "   Removed post from database"
+    elsif absolute_file.include?('content/pages')
+      Page.remove_by_file_path(absolute_file)
+      puts "   Removed page from database"
     end
   end
 end

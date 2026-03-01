@@ -10,7 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_25_163933) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_01_171437) do
+  create_table "pages", force: :cascade do |t|
+    t.text "content"
+    t.datetime "created_at", null: false
+    t.string "file_path"
+    t.json "metadata"
+    t.datetime "updated_at", null: false
+  end
+
   create_table "posts", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -18,4 +26,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_25_163933) do
     t.json "metadata", default: {}
     t.datetime "updated_at", null: false
   end
+
+  create_table "sessions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "ip_address"
+    t.datetime "updated_at", null: false
+    t.string "user_agent"
+    t.integer "user_id", null: false
+    t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "email_address", null: false
+    t.string "password_digest", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_address"], name: "index_users_on_email_address", unique: true
+  end
+
+  add_foreign_key "sessions", "users"
 end

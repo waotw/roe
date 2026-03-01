@@ -5,6 +5,7 @@ class ContentSync
 
   def sync_all
     sync_posts
+    sync_pages
   end
 
   def sync_posts
@@ -57,6 +58,33 @@ class ContentSync
     puts "✅ Sync complete! #{success_count} synced, #{error_count} errors\n\n"
   end
 
+  def sync_pages
+    relative_paths = Dir.glob("content/pages/**/*.md")
+    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+
+    return if markdown_files.empty?
+
+    puts "\n📄 Found #{markdown_files.count} markdown files in content/pages"
+    puts "=" * 60
+
+    success_count = 0
+    error_count = 0
+
+    markdown_files.each do |file_path|
+      result = sync_page_file(file_path)
+
+      case result
+      when :success
+        success_count += 1
+      when :error
+        error_count += 1
+      end
+    end
+
+    puts "=" * 60
+    puts "✅ Pages sync complete! #{success_count} synced, #{error_count} errors\n\n"
+  end
+
   private
 
   def sync_file(file_path)
@@ -70,6 +98,21 @@ class ContentSync
       :success
     else
       :error  # Error already logged by Post model
+    end
+  rescue => e
+    Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"
+    puts "  ✗ Unexpected error: #{File.basename(file_path)}"
+    :error
+  end
+
+  def sync_page_file(file_path)
+    result = Page.create_or_update_from_file(file_path)
+
+    if result
+      puts "  ✓ Synced: #{File.basename(file_path)}"
+      :success
+    else
+      :error
     end
   rescue => e
     Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"

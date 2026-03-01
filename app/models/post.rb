@@ -91,8 +91,14 @@ class Post < ApplicationRecord
   end
 
   def url_name
-    # Generate from filename if not in metadata
-    metadata["url_name"] || File.basename(file_path, '.md')
+    # Priority: explicit url_name > title > filename
+    if metadata["url_name"].present?
+      metadata["url_name"]
+    elsif metadata["title"].present?
+      metadata["title"].parameterize
+    else
+      File.basename(file_path, '.md')
+    end
   end
 
   def date
