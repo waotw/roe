@@ -5,31 +5,75 @@ class ContentSync
 
   def sync_all
     sync_posts
-    # Later: sync_pages when you build that feature
   end
 
   def sync_posts
-    # Get relative paths from glob
     relative_paths = Dir.glob("content/posts/**/*.md")
-
-    # Convert to absolute paths
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
-    puts "📚 Found #{markdown_files.count} markdown files in content/posts"
+    puts "\n📚 Found #{markdown_files.count} markdown files in content/posts"
+    puts "=" * 60
+
+    success_count = 0
+    error_count = 0
+    error_files = []
+    warning_files = []
 
     markdown_files.each do |file_path|
-      sync_file(file_path)
+      result = sync_file(file_path)
+
+      case result
+      when :success
+        success_count += 1
+      when :error
+        error_count += 1
+        error_files << File.basename(file_path)
+      when :warning
+        success_count += 1
+        warning_files << File.basename(file_path)
+      end
     end
 
-    puts "✅ Initial sync complete!"
+    puts "=" * 60
+
+    # Summary with visual separation
+    if error_count > 0 || warning_files.any?
+      puts "\n⚠️  SYNC SUMMARY"
+      puts "-" * 60
+
+      if error_files.any?
+        puts "❌ ERRORS (#{error_count}):"
+        error_files.each { |file| puts "   • #{file}" }
+        puts ""
+      end
+
+      if warning_files.any?
+        puts "⚠️  WARNINGS (#{warning_files.count}):"
+        warning_files.each { |file| puts "   • #{file}" }
+        puts ""
+      end
+    end
+
+    puts "✅ Sync complete! #{success_count} synced, #{error_count} errors\n\n"
   end
 
   private
 
   def sync_file(file_path)
-    Post.create_or_update_from_file(file_path)
-    puts "  ✓ Synced: #{File.basename(file_path)}"
+    result = Post.create_or_update_from_file(file_path)
+
+    if result.is_a?(Symbol) && result == :warning
+      puts "  ⚠ Synced with warnings: #{File.basename(file_path)}"
+      :warning
+    elsif result
+      puts "  ✓ Synced: #{File.basename(file_path)}"
+      :success
+    else
+      :error  # Error already logged by Post model
+    end
   rescue => e
-    puts "  ✗ Error syncing #{file_path}: #{e.message}"
+    Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"
+    puts "  ✗ Unexpected error: #{File.basename(file_path)}"
+    :error
   end
 end

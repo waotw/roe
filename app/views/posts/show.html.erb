@@ -7,9 +7,11 @@
     <% end %>
 
     <div class="post-meta">
-      <time datetime="<%= @post.date %>">
-        <%= @post.date.strftime("%B %d, %Y") %>
-      </time>
+      <% if @post.date %>
+        <time datetime="<%= @post.date %>">
+          <%= @post.date.strftime("%B %d, %Y") %>
+        </time>
+      <% end %>
       <% if @post.author %>
         <span>• <%= @post.author %></span>
       <% end %>

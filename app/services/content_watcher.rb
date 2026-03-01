@@ -17,33 +17,50 @@ class ContentWatcher
   def self.handle_changes(modified, added, removed)
     added.each do |file|
       next unless file.end_with?('.md')
-      puts "✨ New file detected: #{file}"
+      puts "\n" + "=" * 60
+      puts "✨ New file: #{File.basename(file)}"
+      puts "=" * 60
       process_file(file)
+      puts ""
     end
 
     modified.each do |file|
       next unless file.end_with?('.md')
-      puts "📝 File modified: #{file}"
+      puts "\n" + "=" * 60
+      puts "📝 Modified: #{File.basename(file)}"
+      puts "=" * 60
       process_file(file)
+      puts ""
     end
 
     removed.each do |file|
       next unless file.end_with?('.md')
-      puts "🗑️  File removed: #{file}"
+      puts "\n" + "=" * 60
+      puts "🗑️  Removed: #{File.basename(file)}"
+      puts "=" * 60
       remove_file(file)
+      puts ""
     end
   end
 
   def self.process_file(file)
-    if file.include?('content/posts')
-      post = Post.create_or_update_from_file(file)
-      puts "   Saved: #{post.title}"
-    elsif file.include?('content/pages')
-      # Future: Page.create_or_update_from_file(file)
-      puts "   Pages not yet implemented"
+    absolute_file = File.expand_path(file)
+
+    if absolute_file.include?('content/posts')
+      result = Post.create_or_update_from_file(absolute_file)
+
+      case result
+      when :warning
+        puts "\n   ⚠ Saved with warnings: #{File.basename(file)}\n"
+      when nil
+        # Error already logged by Post model
+      else
+        # It's a Post object
+        puts "\n   ✓ Saved: #{result.title || File.basename(file)}\n"
+      end
+    elsif absolute_file.include?('content/pages')
+      puts "\n   ⚠ Pages not yet implemented\n"
     end
-  rescue => e
-    puts "   ✗ Error: #{e.message}"
   end
 
   def self.remove_file(file)
