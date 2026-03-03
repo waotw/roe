@@ -13,6 +13,14 @@ class ContentSync
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     puts "\n📚 Found #{markdown_files.count} markdown files in content/posts"
+
+    # Clean up orphaned records
+    orphans = Post.where.not(file_path: markdown_files)
+    if orphans.any?
+      puts "🧹 Removing #{orphans.count} orphaned post(s) from database"
+      orphans.destroy_all
+    end
+
     puts "=" * 60
 
     success_count = 0

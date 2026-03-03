@@ -312,6 +312,44 @@ body {
 }
 
 /* ==========================================
+   COLLECTIONS
+   ========================================== */
+
+.collection {
+  margin-bottom: var(--space-12);
+}
+
+.collection-heading {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+
+.collection ul {
+  list-style: none;
+  padding: 0;
+}
+
+.collection li {
+  margin-bottom: var(--space-2);
+}
+
+.item-title {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-2);
+}
+
+.item-subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.item-date {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ==========================================
    UTILITIES
    ========================================== */
 

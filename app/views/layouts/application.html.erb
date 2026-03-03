@@ -1,32 +1,43 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Roe CMS</title>
+    <title>Roe CMS - Admin</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
-    <!-- Public site theme -->
-    <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
-
-    <!-- App/Admin UI (currently empty, for future use) -->
+    <!--<%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>-->
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
-
-    <!-- Tailwind for admin UI (future) -->
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
   </head>
 
-  <body>
-    <header class="site-header">
-      <%= render_layout_file('header') %>
-    </header>
+  <body class="bg-gray-100">
+    <!-- Admin Navigation -->
+    <nav class="bg-white border-b border-gray-200">
+      <div class="px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex">
+            <div class="shrink-0 flex items-center">
+              <%= link_to "Roe CMS", admin_root_path, class: "text-xl font-bold text-gray-900" %>
+            </div>
+            <div class="ml-6 flex space-x-8">
+              <%= link_to "Dashboard", admin_root_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500" %>
+              <%= link_to "Pages", admin_pages_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <%= link_to "Posts", admin_posts_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <%= link_to "Drafts", admin_drafts_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            </div>
+          </div>
+          <div class="flex items-center">
+            <span class="text-sm text-gray-500 mr-4"><%= Current.user.email_address %></span>
+            <%= link_to "Logout", session_path, data: { turbo_method: :delete }, class: "text-sm text-gray-700 hover:text-gray-900" %>
+          </div>
+        </div>
+      </div>
+    </nav>
 
-    <main>
+    <!-- Page Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <%= yield %>
     </main>
-
-    <footer class="site-footer">
-      <%= render_layout_file('footer') %>
-    </footer>
   </body>
 </html>

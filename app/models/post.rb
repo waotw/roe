@@ -1,4 +1,6 @@
 class Post < ApplicationRecord
+  include HasCollections
+
   def self.create_or_update_from_file(file_path)
     absolute_path = File.expand_path(file_path)
     has_warnings = false
@@ -38,8 +40,18 @@ class Post < ApplicationRecord
       end
     end
 
-    # Find or create post
-    post = find_or_initialize_by(file_path: absolute_path)
+    # Find or create post - with duplicate handling
+    existing_posts = where(file_path: absolute_path)
+
+    if existing_posts.count > 1
+      # Cleanup duplicates: keep newest, delete rest
+      Rails.logger.warn "Found #{existing_posts.count} posts for #{file_path}, cleaning up duplicates"
+      post = existing_posts.order(created_at: :desc).first
+      existing_posts.where.not(id: post.id).destroy_all
+      puts "  ℹ Removed #{existing_posts.count - 1} duplicate(s) for #{File.basename(file_path)}"
+    else
+      post = existing_posts.first_or_initialize
+    end
 
     # Store ALL frontmatter in metadata JSON
     post.metadata = parsed.front_matter
@@ -63,12 +75,12 @@ class Post < ApplicationRecord
     find_by(file_path: absolute_path)&.destroy
   end
 
-  def to_html
-    Kramdown::Document.new(
-      content,
-      footnote_backlink: '↩'
-    ).to_html
-  end
+  # def to_html
+  #   Kramdown::Document.new(
+  #     content,
+  #     footnote_backlink: '↩'
+  #   ).to_html
+  # end
 
   def validate_for_display
     errors = []
