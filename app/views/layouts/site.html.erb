@@ -18,5 +18,13 @@
     <footer class="site-footer">
       <%= render_layout_file('footer') %>
     </footer>
+    <script>
+      // Auto-refresh when content is saved in admin
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'content-updated') {
+          location.reload();
+        }
+      });
+    </script>
   </body>
 </html>

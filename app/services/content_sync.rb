@@ -29,7 +29,7 @@ class ContentSync
     warning_files = []
 
     markdown_files.each do |file_path|
-      result = sync_file(file_path)
+      result = result = self.class.sync_file(file_path)
 
       case result
       when :success
@@ -95,8 +95,12 @@ class ContentSync
 
   private
 
-  def sync_file(file_path)
-    result = Post.create_or_update_from_file(file_path)
+  def self.sync_file(file_path)
+    result = if file_path.to_s.include?('/posts/')
+      Post.create_or_update_from_file(file_path)
+    elsif file_path.to_s.include?('/pages/')
+      Page.create_or_update_from_file(file_path)
+    end
 
     if result.is_a?(Symbol) && result == :warning
       puts "  ⚠ Synced with warnings: #{File.basename(file_path)}"
@@ -105,7 +109,7 @@ class ContentSync
       puts "  ✓ Synced: #{File.basename(file_path)}"
       :success
     else
-      :error  # Error already logged by Post model
+      :error  # Error already logged by Post/Page model
     end
   rescue => e
     Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"

@@ -1,5 +1,6 @@
 class Post < ApplicationRecord
   include HasCollections
+  include HasInlineFootnotes
 
   def self.create_or_update_from_file(file_path)
     absolute_path = File.expand_path(file_path)
@@ -144,6 +145,10 @@ class Post < ApplicationRecord
     status == "published"
   end
 
+  def unlisted?
+    status == "unlisted"
+  end
+
   def draft?
     status == "draft"
   end
@@ -185,8 +190,20 @@ class Post < ApplicationRecord
     where("json_extract(metadata, '$.status') = ?", "published")
   end
 
+  def self.unlisted
+    where("json_extract(metadata, '$.status') = ?", "unlisted")
+  end
+
   def self.drafts
     where("json_extract(metadata, '$.status') = ?", "draft")
+  end
+
+  def self.public_posts
+    where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
+  end
+
+  def self.feed_posts
+    published
   end
 
   # Dynamic access to any metadata field
