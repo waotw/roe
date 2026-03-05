@@ -24,5 +24,5 @@ test:
 # is mounted as a persistent Docker volume in config/deploy.yml.
 production:
   <<: *default
-  database: data/production.sqlite3
+  database: /data/production.sqlite3
   url: <%= ENV["DATABASE_URL"] %>

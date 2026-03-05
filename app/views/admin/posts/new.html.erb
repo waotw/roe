@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>New Post</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      background: white;
+      color: black;
+    }
+    a { color: blue; }
+    label { display: block; margin-top: 10px; }
+    input[type="text"] {
+      width: 300px;
+      padding: 2px;
+      font-size: 14px;
+    }
+    .back-link { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="back-link">
+    <%= link_to "← Back to Posts", admin_posts_path %>
+  </div>
+
+  <h1>New Post</h1>
+
+  <% if flash[:error] %>
+    <p style="color: red;"><%= flash[:error] %></p>
+  <% end %>
+
+  <%= form_with url: admin_posts_path, method: :post do |f| %>
+    <label>
+      Filename (without .md):
+      <%= f.text_field :filename, placeholder: "my-first-post", autofocus: true %>
+    </label>
+
+    <%= f.hidden_field :content, value: @template %>
+
+    <p style="margin-top: 20px;">
+      <button type="submit">Create Post</button>
+    </p>
+  <% end %>
+</body>
+</html>

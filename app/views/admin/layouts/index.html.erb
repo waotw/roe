@@ -1,0 +1,29 @@
+<div class="px-4 sm:px-0">
+  <h1 class="text-3xl font-bold text-gray-900">Layouts</h1>
+  <p class="mt-2 text-sm text-gray-700">Edit header and footer that appear on all pages.</p>
+
+  <div class="mt-8">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">File</th>
+          <th class="relative py-3.5 pl-3 pr-4 text-right">
+            <span class="sr-only">Actions</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @layouts.each do |layout| %>
+          <tr>
+            <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
+              <%= layout[:name] %>
+            </td>
+            <td class="py-4 pl-3 pr-4 text-right text-sm">
+              <%= link_to "Edit", layout[:path], class: "text-blue-600 hover:text-blue-900" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

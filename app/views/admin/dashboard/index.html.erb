@@ -1,0 +1,41 @@
+<div class="px-4 sm:px-0">
+  <h1 class="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+
+  <!-- Stats Table -->
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-300 border border-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Content Type</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Count</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%= link_to "Total Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-900" %>
+          </td>
+          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @posts_count %></td>
+        </tr>
+        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%= link_to "Published Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-900" %>
+          </td>
+          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @published_posts_count %></td>
+        </tr>
+        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= drafts_admin_posts_path %>'">
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%= link_to "Draft Posts", drafts_admin_posts_path, class: "text-blue-600 hover:text-blue-900" %>
+          </td>
+          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @draft_posts_count %></td>
+        </tr>
+        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= admin_pages_path %>'">
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%= link_to "Pages", admin_pages_path, class: "text-blue-600 hover:text-blue-900" %>
+          </td>
+          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @pages_count %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

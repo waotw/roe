@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Post Template</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      background: white;
+      color: black;
+    }
+    a { color: blue; }
+
+    textarea {
+      width: 100%;
+      height: 400px;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    .flash {
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      background: #e7f3e7;
+    }
+  </style>
+</head>
+<body>
+  <%= link_to "← Back to Posts", admin_posts_path %>
+
+  <h1>Edit Post Template</h1>
+
+  <% if flash[:notice] %>
+    <div class="flash"><%= flash[:notice] %></div>
+  <% end %>
+
+  <p>This template is used when creating new posts.</p>
+
+  <%= form_with url: admin_settings_post_template_path, method: :patch do |f| %>
+    <%= f.text_area :content, value: @template_content %>
+    <p><button type="submit">Save Template</button></p>
+  <% end %>
+</body>
+</html>

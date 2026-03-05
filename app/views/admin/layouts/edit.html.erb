@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit <%= @layout_name %></title>
+</head>
+<body class="bg-white text-black p-5">
+
+  <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative">
+    <%= link_to "← Back to Layouts", admin_layouts_path, class: "text-blue-600 hover:text-blue-800" %>
+    <% if flash[:notice] %>
+      <div class="flash-notice px-2 py-0.5 border border-gray-300 bg-green-100 absolute right-0"><%= flash[:notice] %></div>
+    <% end %>
+    <% if flash[:trigger_refresh] %>
+      <script>
+        setTimeout(() => {
+          localStorage.setItem('content-updated', Date.now());
+        }, 100);
+      </script>
+    <% end %>
+  </div>
+
+  <h1 class="text-3xl font-bold mb-5">Edit <%= @layout_name %></h1>
+
+  <div class="mb-5 flex gap-2.5 items-center">
+    <span style="display: inline; margin: 0;">
+      <button type="submit" form="layout-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Save</button>
+    </span>
+
+    <%= button_to "Preview", root_path,
+        method: :get,
+        class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+        form: { target: "_blank", style: "display: inline; margin: 0;" } %>
+  </div>
+
+  <%= form_with url: send("admin_layout_#{@file_key}_path"), method: :patch, id: "layout-form" do |f| %>
+    <%= f.text_area :content, value: @content,
+        class: "w-full font-mono text-sm p-1 border border-gray-300 box-border h-[500px]" %>
+  <% end %>
+
+  <script>
+    let originalContent = document.querySelector('[name="content"]').value;
+
+    function handleBeforeUnload(e) {
+      let currentContent = document.querySelector('[name="content"]').value;
+
+      if (currentContent !== originalContent) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        // Save cursor position before submit
+        const textarea = document.querySelector('[name="content"]');
+        sessionStorage.setItem('cursorPosition', textarea.selectionStart);
+        document.getElementById('layout-form').requestSubmit();
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        document.querySelector('form[target="_blank"]').requestSubmit();
+      }
+    });
+
+    document.getElementById('layout-form').addEventListener('submit', () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      // Save cursor position from regular save button too
+      const textarea = document.querySelector('[name="content"]');
+      sessionStorage.setItem('cursorPosition', textarea.selectionStart);
+
+      localStorage.setItem('content-updated', Date.now());
+    });
+
+    // Restore cursor position after page renders
+    const savedPosition = sessionStorage.getItem('cursorPosition');
+    if (savedPosition) {
+      const textarea = document.querySelector('[name="content"]');
+      textarea.focus();
+      textarea.setSelectionRange(parseInt(savedPosition), parseInt(savedPosition));
+      sessionStorage.removeItem('cursorPosition');
+    }
+
+    // Hide flash notice on any input
+    const flashNotice = document.querySelector('.flash-notice');
+    if (flashNotice) {
+      const textarea = document.querySelector('[name="content"]');
+      textarea.addEventListener('input', () => {
+        flashNotice.style.display = 'none';
+      });
+      textarea.addEventListener('blur', () => {
+        flashNotice.style.display = 'none';
+      });
+    }
+  </script>
+</body>
+</html>
