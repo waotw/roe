@@ -29,3 +29,11 @@ production:
 cable:
   <<: *default
   database: /data/production.sqlite3
+
+queue:
+  <<: *default
+  database: /data/production.sqlite3
+
+cache:
+  <<: *default
+  database: /data/production.sqlite3
