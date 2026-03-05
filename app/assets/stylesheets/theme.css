@@ -14,6 +14,7 @@
   --font-scale: 1.125em;
 
   /* Font Sizes */
+  --text-xs: 0.8rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
@@ -80,24 +81,33 @@ body {
    LAYOUT COMPONENTS
    ========================================== */
 
-/* Site Header */
-.site-header {
+/* SITE NAME/LOGO */
+
+.site-logo {
+  font-size: var(--text-2xl);
+}
+
+p:has(.site-logo) {
+  margin-bottom: var(--space-6);
+}
+
+/* SITE NAV */
+.site-nav {
   padding: var(--space-8) 0;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-8);
 }
 
-.site-header h1 {
+.site-nav h1 {
   font-size: var(--text-2xl);
   margin: 0 0 var(--space-2) 0;
 }
 
-.site-header p {
-  margin: 0;
+.site-nav p {
   color: var(--color-muted);
 }
 
-/* Site Footer */
+/* SITE FOOTER */
 .site-footer {
   margin-top: var(--space-16);
   padding: var(--space-8) 0;
@@ -315,6 +325,8 @@ body {
    COLLECTIONS
    ========================================== */
 
+/* LIST (DEFAULT) */
+
 .collection {
   margin-bottom: var(--space-12);
 }
@@ -349,6 +361,20 @@ body {
   color: var(--color-text-muted);
 }
 
+/* COMPACT */
+
+/* LINKS */
+
+.links .item-title {
+  font-size: var(--text-base);
+  margin-bottom: var(--space-1);
+}
+
+.links .item-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 0;
+}
 /* ==========================================
    UTILITIES
    ========================================== */

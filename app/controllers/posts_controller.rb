@@ -2,9 +2,7 @@ class PostsController < ApplicationController
   layout "site"
 
   def index
-    # Only show published posts in feed (not unlisted)
-    @posts = Post.feed_posts
-                 .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
+    @home_page = Page.all.find { |p| p.file_path.end_with?('home.md') }
   end
 
   def show
