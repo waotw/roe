@@ -25,3 +25,7 @@ test:
 production:
   <<: *default
   database: /data/production.sqlite3
+
+cable:
+  <<: *default
+  database: /data/production.sqlite3
