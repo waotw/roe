@@ -1,20 +1,20 @@
 class Admin::LayoutsController < Admin::BaseController
   LAYOUT_FILES = {
-    'header' => Rails.root.join('content/layout/header.md'),
+    'navigation' => Rails.root.join('content/layout/navigation.md'),
     'footer' => Rails.root.join('content/layout/footer.md')
   }
 
   def index
     @layouts = [
-      { name: 'Header', file: 'header', path: admin_layout_header_edit_path },
+      { name: 'Navigation', file: 'navigation', path: admin_layout_navigation_edit_path },
       { name: 'Footer', file: 'footer', path: admin_layout_footer_edit_path }
     ]
   end
 
-  def edit_header
-    @layout_name = 'Header'
-    @file_key = 'header'
-    @content = File.read(LAYOUT_FILES['header'])
+  def edit_navigation
+    @layout_name = 'Navigation'
+    @file_key = 'navigation'
+    @content = File.read(LAYOUT_FILES['navigation'])
     render :edit
   end
 
@@ -25,11 +25,11 @@ class Admin::LayoutsController < Admin::BaseController
     render :edit
   end
 
-  def update_header
-    File.write(LAYOUT_FILES['header'], params[:content].gsub(/\r\n/, "\n"))
-    flash[:notice] = "Header updated"
+  def update_navigation
+    File.write(LAYOUT_FILES['navigation'], params[:content].gsub(/\r\n/, "\n"))
+    flash[:notice] = "Navigation updated"
     flash[:trigger_refresh] = true
-    redirect_to admin_layout_header_edit_path
+    redirect_to admin_layout_navigation_edit_path
   end
 
   def update_footer

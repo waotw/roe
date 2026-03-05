@@ -9,16 +9,16 @@ Rails.application.routes.draw do
   namespace :admin do
     root "dashboard#index"
 
-    get "layout/header/edit", to: "layouts#edit_header"  # Correct - plural
-    patch "layout/header", to: "layouts#update_header"
+    get "layout/navigation/edit", to: "layouts#edit_navigation"
+    patch "layout/navigation", to: "layouts#update_navigation"
     get "layout/footer/edit", to: "layouts#edit_footer"
     patch "layout/footer", to: "layouts#update_footer"
     get "layouts", to: "layouts#index"
 
     resources :posts, only: [ :index, :edit, :update, :new, :create ] do
       collection do
-        get :drafts       # This creates admin_posts_drafts_path
-        get :unlisted     # This creates admin_posts_unlisted_path
+        get :drafts
+        get :unlisted
       end
       member do
         patch :publish
@@ -28,8 +28,8 @@ Rails.application.routes.draw do
 
     resources :pages, only: [ :index, :edit, :update, :new, :create ] do
         member do
-          patch :publish      # Add these
-          patch :unpublish    # Add these
+          patch :publish
+          patch :unpublish
         end
       end
 
