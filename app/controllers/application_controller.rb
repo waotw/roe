@@ -4,4 +4,13 @@ class ApplicationController < ActionController::Base
   allow_browser versions: :modern
 
   layout "site"
+
+  # Render 404 for RecordNotFound
+  rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
+
+  private
+
+  def render_not_found
+    render file: "#{Rails.root}/public/404.html", status: :not_found, layout: false
+  end
 end
