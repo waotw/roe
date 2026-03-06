@@ -1,18 +1,20 @@
-if defined?(Puma) && File.basename($0) != 'rake'
+# ONLY run when Puma is actually serving requests
+if ENV['RAILS_ENV'] == 'production' ||
+   (Rails.env.development? && ARGV.any? { |arg| arg == 'server' || arg == 's' })
+
   Rails.application.config.after_initialize do
-    # Skip if tables don't exist yet (first deploy)
-    if ActiveRecord::Base.connection.table_exists?('posts')
-      ContentSync.sync_all
+    begin
+      if ActiveRecord::Base.connection.table_exists?('posts')
+        ContentSync.sync_all
 
-      # Only watch files in development
-      if Rails.env.development?
-        ContentWatcher.start
+        if Rails.env.development?
+          ContentWatcher.start
+        end
+
+        puts "🚀 Content management system ready!"
       end
-
-      puts "🚀 Content management system ready!"
+    rescue => e
+      Rails.logger.error "Content sync failed: #{e.message}"
     end
-  rescue => e
-    # Fail gracefully if something goes wrong during startup
-    Rails.logger.error "Content sync failed: #{e.message}"
   end
 end

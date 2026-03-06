@@ -49,4 +49,3 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
-storage/*.sqlite3

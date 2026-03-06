@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for roe-cms on 2026-03-05T13:26:51-06:00
+# fly.toml app configuration file generated for roe on 2026-03-06T06:19:54-06:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'roe-cms'
+app = 'roe'
 primary_region = 'lhr'
 console_command = '/rails/bin/rails console'
 
@@ -13,14 +13,11 @@ console_command = '/rails/bin/rails console'
   PORT = '8080'
 
 [processes]
-  app = "./bin/rails server -b 0.0.0.0"
+  app = './bin/rails server'
 
 [[mounts]]
   source = 'data'
-  destination = '/mnt/data'
-  auto_extend_size_threshold = 80
-  auto_extend_size_increment = '1GB'
-  auto_extend_size_limit = '10GB'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
