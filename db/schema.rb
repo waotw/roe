@@ -10,7 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_01_171437) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_06_212456) do
+  create_table "media", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "file_path"
+    t.string "media_type"
+    t.datetime "updated_at", null: false
+    t.datetime "uploaded_at"
+    t.index ["file_path"], name: "index_media_on_file_path", unique: true
+  end
+
   create_table "pages", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false

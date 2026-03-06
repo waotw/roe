@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Media Browser</title>
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+  <%= stylesheet_link_tag "application" %>
+</head>
+<body class="bg-white text-black p-5">
+
+  <div class="mb-5 pb-2.5 border-b border-gray-300">
+    <h1 class="text-2xl font-bold">Select Image</h1>
+  </div>
+
+  <!-- Upload Form -->
+  <div class="mb-5 p-4 border border-gray-300 bg-gray-50">
+    <%= form_with url: admin_medium_index_path, multipart: true, local: true do |f| %>
+      <div class="flex gap-2 items-center">
+        <%= f.file_field :file, accept: "image/*", class: "text-sm" %>
+        <%= f.submit "Upload", class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if flash[:notice] %>
+    <div class="mb-5 px-2.5 py-1 border border-gray-300 bg-green-100">
+      <%= flash[:notice] %>
+    </div>
+  <% end %>
+
+  <!-- Media Grid -->
+  <% if @media.any? %>
+    <div class="grid grid-cols-4 gap-4">
+      <% @media.each do |media| %>
+        <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative" onclick="selectMedia('<%= media.file_path %>', '<%= File.basename(media.file_path) %>')">
+          <img src="<%= media.file_path %>" alt="<%= File.basename(media.file_path) %>" class="w-full h-32 object-cover mb-2">
+          <p class="text-xs font-mono truncate"><%= File.basename(media.file_path) %></p>
+
+          <%= button_to "×", admin_medium_path(media),
+              method: :delete,
+              class: "absolute top-1 right-1 w-6 h-6 bg-red-600 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-center leading-none pt-0.5",
+              form: {
+                onsubmit: "event.stopPropagation(); return confirm('Delete this image?')",
+                class: "inline"
+              } %>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-gray-600">No images uploaded yet.</p>
+  <% end %>
+
+  <script>
+    function selectMedia(path, filename) {
+      // Send message to parent window (the editor)
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'media-selected',
+          path: path,
+          filename: filename
+        }, '*');
+        window.close();
+      }
+    }
+  </script>
+
+</body>
+</html>

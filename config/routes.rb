@@ -27,11 +27,17 @@ Rails.application.routes.draw do
     end
 
     resources :pages, only: [ :index, :edit, :update, :new, :create ] do
-        member do
-          patch :publish
-          patch :unpublish
-        end
+      member do
+        patch :publish
+        patch :unpublish
       end
+    end
+
+    resources :medium, only: [ :index, :create, :destroy ] do
+      collection do
+        get :browse
+      end
+    end
 
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
@@ -44,4 +50,6 @@ Rails.application.routes.draw do
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page
+
+  get '/media/*path', to: 'media#show', format: false
 end
