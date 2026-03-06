@@ -1,6 +1,5 @@
-unless ENV['SECRET_KEY_BASE_DUMMY'] || defined?(Rails::Console) || Rails.env.test? || File.basename($0) == 'rake'
+if defined?(Rails::Server) || ENV['RAILS_ENV'] == 'production'
   Rails.application.config.after_initialize do
-    # Only sync if database tables exist
     if ActiveRecord::Base.connection.table_exists?('posts')
       ContentSync.sync_all
 
@@ -9,8 +8,6 @@ unless ENV['SECRET_KEY_BASE_DUMMY'] || defined?(Rails::Console) || Rails.env.tes
       end
 
       puts "🚀 Content management system ready!"
-    else
-      puts "⚠️  Database not ready yet, skipping content sync"
     end
   end
 end
