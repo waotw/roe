@@ -4,7 +4,11 @@ module HasCollections
   def to_html
     processed_content = process_collections(content)
     processed_content = process_inline_footnotes(processed_content)
-    Kramdown::Document.new(processed_content, footnote_backlink: "↩").to_html
+    Kramdown::Document.new(
+      processed_content,
+      input: 'GFM',  # Add this to enable GitHub Flavored Markdown
+      footnote_backlink: "↩"
+    ).to_html
   end
 
   private

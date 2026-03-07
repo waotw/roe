@@ -10,11 +10,18 @@
   <div>
     <div class="flex justify-between gap-4 items-center mb-1">
       <h3 class="text-sm text-gray-600">Content</h3>
-      <div class="flex justify-end gap-4">
-        <button type="button" onclick="insertFootnote()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Footnote</button>
-        <button type="button" onclick="insertCollection()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Collection</button>
-        <button type="button" onclick="triggerMediaUpload()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Upload Media</button>
-        <input type="file" id="media-upload" accept="image/*" style="display: none;" onchange="handleMediaUpload(event)">
+      <div class="flex gap-4">
+        <div class="flex gap-2">
+          <button type="button" onclick="insertBold()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]"><strong>B</strong></button>
+          <button type="button" onclick="insertItalic()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]"><em>I</em></button>
+          <button type="button" onclick="insertStrike()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]"><s>S</s></button>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="insertFootnote()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Footnote</button>
+          <button type="button" onclick="insertCollection()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Collection</button>
+          <button type="button" onclick="triggerMediaUpload()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Upload Media</button>
+          <input type="file" id="media-upload" accept="image/*" style="display: none;" onchange="handleMediaUpload(event)">
+        </div>
       </div>
     </div>
     <%= f.text_area :content, value: content,

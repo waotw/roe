@@ -92,8 +92,34 @@
     metadataTextarea.addEventListener("input", schedulePreview);
   }
 
+  // Add this function:
+  let originalMetadata = document.querySelector('[name="metadata"]')?.value || "";
+  let originalContent = document.querySelector('[name="content"]').value;
+
+  window.handleBeforeUnload = function(e) {
+    let currentMetadata = document.querySelector('[name="metadata"]')?.value || "";
+    let currentContent = document.querySelector('[name="content"]').value;
+
+    if (currentMetadata !== originalMetadata || currentContent !== originalContent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
+
   function insertFootnote() {
     wrapOrInsert('(*', '*)', 'footnote text here');
+  }
+
+  function insertItalic() {
+    wrapOrInsert('_', '_', 'italic text');
+  }
+
+  function insertStrike() {
+    wrapOrInsert('~~', '~~', 'struck text');
+  }
+
+  function insertBold() {
+    wrapOrInsert('**', '**', 'bold text');
   }
 
   function insertCollection() {
