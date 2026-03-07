@@ -141,6 +141,164 @@
     document.getElementById("media-upload").click();
   }
 
+  function toggleCardMenu(event) {
+    event.stopPropagation();
+    const menu = document.getElementById('card-menu');
+    menu.classList.toggle('hidden');
+  }
+
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('card-menu');
+    if (menu && !menu.classList.contains('hidden')) {
+      menu.classList.add('hidden');
+    }
+  });
+
+  function insertCard(type) {
+    const textarea = document.getElementById("content-textarea");
+    const start = textarea.selectionStart;
+    textarea.focus({ preventScroll: true });
+
+    let cardTemplate = '';
+    let selectStart = 0;
+    let selectEnd = 0;
+
+    if (type === 'pullquote') {
+      cardTemplate = '```card\ntype: pullquote\ntext: Your quote text here\n```';
+      // Calculate position of "Your quote text here"
+      selectStart = start + '```card\ntype: pullquote\ntext: '.length;
+      selectEnd = selectStart + 'Your quote text here'.length;
+    } else if (type === 'post-link') {
+      cardTemplate = '```card\ntype: post-link\nstyle: small\nimage: \ntitle: \nauthor: \ndate: \nurl: \nlink_text: Read full story →\n```';
+    }
+
+    document.execCommand('insertText', false, cardTemplate);
+
+    // Select the placeholder text for pullquotes
+    if (type === 'pullquote') {
+      textarea.setSelectionRange(selectStart, selectEnd);
+    }
+
+    // Hide the menu
+    document.getElementById('card-menu').classList.add('hidden');
+  }
+
+  function showPostLinkPrompt() {
+    // Hide card menu
+    document.getElementById('card-menu').classList.add('hidden');
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'post-link-modal';
+    overlay.className = 'fixed inset-0 flex items-center justify-center z-50';
+    overlay.style.cssText = 'background-color: rgba(0, 0, 0, 0.2);';
+    overlay.innerHTML = `
+      <div class="bg-white p-6 w-96 border border-gray-400">
+        <div class="relative mb-4">
+          <input
+            type="text"
+            id="post-search-input"
+            placeholder="Search for a post by title..."
+            class="w-full px-3 py-2 border border-gray-300"
+          >
+          <div id="post-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 max-h-60 overflow-y-auto z-10"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button onclick="closePostLinkModal()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Focus input
+    const input = document.getElementById('post-search-input');
+    input.focus();
+
+    // Setup search
+    let searchTimeout;
+    input.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      const query = e.target.value.trim();
+
+      if (query.length < 2) {
+        document.getElementById('post-search-results').classList.add('hidden');
+        return;
+      }
+
+      searchTimeout = setTimeout(() => searchPosts(query), 300);
+    });
+  }
+
+  function searchPosts(query) {
+    const resultsDiv = document.getElementById('post-search-results');
+
+    fetch(`/admin/posts/search?q=${encodeURIComponent(query)}`)
+      .then(response => response.json())
+      .then(posts => {
+        if (posts.length === 0) {
+          resultsDiv.innerHTML = '<div class="p-2 text-gray-500 text-sm">No posts found</div>';
+          resultsDiv.classList.remove('hidden');
+          return;
+        }
+
+        resultsDiv.innerHTML = posts.map(post => `
+          <button
+            onclick='selectPost(${JSON.stringify(post)})'
+            class="block w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-200 last:border-b-0"
+          >
+            ${post.title}
+          </button>
+        `).join('');
+
+        resultsDiv.classList.remove('hidden');
+      })
+      .catch(error => {
+        console.error('Search error:', error);
+      });
+  }
+
+  function selectPost(post) {
+    const metadata = post.metadata;
+
+    // Build card template from post data
+    let cardTemplate = '```card\ntype: post-link\nstyle: small\n';
+
+    if (metadata.image) cardTemplate += `image: ${metadata.image}\n`;
+    if (post.title) cardTemplate += `title: ${post.title}\n`;
+    if (metadata.author) cardTemplate += `author: ${metadata.author}\n`;
+    if (metadata.date) cardTemplate += `date: ${metadata.date}\n`;
+    if (metadata.subtitle) {
+      const excerpt = metadata.subtitle.substring(0, 200);
+      cardTemplate += `excerpt: ${excerpt}\n`;
+    }
+    cardTemplate += `url: ${post.url}\n`;
+    cardTemplate += '```';
+
+    // Insert into editor
+    const textarea = document.getElementById("content-textarea");
+    textarea.focus({ preventScroll: true });
+    document.execCommand('insertText', false, cardTemplate);
+
+    // Close modal
+    closePostLinkModal();
+  }
+
+  function closePostLinkModal() {
+    const modal = document.getElementById('post-link-modal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+
+  // Close modal on overlay click
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'post-link-modal') {
+      closePostLinkModal();
+    }
+  });
+
   function handleMediaUpload(event) {
     const file = event.target.files[0];
     if (!file) return;

@@ -1,8 +1,9 @@
-module HasCollections
+module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
   def to_html
     processed_content = process_collections(content)
+    processed_content = process_cards(processed_content)
     processed_content = process_inline_footnotes(processed_content)
     Kramdown::Document.new(
       processed_content,
@@ -177,5 +178,100 @@ module HasCollections
     else
       "/#{item.url_name}"
     end
+  end
+
+  # CARDS
+
+  def process_cards(markdown)
+    markdown.gsub(/```card\r?\n(.*?)```/m) do
+      config_text = $1
+      config = parse_card_config(config_text)
+      render_card(config)
+    end
+  end
+
+  def parse_card_config(text)
+    config = {}
+    text.split("\n").each do |line|
+      next if line.strip.empty?
+      key, value = line.split(':', 2).map(&:strip)
+      config[key.to_sym] = value if key && value
+    end
+    config
+  end
+
+  def render_card(config)
+    type = config[:type] || 'pullquote'
+
+    case type
+    when 'pullquote'
+      render_pullquote(config)
+    when 'aside'
+      render_aside(config)
+    when 'post-link'
+      render_post_link(config)
+    else
+      '<!-- Unknown card type -->'
+    end
+  end
+
+  def render_pullquote(config)
+    text = config[:text] || ''
+
+    <<~HTML
+      <div class="card card-pullquote" markdown="1">
+
+      #{text}
+      {: .pullquote-text}
+
+      </div>
+    HTML
+  end
+
+  # POST LINKS
+
+  def render_post_link(config)
+    style = config[:style] || 'small'
+    image = config[:image] || ''
+    title = config[:title] || 'Untitled'
+    author = config[:author] || ''
+    date_raw = config[:date] || ''
+    excerpt = config[:excerpt] || ''
+    url = config[:url] || '#'
+    link_text = config[:link_text] || 'Read full story →'
+
+    # Format date
+    date = ''
+    if date_raw.present?
+      begin
+        parsed_date = Date.parse(date_raw.to_s)
+        date = parsed_date.strftime('%b %d, %Y')
+      rescue
+        date = date_raw.to_s  # Fallback to original if parsing fails
+      end
+    end
+
+    # Build metadata line
+    metadata_parts = [author, date].reject(&:blank?)
+    metadata = metadata_parts.join(' • ')
+
+    # Only show excerpt for large style, truncate if needed
+    excerpt_html = ''
+    if style == 'large' && excerpt.present?
+      truncated = excerpt.length > 200 ? excerpt[0..197] + '...' : excerpt
+      excerpt_html = "<p class=\"card-excerpt\">#{truncated}</p>"
+    end
+
+    <<~HTML
+      <div class="card post-link-#{style}">
+        #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+        <div class="card-content">
+          <h4 class="card-title-#{style}">#{title}</h4>
+          #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
+          #{excerpt_html}
+          <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+        </div>
+      </div>
+    HTML
   end
 end

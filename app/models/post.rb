@@ -1,5 +1,5 @@
 class Post < ApplicationRecord
-  include HasCollections
+  include HasMarkdownExtensions
   include HasInlineFootnotes
 
   def self.create_or_update_from_file(file_path)

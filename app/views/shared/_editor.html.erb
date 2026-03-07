@@ -18,6 +18,15 @@
         </div>
         <div class="flex gap-2">
           <button type="button" onclick="insertFootnote()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Footnote</button>
+          <div class="relative inline-flex">
+            <button type="button" onclick="toggleCardMenu(event)" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">
+              Card ▼
+            </button>
+            <div id="card-menu" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-10" style="min-width: 150px;">
+              <button type="button" onclick="insertCard('pullquote')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Pull Quote</button>
+              <button type="button" onclick="showPostLinkPrompt()" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Post Link</button>
+            </div>
+          </div>
           <button type="button" onclick="insertCollection()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Collection</button>
           <button type="button" onclick="triggerMediaUpload()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Upload Media</button>
           <input type="file" id="media-upload" accept="image/*" style="display: none;" onchange="handleMediaUpload(event)">

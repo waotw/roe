@@ -44,6 +44,7 @@ Rails.application.routes.draw do
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
     patch "settings/post_template", to: "settings#update_post_template"
+    get 'posts/search', to: 'posts#search'
   end
 
   # Public site (specific before catch-all)

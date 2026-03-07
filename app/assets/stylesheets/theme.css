@@ -34,7 +34,7 @@
   --space-16: 4rem;
 
   /* Colors */
-  --color-bg: #ffffff;
+  --color-bg: #fffbf3;
   --color-text: #000000;
   --color-heading: #222222;
   --color-muted: #666666;
@@ -375,6 +375,134 @@ p:has(.site-logo) {
   color: var(--color-text-muted);
   margin-bottom: 0;
 }
+
+/* ==========================================
+   CARDS
+   ========================================== */
+
+/* PULLQUOTE */
+
+.card {
+  position: relative;
+}
+
+.card-pullquote {
+  text-align: center;
+  font-size: 1.5rem;
+  padding: 2rem;
+  margin: 2rem 0;
+  border-top: 1px solid var(--color-muted);
+  border-bottom: 1px solid var(--color-muted);
+}
+
+/* POST LINKS */
+
+.card.post-link-small {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  margin: 2rem 0;
+  text-decoration: none;
+  align-items: flex-start;
+}
+
+.card.post-link-large {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  margin: 2rem 0;
+  text-decoration: none;
+  align-items: flex-start;
+}
+
+.card-post-link:hover {
+  background: #f9f9f9;
+}
+
+.card.post-link-small .card-image {
+  margin: 0;
+  width: 70px;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.card.post-link-large .card-image {
+  width: 200px;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.card-content {
+  min-height: 80px;
+}
+
+.card-title-small {
+  margin: 0 0 0.1rem 0;
+  font-size: 1rem;
+}
+
+.card-title-large {
+  margin: 0 0 0rem 0;
+  font-size: 1.5rem;
+}
+
+.card-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-title a:hover {
+  text-decoration: underline;
+}
+
+p.card-metadata-small {
+  margin: 0;
+  margin-bottom: 0.2rem;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+p.card-metadata-large {
+  margin: 0;
+  margin-bottom: 0.2rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.card-excerpt {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: #666;
+}
+
+.card-link-small {
+  position: absolute;
+  display: inline-block;
+  color: #0066cc;
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+
+.card-link-large {
+  position: absolute;
+  bottom: 20px;
+  display: inline-block;
+  color: #0066cc;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.card-link-small:hover {
+  text-decoration: underline;
+}
+
 /* ==========================================
    UTILITIES
    ========================================== */

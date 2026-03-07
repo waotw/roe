@@ -153,6 +153,29 @@ class Admin::PostsController < Admin::BaseController
     redirect_to edit_admin_post_path(@post)
   end
 
+  def search
+    query = params[:q].to_s.downcase
+
+    posts = Post.where("json_extract(metadata, '$.status') = 'published'")
+                .where("LOWER(json_extract(metadata, '$.title')) LIKE ?", "%#{query}%")
+                .limit(10)
+
+    results = posts.map do |post|
+      {
+        id: post.id,
+        title: post.title,  # This uses the Post model's title method which extracts from metadata
+        url_name: post.url_name,
+        url: "/posts/#{post.url_name}",
+        metadata: post.metadata
+      }
+    end
+
+    render json: results
+  rescue => e
+    Rails.logger.error "Post search error: #{e.message}"
+    render json: { error: e.message }, status: :internal_server_error
+  end
+
   private
 
   def load_post_template
