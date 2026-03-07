@@ -1,0 +1,16 @@
+<script>
+  let lastUpdate = localStorage.getItem('preview-updated');
+  let lastReload = Date.now();
+
+  setInterval(() => {
+    const currentUpdate = localStorage.getItem('preview-updated');
+    const now = Date.now();
+
+    // Only reload if: update detected AND at least 1 second since last reload
+    if (currentUpdate && currentUpdate !== lastUpdate && (now - lastReload) > 1000) {
+      lastUpdate = currentUpdate;
+      lastReload = now;
+      location.reload();
+    }
+  }, 1000);
+</script>

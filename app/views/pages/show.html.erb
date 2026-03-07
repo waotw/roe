@@ -3,3 +3,4 @@
     <%= raw @page.to_html %>
   </div>
 </article>
+<%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>

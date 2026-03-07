@@ -19,6 +19,30 @@ class Admin::PostsController < Admin::BaseController
     render :index
   end
 
+  def preview
+    # Reconstruct content from params
+    metadata_yaml = params[:metadata]
+    content = params[:content]
+
+    begin
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [Date, Time, Symbol])
+    rescue
+      metadata = {}
+    end
+
+    # Create a temporary post object (not saved to DB)
+    @post = Post.find(params[:id])
+
+    # Override with preview content
+    @post.define_singleton_method(:metadata) { metadata }
+    @post.define_singleton_method(:content) { content }
+    @post.define_singleton_method(:rendered_content) do
+      MarkdownRenderer.render(content, metadata)
+    end
+
+    render template: 'posts/show', layout: 'site'
+  end
+
   def new
     @template = load_post_template
   end
@@ -69,6 +93,7 @@ class Admin::PostsController < Admin::BaseController
     # Convert hash to YAML without document separator
     @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
     @content = parsed.content
+    @preview_path = preview_admin_post_path(@post)
   end
 
   def update
@@ -110,6 +135,7 @@ class Admin::PostsController < Admin::BaseController
     @raw_content = full_content
     @metadata = metadata.to_yaml.strip
     @content = params[:content]
+    @preview_path = preview_admin_post_path(@post)
     render :edit
   end
 

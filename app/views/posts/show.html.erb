@@ -24,3 +24,4 @@
 
   <%= link_to "← Back to all posts", root_path, class: "back-link" %>
 </article>
+<%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>

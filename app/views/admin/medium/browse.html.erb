@@ -35,14 +35,19 @@
         <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative" onclick="selectMedia('<%= media.file_path %>', '<%= File.basename(media.file_path) %>')">
           <img src="<%= media.file_path %>" alt="<%= File.basename(media.file_path) %>" class="w-full h-32 object-cover mb-2">
           <p class="text-xs font-mono truncate"><%= File.basename(media.file_path) %></p>
-
-          <%= button_to "×", admin_medium_path(media),
-              method: :delete,
-              class: "absolute top-1 right-1 w-6 h-6 bg-red-600 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-center leading-none pt-0.5",
-              form: {
-                onsubmit: "event.stopPropagation(); return confirm('Delete this image?')",
-                class: "inline"
-              } %>
+          <div class="flex gap-1">
+            <button onclick="copyMarkdown(event, '<%= media.file_path %>', '<%= File.basename(media.file_path) %>')"
+                class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
+              Copy Link
+            </button>
+            <%= button_to "×", admin_medium_path(media),
+                method: :delete,
+                class: "absolute top-1 right-1 w-6 h-6 bg-red-600 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-center leading-none",
+                form: {
+                  onsubmit: "event.stopPropagation(); return confirm('Delete this image?')",
+                  class: "inline"
+                } %>
+          </div>
         </div>
       <% end %>
     </div>
@@ -61,6 +66,26 @@
         }, '*');
         window.close();
       }
+    }
+
+    function copyMarkdown(event, path, filename) {
+      const markdown = `![${filename}](${path})`;
+
+      // Copy to clipboard
+      navigator.clipboard.writeText(markdown).then(() => {
+        // Show temporary feedback
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('bg-green-200');
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('bg-green-200');
+        }, 1500);
+      }).catch(err => {
+        alert('Failed to copy: ' + err);
+      });
     }
   </script>
 

@@ -23,6 +23,7 @@ Rails.application.routes.draw do
       member do
         patch :publish
         patch :unpublish
+        post :preview
       end
     end
 
@@ -30,6 +31,7 @@ Rails.application.routes.draw do
       member do
         patch :publish
         patch :unpublish
+        post :preview
       end
     end
 

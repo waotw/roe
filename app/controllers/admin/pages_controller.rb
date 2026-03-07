@@ -55,6 +55,7 @@ class Admin::PagesController < Admin::BaseController
     # Convert hash to YAML without document separator
     @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
     @content = parsed.content
+    @preview_path = preview_admin_page_path(@page)
   end
 
   def update
@@ -78,6 +79,7 @@ class Admin::PagesController < Admin::BaseController
 
       @metadata = params[:metadata]
       @content = params[:content]
+      @preview_path = preview_admin_page_path(@page)
       render :edit
       return
     end
@@ -113,6 +115,30 @@ class Admin::PagesController < Admin::BaseController
     redirect_to edit_admin_page_path(@page)
   end
 
+  def preview
+    # Reconstruct content from params
+    metadata_yaml = params[:metadata]
+    content = params[:content]
+
+    begin
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [Date, Time, Symbol])
+    rescue
+      metadata = {}
+    end
+
+    # Create a temporary post object (not saved to DB)
+    @page = Page.find(params[:id])
+
+    # Override with preview content
+    @page.define_singleton_method(:metadata) { metadata }
+    @page.define_singleton_method(:content) { content }
+    @page.define_singleton_method(:rendered_content) do
+      MarkdownRenderer.render(content, metadata)
+    end
+
+    render template: 'pages/show', layout: 'site'
+  end
+
   private
 
   def load_page_template
@@ -137,7 +163,7 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def filename_to_title(filename)
-    name = filename.sub(/\.md$/, '')
+    name = filename.sub(/\.md$/, "")
 
     if name.match?(/[-_]/)
       name.split(/[-_]/).map(&:capitalize).join(' ')

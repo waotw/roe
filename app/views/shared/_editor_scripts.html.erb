@@ -1,0 +1,219 @@
+<script>
+  EditorState.init("content-textarea");
+
+  function previewPost() {
+    const previewPath = '<%= defined?(preview_path) ? preview_path : "" %>';
+
+    if (!previewPath) {
+      console.error("Preview path not defined");
+      return;
+    }
+
+    // Collect form data
+    const formData = new FormData();
+    formData.append('authenticity_token', document.querySelector('meta[name="csrf-token"]').content);
+
+    const metadataTextarea = document.querySelector('[name="metadata"]');
+    if (metadataTextarea) {
+      formData.append('metadata', metadataTextarea.value);
+    }
+
+    formData.append('content', document.getElementById("content-textarea").value);
+
+    // Open window first time only
+    if (!window.previewWindow || window.previewWindow.closed) {
+      window.previewWindow = window.open('about:blank', 'preview-window');
+    }
+
+    // Fetch and write to preview window without losing focus
+    fetch(previewPath + '?preview=true', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.text())
+    .then(html => {
+      window.previewWindow.document.open();
+      window.previewWindow.document.write(html);
+      window.previewWindow.document.close();
+
+      // Keep focus on editor
+      document.getElementById('content-textarea').focus({ preventScroll: true });
+    });
+  }
+
+  // NOW wrap it for auto-preview tracking
+  let previewTimeout;
+  let previewWindowOpened = false;
+
+  const originalPreviewPost = previewPost;
+  previewPost = function () {
+    previewWindowOpened = true;
+    originalPreviewPost();
+  };
+
+  function schedulePreview() {
+    if (!previewWindowOpened) return;
+
+    clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(() => {
+      previewPost();
+    }, 500);
+  }
+
+  // Listen to both content and metadata changes
+  document
+    .getElementById("content-textarea")
+    .addEventListener("input", schedulePreview);
+
+  const metadataTextarea = document.querySelector('[name="metadata"]');
+  if (metadataTextarea) {
+    metadataTextarea.addEventListener("input", schedulePreview);
+  }
+
+  function insertFootnote() {
+    const textarea = document.getElementById("content-textarea");
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const footnote = "(*footnote text here*)";
+
+    textarea.value = text.substring(0, start) + footnote + text.substring(end);
+
+    textarea.focus({ preventScroll: true });
+    textarea.setSelectionRange(start + 2, start + 20);
+  }
+
+  let originalMetadata = document.querySelector('[name="metadata"]')?.value || "";
+  let originalContent = document.querySelector('[name="content"]').value;
+
+  function handleBeforeUnload(e) {
+    let currentMetadata =
+      document.querySelector('[name="metadata"]')?.value || "";
+    let currentContent = document.querySelector('[name="content"]').value;
+
+    if (
+      currentMetadata !== originalMetadata ||
+      currentContent !== originalContent
+    ) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  }
+
+  function insertCollection() {
+    const textarea = document.getElementById("content-textarea");
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+
+    const collectionTemplate =
+      "```collection\nheading: \nlimit: 5\ntype: \ntemplate: list\n```";
+
+    textarea.value =
+      text.substring(0, start) + collectionTemplate + text.substring(end);
+    textarea.focus({ preventScroll: true });
+
+    const cursorPos = start + "```collection\nheading: ".length;
+    textarea.setSelectionRange(cursorPos, cursorPos);
+  }
+
+  function triggerMediaUpload() {
+    document.getElementById("media-upload").click();
+  }
+
+  function handleMediaUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const textarea = document.getElementById("content-textarea");
+    const savedPosition = textarea.selectionStart;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+
+    fetch("/admin/medium", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": token,
+      },
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          insertMedia(data.path, file.name, savedPosition);
+        } else {
+          alert("Upload failed: " + data.error);
+        }
+      })
+      .catch((error) => {
+        alert("Upload error: " + error);
+      });
+
+    event.target.value = "";
+  }
+
+  function insertMedia(path, filename, position) {
+    const textarea = document.getElementById("content-textarea");
+    const text = textarea.value;
+
+    const markdown = `![${filename}](${path})`;
+
+    textarea.value =
+      text.substring(0, position) + markdown + text.substring(position);
+    textarea.focus();
+
+    const newPos = position + markdown.length;
+    textarea.setSelectionRange(newPos, newPos);
+
+    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
+    const lines = textarea.value.substring(0, newPos).split("\n").length;
+    textarea.scrollTop = (lines - 5) * lineHeight;
+  }
+
+  window.addEventListener("beforeunload", handleBeforeUnload);
+
+  // Keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+      e.preventDefault();
+      document.getElementById("<%= resource_type %>-form").requestSubmit();
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+      e.preventDefault();
+      document.querySelector('form[target="_blank"]')?.requestSubmit();
+    }
+  });
+
+  document.getElementById("browse-media-link")?.addEventListener("click", () => {
+    EditorState.save("content-textarea");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      EditorState.save("content-textarea");
+    } else {
+      EditorState.restore("content-textarea");
+    }
+  });
+
+  document
+    .getElementById("<%= resource_type %>-form")
+    .addEventListener("submit", () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      localStorage.setItem("content-updated", Date.now());
+    });
+
+  // Hide flash notice on any input
+  const flashNotice = document.querySelector(".flash-notice");
+  if (flashNotice) {
+    document.querySelectorAll("textarea").forEach((textarea) => {
+      textarea.addEventListener("input", () => {
+        flashNotice.style.display = "none";
+      });
+    });
+  }
+</script>

@@ -9,6 +9,66 @@
     <!--<%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>-->
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <script>
+      // Editor State Manager - preserves cursor and scroll across navigation
+      const EditorState = {
+        save(textareaId) {
+          const textarea = document.getElementById(textareaId);
+          if (!textarea) return;
+
+          const state = {
+            cursorPosition: textarea.selectionStart,
+            scrollPosition: textarea.scrollTop,
+            url: window.location.pathname
+          };
+
+          sessionStorage.setItem(`editorState:${window.location.pathname}`, JSON.stringify(state));
+        },
+
+        restore(textareaId) {
+          const stateKey = `editorState:${window.location.pathname}`;
+          const savedState = sessionStorage.getItem(stateKey);
+
+          if (!savedState) return;
+
+          const state = JSON.parse(savedState);
+          const textarea = document.getElementById(textareaId);
+
+          if (!textarea) return;
+
+          setTimeout(() => {
+            // Set cursor position FIRST (before focus)
+            textarea.setSelectionRange(state.cursorPosition, state.cursorPosition);
+
+            // Then restore scroll position
+            textarea.scrollTop = state.scrollPosition;
+
+            // Focus last, with preventScroll option
+            textarea.focus({ preventScroll: true });
+
+            sessionStorage.removeItem(stateKey);
+          }, 200);
+        },
+
+        init(textareaId) {
+          const textarea = document.getElementById(textareaId);
+          if (!textarea) return;
+
+          this.restore(textareaId);
+
+          window.addEventListener('beforeunload', () => {
+            this.save(textareaId);
+          });
+
+          const form = textarea.closest('form');
+          if (form) {
+            form.addEventListener('submit', () => {
+              this.save(textareaId);
+            });
+          }
+        }
+      };
+    </script>
   </head>
 
   <body class="bg-gray-100">

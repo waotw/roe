@@ -1,0 +1,26 @@
+<%= form_with url: form_url, method: :patch, id: "#{resource_type}-form" do |f| %>
+  <% if show_metadata %>
+    <div class="mb-5">
+      <h3 class="text-sm text-gray-600 mb-1">Metadata</h3>
+      <%= f.text_area :metadata, value: metadata,
+          class: "w-full font-mono text-sm p-1 border border-gray-300 bg-gray-50 box-border h-[150px]" %>
+    </div>
+  <% end %>
+
+  <div>
+    <div class="flex justify-between gap-4 items-center mb-1">
+      <h3 class="text-sm text-gray-600">Content</h3>
+      <div class="flex justify-end gap-4">
+        <button type="button" onclick="insertFootnote()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Footnote</button>
+        <button type="button" onclick="insertCollection()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Collection</button>
+        <button type="button" onclick="triggerMediaUpload()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Upload Media</button>
+        <input type="file" id="media-upload" accept="image/*" style="display: none;" onchange="handleMediaUpload(event)">
+      </div>
+    </div>
+    <%= f.text_area :content, value: content,
+        class: "w-full font-mono text-sm p-1 border border-gray-300 box-border h-[500px] bg-white",
+        id: "content-textarea" %>
+  </div>
+<% end %>
+
+<%= render 'shared/editor_scripts', resource_type: resource_type, preview_path: preview_path %>

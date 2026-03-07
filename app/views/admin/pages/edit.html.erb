@@ -6,7 +6,10 @@
 <body class="bg-white text-black p-5">
 
   <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative">
-    <%= link_to "← Back to Pages", admin_pages_path, class: "text-blue-600 hover:text-blue-800" %>
+    <div class="flex items-center gap-2">
+    <%= link_to "← Back to Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-800" %> |
+    <%= link_to "Media", browse_admin_medium_index_path, target: "_blank", id: "browse-media-link", class: "text-blue-600 hover:text-blue-800" %>
+    </div>
     <% if flash[:notice] %>
       <div class="flash-notice px-2 py-0.5 border border-gray-300 bg-green-100 absolute right-0"><%= flash[:notice] %></div>
     <% end %>
@@ -30,118 +33,33 @@
       <button type="submit" form="page-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Save</button>
     </span>
 
-    <%= button_to "Preview", page_path(url_name: @page.url_name),
-        method: :get,
-        class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-        form: { target: "_blank", style: "display: inline; margin: 0;" } %>
+    <button type="button" onclick="previewPost()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Preview</button>
 
-    <% if @page.draft? %>
-      <%= button_to "Publish", publish_admin_page_path(@page),
-          method: :patch,
-          class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-          form: { onsubmit: "return confirm('Publish this page? It will be visible on your site.')", style: "display: inline; margin: 0;" } %>
-    <% else %>
-      <%= button_to "Unpublish", unpublish_admin_page_path(@page),
-          method: :patch,
-          class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-          form: { onsubmit: "return confirm('Unpublish this page? It will become a draft.')", style: "display: inline; margin: 0;" } %>
-    <% end %>
+        <% if @page.draft? %>
+          <%= button_to "Publish", publish_admin_page_path(@page),
+              method: :patch,
+              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+              form: {
+                onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Publishing this page will save your changes and make it live on your site. Continue?')",
+                style: "display: inline; margin: 0;"
+              } %>
+        <% else %>
+          <%= button_to "Unpublish", unpublish_admin_page_path(@page),
+              method: :patch,
+              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+              form: {
+                onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Unpublishing this page will save your changes and remove it from your site. Continue?')",
+                style: "display: inline; margin: 0;"
+              } %>
+        <% end %>
   </div>
 
-  <%= form_with url: admin_page_path(@page), method: :patch, id: "page-form" do |f| %>
-    <div class="mb-5">
-      <h3 class="text-sm text-gray-600 mb-1">Metadata</h3>
-      <%= f.text_area :metadata, value: @metadata.gsub(/^---\n/, ''),
-          class: "w-full font-mono text-sm p-1 border border-gray-300 bg-gray-50 box-border h-[150px]" %>
-    </div>
-
-    <div>
-      <div class="flex justify-between items-center mb-1">
-        <h3 class="text-sm text-gray-600">Content</h3>
-        <button type="button" onclick="insertFootnote()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Add Footnote</button>
-      </div>
-      <%= f.text_area :content, value: @content,
-          class: "w-full font-mono text-sm p-1 border border-gray-300 bg-white box-border h-[500px]",
-          id: "content-textarea" %>
-    </div>
-  <% end %>
-
-  <script>
-    function insertFootnote() {
-      const textarea = document.getElementById('content-textarea');
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = textarea.value;
-      const footnote = '(*footnote text here*)';
-
-      textarea.value = text.substring(0, start) + footnote + text.substring(end);
-
-      textarea.focus();
-      textarea.setSelectionRange(start + 2, start + 20);
-    }
-
-    let originalMetadata = document.querySelector('[name="metadata"]').value;
-    let originalContent = document.querySelector('[name="content"]').value;
-
-    function handleBeforeUnload(e) {
-      let currentMetadata = document.querySelector('[name="metadata"]').value;
-      let currentContent = document.querySelector('[name="content"]').value;
-
-      if (currentMetadata !== originalMetadata || currentContent !== originalContent) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        // Save cursor position before submit
-        const textarea = document.getElementById('content-textarea');
-        sessionStorage.setItem('cursorPosition', textarea.selectionStart);
-        document.getElementById('page-form').requestSubmit();
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault();
-        document.querySelector('form[target="_blank"]').requestSubmit();
-      }
-    });
-
-    document.getElementById('page-form').addEventListener('submit', () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      // Save cursor position from regular save button too
-      const textarea = document.getElementById('content-textarea');
-      sessionStorage.setItem('cursorPosition', textarea.selectionStart);
-
-      localStorage.setItem('content-updated', Date.now());
-    });
-
-    // Restore cursor position after page renders
-    const savedPosition = sessionStorage.getItem('cursorPosition');
-    if (savedPosition) {
-      const textarea = document.getElementById('content-textarea');
-      textarea.focus();
-      textarea.setSelectionRange(parseInt(savedPosition), parseInt(savedPosition));
-      sessionStorage.removeItem('cursorPosition'); // Clear it after use
-    }
-
-    // Hide flash notice on any input
-    const flashNotice = document.querySelector('.flash-notice');
-    if (flashNotice) {
-      document.querySelectorAll('textarea').forEach(textarea => {
-        textarea.addEventListener('input', () => {
-          flashNotice.style.display = 'none';
-        });
-        textarea.addEventListener('blur', () => {
-          flashNotice.style.display = 'none';
-        });
-      });
-    }
-  </script>
+  <%= render 'shared/editor',
+      form_url: admin_page_path(@page),
+      resource_type: 'page',
+      metadata: @metadata.gsub(/^---\n/, ''),
+      content: @content,
+      show_metadata: true,
+      preview_path: @preview_path || preview_admin_page_path(@page) %>
 </body>
 </html>
