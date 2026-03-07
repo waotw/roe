@@ -1,6 +1,28 @@
 <script>
   EditorState.init("content-textarea");
 
+  function wrapOrInsert(prefix, suffix, placeholder = '') {
+    const textarea = document.getElementById("content-textarea");
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+
+    // Use selected text if available, otherwise use placeholder
+    const content = selectedText || placeholder;
+    const insertion = prefix + content + suffix;
+
+    // Use execCommand to preserve undo stack
+    textarea.focus({ preventScroll: true });
+    document.execCommand('insertText', false, insertion);
+
+    if (!selectedText && placeholder) {
+      // If placeholder was used, select it for easy replacement
+      const selectStart = start + prefix.length;
+      const selectEnd = selectStart + placeholder.length;
+      textarea.setSelectionRange(selectStart, selectEnd);
+    }
+  }
+
   function previewPost() {
     const previewPath = '<%= defined?(preview_path) ? preview_path : "" %>';
 
@@ -71,33 +93,7 @@
   }
 
   function insertFootnote() {
-    const textarea = document.getElementById("content-textarea");
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const footnote = "(*footnote text here*)";
-
-    textarea.value = text.substring(0, start) + footnote + text.substring(end);
-
-    textarea.focus({ preventScroll: true });
-    textarea.setSelectionRange(start + 2, start + 20);
-  }
-
-  let originalMetadata = document.querySelector('[name="metadata"]')?.value || "";
-  let originalContent = document.querySelector('[name="content"]').value;
-
-  function handleBeforeUnload(e) {
-    let currentMetadata =
-      document.querySelector('[name="metadata"]')?.value || "";
-    let currentContent = document.querySelector('[name="content"]').value;
-
-    if (
-      currentMetadata !== originalMetadata ||
-      currentContent !== originalContent
-    ) {
-      e.preventDefault();
-      e.returnValue = "";
-    }
+    wrapOrInsert('(*', '*)', 'footnote text here');
   }
 
   function insertCollection() {
@@ -109,9 +105,7 @@
     const collectionTemplate =
       "```collection\nheading: \nlimit: 5\ntype: \ntemplate: list\n```";
 
-    textarea.value =
-      text.substring(0, start) + collectionTemplate + text.substring(end);
-    textarea.focus({ preventScroll: true });
+    document.execCommand('insertText', false, collectionTemplate);
 
     const cursorPos = start + "```collection\nheading: ".length;
     textarea.setSelectionRange(cursorPos, cursorPos);
@@ -157,19 +151,18 @@
 
   function insertMedia(path, filename, position) {
     const textarea = document.getElementById("content-textarea");
-    const text = textarea.value;
-
     const markdown = `![${filename}](${path})`;
 
-    textarea.value =
-      text.substring(0, position) + markdown + text.substring(position);
-    textarea.focus();
+    // Set cursor to saved position first
+    textarea.focus({ preventScroll: true });
+    textarea.setSelectionRange(position, position);
 
-    const newPos = position + markdown.length;
-    textarea.setSelectionRange(newPos, newPos);
+    // Use execCommand for undo support
+    document.execCommand('insertText', false, markdown);
 
+    // Scroll to the insertion point (cursor is now after the inserted text)
     const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
-    const lines = textarea.value.substring(0, newPos).split("\n").length;
+    const lines = textarea.value.substring(0, textarea.selectionStart).split("\n").length;
     textarea.scrollTop = (lines - 5) * lineHeight;
   }
 
