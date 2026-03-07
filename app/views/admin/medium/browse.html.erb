@@ -14,12 +14,13 @@
 
   <!-- Upload Form -->
   <div class="mb-5 p-4 border border-gray-300 bg-gray-50">
-    <%= form_with url: admin_medium_index_path, multipart: true, local: true do |f| %>
-      <div class="flex gap-2 items-center">
-        <%= f.file_field :file, accept: "image/*", class: "text-sm" %>
-        <%= f.submit "Upload", class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
-      </div>
-    <% end %>
+    <div class="flex gap-2 items-center">
+      <input type="file" id="browse-media-upload" accept="image/*" style="display: none;" onchange="handleBrowseUpload(event)">
+      <button type="button" onclick="document.getElementById('browse-media-upload').click()" class="uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
+        Upload
+      </button>
+      <span id="upload-status" class="text-sm text-gray-600"></span>
+    </div>
   </div>
 
   <% if flash[:notice] %>
@@ -56,6 +57,40 @@
   <% end %>
 
   <script>
+  function handleBrowseUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+    const status = document.getElementById('upload-status');
+    status.textContent = 'Uploading...';
+
+    fetch('/admin/medium', {
+      method: 'POST',
+      headers: {
+        'X-CSRF-Token': token
+      },
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        status.textContent = 'Upload successful!';
+        setTimeout(() => location.reload(), 500);
+      } else {
+        status.textContent = 'Upload failed: ' + data.error;
+      }
+    })
+    .catch(error => {
+      status.textContent = 'Upload error: ' + error;
+    });
+
+    event.target.value = '';
+  }
+
     function selectMedia(path, filename) {
       // Send message to parent window (the editor)
       if (window.opener) {

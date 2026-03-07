@@ -6,15 +6,23 @@ class Admin::MediumController < Admin::BaseController
   def create
     uploaded_file = params[:file]
 
-    # Determine media type and folder
     media_type = 'images'
     folder_path = Rails.root.join("content/media/#{media_type}")
-
-    # Ensure folder exists
     FileUtils.mkdir_p(folder_path)
 
     # Sanitize filename
     filename = sanitize_media_filename(uploaded_file.original_filename)
+
+    # Check for duplicates and append timestamp if needed
+    base_name = File.basename(filename, File.extname(filename))
+    extension = File.extname(filename)
+    counter = 1
+
+    while Medium.exists?(file_path: "/media/#{media_type}/#{filename}")
+      filename = "#{base_name}-#{counter}#{extension}"
+      counter += 1
+    end
+
     file_path = folder_path.join(filename)
 
     # Save file
@@ -32,12 +40,12 @@ class Admin::MediumController < Admin::BaseController
 
     respond_to do |format|
       format.json { render json: { success: true, path: relative_path } }
-      format.html { redirect_to browse_admin_medium_path, notice: "Image uploaded" }
+      format.html { redirect_to browse_admin_medium_index_path, notice: "Image uploaded" }
     end
   rescue => e
     respond_to do |format|
       format.json { render json: { success: false, error: e.message }, status: :unprocessable_entity }
-      format.html { redirect_to browse_admin_medium_path, alert: "Upload failed: #{e.message}" }
+      format.html { redirect_to browse_admin_medium_index_path, alert: "Upload failed: #{e.message}" }
     end
   end
 
