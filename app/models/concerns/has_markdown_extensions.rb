@@ -1,9 +1,9 @@
 module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
-  def to_html
-    processed_content = process_collections(content)
-    processed_content = process_cards(processed_content)
+  def to_html(preview: false)
+    processed_content = process_collections(content, preview: preview)
+    processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
     Kramdown::Document.new(
       processed_content,
@@ -14,7 +14,7 @@ module HasMarkdownExtensions
 
   private
 
-  def process_collections(markdown)
+  def process_collections(markdown, preview: false)
     # Match fenced blocks with 'collection' language - handle both \n and \r\n
     markdown.gsub(/```collection\r?\n(.*?)```/m) do
       config_text = $1
@@ -182,11 +182,11 @@ module HasMarkdownExtensions
 
   # CARDS
 
-  def process_cards(markdown)
+  def process_cards(markdown, preview: false)
     markdown.gsub(/```card\r?\n(.*?)```/m) do
       config_text = $1
       config = parse_card_config(config_text)
-      render_card(config)
+      render_card(config, preview: preview)
     end
   end
 
@@ -200,7 +200,7 @@ module HasMarkdownExtensions
     config
   end
 
-  def render_card(config)
+  def render_card(config, preview: false)
     type = config[:type] || 'pullquote'
 
     case type
@@ -209,9 +209,9 @@ module HasMarkdownExtensions
     when 'aside'
       render_aside(config)
     when 'post-link'
-      render_post_link(config)
+      render_post_link(config, preview: preview)
     else
-      '<!-- Unknown card type -->'
+      preview ? '<!-- Unknown card type -->' : ''
     end
   end
 
@@ -230,7 +230,30 @@ module HasMarkdownExtensions
 
   # POST LINKS
 
-  def render_post_link(config)
+  def render_post_link(config, preview: false)
+    # If a post reference is provided, look it up and merge its data
+    if config[:post].present?
+      referenced_post = find_post_by_slug(config[:post])
+
+      if referenced_post
+        # Start with post's actual data
+        post_data = {
+          image: referenced_post.image || '',
+          title: referenced_post.title || 'Untitled',
+          author: referenced_post.author || '',
+          date: referenced_post.date,
+          excerpt: referenced_post.excerpt || '',
+          url: "/posts/#{referenced_post.url_name}"
+        }
+
+        # Override with any explicitly provided values
+        config = post_data.merge(config.except(:post))
+      else
+        # Post not found - render error card
+        return preview ? render_error_card("Post not found: #{config[:post]}") : ''
+      end
+    end
+
     style = config[:style] || 'small'
     image = config[:image] || ''
     title = config[:title] || 'Untitled'
@@ -244,7 +267,8 @@ module HasMarkdownExtensions
     date = ''
     if date_raw.present?
       begin
-        parsed_date = Date.parse(date_raw.to_s)
+        # Handle both Date objects and strings
+        parsed_date = date_raw.is_a?(Date) ? date_raw : Date.parse(date_raw.to_s)
         date = parsed_date.strftime('%b %d, %Y')
       rescue
         date = date_raw.to_s  # Fallback to original if parsing fails
@@ -252,7 +276,7 @@ module HasMarkdownExtensions
     end
 
     # Build metadata line
-    metadata_parts = [author, date].reject(&:blank?)
+    metadata_parts = [ author, date ].reject(&:blank?)
     metadata = metadata_parts.join(' • ')
 
     # Only show excerpt for large style, truncate if needed
@@ -270,6 +294,21 @@ module HasMarkdownExtensions
           #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
           #{excerpt_html}
           <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+        </div>
+      </div>
+    HTML
+  end
+
+  def find_post_by_slug(slug_or_path)
+    slug = slug_or_path.to_s.sub(%r{^/posts/}, '').sub(%r{^/}, '')
+    Post.where("json_extract(metadata, '$.url_name') = ?", slug).first
+  end
+
+  def render_error_card(message)
+    <<~HTML
+      <div class="card card-error">
+        <div class="card-content">
+          <p><strong>⚠️ Card Error:</strong> #{message}</p>
         </div>
       </div>
     HTML

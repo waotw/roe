@@ -25,7 +25,7 @@ class Admin::PostsController < Admin::BaseController
     content = params[:content]
 
     begin
-      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [Date, Time, Symbol])
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
     rescue
       metadata = {}
     end
@@ -39,6 +39,8 @@ class Admin::PostsController < Admin::BaseController
     @post.define_singleton_method(:rendered_content) do
       MarkdownRenderer.render(content, metadata)
     end
+
+    @preview_mode = true  # Add this line
 
     render template: 'posts/show', layout: 'site'
   end

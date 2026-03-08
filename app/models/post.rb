@@ -1,4 +1,5 @@
 class Post < ApplicationRecord
+  include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
@@ -94,26 +95,6 @@ class Post < ApplicationRecord
     errors
   end
 
-  # Convenience methods for common fields
-  def title
-    metadata["title"]
-  end
-
-  def subtitle
-    metadata["subtitle"]
-  end
-
-  def url_name
-    # Priority: explicit url_name > title > filename
-    if metadata["url_name"].present?
-      metadata["url_name"]
-    elsif metadata["title"].present?
-      metadata["title"].parameterize
-    else
-      File.basename(file_path, '.md')
-    end
-  end
-
   def date
     # Handle both Date objects and strings
     date_value = metadata["date"]
@@ -136,21 +117,9 @@ class Post < ApplicationRecord
     metadata["author"]
   end
 
-  # Status methods
-  def status
-    metadata["status"] || "draft"
-  end
-
-  def published?
-    status == "published"
-  end
-
+  # Post status methods
   def unlisted?
     status == "unlisted"
-  end
-
-  def draft?
-    status == "draft"
   end
 
   # Type methods
@@ -186,16 +155,8 @@ class Post < ApplicationRecord
   end
 
   # Class methods for filtering by status
-  def self.published
-    where("json_extract(metadata, '$.status') = ?", "published")
-  end
-
   def self.unlisted
     where("json_extract(metadata, '$.status') = ?", "unlisted")
-  end
-
-  def self.drafts
-    where("json_extract(metadata, '$.status') = ?", "draft")
   end
 
   def self.public_posts
@@ -204,18 +165,5 @@ class Post < ApplicationRecord
 
   def self.feed_posts
     published
-  end
-
-  # Dynamic access to any metadata field
-  def method_missing(method_name, *args, &block)
-    if metadata.key?(method_name.to_s)
-      metadata[method_name.to_s]
-    else
-      super
-    end
-  end
-
-  def respond_to_missing?(method_name, include_private = false)
-    metadata.key?(method_name.to_s) || super
   end
 end

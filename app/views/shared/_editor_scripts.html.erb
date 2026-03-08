@@ -260,20 +260,12 @@
   }
 
   function selectPost(post) {
-    const metadata = post.metadata;
+    // Extract just the slug from the URL (remove /posts/ prefix)
+    const slug = post.url.replace(/^\/posts\//, '');
 
-    // Build card template from post data
+    // Build simplified card template with just the slug
     let cardTemplate = '```card\ntype: post-link\nstyle: small\n';
-
-    if (metadata.image) cardTemplate += `image: ${metadata.image}\n`;
-    if (post.title) cardTemplate += `title: ${post.title}\n`;
-    if (metadata.author) cardTemplate += `author: ${metadata.author}\n`;
-    if (metadata.date) cardTemplate += `date: ${metadata.date}\n`;
-    if (metadata.subtitle) {
-      const excerpt = metadata.subtitle.substring(0, 200);
-      cardTemplate += `excerpt: ${excerpt}\n`;
-    }
-    cardTemplate += `url: ${post.url}\n`;
+    cardTemplate += `post: ${slug}\n`;
     cardTemplate += '```';
 
     // Insert into editor

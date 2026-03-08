@@ -56,12 +56,13 @@
   </div>
 
   <%= render 'shared/editor',
-      form_url: admin_post_path(@post),
-      resource_type: 'page',
-      metadata: @metadata.gsub(/^---\n/, ''),
-      content: @content,
-      show_metadata: true,
-      preview_path: @preview_path || preview_admin_post_path(@post) %>
+        form_url: admin_post_path(@post),
+        resource_type: 'post',
+        metadata: @metadata.gsub(/^---\n/, ''),
+        content: @content,
+        show_metadata: true,
+        preview_path: @preview_path || preview_admin_post_path(@post),
+        item: @post %>
 
 </body>
 </html>

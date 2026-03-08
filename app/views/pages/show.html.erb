@@ -1,6 +1,6 @@
 <article>
   <div class="content">
-    <%= raw @page.to_html %>
+    <%= raw @page.to_html(preview: @preview_mode || false) %>
   </div>
 </article>
 <%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>

@@ -55,11 +55,12 @@
   </div>
 
   <%= render 'shared/editor',
-      form_url: admin_page_path(@page),
-      resource_type: 'page',
-      metadata: @metadata.gsub(/^---\n/, ''),
-      content: @content,
-      show_metadata: true,
-      preview_path: @preview_path || preview_admin_page_path(@page) %>
+        form_url: admin_page_path(@page),
+        resource_type: 'page',
+        metadata: @metadata.gsub(/^---\n/, ''),
+        content: @content,
+        show_metadata: true,
+        preview_path: @preview_path || preview_admin_page_path(@page),
+        item: @page %>
 </body>
 </html>

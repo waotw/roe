@@ -1,4 +1,5 @@
 class Page < ApplicationRecord
+  include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
@@ -54,54 +55,4 @@ class Page < ApplicationRecord
   #     footnote_backlink: '↩'
   #   ).to_html
   # end
-
-  # Convenience methods
-  def title
-    metadata["title"]
-  end
-
-  def status
-    metadata["status"] || "draft" # Pages default to published
-  end
-
-  def url_name
-    # Priority: explicit url_name > title > filename
-    if metadata["url_name"].present?
-      metadata["url_name"]
-    elsif metadata["title"].present?
-      metadata["title"].parameterize
-    else
-      File.basename(file_path, '.md')
-    end
-  end
-
-  def published?
-    status == "published"
-  end
-
-  def draft?
-    status == "draft"
-  end
-
-  # Class methods for filtering
-  def self.published
-    where("json_extract(metadata, '$.status') = ?", "published")
-  end
-
-  def self.drafts
-    where("json_extract(metadata, '$.status') = ?", "draft")
-  end
-
-  # Dynamic access to any metadata field
-  def method_missing(method_name, *args, &block)
-    if metadata.key?(method_name.to_s)
-      metadata[method_name.to_s]
-    else
-      super
-    end
-  end
-
-  def respond_to_missing?(method_name, include_private = false)
-    metadata.key?(method_name.to_s) || super
-  end
 end

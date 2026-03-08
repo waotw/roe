@@ -121,7 +121,7 @@ class Admin::PagesController < Admin::BaseController
     content = params[:content]
 
     begin
-      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [Date, Time, Symbol])
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
     rescue
       metadata = {}
     end
@@ -135,6 +135,8 @@ class Admin::PagesController < Admin::BaseController
     @page.define_singleton_method(:rendered_content) do
       MarkdownRenderer.render(content, metadata)
     end
+
+    @preview_mode = true  # Add this line
 
     render template: 'pages/show', layout: 'site'
   end
