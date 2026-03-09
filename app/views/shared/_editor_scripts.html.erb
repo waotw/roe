@@ -169,7 +169,7 @@
       selectStart = start + '```card\ntype: pullquote\ntext: '.length;
       selectEnd = selectStart + 'Your quote text here'.length;
     } else if (type === 'aside') {
-      cardTemplate = '```card\ntype: aside\ntext: Your aside text here\nimage: \nlink: \n```';
+      cardTemplate = '```card\ntype: aside\ntext: Your aside text here\nimage: \nlink: \nlink_text: \n```';
       selectStart = start + '```card\ntype: aside\ntext: '.length;
       selectEnd = selectStart + 'Your aside text here'.length;
     } else if (type === 'post-link') {
