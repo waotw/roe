@@ -166,17 +166,20 @@
 
     if (type === 'pullquote') {
       cardTemplate = '```card\ntype: pullquote\ntext: Your quote text here\n```';
-      // Calculate position of "Your quote text here"
       selectStart = start + '```card\ntype: pullquote\ntext: '.length;
       selectEnd = selectStart + 'Your quote text here'.length;
+    } else if (type === 'aside') {
+      cardTemplate = '```card\ntype: aside\ntext: Your aside text here\nimage: \nlink: \n```';
+      selectStart = start + '```card\ntype: aside\ntext: '.length;
+      selectEnd = selectStart + 'Your aside text here'.length;
     } else if (type === 'post-link') {
       cardTemplate = '```card\ntype: post-link\nstyle: small\nimage: \ntitle: \nauthor: \ndate: \nurl: \nlink_text: Read full story →\n```';
     }
 
     document.execCommand('insertText', false, cardTemplate);
 
-    // Select the placeholder text for pullquotes
-    if (type === 'pullquote') {
+    // Select the placeholder text
+    if (type === 'pullquote' || type === 'aside') {
       textarea.setSelectionRange(selectStart, selectEnd);
     }
 

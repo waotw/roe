@@ -180,7 +180,7 @@ module HasMarkdownExtensions
     end
   end
 
-  # CARDS
+  ## CARDS
 
   def process_cards(markdown, preview: false)
     markdown.gsub(/```card\r?\n(.*?)```/m) do
@@ -207,13 +207,15 @@ module HasMarkdownExtensions
     when 'pullquote'
       render_pullquote(config)
     when 'aside'
-      render_aside(config)
+      render_aside(config, preview: preview)
     when 'post-link'
       render_post_link(config, preview: preview)
     else
       preview ? '<!-- Unknown card type -->' : ''
     end
   end
+
+  ### PULLQUOTE
 
   def render_pullquote(config)
     text = config[:text] || ''
@@ -228,7 +230,7 @@ module HasMarkdownExtensions
     HTML
   end
 
-  # POST LINKS
+  ### POST LINKS
 
   def render_post_link(config, preview: false)
     # If a post reference is provided, look it up and merge its data
@@ -294,6 +296,53 @@ module HasMarkdownExtensions
           #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
           #{excerpt_html}
           <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+        </div>
+      </div>
+    HTML
+  end
+
+  ### ASIDES
+
+  def render_aside(config, preview: false)
+    text = config[:text] || ''
+    image = config[:image] || ''
+    link = config[:link] || ''
+    link_text = config[:link_text] || ''
+
+    # Build the content
+    content = []
+    content << "<img src=\"#{image}\" alt=\"\" class=\"aside-image\">" if image.present?
+
+    # Wrap text and link in a container for mobile layout
+    text_content = []
+
+    if text.present?
+      if link.present?
+        if link_text.present?
+          # Case 3: Link with custom link text - text separate from link
+          text_content << "<div class=\"aside-text\">#{text}</div>"
+          text_content << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
+        else
+          # Case 2: Link without link text - arrow inline with text
+          text_content << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} →</a></div>"
+        end
+      else
+        # Case 1: No link - just text
+        text_content << "<div class=\"aside-text\">#{text}</div>"
+      end
+    end
+
+    # Wrap text content in a container for flex layout
+    content << "<div class=\"aside-text-wrapper\">#{text_content.join("\n")}</div>" if text_content.any?
+
+    # Determine if this is image-only
+    aside_class = (image.present? && text.blank? && link_text.blank?) ? "card card-aside image-only" : "card card-aside"
+
+    # Wrap in container
+    <<~HTML
+      <div class="aside-container">
+        <div class="#{aside_class}">
+          #{content.join("\n")}
         </div>
       </div>
     HTML
