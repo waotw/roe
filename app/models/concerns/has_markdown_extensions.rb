@@ -36,9 +36,9 @@ module HasMarkdownExtensions
   def render_collection(config)
     heading = config[:heading]
     source = config[:source] || 'posts'
+    order_by = config[:order] || 'date'
 
     # Only filter by type if source is 'posts' AND a type is specified
-    # AND the type isn't 'posts' (which would be redundant)
     post_type = nil
     if source == 'posts' && config[:type] && config[:type] != 'posts'
       post_type = config[:type]
@@ -47,25 +47,28 @@ module HasMarkdownExtensions
     # Get base collection
     items = case source
     when 'posts'
-      collection = Post.public_posts # Changed from Post.published
+      collection = Post.public_posts
       collection = collection.by_type(post_type) if post_type
-      collection.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
-
+      collection
     when 'pages'
-      Page.order(:created_at)
+      Page.all
     else
       []
     end
 
-    # Apply limit with default - ensure it's an array
+    # Apply ordering based on order parameter
+    items = apply_collection_order(items, order_by)
+
+    # Apply limit - handle both arrays and ActiveRecord relations
     limit_value = config[:limit]
 
     if limit_value.to_s.downcase == 'all'
-      items = items.to_a
+      items = items.is_a?(Array) ? items : items.to_a
     elsif limit_value
-      items = items.limit(limit_value.to_i).to_a
+      limit_int = limit_value.to_i
+      items = items.is_a?(Array) ? items.take(limit_int) : items.limit(limit_int).to_a
     else
-      items = items.limit(10).to_a
+      items = items.is_a?(Array) ? items.take(10) : items.limit(10).to_a
     end
 
     # Render based on template
@@ -87,6 +90,34 @@ module HasMarkdownExtensions
     output << '</div>'
 
     output.join("\n")
+  end
+
+  def apply_collection_order(items, order_by)
+    case order_by
+    when 'filename'
+      # Convert to array for filename sorting
+      items.to_a.sort_by do |item|
+        filename = File.basename(item.file_path, '.md')
+        # Extract leading number if present
+        if filename =~ /^(\d+)/
+          [ $1.to_i, filename ]
+        else
+          [ Float::INFINITY, filename ]
+        end
+      end
+    when 'title'
+      # Alphabetical by title
+      items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
+    when 'date'
+      # Newest first (default)
+      items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+    when 'date-asc'
+      # Oldest first
+      items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
+    else
+      # Default to date descending
+      items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+    end
   end
 
   def render_template(items, template, config)

@@ -14,12 +14,8 @@ class ContentSync
 
     puts "\n📚 Found #{markdown_files.count} markdown files in content/posts"
 
-    # Clean up orphaned records
-    orphans = Post.where.not(file_path: markdown_files)
-    if orphans.any?
-      puts "🧹 Removing #{orphans.count} orphaned post(s) from database"
-      orphans.destroy_all
-    end
+    # Handle orphaned records and detect renames
+    handle_orphaned_posts(markdown_files)
 
     puts "=" * 60
 
@@ -29,7 +25,7 @@ class ContentSync
     warning_files = []
 
     markdown_files.each do |file_path|
-      result = result = self.class.sync_file(file_path)
+      result = self.class.sync_file(file_path)
 
       case result
       when :success
@@ -73,6 +69,10 @@ class ContentSync
     return if markdown_files.empty?
 
     puts "\n📄 Found #{markdown_files.count} markdown files in content/pages"
+
+    # Handle orphaned pages
+    handle_orphaned_pages(markdown_files)
+
     puts "=" * 60
 
     success_count = 0
@@ -95,6 +95,63 @@ class ContentSync
 
   private
 
+  def handle_orphaned_posts(current_files)
+    orphans = Post.where.not(file_path: current_files)
+
+    return unless orphans.any?
+
+    orphans.each do |orphan|
+      old_path = orphan.file_path
+      old_basename = File.basename(old_path, '.md')
+
+      # Try to find a renamed file by matching content or metadata
+      possible_rename = current_files.find do |file_path|
+        # Skip if this file already has a database record
+        next if Post.exists?(file_path: file_path)
+
+        # Check if the new filename is similar (could be just adding a number prefix)
+        new_basename = File.basename(file_path, '.md')
+
+        # Match if the old name is contained in the new name (handles 01-old-name.md)
+        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ''))
+      end
+
+      if possible_rename
+        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
+        orphan.update(file_path: possible_rename)
+      else
+        puts "🧹 Removing orphaned post: #{File.basename(old_path)}"
+        orphan.destroy
+      end
+    end
+  end
+
+  def handle_orphaned_pages(current_files)
+    orphans = Page.where.not(file_path: current_files)
+
+    return unless orphans.any?
+
+    orphans.each do |orphan|
+      old_path = orphan.file_path
+      old_basename = File.basename(old_path, '.md')
+
+      possible_rename = current_files.find do |file_path|
+        next if Page.exists?(file_path: file_path)
+
+        new_basename = File.basename(file_path, '.md')
+        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ''))
+      end
+
+      if possible_rename
+        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
+        orphan.update(file_path: possible_rename)
+      else
+        puts "🧹 Removing orphaned page: #{File.basename(old_path)}"
+        orphan.destroy
+      end
+    end
+  end
+
   def self.sync_file(file_path)
     result = if file_path.to_s.include?('/posts/')
       Post.create_or_update_from_file(file_path)
@@ -109,7 +166,7 @@ class ContentSync
       puts "  ✓ Synced: #{File.basename(file_path)}"
       :success
     else
-      :error  # Error already logged by Post/Page model
+      :error
     end
   rescue => e
     Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"
