@@ -6,6 +6,7 @@ class ContentSync
   def sync_all
     sync_posts
     sync_pages
+    sync_documentation
   end
 
   def sync_posts
@@ -93,6 +94,37 @@ class ContentSync
     puts "✅ Pages sync complete! #{success_count} synced, #{error_count} errors\n\n"
   end
 
+  def sync_documentation
+    relative_paths = Dir.glob("content/documentation/**/*.md")
+    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+
+    return if markdown_files.empty?
+
+    puts "\n📖 Found #{markdown_files.count} markdown files in content/documentation"
+
+    # Handle orphaned docs
+    handle_orphaned_documentation(markdown_files)
+
+    puts "=" * 60
+
+    success_count = 0
+    error_count = 0
+
+    markdown_files.each do |file_path|
+      result = sync_documentation_file(file_path)
+
+      case result
+      when :success
+        success_count += 1
+      when :error
+        error_count += 1
+      end
+    end
+
+    puts "=" * 60
+    puts "✅ Documentation sync complete! #{success_count} synced, #{error_count} errors\n\n"
+  end
+
   private
 
   def handle_orphaned_posts(current_files)
@@ -152,6 +184,32 @@ class ContentSync
     end
   end
 
+  def handle_orphaned_documentation(current_files)
+    orphans = Documentation.where.not(file_path: current_files)
+
+    return unless orphans.any?
+
+    orphans.each do |orphan|
+      old_path = orphan.file_path
+      old_basename = File.basename(old_path, '.md')
+
+      possible_rename = current_files.find do |file_path|
+        next if Documentation.exists?(file_path: file_path)
+
+        new_basename = File.basename(file_path, '.md')
+        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ''))
+      end
+
+      if possible_rename
+        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
+        orphan.update(file_path: possible_rename)
+      else
+        puts "🧹 Removing orphaned documentation: #{File.basename(old_path)}"
+        orphan.destroy
+      end
+    end
+  end
+
   def self.sync_file(file_path)
     result = if file_path.to_s.include?('/posts/')
       Post.create_or_update_from_file(file_path)
@@ -176,6 +234,21 @@ class ContentSync
 
   def sync_page_file(file_path)
     result = Page.create_or_update_from_file(file_path)
+
+    if result
+      puts "  ✓ Synced: #{File.basename(file_path)}"
+      :success
+    else
+      :error
+    end
+  rescue => e
+    Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"
+    puts "  ✗ Unexpected error: #{File.basename(file_path)}"
+    :error
+  end
+
+  def sync_documentation_file(file_path)
+    result = Documentation.create_or_update_from_file(file_path)
 
     if result
       puts "  ✓ Synced: #{File.basename(file_path)}"

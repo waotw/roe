@@ -159,11 +159,20 @@ class Post < ApplicationRecord
     where("json_extract(metadata, '$.status') = ?", "unlisted")
   end
 
+  def self.documentation
+    where("file_path LIKE ?", "%content/docs/%")
+  end
+
+  def self.regular_posts
+    where("file_path NOT LIKE ?", "%content/docs/%")
+  end
+
   def self.public_posts
     where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
+      .where("file_path NOT LIKE ?", "%content/docs/%")
   end
 
   def self.feed_posts
-    published
+    published.where("file_path NOT LIKE ?", "%content/docs/%")
   end
 end

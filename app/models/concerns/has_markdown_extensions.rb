@@ -2,12 +2,42 @@ module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
   def to_html(preview: false)
-    processed_content = process_collections(content, preview: preview)
+    # Step 1: Protect ALL fenced code blocks (4+ backticks)
+    code_blocks = {}
+    counter = 0
+
+    # Match 4+ backtick blocks first
+    processed_content = content.gsub(/````+.*?\n(.*?)````+/m) do
+      token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
+      code_blocks[token] = $~.to_s
+      counter += 1
+      token
+    end
+
+    # Then protect regular 3-backtick blocks that aren't collection/card
+    processed_content = processed_content.gsub(/```(?!collection|card)(\w*)\r?\n(.*?)```/m) do
+      lang = $1
+      code = $2
+      token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
+      code_blocks[token] = "```#{lang}\n#{code}```"
+      counter += 1
+      token
+    end
+
+    # Step 2: Process collections and cards
+    processed_content = process_collections(processed_content, preview: preview)
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
+
+    # Step 3: Restore code blocks
+    code_blocks.each do |token, original|
+      processed_content.gsub!(token, original)
+    end
+
+    # Step 4: Convert to HTML
     Kramdown::Document.new(
       processed_content,
-      input: 'GFM',  # Add this to enable GitHub Flavored Markdown
+      input: 'GFM',
       footnote_backlink: "↩"
     ).to_html
   end
@@ -52,6 +82,8 @@ module HasMarkdownExtensions
       collection
     when 'pages'
       Page.all
+    when 'documentation'
+      Documentation.all
     else
       []
     end
@@ -206,6 +238,8 @@ module HasMarkdownExtensions
   def item_path(item)
     if item.is_a?(Post)
       "/posts/#{item.url_name}"
+    elsif item.is_a?(Documentation)
+      "/documentation/#{item.url_name}"
     else
       "/#{item.url_name}"
     end

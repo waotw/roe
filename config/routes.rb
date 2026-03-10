@@ -41,6 +41,8 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :documentation, only: [ :index, :new, :create, :edit, :update, :destroy ]
+
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
     patch "settings/post_template", to: "settings#update_post_template"
@@ -50,6 +52,7 @@ Rails.application.routes.draw do
   # Public site (specific before catch-all)
   root "posts#index"
   get "posts/:url_name", to: "posts#show", as: :post
+  get "documentation/:url_name", to: "documentation#show", as: :documentation
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page

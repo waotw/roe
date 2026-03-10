@@ -1,5 +1,5 @@
 class ContentWatcher
-  WATCH_PATHS = [ 'content/posts', 'content/pages' ].freeze
+  WATCH_PATHS = [ 'content/posts', 'content/pages', 'content/documentation' ].freeze
 
   def self.start
     listener = Listen.to(*WATCH_PATHS) do |modified, added, removed|
@@ -77,7 +77,13 @@ class ContentWatcher
       if result
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
-      # Errors already logged
+
+    elsif absolute_file.include?('content/documentation')
+      result = Documentation.create_or_update_from_file(absolute_file)
+
+      if result
+        puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
+      end
     end
   end
 
@@ -138,6 +144,9 @@ class ContentWatcher
     elsif absolute_file.include?('content/pages')
       Page.remove_by_file_path(absolute_file)
       puts "   Removed page from database"
+    elsif absolute_file.include?('content/documentation')
+      Documentation.remove_by_file_path(absolute_file)
+      puts "   Removed documentation from database"
     end
   end
 end
