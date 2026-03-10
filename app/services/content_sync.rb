@@ -4,6 +4,7 @@ class ContentSync
   end
 
   def sync_all
+    sync_site_config
     sync_posts
     sync_pages
     sync_documentation
@@ -260,5 +261,22 @@ class ContentSync
     Rails.logger.error "Unexpected error syncing #{file_path}: #{e.message}"
     puts "  ✗ Unexpected error: #{File.basename(file_path)}"
     :error
+  end
+
+  def sync_site_config
+    return unless File.exist?(SiteConfig::FILE_PATH)
+
+    puts "\n⚙️  Syncing site configuration"
+    puts "=" * 60
+
+    result = SiteConfig.sync_from_file
+
+    if result
+      puts "  ✓ Site config synced"
+    else
+      puts "  ✗ Site config sync failed"
+    end
+
+    puts "=" * 60
   end
 end

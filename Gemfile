@@ -74,3 +74,5 @@ gem "tailwindcss-ruby", "~> 4.2"
 gem "dockerfile-rails", ">= 1.7", group: :development
 
 gem "kramdown-parser-gfm", "~> 1.1"
+
+gem "rss", "~> 0.3.2"

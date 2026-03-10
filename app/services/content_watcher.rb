@@ -1,5 +1,5 @@
 class ContentWatcher
-  WATCH_PATHS = [ 'content/posts', 'content/pages', 'content/documentation' ].freeze
+  WATCH_PATHS = [ 'content/posts', 'content/pages', 'content/documentation', 'content/system' ].freeze
 
   def self.start
     listener = Listen.to(*WATCH_PATHS) do |modified, added, removed|
@@ -28,7 +28,7 @@ class ContentWatcher
 
     # Handle remaining additions (not part of renames)
     (added - potential_renames.values).each do |file|
-      next unless file.end_with?('.md')
+      next unless file.end_with?('.md', '.yml')
       puts "\n" + "=" * 60
       puts "✨ New file: #{File.basename(file)}"
       puts "=" * 60
@@ -37,7 +37,7 @@ class ContentWatcher
     end
 
     modified.each do |file|
-      next unless file.end_with?('.md')
+      next unless file.end_with?('.md', '.yml')
       puts "\n" + "=" * 60
       puts "📝 Modified: #{File.basename(file)}"
       puts "=" * 60
@@ -59,7 +59,11 @@ class ContentWatcher
   def self.process_file(file)
     absolute_file = File.expand_path(file)
 
-    if absolute_file.include?('content/posts')
+    if absolute_file.include?('content/system/site.yml')
+      SiteConfig.sync_from_file
+      puts "\n   ✓ Site config reloaded\n"
+
+    elsif absolute_file.include?('content/posts')
       result = Post.create_or_update_from_file(absolute_file)
 
       case result
