@@ -10,6 +10,7 @@ class FeedsController < ApplicationController
       site_config: site_config
     ).generate
 
+    response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
     render xml: feed_xml
   end
 
@@ -22,6 +23,7 @@ class FeedsController < ApplicationController
       site_config: site_config
     ).generate
 
+    response.headers['Content-Type'] = 'application/atom+xml; charset=utf-8'
     render xml: feed_xml
   end
 
