@@ -54,6 +54,11 @@ Rails.application.routes.draw do
   get "posts/:url_name", to: "posts#show", as: :post
   get "documentation/:url_name", to: "documentation#show", as: :documentation
 
+  # Feeds
+  get "feed", to: "feeds#rss", defaults: { format: 'xml' }, as: :feed
+  get "feed.xml", to: "feeds#rss", defaults: { format: 'xml' }
+  get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
+
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page
 

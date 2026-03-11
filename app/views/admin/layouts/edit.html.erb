@@ -1,3 +1,4 @@
+<!-- app/views/admin/layouts/edit.html.erb -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -30,6 +31,34 @@
         method: :get,
         class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
         form: { target: "_blank", style: "display: inline; margin: 0;" } %>
+
+    <button type="button" id="toggle-links" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-blue-100 hover:bg-blue-200 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">
+      Show Links
+    </button>
+  </div>
+
+  <!-- Collapsible Useful Links Section -->
+  <div id="useful-links" class="mb-5 p-3 border border-gray-300 bg-gray-50 rounded hidden">
+    <h3 class="text-sm font-bold mb-2">Useful Links (click to copy)</h3>
+
+    <% useful_links.each do |category, items| %>
+      <div class="mb-3">
+        <h4 class="text-xs font-semibold uppercase text-gray-600 mb-1"><%= category.to_s.titleize %></h4>
+        <div class="grid grid-cols-2 gap-1">
+          <% items.each do |label, url| %>
+            <button type="button"
+                    class="copy-link text-left text-xs px-2 py-1 bg-white border border-gray-300 hover:bg-gray-100 rounded font-mono"
+                    data-url="<%= url %>"
+                    data-label="<%= label %>">
+              <span class="text-gray-600"><%= label %>:</span>
+              <span class="text-blue-600"><%= url %></span>
+            </button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="mt-2 text-xs text-gray-500" id="copy-feedback"></div>
   </div>
 
   <%= form_with url: send("admin_layout_#{@file_key}_path"), method: :patch, id: "layout-form" do |f| %>
@@ -51,11 +80,42 @@
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    // Toggle useful links
+    const toggleBtn = document.getElementById('toggle-links');
+    const linksPanel = document.getElementById('useful-links');
+
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = linksPanel.classList.contains('hidden');
+      linksPanel.classList.toggle('hidden');
+      toggleBtn.textContent = isHidden ? 'Hide Links' : 'Show Links';
+    });
+
+    // Copy link functionality
+    document.querySelectorAll('.copy-link').forEach(button => {
+      button.addEventListener('click', async (e) => {
+        const url = e.currentTarget.dataset.url;
+        const label = e.currentTarget.dataset.label;
+        const feedback = document.getElementById('copy-feedback');
+
+        try {
+          await navigator.clipboard.writeText(url);
+          feedback.textContent = `✓ Copied: ${label} (${url})`;
+          feedback.className = 'mt-2 text-xs text-green-600';
+
+          setTimeout(() => {
+            feedback.textContent = '';
+          }, 2000);
+        } catch (err) {
+          feedback.textContent = '✗ Failed to copy';
+          feedback.className = 'mt-2 text-xs text-red-600';
+        }
+      });
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
-        // Save cursor position before submit
         const textarea = document.querySelector('[name="content"]');
         sessionStorage.setItem('cursorPosition', textarea.selectionStart);
         document.getElementById('layout-form').requestSubmit();
@@ -65,15 +125,18 @@
         e.preventDefault();
         document.querySelector('form[target="_blank"]').requestSubmit();
       }
+
+      // Toggle links with Cmd/Ctrl + K
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleBtn.click();
+      }
     });
 
     document.getElementById('layout-form').addEventListener('submit', () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      // Save cursor position from regular save button too
       const textarea = document.querySelector('[name="content"]');
       sessionStorage.setItem('cursorPosition', textarea.selectionStart);
-
       localStorage.setItem('content-updated', Date.now());
     });
 
