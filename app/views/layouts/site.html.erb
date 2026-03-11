@@ -10,11 +10,50 @@
     <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="<%= feed_url(format: :xml) %>">
     <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="<%= feed_atom_url(format: :xml) %>">
 
+    <!-- Custom Fonts & Site Assets -->
+    <style>
+      <%= font_face_css.html_safe %>
+
+      <% logo_style = SiteConfig.get('logo_style') || 'beside_text' %>
+
+      /* Base logo styles */
+      .site-logo {
+        background-image: var(--logo-url);
+        background-size: 40px 40px;
+        background-repeat: no-repeat;
+      }
+
+      <% if logo_style == 'replace_text' %>
+      /* Logo replaces text */
+      .site-logo {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        text-indent: -9999px;
+        overflow: hidden;
+        background-position: center;
+        background-size: contain;
+      }
+      <% else %>
+      /* Logo beside text (default) */
+      .site-logo {
+        padding-left: 50px;
+        background-position: left center;
+      }
+      <% end %>
+    </style>
     <!-- Public site theme -->
     <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+    <% if SiteConfig.get('favicon') %>
+      <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
+    <% end %>
+
+    <% if SiteConfig.get('logo') %>
+      <link rel="apple-touch-icon" href="<%= system_image_path(SiteConfig.get('logo')) %>">
+    <% end %>
   </head>
   <body>
-    <header class="site-nav">
+    <header class="site-nav logo-<%= SiteConfig.get('logo_style') || 'beside_text' %>">
       <%= render_layout_file('navigation') %>
     </header>
     <main>

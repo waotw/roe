@@ -70,13 +70,16 @@ module HasMarkdownExtensions
 
   def render_collection(config)
     heading = config[:heading]
-    source = config[:source] || 'posts'
-    order_by = config[:order] || 'date'
+    source = config[:source] || SiteConfig.default('collections', 'default_source') || 'posts'
+    order_by = config[:order] || SiteConfig.default('collections', 'default_order') || 'date'
 
-    # Only filter by type if source is 'posts' AND a type is specified
+    # Get type from config or default, treating 'all' as nil (no filter)
+    type_value = config[:type] || SiteConfig.default('collections', 'default_type') || 'all'
+
+    # Only filter by type if source is 'posts' AND type is specified AND not 'all'
     post_type = nil
-    if source == 'posts' && config[:type] && config[:type] != 'posts'
-      post_type = config[:type]
+    if source == 'posts' && type_value && type_value != 'all' && type_value != 'posts'
+      post_type = type_value
     end
 
     # Get base collection
@@ -98,6 +101,7 @@ module HasMarkdownExtensions
 
     # Apply limit - handle both arrays and ActiveRecord relations
     limit_value = config[:limit]
+    default_limit = SiteConfig.default('collections', 'default_limit') || 10
 
     if limit_value.to_s.downcase == 'all'
       items = items.is_a?(Array) ? items : items.to_a
@@ -105,11 +109,11 @@ module HasMarkdownExtensions
       limit_int = limit_value.to_i
       items = items.is_a?(Array) ? items.take(limit_int) : items.limit(limit_int).to_a
     else
-      items = items.is_a?(Array) ? items.take(10) : items.limit(10).to_a
+      items = items.is_a?(Array) ? items.take(default_limit) : items.limit(default_limit).to_a
     end
 
     # Render based on template
-    template = config[:template] || 'list'
+    template = config[:template] || SiteConfig.default('collections', 'default_template') || 'list'
     list_markdown = render_template(items, template, config)
 
     # Build output with proper spacing
@@ -117,7 +121,7 @@ module HasMarkdownExtensions
     output << '<div class="collection" markdown="1">'
     output << ""
 
-    if heading
+    if heading.present?  # Changed from just 'if heading'
       output << "## #{heading}"
       output << ""
     end

@@ -59,8 +59,13 @@ Rails.application.routes.draw do
   get "feed.xml", to: "feeds#rss", defaults: { format: 'xml' }
   get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
 
+  # System assets
+  get 'system/fonts/:filename', to: 'system/fonts#show', as: :system_font, constraints: { filename: /[^\/]+/ }
+  get 'system/images/:filename', to: 'system/images#show', as: :system_image, constraints: { filename: /[^\/]+/ }
+
+  # Media files
+  get '/media/*path', to: 'media#show', format: false
+
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page
-
-  get '/media/*path', to: 'media#show', format: false
 end

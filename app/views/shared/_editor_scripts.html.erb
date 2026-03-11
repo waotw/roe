@@ -1,5 +1,6 @@
 <script>
   EditorState.init("content-textarea");
+  const collectionButtonTemplate = <%= raw SiteConfig.default('collections', 'button_template').to_json %>;
 
   function wrapOrInsert(prefix, suffix, placeholder = '') {
     const textarea = document.getElementById("content-textarea");
@@ -125,11 +126,9 @@
   function insertCollection() {
     const textarea = document.getElementById("content-textarea");
     const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
 
-    const collectionTemplate =
-      "```collection\nheading: \nlimit: 5\ntype: \ntemplate: list\n```";
+    // Wrap the template with collection syntax
+    const collectionTemplate = "```collection\n" + collectionButtonTemplate + "\n```";
 
     document.execCommand('insertText', false, collectionTemplate);
 
