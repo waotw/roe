@@ -400,6 +400,7 @@ module HasMarkdownExtensions
     image = config[:image] || ''
     link = config[:link] || ''
     link_text = config[:link_text] || ''
+    default_link_text = SiteConfig.default('cards', 'aside')&.[]('default_link_text') || '→'
 
     # Build the content
     content = []
@@ -416,7 +417,7 @@ module HasMarkdownExtensions
           text_content << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
         else
           # Case 2: Link without link text - arrow inline with text
-          text_content << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} →</a></div>"
+          text_content << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} #{default_link_text}</a></div>"
         end
       else
         # Case 1: No link - just text

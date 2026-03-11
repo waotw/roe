@@ -12,6 +12,10 @@ if should_run
   Rails.application.config.after_initialize do
     begin
       if ActiveRecord::Base.connection.table_exists?('posts')
+        # Generate default config files if they don't exist
+        ConfigGenerator.generate_all
+
+        # Sync all content and configs to database
         ContentSync.sync_all
 
         if Rails.env.development?

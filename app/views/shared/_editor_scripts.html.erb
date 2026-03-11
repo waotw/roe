@@ -1,6 +1,12 @@
 <script>
   EditorState.init("content-textarea");
+  // Collection template
   const collectionButtonTemplate = <%= raw SiteConfig.default('collections', 'button_template').to_json %>;
+
+  // Card templates
+  const asideButtonTemplate = <%= raw SiteConfig.default('cards', 'aside_button_template').to_json %>;
+  const postLinkButtonTemplate = <%= raw SiteConfig.default('cards', 'post_link_button_template').to_json %>;
+  const pullquoteButtonTemplate = <%= raw SiteConfig.default('cards', 'pullquote_button_template').to_json %>;
 
   function wrapOrInsert(prefix, suffix, placeholder = '') {
     const textarea = document.getElementById("content-textarea");
@@ -23,6 +29,26 @@
       textarea.setSelectionRange(selectStart, selectEnd);
     }
   }
+
+  function insertCardTemplate(template) {
+      const textarea = document.getElementById("content-textarea");
+      const start = textarea.selectionStart;
+
+      const fullText = "```card\n" + template + "\n```";
+      document.execCommand('insertText', false, fullText);
+
+      // Find and select the placeholder if it exists
+      const placeholderIndex = template.indexOf('__PLACEHOLDER__');
+      if (placeholderIndex !== -1) {
+        const placeholderStart = start + "```card\n".length + placeholderIndex;
+        const placeholderEnd = placeholderStart + '__PLACEHOLDER__'.length;
+        textarea.setSelectionRange(placeholderStart, placeholderEnd);
+      } else {
+        // No placeholder, position cursor at the end
+        const cursorPos = start + fullText.length;
+        textarea.setSelectionRange(cursorPos, cursorPos);
+      }
+    }
 
   function previewPost() {
     const previewPath = '<%= defined?(preview_path) ? preview_path : "" %>';
@@ -155,31 +181,12 @@
   });
 
   function insertCard(type) {
-    const textarea = document.getElementById("content-textarea");
-    const start = textarea.selectionStart;
-    textarea.focus({ preventScroll: true });
-
-    let cardTemplate = '';
-    let selectStart = 0;
-    let selectEnd = 0;
-
     if (type === 'pullquote') {
-      cardTemplate = '```card\ntype: pullquote\ntext: Your quote text here\n```';
-      selectStart = start + '```card\ntype: pullquote\ntext: '.length;
-      selectEnd = selectStart + 'Your quote text here'.length;
+      insertCardTemplate(pullquoteButtonTemplate);
     } else if (type === 'aside') {
-      cardTemplate = '```card\ntype: aside\ntext: Your aside text here\nimage: \nlink: \nlink_text: \n```';
-      selectStart = start + '```card\ntype: aside\ntext: '.length;
-      selectEnd = selectStart + 'Your aside text here'.length;
+      insertCardTemplate(asideButtonTemplate);
     } else if (type === 'post-link') {
-      cardTemplate = '```card\ntype: post-link\nstyle: small\nimage: \ntitle: \nauthor: \ndate: \nurl: \nlink_text: Read full story →\n```';
-    }
-
-    document.execCommand('insertText', false, cardTemplate);
-
-    // Select the placeholder text
-    if (type === 'pullquote' || type === 'aside') {
-      textarea.setSelectionRange(selectStart, selectEnd);
+      insertCardTemplate(postLinkButtonTemplate);
     }
 
     // Hide the menu
