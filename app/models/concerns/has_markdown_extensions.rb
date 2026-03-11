@@ -2,7 +2,39 @@ module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
   def to_html(preview: false)
+<<<<<<< Updated upstream
     processed_content = process_collections(content, preview: preview)
+=======
+    # Step 1: Protect ALL fenced code blocks (4+ backticks)
+    code_blocks = {}
+    counter = 0
+
+    # Match 4+ backtick blocks first
+    processed_content = content.gsub(/````+.*?\n(.*?)````+/m) do
+      token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
+      code_blocks[token] = $~.to_s
+      counter += 1
+      token
+    end
+
+    # Then protect regular 3-backtick blocks that aren't collection/card
+    # Key fix: match language identifier OR empty, but NOT collection/card
+    processed_content = processed_content.gsub(/```(\w+)\r?\n(.*?)```/m) do
+      lang = $1
+      code = $2
+
+      # Skip if it's a collection or card block
+      next $~.to_s if lang == 'collection' || lang == 'card'
+
+      token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
+      code_blocks[token] = "```#{lang}\n#{code}```"
+      counter += 1
+      token
+    end
+
+    # Step 2: Process collections and cards
+    processed_content = process_collections(processed_content, preview: preview)
+>>>>>>> Stashed changes
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
     Kramdown::Document.new(
@@ -236,15 +268,17 @@ module HasMarkdownExtensions
       referenced_post = find_post_by_slug(config[:post])
 
       if referenced_post
-        # Start with post's actual data
+        # Start with post's actual data - only include image if it exists
         post_data = {
-          image: referenced_post.image || '',
           title: referenced_post.title || 'Untitled',
           author: referenced_post.author || '',
           date: referenced_post.date,
           excerpt: referenced_post.excerpt || '',
           url: "/posts/#{referenced_post.url_name}"
         }
+
+        # Only add image to post_data if the post has one
+        post_data[:image] = referenced_post.image if referenced_post.image.present?
 
         # Override with any explicitly provided values
         config = post_data.merge(config.except(:post))
@@ -255,13 +289,29 @@ module HasMarkdownExtensions
     end
 
     style = config[:style] || 'small'
-    image = config[:image] || ''
     title = config[:title] || 'Untitled'
     author = config[:author] || ''
     date_raw = config[:date] || ''
     excerpt = config[:excerpt] || ''
     url = config[:url] || '#'
     link_text = config[:link_text] || 'Read full story →'
+
+    # Handle image with priority: explicit > post metadata > default
+    image = if config.key?(:image)
+      # Image key exists in config
+      if config[:image] == 'none'
+        nil  # Explicitly no image
+      elsif config[:image].blank?
+        # Empty image value - warn in preview
+        Rails.logger.warn "Empty image value in post-link card for #{title}" if preview
+        nil
+      else
+        config[:image]  # Explicitly provided image
+      end
+    else
+      # No image key - use default
+      SiteConfig.default('cards', 'post-link')&.[]('default_image')
+    end
 
     # Format date
     date = ''
