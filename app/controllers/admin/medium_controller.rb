@@ -32,7 +32,7 @@ class Admin::MediumController < Admin::BaseController
 
     # Create database record
     relative_path = "/media/#{media_type}/#{filename}"
-    media = Medium.create!(
+    Medium.create!(
       file_path: relative_path,
       media_type: media_type,
       uploaded_at: Time.current

@@ -43,6 +43,27 @@ Rails.application.routes.draw do
 
     resources :documentation, only: [ :index, :new, :create, :edit, :update, :destroy ]
 
+    resources :configs, only: [ :index ]
+
+    resources :system_assets, only: [ :index, :create ] do
+      collection do
+        get :browse_fonts
+        get :browse_images
+      end
+    end
+
+    delete 'system_assets/:id', to: 'system_assets#destroy', as: 'system_asset', constraints: { id: /[^\/]+/ }
+
+    # Separate config edit routes
+    get 'configs/site/edit', to: 'configs#edit_site', as: 'edit_site_config'
+    patch 'configs/site', to: 'configs#update_site', as: 'site_config'
+
+    get 'configs/cards/edit', to: 'configs#edit_cards', as: 'edit_cards_config'
+    patch 'configs/cards', to: 'configs#update_cards', as: 'cards_config'
+
+    get 'configs/collections/edit', to: 'configs#edit_collections', as: 'edit_collections_config'
+    patch 'configs/collections', to: 'configs#update_collections', as: 'collections_config'
+
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
     patch "settings/post_template", to: "settings#update_post_template"
