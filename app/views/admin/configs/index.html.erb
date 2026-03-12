@@ -1,0 +1,26 @@
+<div class="px-4 sm:px-0">
+  <h1 class="text-3xl font-bold text-gray-900">Configuration Files</h1>
+  <p class="mt-2 text-sm text-gray-700">Edit YAML configuration files for your site.</p>
+
+  <div class="mt-8 space-y-8">
+    <% @config_files.each do |section| %>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900 mb-3"><%= section[:section] %></h2>
+        <table class="min-w-full divide-y divide-gray-300">
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% section[:files].each do |file| %>
+              <tr>
+                <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 font-mono">
+                  <%= link_to file[:name], file[:path], class: "text-blue-600 hover:text-blue-900" %>
+                </td>
+                <td class="py-4 pl-3 pr-4 text-right text-sm">
+                  <%= link_to "Edit", file[:path], class: "text-blue-600 hover:text-blue-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </div>
+</div>

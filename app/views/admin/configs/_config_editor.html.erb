@@ -1,0 +1,64 @@
+<%= form_with url: form_url, method: :patch, class: "mt-6" do |f| %>
+  <div class="bg-white">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="mb-4">
+        <div class="flex justify-between items-center mb-2">
+          <label class="block text-sm font-medium text-gray-700">YAML Content</label>
+          <div class="flex gap-3 items-center">
+            <% if config_type == 'site' %>
+                    <p class="block text-sm font-medium text-gray-700">Manage:</p>
+                    <%= link_to "Fonts", browse_fonts_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.2rem]" %>
+                    <%= link_to "Global Images", browse_images_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.2rem]" %>
+                  <% end %>
+            <div class="text-xs text-gray-500">
+              Lines: <span id="line-count">0</span>
+            </div>
+          </div>
+        </div>
+        <%= f.text_area :content,
+            value: content,
+            class: "w-full font-mono text-sm p-3 border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white",
+            style: "min-height: 500px; tab-size: 2;",
+            id: "config-content",
+            spellcheck: "false" %>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-gray-500">
+          <p>⚠︎ Use 2 spaces for indentation</p>
+          <p>⚠︎ Comments start with #</p>
+        </div>
+        <div class="flex gap-3">
+          <%= link_to "Cancel", admin_configs_path, class: "px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+          <%= f.submit "Save Configuration", class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<script>
+  // Line counter
+  const textarea = document.getElementById('config-content');
+  const lineCount = document.getElementById('line-count');
+
+  function updateLineCount() {
+    const lines = textarea.value.split('\n').length;
+    lineCount.textContent = lines;
+  }
+
+  textarea.addEventListener('input', updateLineCount);
+  updateLineCount();
+
+  // Tab key support
+  textarea.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = this.selectionStart;
+      const end = this.selectionEnd;
+
+      this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+      this.selectionStart = this.selectionEnd = start + 2;
+    }
+  });
+</script>

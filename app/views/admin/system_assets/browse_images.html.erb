@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>System Images Browser</title>
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+  <%= stylesheet_link_tag "application" %>
+</head>
+<body class="bg-white text-black p-5">
+
+  <div class="mb-5 pb-2.5 border-b border-gray-300">
+    <h1 class="text-2xl font-bold">System Images</h1>
+    <p class="text-sm text-gray-600 mt-1">Upload and manage logos, favicons, and other system images</p>
+  </div>
+
+  <!-- Upload Form -->
+  <div class="mb-5 p-4 border border-gray-300 bg-gray-50">
+    <div class="flex gap-2 items-center">
+      <input type="file" id="image-upload" accept="image/*,.svg" style="display: none;" onchange="handleImageUpload(event)">
+      <button type="button" onclick="document.getElementById('image-upload').click()" class="uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
+        Upload Image
+      </button>
+      <span id="upload-status" class="text-sm text-gray-600"></span>
+      <span class="text-xs text-gray-500 ml-2">Accepts: images, SVG</span>
+    </div>
+  </div>
+
+  <% if flash[:notice] %>
+    <div class="mb-5 px-2.5 py-1 border border-gray-300 bg-green-100">
+      <%= flash[:notice] %>
+    </div>
+  <% end %>
+
+  <% if flash[:alert] %>
+    <div class="mb-5 px-2.5 py-1 border border-red-300 bg-red-100">
+      <%= flash[:alert] %>
+    </div>
+  <% end %>
+
+  <!-- Images List -->
+  <% if @images.any? %>
+    <div class="space-y-2">
+      <% @images.each do |image| %>
+        <div class="border border-gray-300 p-3 hover:bg-gray-50 group relative flex items-center justify-between">
+          <div class="flex items-center gap-3 flex-1">
+            <% if image[:filename].end_with?('.svg') %>
+              <div class="w-12 h-12 border border-gray-300 flex items-center justify-center bg-gray-50">
+                <span class="text-xs text-gray-500">SVG</span>
+              </div>
+            <% else %>
+              <img src="<%= system_image_path(image[:filename]) %>" alt="<%= image[:filename] %>" class="w-12 h-12 object-contain border border-gray-300">
+            <% end %>
+            <div>
+              <p class="text-sm font-mono font-semibold"><%= image[:filename] %></p>
+              <p class="text-xs text-gray-500">
+                <%= number_to_human_size(image[:size]) %> •
+                Modified <%= image[:modified].strftime('%b %d, %Y') %>
+              </p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="copyFilename(event, '<%= image[:filename] %>')"
+                    class="uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">
+              Copy Filename
+            </button>
+            <%= button_to "Delete", admin_system_asset_path(image[:filename], asset_type: 'images'),
+                method: :delete,
+                class: "uppercase text-xs px-2 py-1 border border-red-800 bg-red-100 hover:bg-red-300 font-mono rounded-xs",
+                form: {
+                  onsubmit: "return confirm('Delete #{image[:filename]}?')",
+                  class: "inline"
+                } %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-gray-600">No images uploaded yet.</p>
+  <% end %>
+
+  <script>
+  function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('asset_type', 'images');
+
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+    const status = document.getElementById('upload-status');
+    status.textContent = 'Uploading...';
+
+    fetch('/admin/system_assets', {
+      method: 'POST',
+      headers: {
+        'X-CSRF-Token': token
+      },
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        status.textContent = 'Upload successful!';
+        setTimeout(() => location.reload(), 500);
+      } else {
+        status.textContent = 'Upload failed: ' + data.error;
+      }
+    })
+    .catch(error => {
+      status.textContent = 'Upload error: ' + error;
+    });
+
+    event.target.value = '';
+  }
+
+  function copyFilename(event, filename) {
+    navigator.clipboard.writeText(filename).then(() => {
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.remove('bg-blue-100');
+      btn.classList.add('bg-green-200');
+
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove('bg-green-200');
+        btn.classList.add('bg-blue-100');
+      }, 1500);
+    }).catch(err => {
+      alert('Failed to copy: ' + err);
+    });
+  }
+  </script>
+
+</body>
+</html>
