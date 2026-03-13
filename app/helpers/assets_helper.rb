@@ -35,9 +35,11 @@ module AssetsHelper
     vars = []
 
     # Logo
-    if SiteConfig.get('logo')
-      logo_url = SiteConfig.get('logo')
-      logo_style = SiteConfig.get('logo_style') || "beside_text"
+    logo_url = SiteConfig.get('logo')
+
+    # Only process logo if it exists and is not 'none'
+    if logo_url.present? && logo_url != 'none'
+      logo_style = SiteConfig.get('logo_style')
 
       # If it starts with /, use it as-is (media file), otherwise treat as system asset
       logo_path = if logo_url.start_with?('/')
@@ -47,7 +49,11 @@ module AssetsHelper
       end
 
       vars << "  --logo-url: url('#{logo_path}');"
-      vars << "  --logo-style: #{logo_style};"
+
+      # Only add logo-style if it's set
+      if logo_style.present?
+        vars << "  --logo-style: #{logo_style};"
+      end
     end
 
     vars.join("\n")
@@ -62,7 +68,7 @@ module AssetsHelper
         src: url('#{system_font_path(filename)}') format('#{font_format(filename)}');
         font-weight: #{weight};
         font-style: #{style};
-        font-display: swap;
+        font-display: block;
       }
     CSS
   end

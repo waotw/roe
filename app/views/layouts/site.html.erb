@@ -13,34 +13,6 @@
     <!-- Custom Fonts & Site Assets -->
     <style>
       <%= font_face_css.html_safe %>
-
-      <% logo_style = SiteConfig.get('logo_style') || 'beside_text' %>
-
-      /* Base logo styles */
-      .site-logo {
-        background-image: var(--logo-url);
-        background-size: 40px 40px;
-        background-repeat: no-repeat;
-      }
-
-      <% if logo_style == 'replace_text' %>
-      /* Logo replaces text */
-      .site-logo {
-        display: inline-block;
-        width: 40px;
-        height: 40px;
-        text-indent: -9999px;
-        overflow: hidden;
-        background-position: center;
-        background-size: contain;
-      }
-      <% else %>
-      /* Logo beside text (default) */
-      .site-logo {
-        padding-left: 50px;
-        background-position: left center;
-      }
-      <% end %>
     </style>
     <!-- Public site theme -->
     <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
@@ -53,8 +25,11 @@
     <% end %>
   </head>
   <body>
-    <header class="site-nav logo-<%= SiteConfig.get('logo_style') || 'beside_text' %>">
-      <%= render_layout_file('navigation') %>
+    <% logo_url = SiteConfig.get('logo') %>
+    <% logo_style = SiteConfig.get('logo_style') %>
+    <% has_logo = logo_url.present? && logo_url != 'none' %>
+    <header class="site-nav <%= 'logo' if has_logo %> <%= "logo-#{logo_style}" if has_logo && logo_style.present? %>">
+      <%= render_layout_file('navigation', current_page: @page) %>
     </header>
     <main>
       <%= yield %>
