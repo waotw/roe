@@ -40,11 +40,16 @@ module HasMarkdownExtensions
     end
 
     # Step 4: Convert to HTML
-    Kramdown::Document.new(
+    html = Kramdown::Document.new(
       processed_content,
       input: 'GFM',
       footnote_backlink: "↩"
     ).to_html
+
+    # Step 5: Process collection grids (detect consecutive collections)
+    html = CollectionGridProcessor.process(html)
+
+    html
   end
 
   private
