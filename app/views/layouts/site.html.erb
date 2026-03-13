@@ -9,7 +9,6 @@
     <!-- Feed autodiscovery -->
     <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="<%= feed_url(format: :xml) %>">
     <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="<%= feed_atom_url(format: :xml) %>">
-
     <!-- Font preloading -->
     <% fonts_config = SiteConfig.get('fonts') %>
     <% if fonts_config %>
@@ -44,6 +43,7 @@
 
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>
+    <!--<meta name="turbo-visit-control" content="reload">-->
   </head>
   <body>
     <% logo_url = SiteConfig.get('logo') %>
@@ -60,11 +60,11 @@
     </footer>
     <script>
       // Auto-refresh when content is saved in admin
-      window.addEventListener('storage', (e) => {
-        if (e.key === 'content-updated') {
-          location.reload();
-        }
-      });
+      // window.addEventListener('storage', (e) => {
+      //   if (e.key === 'content-updated') {
+      //     Turbo.visit(window.location, { action: "replace" });
+      //   }
+      // });
     </script>
   </body>
 </html>

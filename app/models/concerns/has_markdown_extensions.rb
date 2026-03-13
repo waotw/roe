@@ -49,6 +49,9 @@ module HasMarkdownExtensions
     # Step 5: Process collection grids (detect consecutive collections)
     html = CollectionGridProcessor.process(html)
 
+    # Step 6: Merge floated pullquotes into following paragraphs
+    html = merge_floated_pullquotes(html)
+
     html
   end
 
@@ -283,11 +286,11 @@ module HasMarkdownExtensions
     type = config[:type] || 'pullquote'
 
     case type
-    when 'pullquote'
+    when "pullquote"
       render_pullquote(config)
-    when 'aside'
+    when "aside"
       render_aside(config, preview: preview)
-    when 'post-link'
+    when "post-link"
       render_post_link(config, preview: preview)
     else
       preview ? '<!-- Unknown card type -->' : ''
@@ -298,15 +301,99 @@ module HasMarkdownExtensions
 
   def render_pullquote(config)
     text = config[:text] || ''
+    attribution = config[:attribution] || ''
+    position = config[:position] || 'center'  # center, left, or right
 
-    <<~HTML
-      <div class="card card-pullquote" markdown="1">
+    # Build CSS classes
+    pullquote_classes = [ "card", "card-pullquote", "pullquote-#{position}" ]
 
-      #{text}
-      {: .pullquote-text}
+    output = []
+    output << "<div class=\"#{pullquote_classes.join(' ')}\" markdown=\"1\">"
+    output << ""
+    output << text
 
-      </div>
-    HTML
+    if attribution.present?
+      output << ""
+      output << "{::nomarkdown}"
+      output << "<cite>— #{attribution}</cite>"
+      output << "{:/nomarkdown}"
+    end
+
+    output << ""
+    output << '</div>'
+
+    output.join("\n")
+  end
+
+  def merge_floated_pullquotes(html)
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    # Find all floated pullquotes (left or right position)
+    floated_pullquotes = doc.css('.pullquote-left, .pullquote-right')
+
+    floated_pullquotes.each do |pullquote|
+      # Get the next sibling element
+      next_element = pullquote.next_element
+
+      # Check if it's a paragraph
+      if next_element && next_element.name == 'p'
+        # Get the paragraph text (as plain text, not HTML)
+        para_text = next_element.inner_html
+
+        # Split the paragraph roughly in half
+        split_point = find_split_point(para_text)
+
+        first_half = para_text[0...split_point].strip
+        second_half = para_text[split_point..-1].strip
+
+        # Create a wrapper div to hold all three parts
+        wrapper = Nokogiri::XML::Node.new('div', doc)
+        wrapper['class'] = 'pullquote-merge'
+
+        # Create first paragraph
+        first_p = Nokogiri::XML::Node.new('p', doc)
+        first_p.inner_html = first_half
+
+        # Create second paragraph
+        second_p = Nokogiri::XML::Node.new('p', doc)
+        second_p.inner_html = second_half
+
+        # Build the structure
+        wrapper.add_child(first_p)
+        wrapper.add_child(pullquote.dup) # Duplicate the pullquote
+        wrapper.add_child(second_p)
+
+        # Replace the original paragraph with the wrapper
+        next_element.replace(wrapper)
+
+        # Remove the original pullquote
+        pullquote.remove
+      end
+    end
+
+    doc.to_html
+  end
+
+  def find_split_point(text)
+    # Remove HTML tags for better sentence detection
+    plain_text = Nokogiri::HTML(text).text
+
+    middle = plain_text.length / 2
+
+    # Look for ". " near the middle (within 30% either way for more flexibility)
+    search_start = [ (middle * 0.7).to_i, 0 ].max
+    search_end = [ (middle * 1.3).to_i, plain_text.length ].min
+
+    sentence_end = plain_text[search_start..search_end]&.index('. ')
+
+    if sentence_end
+      # Find this position in the original HTML text
+      search_start + sentence_end + 2
+    else
+      # Fallback: try to split at a space near middle
+      space_pos = plain_text[middle..-1]&.index(' ')
+      space_pos ? middle + space_pos : middle
+    end
   end
 
   ### POST LINKS

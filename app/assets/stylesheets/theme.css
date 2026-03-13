@@ -547,19 +547,66 @@ p:has(.site-logo) {
    CARDS
    ========================================== */
 
-/* PULLQUOTE */
-
 .card {
   position: relative;
 }
 
+/* PULLQUOTE */
+
 .card-pullquote {
+  font-family: var(--font-heading);
   text-align: center;
-  font-size: 1.5rem;
-  padding: 2rem;
-  margin: 2rem 0;
-  border-top: 1px solid var(--color-muted);
-  border-bottom: 1px solid var(--color-muted);
+  font-size: var(--text-2xl);
+  padding: var(--space-2);
+  margin: 0 0 0 0;
+  clear: both;
+  /*border-top: 1px solid var(--color-muted);
+  border-bottom: 1px solid var(--color-muted);*/
+}
+
+.card-pullquote p {
+  line-height: var(--space-4);
+  margin: 0;
+  padding: 0;
+}
+
+.card-pullquote cite {
+  font-size: var(--text-lg);
+}
+
+.pullquote-merge p {
+  display: inline; /* Make paragraphs flow together */
+}
+
+/* position: center (default) */
+.pullquote-center {
+  max-width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+/* position: left - inline with text wrap */
+.pullquote-left {
+  line-height: var(--space-8);
+  clear: none;
+  float: left;
+  width: 40%;
+  margin-top: var(--space-2);
+  margin-right: 0;
+  margin-left: 0;
+}
+
+/* position: right - inline with text wrap */
+.pullquote-right {
+  line-height: var(--space-8);
+  margin-top: var(--space-1);
+  padding-bottom: 0;
+  clear: none;
+  float: right;
+  width: 40%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* POST LINKS */
@@ -823,6 +870,7 @@ article .content:has(.card-aside),
   article .content:has(.card-aside),
   .home.content:has(.card-aside) {
     margin-left: 0;
+    max-width: var(--container-width);
   }
 }
 
