@@ -59,6 +59,15 @@ module AssetsHelper
     vars.join("\n")
   end
 
+  def font_format_for_preload(filename)
+    case File.extname(filename)
+    when '.woff2' then 'woff2'
+    when '.woff' then 'woff'
+    when '.ttf' then 'ttf'
+    when '.otf' then 'otf'
+    end
+  end
+
   private
 
   def generate_font_face(css, family, filename, weight, style)
@@ -68,7 +77,7 @@ module AssetsHelper
         src: url('#{system_font_path(filename)}') format('#{font_format(filename)}');
         font-weight: #{weight};
         font-style: #{style};
-        font-display: block;
+        font-display: swap;
       }
     CSS
   end

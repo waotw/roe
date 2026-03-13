@@ -2,12 +2,17 @@ class System::FontsController < ApplicationController
   skip_before_action :require_authentication
 
   def show
-    font_path = Rails.root.join('content', 'system', 'assets', 'fonts', params[:filename])
+    filename = params[:filename]
+    file_path = Rails.root.join('content/system/assets/fonts', filename)
 
-    if File.exist?(font_path)
-      send_file font_path,
-        type: font_mime_type(params[:filename]),
-        disposition: 'inline'
+    if File.exist?(file_path)
+      # Set aggressive caching for fonts (they rarely change)
+      expires_in 1.year, public: true
+
+      send_file file_path,
+        type: font_mime_type(filename),  # Changed from mime_type_for
+        disposition: 'inline',
+        filename: filename
     else
       head :not_found
     end

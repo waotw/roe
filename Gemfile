@@ -76,3 +76,7 @@ gem "dockerfile-rails", ">= 1.7", group: :development
 gem "kramdown-parser-gfm", "~> 1.1"
 
 gem "rss", "~> 0.3.2"
+
+gem "turbo-rails", "~> 2.0"
+
+gem "importmap-rails", "~> 2.2"

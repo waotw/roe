@@ -10,19 +10,40 @@
     <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="<%= feed_url(format: :xml) %>">
     <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="<%= feed_atom_url(format: :xml) %>">
 
+    <!-- Font preloading -->
+    <% fonts_config = SiteConfig.get('fonts') %>
+    <% if fonts_config %>
+      <% %w[heading body].each do |role| %>
+        <% if fonts_config[role] && fonts_config[role]['regular'] %>
+          <link rel="preload"
+                as="font"
+                type="font/<%= font_format_for_preload(fonts_config[role]['regular']) %>"
+                href="<%= system_font_path(fonts_config[role]['regular']) %>"
+                crossorigin>
+        <% end %>
+      <% end %>
+    <% end %>
+
     <!-- Custom Fonts & Site Assets -->
     <style>
       <%= font_face_css.html_safe %>
     </style>
+
     <!-- Public site theme -->
     <%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>
+
+    <!-- Favicon -->
     <% if SiteConfig.get('favicon') %>
       <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
     <% end %>
 
+    <!-- Apple touch icon -->
     <% if SiteConfig.get('logo') %>
       <link rel="apple-touch-icon" href="<%= system_image_path(SiteConfig.get('logo')) %>">
     <% end %>
+
+    <!-- Turbo / Import maps -->
+    <%= javascript_importmap_tags %>
   </head>
   <body>
     <% logo_url = SiteConfig.get('logo') %>
