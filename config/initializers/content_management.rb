@@ -15,6 +15,9 @@ if should_run
         # Generate default config files if they don't exist
         ConfigGenerator.generate_all
 
+        # Generate default pages if they don't exist
+        PageGenerator.generate_defaults
+
         # Sync all content and configs to database
         ContentSync.sync_all
 

@@ -119,7 +119,7 @@ class ConfigGenerator
       # Default post type to display (only applies when source is 'posts')
       # Options: all, article, music, video, note, link
       # Use 'all' to show all post types
-      default_type: all
+      default_post_type: all
 
       # Default ordering method
       # Options:
@@ -144,7 +144,7 @@ class ConfigGenerator
       button_template: |-
         heading:
         limit: 5
-        type:
+        post_type:
         template: list
     YAML
 

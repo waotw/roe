@@ -197,7 +197,7 @@ class Admin::PostsController < Admin::BaseController
       title:
       date: #{Date.today}
       status: draft
-      type: article
+      post_type: article
       ---
 
       Start writing...

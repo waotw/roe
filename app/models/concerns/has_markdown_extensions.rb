@@ -78,27 +78,33 @@ module HasMarkdownExtensions
 
   def render_collection(config)
     heading = config[:heading]
-    source = config[:source] || SiteConfig.default('collections', 'default_source') || 'posts'
-    order_by = config[:order] || SiteConfig.default('collections', 'default_order') || 'date'
+    source = config[:source] || SiteConfig.default('collections', 'default_source') || "posts"
+    order_by = config[:order] || SiteConfig.default('collections', 'default_order') || "date"
+    tag = config[:tag]  # NEW: tag filter
 
-    # Get type from config or default, treating 'all' as nil (no filter)
-    type_value = config[:type] || SiteConfig.default('collections', 'default_type') || 'all'
+    # Get post_type from config or default, treating 'all' as nil (no filter)
+    post_type = config[:post_type]
+    post_type = nil if post_type == "all"
 
-    # Only filter by type if source is 'posts' AND type is specified AND not 'all'
-    post_type = nil
-    if source == 'posts' && type_value && type_value != 'all' && type_value != 'posts'
-      post_type = type_value
-    end
+    # DEBUG
+    Rails.logger.info "=== COLLECTION DEBUG ==="
+    Rails.logger.info "Config: #{config.inspect}"
+    Rails.logger.info "post_type from config: #{config[:post_type].inspect}"
+    Rails.logger.info "post_type after processing: #{post_type.inspect}"
 
     # Get base collection
     items = case source
     when 'posts'
       collection = Post.public_posts
+      Rails.logger.info "Before by_type: #{collection.count} posts"
       collection = collection.by_type(post_type) if post_type
+      Rails.logger.info "After by_type(#{post_type}): #{collection.count} posts"
+      collection = collection.tagged_with(tag) if tag
+      Rails.logger.info "After tagged_with(#{tag}): #{collection.count} posts"
       collection
-    when 'pages'
+    when "pages"
       Page.all
-    when 'documentation'
+    when "documentation"
       Documentation.all
     else
       []
@@ -107,34 +113,49 @@ module HasMarkdownExtensions
     # Apply ordering based on order parameter
     items = apply_collection_order(items, order_by)
 
-    # Apply limit - handle both arrays and ActiveRecord relations
+    # Apply limit
     limit_value = config[:limit]
     default_limit = SiteConfig.default('collections', 'default_limit') || 10
+    show_more = config[:show_more] == 'true' || config[:show_more] == true
 
     if limit_value.to_s.downcase == 'all'
-      items = items.is_a?(Array) ? items : items.to_a
+      display_items = items.is_a?(Array) ? items : items.to_a
+      total_count = display_items.count
     elsif limit_value
       limit_int = limit_value.to_i
-      items = items.is_a?(Array) ? items.take(limit_int) : items.limit(limit_int).to_a
+      total_count = items.is_a?(Array) ? items.count : items.count
+      display_items = items.is_a?(Array) ? items.take(limit_int) : items.limit(limit_int).to_a
     else
-      items = items.is_a?(Array) ? items.take(default_limit) : items.limit(default_limit).to_a
+      total_count = items.is_a?(Array) ? items.count : items.count
+      display_items = items.is_a?(Array) ? items.take(default_limit) : items.limit(default_limit).to_a
     end
 
     # Render based on template
     template = config[:template] || SiteConfig.default('collections', 'default_template') || 'list'
-    list_markdown = render_template(items, template, config)
+    list_markdown = render_template(display_items, template, config)
 
     # Build output with proper spacing
     output = []
     output << '<div class="collection" markdown="1">'
     output << ""
 
-    if heading.present?  # Changed from just 'if heading'
+    if heading.present?
       output << "## #{heading}"
       output << ""
     end
 
     output << list_markdown
+
+    # Add "View More" link if applicable
+    if show_more && total_count > display_items.count
+      show_more_text = config[:show_more_text] || "View all"
+      collection_url = generate_collection_url(config)
+
+      output << ""
+      output << "[#{show_more_text}](#{collection_url})"
+      output << "{: .collection-more}"
+    end
+
     output << ""
     output << '</div>'
 
@@ -260,6 +281,33 @@ module HasMarkdownExtensions
     else
       "/#{item.url_name}"
     end
+  end
+
+  def generate_collection_url(config)
+    source = config[:source] || 'posts'
+    tag = config[:tag]
+    post_type = config[:post_type] unless config[:post_type] == 'all'
+
+    segments = []
+
+    # Add post_type filter if specified
+    if post_type && post_type != 'all'
+      segments << "type-#{post_type.parameterize}"
+    end
+
+    # Add tag filter
+    if tag
+      segments << tag.parameterize
+    end
+
+    # If no filters, show all
+    if segments.empty?
+      # Check if user has custom archive page
+      archive_page = Page.find_by(url_name: 'archive')
+      return archive_page ? '/archive' : '/collections/all'
+    end
+
+    "/collections/#{segments.join('/')}"
   end
 
   ## CARDS

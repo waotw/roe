@@ -3,6 +3,14 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
+  scope :tagged_with, ->(tag) {
+    where("json_extract(metadata, '$.tags') LIKE ?", "%#{tag}%")
+  }
+
+  scope :by_type, ->(post_type) {
+    where("json_extract(metadata, '$.post_type') = ?", post_type)
+  }
+
   def self.create_or_update_from_file(file_path)
     absolute_path = File.expand_path(file_path)
     has_warnings = false
@@ -129,12 +137,17 @@ class Post < ApplicationRecord
       .sort
   end
 
-  def self.by_type(type)
-    where("json_extract(metadata, '$.type') = ?", type)
-  end
+  # replaced by scope at top of file.
+  # def self.by_type(type)
+  #   where("json_extract(metadata, '$.type') = ?", type)
+  # end
 
   def type
     metadata["type"] || "article"
+  end
+
+  def tags
+    metadata['tags']&.split(',')&.map(&:strip) || []
   end
 
   # Class methods for filtering by type
