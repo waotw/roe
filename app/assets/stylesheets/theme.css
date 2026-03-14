@@ -584,6 +584,11 @@ p:has(.site-logo) {
   margin-left: auto;
   margin-right: auto;
   text-align: center;
+  line-height: var(--space-12);
+}
+
+.pullquote-center + p {
+  margin-top: 0;
 }
 
 /* position: left - inline with text wrap */
@@ -592,8 +597,8 @@ p:has(.site-logo) {
   clear: none;
   float: left;
   width: 40%;
-  margin-top: var(--space-2);
-  margin-right: 0;
+  margin-top: var(--space-4);
+  margin-right: var(--space-4);
   margin-left: 0;
 }
 
@@ -607,6 +612,65 @@ p:has(.site-logo) {
   width: 40%;
   margin-left: 0;
   margin-right: 0;
+}
+
+@media (max-width: 1024px) {
+  .pullquote-left {
+    line-height: var(--space-8);
+    clear: none;
+    float: left;
+    width: 40%;
+    margin-top: var(--space-4);
+    margin-right: var(--space-2);
+    margin-left: 0;
+  }
+
+  .pullquote-right {
+    line-height: var(--space-8);
+    margin-top: var(--space-1);
+    padding-bottom: 0;
+    clear: none;
+    float: right;
+    width: 35%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .pullquote-left,
+  .pullquote-right {
+    font-size: var(--text-lg);
+    line-height: var(--space-6);
+    margin: var(--space-4) var(--space-4) 0 0;
+  }
+
+  .card-pullquote cite {
+    font-size: var(--text-base);
+  }
+}
+
+/* Small mobile (inline block, below content) */
+@media (max-width: 600px) {
+  .pullquote-center {
+    max-width: 60%;
+  }
+
+  .pullquote-center p {
+    line-height: var(--space-8);
+    margin-bottom: calc(var(--space-2) * -1);
+  }
+
+  .pullquote-left,
+  .pullquote-right {
+    font-size: var(--text-lg);
+    line-height: var(--space-6);
+    margin: var(--space-4) var(--space-4) 0 0;
+  }
+
+  .card-pullquote cite {
+    font-size: var(--text-base);
+  }
 }
 
 /* POST LINKS */
