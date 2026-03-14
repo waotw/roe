@@ -141,6 +141,36 @@ class Admin::PostsController < Admin::BaseController
     render :edit
   end
 
+  def rename
+    @post = Post.find(params[:id])
+    new_filename = sanitize_filename(params[:new_filename])
+
+    if new_filename.blank?
+      flash[:error] = "Filename cannot be empty"
+      redirect_to admin_posts_path and return
+    end
+
+    old_path = Pathname.new(@post.file_path)
+    new_path = old_path.dirname.join("#{new_filename}.md")
+
+    if File.exist?(new_path) && new_path != old_path
+      flash[:error] = "A file with that name already exists"
+      redirect_to admin_posts_path and return
+    end
+
+    begin
+      File.rename(old_path, new_path)
+      @post.update(file_path: new_path.to_s)
+      ContentSync.sync_file(new_path)
+
+      flash[:notice] = "Renamed to #{new_filename}.md"
+    rescue => e
+      flash[:error] = "Failed to rename: #{e.message}"
+    end
+
+    redirect_to admin_posts_path
+  end
+
   def publish
     @post = Post.find(params[:id])
     update_post_status(@post, 'published')
@@ -179,6 +209,15 @@ class Admin::PostsController < Admin::BaseController
   end
 
   private
+
+  def sanitize_filename(filename)
+    filename = filename.to_s.sub(/\.md$/, '')
+    filename = File.basename(filename)
+    filename.gsub(/[^a-zA-Z0-9\-_]/, '-')
+            .gsub(/-+/, '-')
+            .strip
+            .gsub(/^-|-$/, '')
+  end
 
   def load_post_template
     template_path = Rails.root.join("content/templates/post_template.md")

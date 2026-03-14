@@ -101,6 +101,36 @@ class Admin::PagesController < Admin::BaseController
     render :edit
   end
 
+  def rename
+    @page = Page.find(params[:id])
+    new_filename = sanitize_filename(params[:new_filename])
+
+    if new_filename.blank?
+      flash[:error] = "Filename cannot be empty"
+      redirect_to admin_pages_path and return
+    end
+
+    old_path = Pathname.new(@page.file_path)
+    new_path = old_path.dirname.join("#{new_filename}.md")
+
+    if File.exist?(new_path) && new_path != old_path
+      flash[:error] = "A file with that name already exists"
+      redirect_to admin_pages_path and return
+    end
+
+    begin
+      File.rename(old_path, new_path)
+      @page.update(file_path: new_path.to_s)
+      ContentSync.sync_file(new_path)
+
+      flash[:notice] = "Renamed to #{new_filename}.md"
+    rescue => e
+      flash[:error] = "Failed to rename: #{e.message}"
+    end
+
+    redirect_to admin_pages_path
+  end
+
   def publish
     @page = Page.find(params[:id])
     update_page_status(@page, 'published')
@@ -142,6 +172,15 @@ class Admin::PagesController < Admin::BaseController
   end
 
   private
+
+  def sanitize_filename(filename)
+    filename = filename.to_s.sub(/\.md$/, '')
+    filename = File.basename(filename)
+    filename.gsub(/[^a-zA-Z0-9\-_]/, '-')
+            .gsub(/-+/, '-')
+            .strip
+            .gsub(/^-|-$/, '')
+  end
 
   def load_page_template
     template_path = Rails.root.join("content/templates/page_template.md")

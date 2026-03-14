@@ -76,24 +76,27 @@
     <!-- Admin Navigation -->
     <nav class="bg-white border-b border-gray-200">
       <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex">
-            <div class="shrink-0 flex items-center">
-              <%= link_to "Roe CMS", admin_root_path, class: "text-xl font-bold text-gray-900" %>
-            </div>
-            <div class="ml-6 flex space-x-8">
-              <%= link_to "Dashboard", admin_root_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500" %>
-              <%= link_to "Pages", admin_pages_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
-              <%= link_to "Posts", admin_posts_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
-              <%= link_to "Drafts", drafts_admin_posts_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
-              <%= link_to "Layouts", admin_layouts_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
-              <%= link_to "Settings", admin_configs_path, class: "inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900" %>
-            </div>
+        <div class="flex justify-between items-center h-16">
+          <!-- Left: Roe CMS Title -->
+          <div class="shrink-0">
+            <%= link_to "Roe CMS", admin_root_path, class: "text-xl font-bold text-gray-900" %>
           </div>
-          <div class="flex items-center">
-            <span class="text-sm text-gray-500 mr-4"><%= Current.user.email_address %></span>
-            <%= button_to "Logout", session_path, method: :delete, class: "text-sm text-gray-700 hover:text-gray-900", form: { style: "display: inline;" } %>
+
+          <!-- Right: Settings & Logout -->
+          <div class="flex items-center gap-6">
+            <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>
+        </div>
+
+        <!-- Navigation Links Row (wraps on smaller screens) -->
+        <div class="flex flex-wrap gap-x-6 gap-y-2 pb-3 border-t border-gray-100 pt-3">
+          <%= link_to "Dashboard", admin_root_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          <%= link_to "Pages", admin_pages_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          <%= link_to "Posts", admin_posts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          <%= link_to "Drafts", drafts_admin_posts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          <%= link_to "Media", browse_admin_medium_index_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          <%= link_to "Layouts", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
         </div>
       </div>
     </nav>

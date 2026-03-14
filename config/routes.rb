@@ -24,6 +24,7 @@ Rails.application.routes.draw do
         patch :publish
         patch :unpublish
         post :preview
+        patch :rename
       end
     end
 
@@ -32,12 +33,16 @@ Rails.application.routes.draw do
         patch :publish
         patch :unpublish
         post :preview
+        patch :rename
       end
     end
 
     resources :medium, only: [ :index, :create, :destroy ] do
       collection do
         get :browse
+      end
+      member do
+        patch :rename
       end
     end
 

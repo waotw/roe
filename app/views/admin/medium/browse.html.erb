@@ -35,7 +35,9 @@
       <% @media.each do |media| %>
         <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative" onclick="selectMedia('<%= media.file_path %>', '<%= File.basename(media.file_path) %>')">
           <img src="<%= media.file_path %>" alt="<%= File.basename(media.file_path) %>" class="w-full h-32 object-cover mb-2">
-          <p class="text-xs font-mono truncate mb-1"><%= File.basename(media.file_path) %></p>
+          <div class="mb-1">
+            <%= render 'shared/inline_rename_media', media: media %>
+          </div>
           <div class="flex flex-col gap-1">
             <button onclick="copyUrl(event, '<%= media.file_path %>')"
                   class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">

@@ -62,16 +62,53 @@ class Admin::MediumController < Admin::BaseController
     redirect_to browse_admin_medium_index_path, notice: "Image deleted"
   end
 
+  def rename
+    @medium = Medium.find(params[:id])
+    new_filename = sanitize_media_filename(params[:new_filename])
+
+    if new_filename.blank?
+      flash[:error] = "Filename cannot be empty"
+      redirect_to browse_admin_medium_index_path and return
+    end
+
+    # Use content/media/images instead of public
+    relative_path = @medium.file_path.delete_prefix('/')
+    old_path = Rails.root.join('content', relative_path)
+    extension = File.extname(old_path)
+    new_path = old_path.dirname.join("#{new_filename}#{extension}")
+
+    Rails.logger.info "Old path: #{old_path}"
+    Rails.logger.info "File exists? #{File.exist?(old_path)}"
+
+    if File.exist?(new_path) && new_path != old_path
+      flash[:error] = "A file with that name already exists"
+      redirect_to browse_admin_medium_index_path and return
+    end
+
+    begin
+      File.rename(old_path, new_path)
+      # The file_path in DB stays the same pattern, just new filename
+      new_file_path = "/media/images/#{new_filename}#{extension}"
+      @medium.update(file_path: new_file_path)
+
+      flash[:notice] = "Renamed to #{new_filename}#{extension}"
+    rescue => e
+      flash[:error] = "Failed to rename: #{e.message}"
+    end
+
+    redirect_to browse_admin_medium_index_path
+  end
+
   private
 
   def sanitize_media_filename(filename)
-    # Get extension
-    ext = File.extname(filename)
-    basename = File.basename(filename, ext)
+    basename = File.basename(filename, '.*')
 
     # Convert to lowercase, replace spaces/special chars with hyphens
-    clean_name = basename.downcase.gsub(/[^a-z0-9\-_]/, '-').gsub(/-+/, '-')
-
-    "#{clean_name}#{ext}"
+    basename.downcase
+            .gsub(/[^a-z0-9\-_]/, '-')
+            .gsub(/-+/, '-')
+            .strip
+            .gsub(/^-|-$/, '')
   end
 end

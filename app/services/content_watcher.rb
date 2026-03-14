@@ -1,5 +1,5 @@
 class ContentWatcher
-  WATCH_PATHS = [ 'content/posts', 'content/pages', 'content/documentation', 'content/system' ].freeze
+  WATCH_PATHS = [ 'content/posts', 'content/pages', 'content/documentation', 'content/system', 'content/media' ].freeze
 
   def self.start
     listener = Listen.to(*WATCH_PATHS) do |modified, added, removed|
@@ -88,11 +88,17 @@ class ContentWatcher
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('content/documentation')
-      result = Documentation.create_or_update_from_file(absolute_file)
+    elsif absolute_file.include?('content/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
+      # New media file added manually
+      web_path = absolute_file.sub(Rails.root.join('content').to_s, '')
 
-      if result
-        puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
+      unless Medium.exists?(file_path: web_path)
+        Medium.create!(
+          file_path: web_path,
+          media_type: 'images',
+          uploaded_at: Time.current
+        )
+        puts "\n   ✓ Media file added: #{File.basename(file)}\n"
       end
     end
   end
@@ -101,21 +107,34 @@ class ContentWatcher
     renames = {}
 
     removed.each do |old_file|
-      next unless old_file.end_with?('.md')
-      old_basename = File.basename(old_file, '.md')
+      # Handle markdown files
+      if old_file.end_with?('.md')
+        old_basename = File.basename(old_file, '.md')
 
-      # Look for an added file that matches (could be prefixed with numbers)
-      new_file = added.find do |file|
-        next unless file.end_with?('.md')
-        new_basename = File.basename(file, '.md')
+        new_file = added.find do |file|
+          next unless file.end_with?('.md')
+          new_basename = File.basename(file, '.md')
 
-        # Match if the old name is contained in the new name
-        new_basename.include?(old_basename) ||
-          old_basename.include?(new_basename.sub(/^\d+-/, ''))
-      end
+          new_basename.include?(old_basename) ||
+            old_basename.include?(new_basename.sub(/^\d+-/, ''))
+        end
 
-      if new_file
-        renames[old_file] = new_file
+        renames[old_file] = new_file if new_file
+
+      # Handle media files (images)
+      elsif old_file.match?(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
+        old_basename = File.basename(old_file, File.extname(old_file))
+        old_ext = File.extname(old_file)
+
+        new_file = added.find do |file|
+          next unless file.end_with?(old_ext) # Same extension
+          new_basename = File.basename(file, File.extname(file))
+
+          # For media, we want more exact matching
+          new_basename.include?(old_basename) || old_basename.include?(new_basename)
+        end
+
+        renames[old_file] = new_file if new_file
       end
     end
 
@@ -126,12 +145,10 @@ class ContentWatcher
     absolute_old = File.expand_path(old_path)
     absolute_new = File.expand_path(new_path)
 
-    # Find the record by old path and update to new path
     if absolute_old.include?('content/posts')
       post = Post.find_by(file_path: absolute_old)
       if post
         post.update(file_path: absolute_new)
-        # Re-process to update metadata if needed
         Post.create_or_update_from_file(absolute_new)
         puts "   ✓ Post renamed in database"
       end
@@ -149,6 +166,18 @@ class ContentWatcher
         Documentation.create_or_update_from_file(absolute_new)
         puts "   ✓ Documentation renamed in database"
       end
+    elsif absolute_old.include?('content/media')
+      # Media files are stored with web paths like "/media/images/file.jpg"
+      old_web_path = absolute_old.sub(Rails.root.join('content').to_s, '')
+      new_web_path = absolute_new.sub(Rails.root.join('content').to_s, '')
+
+      medium = Medium.find_by(file_path: old_web_path)
+      if medium
+        medium.update(file_path: new_web_path)
+        puts "   ✓ Media file renamed in database"
+        puts "   Old: #{old_web_path}"
+        puts "   New: #{new_web_path}"
+      end
     end
   end
 
@@ -164,6 +193,10 @@ class ContentWatcher
     elsif absolute_file.include?('content/documentation')
       Documentation.remove_by_file_path(absolute_file)
       puts "   Removed documentation from database"
+    elsif absolute_file.include?('content/media')
+      web_path = absolute_file.sub(Rails.root.join('content').to_s, '')
+      Medium.remove_by_file_path(web_path)
+      puts "   Removed media file from database"
     end
   end
 end
