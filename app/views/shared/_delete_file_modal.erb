@@ -1,0 +1,68 @@
+<div id="delete-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Delete "<span id="delete-item-title"></span>"?</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      This will permanently delete the file from <code class="bg-gray-100 px-1">content/<%= resource_type %>s/</code>.
+      This action cannot be undone.
+    </p>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Type <strong>DELETE</strong> to confirm:
+      </label>
+      <input type="text"
+             id="delete-confirmation-input"
+             class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 focus:border-red-500"
+             placeholder="DELETE"
+             autocomplete="off">
+    </div>
+    <div class="flex gap-3 justify-end">
+      <button type="button"
+              onclick="hideDeleteConfirmation()"
+              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded">
+        Cancel
+      </button>
+      <%= button_to "Delete Permanently",
+          resource_type == 'post' ? admin_post_path(resource) : admin_page_path(resource),
+          method: :delete,
+          id: "delete-confirm-btn",
+          disabled: true,
+          class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50 disabled:cursor-not-allowed",
+          form: {
+            onsubmit: "return document.getElementById('delete-confirmation-input').value === 'DELETE'",
+            style: "display: inline; margin: 0;"
+          } %>
+    </div>
+  </div>
+</div>
+<script>
+  function showDeleteConfirmation(id, title) {
+    document.getElementById('delete-item-title').textContent = title;
+    document.getElementById('delete-modal').classList.remove('hidden');
+    const input = document.getElementById('delete-confirmation-input');
+    input.value = '';
+    input.focus();
+    document.getElementById('delete-confirm-btn').disabled = true;
+  }
+
+  function hideDeleteConfirmation() {
+    document.getElementById('delete-modal').classList.add('hidden');
+  }
+
+  // Enable delete button only when "DELETE" is typed
+  const deleteInput = document.getElementById('delete-confirmation-input');
+  const deleteBtn = document.getElementById('delete-confirm-btn');
+
+  if (deleteInput && deleteBtn) {
+    deleteInput.addEventListener('input', function() {
+      deleteBtn.disabled = this.value !== 'DELETE';
+    });
+
+    deleteInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && this.value === 'DELETE') {
+        deleteBtn.form.requestSubmit();
+      } else if (e.key === 'Escape') {
+        hideDeleteConfirmation();
+      }
+    });
+  }
+</script>

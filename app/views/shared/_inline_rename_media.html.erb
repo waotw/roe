@@ -1,0 +1,70 @@
+<%
+  filename = File.basename(media.file_path)
+  name_without_ext = File.basename(media.file_path, File.extname(media.file_path))
+  extension = File.extname(media.file_path)
+%>
+
+<div class="inline-rename-container" data-media-id="<%= media.id %>">
+  <p class="filename-display text-xs font-mono truncate cursor-pointer hover:bg-gray-100 px-1 py-0.5 "
+     ondblclick="startMediaRename(this)"
+     title="Double-click to rename">
+    <%= filename %>
+  </p>
+
+  <div class="filename-edit hidden">
+    <%= form_with url: rename_admin_medium_path(media), method: :patch, class: "flex flex-col gap-1" do |f| %>
+      <div class="flex items-center gap-1">
+        <%= f.text_field :new_filename,
+            value: name_without_ext,
+            class: "font-mono text-xs px-1 py-0.5 border border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white flex-1 min-w-0",
+            onkeydown: "handleMediaRenameKeydown(event)",
+            onclick: "event.stopPropagation()" %>
+        <span class="text-xs text-gray-500 font-mono flex-shrink-0"><%= extension %></span>
+      </div>
+      <div class="flex gap-1">
+        <%= f.submit "✓",
+            class: "flex-1 px-1.5 py-0.5 bg-green-500 text-white hover:bg-green-600 text-xs  cursor-pointer border-0",
+            title: "Save (Enter)" %>
+        <button type="button"
+                onclick="cancelMediaRename(this)"
+                class="flex-1 px-1.5 py-0.5 bg-gray-300 text-gray-700 hover:bg-gray-400 text-xs "
+                title="Cancel (Esc)">
+          ✕
+        </button>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<script>
+function startMediaRename(element) {
+  const container = element.closest('.inline-rename-container');
+  const display = container.querySelector('.filename-display');
+  const edit = container.querySelector('.filename-edit');
+  const input = edit.querySelector('input[type="text"]');
+
+  display.classList.add('hidden');
+  edit.classList.remove('hidden');
+
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
+}
+
+function cancelMediaRename(button) {
+  const container = button.closest('.inline-rename-container');
+  const display = container.querySelector('.filename-display');
+  const edit = container.querySelector('.filename-edit');
+
+  display.classList.remove('hidden');
+  edit.classList.add('hidden');
+}
+
+function handleMediaRenameKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelMediaRename(event.target);
+  }
+}
+</script>
