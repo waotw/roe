@@ -170,6 +170,25 @@ class Admin::PostsController < Admin::BaseController
     redirect_to admin_posts_path
   end
 
+  def destroy
+    @post = Post.find(params[:id])
+    file_path = @post.file_path
+
+    begin
+      # Delete the file from content/posts/
+      File.delete(file_path) if File.exist?(file_path)
+
+      # Delete the database record
+      @post.destroy
+
+      flash[:notice] = "Post deleted successfully"
+    rescue => e
+      flash[:error] = "Failed to delete post: #{e.message}"
+    end
+
+    redirect_to admin_posts_path
+  end
+
   def publish
     @post = Post.find(params[:id])
     update_post_status(@post, 'published')

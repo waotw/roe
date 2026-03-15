@@ -146,6 +146,25 @@ class Admin::PagesController < Admin::BaseController
     redirect_to edit_admin_page_path(@page)
   end
 
+  def destroy
+    @page = Page.find(params[:id])
+    file_path = @page.file_path
+
+    begin
+      # Delete the file from content/pages/
+      File.delete(file_path) if File.exist?(file_path)
+
+      # Delete the database record
+      @page.destroy
+
+      flash[:notice] = "Page deleted successfully"
+    rescue => e
+      flash[:error] = "Failed to delete page: #{e.message}"
+    end
+
+    redirect_to admin_pages_path
+  end
+
   def preview
     # Reconstruct content from params
     metadata_yaml = params[:metadata]

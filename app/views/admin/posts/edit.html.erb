@@ -29,30 +29,39 @@
 
   <h1 class="text-3xl font-bold mb-5">Edit Post: <%= @post.title %></h1>
 
-  <div class="mb-5 flex gap-2.5 items-center">
-    <span style="display: inline; margin: 0;">
+  <div class="mb-5 flex justify-between items-center">
+    <div class="flex gap-2.5 items-center">
+      <span style="display: inline; margin: 0;">
         <button type="submit" form="post-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Save</button>
       </span>
 
       <button type="button" onclick="previewPost()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Preview</button>
 
-        <% if @post.draft? %>
-          <%= button_to "Publish", publish_admin_post_path(@post),
-              method: :patch,
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-              form: {
-                onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Publishing this post will save your changes and make it live on your site. Continue?')",
-                style: "display: inline; margin: 0;"
-              } %>
-        <% else %>
-          <%= button_to "Unpublish", unpublish_admin_post_path(@post),
-              method: :patch,
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-              form: {
-                onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Unpublishing this post will save your changes and remove it from your site. Continue?')",
-                style: "display: inline; margin: 0;"
-              } %>
-        <% end %>
+      <% if @post.draft? %>
+        <%= button_to "Publish", publish_admin_post_path(@post),
+            method: :patch,
+            class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+            form: {
+              onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Publishing this post will save your changes and make it live on your site. Continue?')",
+              style: "display: inline; margin: 0;"
+            } %>
+      <% else %>
+        <%= button_to "Unpublish", unpublish_admin_post_path(@post),
+            method: :patch,
+            class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+            form: {
+              onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Unpublishing this post will save your changes and remove it from your site. Continue?')",
+              style: "display: inline; margin: 0;"
+            } %>
+      <% end %>
+    </div>
+
+    <!-- Right: Delete button -->
+    <button type="button"
+            onclick="showDeleteConfirmation('<%= @post.id %>', '<%= @post.title || 'Untitled' %>')"
+            class="uppercase text-xs px-1.5 py-0 border border-red-600 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">
+      Delete
+    </button>
   </div>
 
   <%= render 'shared/editor',
@@ -63,6 +72,8 @@
         show_metadata: true,
         preview_path: @preview_path || preview_admin_post_path(@post),
         item: @post %>
+
+  <%= render 'shared/delete_file_modal', resource: @post, resource_type: 'post' %>
 
 </body>
 </html>

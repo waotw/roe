@@ -15,7 +15,7 @@ Rails.application.routes.draw do
     patch "layout/footer", to: "layouts#update_footer"
     get "layouts", to: "layouts#index"
 
-    resources :posts, only: [ :index, :edit, :update, :new, :create ] do
+    resources :posts, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       collection do
         get :drafts
         get :unlisted
@@ -28,7 +28,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :pages, only: [ :index, :edit, :update, :new, :create ] do
+    resources :pages, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       member do
         patch :publish
         patch :unpublish

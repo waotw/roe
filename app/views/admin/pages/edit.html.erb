@@ -7,7 +7,7 @@
 
   <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative">
     <div class="flex items-center gap-2">
-    <%= link_to "← Back to Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-800" %> |
+    <%= link_to "← Back to pages", admin_pages_path, class: "text-blue-600 hover:text-blue-800" %> |
     <%= link_to "Media", browse_admin_medium_index_path, target: "_blank", id: "browse-media-link", class: "text-blue-600 hover:text-blue-800" %>
     </div>
     <% if flash[:notice] %>
@@ -28,30 +28,39 @@
 
   <h1 class="text-3xl font-bold mb-5">Edit Page: <%= @page.title %></h1>
 
-  <div class="mb-5 flex gap-2.5 items-center">
-    <span style="display: inline; margin: 0;">
-      <button type="submit" form="page-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Save</button>
-    </span>
+  <div class="mb-5 flex justify-between items-center">
+    <div class="flex gap-2.5 items-center">
+      <span style="display: inline; margin: 0;">
+        <button type="submit" form="page-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Save</button>
+      </span>
 
-    <button type="button" onclick="previewPost()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Preview</button>
+      <button type="button" onclick="previewpage()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Preview</button>
 
-        <% if @page.draft? %>
-          <%= button_to "Publish", publish_admin_page_path(@page),
-              method: :patch,
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-              form: {
-                onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Publishing this page will save your changes and make it live on your site. Continue?')",
-                style: "display: inline; margin: 0;"
-              } %>
-        <% else %>
-          <%= button_to "Unpublish", unpublish_admin_page_path(@page),
-              method: :patch,
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
-              form: {
-                onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Unpublishing this page will save your changes and remove it from your site. Continue?')",
-                style: "display: inline; margin: 0;"
-              } %>
-        <% end %>
+      <% if @page.draft? %>
+        <%= button_to "Publish", publish_admin_page_path(@page),
+            method: :patch,
+            class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+            form: {
+              onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Publishing this page will save your changes and make it live on your site. Continue?')",
+              style: "display: inline; margin: 0;"
+            } %>
+      <% else %>
+        <%= button_to "Unpublish", unpublish_admin_page_path(@page),
+            method: :patch,
+            class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]",
+            form: {
+              onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Unpublishing this page will save your changes and remove it from your site. Continue?')",
+              style: "display: inline; margin: 0;"
+            } %>
+      <% end %>
+    </div>
+
+    <!-- Right: Delete button -->
+    <button type="button"
+            onclick="showDeleteConfirmation('<%= @page.id %>', '<%= @page.title || 'Untitled' %>')"
+            class="uppercase text-xs px-1.5 py-0 border border-red-600 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">
+      Delete
+    </button>
   </div>
 
   <%= render 'shared/editor',
@@ -62,5 +71,7 @@
         show_metadata: true,
         preview_path: @preview_path || preview_admin_page_path(@page),
         item: @page %>
+
+  <%= render 'shared/delete_file_modal', resource: @page, resource_type: 'page' %>
 </body>
 </html>

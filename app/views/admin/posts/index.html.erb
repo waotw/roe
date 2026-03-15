@@ -43,7 +43,7 @@
               <% @posts.each do |post| %>
                 <tr>
                   <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
-                    <%= post.title || "Untitled" %>
+                    <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4" %>
                   </td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                     <%= render 'shared/inline_rename',
