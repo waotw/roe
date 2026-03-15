@@ -20,30 +20,59 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def preview
-    # Reconstruct content from params
-    metadata_yaml = params[:metadata]
-    content = params[:content]
-
-    begin
-      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
-    rescue
-      metadata = {}
-    end
-
-    # Create a temporary post object (not saved to DB)
     @post = Post.find(params[:id])
 
-    # Override with preview content
-    @post.define_singleton_method(:metadata) { metadata }
-    @post.define_singleton_method(:content) { content }
-    @post.define_singleton_method(:rendered_content) do
-      MarkdownRenderer.render(content, metadata)
-    end
+    # POST = live editing preview with unsaved content
+    if request.post?
+      metadata_yaml = params[:metadata]
+      content = params[:content]
 
-    @preview_mode = true  # Add this line
+      begin
+        metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ]) || {}
+      rescue
+        metadata = {}
+      end
+
+      # Preserve url_name from database if not in submitted metadata
+      metadata['url_name'] ||= @post.metadata['url_name']
+
+      @post.metadata = metadata
+      @post.content = content
+    end
+    # GET = show saved version from database
+
+    # ALWAYS set preview mode
+    @preview_mode = true
+    @preview_id = "post-#{@post.id}"
 
     render template: 'posts/show', layout: 'site'
   end
+
+  # def preview
+  #   # Reconstruct content from params
+  #   metadata_yaml = params[:metadata]
+  #   content = params[:content]
+
+  #   begin
+  #     metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
+  #   rescue
+  #     metadata = {}
+  #   end
+
+  #   # Create a temporary post object (not saved to DB)
+  #   @post = Post.find(params[:id])
+
+  #   # Override with preview content
+  #   @post.define_singleton_method(:metadata) { metadata }
+  #   @post.define_singleton_method(:content) { content }
+  #   @post.define_singleton_method(:rendered_content) do
+  #     MarkdownRenderer.render(content, metadata)
+  #   end
+
+  #   @preview_mode = true  # Add this line
+
+  #   render template: 'posts/show', layout: 'site'
+  # end
 
   def new
     @template = load_post_template
@@ -101,10 +130,7 @@ class Admin::PostsController < Admin::BaseController
   def update
     @post = Post.find(params[:id])
 
-    # Get metadata from the hidden field that gets populated on submit
     metadata_yaml = params[:metadata_final].presence || params[:metadata]
-
-    Rails.logger.info "Received metadata_yaml: #{metadata_yaml}" # Debug
 
     begin
       metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
@@ -114,13 +140,10 @@ class Admin::PostsController < Admin::BaseController
       end
 
     rescue => e
-      flash.now[:warning] = "YAML warning: #{e.message}. File saved anyway."
+      flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@post.file_path, full_content)
-
-      @metadata = metadata_yaml
-      @content = params[:content]
-      render :edit
+      redirect_to edit_admin_post_path(@post)
       return
     end
 
@@ -131,13 +154,8 @@ class Admin::PostsController < Admin::BaseController
     ContentSync.sync_file(@post.file_path)
 
     flash[:notice] = "Post saved"
-    flash[:trigger_refresh] = true
 
-    @raw_content = full_content
-    @metadata = metadata.to_yaml.strip
-    @content = params[:content]
-    @preview_path = preview_admin_post_path(@post)
-    render :edit
+    redirect_to edit_admin_post_path(@post)
   end
 
   def rename

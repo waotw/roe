@@ -13,13 +13,6 @@
     <% if flash[:notice] %>
       <div class="flash-notice px-2 py-0.5 border border-gray-300 bg-green-100 absolute right-0"><%= flash[:notice] %></div>
     <% end %>
-    <% if flash[:trigger_refresh] %>
-      <script>
-        setTimeout(() => {
-          localStorage.setItem('content-updated', Date.now());
-        }, 100);
-      </script>
-    <% end %>
   </div>
 
   <% if flash[:warning] %>
@@ -34,7 +27,7 @@
         <button type="submit" form="page-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Save</button>
       </span>
 
-      <button type="button" onclick="previewpage()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Preview</button>
+      <button type="button" onclick="previewPost()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-[18px] leading-none pt-[0.1rem]">Preview</button>
 
       <% if @page.draft? %>
         <%= button_to "Publish", publish_admin_page_path(@page),
@@ -73,5 +66,18 @@
         item: @page %>
 
   <%= render 'shared/delete_file_modal', resource: @page, resource_type: 'page' %>
+
+  <% if flash[:notice] == "Page saved" %>
+    <script>
+      console.log('Flash notice detected, attempting broadcast...');
+      // Broadcast refresh after successful save (don't redeclare, reuse existing)
+      if (typeof previewChannel !== 'undefined') {
+        console.log('Sending refresh message via previewChannel');
+        previewChannel.postMessage({ action: 'refresh' });
+      } else {
+        console.log('ERROR: previewChannel is undefined!');
+      }
+    </script>
+  <% end %>
 </body>
 </html>

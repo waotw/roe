@@ -59,12 +59,20 @@
       <%= render_layout_file('footer') %>
     </footer>
     <script>
-      // Auto-refresh when content is saved in admin
-      // window.addEventListener('storage', (e) => {
-      //   if (e.key === 'content-updated') {
-      //     Turbo.visit(window.location, { action: "replace" });
-      //   }
-      // });
+      <% if defined?(@preview_mode) && @preview_mode %>
+        const previewId = '<%= @preview_id %>';
+
+        // Listen on broadcast channel
+        window.previewChannel = new BroadcastChannel(`preview-${previewId}`);
+
+        window.previewChannel.onmessage = (event) => {
+          if (event.data.action === 'refresh') {
+            window.location.reload();
+          }
+        };
+
+        window.name = previewId;
+      <% end %>
     </script>
   </body>
 </html>

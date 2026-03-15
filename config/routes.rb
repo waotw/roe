@@ -24,6 +24,7 @@ Rails.application.routes.draw do
         patch :publish
         patch :unpublish
         post :preview
+        get :preview
         patch :rename
       end
     end
@@ -33,6 +34,7 @@ Rails.application.routes.draw do
         patch :publish
         patch :unpublish
         post :preview
+        get :preview
         patch :rename
       end
     end

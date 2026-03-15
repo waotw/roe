@@ -1,4 +1,4 @@
-<%= form_with url: form_url, method: :patch, id: "#{resource_type}-form" do |f| %>
+<%= form_with url: form_url, method: :patch, id: "#{resource_type}-form", data: { turbo: false } do |f| %>
   <% if show_metadata %>
     <%= render 'shared/metadata_editor',
         metadata: metadata,
@@ -39,4 +39,4 @@
   </div>
 <% end %>
 
-<%= render 'shared/editor_scripts', resource_type: resource_type, preview_path: preview_path %>
+<%= render 'shared/editor_scripts', resource_type: resource_type, preview_path: preview_path, item: item %>

@@ -61,31 +61,23 @@ class Admin::PagesController < Admin::BaseController
   def update
     @page = Page.find(params[:id])
 
-    # Get metadata from the hidden field that gets populated on submit
     metadata_yaml = params[:metadata_final].presence || params[:metadata]
 
     begin
-      # Parse submitted metadata YAML
       metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
 
-      # Validate YAML structure
       unless metadata.is_a?(Hash)
         raise "Metadata must be key-value pairs"
       end
 
     rescue => e
-      flash.now[:warning] = "YAML warning: #{e.message}. File saved anyway."
+      flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@page.file_path, full_content)
-
-      @metadata = metadata_yaml
-      @content = params[:content]
-      @preview_path = preview_admin_page_path(@page)
-      render :edit
+      redirect_to edit_admin_page_path(@page)
       return
     end
 
-    # Valid YAML - reconstruct properly
     yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@page.file_path, full_content)
@@ -93,13 +85,8 @@ class Admin::PagesController < Admin::BaseController
     ContentSync.sync_file(@page.file_path)
 
     flash[:notice] = "Page saved"
-    flash[:trigger_refresh] = true
 
-    @raw_content = full_content
-    @metadata = metadata.to_yaml.strip
-    @content = params[:content]
-    @preview_path = preview_admin_page_path(@page)
-    render :edit
+    redirect_to edit_admin_page_path(@page)
   end
 
   def rename
@@ -166,30 +153,59 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def preview
-    # Reconstruct content from params
-    metadata_yaml = params[:metadata]
-    content = params[:content]
-
-    begin
-      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
-    rescue
-      metadata = {}
-    end
-
-    # Create a temporary post object (not saved to DB)
     @page = Page.find(params[:id])
 
-    # Override with preview content
-    @page.define_singleton_method(:metadata) { metadata }
-    @page.define_singleton_method(:content) { content }
-    @page.define_singleton_method(:rendered_content) do
-      MarkdownRenderer.render(content, metadata)
-    end
+    # POST = live editing preview with unsaved content
+    if request.post?
+      metadata_yaml = params[:metadata]
+      content = params[:content]
 
-    @preview_mode = true  # Add this line
+      begin
+        metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ]) || {}
+      rescue
+        metadata = {}
+      end
+
+      # Preserve url_name from database if not in submitted metadata
+      metadata['url_name'] ||= @page.metadata['url_name']
+
+      @page.metadata = metadata
+      @page.content = content
+    end
+    # GET = show saved version from database
+
+    # ALWAYS set preview mode
+    @preview_mode = true
+    @preview_id = "page-#{@page.id}"
 
     render template: 'pages/show', layout: 'site'
   end
+
+  # def preview
+  #   # Reconstruct content from params
+  #   metadata_yaml = params[:metadata]
+  #   content = params[:content]
+
+  #   begin
+  #     metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
+  #   rescue
+  #     metadata = {}
+  #   end
+
+  #   # Create a temporary page object (not saved to DB)
+  #   @page = Page.find(params[:id])
+
+  #   # Override with preview content
+  #   @page.define_singleton_method(:metadata) { metadata }
+  #   @page.define_singleton_method(:content) { content }
+  #   @page.define_singleton_method(:rendered_content) do
+  #     MarkdownRenderer.render(content, metadata)
+  #   end
+
+  #   @preview_mode = true  # Add this line
+
+  #   render template: 'pages/show', layout: 'site'
+  # end
 
   private
 

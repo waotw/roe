@@ -3,6 +3,11 @@
   // Collection template
   const collectionButtonTemplate = <%= raw SiteConfig.default('collections', 'button_template').to_json %>;
 
+  // Preview variables:
+  const resourceType = '<%= resource_type %>';
+  const resourceId = '<%= defined?(item) && item && item.id ? item.id : "" %>';
+  const previewId = `${resourceType}-${resourceId}`;
+
   // Card templates
   const asideButtonTemplate = <%= raw SiteConfig.default('cards', 'aside_button_template').to_json %>;
   const postLinkButtonTemplate = <%= raw SiteConfig.default('cards', 'post_link_button_template').to_json %>;
@@ -50,74 +55,18 @@
       }
     }
 
-  function previewPost() {
-    const previewPath = '<%= defined?(preview_path) ? preview_path : "" %>';
+    function previewPost() {
+      const previewPath = '<%= defined?(preview_path) ? preview_path : "" %>';
 
-    if (!previewPath) {
-      console.error("Preview path not defined");
-      return;
+      if (!previewPath) {
+        console.error("Preview path not defined");
+        return;
+      }
+
+      // Always open the preview URL (works for both drafts and published)
+      const url = new URL(previewPath, window.location.origin);
+      window.open(url.toString(), previewId);
     }
-
-    // Collect form data
-    const formData = new FormData();
-    formData.append('authenticity_token', document.querySelector('meta[name="csrf-token"]').content);
-
-    const metadataTextarea = document.querySelector('[name="metadata"]');
-    if (metadataTextarea) {
-      formData.append('metadata', metadataTextarea.value);
-    }
-
-    formData.append('content', document.getElementById("content-textarea").value);
-
-    // Open window first time only
-    if (!window.previewWindow || window.previewWindow.closed) {
-      window.previewWindow = window.open('about:blank', 'preview-window');
-    }
-
-    // Fetch and write to preview window without losing focus
-    fetch(previewPath + '?preview=true', {
-      method: 'POST',
-      body: formData
-    })
-    .then(response => response.text())
-    .then(html => {
-      window.previewWindow.document.open();
-      window.previewWindow.document.write(html);
-      window.previewWindow.document.close();
-
-      // Keep focus on editor
-      document.getElementById('content-textarea').focus({ preventScroll: true });
-    });
-  }
-
-  // NOW wrap it for auto-preview tracking
-  let previewTimeout;
-  let previewWindowOpened = false;
-
-  const originalPreviewPost = previewPost;
-  previewPost = function () {
-    previewWindowOpened = true;
-    originalPreviewPost();
-  };
-
-  function schedulePreview() {
-    if (!previewWindowOpened) return;
-
-    clearTimeout(previewTimeout);
-    previewTimeout = setTimeout(() => {
-      previewPost();
-    }, 500);
-  }
-
-  // Listen to both content and metadata changes
-  document
-    .getElementById("content-textarea")
-    .addEventListener("input", schedulePreview);
-
-  const metadataTextarea = document.querySelector('[name="metadata"]');
-  if (metadataTextarea) {
-    metadataTextarea.addEventListener("input", schedulePreview);
-  }
 
   // Add this function:
   let originalMetadata = document.querySelector('[name="metadata"]')?.value || "";
@@ -357,12 +306,17 @@
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
-      document.getElementById("<%= resource_type %>-form").requestSubmit();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+
+      // Broadcast save
+      previewChannel.postMessage({ action: 'refresh' });
+
+      document.getElementById("<%= resource_type %>-form").submit();
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key === "p") {
       e.preventDefault();
-      document.querySelector('form[target="_blank"]')?.requestSubmit();
+      previewPost();
     }
   });
 
@@ -378,12 +332,16 @@
     }
   });
 
-  document
-    .getElementById("<%= resource_type %>-form")
-    .addEventListener("submit", () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      localStorage.setItem("content-updated", Date.now());
-    });
+  // Create a broadcast channel for this preview
+  const previewChannel = new BroadcastChannel(`preview-${previewId}`);
+
+  const form = document.getElementById("<%= resource_type %>-form");
+  form.addEventListener("submit", (e) => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+
+    // Broadcast that content was saved
+    previewChannel.postMessage({ action: 'refresh' });
+  });
 
   // Hide flash notice on any input
   const flashNotice = document.querySelector(".flash-notice");

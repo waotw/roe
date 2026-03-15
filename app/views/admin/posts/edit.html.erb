@@ -13,14 +13,6 @@
     <% if flash[:notice] %>
       <div class="flash-notice px-2 py-0.5 border border-gray-300 bg-green-100 absolute right-0"><%= flash[:notice] %></div>
     <% end %>
-    <% if flash[:trigger_refresh] %>
-      <script>
-        // Delay slightly to ensure other tabs are listening
-        setTimeout(() => {
-          localStorage.setItem('content-updated', Date.now());
-        }, 100);
-      </script>
-    <% end %>
   </div>
 
   <% if flash[:warning] %>
@@ -75,5 +67,17 @@
 
   <%= render 'shared/delete_file_modal', resource: @post, resource_type: 'post' %>
 
+  <% if flash[:notice] == "Post saved" %>
+    <script>
+      console.log('Flash notice detected, attempting broadcast...');
+      // Broadcast refresh after successful save (don't redeclare, reuse existing)
+      if (typeof previewChannel !== 'undefined') {
+        console.log('Sending refresh message via previewChannel');
+        previewChannel.postMessage({ action: 'refresh' });
+      } else {
+        console.log('ERROR: previewChannel is undefined!');
+      }
+    </script>
+  <% end %>
 </body>
 </html>
