@@ -1,17 +1,9 @@
 <%= form_with url: form_url, method: :patch, id: "#{resource_type}-form" do |f| %>
   <% if show_metadata %>
-    <div class="mb-5">
-      <h3 class="text-sm text-gray-600 mb-1">Metadata</h3>
-      <% if defined?(item) && item.persisted? && item.url_name.present? %>
-        <div class="mb-3 p-2 bg-blue-50 border border-blue-200 text-sm">
-          <span class="text-blue-800 font-semibold">URL:</span>
-          <code class="font-mono text-xs ml-2"><%= item.url_name %></code>
-          <span class="text-gray-500 text-xs ml-2">(computed: customize with <code><strong>url_name:</strong></code> in metadata)</span>
-        </div>
-      <% end %>
-      <%= f.text_area :metadata, value: metadata,
-          class: "w-full font-mono text-sm p-1 border border-gray-300 bg-gray-50 box-border h-[150px]" %>
-    </div>
+    <%= render 'shared/metadata_editor',
+        metadata: metadata,
+        resource_type: resource_type,
+        item: defined?(item) ? item : nil %>
   <% end %>
 
   <div>
@@ -42,8 +34,8 @@
       </div>
     </div>
     <%= f.text_area :content, value: content,
-        class: "w-full font-mono text-sm p-1 border border-gray-300 box-border h-[500px] bg-white",
-        id: "content-textarea" %>
+            class: "w-full font-mono text-sm p-1 border border-gray-300 box-border h-[500px] bg-white",
+            id: "content-textarea" %>
   </div>
 <% end %>
 

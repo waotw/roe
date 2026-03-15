@@ -79,7 +79,7 @@ class Admin::PostsController < Admin::BaseController
     post = Post.find_by(file_path: file_path.to_s)
 
     if post
-      redirect_to edit_admin_post_path(post)
+      redirect_to edit_admin_post_path(post), notice: "Post created", flash: { new_post: true }
     else
       flash[:error] = "Post file created but failed to sync to database"
       redirect_to admin_posts_path
@@ -101,32 +101,31 @@ class Admin::PostsController < Admin::BaseController
   def update
     @post = Post.find(params[:id])
 
-    # Reconstruct full markdown file
-    begin
-      # Parse submitted metadata YAML
-      metadata = YAML.safe_load(params[:metadata], permitted_classes: [ Date, Time, Symbol ])
+    # Get metadata from the hidden field that gets populated on submit
+    metadata_yaml = params[:metadata_final].presence || params[:metadata]
 
-      # Validate YAML structure
+    Rails.logger.info "Received metadata_yaml: #{metadata_yaml}" # Debug
+
+    begin
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
+
       unless metadata.is_a?(Hash)
         raise "Metadata must be key-value pairs"
       end
 
     rescue => e
       flash.now[:warning] = "YAML warning: #{e.message}. File saved anyway."
-      # Save as-is even with invalid YAML
-      full_content = "---\n#{params[:metadata]}\n---\n#{params[:content]}"
+      full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@post.file_path, full_content)
 
-      @metadata = params[:metadata]
+      @metadata = metadata_yaml
       @content = params[:content]
       render :edit
       return
     end
 
-    # Valid YAML - reconstruct properly
     yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
-    full_content = full_content.gsub(/\r\n/, "\n")
     normalize_and_write(@post.file_path, full_content)
 
     ContentSync.sync_file(@post.file_path)

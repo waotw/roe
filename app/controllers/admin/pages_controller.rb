@@ -61,10 +61,12 @@ class Admin::PagesController < Admin::BaseController
   def update
     @page = Page.find(params[:id])
 
-    # Reconstruct full markdown file
+    # Get metadata from the hidden field that gets populated on submit
+    metadata_yaml = params[:metadata_final].presence || params[:metadata]
+
     begin
       # Parse submitted metadata YAML
-      metadata = YAML.safe_load(params[:metadata], permitted_classes: [ Date, Time, Symbol ])
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
 
       # Validate YAML structure
       unless metadata.is_a?(Hash)
@@ -73,11 +75,10 @@ class Admin::PagesController < Admin::BaseController
 
     rescue => e
       flash.now[:warning] = "YAML warning: #{e.message}. File saved anyway."
-      # Save as-is even with invalid YAML - but wrap properly
-      full_content = "---\n#{params[:metadata].strip}\n---\n#{params[:content]}"
+      full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@page.file_path, full_content)
 
-      @metadata = params[:metadata]
+      @metadata = metadata_yaml
       @content = params[:content]
       @preview_path = preview_admin_page_path(@page)
       render :edit
@@ -87,7 +88,6 @@ class Admin::PagesController < Admin::BaseController
     # Valid YAML - reconstruct properly
     yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
-    full_content = full_content.gsub(/\r\n/, "\n")
     normalize_and_write(@page.file_path, full_content)
 
     ContentSync.sync_file(@page.file_path)
@@ -95,9 +95,10 @@ class Admin::PagesController < Admin::BaseController
     flash[:notice] = "Page saved"
     flash[:trigger_refresh] = true
 
-    # Re-parse for display
-    @metadata = yaml_content
+    @raw_content = full_content
+    @metadata = metadata.to_yaml.strip
     @content = params[:content]
+    @preview_path = preview_admin_page_path(@page)
     render :edit
   end
 
