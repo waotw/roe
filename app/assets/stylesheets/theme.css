@@ -32,6 +32,7 @@
   --space-8: 2rem;
   --space-12: 3rem;
   --space-16: 4rem;
+  --space-gallery: 1rem;
   --aside-width: 190px;
 
   /* Colors */
@@ -540,6 +541,72 @@ p:has(.site-logo) {
 /* Optional: adjust individual collection spacing inside grids */
 .collection-grid .collection {
   margin: 0; /* Remove default margins since grid handles spacing */
+}
+
+/* ==========================================
+   GALLERIES
+   ========================================== */
+
+.gallery {
+  margin-bottom: var(--space-8);
+}
+
+.gallery-row {
+  display: grid;
+  gap: var(--space-gallery);
+  margin-bottom: var(--space-gallery);
+}
+
+.gallery-row:has(figure) {
+  margin-bottom: 0;
+}
+
+.gallery-row:last-child {
+  margin-bottom: 0;
+}
+
+/* Column layouts */
+.gallery-col-1 {
+  grid-template-columns: 1fr;
+}
+
+.gallery-col-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.gallery-col-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Image styling */
+.content .gallery img {
+  margin: 0;
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+/* Figure and caption styling */
+.gallery figure {
+  margin: 0;
+}
+
+.gallery figcaption {
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-gallery);
+  font-size: 0.875rem;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 768px) {
+  .gallery-col-2,
+  .gallery-col-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ==========================================

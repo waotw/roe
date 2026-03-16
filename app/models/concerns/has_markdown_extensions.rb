@@ -6,7 +6,6 @@ module HasMarkdownExtensions
     code_blocks = {}
     counter = 0
 
-    # Match 4+ backtick blocks first
     processed_content = content.gsub(/````+.*?\n(.*?)````+/m) do
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
       code_blocks[token] = $~.to_s
@@ -14,14 +13,13 @@ module HasMarkdownExtensions
       token
     end
 
-    # Then protect regular 3-backtick blocks that aren't collection/card
-    # Key fix: match language identifier OR empty, but NOT collection/card
+    # Then protect regular 3-backtick blocks that aren't collection/card/gallery
     processed_content = processed_content.gsub(/```(\w+)\r?\n(.*?)```/m) do
       lang = $1
       code = $2
 
-      # Skip if it's a collection or card block
-      next $~.to_s if lang == 'collection' || lang == 'card'
+      # Skip if it's a collection, card, or gallery block
+      next $~.to_s if [ 'collection', 'card', 'gallery' ].include?(lang)
 
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
       code_blocks[token] = "```#{lang}\n#{code}```"
@@ -29,7 +27,9 @@ module HasMarkdownExtensions
       token
     end
 
-    # Step 2: Process collections and cards
+    # Step 2: Process galleries, collections and cards
+    processed_content = process_auto_galleries(processed_content)
+    processed_content = process_galleries(processed_content, preview: preview)
     processed_content = process_collections(processed_content, preview: preview)
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
@@ -56,6 +56,138 @@ module HasMarkdownExtensions
   end
 
   private
+
+  def process_auto_galleries(markdown)
+    lines = markdown.split("\n")
+    result = []
+    consecutive_images = []
+    inside_fenced_block = false
+
+    lines.each do |line|
+      # Track if we're inside a fenced code block
+      if line.strip =~ /^```/
+        inside_fenced_block = !inside_fenced_block
+
+        # Flush any accumulated images before entering a block
+        if inside_fenced_block && consecutive_images.length >= 2
+          result << "```gallery"
+          result.concat(consecutive_images)
+          result << "```"
+          consecutive_images = []
+        elsif consecutive_images.length == 1
+          result.concat(consecutive_images)
+          consecutive_images = []
+        end
+
+        result << line
+        next
+      end
+
+      # Skip auto-gallery processing inside fenced blocks
+      if inside_fenced_block
+        result << line
+        next
+      end
+
+      # Check if this line is an image (with optional caption)
+      if line.strip =~ /^!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*([^*]+)\*\))?$/
+        consecutive_images << line
+      else
+        # Not an image - process any accumulated images
+        if consecutive_images.length >= 2
+          result << "```gallery"
+          result.concat(consecutive_images)
+          result << "```"
+        elsif consecutive_images.length == 1
+          result.concat(consecutive_images)
+        end
+
+        consecutive_images = []
+        result << line
+      end
+    end
+
+    # Handle any remaining consecutive images at end
+    if consecutive_images.length >= 2
+      result << "```gallery"
+      result.concat(consecutive_images)
+      result << "```"
+    elsif consecutive_images.length == 1
+      result.concat(consecutive_images)
+    end
+
+    result.join("\n")
+  end
+
+  def process_galleries(markdown, preview: false)
+    result = markdown.gsub(/```gallery\r?\n(.*?)```/m) do
+      gallery_content = $1
+      html = render_gallery(gallery_content, preview: preview)
+
+      html
+    end
+    result
+  end
+
+  def render_gallery(content, preview: false)
+    # Split by blank lines to get rows
+    rows = content.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
+
+    if rows.empty?
+      return preview ? '<!-- Empty gallery -->' : ''
+    end
+
+    output = [ '{::nomarkdown}' ]
+    output << '<div class="gallery">'
+
+    rows.each do |row_content|
+      images = []
+
+      row_content.scan(/!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*(.*?)\*\))?/) do
+        alt_text = $1
+        src = $2
+        caption = $3&.strip
+
+        images << {
+          alt: alt_text,
+          src: src,
+          caption: caption
+        }
+      end
+
+      next if images.empty?
+
+      col_count = [ images.length, 3 ].min
+
+      output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
+
+      images.each do |img|
+        if img[:caption].present?
+          # Process caption as inline markdown
+          caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
+          # Remove wrapping <p> tags that Kramdown adds
+          caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
+
+          output << "    <figure>"
+          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+          output << "      <figcaption>#{caption_html}</figcaption>"
+          output << "    </figure>"
+        else
+          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+        end
+      end
+
+      output << "  </div>"
+    end
+
+    output << '</div>'
+    output << '{:/nomarkdown}'
+    output.join("\n")
+  end
+
+  def escape_html(text)
+    CGI.escapeHTML(text.to_s)
+  end
 
   def process_collections(markdown, preview: false)
     # Match fenced blocks with 'collection' language - handle both \n and \r\n
