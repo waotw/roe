@@ -9,8 +9,8 @@
                 aside_template: SiteConfig.default('cards', 'aside_button_template'),
                 post_link_template: SiteConfig.default('cards', 'post_link_button_template'),
                 pullquote_template: SiteConfig.default('cards', 'pullquote_button_template'),
-                known_fields: @metadata_config.to_json,
-                default_author: @default_author
+                known_fields: metadata_config.to_json,
+                default_author: default_author
               } do |form| %>
   <% if show_metadata %>
     <%= render 'shared/metadata_editor',

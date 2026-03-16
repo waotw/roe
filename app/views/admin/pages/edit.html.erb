@@ -66,7 +66,9 @@
         content: @content,
         show_metadata: true,
         preview_path: @preview_path || preview_admin_page_path(@page),
-        item: @page %>
+        item: @page,
+        metadata_config: @metadata_config,
+        default_author: @default_author %>
 
   <%= render 'shared/delete_file_modal', resource: @page, resource_type: 'page' %>
 
