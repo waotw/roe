@@ -88,6 +88,13 @@ class ContentWatcher
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
 
+    elsif absolute_file.include?('content/documentation')
+      result = Documentation.create_or_update_from_file(absolute_file)
+
+      if result
+        puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
+      end
+
     elsif absolute_file.include?('content/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
       # New media file added manually
       web_path = absolute_file.sub(Rails.root.join('content').to_s, '')

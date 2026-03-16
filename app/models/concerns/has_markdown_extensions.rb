@@ -137,7 +137,8 @@ module HasMarkdownExtensions
       return preview ? '<!-- Empty gallery -->' : ''
     end
 
-    output = [ '{::nomarkdown}' ]
+    output = [ '' ]
+    output << '{::nomarkdown}'
     output << '<div class="gallery">'
 
     rows.each do |row_content|
@@ -182,6 +183,7 @@ module HasMarkdownExtensions
 
     output << '</div>'
     output << '{:/nomarkdown}'
+    output << ''
     output.join("\n")
   end
 
