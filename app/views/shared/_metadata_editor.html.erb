@@ -49,11 +49,11 @@
     <button type="button"
               onclick="toggleMetadataSection()"
               class="text-sm font-semibold text-gray-700 hover:text-gray-900">
-              Metadata <span id="metadata-arrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono text-xs h-[18px] rounded-xs leading-none  text-blue-800"><%= metadata_hidden.present? ? '▶' : '▼' %></span>
+              Metadata <span id="metadata-arrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none  text-blue-800"><%= metadata_hidden.present? ? '▶' : '▼' %></span>
     </button>
     <button type="button"
             onclick="toggleMetadataView()"
-            class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono text-xs h-[18px] rounded-xs leading-none pt-[0.1rem]"
+            class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem]"
             id="metadata-toggle">
             RAW
     </button>
@@ -87,7 +87,7 @@
                     data-custom-key>
             <% else %>
               <!-- Known field with fixed label -->
-              <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+              <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 shrink-0 pt-1.5">
                 <%= config[:label] %>:
               </label>
             <% end %>
@@ -122,7 +122,7 @@
                         data-metadata-field="<%= field_name %>">
                   <option value="">-- select --</option>
                   <% config[:options].each do |option| %>
-                    <option value="<%= option %>" <%= 'selected' if value == option %>><%= option %></option>
+                    <option value="<%= option %>" <% if value == option %>selected<% end %>><%= option %></option>
                   <% end %>
                 </select>
 
@@ -138,12 +138,12 @@
             <% if is_custom || !config[:required] %>
               <button type="button"
                       onclick="removeMetadataField(this)"
-                      class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
+                      class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0">
                 ×
               </button>
             <% else %>
               <!-- Spacer to maintain alignment -->
-              <div class="w-6 flex-shrink-0"></div>
+              <div class="w-6 shrink-0"></div>
             <% end %>
           </div>
         <% end %>
@@ -158,7 +158,7 @@
         </button>
 
         <div id="add-field-menu"
-            class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-10 min-w-[200px]">
+            class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-10 min-w-50">
           <% available_known_fields.each do |field_name| %>
             <button type="button"
                     onclick="addKnownField('<%= field_name %>')"
@@ -191,15 +191,32 @@
 </div>
 
 <script>
-// Store field configs for dynamic add
-const knownFieldsConfig = <%= raw known_fields_config.to_json %>;
-const defaultAuthor = '<%= j default_author %>';
-let isYamlView = false;
+(function() {
+  // Store field configs for dynamic add
+  const knownFieldsConfig = <%= raw known_fields_config.to_json %>;
+  const defaultAuthor = <%= default_author.to_json.html_safe %>;
+  let isYamlView = false;
 
-function toggleAddFieldMenu() {
-  const menu = document.getElementById('add-field-menu');
-  menu.classList.toggle('hidden');
-}
+  // Restore metadata section state from sessionStorage
+  const savedState = sessionStorage.getItem('metadataEditorOpen');
+  const content = document.getElementById('metadata-content');
+  const arrow = document.getElementById('metadata-arrow');
+
+  if (savedState !== null) {
+    const shouldBeOpen = savedState === 'true';
+    if (shouldBeOpen) {
+      content.classList.remove('hidden');
+      arrow.textContent = '▼';
+    } else {
+      content.classList.add('hidden');
+      arrow.textContent = '▶';
+    }
+  }
+
+  function toggleAddFieldMenu() {
+    const menu = document.getElementById('add-field-menu');
+    menu.classList.toggle('hidden');
+  }
 
 // Close menu when clicking outside
 document.addEventListener('click', function(e) {
@@ -401,7 +418,11 @@ function toggleMetadataSection() {
   const arrow = document.getElementById('metadata-arrow');
 
   content.classList.toggle('hidden');
-  arrow.textContent = content.classList.contains('hidden') ? '▶' : '▼';
+  const isHidden = content.classList.contains('hidden');
+  arrow.textContent = isHidden ? '▶' : '▼';
+
+  // Save state to sessionStorage
+  sessionStorage.setItem('metadataEditorOpen', !isHidden);
 }
 
 function formToYaml() {
@@ -513,7 +534,7 @@ function addKnownFieldToForm(fieldName, value) {
 
   // Conditionally add delete button (not for required fields)
   const deleteButton = config.required
-    ? '<div class="w-8 flex-shrink-0"></div>'
+    ? '<div class="w-6 flex-shrink-0"></div>'
     : `<button type="button"
               onclick="removeMetadataField(this)"
               class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
@@ -559,16 +580,23 @@ function addCustomFieldToForm(key, value) {
 }
 
 // Before form submission, convert form data to YAML
-document.addEventListener('DOMContentLoaded', function() {
-  const form = document.getElementById('<%= resource_type %>-form');
-  if (form) {
-    form.addEventListener('submit', function(e) {
-      const finalYaml = isYamlView
-        ? document.getElementById('metadata-yaml').value
-        : formToYaml();
+const form = document.getElementById('<%= j(resource_type) %>-form');
+if (form) {
+  form.addEventListener('submit', function(e) {
+    const finalYaml = isYamlView
+      ? document.getElementById('metadata-yaml').value
+      : formToYaml();
 
-      document.getElementById('metadata-final').value = finalYaml;
-    });
-  }
-});
+    document.getElementById('metadata-final').value = finalYaml;
+  });
+}
+
+// Make functions globally available
+  window.toggleAddFieldMenu = toggleAddFieldMenu;
+  window.addKnownField = addKnownField;
+  window.addCustomField = addCustomField;
+  window.removeMetadataField = removeMetadataField;
+  window.toggleMetadataView = toggleMetadataView;
+  window.toggleMetadataSection = toggleMetadataSection;
+})();
 </script>

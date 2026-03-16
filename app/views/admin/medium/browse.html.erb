@@ -33,17 +33,17 @@
   <% if @media.any? %>
     <div class="grid grid-cols-4 gap-4">
       <% @media.each do |media| %>
-        <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative" onclick="selectMedia('<%= media.file_path %>', '<%= File.basename(media.file_path) %>')">
-          <img src="<%= media.file_path %>" alt="<%= File.basename(media.file_path) %>" class="w-full h-32 object-cover mb-2">
+        <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative" onclick="selectMedia('<%= j(media.file_path) %>', '<%= j(File.basename(media.file_path)) %>')">
+          <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2" %>
           <div class="mb-1">
             <%= render 'shared/inline_rename_media', media: media %>
           </div>
           <div class="flex flex-col gap-1">
-            <button onclick="copyUrl(event, '<%= media.file_path %>')"
+            <button onclick="copyUrl(event, '<%= j(media.file_path) %>')"
                   class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">
                 Copy URL
               </button>
-            <button onclick="copyMarkdown(event, '<%= media.file_path %>', '<%= File.basename(media.file_path) %>')"
+            <button onclick="copyMarkdown(event, '<%= j(media.file_path) %>', '<%= j(File.basename(media.file_path)) %>')"
                 class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
               Markdown Link
             </button>

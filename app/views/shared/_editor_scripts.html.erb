@@ -4,8 +4,8 @@
   const collectionButtonTemplate = <%= raw SiteConfig.default('collections', 'button_template').to_json %>;
 
   // Preview variables:
-  const resourceType = '<%= resource_type %>';
-  const resourceId = '<%= defined?(item) && item && item.id ? item.id : "" %>';
+  const resourceType = '<%= resource_type.to_json %>';
+  const resourceId = <%= (defined?(item) && item && item.id ? item.id : "").to_json %>;
   const previewId = `${resourceType}-${resourceId}`;
 
   // Card templates
@@ -56,7 +56,7 @@
     }
 
     function previewPost() {
-      const previewPath = '<%= defined?(preview_path) ? preview_path : "" %>';
+      const previewPath = '<%= defined?(preview_path) ? j(preview_path) : "" %>';
 
       if (!previewPath) {
         console.error("Preview path not defined");
@@ -311,7 +311,7 @@
       // Broadcast save
       previewChannel.postMessage({ action: 'refresh' });
 
-      document.getElementById("<%= resource_type %>-form").submit();
+      document.getElementById("<%= resource_type.to_json %>-form").submit();
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key === "p") {
@@ -335,7 +335,7 @@
   // Create a broadcast channel for this preview
   const previewChannel = new BroadcastChannel(`preview-${previewId}`);
 
-  const form = document.getElementById("<%= resource_type %>-form");
+  const form = document.getElementById("<%= j(resource_type) %>-form");
   form.addEventListener("submit", (e) => {
     window.removeEventListener("beforeunload", handleBeforeUnload);
 

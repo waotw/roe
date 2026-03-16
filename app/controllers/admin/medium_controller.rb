@@ -10,16 +10,18 @@ class Admin::MediumController < Admin::BaseController
     folder_path = Rails.root.join("content/media/#{media_type}")
     FileUtils.mkdir_p(folder_path)
 
-    # Sanitize filename
-    filename = sanitize_media_filename(uploaded_file.original_filename)
+    # Extract extension FIRST, before sanitizing
+    extension = File.extname(uploaded_file.original_filename)
+    base_name = File.basename(uploaded_file.original_filename, extension)
 
-    # Check for duplicates and append timestamp if needed
-    base_name = File.basename(filename, File.extname(filename))
-    extension = File.extname(filename)
+    # Sanitize only the base name (without extension)
+    sanitized_base = sanitize_media_filename(base_name)
+    filename = "#{sanitized_base}#{extension}"
+
+    # Check for duplicates
     counter = 1
-
     while Medium.exists?(file_path: "/media/#{media_type}/#{filename}")
-      filename = "#{base_name}-#{counter}#{extension}"
+      filename = "#{sanitized_base}-#{counter}#{extension}"
       counter += 1
     end
 

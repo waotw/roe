@@ -50,7 +50,7 @@
             </p>
           </div>
           <div class="flex gap-2">
-            <button onclick="copyFilename(event, '<%= font[:filename] %>')"
+            <button onclick="copyFilename(event, '<%= j(font[:filename]) %>')"
                     class="uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">
               Copy Filename
             </button>
