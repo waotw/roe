@@ -93,6 +93,11 @@ class Admin::SystemAssetsController < ApplicationController
     end
   end
 
+  def available_fonts
+    fonts = Dir.glob(FONTS_PATH.join('*')).map { |f| File.basename(f) }
+    render json: { fonts: fonts }
+  end
+
   private
 
   def sanitize_filename(filename)

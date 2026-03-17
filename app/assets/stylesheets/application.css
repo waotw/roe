@@ -2,3 +2,45 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Floating flash message */
+.flash-floating {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  min-width: 300px;
+  padding: 1rem 1.5rem;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.flash-floating.notice {
+  background-color: #10b981;
+  color: white;
+}
+
+.flash-floating.alert,
+.flash-floating.error {
+  background-color: #ef4444;
+  color: white;
+}
+
+/*@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}*/

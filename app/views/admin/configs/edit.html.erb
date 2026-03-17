@@ -1,14 +1,14 @@
+<% content_for :editor_js, false %>
 <div class="px-4 sm:px-0">
   <div class="sm:flex sm:items-center mb-6">
     <div class="sm:flex-auto">
       <h1 class="text-3xl font-bold text-gray-900">Edit <%= @config_type.capitalize %> Configuration</h1>
       <p class="mt-2 text-sm text-gray-700">
-        Edit the YAML configuration file.
-        <span class="text-amber-600">Be careful with syntax - invalid YAML will be rejected.</span>
+        Configure your site settings using the form below or edit the raw YAML.
       </p>
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
     </div>
   </div>
 
@@ -18,13 +18,12 @@
     </div>
   <% end %>
 
-  <%
-    form_url = case @config_type
-    when 'site' then admin_site_config_path
-    when 'cards' then admin_cards_config_path
-    when 'collections' then admin_collections_config_path
-    end
-  %>
-
-  <%= render 'config_editor', form_url: form_url, content: @config_content, config_type: @config_type %>
+  <% if @config_schema %>
+    <%= render 'shared/config_editor',
+               form_url: admin_site_config_path,
+               config_content: @config_content,
+               config_schema: @config_schema %>
+  <% else %>
+    <%= render 'config_editor', form_url: form_url, content: @config_content, config_type: @config_type %>
+  <% end %>
 </div>

@@ -56,6 +56,7 @@ Rails.application.routes.draw do
       collection do
         get :browse_fonts
         get :browse_images
+        get :available_fonts
       end
     end
 

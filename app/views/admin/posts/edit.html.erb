@@ -2,17 +2,15 @@
 <html>
 <head>
   <title>Edit: <%= @post.title || 'Untitled' %></title>
+  <% content_for :editor_js, true %>
 </head>
-<body class="bg-white text-black p-5" data-turbo-action="replace">
+<body class="bg-white text-black p-5" data-turbo-action="replace" data-md-editor>
 
   <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative">
     <div class="flex items-center gap-2">
     <%= link_to "← Back to Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-800" %> |
     <%= link_to "Media", browse_admin_medium_index_path, target: "_blank", id: "browse-media-link", class: "text-blue-600 hover:text-blue-800" %>
     </div>
-    <% if flash[:notice] %>
-      <div class="flash-notice px-2 py-0.5 border border-gray-300 bg-green-100 absolute right-0"><%= flash[:notice] %></div>
-    <% end %>
   </div>
 
   <% if flash[:warning] %>

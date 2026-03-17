@@ -1,0 +1,75 @@
+<%
+  # Check if field is conditionally dependent on another field
+  is_disabled = false
+  disabled_message = nil
+
+  if field_config[:depends_on]
+    dependency_value = all_values[field_config[:depends_on]]
+    if dependency_value.blank?
+      is_disabled = true
+      disabled_message = "(requires #{field_config[:depends_on]} to be set)"
+    end
+  end
+%>
+
+<div class="config-field-row <%= is_disabled ? 'opacity-50' : '' %>">
+  <label class="block text-sm font-medium text-gray-700 mb-1">
+    <%= field_config[:label] %>
+    <% if field_config[:required] %>
+      <span class="text-red-600">*</span>
+    <% end %>
+    <% if disabled_message %>
+      <span class="text-gray-400 text-xs font-normal"><%= disabled_message %></span>
+    <% end %>
+  </label>
+
+  <% case field_config[:type] %>
+  <% when :text %>
+    <input type="text"
+              name="config_fields[<%= field_name %>]"
+              value="<%= value %>"
+              class="w-full font-mono text-sm p-1 border border-gray-300 <%= is_disabled ? 'bg-gray-100 text-gray-400' : '' %>"
+              data-config-field="<%= field_name %>"
+              <% if field_name == 'logo' || field_name == 'favicon' %>data-validate-image="true"<% end %>
+              <% if field_config[:depends_on] %>data-depends-on="<%= field_config[:depends_on] %>"<% end %>
+              <%= 'disabled' if is_disabled %>
+              <% if field_config[:placeholder] %>placeholder="<%= field_config[:placeholder] %>"<% end %>>
+
+  <% when :textarea %>
+    <textarea name="config_fields[<%= field_name %>]"
+              rows="<%= field_config[:rows] || 3 %>"
+              class="w-full font-mono text-sm p-1 border border-gray-300 <%= is_disabled ? 'bg-gray-100 text-gray-400' : '' %>"
+              data-config-field="<%= field_name %>"
+              <% if field_config[:depends_on] %>data-depends-on="<%= field_config[:depends_on] %>"<% end %>
+              <%= 'disabled' if is_disabled %>
+              <% if field_config[:placeholder] %>placeholder="<%= field_config[:placeholder] %>"<% end %>><%= value %></textarea>
+
+  <% when :select %>
+    <select name="config_fields[<%= field_name %>]"
+            class="w-full font-mono text-sm p-1 border border-gray-300 <%= is_disabled ? 'bg-gray-100 text-gray-400' : '' %>"
+            data-config-field="<%= field_name %>"
+            <% if field_config[:depends_on] %>data-depends-on="<%= field_config[:depends_on] %>"<% end %>
+            <%= 'disabled' if is_disabled %>>
+      <option value="">-- select --</option>
+      <% field_config[:options].each do |option| %>
+        <option value="<%= option %>" <%= 'selected' if value == option %>><%= option %></option>
+      <% end %>
+    </select>
+  <% end %>
+
+  <% if field_name == 'logo' %>
+    <p class="text-xs text-red-600 mt-1 hidden" data-logo-error>
+      Image not found. Please upload it using the <strong>Global Images</strong> button above, then add the URL here.
+    </p>
+  <% end %>
+
+  <% if field_name == 'favicon' %>
+    <p class="text-xs text-red-600 mt-1 hidden" data-favicon-error>
+      Favicon not found. Please upload it using the <strong>Global Images</strong> button above, then add the filename here.
+    </p>
+  <% end %>
+
+  <% if field_config[:hint] %>
+    <p class="text-xs text-gray-500 mt-1"><%= field_config[:hint] %></p>
+  <% end %>
+</div>
