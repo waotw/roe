@@ -110,6 +110,8 @@ class Admin::ConfigsController < ApplicationController
   def edit_cards
     @config_type = 'cards'
     @config_content = File.read(SiteConfig::DEFAULTS_PATH.join('cards.yml'))
+    @config_hash = YAML.load(@config_content) || {}
+    @field_options = build_field_options_for_cards
     render :edit
   end
 
@@ -120,6 +122,8 @@ class Admin::ConfigsController < ApplicationController
   def edit_collections
     @config_type = 'collections'
     @config_content = File.read(SiteConfig::DEFAULTS_PATH.join('collections.yml'))
+    @config_hash = YAML.load(@config_content) || {}
+    @field_options = build_field_options_for_collections
     render :edit
   end
 
@@ -127,7 +131,43 @@ class Admin::ConfigsController < ApplicationController
     update_config('defaults/collections', SiteConfig::DEFAULTS_PATH.join('collections.yml'))
   end
 
+  def field_options_for(config_type, field_name)
+    case [ config_type, field_name ]
+    when [ "collections", "default_source" ]
+      [ "posts", "pages", "documentation" ]
+    when [ "collections", "default_post_type" ]
+      [ "all" ] + Post::POST_TYPES.keys.map(&:to_s)
+    when [ "collections", "default_order" ]
+      [ "date", "date-asc", "title", "filename" ]
+    when [ "collections", "default_template" ]
+      [ "list", "compact", "full" ]
+    when [ "cards", "default_style" ]
+      [ "small", "large", "compact" ]
+    else
+      nil # Return nil for fields without predefined options
+    end
+  end
+
   private
+
+  def build_field_options_for_collections
+    # Get all posts and extract post_type from each
+    existing_post_types = Post.all.map(&:post_type).compact.uniq.sort
+
+    {
+      'default_source' => [ 'posts', 'pages', 'documentation' ],
+      'default_post_type' => [ 'all' ] + existing_post_types,
+      'default_order' => [ 'date', 'date-asc', 'title', 'filename' ],
+      'default_template' => [ 'list', 'compact', 'full' ]
+    }
+  end
+
+  def build_field_options_for_cards
+    {
+      'post-link.default_style' => [ 'small', 'large', 'compact' ],
+      'pullquote.default_position' => [ 'center', 'left', 'right' ]
+    }
+  end
 
   def update_config(type, file_path)
     content = params[:content]

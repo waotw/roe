@@ -220,12 +220,6 @@ module HasMarkdownExtensions
     post_type = config[:post_type]
     post_type = nil if post_type == "all"
 
-    # DEBUG
-    Rails.logger.info "=== COLLECTION DEBUG ==="
-    Rails.logger.info "Config: #{config.inspect}"
-    Rails.logger.info "post_type from config: #{config[:post_type].inspect}"
-    Rails.logger.info "post_type after processing: #{post_type.inspect}"
-
     # Get base collection
     items = case source
     when 'posts'
@@ -484,7 +478,7 @@ module HasMarkdownExtensions
   def render_pullquote(config)
     text = config[:text] || ''
     attribution = config[:attribution] || ''
-    position = config[:position] || 'center'  # center, left, or right
+    position = config[:position] || SiteConfig.default("cards", "pullquote")&.[]('default_position') || 'center'
 
     # Build CSS classes
     pullquote_classes = [ "card", "card-pullquote", "pullquote-#{position}" ]
@@ -612,7 +606,7 @@ module HasMarkdownExtensions
     date_raw = config[:date] || ''
     excerpt = config[:excerpt] || ''
     url = config[:url] || '#'
-    link_text = config[:link_text] || 'Read full story →'
+    link_text = config[:link_text] || SiteConfig.default('cards', 'post-link')&.[]('default_link_text') || 'Read full story →'
 
     # Handle image with priority: explicit > post metadata > default
     image = if config.key?(:image)

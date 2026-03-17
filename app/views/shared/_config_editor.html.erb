@@ -26,7 +26,8 @@
 
 <div id="config-container" class="mb-5 bg-white p-8">
   <div class="flex items-center justify-between mb-2">
-    <h2 class="text-lg font-semibold text-gray-900">Configuration</h2>
+    <!--<h2 class="text-lg font-semibold text-gray-900">Configuration</h2>-->
+    <h2 class="text-xl font-semibold text-gray-900"><%= @config_type.capitalize %></h2>
     <button type="button"
             onclick="toggleConfigView()"
             class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem]"
@@ -40,61 +41,176 @@
     <!-- Form View -->
     <div id="config-form-view">
 
-      <!-- Site Information Section -->
       <div class="config-section mb-8">
-        <h3 class="text-base font-semibold text-gray-900 mb-1">Site Information</h3>
+        <% if @config_type == 'site' %>
+          <!-- Site Information Section -->
+          <div class="config-section mb-10">
+            <h3 class="text-base font-semibold text-gray-900 mb-1">Global</h3>
 
-        <div class="space-y-3 pl-4 border-l-2 border-gray-200">
-          <% config_schema[:site_info][:fields].each do |field_name, field_config| %>
-            <%= render 'shared/config_field',
-                       field_name: field_name,
-                       field_config: field_config,
-                       value: flattened_config[field_name],
-                       all_values: flattened_config %>
+            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+              <% config_schema[:site_info][:fields].each do |field_name, field_config| %>
+                <%= render 'shared/config_field',
+                         field_name: field_name,
+                         field_config: field_config,
+                         value: flattened_config[field_name],
+                         all_values: flattened_config %>
+              <% end %>
+            </div>
+          </div>
+
+          <!-- Branding Section -->
+          <div class="config-section mb-10">
+            <h3 class="text-base font-semibold text-gray-900 mb-1">Branding</h3>
+
+            <div class="mb-3 flex gap-2 items-center">
+              <p class="text-sm font-medium text-gray-700">Manage:</p>
+              <%= link_to "Global Images", browse_images_admin_system_assets_path,
+                target: "_blank",
+                class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
+            </div>
+
+            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+              <% config_schema[:branding][:fields].each do |field_name, field_config| %>
+                <%= render 'shared/config_field',
+                         field_name: field_name,
+                         field_config: field_config,
+                         value: flattened_config[field_name],
+                         all_values: flattened_config %>
+              <% end %>
+            </div>
+          </div>
+
+          <!-- Custom Fonts Section -->
+
+          <h3 class="text-base font-semibold text-gray-900 mb-1">Custom Fonts</h3>
+          <p class="text-sm text-gray-600 mb-3">Upload font files with the FONTS button. Copy the url…</p>
+
+          <div class="mb-3 flex gap-2 items-center">
+            <p class="text-sm font-medium text-gray-700">Manage:</p>
+            <%= link_to "Fonts", browse_fonts_admin_system_assets_path,
+                target: "_blank",
+                class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
+          </div>
+
+          <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+            <%= render 'shared/config_font_roles',
+                       roles: config_schema[:fonts][:roles],
+                       config_hash: config_hash,
+                       flattened_config: flattened_config %>
+          </div>
+
+
+          <% else %>
+            <!-- SIMPLE KEY-VALUE EDITOR FOR CARDS/COLLECTIONS -->
+            <div class="config-section mb-10">
+
+              <%
+                # Separate defaults from templates
+                # Templates end with _button_template or are exactly "button_template"
+                templates = config_hash.select { |k, v| k.to_s.end_with?('_button_template') || k.to_s == 'button_template' }
+                defaults = config_hash.reject { |k, v| templates.key?(k) }
+              %>
+
+              <!-- Defaults Section -->
+              <% if defaults.any? %>
+                <div class="mb-8">
+                  <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Defaults</h3>
+
+                  <div class="space-y-6">
+                    <% defaults.each do |key, value| %>
+                      <% if value.is_a?(Hash) %>
+                        <!-- Nested section (like post-link, aside, pullquote) -->
+                        <div class="config-subsection pl-4 border-l-2 border-gray-300">
+                          <h5 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h5>
+
+                          <div class="space-y-3">
+                            <% value.each do |subkey, subvalue| %>
+                              <div class="config-field-row">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                  <%= subkey.humanize %>
+                                </label>
+
+                                <% nested_field_key = "#{key}.#{subkey}" %>
+                                <% if @field_options&.key?(nested_field_key) %>
+                                  <!-- Select dropdown for nested field with options -->
+                                  <select name="config_fields[<%= key %>][<%= subkey %>]"
+                                          class="w-full font-mono text-sm p-2 border border-gray-300"
+                                          data-config-field="<%= nested_field_key %>">
+                                    <% @field_options[nested_field_key].each do |option| %>
+                                      <option value="<%= option %>" <%= 'selected' if subvalue.to_s == option.to_s %>><%= option %></option>
+                                    <% end %>
+                                  </select>
+                                <% else %>
+                                  <!-- Regular text input for nested field -->
+                                  <input type="text"
+                                         name="config_fields[<%= key %>][<%= subkey %>]"
+                                         value="<%= subvalue %>"
+                                         class="w-full font-mono text-sm p-2 border border-gray-300"
+                                         data-config-field="<%= nested_field_key %>">
+                                <% end %>
+                              </div>
+                            <% end %>
+                          </div>
+                        </div>
+
+                      <% else %>
+                        <!-- Top-level field -->
+                        <div class="config-field-row">
+                          <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <%= key.humanize %>
+                          </label>
+
+                          <% if @field_options&.key?(key) %>
+                            <!-- Select dropdown for field with options -->
+                            <select name="config_fields[<%= key %>]"
+                                    class="w-full font-mono text-sm p-2 border border-gray-300"
+                                    data-config-field="<%= key %>">
+                              <% @field_options[key].each do |option| %>
+                                <option value="<%= option %>" <%= 'selected' if value.to_s == option.to_s %>><%= option %></option>
+                              <% end %>
+                            </select>
+                          <% else %>
+                            <!-- Regular text input -->
+                            <input type="text"
+                                   name="config_fields[<%= key %>]"
+                                   value="<%= value %>"
+                                   class="w-full font-mono text-sm p-2 border border-gray-300"
+                                   data-config-field="<%= key %>">
+                          <% end %>
+
+                          <% if key == 'default_limit' %>
+                            <p class="text-xs text-gray-500 mt-1">Use a number (e.g., 10) or "all" to show everything</p>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <!-- Templates Section -->
+              <% if templates.any? %>
+                <div>
+                  <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Button Templates</h3>
+
+                  <div class="space-y-4">
+                    <% templates.each do |key, value| %>
+                      <div class="config-field-row">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                          <%= key.humanize %>
+                        </label>
+                        <textarea name="config_fields[<%= key %>]"
+                                  rows="<%= value.lines.count + 2 %>"
+                                  class="w-full font-mono text-sm p-2 border border-gray-300 bg-gray-50"
+                                  data-config-field="<%= key %>"><%= value %></textarea>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+            </div>
           <% end %>
-        </div>
-      </div>
-
-      <!-- Branding Section -->
-      <div class="config-section mb-8">
-        <h3 class="text-base font-semibold text-gray-900 mb-1">Branding</h3>
-
-        <div class="mb-3 flex gap-2 items-center">
-          <p class="text-sm font-medium text-gray-700">Manage:</p>
-          <%= link_to "Global Images", browse_images_admin_system_assets_path,
-              target: "_blank",
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
-        </div>
-
-        <div class="space-y-3 pl-4 border-l-2 border-gray-200">
-          <% config_schema[:branding][:fields].each do |field_name, field_config| %>
-            <%= render 'shared/config_field',
-                       field_name: field_name,
-                       field_config: field_config,
-                       value: flattened_config[field_name],
-                       all_values: flattened_config %>
-          <% end %>
-        </div>
-      </div>
-
-      <!-- Custom Fonts Section -->
-      <div class="config-section mb-8">
-        <h3 class="text-base font-semibold text-gray-900 mb-1">Custom Fonts</h3>
-        <p class="text-sm text-gray-600 mb-3">Upload font files with the FONTS button. Copy the url…</p>
-
-        <div class="mb-3 flex gap-2 items-center">
-          <p class="text-sm font-medium text-gray-700">Manage:</p>
-          <%= link_to "Fonts", browse_fonts_admin_system_assets_path,
-              target: "_blank",
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
-        </div>
-
-        <div class="space-y-3 pl-4 border-l-2 border-gray-200">
-          <%= render 'shared/config_font_roles',
-                     roles: config_schema[:fonts][:roles],
-                     config_hash: config_hash,
-                     flattened_config: flattened_config %>
-        </div>
       </div>
 
     </div>
@@ -113,7 +229,7 @@
 
     <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 bg-white">
       <%= form.submit "Save Configuration",
-                      class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+                      class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
       <%= link_to "Cancel", admin_configs_path,
                   class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
     </div>
@@ -121,399 +237,395 @@
 </div>
 
 <script>
-// Global flags (outside IIFE so it persists)
-window.configEditorSetupComplete = window.configEditorSetupComplete || false;
-window.yamlWasEdited = window.yamlWasEdited || false;
-window.isYamlView = window.isYamlView || false;
-window.hasUnsavedChanges = window.hasUnsavedChanges || false;
+  // Global flags (outside IIFE so it persists)
+  window.configEditorSetupComplete = window.configEditorSetupComplete || false;
+  window.yamlWasEdited = window.yamlWasEdited || false;
+  window.isYamlView = window.isYamlView || false;
+  window.hasUnsavedChanges = window.hasUnsavedChanges || false;
 
-(function() {
-  const configSchema = <%= raw config_schema.to_json %>;
+  (function() {
+  const configSchema = <%= raw (defined?(config_schema) ? config_schema.to_json : '{}') %>;
   let imageFieldsWithErrors = {};
   let fontFieldsWithErrors = {};
   let availableFonts = [];
 
   // Fetch available fonts on page load
   async function fetchAvailableFonts() {
-    try {
-      const response = await fetch('<%= available_fonts_admin_system_assets_path %>');
-      const data = await response.json();
-      availableFonts = data.fonts || [];
-    } catch (error) {
-      console.error('Failed to fetch available fonts:', error);
-    }
+  try {
+  const response = await fetch('<%= available_fonts_admin_system_assets_path %>');
+  const data = await response.json();
+  availableFonts = data.fonts || [];
+  } catch (error) {
+  console.error('Failed to fetch available fonts:', error);
+  }
   }
 
   // Load saved view preference
   function loadViewPreference() {
-    const savedView = sessionStorage.getItem('configViewMode');
-    console.log('Loading view preference:', savedView); // Debug
+  const savedView = sessionStorage.getItem('configViewMode');
+  console.log('Loading view preference:', savedView); // Debug
 
-    // Only toggle if we're NOT already in the saved view
-    if (savedView === 'yaml' && !window.isYamlView) {
-      toggleConfigView();
-    } else if (savedView === 'form' && window.isYamlView) {
-      toggleConfigView();
-    }
+  // Only toggle if we're NOT already in the saved view
+  if (savedView === 'yaml' && !window.isYamlView) {
+  toggleConfigView();
+  } else if (savedView === 'form' && window.isYamlView) {
+  toggleConfigView();
+  }
   }
 
   // Save view preference
   function saveViewPreference(mode) {
-    sessionStorage.setItem('configViewMode', mode);
+  sessionStorage.setItem('configViewMode', mode);
   }
 
   function toggleConfigView() {
-    const formView = document.getElementById('config-form-view');
-    const yamlView = document.getElementById('config-yaml-view');
-    const toggleBtn = document.getElementById('config-toggle');
-    const yamlTextarea = document.getElementById('config-yaml');
+  const formView = document.getElementById('config-form-view');
+  const yamlView = document.getElementById('config-yaml-view');
+  const toggleBtn = document.getElementById('config-toggle');
+  const yamlTextarea = document.getElementById('config-yaml');
 
-    console.log('Toggle attempt - isYamlView:', window.isYamlView, 'yamlWasEdited:', window.yamlWasEdited); // Add this
+  console.log('Toggle attempt - isYamlView:', window.isYamlView, 'yamlWasEdited:', window.yamlWasEdited); // Add this
 
-    // Prevent switching back to form if YAML was edited
-    if (window.isYamlView && window.yamlWasEdited) {
-      alert('YAML has been edited. Please save your changes first. The page will refresh and you can use the form view again.');
-      return;
-    }
+  // Prevent switching back to form if YAML was edited
+  if (window.isYamlView && window.yamlWasEdited) {
+  alert('YAML has been edited. Please save your changes first. The page will refresh and you can use the form view again.');
+  return;
+  }
 
-    window.isYamlView = !window.isYamlView;
+  window.isYamlView = !window.isYamlView;
 
-    if (window.isYamlView) {
-      const yamlContent = formToYaml();
-      yamlTextarea.value = yamlContent;
-      window.yamlWasEdited = false; // Reset since we just generated it from form
+  if (window.isYamlView) {
+  const yamlContent = formToYaml();
+  yamlTextarea.value = yamlContent;
+  window.yamlWasEdited = false; // Reset since we just generated it from form
 
-      formView.classList.add('hidden');
-      yamlView.classList.remove('hidden');
-      toggleBtn.textContent = 'EDIT IN FORM';
-      saveViewPreference('yaml');
-    } else {
-      formView.classList.remove('hidden');
-      yamlView.classList.add('hidden');
-      toggleBtn.textContent = 'EDIT YAML';
-      saveViewPreference('form');
-    }
+  formView.classList.add('hidden');
+  yamlView.classList.remove('hidden');
+  toggleBtn.textContent = 'EDIT IN FORM';
+  saveViewPreference('yaml');
+  } else {
+  formView.classList.remove('hidden');
+  yamlView.classList.add('hidden');
+  toggleBtn.textContent = 'EDIT YAML';
+  saveViewPreference('form');
+  }
   }
 
   // Track changes in form
   function trackChanges() {
-    window.hasUnsavedChanges = true;
+  window.hasUnsavedChanges = true;
   }
 
   // Check field dependencies in real-time
   function checkDependencies() {
-    document.querySelectorAll('[data-depends-on]').forEach(field => {
-      const dependsOn = field.dataset.dependsOn;
-      const dependencyField = document.querySelector(`[data-config-field="${dependsOn}"]`);
+  document.querySelectorAll('[data-depends-on]').forEach(field => {
+  const dependsOn = field.dataset.dependsOn;
+  const dependencyField = document.querySelector(`[data-config-field="${dependsOn}"]`);
 
-      if (dependencyField) {
-        const hasValue = dependencyField.value.trim() !== '';
-        field.disabled = !hasValue;
+  if (dependencyField) {
+  const hasValue = dependencyField.value.trim() !== '';
+  field.disabled = !hasValue;
 
-        // Optional: add visual indication
-        const wrapper = field.closest('.config-field-row');
-        if (wrapper) {
-          if (hasValue) {
-            wrapper.classList.remove('opacity-50');
-          } else {
-            wrapper.classList.add('opacity-50');
-          }
-        }
-      }
-    });
+  // Optional: add visual indication
+  const wrapper = field.closest('.config-field-row');
+  if (wrapper) {
+  if (hasValue) {
+  wrapper.classList.remove('opacity-50');
+  } else {
+  wrapper.classList.add('opacity-50');
+  }
+  }
+  }
+  });
   }
 
   // Validate image exists
   function validateImage(input) {
-    const fieldName = input.dataset.configField;
-    const value = input.value.trim();
-    const errorMsg = document.querySelector(`[data-${fieldName}-error]`);
+  const fieldName = input.dataset.configField;
+  const value = input.value.trim();
+  const errorMsg = document.querySelector(`[data-${fieldName}-error]`);
 
-    if (!value) {
-      // Empty field - hide error
-      if (errorMsg) {
-        errorMsg.classList.add('hidden');
-        input.classList.remove('border-red-300');
-      }
-      imageFieldsWithErrors[fieldName] = false;
-      return;
-    }
+  if (!value) {
+  // Empty field - hide error
+  if (errorMsg) {
+  errorMsg.classList.add('hidden');
+  input.classList.remove('border-red-300');
+  }
+  imageFieldsWithErrors[fieldName] = false;
+  return;
+  }
 
-    if (!errorMsg) return;
+  if (!errorMsg) return;
 
-    // User only types filename (e.g., "logo.svg"), prepend the system images path
-    let imageUrl = '/system/images/' + value;
+  // User only types filename (e.g., "logo.svg"), prepend the system images path
+  let imageUrl = '/system/images/' + value;
 
-    // Create a temporary image to test if it loads
-    const img = new Image();
+  // Create a temporary image to test if it loads
+  const img = new Image();
 
-    img.onload = function() {
-      errorMsg.classList.add('hidden');
-      input.classList.remove('border-red-300');
-      imageFieldsWithErrors[fieldName] = false;
-    };
+  img.onload = function() {
+  errorMsg.classList.add('hidden');
+  input.classList.remove('border-red-300');
+  imageFieldsWithErrors[fieldName] = false;
+  };
 
-    img.onerror = function() {
-      errorMsg.classList.remove('hidden');
-      input.classList.add('border-red-300');
-      imageFieldsWithErrors[fieldName] = true;
-    };
+  img.onerror = function() {
+  errorMsg.classList.remove('hidden');
+  input.classList.add('border-red-300');
+  imageFieldsWithErrors[fieldName] = true;
+  };
 
-    img.src = imageUrl;
+  img.src = imageUrl;
   }
 
   // Validate font exists
   function validateFont(input) {
-    const fieldName = input.dataset.configField;
-    const value = input.value.trim();
-    const errorMsg = document.querySelector(`[data-font-error="${fieldName}"]`);
+  const fieldName = input.dataset.configField;
+  const value = input.value.trim();
+  const errorMsg = document.querySelector(`[data-font-error="${fieldName}"]`);
 
-    if (!value) {
-      // Empty field - hide error
-      if (errorMsg) {
-        errorMsg.classList.add('hidden');
-        input.classList.remove('border-red-400');
-      }
-      fontFieldsWithErrors[fieldName] = false;
-      return;
-    }
+  if (!value) {
+  // Empty field - hide error
+  if (errorMsg) {
+  errorMsg.classList.add('hidden');
+  input.classList.remove('border-red-400');
+  }
+  fontFieldsWithErrors[fieldName] = false;
+  return;
+  }
 
-    if (!errorMsg) return;
+  if (!errorMsg) return;
 
-    // Wait for fonts to be fetched if list is empty
-    if (availableFonts.length === 0) {
-      return; // Don't validate if list isn't loaded yet
-    }
+  // Wait for fonts to be fetched if list is empty
+  if (availableFonts.length === 0) {
+  return; // Don't validate if list isn't loaded yet
+  }
 
-    // Check if font filename exists in available fonts list
-    const fontExists = availableFonts.includes(value);
+  // Check if font filename exists in available fonts list
+  const fontExists = availableFonts.includes(value);
 
-    if (fontExists) {
-      errorMsg.classList.add('hidden');
-      input.classList.remove('border-red-400');
-      fontFieldsWithErrors[fieldName] = false;
-    } else {
-      errorMsg.classList.remove('hidden');
-      input.classList.add('border-red-400');
-      fontFieldsWithErrors[fieldName] = true;
-    }
+  if (fontExists) {
+  errorMsg.classList.add('hidden');
+  input.classList.remove('border-red-400');
+  fontFieldsWithErrors[fieldName] = false;
+  } else {
+  errorMsg.classList.remove('hidden');
+  input.classList.add('border-red-400');
+  fontFieldsWithErrors[fieldName] = true;
+  }
   }
 
   // Setup font validation listeners
   function setupFontValidation() {
-    // Validate all font fields on page load
-    document.querySelectorAll('[data-validate-font="true"]').forEach(input => {
-      if (input.value.trim()) {
-        validateFont(input);
-      }
-    });
+  // Validate all font fields on page load
+  document.querySelectorAll('[data-validate-font="true"]').forEach(input => {
+  if (input.value.trim()) {
+  validateFont(input);
+  }
+  });
   }
 
   // Keyboard shortcut handler (only set up once)
   function handleKeyboardShortcut(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault();
-      const formElement = document.getElementById('config-form');
-      if (formElement) {
-        formElement.requestSubmit();
-      }
-    }
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+  e.preventDefault();
+  const formElement = document.getElementById('config-form');
+  if (formElement) {
+  formElement.requestSubmit();
+  }
+  }
   }
 
   // Set up global event listeners (only once)
   console.log('setupComplete at start:', window.configEditorSetupComplete);
 
   if (!window.configEditorSetupComplete) {
-    console.log('Setting up global listeners');
+  console.log('Setting up global listeners');
 
-    // Unsaved changes warning (for closing tab/window/external navigation)
-      window.addEventListener('beforeunload', function(e) {
-        console.log('beforeunload event fired, hasUnsavedChanges:', window.hasUnsavedChanges);
-        if (window.hasUnsavedChanges) {
-          e.preventDefault();
-          e.returnValue = '';
-          return '';
-        }
-      });
+  // Unsaved changes warning (for closing tab/window/external navigation)
+  window.addEventListener('beforeunload', function(e) {
+  console.log('beforeunload event fired, hasUnsavedChanges:', window.hasUnsavedChanges);
+  if (window.hasUnsavedChanges) {
+  e.preventDefault();
+  e.returnValue = '';
+  return '';
+  }
+  });
 
-    // Clear unsaved changes flag when navigating via Turbo
-    document.addEventListener('turbo:before-visit', function(e) {
-      console.log('turbo:before-visit fired, hasUnsavedChanges:', window.hasUnsavedChanges);
-      if (window.hasUnsavedChanges) {
-        const confirmed = confirm('You have unsaved changes. Are you sure you want to leave?');
-        if (!confirmed) {
-          e.preventDefault();
-        }
-      }
-    });
+  // Clear unsaved changes flag when navigating via Turbo
+  document.addEventListener('turbo:before-visit', function(e) {
+  console.log('turbo:before-visit fired, hasUnsavedChanges:', window.hasUnsavedChanges);
+  if (window.hasUnsavedChanges) {
+  const confirmed = confirm('You have unsaved changes. Are you sure you want to leave?');
+  if (!confirmed) {
+  e.preventDefault();
+  }
+  }
+  });
 
-    // Listen for changes on all config fields
-    document.addEventListener('input', function(e) {
-      if (e.target.matches('[data-config-field]')) {
-        checkDependencies();
-        trackChanges();
-      }
+  // Listen for changes on all config fields
+  document.addEventListener('input', function(e) {
+  if (e.target.matches('[data-config-field]')) {
+  checkDependencies();
+  trackChanges();
+  }
 
-      if (e.target.id === 'config-yaml') {
-        console.log('YAML edited, setting yamlWasEdited to true');
-        window.yamlWasEdited = true;
-        trackChanges();
-      }
+  if (e.target.id === 'config-yaml') {
+  console.log('YAML edited, setting yamlWasEdited to true');
+  window.yamlWasEdited = true;
+  trackChanges();
+  }
 
-      // If any image field has an error showing, validate in real-time as they type
-      if (e.target.matches('[data-validate-image="true"]')) {
-        const fieldName = e.target.dataset.configField;
-        if (imageFieldsWithErrors[fieldName]) {
-          validateImage(e.target);
-        }
-      }
+  // If any image field has an error showing, validate in real-time as they type
+  if (e.target.matches('[data-validate-image="true"]')) {
+  const fieldName = e.target.dataset.configField;
+  if (imageFieldsWithErrors[fieldName]) {
+  validateImage(e.target);
+  }
+  }
 
-      // If any font field has an error showing, validate in real-time as they type
-      if (e.target.matches('[data-validate-font="true"]')) {
-        const fieldName = e.target.dataset.configField;
-        if (fontFieldsWithErrors[fieldName]) {
-          validateFont(e.target);
-        }
-      }
-    });
+  // If any font field has an error showing, validate in real-time as they type
+  if (e.target.matches('[data-validate-font="true"]')) {
+  const fieldName = e.target.dataset.configField;
+  if (fontFieldsWithErrors[fieldName]) {
+  validateFont(e.target);
+  }
+  }
+  });
 
-    // Validate image/font on blur
-    document.addEventListener('blur', function(e) {
-      if (e.target.matches('[data-validate-image="true"]')) {
-        validateImage(e.target);
-      }
+  // Validate image/font on blur
+  document.addEventListener('blur', function(e) {
+  if (e.target.matches('[data-validate-image="true"]')) {
+  validateImage(e.target);
+  }
 
-      if (e.target.matches('[data-validate-font="true"]')) {
-        validateFont(e.target);
-      }
-    }, true);
+  if (e.target.matches('[data-validate-font="true"]')) {
+  validateFont(e.target);
+  }
+  }, true);
 
-    // Validate on Enter key
-    document.addEventListener('keydown', function(e) {
-      // Keyboard shortcut
-      handleKeyboardShortcut(e);
+  // Validate on Enter key
+  document.addEventListener('keydown', function(e) {
+  // Keyboard shortcut
+  handleKeyboardShortcut(e);
 
-      // Validate on Enter
-      if (e.key === 'Enter') {
-        if (e.target.matches('[data-validate-image="true"]')) {
-          validateImage(e.target);
-        }
-        if (e.target.matches('[data-validate-font="true"]')) {
-          validateFont(e.target);
-        }
-      }
-    });
+  // Validate on Enter
+  if (e.key === 'Enter') {
+  if (e.target.matches('[data-validate-image="true"]')) {
+  validateImage(e.target);
+  }
+  if (e.target.matches('[data-validate-font="true"]')) {
+  validateFont(e.target);
+  }
+  }
+  });
 
-    // Refetch fonts when window regains focus
-    window.addEventListener('focus', async function() {
-      await fetchAvailableFonts();
-      setupFontValidation();
-    });
+  // Refetch fonts when window regains focus
+  window.addEventListener('focus', async function() {
+  await fetchAvailableFonts();
+  setupFontValidation();
+  });
 
-    // Clear flag on form submission (BEFORE Turbo processes it)
-    document.addEventListener('turbo:submit-start', function(e) {
-      if (e.target.id === 'config-form') {
-        window.hasUnsavedChanges = false;
-      }
-    });
+  // Clear flag on form submission (BEFORE Turbo processes it)
+  document.addEventListener('turbo:submit-start', function(e) {
+  if (e.target.id === 'config-form') {
+  window.hasUnsavedChanges = false;
+  }
+  });
 
-    window.configEditorSetupComplete = true;
-    console.log('setupComplete set to true');
+  window.configEditorSetupComplete = true;
+  console.log('setupComplete set to true');
   }
 
   console.log('setupComplete at end:', window.configEditorSetupComplete);
 
   // Run on page load
   document.addEventListener('turbo:load', async function() {
-    // Reset unsaved changes flag on new page load
-    window.hasUnsavedChanges = false;
-    window.isYamlView = false;
-    window.yamlWasEdited = false;
+  // Reset unsaved changes flag on new page load
+  window.hasUnsavedChanges = false;
+  window.isYamlView = false;
+  window.yamlWasEdited = false;
 
-    checkDependencies();
+  checkDependencies();
 
-    // Restore scroll position after save
-    const savedPosition = sessionStorage.getItem('configScrollPosition');
-    if (savedPosition) {
-      setTimeout(function() {
-        window.scrollTo(0, parseInt(savedPosition));
-        sessionStorage.removeItem('configScrollPosition');
-      }, 0);
-    }
+  // Restore scroll position after save
+  const savedPosition = sessionStorage.getItem('configScrollPosition');
+  if (savedPosition) {
+  setTimeout(function() {
+  window.scrollTo(0, parseInt(savedPosition));
+  sessionStorage.removeItem('configScrollPosition');
+  }, 0);
+  }
 
-    // Fetch available fonts first
-    await fetchAvailableFonts();
+  // Fetch available fonts first
+  await fetchAvailableFonts();
 
-    // Validate logo/favicon on page load if they have values
-    const logoInput = document.querySelector('[data-config-field="logo"]');
-    if (logoInput && logoInput.value.trim()) {
-      validateImage(logoInput);
-    }
+  // Validate logo/favicon on page load if they have values
+  const logoInput = document.querySelector('[data-config-field="logo"]');
+  if (logoInput && logoInput.value.trim()) {
+  validateImage(logoInput);
+  }
 
-    const faviconInput = document.querySelector('[data-config-field="favicon"]');
-    if (faviconInput && faviconInput.value.trim()) {
-      validateImage(faviconInput);
-    }
+  const faviconInput = document.querySelector('[data-config-field="favicon"]');
+  if (faviconInput && faviconInput.value.trim()) {
+  validateImage(faviconInput);
+  }
 
-    // Setup font validation
-    setupFontValidation();
+  // Setup font validation
+  setupFontValidation();
 
-    // Set up form submission handler (only if form exists)
-      const configForm = document.getElementById('config-form');
-      if (configForm) {
-        configForm.removeEventListener('submit', handleFormSubmit);
-        configForm.addEventListener('submit', handleFormSubmit);
-      }
+  // Set up form submission handler (only if form exists)
+  const configForm = document.getElementById('config-form');
+  if (configForm) {
+  configForm.removeEventListener('submit', handleFormSubmit);
+  configForm.addEventListener('submit', handleFormSubmit);
+  }
 
-      // Load view preference LAST (after form is ready)
-      setTimeout(function() {
-        loadViewPreference();
-      }, 0);
-    });
+  // Load view preference LAST (after form is ready)
+  setTimeout(function() {
+  loadViewPreference();
+  }, 0);
+  });
 
   // Form submit handler (defined outside to allow removal)
   function handleFormSubmit(e) {
-    const finalYaml = window.isYamlView
-      ? document.getElementById('config-yaml').value
-      : formToYaml();
+  const finalYaml = window.isYamlView
+  ? document.getElementById('config-yaml').value
+  : formToYaml();
 
-    document.getElementById('config-final').value = finalYaml;
+  document.getElementById('config-final').value = finalYaml;
 
-    // Save scroll position
-    sessionStorage.setItem('configScrollPosition', window.scrollY);
+  // Save scroll position
+  sessionStorage.setItem('configScrollPosition', window.scrollY);
 
-    // Clear unsaved changes flag before submit
-    window.hasUnsavedChanges = false;
+  // Clear unsaved changes flag before submit
+  window.hasUnsavedChanges = false;
   }
 
   function formToYaml() {
     const fields = {};
 
-    // Collect all regular fields
     document.querySelectorAll('[data-config-field]').forEach(input => {
       const fieldName = input.dataset.configField;
-      let value = input.value.trim();
+      let value = input.value; // Don't trim yet
 
-      if (value !== '') {
-        // Handle nested fields (fonts.heading.family)
-        const parts = fieldName.split('.');
-        if (parts.length > 1) {
-          // Build nested structure
-          let current = fields;
-          for (let i = 0; i < parts.length - 1; i++) {
-            if (!current[parts[i]]) {
-              current[parts[i]] = {};
-            }
-            current = current[parts[i]];
+      // Always include the field, even if empty (for config files)
+      // Handle nested fields (fonts.heading.family OR post-link.default_link_text)
+      const parts = fieldName.split('.');
+      if (parts.length > 1) {
+        let current = fields;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!current[parts[i]]) {
+            current[parts[i]] = {};
           }
-          current[parts[parts.length - 1]] = value;
-        } else {
-          fields[fieldName] = value;
+          current = current[parts[i]];
         }
+        current[parts[parts.length - 1]] = value.trim();
+      } else {
+        fields[fieldName] = value.trim();
       }
     });
 
-    // Convert to YAML string
     return simpleYamlStringify(fields, 0);
   }
 
@@ -523,12 +635,24 @@ window.hasUnsavedChanges = window.hasUnsavedChanges || false;
 
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        // Nested object
         yaml += `${spaces}${key}:\n`;
         yaml += simpleYamlStringify(value, indent + 1);
+      } else if (typeof value === 'string' && value.includes('\n')) {
+        // Multi-line string - use block scalar
+        yaml += `${spaces}${key}: |-\n`;
+        const lines = value.split('\n');
+        lines.forEach(line => {
+          yaml += `${spaces}  ${line}\n`;
+        });
       } else {
-        // Handle values that need quotes
+        // Simple value
         const needsQuotes = typeof value === 'string' &&
-                           (value.includes(':') || value.includes('#') || value.match(/^\d/));
+                           (value.includes(':') ||
+                            value.includes('#') ||
+                            value.match(/^\d/) ||
+                            value.includes('→') ||
+                            value.includes('__'));
         const formattedValue = needsQuotes ? `"${value}"` : value;
         yaml += `${spaces}${key}: ${formattedValue}\n`;
       }
@@ -538,19 +662,19 @@ window.hasUnsavedChanges = window.hasUnsavedChanges || false;
   }
 
   function yamlToForm(yamlText) {
-    // Parse YAML (basic parser for simple structures)
-    // For production, you might want to use a proper YAML parser
-    // For now, this handles the basic case
+  // Parse YAML (basic parser for simple structures)
+  // For production, you might want to use a proper YAML parser
+  // For now, this handles the basic case
 
-    // This is a simplified version - we'll rely on the server-side YAML parsing
-    // and page reload for now. A full client-side YAML parser would be complex.
+  // This is a simplified version - we'll rely on the server-side YAML parsing
+  // and page reload for now. A full client-side YAML parser would be complex.
 
-    // Just validate it's parseable
-    const lines = yamlText.split('\n');
-    // Basic validation - actual parsing will happen on submit
+  // Just validate it's parseable
+  const lines = yamlText.split('\n');
+  // Basic validation - actual parsing will happen on submit
   }
 
   window.toggleConfigView = toggleConfigView;
   window.setupFontValidation = setupFontValidation;
-})();
+  })();
 </script>

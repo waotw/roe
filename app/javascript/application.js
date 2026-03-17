@@ -3,7 +3,7 @@ import "@hotwired/turbo-rails";
 import "delete_modal";
 
 if (document.querySelector("[data-md-editor]")) {
-  import("./editor.js");
+  import("editor");
 }
 
 // Auto-dismiss floating flash messages

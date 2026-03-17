@@ -18,12 +18,22 @@
     </div>
   <% end %>
 
-  <% if @config_schema %>
+  <% if @config_type == 'site' %>
     <%= render 'shared/config_editor',
                form_url: admin_site_config_path,
                config_content: @config_content,
+               config_hash: @config_hash,
+               flattened_config: @flattened_config,
                config_schema: @config_schema %>
-  <% else %>
-    <%= render 'config_editor', form_url: form_url, content: @config_content, config_type: @config_type %>
+  <% elsif @config_type == 'cards' %>
+    <%= render 'shared/config_editor',
+               form_url: admin_cards_config_path,
+               config_content: @config_content,
+               config_hash: @config_hash %>
+  <% elsif @config_type == 'collections' %>
+    <%= render 'shared/config_editor',
+               form_url: admin_collections_config_path,
+               config_content: @config_content,
+               config_hash: @config_hash %>
   <% end %>
 </div>
