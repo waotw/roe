@@ -434,6 +434,39 @@ p:has(.site-logo) {
    COLLECTIONS
    ========================================== */
 
+<<<<<<< Updated upstream
+=======
+/* PAGINATION/SHOW_MORE */
+
+.collection-page-heading {
+  display: flex;
+  gap: var(--space-6);
+  align-items: center;
+  margin: var(--space-8) 0;
+}
+
+.collection-page-heading h1 {
+  margin: 0;
+}
+
+p.collection-description {
+  background-color: var(--color-code-bg);
+  padding: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+p.collection-more a {
+  color: var(--color-link);
+  font-size: var(--text-sm);
+}
+
+p.collection-more a:hover {
+  color: var(--color-muted);
+}
+
+>>>>>>> Stashed changes
 /* LIST (DEFAULT) */
 
 .collection {
