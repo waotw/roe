@@ -434,7 +434,7 @@ p:has(.site-logo) {
    COLLECTIONS
    ========================================== */
 
-/* PAGINATION/SHOW_MORE */
+/* PAGINATION/SHOW_MORE PAGES */
 
 .collection-page-heading {
   display: flex;
@@ -462,6 +462,15 @@ p.collection-more a {
 
 p.collection-more a:hover {
   color: var(--color-muted);
+}
+
+.pagination {
+  font-size: var(--text-lg);
+  margin-top: var(--space-8);
+}
+
+.pagination-info {
+  margin: 0 var(--space-4);
 }
 
 /* LIST (DEFAULT) */

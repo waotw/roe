@@ -113,7 +113,7 @@ class CollectionsController < ApplicationController
   end
 
   def generate_heading
-    case @source
+    base_heading = case @source
     when 'documentation'
       'Documentation'
     when 'pages'
@@ -126,6 +126,13 @@ class CollectionsController < ApplicationController
       else
         'Archive'
       end
+    end
+
+    # Add custom heading as context if provided
+    if @heading.present? && @heading != base_heading
+      "#{base_heading} <span class=\"collection-context\">(#{@heading})</span>"
+    else
+      base_heading
     end
   end
 

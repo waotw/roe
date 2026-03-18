@@ -83,7 +83,8 @@ Rails.application.routes.draw do
   get "posts/:url_name", to: "posts#show", as: :post
   get "documentation/:url_name", to: "documentation#show", as: :documentation
 
-  # Collections
+  # Collections and posts archive
+  get 'posts', to: 'collections#show', defaults: { filters: 'all' }
   get 'collections/*filters', to: 'collections#show', as: :collection
 
   # Feeds

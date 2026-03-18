@@ -448,19 +448,14 @@ module HasMarkdownExtensions
     segments = []
     query_params = []
 
-    # Add source to query params if not posts
+    # Only add non-default source to query params
     if source != 'posts'
       query_params << "source=#{source}"
     end
 
-    # Add order to query params if not date
+    # Only add non-default order to query params
     if order != 'date'
       query_params << "order=#{order}"
-    end
-
-    # Add heading to query params if present
-    if heading.present?
-      query_params << "heading=#{CGI.escape(heading)}"
     end
 
     # Add post_type filter if specified
@@ -485,12 +480,22 @@ module HasMarkdownExtensions
       end
     end
 
+    # Only add heading if there are actual filters
+    has_filters = segments.any? || query_params.any?
+    if heading.present? && has_filters
+      query_params << "heading=#{CGI.escape(heading)}"
+    end
+
     # Build base URL
-    base_url = if segments.empty?
-      # Check if user has custom archive page
+    base_url = if segments.empty? && !has_filters
+      # No filters - use archive page if it exists, otherwise /posts
       archive_page = Page.where("json_extract(metadata, '$.url_name') = ?", 'archive').first
-      archive_page ? '/archive' : '/collections/all'
+      archive_page ? '/archive' : '/posts'
+    elsif segments.empty?
+      # Has query params but no segments
+      '/collections/all'
     else
+      # Has segments (tags or post_type)
       "/collections/#{segments.join('/')}"
     end
 
