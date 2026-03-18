@@ -434,6 +434,27 @@ p:has(.site-logo) {
    COLLECTIONS
    ========================================== */
 
+/* PAGINATION/SHOW_MORE */
+
+.collection-page-heading {
+  display: flex;
+  gap: var(--space-6);
+  align-items: center;
+  margin: var(--space-8) 0;
+}
+
+.collection-page-heading h1 {
+  margin: 0;
+}
+
+p.collection-description {
+  background-color: var(--color-code-bg);
+  padding: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
 /* LIST (DEFAULT) */
 
 .collection {
@@ -447,7 +468,7 @@ p:has(.site-logo) {
 }
 
 .collection h2 {
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-4) 0;
 }
 
 .collection h3 {

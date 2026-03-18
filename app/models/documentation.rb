@@ -50,4 +50,8 @@ class Documentation < ApplicationRecord
     absolute_path = File.expand_path(file_path)
     find_by(file_path: absolute_path)&.destroy
   end
+
+  def self.public_documentation
+    where("json_extract(metadata, '$.status') = ?", "published")
+  end
 end

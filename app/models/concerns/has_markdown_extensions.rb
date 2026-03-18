@@ -57,6 +57,32 @@ module HasMarkdownExtensions
 
   private
 
+  def apply_tag_filters(collection, tag_string)
+    return collection if tag_string.blank?
+
+    # Split by comma and clean up whitespace
+    tags = tag_string.split(',').map(&:strip)
+
+    # Separate positive and negative tags
+    positive_tags = tags.reject { |t| t.start_with?('-') }
+    negative_tags = tags.select { |t| t.start_with?('-') }.map { |t| t[1..-1] } # Remove the '-'
+
+    # Apply positive tags (OR logic - any of these tags)
+    if positive_tags.any?
+      collection = collection.tagged_with(positive_tags)
+    end
+
+    # Apply negative tags (exclude all of these, but keep untagged posts)
+    negative_tags.each do |neg_tag|
+      collection = collection.where(
+        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
+        "%#{neg_tag}%"
+      )
+    end
+
+    collection
+  end
+
   def process_auto_galleries(markdown)
     lines = markdown.split("\n")
     result = []
@@ -214,7 +240,7 @@ module HasMarkdownExtensions
     heading = config[:heading]
     source = config[:source] || SiteConfig.default('collections', 'default_source') || "posts"
     order_by = config[:order] || SiteConfig.default('collections', 'default_order') || "date"
-    tag = config[:tag]  # NEW: tag filter
+    tags = config[:tags]
 
     # Get post_type from config or default, treating 'all' as nil (no filter)
     post_type = config[:post_type]
@@ -224,16 +250,17 @@ module HasMarkdownExtensions
     items = case source
     when 'posts'
       collection = Post.public_posts
-      Rails.logger.info "Before by_type: #{collection.count} posts"
       collection = collection.by_type(post_type) if post_type
-      Rails.logger.info "After by_type(#{post_type}): #{collection.count} posts"
-      collection = collection.tagged_with(tag) if tag
-      Rails.logger.info "After tagged_with(#{tag}): #{collection.count} posts"
+      collection = apply_tag_filters(collection, tags) if tags
       collection
     when "pages"
-      Page.all
+      collection = Page.public_pages
+      collection = apply_tag_filters(collection, tags) if tags
+      collection
     when "documentation"
-      Documentation.all
+      collection = Documentation.public_documentation
+      collection = apply_tag_filters(collection, tags) if tags
+      collection
     else
       []
     end
@@ -274,8 +301,8 @@ module HasMarkdownExtensions
 
     output << list_markdown
 
-    # Add "View More" link if applicable
-    if show_more && total_count > display_items.count
+    # Add "View More" link ONLY for posts source
+    if show_more && total_count > display_items.count && source == 'posts'
       show_more_text = config[:show_more_text] || "View all"
       collection_url = generate_collection_url(config)
 
@@ -413,29 +440,66 @@ module HasMarkdownExtensions
 
   def generate_collection_url(config)
     source = config[:source] || 'posts'
-    tag = config[:tag]
+    tags = config[:tags]
     post_type = config[:post_type] unless config[:post_type] == 'all'
+    order = config[:order] || 'date'
+    heading = config[:heading]
 
     segments = []
+    query_params = []
+
+    # Add source to query params if not posts
+    if source != 'posts'
+      query_params << "source=#{source}"
+    end
+
+    # Add order to query params if not date
+    if order != 'date'
+      query_params << "order=#{order}"
+    end
+
+    # Add heading to query params if present
+    if heading.present?
+      query_params << "heading=#{CGI.escape(heading)}"
+    end
 
     # Add post_type filter if specified
     if post_type && post_type != 'all'
       segments << "type-#{post_type.parameterize}"
     end
 
-    # Add tag filter
-    if tag
-      segments << tag.parameterize
+    # Process tags (split positive and negative)
+    if tags.present?
+      tag_array = tags.split(',').map(&:strip)
+      positive_tags = tag_array.reject { |t| t.start_with?('-') }
+      negative_tags = tag_array.select { |t| t.start_with?('-') }.map { |t| t[1..-1] }
+
+      # Add positive tags to URL path
+      if positive_tags.any?
+        segments << positive_tags.map(&:parameterize).join(',')
+      end
+
+      # Add negative tags as query parameter
+      if negative_tags.any?
+        query_params << "exclude=#{negative_tags.map(&:parameterize).join(',')}"
+      end
     end
 
-    # If no filters, show all
-    if segments.empty?
+    # Build base URL
+    base_url = if segments.empty?
       # Check if user has custom archive page
-      archive_page = Page.find_by(url_name: 'archive')
-      return archive_page ? '/archive' : '/collections/all'
+      archive_page = Page.where("json_extract(metadata, '$.url_name') = ?", 'archive').first
+      archive_page ? '/archive' : '/collections/all'
+    else
+      "/collections/#{segments.join('/')}"
     end
 
-    "/collections/#{segments.join('/')}"
+    # Append query parameters if any
+    if query_params.any?
+      "#{base_url}?#{query_params.join('&')}"
+    else
+      base_url
+    end
   end
 
   ## CARDS

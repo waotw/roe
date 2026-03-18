@@ -3,10 +3,6 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
-  scope :tagged_with, ->(tag) {
-    where("json_extract(metadata, '$.tags') LIKE ?", "%#{tag}%")
-  }
-
   scope :by_type, ->(post_type) {
     where("json_extract(metadata, '$.post_type') = ?", post_type)
   }
@@ -146,10 +142,6 @@ class Post < ApplicationRecord
     metadata["type"] || "article"
   end
 
-  def tags
-    metadata['tags']&.split(',')&.map(&:strip) || []
-  end
-
   # Class methods for filtering by type
   def self.articles
     where("json_extract(metadata, '$.type') = ?", "article")
@@ -172,8 +164,12 @@ class Post < ApplicationRecord
     where("json_extract(metadata, '$.status') = ?", "unlisted")
   end
 
-  def self.documentation
-    where("file_path LIKE ?", "%content/docs/%")
+  # def self.documentation
+  #   where("file_path LIKE ?", "%content/docs/%")
+  # end
+
+  def self.public_documentation
+    where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
   end
 
   def self.regular_posts
@@ -181,7 +177,7 @@ class Post < ApplicationRecord
   end
 
   def self.public_posts
-    where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
+    where("json_extract(metadata, '$.status') = ?", "published")
       .where("file_path NOT LIKE ?", "%content/docs/%")
   end
 

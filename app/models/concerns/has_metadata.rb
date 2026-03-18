@@ -3,6 +3,15 @@ module HasMetadata
 
   included do
     before_save :ensure_url_name_in_metadata
+
+    # Shared scopes
+    scope :tagged_with, ->(tags) {
+      tag_array = Array(tags)
+      return none if tag_array.empty?
+
+      conditions = tag_array.map { "json_extract(metadata, '$.tags') LIKE ?" }
+      where(conditions.join(' OR '), *tag_array.map { |t| "%#{t}%" })
+    }
   end
 
   # Shared accessors
@@ -24,6 +33,11 @@ module HasMetadata
 
   def excerpt
     metadata["excerpt"]
+  end
+
+  # Tags accessor (instance method)
+  def tags
+    metadata['tags']&.split(',')&.map(&:strip) || []
   end
 
   # Status methods (shared by both)

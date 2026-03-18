@@ -49,6 +49,12 @@ class Page < ApplicationRecord
     find_by(file_path: absolute_path)&.destroy
   end
 
+  def self.public_pages
+    where("json_extract(metadata, '$.status') = ?", "published")
+  end
+
+  private
+
   # def to_html
   #   Kramdown::Document.new(
   #     content,

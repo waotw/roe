@@ -1,48 +1,66 @@
-<article class="content">
-  <h1>
-    <% if @post_type %>
-      <%= @post_type.titleize %> Posts
-    <% end %>
-    <% if @tag %>
-      <%= "tagged with #{@tag.titleize}" %>
-    <% end %>
-    <% if !@post_type && !@tag %>
-      All Posts
-    <% end %>
-  </h1>
+<article class="content collection-page">
+  <div class="collection-page-heading">
+    <h1><%= @page_heading %></h1>
+    <p class="collection-description"><%= @page_description %></p>
+  </div>
+  <% if @items.any? %>
+    <div class="collection-list">
+      <% @items.each do |item| %>
+        <div class="collection-item">
+          <h3><%= link_to item.title || 'Untitled', item_path(item) %></h3>
 
-  <p class="text-gray-600 mb-8">
-    Showing <%= @items.count %> of <%= @total_count %> posts
-  </p>
+          <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
+            <p class="subtitle"><em><%= item.subtitle %></em></p>
+          <% end %>
 
-  <div class="space-y-6">
-    <% @items.each do |item| %>
-      <div class="collection-item">
-        <h3><%= link_to item.title || 'Untitled', post_path(item.url_name) %></h3>
+          <% if item.respond_to?(:date) && item.date %>
+            <p class="date"><%= item.date.strftime('%B %d, %Y') %></p>
+          <% end %>
 
-        <% if item.date %>
-          <p class="text-sm text-gray-500"><%= item.date.strftime('%B %d, %Y') %></p>
+          <% if item.respond_to?(:excerpt) && item.excerpt.present? %>
+            <p class="excerpt"><%= item.excerpt %></p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Pagination -->
+    <% if @total_pages > 1 %>
+      <div class="pagination">
+        <% if @page > 1 %>
+          <%= link_to '← Previous', collection_path(@filters, page: @page - 1, **pagination_params), class: 'pagination-prev' %>
         <% end %>
 
-        <% if item.excerpt %>
-          <p class="text-gray-700 mt-2"><%= item.excerpt %></p>
+        <span class="pagination-info">Page <%= @page %> of <%= @total_pages %></span>
+
+        <% if @page < @total_pages %>
+          <%= link_to 'Next →', collection_path(@filters, page: @page + 1, **pagination_params), class: 'pagination-next' %>
         <% end %>
       </div>
     <% end %>
-  </div>
-
-  <!-- Pagination -->
-  <% if @total_pages > 1 %>
-    <div class="pagination mt-8 flex gap-4 justify-center">
-      <% if @page > 1 %>
-        <%= link_to "← Previous", collection_path(@filters, page: @page - 1), class: "px-4 py-2 border" %>
-      <% end %>
-
-      <span class="px-4 py-2">Page <%= @page %> of <%= @total_pages %></span>
-
-      <% if @page < @total_pages %>
-        <%= link_to "Next →", collection_path(@filters, page: @page + 1), class: "px-4 py-2 border" %>
-      <% end %>
-    </div>
+  <% else %>
+    <p>No items found.</p>
   <% end %>
 </article>
+
+<%
+  # Helper methods for the view
+  def pagination_params
+    # Only include params that exist
+    permitted = params.permit(:source, :order, :heading, :exclude).to_h.symbolize_keys
+    permitted.reject { |k, v| v.blank? }
+  end
+
+  def item_path(item)
+    case item
+    when Post
+      "/posts/#{item.url_name}"
+    when Documentation
+      "/documentation/#{item.url_name}"
+    when Page
+      "/#{item.url_name}"
+    else
+      "#"
+    end
+  end
+%>
