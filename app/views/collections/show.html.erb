@@ -1,6 +1,6 @@
 <article class="content collection-page">
   <div class="collection-page-heading">
-    <h1><%= raw @page_heading %></h1>
+    <h1><%= sanitize(@page_heading, tags: %w[span], attributes: %w[class]) %></h1>
     <p class="collection-description"><%= @page_description %></p>
   </div>
   <% if @items.any? %>

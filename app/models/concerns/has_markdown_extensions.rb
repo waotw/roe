@@ -27,6 +27,15 @@ module HasMarkdownExtensions
       token
     end
 
+    # NEW: Protect || split markers from Kramdown table processing
+    pullquote_splits = {}
+    processed_content = processed_content.gsub(/\|\|/) do
+      token = "PULLQUOTE_SPLIT_#{counter}"
+      pullquote_splits[token] = '||'
+      counter += 1
+      token
+    end
+
     # Step 2: Process galleries, collections and cards
     processed_content = process_auto_galleries(processed_content)
     processed_content = process_galleries(processed_content, preview: preview)
@@ -46,10 +55,15 @@ module HasMarkdownExtensions
       footnote_backlink: "↩"
     ).to_html
 
-    # Step 5: Process collection grids (detect consecutive collections)
+    # Step 5: Restore pullquote split markers AFTER Kramdown
+    pullquote_splits.each do |token, original|
+      html.gsub!(token, original)
+    end
+
+    # Step 6: Process collection grids (detect consecutive collections)
     html = CollectionGridProcessor.process(html)
 
-    # Step 6: Merge floated pullquotes into following paragraphs
+    # Step 7: Merge floated pullquotes into following paragraphs
     html = merge_floated_pullquotes(html)
 
     html
@@ -582,14 +596,21 @@ module HasMarkdownExtensions
 
       # Check if it's a paragraph
       if next_element && next_element.name == 'p'
-        # Get the paragraph text (as plain text, not HTML)
-        para_text = next_element.inner_html
+        # Get the paragraph HTML
+        para_html = next_element.inner_html
 
-        # Split the paragraph roughly in half
-        split_point = find_split_point(para_text)
-
-        first_half = para_text[0...split_point].strip
-        second_half = para_text[split_point..-1].strip
+        # Check for manual split marker
+        if para_html.include?('||')
+          # Manual split - use the || marker
+          parts = para_html.split('||', 2)
+          first_half = parts[0].strip
+          second_half = parts[1].strip
+        else
+          # Automatic split - use smart detection
+          split_point = find_split_point(para_html)
+          first_half = para_html[0...split_point].strip
+          second_half = para_html[split_point..-1].strip
+        end
 
         # Create a wrapper div to hold all three parts
         wrapper = Nokogiri::XML::Node.new('div', doc)
