@@ -455,6 +455,15 @@ p.collection-description {
   white-space: nowrap;
 }
 
+p.collection-more a {
+  color: var(--color-link);
+  font-size: var(--text-sm);
+}
+
+p.collection-more a:hover {
+  color: var(--color-muted);
+}
+
 /* LIST (DEFAULT) */
 
 .collection {
