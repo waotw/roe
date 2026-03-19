@@ -1,7 +1,7 @@
 class Admin::SystemAssetsController < ApplicationController
   layout "application"
 
-  ASSETS_PATH = Rails.root.join('content/system/assets')
+  ASSETS_PATH = Rails.root.join('site/system/assets')
   FONTS_PATH = ASSETS_PATH.join('fonts')
 
   def index

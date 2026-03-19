@@ -1,5 +1,5 @@
 class SiteConfig < ApplicationRecord
-  SYSTEM_PATH = Rails.root.join('content', 'system')
+  SYSTEM_PATH = Rails.root.join('site', 'system')
   SITE_FILE = SYSTEM_PATH.join('site.yml')
   DEFAULTS_PATH = SYSTEM_PATH.join('defaults')
 

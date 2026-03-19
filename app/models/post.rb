@@ -173,15 +173,15 @@ class Post < ApplicationRecord
   end
 
   def self.regular_posts
-    where("file_path NOT LIKE ?", "%content/docs/%")
+    where("file_path NOT LIKE ?", "%site/docs/%")
   end
 
   def self.public_posts
     where("json_extract(metadata, '$.status') = ?", "published")
-      .where("file_path NOT LIKE ?", "%content/docs/%")
+      .where("file_path NOT LIKE ?", "%site/docs/%")
   end
 
   def self.feed_posts
-    published.where("file_path NOT LIKE ?", "%content/docs/%")
+    published.where("file_path NOT LIKE ?", "%site/docs/%")
   end
 end

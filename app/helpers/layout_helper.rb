@@ -1,6 +1,6 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-    file_path = Rails.root.join('content', 'layout', "#{filename}.md")
+    file_path = Rails.root.join('site', 'layout', "#{filename}.md")
 
     return '' unless File.exist?(file_path)
 

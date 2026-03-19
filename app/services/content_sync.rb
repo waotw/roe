@@ -12,10 +12,10 @@ class ContentSync
   end
 
   def sync_posts
-    relative_paths = Dir.glob("content/posts/**/*.md")
+    relative_paths = Dir.glob("site/posts/**/*.md")
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
-    puts "\n📚 Found #{markdown_files.count} markdown files in content/posts"
+    puts "\n📚 Found #{markdown_files.count} markdown files in site/posts"
 
     # Handle orphaned records and detect renames
     handle_orphaned_posts(markdown_files)
@@ -66,12 +66,12 @@ class ContentSync
   end
 
   def sync_pages
-    relative_paths = Dir.glob("content/pages/**/*.md")
+    relative_paths = Dir.glob("site/pages/**/*.md")
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     return if markdown_files.empty?
 
-    puts "\n📄 Found #{markdown_files.count} markdown files in content/pages"
+    puts "\n📄 Found #{markdown_files.count} markdown files in site/pages"
 
     # Handle orphaned pages
     handle_orphaned_pages(markdown_files)
@@ -97,12 +97,12 @@ class ContentSync
   end
 
   def sync_documentation
-    relative_paths = Dir.glob("content/documentation/**/*.md")
+    relative_paths = Dir.glob("site/documentation/**/*.md")
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     return if markdown_files.empty?
 
-    puts "\n📖 Found #{markdown_files.count} markdown files in content/documentation"
+    puts "\n📖 Found #{markdown_files.count} markdown files in site/documentation"
 
     # Handle orphaned docs
     handle_orphaned_documentation(markdown_files)
