@@ -1,23 +1,33 @@
 class CollectionsController < ApplicationController
   skip_before_action :require_authentication
 
-  PER_PAGE = 20
-
   def show
-    @filters = params[:filters] # e.g., "type-music/jazz" or "all"
-    @page = params[:page]&.to_i || 1
-    @exclude_tags = params[:exclude]&.split(',') || []
-    @source = params[:source] || 'posts' # NEW
-    @order = params[:order] || 'date' # NEW
-    @heading = params[:heading] # NEW
+      @filters = params[:filters]
+      @page = params[:page]&.to_i || 1
+      @exclude_tags = params[:exclude]&.split(',') || []
+      @source = params[:source] || 'posts'
+      @order = params[:order] || 'date'
+      @heading = params[:heading]
 
-    parse_filters
-    fetch_items
-    paginate_items
-    set_page_metadata
-  end
+      parse_filters
+      fetch_items
+      paginate_items
+      set_page_metadata
+    end
 
-  private
+    private
+
+    def per_page
+      # Get from config, fallback to 20 if not set
+      SiteConfig.get('defaults/collections', 'items_per_page')&.to_i || 20
+    end
+
+    def paginate_items
+      offset = (@page - 1) * per_page
+      @total_items = @items.count
+      @items = @items.offset(offset).limit(per_page)
+      @total_pages = (@total_items.to_f / per_page).ceil
+    end
 
   def parse_filters
     # Split the filters path into segments

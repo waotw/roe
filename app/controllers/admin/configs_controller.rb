@@ -140,31 +140,33 @@ class Admin::ConfigsController < ApplicationController
     when [ "collections", "default_order" ]
       [ "date", "date-asc", "title", "filename" ]
     when [ "collections", "default_template" ]
-      [ "list", "compact", "full" ]
+      [ "list", "compact", "links" ]
+    when [ "collections", "items_per_page" ]
+      [ "5", "10", "20", "25", "50", "100" ]
     when [ "cards", "default_style" ]
-      [ "small", "large", "compact" ]
+      [ "small", "large" ]
     else
-      nil # Return nil for fields without predefined options
+      nil
     end
   end
 
   private
 
   def build_field_options_for_collections
-    # Get all posts and extract post_type from each
     existing_post_types = Post.all.map(&:post_type).compact.uniq.sort
 
     {
       'default_source' => [ 'posts', 'pages', 'documentation' ],
       'default_post_type' => [ 'all' ] + existing_post_types,
       'default_order' => [ 'date', 'date-asc', 'title', 'filename' ],
-      'default_template' => [ 'list', 'compact', 'full' ]
+      'default_template' => [ 'list', 'compact', 'links' ],
+      'items_per_page' => [ '10', '20', '25', '50', '100' ]
     }
   end
 
   def build_field_options_for_cards
     {
-      'post-link.default_style' => [ 'small', 'large', 'compact' ],
+      'post-link.default_style' => [ 'small', 'large' ],
       'pullquote.default_position' => [ 'center', 'left', 'right' ]
     }
   end

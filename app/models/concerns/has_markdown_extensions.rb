@@ -71,31 +71,7 @@ module HasMarkdownExtensions
 
   private
 
-  def apply_tag_filters(collection, tag_string)
-    return collection if tag_string.blank?
-
-    # Split by comma and clean up whitespace
-    tags = tag_string.split(',').map(&:strip)
-
-    # Separate positive and negative tags
-    positive_tags = tags.reject { |t| t.start_with?('-') }
-    negative_tags = tags.select { |t| t.start_with?('-') }.map { |t| t[1..-1] } # Remove the '-'
-
-    # Apply positive tags (OR logic - any of these tags)
-    if positive_tags.any?
-      collection = collection.tagged_with(positive_tags)
-    end
-
-    # Apply negative tags (exclude all of these, but keep untagged posts)
-    negative_tags.each do |neg_tag|
-      collection = collection.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{neg_tag}%"
-      )
-    end
-
-    collection
-  end
+  # GALLERIES
 
   def process_auto_galleries(markdown)
     lines = markdown.split("\n")
@@ -231,6 +207,8 @@ module HasMarkdownExtensions
     CGI.escapeHTML(text.to_s)
   end
 
+  # COLLECTIONS
+
   def process_collections(markdown, preview: false)
     # Match fenced blocks with 'collection' language - handle both \n and \r\n
     markdown.gsub(/```collection\r?\n(.*?)```/m) do
@@ -248,6 +226,32 @@ module HasMarkdownExtensions
       config[key.to_sym] = value if key && value
     end
     config
+  end
+
+  def apply_tag_filters(collection, tag_string)
+    return collection if tag_string.blank?
+
+    # Split by comma and clean up whitespace
+    tags = tag_string.split(',').map(&:strip)
+
+    # Separate positive and negative tags
+    positive_tags = tags.reject { |t| t.start_with?('-') }
+    negative_tags = tags.select { |t| t.start_with?('-') }.map { |t| t[1..-1] } # Remove the '-'
+
+    # Apply positive tags (OR logic - any of these tags)
+    if positive_tags.any?
+      collection = collection.tagged_with(positive_tags)
+    end
+
+    # Apply negative tags (exclude all of these, but keep untagged posts)
+    negative_tags.each do |neg_tag|
+      collection = collection.where(
+        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
+        "%#{neg_tag}%"
+      )
+    end
+
+    collection
   end
 
   def render_collection(config)
