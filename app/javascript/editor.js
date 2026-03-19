@@ -1,4 +1,10 @@
 document.addEventListener("turbo:load", function () {
+  // Prevent multiple setups
+  if (window.editorSetupComplete) {
+    console.log("[Editor] Already set up, skipping...");
+    return;
+  }
+
   // Prevent scroll restoration
   if ("scrollRestoration" in history) {
     history.scrollRestoration = "manual";
@@ -22,7 +28,7 @@ document.addEventListener("turbo:load", function () {
 
   EditorState.init("content-textarea");
 
-  // Restore scroll positions FIRST
+  // Restore scroll positions
   const savedTextareaScroll = sessionStorage.getItem("editorScrollPosition");
   const savedWindowScroll = sessionStorage.getItem("windowScrollPosition");
 
@@ -40,6 +46,7 @@ document.addEventListener("turbo:load", function () {
     }, 0);
   }
 
+  // Helper functions
   function wrapOrInsert(prefix, suffix, placeholder = "") {
     const textarea = document.getElementById("content-textarea");
     const start = textarea.selectionStart;
@@ -87,105 +94,101 @@ document.addEventListener("turbo:load", function () {
     window.open(url.toString(), previewId);
   }
 
-  let originalMetadata =
-    document.querySelector('[name="metadata"]')?.value || "";
-  let originalContent = document.querySelector('[name="content"]').value;
-
-  window.handleBeforeUnload = function (e) {
-    let currentMetadata =
-      document.querySelector('[name="metadata"]')?.value || "";
-    let currentContent = document.querySelector('[name="content"]').value;
-
-    if (
-      currentMetadata !== originalMetadata ||
-      currentContent !== originalContent
-    ) {
-      e.preventDefault();
-      e.returnValue = "";
-    }
-  };
-
-  function insertFootnote() {
-    wrapOrInsert("(*", "*)", "footnote text here");
-  }
-
-  function insertItalic() {
-    wrapOrInsert("_", "_", "italic text");
-  }
-
-  function insertStrike() {
-    wrapOrInsert("~~", "~~", "struck text");
-  }
-
-  function insertBold() {
-    wrapOrInsert("**", "**", "bold text");
-  }
-
-  function insertCollection() {
+  function insertMedia(path, filename, position) {
     const textarea = document.getElementById("content-textarea");
-    const start = textarea.selectionStart;
+    const markdown = `![${filename}](${path})`;
 
-    const collectionTemplate =
-      "```collection\n" + collectionButtonTemplate + "\n```";
+    textarea.focus({ preventScroll: true });
+    textarea.setSelectionRange(position, position);
 
-    document.execCommand("insertText", false, collectionTemplate);
+    document.execCommand("insertText", false, markdown);
 
-    const cursorPos = start + "```collection\nheading: ".length;
-    textarea.setSelectionRange(cursorPos, cursorPos);
+    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
+    const lines = textarea.value
+      .substring(0, textarea.selectionStart)
+      .split("\n").length;
+    textarea.scrollTop = (lines - 5) * lineHeight;
   }
 
-  function triggerMediaUpload() {
-    document.getElementById("media-upload").click();
+  function searchPosts(query) {
+    const resultsDiv = document.getElementById("post-search-results");
+
+    fetch(`/admin/posts/search?q=${encodeURIComponent(query)}`)
+      .then((response) => response.json())
+      .then((posts) => {
+        if (posts.length === 0) {
+          resultsDiv.innerHTML =
+            '<div class="p-2 text-gray-500 text-sm">No posts found</div>';
+          resultsDiv.classList.remove("hidden");
+          return;
+        }
+
+        resultsDiv.innerHTML = posts
+          .map(
+            (post) => `
+            <button
+              type="button"
+              data-action="select-post"
+              data-post='${JSON.stringify(post)}'
+              class="block w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-200 last:border-b-0"
+            >
+              ${post.title}
+            </button>
+          `,
+          )
+          .join("");
+
+        resultsDiv.classList.remove("hidden");
+      })
+      .catch((error) => {
+        console.error("Search error:", error);
+      });
   }
 
-  function toggleCardMenu(event) {
-    event.stopPropagation();
-    const menu = document.getElementById("card-menu");
-    menu.classList.toggle("hidden");
+  function selectPost(postData) {
+    const slug = postData.url.replace(/^\/posts\//, "");
+
+    let cardTemplate = "```card\ntype: post-link\nstyle: small\n";
+    cardTemplate += `post: ${slug}\n`;
+    cardTemplate += "```";
+
+    const textarea = document.getElementById("content-textarea");
+    textarea.focus({ preventScroll: true });
+    document.execCommand("insertText", false, cardTemplate);
+
+    closePostLinkModal();
   }
 
-  document.addEventListener("click", (e) => {
-    const menu = document.getElementById("card-menu");
-    if (menu && !menu.classList.contains("hidden")) {
-      menu.classList.add("hidden");
+  function closePostLinkModal() {
+    const modal = document.getElementById("post-link-modal");
+    if (modal) {
+      modal.remove();
     }
-  });
-
-  function insertCard(type) {
-    if (type === "pullquote") {
-      insertCardTemplate(pullquoteButtonTemplate);
-    } else if (type === "aside") {
-      insertCardTemplate(asideButtonTemplate);
-    } else if (type === "post-link") {
-      insertCardTemplate(postLinkButtonTemplate);
-    }
-
-    document.getElementById("card-menu").classList.add("hidden");
   }
 
   function showPostLinkPrompt() {
-    document.getElementById("card-menu").classList.add("hidden");
+    document.getElementById("card-menu")?.classList.add("hidden");
 
     const overlay = document.createElement("div");
     overlay.id = "post-link-modal";
     overlay.className = "fixed inset-0 flex items-center justify-center z-50";
     overlay.style.cssText = "background-color: rgba(0, 0, 0, 0.2);";
     overlay.innerHTML = `
-        <div class="bg-white p-6 w-96 border border-gray-400">
-          <div class="relative mb-4">
-            <input
-              type="text"
-              id="post-search-input"
-              placeholder="Search for a post by title..."
-              class="w-full px-3 py-2 border border-gray-300"
-            >
-            <div id="post-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 max-h-60 overflow-y-auto z-10"></div>
-          </div>
-          <div class="flex justify-end gap-2">
-            <button onclick="closePostLinkModal()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Cancel</button>
-          </div>
+      <div class="bg-white p-6 w-96 border border-gray-400">
+        <div class="relative mb-4">
+          <input
+            type="text"
+            id="post-search-input"
+            placeholder="Search for a post by title..."
+            class="w-full px-3 py-2 border border-gray-300"
+          >
+          <div id="post-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 max-h-60 overflow-y-auto z-10"></div>
         </div>
-      `;
+        <div class="flex justify-end gap-2">
+          <button type="button" data-action="close-post-link-modal" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Cancel</button>
+        </div>
+      </div>
+    `;
 
     document.body.appendChild(overlay);
 
@@ -206,128 +209,196 @@ document.addEventListener("turbo:load", function () {
     });
   }
 
-  function searchPosts(query) {
-    const resultsDiv = document.getElementById("post-search-results");
+  // Track original values for unsaved changes warning
+  let originalMetadata =
+    document.querySelector('[name="metadata"]')?.value || "";
+  let originalContent = document.querySelector('[name="content"]').value;
 
-    fetch(`/admin/posts/search?q=${encodeURIComponent(query)}`)
-      .then((response) => response.json())
-      .then((posts) => {
-        if (posts.length === 0) {
-          resultsDiv.innerHTML =
-            '<div class="p-2 text-gray-500 text-sm">No posts found</div>';
-          resultsDiv.classList.remove("hidden");
-          return;
-        }
+  function handleBeforeUnload(e) {
+    let currentMetadata =
+      document.querySelector('[name="metadata"]')?.value || "";
+    let currentContent = document.querySelector('[name="content"]').value;
 
-        resultsDiv.innerHTML = posts
-          .map(
-            (post) => `
-            <button
-              onclick='selectPost(${JSON.stringify(post)})'
-              class="block w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-200 last:border-b-0"
-            >
-              ${post.title}
-            </button>
-          `,
-          )
-          .join("");
-
-        resultsDiv.classList.remove("hidden");
-      })
-      .catch((error) => {
-        console.error("Search error:", error);
-      });
-  }
-
-  function selectPost(post) {
-    const slug = post.url.replace(/^\/posts\//, "");
-
-    let cardTemplate = "```card\ntype: post-link\nstyle: small\n";
-    cardTemplate += `post: ${slug}\n`;
-    cardTemplate += "```";
-
-    const textarea = document.getElementById("content-textarea");
-    textarea.focus({ preventScroll: true });
-    document.execCommand("insertText", false, cardTemplate);
-
-    closePostLinkModal();
-  }
-
-  function closePostLinkModal() {
-    const modal = document.getElementById("post-link-modal");
-    if (modal) {
-      modal.remove();
+    if (
+      currentMetadata !== originalMetadata ||
+      currentContent !== originalContent
+    ) {
+      e.preventDefault();
+      e.returnValue = "";
     }
   }
 
+  window.addEventListener("beforeunload", handleBeforeUnload);
+
+  // Event delegation for all button clicks
   document.addEventListener("click", (e) => {
+    const target = e.target.closest("[data-action]");
+    if (!target) return;
+
+    const action = target.dataset.action;
+
+    switch (action) {
+      case "preview-post":
+        e.preventDefault();
+        previewPost();
+        break;
+
+      case "insert-bold":
+        e.preventDefault();
+        wrapOrInsert("**", "**", "bold text");
+        break;
+
+      case "insert-italic":
+        e.preventDefault();
+        wrapOrInsert("_", "_", "italic text");
+        break;
+
+      case "insert-strike":
+        e.preventDefault();
+        wrapOrInsert("~~", "~~", "struck text");
+        break;
+
+      case "insert-footnote":
+        e.preventDefault();
+        wrapOrInsert("(*", "*)", "footnote text here");
+        break;
+
+      case "toggle-card-menu":
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById("card-menu")?.classList.toggle("hidden");
+        break;
+
+      case "insert-card":
+        e.preventDefault();
+        const cardType = target.dataset.cardType;
+        if (cardType === "pullquote") {
+          insertCardTemplate(pullquoteButtonTemplate);
+        } else if (cardType === "aside") {
+          insertCardTemplate(asideButtonTemplate);
+        } else if (cardType === "post-link") {
+          insertCardTemplate(postLinkButtonTemplate);
+        }
+        document.getElementById("card-menu")?.classList.add("hidden");
+        break;
+
+      case "show-post-link-prompt":
+        e.preventDefault();
+        showPostLinkPrompt();
+        break;
+
+      case "insert-collection":
+        e.preventDefault();
+        const textarea = document.getElementById("content-textarea");
+        const start = textarea.selectionStart;
+        const collectionTemplate =
+          "```collection\n" + collectionButtonTemplate + "\n```";
+        document.execCommand("insertText", false, collectionTemplate);
+        const cursorPos = start + "```collection\nheading: ".length;
+        textarea.setSelectionRange(cursorPos, cursorPos);
+        break;
+
+      case "trigger-media-upload":
+        e.preventDefault();
+        document.getElementById("media-upload")?.click();
+        break;
+
+      case "select-post":
+        e.preventDefault();
+        const postData = JSON.parse(target.dataset.post);
+        selectPost(postData);
+        break;
+
+      case "close-post-link-modal":
+        e.preventDefault();
+        closePostLinkModal();
+        break;
+    }
+
+    // Close card menu when clicking outside
+    if (!target.closest("#card-menu") && action !== "toggle-card-menu") {
+      document.getElementById("card-menu")?.classList.add("hidden");
+    }
+
+    // Close modal when clicking overlay
     if (e.target.id === "post-link-modal") {
       closePostLinkModal();
     }
   });
 
-  function handleMediaUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+  // Handle publish/unpublish confirmations
+  document.addEventListener("submit", (e) => {
+    const form = e.target;
 
-    const textarea = document.getElementById("content-textarea");
-    const savedPosition = textarea.selectionStart;
+    if (form.dataset.action === "publish-confirm") {
+      if (
+        !confirm(
+          "Publishing this post will save your changes and make it live on your site. Continue?",
+        )
+      ) {
+        e.preventDefault();
+        return;
+      }
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    }
 
-    const formData = new FormData();
-    formData.append("file", file);
+    if (form.dataset.action === "unpublish-confirm") {
+      if (
+        !confirm(
+          "Unpublishing this post will save your changes and remove it from your site. Continue?",
+        )
+      ) {
+        e.preventDefault();
+        return;
+      }
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    }
+  });
 
-    const token = document.querySelector('meta[name="csrf-token"]').content;
+  // Media upload handler
+  document
+    .getElementById("media-upload")
+    ?.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
 
-    fetch("/admin/medium", {
-      method: "POST",
-      headers: {
-        "X-CSRF-Token": token,
-      },
-      body: formData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.success) {
-          insertMedia(data.path, file.name, savedPosition);
-        } else {
-          alert("Upload failed: " + data.error);
-        }
+      const textarea = document.getElementById("content-textarea");
+      const savedPosition = textarea.selectionStart;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const token = document.querySelector('meta[name="csrf-token"]').content;
+
+      fetch("/admin/medium", {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": token,
+        },
+        body: formData,
       })
-      .catch((error) => {
-        alert("Upload error: " + error);
-      });
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.success) {
+            insertMedia(data.path, file.name, savedPosition);
+          } else {
+            alert("Upload failed: " + data.error);
+          }
+        })
+        .catch((error) => {
+          alert("Upload error: " + error);
+        });
 
-    event.target.value = "";
-  }
-
-  function insertMedia(path, filename, position) {
-    const textarea = document.getElementById("content-textarea");
-    const markdown = `![${filename}](${path})`;
-
-    textarea.focus({ preventScroll: true });
-    textarea.setSelectionRange(position, position);
-
-    document.execCommand("insertText", false, markdown);
-
-    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight);
-    const lines = textarea.value
-      .substring(0, textarea.selectionStart)
-      .split("\n").length;
-    textarea.scrollTop = (lines - 5) * lineHeight;
-  }
-
-  window.addEventListener("beforeunload", handleBeforeUnload);
+      event.target.value = "";
+    });
 
   // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
 
-      // Remove the listener
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.handleBeforeUnload = null;
 
-      // Save scroll position before submit
       if (contentTextarea) {
         sessionStorage.setItem(
           "editorScrollPosition",
@@ -336,7 +407,6 @@ document.addEventListener("turbo:load", function () {
         sessionStorage.setItem("windowScrollPosition", window.scrollY);
       }
 
-      // Use requestSubmit() instead of submit() to trigger event listeners
       document.getElementById(`${resourceType}-form`).requestSubmit();
     }
 
@@ -346,12 +416,14 @@ document.addEventListener("turbo:load", function () {
     }
   });
 
+  // Save editor state when browsing media
   document
     .getElementById("browse-media-link")
     ?.addEventListener("click", () => {
       EditorState.save("content-textarea");
     });
 
+  // Handle visibility changes
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       EditorState.save("content-textarea");
@@ -360,26 +432,23 @@ document.addEventListener("turbo:load", function () {
     }
   });
 
-  // Create a broadcast channel for this preview
+  // Create broadcast channel for preview refresh
   window.previewChannel = new BroadcastChannel(`preview-${previewId}`);
 
+  // Form submission handler
   const formElement = document.getElementById(`${resourceType}-form`);
   formElement.addEventListener("submit", (e) => {
-    // Remove FIRST, synchronously
     window.removeEventListener("beforeunload", handleBeforeUnload);
-    window.handleBeforeUnload = null; // Clear the reference too
 
-    // Save scroll position
     if (contentTextarea) {
       sessionStorage.setItem("editorScrollPosition", contentTextarea.scrollTop);
       sessionStorage.setItem("windowScrollPosition", window.scrollY);
     }
 
-    // Broadcast that content was saved
-    previewChannel.postMessage({ action: "refresh" });
+    window.previewChannel.postMessage({ action: "refresh" });
   });
 
-  // Hide flash notice on any input
+  // Hide flash notice on input
   const flashNotice = document.querySelector(".flash-notice");
   if (flashNotice) {
     document.querySelectorAll("textarea").forEach((textarea) => {
@@ -389,33 +458,17 @@ document.addEventListener("turbo:load", function () {
     });
   }
 
-  // Make functions globally available for onclick handlers
-  window.wrapOrInsert = wrapOrInsert;
-  window.insertCardTemplate = insertCardTemplate;
-  window.previewPost = previewPost;
-  window.insertFootnote = insertFootnote;
-  window.insertItalic = insertItalic;
-  window.insertStrike = insertStrike;
-  window.insertBold = insertBold;
-  window.insertCollection = insertCollection;
-  window.triggerMediaUpload = triggerMediaUpload;
-  window.toggleCardMenu = toggleCardMenu;
-  window.insertCard = insertCard;
-  window.showPostLinkPrompt = showPostLinkPrompt;
-  window.selectPost = selectPost;
-  window.closePostLinkModal = closePostLinkModal;
-  window.handleMediaUpload = handleMediaUpload;
-  window.insertMedia = insertMedia;
-
   // Check for post-saved trigger and broadcast refresh
   const savedTrigger = document.getElementById("post-saved-trigger");
   if (savedTrigger && savedTrigger.dataset.trigger === "refresh") {
-    console.log("Flash notice detected, attempting broadcast...");
-    if (window.previewChannel) {
-      console.log("Sending refresh message via previewChannel");
-      window.previewChannel.postMessage({ action: "refresh" });
-    } else {
-      console.log("ERROR: previewChannel is undefined!");
-    }
+    window.previewChannel?.postMessage({ action: "refresh" });
   }
+
+  // At the very end, mark setup as complete
+  window.editorSetupComplete = true;
+});
+
+// Clear the flag when navigating away
+document.addEventListener("turbo:before-render", function () {
+  window.editorSetupComplete = false;
 });

@@ -2,14 +2,13 @@
 <html>
 <head>
   <title>Edit: <%= @post.title || 'Untitled' %></title>
-  <% content_for :editor_js, true %>
 </head>
 <body class="bg-white text-black p-5" data-turbo-action="replace" data-md-editor>
 
-  <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative">
+  <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative ">
     <div class="flex items-center gap-2">
-    <%= link_to "← Back to Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-800" %> |
-    <%= link_to "Media", browse_admin_medium_index_path, target: "_blank", id: "browse-media-link", class: "text-blue-600 hover:text-blue-800" %>
+    <%= link_to "← Back to Posts", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %> |
+    <%= link_to "Media", browse_admin_medium_index_path, target: "_blank", data: { action: "click->editor#saveEditorState" }, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     </div>
   </div>
 
@@ -19,54 +18,72 @@
 
   <h1 class="text-3xl font-bold mb-5">Edit Post: <%= @post.title %></h1>
 
-  <div class="mb-5 flex justify-between items-center">
-    <div class="flex gap-2.5 items-center">
-      <span style="display: inline; margin: 0;">
-        <button type="submit" form="post-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Save</button>
-      </span>
+  <!-- Wrap everything in Stimulus controller -->
+  <div data-controller="editor"
+       data-editor-resource-type-value="post"
+       data-editor-resource-id-value="<%= @post.id %>"
+       data-editor-preview-path-value="<%= @preview_path || preview_admin_post_path(@post) %>"
+       data-editor-collection-template-value="<%= SiteConfig.default('collections', 'button_template') %>"
+       data-editor-aside-template-value="<%= SiteConfig.default('cards', 'aside_button_template') %>"
+       data-editor-post-link-template-value="<%= SiteConfig.default('cards', 'post_link_button_template') %>"
+       data-editor-pullquote-template-value="<%= SiteConfig.default('cards', 'pullquote_button_template') %>"
+       data-action="keydown->editor#handleKeydown visibilitychange@document->editor#handleVisibilityChange">
 
-      <button type="button" onclick="previewPost()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Preview</button>
+    <div class="mb-5 flex justify-between items-center">
+      <div class="flex gap-2.5 items-center">
+        <span style="display: inline; margin: 0;">
+          <button type="submit" form="post-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Save</button>
+        </span>
 
-      <% if @post.draft? %>
-        <%= button_to "Publish", publish_admin_post_path(@post),
-            method: :patch,
-            class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
-            form: {
-              onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Publishing this post will save your changes and make it live on your site. Continue?')",
-              style: "display: inline; margin: 0;"
-            } %>
-      <% else %>
-        <%= button_to "Unpublish", unpublish_admin_post_path(@post),
-            method: :patch,
-            class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
-            form: {
-              onsubmit: "window.removeEventListener('beforeunload', handleBeforeUnload); return confirm('Unpublishing this post will save your changes and remove it from your site. Continue?')",
-              style: "display: inline; margin: 0;"
-            } %>
-      <% end %>
+        <button type="button"
+                data-action="click->editor#preview"
+                class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+          Preview
+        </button>
+
+        <% if @post.draft? %>
+          <%= button_to "Publish", publish_admin_post_path(@post),
+              method: :patch,
+              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
+              form: {
+                data: { action: "submit->editor#confirmPublish" },
+                style: "display: inline; margin: 0;"
+              } %>
+        <% else %>
+          <%= button_to "Unpublish", unpublish_admin_post_path(@post),
+              method: :patch,
+              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
+              form: {
+                data: { action: "submit->editor#confirmUnpublish" },
+                style: "display: inline; margin: 0;"
+              } %>
+        <% end %>
+      </div>
+
+      <!-- Right: Delete button -->
+      <button type="button"
+              data-action="delete"
+              data-resource-id="<%= @post.id %>"
+              data-resource-title="<%= @post.title || @post.filename %>"
+              data-resource-type="post"
+              class="uppercase text-xs px-1.5 py-0 border border-red-600 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+        Delete
+      </button>
     </div>
 
-    <!-- Right: Delete button -->
-    <button type="button"
-            data-action="delete"
-            data-resource-id="<%= @post.id %>"
-            data-resource-title="<%= @post.title || @post.filename %>"
-            data-resource-type="post"
-            class="uppercase text-xs px-1.5 py-0 border border-red-600 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
-      Delete
-    </button>
-  </div>
+    <%= render 'shared/editor',
+          form_url: admin_post_path(@post),
+          resource_type: 'post',
+          metadata: @metadata.gsub(/^---\n/, ''),
+          content: @content,
+          show_metadata: true,
+          preview_path: @preview_path || preview_admin_post_path(@post),
+          item: @post,
+          metadata_config: @metadata_config,
+          default_author: @default_author %>
 
-  <%= render 'shared/editor',
-        form_url: admin_post_path(@post),
-        resource_type: 'post',
-        metadata: @metadata.gsub(/^---\n/, ''),
-        content: @content,
-        show_metadata: true,
-        preview_path: @preview_path || preview_admin_post_path(@post),
-        item: @post,
-        metadata_config: @metadata_config,
-        default_author: @default_author %>
+  </div>
+  <!-- End Stimulus controller -->
 
   <%= render 'shared/delete_file_modal', resource: @post, resource_type: 'post' %>
 

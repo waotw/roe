@@ -2,15 +2,8 @@
               method: :patch,
               id: "#{resource_type}-form",
               data: {
-                resource_type: resource_type,
-                resource_id: item.id,
-                preview_path: preview_path,
-                collection_template: SiteConfig.default('collections', 'button_template'),
-                aside_template: SiteConfig.default('cards', 'aside_button_template'),
-                post_link_template: SiteConfig.default('cards', 'post_link_button_template'),
-                pullquote_template: SiteConfig.default('cards', 'pullquote_button_template'),
-                known_fields: metadata_config.to_json,
-                default_author: default_author
+                editor_target: "form",
+                action: "submit->editor#save"
               } do |form| %>
   <% if show_metadata %>
     <%= render 'shared/metadata_editor',
@@ -24,30 +17,48 @@
       <h3 class="text-sm text-gray-600">Content</h3>
       <div class="flex gap-4">
         <div class="flex gap-2">
-          <button type="button" onclick="insertBold()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><strong>B</strong></button>
-          <button type="button" onclick="insertItalic()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><em>I</em></button>
-          <button type="button" onclick="insertStrike()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><s>S</s></button>
+          <button type="button" data-action="click->editor#insertBold" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><strong>B</strong></button>
+          <button type="button" data-action="click->editor#insertItalic" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><em>I</em></button>
+          <button type="button" data-action="click->editor#insertStrike" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><s>S</s></button>
         </div>
         <div class="flex gap-2">
-          <button type="button" onclick="insertFootnote()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Footnote</button>
+          <button type="button" data-action="click->editor#insertFootnote" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Footnote</button>
           <div class="relative inline-flex">
-            <button type="button" onclick="toggleCardMenu(event)" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            <button type="button"
+                    data-action="click->editor#toggleCardMenu"
+                    class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
               Card ▼
             </button>
-            <div id="card-menu" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-20" style="min-width: 150px;">
-              <button type="button" onclick="insertCard('pullquote')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Pull Quote</button>
-              <button type="button" onclick="insertCard('aside')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Aside</button>
-              <button type="button" onclick="showPostLinkPrompt()" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Post Link</button>
+            <div data-editor-target="cardMenu" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-20" style="min-width: 150px;">
+              <button type="button"
+                      data-action="click->editor#insertCard"
+                      data-card-type="pullquote"
+                      class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Pull Quote</button>
+              <button type="button"
+                      data-action="click->editor#insertCard"
+                      data-card-type="aside"
+                      class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Aside</button>
+              <button type="button"
+                      data-action="click->editor#showPostLinkPrompt"
+                      class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Post Link</button>
             </div>
           </div>
-          <button type="button" onclick="insertCollection()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Collection</button>
-          <button type="button" onclick="triggerMediaUpload()" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Upload Media</button>
-          <input type="file" id="media-upload" accept="image/*" style="display: none;" onchange="handleMediaUpload(event)">
+          <button type="button" data-action="click->editor#insertCollection" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Collection</button>
+          <button type="button" data-action="click->editor#triggerMediaUpload" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Upload Media</button>
+          <input type="file"
+                 data-editor-target="mediaUpload"
+                 data-action="change->editor#handleMediaUpload"
+                 accept="image/*"
+                 style="display: none;">
         </div>
       </div>
     </div>
     <%= form.text_area :content, value: content,
             class: "w-full font-mono text-sm p-1 border border-gray-300 box-border h-[500px] bg-white",
+            data: {
+              editor_target: "textarea",
+              action: "input->editor#hideFlashOnInput"
+            },
             id: "content-textarea" %>
   </div>
 <% end %>
