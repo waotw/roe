@@ -23,8 +23,7 @@ module LayoutHelper
   def add_active_nav_class(html, current_page)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     current_url_name = current_page&.url_name
-
-    return doc.to_html unless current_url_name
+    current_path = request.path # Get current path from controller context
 
     doc.css('a').each do |link|
       href = link['href']
@@ -33,8 +32,8 @@ module LayoutHelper
       # Remove leading slash from href for comparison
       link_path = href.sub(/^\//, '')
 
-      # Handle root separately
-      if href == '/' && request.path == '/'
+      # Handle root path - match only when both are exactly '/'
+      if href == '/' && current_path == '/'
         add_active_class(link)
         next
       end
