@@ -78,6 +78,9 @@ Rails.application.routes.draw do
     get 'posts/search', to: 'posts#search'
   end
 
+  # Health check
+  get '/health', to: 'health#check'
+
   # Public site (specific before catch-all)
   root "posts#index"
   get "posts/:url_name", to: "posts#show", as: :post
