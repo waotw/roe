@@ -19,14 +19,6 @@ console_command = '/rails/bin/rails console'
   source = 'data'
   destination = '/data'
 
-[[mounts]]
-  source = 'roe_media'
-  destination = '/app/site/media'
-
-[[mounts]]
-  source = 'roe_system_assets'
-  destination = '/app/site/system/assets'
-
 [http_service]
   internal_port = 8080
   force_https = true

@@ -1,7 +1,7 @@
 namespace :content do
   SYNC_PATHS = {
-    'site/media' => '/app/site/media',
-    'site/system/assets' => '/app/site/system/assets'
+    'site/media' => '/data/media',
+    'site/system/assets' => '/data/system/assets'
   }
 
   def app_name

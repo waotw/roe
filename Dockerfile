@@ -1,13 +1,6 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
-# docker build -t demo .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name demo demo
-
-# For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
-
-# Make sure RUBY_VERSION matches the Ruby version in .ruby-version
 ARG RUBY_VERSION=3.2.2
 FROM ruby:$RUBY_VERSION-slim AS base
 
@@ -71,15 +64,14 @@ COPY --from=build /rails /rails
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
     useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    mkdir -p /data && \
-    mkdir -p /rails/site/media && \
-    mkdir -p /rails/site/system/assets && \
-    chown -R 1000:1000 db log storage tmp /data && \
-    chown -R 1000:1000 /rails/site/media /rails/site/system/assets
+    mkdir -p /data/db /data/media /data/system/assets && \
+    ln -sf /data/media /rails/site/media && \
+    ln -sf /data/system/assets /rails/site/system/assets && \
+    chown -R 1000:1000 db log storage tmp /data
 USER 1000:1000
 
 # Deployment options
-ENV DATABASE_URL="sqlite3:///data/production.sqlite3"
+ENV DATABASE_URL="sqlite3:///data/db/production.sqlite3"
 
 # Entrypoint prepares the database.
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
