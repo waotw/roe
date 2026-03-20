@@ -54,7 +54,7 @@ FROM base
 
 # Install packages needed for deployment
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y imagemagick libvips && \
+    apt-get install --no-install-recommends -y imagemagick libvips gosu && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Copy built artifacts: gems, application
@@ -68,7 +68,8 @@ RUN groupadd --system --gid 1000 rails && \
     ln -sf /data/media /rails/site/media && \
     ln -sf /data/system/assets /rails/site/system/assets && \
     chown -R 1000:1000 db log storage tmp /data
-USER 1000:1000
+
+USER root
 
 # Deployment options
 ENV DATABASE_URL="sqlite3:///data/db/production.sqlite3"

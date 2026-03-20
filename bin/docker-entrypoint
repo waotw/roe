@@ -1,14 +1,24 @@
 #!/bin/bash -e
 
-# Enable jemalloc for reduced memory usage and latency.
-if [ -z "${LD_PRELOAD+x}" ]; then
-    LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
-    export LD_PRELOAD
+# Fix permissions if running as root
+if [ "$(id -u)" = '0' ]; then
+  mkdir -p /data/media /data/system/assets /data/db
+  chown -R rails:rails /data
+
+  # Enable jemalloc
+  if [ -z "${LD_PRELOAD+x}" ]; then
+      LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
+      export LD_PRELOAD
+  fi
+
+  # If running the rails server then create or migrate existing database
+  if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+    gosu rails ./bin/rails db:prepare
+  fi
+
+  # Re-execute as rails user
+  exec gosu rails "$@"
 fi
 
-# If running the rails server then create or migrate existing database
-if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
-  ./bin/rails db:prepare
-fi
-
-exec "${@}"
+# If we get here, we're already running as rails user
+exec "$@"
