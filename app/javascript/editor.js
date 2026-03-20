@@ -1,3 +1,4 @@
+// this is an old file, if I see this or share it, please remind me that this file is no longer in use.
 document.addEventListener("turbo:load", function () {
   // Prevent multiple setups
   if (window.editorSetupComplete) {
@@ -26,6 +27,28 @@ document.addEventListener("turbo:load", function () {
 
   const contentTextarea = document.getElementById("content-textarea");
 
+  // Track last cursor position
+  let lastCursorPosition = null;
+
+  if (contentTextarea) {
+    contentTextarea.addEventListener("blur", (e) => {
+      lastCursorPosition = contentTextarea.selectionStart;
+      console.log("[BLUR] Saved cursor position:", lastCursorPosition);
+    });
+
+    contentTextarea.addEventListener("focus", (e) => {
+      console.log(
+        "[FOCUS] Textarea focused, current position:",
+        contentTextarea.selectionStart,
+      );
+    });
+
+    contentTextarea.addEventListener("input", () => {
+      console.log("[INPUT] Clearing saved position");
+      lastCursorPosition = null;
+    });
+  }
+
   EditorState.init("content-textarea");
 
   // Restore scroll positions
@@ -49,27 +72,62 @@ document.addEventListener("turbo:load", function () {
   // Helper functions
   function wrapOrInsert(prefix, suffix, placeholder = "") {
     const textarea = document.getElementById("content-textarea");
+
+    console.log(
+      "[wrapOrInsert] START - savedPos:",
+      lastCursorPosition,
+      "current selection:",
+      textarea.selectionStart,
+    );
+
+    // Get position BEFORE focusing
+    const savedPos = lastCursorPosition;
+
+    // Focus first
+    textarea.focus();
+    console.log(
+      "[wrapOrInsert] After focus, selection:",
+      textarea.selectionStart,
+    );
+
+    // Now restore the saved position if we have one
+    if (savedPos !== null) {
+      textarea.setSelectionRange(savedPos, savedPos);
+      console.log("[wrapOrInsert] Restored position to:", savedPos);
+    }
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selectedText = textarea.value.substring(start, end);
+    console.log("[wrapOrInsert] About to insert at:", start, "-", end);
 
+    const selectedText = textarea.value.substring(start, end);
     const content = selectedText || placeholder;
     const insertion = prefix + content + suffix;
 
-    textarea.focus({ preventScroll: true });
     document.execCommand("insertText", false, insertion);
+    console.log("[wrapOrInsert] Inserted:", insertion);
 
     if (!selectedText && placeholder) {
       const selectStart = start + prefix.length;
       const selectEnd = selectStart + placeholder.length;
       textarea.setSelectionRange(selectStart, selectEnd);
     }
+
+    lastCursorPosition = null;
+    console.log("[wrapOrInsert] END - cleared saved position");
   }
 
   function insertCardTemplate(template) {
     const textarea = document.getElementById("content-textarea");
-    const start = textarea.selectionStart;
+    const savedPos = lastCursorPosition;
 
+    textarea.focus();
+
+    if (savedPos !== null) {
+      textarea.setSelectionRange(savedPos, savedPos);
+    }
+
+    const start = textarea.selectionStart;
     const fullText = "```card\n" + template + "\n```";
     document.execCommand("insertText", false, fullText);
 
@@ -82,6 +140,8 @@ document.addEventListener("turbo:load", function () {
       const cursorPos = start + fullText.length;
       textarea.setSelectionRange(cursorPos, cursorPos);
     }
+
+    lastCursorPosition = null;
   }
 
   function previewPost() {
@@ -237,65 +297,45 @@ document.addEventListener("turbo:load", function () {
 
     const action = target.dataset.action;
 
+    console.log(
+      "[CLICK] Button action:",
+      action,
+      "savedPos:",
+      lastCursorPosition,
+    );
+
     switch (action) {
-      case "preview-post":
-        e.preventDefault();
-        previewPost();
-        break;
-
-      case "insert-bold":
-        e.preventDefault();
-        wrapOrInsert("**", "**", "bold text");
-        break;
-
-      case "insert-italic":
-        e.preventDefault();
-        wrapOrInsert("_", "_", "italic text");
-        break;
-
-      case "insert-strike":
-        e.preventDefault();
-        wrapOrInsert("~~", "~~", "struck text");
-        break;
-
-      case "insert-footnote":
-        e.preventDefault();
-        wrapOrInsert("(*", "*)", "footnote text here");
-        break;
-
-      case "toggle-card-menu":
-        e.preventDefault();
-        e.stopPropagation();
-        document.getElementById("card-menu")?.classList.toggle("hidden");
-        break;
-
-      case "insert-card":
-        e.preventDefault();
-        const cardType = target.dataset.cardType;
-        if (cardType === "pullquote") {
-          insertCardTemplate(pullquoteButtonTemplate);
-        } else if (cardType === "aside") {
-          insertCardTemplate(asideButtonTemplate);
-        } else if (cardType === "post-link") {
-          insertCardTemplate(postLinkButtonTemplate);
-        }
-        document.getElementById("card-menu")?.classList.add("hidden");
-        break;
-
-      case "show-post-link-prompt":
-        e.preventDefault();
-        showPostLinkPrompt();
-        break;
-
       case "insert-collection":
         e.preventDefault();
+        console.log("[COLLECTION] START");
         const textarea = document.getElementById("content-textarea");
+        const savedPos = lastCursorPosition;
+        console.log("[COLLECTION] Saved position:", savedPos);
+
+        textarea.focus();
+        console.log(
+          "[COLLECTION] After focus, selection:",
+          textarea.selectionStart,
+        );
+
+        if (savedPos !== null) {
+          textarea.setSelectionRange(savedPos, savedPos);
+          console.log("[COLLECTION] Restored position to:", savedPos);
+        }
+
         const start = textarea.selectionStart;
+        console.log("[COLLECTION] About to insert at:", start);
+
         const collectionTemplate =
           "```collection\n" + collectionButtonTemplate + "\n```";
         document.execCommand("insertText", false, collectionTemplate);
+        console.log("[COLLECTION] Inserted template");
+
         const cursorPos = start + "```collection\nheading: ".length;
         textarea.setSelectionRange(cursorPos, cursorPos);
+
+        lastCursorPosition = null;
+        console.log("[COLLECTION] END");
         break;
 
       case "trigger-media-upload":
