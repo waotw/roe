@@ -19,14 +19,9 @@ fi
 # 1. Pull remote media
 echo ""
 echo "📥 Step 1: Pulling production media..."
-rake content:pull_media
+rake content:sync_site
 
-# 2. Show diff
-echo ""
-echo "🔍 Step 2: Checking for conflicts..."
-rake content:diff_media
-
-# 3. Confirm deploy
+# 2. Confirm deploy
 echo ""
 read -p "✅ Ready to deploy? (y/n) " -n 1 -r
 echo
@@ -35,15 +30,10 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# 4. Deploy
+# 3. Deploy
 echo ""
 echo "🚢 Step 3: Deploying to Fly.io..."
-fly deploy
-
-# 5. Push new media
-echo ""
-echo "📤 Step 4: Pushing new media..."
-rake content:push_media
+fly deploy --local-only
 
 # 6. Health check
 echo ""

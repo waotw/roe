@@ -46,15 +46,5 @@ migrate-main.zip
 expressiveegg/
 migrate-main/
 
-# User uploads (on persistent volume)
-/site/media/*
-
-# System assets (on persistent volume)
-/site/system/assets/*
-
-# Documentation media (in git for tutorials)
-!/site/documentation/
-!/site/documentation/media/
-!/site/documentation/media/**/*
-site/documentation/media/images/.DS_Store
-site/documentation/media/.DS_Store
+# Entire site folder is on persistent volume
+/site/

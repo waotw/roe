@@ -2,7 +2,7 @@
 
 # Fix permissions if running as root
 if [ "$(id -u)" = '0' ]; then
-  mkdir -p /data/media /data/system/assets /data/db
+  mkdir -p /data/db /data/site
   chown -R rails:rails /data
 
   # Enable jemalloc
