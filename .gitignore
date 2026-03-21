@@ -48,3 +48,6 @@ migrate-main/
 
 # Entire site folder is on persistent volume
 /site/
+
+# Static site generation output
+/public/
