@@ -61,6 +61,10 @@ class SiteConfig < ApplicationRecord
     end
   end
 
+  def static_generation_enabled
+    data.dig('static_generation_enabled') || false
+  end
+
   private
 
   def self.file_path_for(type)

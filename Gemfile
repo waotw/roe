@@ -82,3 +82,5 @@ gem "turbo-rails", "~> 2.0"
 gem "importmap-rails", "~> 2.2"
 
 gem "stimulus-rails", "~> 1.3"
+
+gem "webrick", "~> 1.9"

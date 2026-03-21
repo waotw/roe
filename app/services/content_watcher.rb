@@ -54,6 +54,57 @@ class ContentWatcher
       remove_file(file)
       puts ""
     end
+
+    # After processing all changes, trigger static generation
+    if static_generation_enabled?
+      trigger_static_generation
+    else
+      puts "\nℹ️  Static generation disabled (enable in Site Config)"
+    end
+  end
+
+
+  def self.static_generation_enabled?
+    config = SiteConfig.instance
+    # Check if the setting exists and is true
+    config.respond_to?(:static_generation_enabled) &&
+      config.static_generation_enabled == true
+  rescue => e
+    Rails.logger.debug "Static generation check failed: #{e.message}"
+    false
+  end
+
+  def self.trigger_static_generation
+    puts "\n" + "=" * 60
+    puts "🔨 Regenerating static site..."
+    puts "=" * 60
+
+    start_time = Time.current
+
+    begin
+      generator = StaticGenerator.new
+      stats = generator.generate_all
+
+      duration = (Time.current - start_time).round(2)
+
+      if stats[:errors].empty?
+        puts "✅ Static site generated successfully in #{duration}s"
+        puts "   Posts: #{stats[:posts]}, Pages: #{stats[:pages]}, Collections: #{stats[:collection_pages]}"
+      else
+        puts "⚠️  Static site generated with #{stats[:errors].count} errors in #{duration}s"
+        stats[:errors].first(3).each do |error|
+          puts "   - #{error[:type]}: #{error[:message]}"
+        end
+      end
+    rescue => e
+      duration = (Time.current - start_time).round(2)
+      puts "❌ Static generation failed after #{duration}s: #{e.message}"
+      Rails.logger.error "Static generation error: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+    end
+
+    puts "=" * 60
+    puts ""
   end
 
   def self.process_file(file)
