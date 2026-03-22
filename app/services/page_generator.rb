@@ -5,7 +5,7 @@ class PageGenerator
     FileUtils.mkdir_p(PAGES_PATH)
 
     generate_home_page unless File.exist?(PAGES_PATH.join('home.md'))
-    generate_archive_page unless File.exist?(PAGES_PATH.join('archive.md'))
+    # generate_archive_page unless File.exist?(PAGES_PATH.join('archive.md'))
   end
 
   private

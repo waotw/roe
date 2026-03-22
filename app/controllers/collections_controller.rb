@@ -15,11 +15,11 @@ class CollectionsController < ApplicationController
     set_page_metadata
   end
 
-    private
+  private
 
   def per_page
-    # Get from config, fallback to 20 if not set
-    SiteConfig.get('defaults/collections')&.dig('items_per_page')&.to_i || 20
+    # Use SiteConfig.default() for defaults/collections.yml
+    SiteConfig.default('collections', 'items_per_page')&.to_i || 20
   end
 
   def paginate_items
@@ -122,9 +122,9 @@ class CollectionsController < ApplicationController
       'Pages'
     else
       if @post_type
-        @post_type.titleize.pluralize
+        pluralize_post_type(@post_type)
       elsif @tags.any?
-        @tags.map(&:titleize).join(' + ')
+        @tags.map(&:titleize).join(', ')  # Changed from ' + ' to ', '
       else
         'Archive'
       end
@@ -135,6 +135,17 @@ class CollectionsController < ApplicationController
       "#{base_heading} <span class=\"collection-context\">(#{@heading})</span>"
     else
       base_heading
+    end
+  end
+
+  def pluralize_post_type(type)
+    # Media types remain singular
+    uncountable = %w[music audio video]
+
+    if uncountable.include?(type.downcase)
+      type.titleize
+    else
+      type.titleize.pluralize
     end
   end
 

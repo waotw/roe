@@ -3,6 +3,7 @@
     <h1><%= sanitize(@page_heading, tags: %w[span], attributes: %w[class]) %></h1>
     <p class="collection-description"><%= @page_description %></p>
   </div>
+
   <% if @items.any? %>
     <div class="collection-list">
       <% @items.each do |item| %>
@@ -28,13 +29,29 @@
     <% if @total_pages > 1 %>
       <div class="pagination">
         <% if @page > 1 %>
-          <%= link_to '← Previous', collection_path(@filters, page: @page - 1, **pagination_params), class: 'pagination-prev' %>
+          <% if @base_url %>
+            <!-- Static site pagination -->
+            <% if @page == 2 %>
+              <%= link_to '← Previous', "#{@base_url}.html", class: 'pagination-prev' %>
+            <% else %>
+              <%= link_to '← Previous', "#{@base_url}/page-#{@page - 1}.html", class: 'pagination-prev' %>
+            <% end %>
+          <% else %>
+            <!-- Dynamic site pagination -->
+            <%= link_to '← Previous', collection_path(@filters, page: @page - 1), class: 'pagination-prev' %>
+          <% end %>
         <% end %>
 
         <span class="pagination-info">Page <%= @page %> of <%= @total_pages %></span>
 
         <% if @page < @total_pages %>
-          <%= link_to 'Next →', collection_path(@filters, page: @page + 1, **pagination_params), class: 'pagination-next' %>
+          <% if @base_url %>
+            <!-- Static site pagination -->
+            <%= link_to 'Next →', "#{@base_url}/page-#{@page + 1}.html", class: 'pagination-next' %>
+          <% else %>
+            <!-- Dynamic site pagination -->
+            <%= link_to 'Next →', collection_path(@filters, page: @page + 1), class: 'pagination-next' %>
+          <% end %>
         <% end %>
       </div>
     <% end %>

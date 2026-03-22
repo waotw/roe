@@ -133,8 +133,8 @@ class StaticGenerator
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? Page.not_draft.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
-      collections: posts.any? || pages.any? || global_changed || @manifest['generated_at'].nil?,
-      feeds: posts.any? || global_changed || @manifest['generated_at'].nil?,
+      collections: global_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
+      feeds: global_changed || posts.any? || @manifest['generated_at'].nil?,
       assets: assets_changed?,
       media: media_changed?,
       config: global_changed
@@ -355,14 +355,11 @@ class StaticGenerator
   def generate_posts_archive
     posts = Post.public_posts.by_date
 
-    collections_config = SiteConfig.find_by("file_path LIKE ?", "%collections.yml")
-    per_page = collections_config&.config&.dig('items_per_page')&.to_i || 20
-
     generate_paginated_collection(
       items: posts,
       slug: 'posts',
       title: 'All Posts',
-      per_page: per_page
+      per_page: default_per_page
     )
   end
 
@@ -407,16 +404,16 @@ class StaticGenerator
     slug = generate_collection_slug(config)
     items = fetch_collection_items(config)
 
-    # Get items_per_page from collections config
-    collections_config = SiteConfig.find_by("file_path LIKE ?", "%collections.yml")
-    per_page = collections_config&.config&.dig('items_per_page')&.to_i || 20
-
     generate_paginated_collection(
       items: items,
       slug: slug,
       title: config[:heading] || generate_title_from_config(config),
-      per_page: per_page
+      per_page: default_per_page
     )
+  end
+
+  def default_per_page
+    SiteConfig.default('collections', 'items_per_page')&.to_i || 20
   end
 
   def generate_collection_slug(config)
@@ -507,42 +504,54 @@ class StaticGenerator
   def generate_title_from_config(config)
     if config[:tags].present?
       tags = config[:tags].split(',').map(&:strip).reject { |t| t.start_with?('-') }
-      "Posts tagged: #{tags.join(', ')}"
+      tags.map(&:titleize).join(', ')
     elsif config[:post_type].present?
-      config[:post_type].titleize.pluralize
+      pluralize_post_type(config[:post_type])
     else
       'Collection'
     end
   end
 
+  def pluralize_post_type(type)
+    # Media types remain singular
+    uncountable = %w[music audio video]
+
+    if uncountable.include?(type.downcase)
+      type.titleize
+    else
+      type.titleize.pluralize
+    end
+  end
+
   def generate_paginated_collection(items:, slug:, title:, per_page: 20)
-    total_items = items.is_a?(Array) ? items.count : items.count
+    items_array = items.is_a?(Array) ? items : items.to_a
+    total_items = items_array.count
     total_pages = (total_items.to_f / per_page).ceil
+
+    # Determine if this is a root-level archive or a filtered collection
+    is_root_archive = slug == 'posts'
+    base_path = is_root_archive ? slug : "collections/#{slug}"
 
     total_pages.times do |page_num|
       page = page_num + 1
-
-      page_items = if items.is_a?(Array)
-        items[(page - 1) * per_page, per_page] || []
-      else
-        items.offset((page - 1) * per_page).limit(per_page)
-      end
+      page_items = items_array[(page - 1) * per_page, per_page] || []
 
       html = render_with_layout(
-        template: 'collections/archive',
+        template: 'collections/show',
         assigns: {
+          page_heading: title,
+          page_description: 'latest',
           items: page_items,
-          collection_title: title,
-          current_page: page,
+          page: page,
           total_pages: total_pages,
-          base_url: "/collections/#{slug}"
+          base_url: "/#{base_path}"
         }
       )
 
       if page == 1
-        write_file("collections/#{slug}.html", html)
+        write_file("#{base_path}.html", html)
       else
-        write_file("collections/#{slug}/page-#{page}.html", html)
+        write_file("#{base_path}/page-#{page}.html", html)
       end
 
       @stats[:collection_pages] += 1

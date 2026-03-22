@@ -47,7 +47,7 @@
   </head>
   <body>
     <header class="site-nav <%= logo_classes %>">
-      <%= render_layout_file('navigation', current_page: @page) %>
+      <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
     <main>
       <%= yield %>

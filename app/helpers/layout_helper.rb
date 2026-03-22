@@ -33,7 +33,18 @@ module LayoutHelper
 
   def add_active_nav_class(html, current_page)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    current_url_name = current_page&.url_name
+
+    # Get current URL name from the actual content object (not page number)
+    current_url_name = if current_page.respond_to?(:url_name)
+      current_page.url_name
+    elsif @post&.respond_to?(:url_name)
+      @post.url_name
+    elsif @page&.respond_to?(:url_name)
+      @page.url_name
+    elsif @doc&.respond_to?(:url_name)
+      @doc.url_name
+    end
+
     current_path = request.path rescue nil  # Add rescue in case request doesn't exist
 
     doc.css('a').each do |link|
