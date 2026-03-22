@@ -457,69 +457,35 @@ module HasMarkdownExtensions
   end
 
   def generate_collection_url(config)
-    source = config[:source] || 'posts'
+    heading = config[:heading]
     tags = config[:tags]
     post_type = config[:post_type] unless config[:post_type] == 'all'
-    order = config[:order] || 'date'
-    heading = config[:heading]
-
-    segments = []
-    query_params = []
-
-    # Only add non-default source to query params
-    if source != 'posts'
-      query_params << "source=#{source}"
-    end
-
-    # Only add non-default order to query params
-    if order != 'date'
-      query_params << "order=#{order}"
-    end
-
-    # Add post_type filter if specified
-    if post_type && post_type != 'all'
-      segments << "type-#{post_type.parameterize}"
-    end
-
-    # Process tags (split positive and negative)
-    if tags.present?
-      tag_array = tags.split(',').map(&:strip)
-      positive_tags = tag_array.reject { |t| t.start_with?('-') }
-      negative_tags = tag_array.select { |t| t.start_with?('-') }.map { |t| t[1..-1] }
-
-      # Add positive tags to URL path
-      if positive_tags.any?
-        segments << positive_tags.map(&:parameterize).join(',')
-      end
-
-      # Add negative tags as query parameter
-      if negative_tags.any?
-        query_params << "exclude=#{negative_tags.map(&:parameterize).join(',')}"
-      end
-    end
-
-    # Only add heading if there are actual filters
-    has_filters = segments.any? || query_params.any?
-    if heading.present? && has_filters
-      query_params << "heading=#{CGI.escape(heading)}"
-    end
+    order = config[:order]
 
     # Build base URL
-    base_url = if segments.empty? && !has_filters
-      # No filters - use archive page if it exists, otherwise /posts
-      archive_page = Page.where("json_extract(metadata, '$.url_name') = ?", 'archive').first
-      archive_page ? '/archive' : '/posts'
-    elsif segments.empty?
-      # Has query params but no segments
-      '/collections/all'
-    else
-      # Has segments (tags or post_type)
+    base_url = if heading.present?
+      # Named collection - heading is the identifier
+      "/collections/#{heading.parameterize}"
+    elsif post_type || tags.present?
+      # Filter-based collection
+      segments = []
+      segments << "type-#{post_type.parameterize}" if post_type
+
+      if tags.present?
+        positive_tags = tags.split(',').map(&:strip).reject { |t| t.start_with?('-') }
+        segments << positive_tags.map(&:parameterize).join(',') if positive_tags.any?
+      end
+
       "/collections/#{segments.join('/')}"
+    else
+      # No filters, no heading = general archive
+      archive_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'archive')
+      archive_page ? '/archive' : '/posts'
     end
 
-    # Append query parameters if any
-    if query_params.any?
-      "#{base_url}?#{query_params.join('&')}"
+    # Add order as query param if non-default
+    if order.present? && order != 'date'
+      "#{base_url}?order=#{order}"
     else
       base_url
     end

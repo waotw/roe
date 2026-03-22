@@ -65,10 +65,8 @@ class ContentWatcher
 
 
   def self.static_generation_enabled?
-    config = SiteConfig.instance
-    # Check if the setting exists and is true
-    config.respond_to?(:static_generation_enabled) &&
-      config.static_generation_enabled == true
+    site_config = SiteConfig.first
+    site_config&.config&.dig('static_generation_enabled') == true  # Change to 'config'
   rescue => e
     Rails.logger.debug "Static generation check failed: #{e.message}"
     false

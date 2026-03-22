@@ -18,30 +18,38 @@ module LayoutHelper
     ''
   end
 
+  def logo_classes
+    logo_url = SiteConfig.get('logo')
+    logo_style = SiteConfig.get('logo_style')
+    has_logo = logo_url.present? && logo_url != 'none'
+
+    classes = []
+    classes << 'logo' if has_logo
+    classes << "logo-#{logo_style}" if has_logo && logo_style.present?
+    classes.join(' ')
+  end
+
   private
 
   def add_active_nav_class(html, current_page)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
     current_url_name = current_page&.url_name
-    current_path = request.path # Get current path from controller context
+    current_path = request.path rescue nil  # Add rescue in case request doesn't exist
 
     doc.css('a').each do |link|
       href = link['href']
       next unless href
 
-      # Remove leading slash from href for comparison
       link_path = href.sub(/^\//, '')
 
-      # Handle root path - match only when both are exactly '/'
-      if href == '/' && current_path == '/'
+      # Handle root/home - check for both dynamic (/) and static (empty or 'home')
+      if href == '/' && (current_path == '/' || current_path.blank? || current_url_name == 'home')
         add_active_class(link)
         next
       end
 
-      # Skip root link when not on root
       next if href == '/'
 
-      # Direct comparison with current page's url_name
       if link_path == current_url_name
         add_active_class(link)
       end

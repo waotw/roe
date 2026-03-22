@@ -28,6 +28,13 @@ class Page < ApplicationRecord
       page = existing_pages.first_or_initialize
     end
 
+    if parsed.front_matter['tags'].is_a?(String)
+      parsed.front_matter['tags'] = parsed.front_matter['tags']
+        .split(',')
+        .map(&:strip)
+        .reject(&:blank?)
+    end
+
     # Store ALL frontmatter in metadata JSON
     page.metadata = parsed.front_matter
     page.content = parsed.content

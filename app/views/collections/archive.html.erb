@@ -5,7 +5,7 @@
     <% @items.each do |item| %>
       <article class="collection-item">
         <h2>
-          <%= link_to item.title, item.url_name %>
+          <%= link_to item.title, item_path(item) %>
         </h2>
 
         <% if item.excerpt.present? %>
@@ -24,7 +24,11 @@
   <% if @total_pages > 1 %>
     <nav class="pagination">
       <% if @current_page > 1 %>
-        <%= link_to "← Previous", "#{@base_url}/page-#{@current_page - 1}.html", class: "prev" %>
+        <% if @current_page == 2 %>
+          <%= link_to "← Previous", "#{@base_url}.html", class: "prev" %>
+        <% else %>
+          <%= link_to "← Previous", "#{@base_url}/page-#{@current_page - 1}.html", class: "prev" %>
+        <% end %>
       <% end %>
 
       <span class="page-info">

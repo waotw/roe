@@ -87,6 +87,14 @@ class Post < ApplicationRecord
       post = existing_posts.first_or_initialize
     end
 
+    # Convert comma-separated tags to array (preserves -tag syntax)
+    if parsed.front_matter['tags'].is_a?(String)
+      parsed.front_matter['tags'] = parsed.front_matter['tags']
+        .split(',')
+        .map(&:strip)
+        .reject(&:blank?)
+    end
+
     post.metadata = parsed.front_matter
     post.content = parsed.content
 

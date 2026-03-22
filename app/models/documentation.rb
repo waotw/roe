@@ -30,6 +30,13 @@ class Documentation < ApplicationRecord
       doc = existing_docs.first_or_initialize
     end
 
+    if parsed.front_matter['tags'].is_a?(String)
+      parsed.front_matter['tags'] = parsed.front_matter['tags']
+        .split(',')
+        .map(&:strip)
+        .reject(&:blank?)
+    end
+
     # Store ALL frontmatter in metadata JSON
     doc.metadata = parsed.front_matter
     doc.content = parsed.content

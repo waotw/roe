@@ -62,7 +62,7 @@ class SiteConfig < ApplicationRecord
   end
 
   def static_generation_enabled
-    data.dig('static_generation_enabled') || false
+    config.dig('static_generation_enabled') || false
   end
 
   private

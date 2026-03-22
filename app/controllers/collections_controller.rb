@@ -2,51 +2,55 @@ class CollectionsController < ApplicationController
   skip_before_action :require_authentication
 
   def show
-      @filters = params[:filters]
-      @page = params[:page]&.to_i || 1
-      @exclude_tags = params[:exclude]&.split(',') || []
-      @source = params[:source] || 'posts'
-      @order = params[:order] || 'date'
-      @heading = params[:heading]
+    @filters = params[:filters]
+    @page = params[:page]&.to_i || 1
+    @exclude_tags = params[:exclude]&.split(',') || []
+    @source = params[:source] || 'posts'
+    @order = params[:order] || 'date'
+    @heading = params[:heading]
 
-      parse_filters
-      fetch_items
-      paginate_items
-      set_page_metadata
-    end
+    parse_filters
+    fetch_items
+    paginate_items
+    set_page_metadata
+  end
 
     private
 
-    def per_page
-      # Get from config, fallback to 20 if not set
-      SiteConfig.get('defaults/collections', 'items_per_page')&.to_i || 20
-    end
+  def per_page
+    # Get from config, fallback to 20 if not set
+    SiteConfig.get('defaults/collections')&.dig('items_per_page')&.to_i || 20
+  end
 
-    def paginate_items
-      offset = (@page - 1) * per_page
-      @total_items = @items.count
-      @items = @items.offset(offset).limit(per_page)
-      @total_pages = (@total_items.to_f / per_page).ceil
-    end
+  def paginate_items
+    offset = (@page - 1) * per_page
+    @total_items = @items.count
+    @items = @items.offset(offset).limit(per_page)
+    @total_pages = (@total_items.to_f / per_page).ceil
+  end
 
   def parse_filters
-    # Split the filters path into segments
     segments = @filters.split('/')
 
     @post_type = nil
     @tags = []
 
+    # Check if first segment could be a heading (not a type- prefix, not 'all')
+    first_segment = segments.first
+
+    if first_segment && !first_segment.start_with?('type-') && first_segment != 'all'
+      # This might be a heading-based collection
+      # For now, treat it as tags (we'll enhance this later)
+      @tags.concat(first_segment.split(','))
+    end
+
     segments.each do |segment|
       if segment.start_with?('type-')
         @post_type = segment.sub('type-', '')
-      elsif segment == 'all'
-        next
-      else
+      elsif segment != 'all' && segment != first_segment
         @tags.concat(segment.split(','))
       end
     end
-
-    Rails.logger.info "Parsed - source: #{@source}, post_type: #{@post_type}, tags: #{@tags}, exclude: #{@exclude_tags}, order: #{@order}"
   end
 
   def fetch_items
@@ -101,18 +105,6 @@ class CollectionsController < ApplicationController
       items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
     else # 'date' or default
       items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
-    end
-  end
-
-  def paginate_items
-    @total_pages = (@total_count.to_f / PER_PAGE).ceil
-
-    # Handle array vs ActiveRecord relation
-    if @items.is_a?(Array)
-      start_index = (@page - 1) * PER_PAGE
-      @items = @items[start_index, PER_PAGE] || []
-    else
-      @items = @items.offset((@page - 1) * PER_PAGE).limit(PER_PAGE)
     end
   end
 
