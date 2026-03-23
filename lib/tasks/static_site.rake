@@ -75,4 +75,69 @@ namespace :site do
     trap('INT') { server.shutdown }
     server.start
   end
+
+  desc "Clean generated static files from public directory"
+  task clean: :environment do
+    public_dir = Rails.root.join('public')
+
+    files_deleted = 0
+
+    puts "🧹 Cleaning static site files..."
+
+    # Remove individual posts
+    Dir.glob(public_dir.join('posts', '*.html')).each do |file|
+      File.delete(file)
+      files_deleted += 1
+    end
+
+    # Remove post pagination
+    Dir.glob(public_dir.join('posts', 'page-*.html')).each do |file|
+      File.delete(file)
+      files_deleted += 1
+    end
+
+    # Remove collections directory
+    if Dir.exist?(public_dir.join('collections'))
+      collection_files = Dir.glob(public_dir.join('collections', '**', '*')).count { |f| File.file?(f) }
+      FileUtils.rm_rf(public_dir.join('collections'))
+      files_deleted += collection_files
+    end
+
+    # Remove documentation pages
+    if Dir.exist?(public_dir.join('documentation'))
+      doc_files = Dir.glob(public_dir.join('documentation', '**', '*')).count { |f| File.file?(f) }
+      FileUtils.rm_rf(public_dir.join('documentation'))
+      files_deleted += doc_files
+    end
+
+    # Remove page files (but keep index.html)
+    Dir.glob(public_dir.join('*.html')).each do |file|
+      next if File.basename(file) == 'index.html'
+      File.delete(file)
+      files_deleted += 1
+    end
+
+    # Remove feeds
+    [ 'feed.rss', 'feed.atom' ].each do |feed|
+      if File.exist?(public_dir.join(feed))
+        File.delete(public_dir.join(feed))
+        files_deleted += 1
+      end
+    end
+
+    # Remove manifest (forces full regeneration)
+    if File.exist?(public_dir.join('.generation_manifest.json'))
+      File.delete(public_dir.join('.generation_manifest.json'))
+      puts "   ✓ Deleted generation manifest"
+    end
+
+    puts "   ✓ Cleaned #{files_deleted} static files"
+    puts ""
+  end
+
+  desc "Clean and regenerate the entire static site"
+  task rebuild: :environment do
+    Rake::Task['site:clean'].invoke
+    Rake::Task['site:generate'].invoke
+  end
 end

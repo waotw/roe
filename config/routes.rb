@@ -60,6 +60,12 @@ Rails.application.routes.draw do
       end
     end
 
+    get 'static_site', to: 'static_site#index', as: :static_site
+    post 'static_site/generate', to: 'static_site#generate', as: :generate_static_site
+    post 'static_site/clean', to: 'static_site#clean', as: :clean_static_site
+    post 'static_site/rebuild', to: 'static_site#rebuild', as: :rebuild_static_site
+    get 'static_site/status', to: 'static_site#status', as: :status_static_site
+
     delete 'system_assets/:id', to: 'system_assets#destroy', as: 'system_asset', constraints: { id: /[^\/]+/ }
 
     # Separate config edit routes

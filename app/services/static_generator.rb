@@ -1,3 +1,55 @@
+# StaticGenerator - Incremental static site generator for Roe CMS
+#
+# Generates a complete static HTML site from Markdown content with smart
+# incremental builds that only regenerate changed content.
+#
+# Architecture:
+#   - Source of truth: Markdown files in /site directory
+#   - Database: Synchronized cache for querying/filtering
+#   - Output: Static HTML files in /public directory
+#   - Change detection: Manifest-based tracking with microsecond timestamps
+#
+# Incremental Build Strategy:
+#   - Tracks content, configs, layouts, and assets via generation manifest
+#   - Only regenerates files when source content has changed
+#   - Config/layout changes trigger full site regeneration
+#   - Asset sync only copies new/modified files
+#
+# Manifest Format (.generation_manifest.json):
+#   {
+#     "generated_at": "2026-03-22T20:48:30.856227Z",
+#     "posts": { "1": { "updated_at": "...", "html_file": "posts/slug.html" } },
+#     "pages": { "2": { "updated_at": "...", "html_file": "about.html" } },
+#     "documentation": { ... },
+#     "configs": {
+#       "site": "2026-03-22T...",
+#       "defaults/collections": "2026-03-22T...",
+#       "defaults/cards": "2026-03-22T..."
+#     },
+#     "layouts": { "/path/to/navigation.md": 1234567890, ... },
+#     "assets": { "fonts": {...}, "images": {...}, "media": {...} }
+#   }
+#
+# Generated URL Structure:
+#   - Home: /index.html
+#   - Posts: /posts/{url_name}.html
+#   - Pages: /{url_name}.html
+#   - Documentation: /documentation/{url_name}.html
+#   - Post archive: /posts.html, /posts/page-2.html, etc.
+#   - Filtered collections: /collections/{slug}.html, /collections/{slug}/page-2.html
+#   - Feeds: /feed.rss, /feed.atom
+#   - Assets: /system/fonts/*, /system/images/*, /media/*
+#
+# Usage:
+#   generator = StaticGenerator.new
+#   stats = generator.generate_all
+#   # => { posts: 10, pages: 5, collections: 15, duration: 0.5, errors: [] }
+#
+# Performance:
+#   - Full generation: ~0.5s for typical site
+#   - Incremental (no changes): ~0.05s
+#   - Single post update: ~0.1s
+#
 class StaticGenerator
   attr_reader :output_dir, :stats
 
@@ -89,8 +141,6 @@ class StaticGenerator
 
     manifest = JSON.parse(File.read(manifest_file))
     puts "   ✓ Loaded manifest (generated at: #{manifest['generated_at']})"
-    puts "   Posts: #{manifest['posts']&.count || 0}"
-    puts "   Pages: #{manifest['pages']&.count || 0}"
 
     manifest
   rescue => e
@@ -174,10 +224,18 @@ class StaticGenerator
   end
 
   def config_file_changed?(config_type)
+
     last = @manifest.dig('configs', config_type)
     config = SiteConfig.find_by("file_path LIKE ?", "%#{config_type}.yml")
 
-    !last || !config || config.updated_at > Time.parse(last)
+    if last && config
+      manifest_time = Time.parse(last)
+      db_time = config.updated_at
+    end
+
+    changed = !last || !config || config.updated_at > Time.parse(last)
+
+    changed
   end
 
   def layouts_changed?
@@ -703,8 +761,11 @@ class StaticGenerator
 
       clean_href = href[1..-1]
 
-      if clean_href.empty? || clean_href == 'index'
-        link['href'] = "#{prefix}index.html"
+      # Keep root path as-is (don't convert / to /index.html)
+      if clean_href.empty?
+        link['href'] = prefix.chomp('./') + '/'
+      elsif clean_href == 'index'
+        link['href'] = prefix.chomp('./') + '/'
       elsif !clean_href.match?(/\.\w+$/)
         link['href'] = "#{prefix}#{clean_href}.html"
       end

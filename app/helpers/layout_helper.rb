@@ -37,31 +37,38 @@ module LayoutHelper
     # Get current URL name from the actual content object (not page number)
     current_url_name = if current_page.respond_to?(:url_name)
       current_page.url_name
-    elsif @post&.respond_to?(:url_name)
+    elsif defined?(@post) && @post&.respond_to?(:url_name)
       @post.url_name
-    elsif @page&.respond_to?(:url_name)
+    elsif defined?(@page) && @page&.respond_to?(:url_name)
       @page.url_name
-    elsif @doc&.respond_to?(:url_name)
+    elsif defined?(@doc) && @doc&.respond_to?(:url_name)
       @doc.url_name
     end
 
-    current_path = request.path rescue nil  # Add rescue in case request doesn't exist
+    # Get current path, handling both dynamic requests and static generation
+    current_path = begin
+      request.path if defined?(request) && request.respond_to?(:path)
+    rescue
+      nil
+    end
 
     doc.css('a').each do |link|
       href = link['href']
       next unless href
 
-      link_path = href.sub(/^\//, '')
+      # Normalize href for comparison (remove leading slash and .html)
+      normalized_href = href.sub(/^\.\.\//, '').sub(/^\.\//, '').sub(/^\//, '').sub(/\.html$/, '')
 
-      # Handle root/home - check for both dynamic (/) and static (empty or 'home')
-      if href == '/' && (current_path == '/' || current_path.blank? || current_url_name == 'home')
-        add_active_class(link)
+      # Handle root/home - href is '/' or empty
+      if href == '/' || href == './' || href.end_with?('index.html') || normalized_href.empty?
+        if current_url_name == 'home' || current_path == '/'
+          add_active_class(link)
+        end
         next
       end
 
-      next if href == '/'
-
-      if link_path == current_url_name
+      # Match other pages by url_name
+      if normalized_href == current_url_name
         add_active_class(link)
       end
     end

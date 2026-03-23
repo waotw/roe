@@ -26,6 +26,17 @@ class Admin::ConfigsController < ApplicationController
       }
     },
 
+    static_generation: {
+      label: "Static Site Generation",
+      fields: {
+        'static_generation_enabled' => {
+          type: :checkbox,
+          label: 'Enable Auto-Generation',
+          hint: 'Automatically generate static files when content changes'
+        }
+      }
+    },
+
     branding: {
       label: "Branding",
       fields: {

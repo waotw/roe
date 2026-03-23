@@ -80,6 +80,22 @@
             </div>
           </div>
 
+          <!-- Static Site Generation Section -->
+          <div class="config-section mb-10">
+            <h3 class="text-base font-semibold text-gray-900 mb-1"><%= link_to "Static Site Settings", admin_static_site_path,
+                  class: "" %></h3>
+
+            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+              <% config_schema[:static_generation][:fields].each do |field_name, field_config| %>
+                <%= render 'shared/config_field',
+                         field_name: field_name,
+                         field_config: field_config,
+                         value: flattened_config[field_name],
+                         all_values: flattened_config %>
+              <% end %>
+            </div>
+          </div>
+
           <!-- Custom Fonts Section -->
 
           <h3 class="text-base font-semibold text-gray-900 mb-1">Custom Fonts</h3>
@@ -319,25 +335,29 @@
 
   // Check field dependencies in real-time
   function checkDependencies() {
-  document.querySelectorAll('[data-depends-on]').forEach(field => {
-  const dependsOn = field.dataset.dependsOn;
-  const dependencyField = document.querySelector(`[data-config-field="${dependsOn}"]`);
+    console.log('checkDependencies called');
+    document.querySelectorAll('[data-depends-on]').forEach(field => {
+      const dependsOn = field.dataset.dependsOn;
+      console.log('Field depends on:', dependsOn);
+      const dependencyField = document.querySelector('[data-config-field="' + dependsOn + '"]');
+      console.log('Dependency field found:', dependencyField);
 
-  if (dependencyField) {
-  const hasValue = dependencyField.value.trim() !== '';
-  field.disabled = !hasValue;
+      if (dependencyField) {
+        const hasValue = dependencyField.value.trim() !== '';
+        console.log('Has value:', hasValue);
+        field.disabled = !hasValue;
 
-  // Optional: add visual indication
-  const wrapper = field.closest('.config-field-row');
-  if (wrapper) {
-  if (hasValue) {
-  wrapper.classList.remove('opacity-50');
-  } else {
-  wrapper.classList.add('opacity-50');
-  }
-  }
-  }
-  });
+        // Visual indication
+        const wrapper = field.closest('.config-field-row');
+        if (wrapper) {
+          if (hasValue) {
+            wrapper.classList.remove('opacity-50');
+          } else {
+            wrapper.classList.add('opacity-50');
+          }
+        }
+      }
+    });
   }
 
   // Validate image exists
@@ -608,9 +628,15 @@
 
     document.querySelectorAll('[data-config-field]').forEach(input => {
       const fieldName = input.dataset.configField;
-      let value = input.value; // Don't trim yet
+      let value;
 
-      // Always include the field, even if empty (for config files)
+      // Handle checkboxes specially
+      if (input.type === 'checkbox') {
+        value = input.checked ? 'true' : 'false';
+      } else {
+        value = input.value;
+      }
+
       // Handle nested fields (fonts.heading.family OR post-link.default_link_text)
       const parts = fieldName.split('.');
       if (parts.length > 1) {
@@ -621,9 +647,9 @@
           }
           current = current[parts[i]];
         }
-        current[parts[parts.length - 1]] = value.trim();
+        current[parts[parts.length - 1]] = value.trim ? value.trim() : value;
       } else {
-        fields[fieldName] = value.trim();
+        fields[fieldName] = value.trim ? value.trim() : value;
       }
     });
 
@@ -671,5 +697,6 @@
 
   window.toggleConfigView = toggleConfigView;
   window.setupFontValidation = setupFontValidation;
+  window.checkDependencies = checkDependencies;
   })();
 </script>
