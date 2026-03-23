@@ -35,20 +35,13 @@ class SiteConfig < ApplicationRecord
   end
 
   def self.sync_from_file(type)
-    puts "🔄 sync_from_file called for: #{type}"
     file_path = file_path_for(type)
     return unless File.exist?(file_path)
 
     config_data = YAML.load_file(file_path)
     site_config = find_or_initialize_by(file_path: file_path.to_s)
-
-    puts "   📅 Before: #{site_config.updated_at&.iso8601(6)}"
-
     site_config.config = config_data
     site_config.touch  # Force timestamp update
-
-    puts "   📅 After touch: #{site_config.updated_at&.iso8601(6)}"
-    puts "   💾 Saved: #{site_config.persisted?}"
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     site_config
