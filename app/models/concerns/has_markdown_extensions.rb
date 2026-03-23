@@ -6,7 +6,6 @@ module HasMarkdownExtensions
     code_blocks = {}
     counter = 0
 
-    # Match 4+ backtick blocks first
     processed_content = content.gsub(/````+.*?\n(.*?)````+/m) do
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
       code_blocks[token] = $~.to_s
@@ -14,14 +13,13 @@ module HasMarkdownExtensions
       token
     end
 
-    # Then protect regular 3-backtick blocks that aren't collection/card
-    # Key fix: match language identifier OR empty, but NOT collection/card
+    # Then protect regular 3-backtick blocks that aren't collection/card/gallery
     processed_content = processed_content.gsub(/```(\w+)\r?\n(.*?)```/m) do
       lang = $1
       code = $2
 
-      # Skip if it's a collection or card block
-      next $~.to_s if lang == 'collection' || lang == 'card'
+      # Skip if it's a collection, card, or gallery block
+      next $~.to_s if [ 'collection', 'card', 'gallery' ].include?(lang)
 
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
       code_blocks[token] = "```#{lang}\n#{code}```"
@@ -29,7 +27,18 @@ module HasMarkdownExtensions
       token
     end
 
-    # Step 2: Process collections and cards
+    # NEW: Protect || split markers from Kramdown table processing
+    pullquote_splits = {}
+    processed_content = processed_content.gsub(/\|\|/) do
+      token = "PULLQUOTE_SPLIT_#{counter}"
+      pullquote_splits[token] = '||'
+      counter += 1
+      token
+    end
+
+    # Step 2: Process galleries, collections and cards
+    processed_content = process_auto_galleries(processed_content)
+    processed_content = process_galleries(processed_content, preview: preview)
     processed_content = process_collections(processed_content, preview: preview)
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
@@ -46,16 +55,159 @@ module HasMarkdownExtensions
       footnote_backlink: "↩"
     ).to_html
 
-    # Step 5: Process collection grids (detect consecutive collections)
+    # Step 5: Restore pullquote split markers AFTER Kramdown
+    pullquote_splits.each do |token, original|
+      html.gsub!(token, original)
+    end
+
+    # Step 6: Process collection grids (detect consecutive collections)
     html = CollectionGridProcessor.process(html)
 
-    # Step 6: Merge floated pullquotes into following paragraphs
+    # Step 7: Merge floated pullquotes into following paragraphs
     html = merge_floated_pullquotes(html)
 
     html
   end
 
   private
+
+  # GALLERIES
+
+  def process_auto_galleries(markdown)
+    lines = markdown.split("\n")
+    result = []
+    consecutive_images = []
+    inside_fenced_block = false
+
+    lines.each do |line|
+      # Track if we're inside a fenced code block
+      if line.strip =~ /^```/
+        inside_fenced_block = !inside_fenced_block
+
+        # Flush any accumulated images before entering a block
+        if inside_fenced_block && consecutive_images.length >= 2
+          result << "```gallery"
+          result.concat(consecutive_images)
+          result << "```"
+          consecutive_images = []
+        elsif consecutive_images.length == 1
+          result.concat(consecutive_images)
+          consecutive_images = []
+        end
+
+        result << line
+        next
+      end
+
+      # Skip auto-gallery processing inside fenced blocks
+      if inside_fenced_block
+        result << line
+        next
+      end
+
+      # Check if this line is an image (with optional caption)
+      if line.strip =~ /^!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*([^*]+)\*\))?$/
+        consecutive_images << line
+      else
+        # Not an image - process any accumulated images
+        if consecutive_images.length >= 2
+          result << "```gallery"
+          result.concat(consecutive_images)
+          result << "```"
+        elsif consecutive_images.length == 1
+          result.concat(consecutive_images)
+        end
+
+        consecutive_images = []
+        result << line
+      end
+    end
+
+    # Handle any remaining consecutive images at end
+    if consecutive_images.length >= 2
+      result << "```gallery"
+      result.concat(consecutive_images)
+      result << "```"
+    elsif consecutive_images.length == 1
+      result.concat(consecutive_images)
+    end
+
+    result.join("\n")
+  end
+
+  def process_galleries(markdown, preview: false)
+    result = markdown.gsub(/```gallery\r?\n(.*?)```/m) do
+      gallery_content = $1
+      html = render_gallery(gallery_content, preview: preview)
+
+      html
+    end
+    result
+  end
+
+  def render_gallery(content, preview: false)
+    # Split by blank lines to get rows
+    rows = content.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
+
+    if rows.empty?
+      return preview ? '<!-- Empty gallery -->' : ''
+    end
+
+    output = [ '' ]
+    output << '{::nomarkdown}'
+    output << '<div class="gallery">'
+
+    rows.each do |row_content|
+      images = []
+
+      row_content.scan(/!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*(.*?)\*\))?/) do
+        alt_text = $1
+        src = $2
+        caption = $3&.strip
+
+        images << {
+          alt: alt_text,
+          src: src,
+          caption: caption
+        }
+      end
+
+      next if images.empty?
+
+      col_count = [ images.length, 3 ].min
+
+      output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
+
+      images.each do |img|
+        if img[:caption].present?
+          # Process caption as inline markdown
+          caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
+          # Remove wrapping <p> tags that Kramdown adds
+          caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
+
+          output << "    <figure>"
+          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+          output << "      <figcaption>#{caption_html}</figcaption>"
+          output << "    </figure>"
+        else
+          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+        end
+      end
+
+      output << "  </div>"
+    end
+
+    output << '</div>'
+    output << '{:/nomarkdown}'
+    output << ''
+    output.join("\n")
+  end
+
+  def escape_html(text)
+    CGI.escapeHTML(text.to_s)
+  end
+
+  # COLLECTIONS
 
   def process_collections(markdown, preview: false)
     # Match fenced blocks with 'collection' language - handle both \n and \r\n
@@ -76,36 +228,57 @@ module HasMarkdownExtensions
     config
   end
 
+  def apply_tag_filters(collection, tag_string)
+    return collection if tag_string.blank?
+
+    # Split by comma and clean up whitespace
+    tags = tag_string.split(',').map(&:strip)
+
+    # Separate positive and negative tags
+    positive_tags = tags.reject { |t| t.start_with?('-') }
+    negative_tags = tags.select { |t| t.start_with?('-') }.map { |t| t[1..-1] } # Remove the '-'
+
+    # Apply positive tags (OR logic - any of these tags)
+    if positive_tags.any?
+      collection = collection.tagged_with(positive_tags)
+    end
+
+    # Apply negative tags (exclude all of these, but keep untagged posts)
+    negative_tags.each do |neg_tag|
+      collection = collection.where(
+        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
+        "%#{neg_tag}%"
+      )
+    end
+
+    collection
+  end
+
   def render_collection(config)
     heading = config[:heading]
     source = config[:source] || SiteConfig.default('collections', 'default_source') || "posts"
     order_by = config[:order] || SiteConfig.default('collections', 'default_order') || "date"
-    tag = config[:tag]  # NEW: tag filter
+    tags = config[:tags]
 
     # Get post_type from config or default, treating 'all' as nil (no filter)
     post_type = config[:post_type]
     post_type = nil if post_type == "all"
 
-    # DEBUG
-    Rails.logger.info "=== COLLECTION DEBUG ==="
-    Rails.logger.info "Config: #{config.inspect}"
-    Rails.logger.info "post_type from config: #{config[:post_type].inspect}"
-    Rails.logger.info "post_type after processing: #{post_type.inspect}"
-
     # Get base collection
     items = case source
     when 'posts'
       collection = Post.public_posts
-      Rails.logger.info "Before by_type: #{collection.count} posts"
       collection = collection.by_type(post_type) if post_type
-      Rails.logger.info "After by_type(#{post_type}): #{collection.count} posts"
-      collection = collection.tagged_with(tag) if tag
-      Rails.logger.info "After tagged_with(#{tag}): #{collection.count} posts"
+      collection = apply_tag_filters(collection, tags) if tags
       collection
     when "pages"
-      Page.all
+      collection = Page.public_pages
+      collection = apply_tag_filters(collection, tags) if tags
+      collection
     when "documentation"
-      Documentation.all
+      collection = Documentation.public_documentation
+      collection = apply_tag_filters(collection, tags) if tags
+      collection
     else
       []
     end
@@ -146,8 +319,8 @@ module HasMarkdownExtensions
 
     output << list_markdown
 
-    # Add "View More" link if applicable
-    if show_more && total_count > display_items.count
+    # Add "View More" link ONLY for posts source
+    if show_more && total_count > display_items.count && source == 'posts'
       show_more_text = config[:show_more_text] || "View all"
       collection_url = generate_collection_url(config)
 
@@ -284,30 +457,38 @@ module HasMarkdownExtensions
   end
 
   def generate_collection_url(config)
-    source = config[:source] || 'posts'
-    tag = config[:tag]
+    heading = config[:heading]
+    tags = config[:tags]
     post_type = config[:post_type] unless config[:post_type] == 'all'
+    order = config[:order]
 
-    segments = []
+    # Build base URL
+    base_url = if heading.present?
+      # Named collection - heading is the identifier
+      "/collections/#{heading.parameterize}"
+    elsif post_type || tags.present?
+      # Filter-based collection
+      segments = []
+      segments << "type-#{post_type.parameterize}" if post_type
 
-    # Add post_type filter if specified
-    if post_type && post_type != 'all'
-      segments << "type-#{post_type.parameterize}"
+      if tags.present?
+        positive_tags = tags.split(',').map(&:strip).reject { |t| t.start_with?('-') }
+        segments << positive_tags.map(&:parameterize).join(',') if positive_tags.any?
+      end
+
+      "/collections/#{segments.join('/')}"
+    else
+      # No filters, no heading = general archive
+      archive_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'archive')
+      archive_page ? '/archive' : '/posts'
     end
 
-    # Add tag filter
-    if tag
-      segments << tag.parameterize
+    # Add order as query param if non-default
+    if order.present? && order != 'date'
+      "#{base_url}?order=#{order}"
+    else
+      base_url
     end
-
-    # If no filters, show all
-    if segments.empty?
-      # Check if user has custom archive page
-      archive_page = Page.find_by(url_name: 'archive')
-      return archive_page ? '/archive' : '/collections/all'
-    end
-
-    "/collections/#{segments.join('/')}"
   end
 
   ## CARDS
@@ -350,7 +531,7 @@ module HasMarkdownExtensions
   def render_pullquote(config)
     text = config[:text] || ''
     attribution = config[:attribution] || ''
-    position = config[:position] || 'center'  # center, left, or right
+    position = config[:position] || SiteConfig.default("cards", "pullquote")&.[]('default_position') || 'center'
 
     # Build CSS classes
     pullquote_classes = [ "card", "card-pullquote", "pullquote-#{position}" ]
@@ -385,14 +566,21 @@ module HasMarkdownExtensions
 
       # Check if it's a paragraph
       if next_element && next_element.name == 'p'
-        # Get the paragraph text (as plain text, not HTML)
-        para_text = next_element.inner_html
+        # Get the paragraph HTML
+        para_html = next_element.inner_html
 
-        # Split the paragraph roughly in half
-        split_point = find_split_point(para_text)
-
-        first_half = para_text[0...split_point].strip
-        second_half = para_text[split_point..-1].strip
+        # Check for manual split marker
+        if para_html.include?('||')
+          # Manual split - use the || marker
+          parts = para_html.split('||', 2)
+          first_half = parts[0].strip
+          second_half = parts[1].strip
+        else
+          # Automatic split - use smart detection
+          split_point = find_split_point(para_html)
+          first_half = para_html[0...split_point].strip
+          second_half = para_html[split_point..-1].strip
+        end
 
         # Create a wrapper div to hold all three parts
         wrapper = Nokogiri::XML::Node.new('div', doc)
@@ -478,7 +666,7 @@ module HasMarkdownExtensions
     date_raw = config[:date] || ''
     excerpt = config[:excerpt] || ''
     url = config[:url] || '#'
-    link_text = config[:link_text] || 'Read full story →'
+    link_text = config[:link_text] || SiteConfig.default('cards', 'post-link')&.[]('default_link_text') || 'Read full story →'
 
     # Handle image with priority: explicit > post metadata > default
     image = if config.key?(:image)

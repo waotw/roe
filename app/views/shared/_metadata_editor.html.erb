@@ -95,6 +95,7 @@
             <% if is_custom %>
               <!-- Custom field value (always text) -->
               <input type="text"
+                    id="metadata-field-<%= field_name.parameterize %>"
                     name="metadata_fields[<%= field_name %>]"
                     value="<%= value %>"
                     class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -103,6 +104,7 @@
               <% case config[:type] %>
               <% when :text %>
                 <input type="text"
+                      id="metadata-field-<%= field_name %>"
                       name="metadata_fields[<%= field_name %>]"
                       value="<%= value %>"
                       class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -111,13 +113,15 @@
 
               <% when :date %>
                 <input type="date"
+                      id="metadata-field-<%= field_name %>"
                       name="metadata_fields[<%= field_name %>]"
                       value="<%= value&.to_s %>"
                       class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                       data-metadata-field="<%= field_name %>">
 
               <% when :select %>
-                <select name="metadata_fields[<%= field_name %>]"
+                <select id="metadata-field-<%= field_name %>"
+                        name="metadata_fields[<%= field_name %>]"
                         class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                         data-metadata-field="<%= field_name %>">
                   <option value="">-- select --</option>
@@ -127,7 +131,8 @@
                 </select>
 
               <% when :textarea %>
-                <textarea name="metadata_fields[<%= field_name %>]"
+                <textarea id="metadata-field-<%= field_name %>"
+                          name="metadata_fields[<%= field_name %>]"
                           rows="2"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="<%= field_name %>"><%= value %></textarea>
@@ -187,7 +192,11 @@
   </div>
 
   <!-- Hidden field to store final metadata YAML -->
-  <input type="hidden" name="metadata_final" id="metadata-final" value="">
+  <input type="hidden"
+         name="metadata"
+         id="metadata-final"
+         value=""
+         data-editor-target="metadata">
 </div>
 
 <script>
@@ -221,7 +230,7 @@
 // Close menu when clicking outside
 document.addEventListener('click', function(e) {
   const menu = document.getElementById('add-field-menu');
-  if (!e.target.closest('[onclick*="toggleAddFieldMenu"]') && !e.target.closest('#add-field-menu')) {
+  if (menu && !e.target.closest('[onclick*="toggleAddFieldMenu"]') && !e.target.closest('#add-field-menu')) {
     menu.classList.add('hidden');
   }
 });
@@ -242,6 +251,7 @@ function addKnownField(fieldName) {
   switch(config.type) {
     case 'text':
       inputHtml = `<input type="text"
+                          id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
                           value="${defaultValue}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -250,6 +260,7 @@ function addKnownField(fieldName) {
       break;
     case 'date':
       inputHtml = `<input type="date"
+                          id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
                           value="${defaultValue}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -259,7 +270,8 @@ function addKnownField(fieldName) {
       const options = config.options.map(opt =>
         `<option value="${opt}">${opt}</option>`
       ).join('');
-      inputHtml = `<select name="metadata_fields[${fieldName}]"
+      inputHtml = `<select id="metadata-field-${fieldName}"
+                          name="metadata_fields[${fieldName}]"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="${fieldName}">
                      <option value="">-- select --</option>
@@ -267,7 +279,8 @@ function addKnownField(fieldName) {
                    </select>`;
       break;
     case 'textarea':
-      inputHtml = `<textarea name="metadata_fields[${fieldName}]"
+      inputHtml = `<textarea id="metadata-field-${fieldName}"
+                            name="metadata_fields[${fieldName}]"
                             rows="2"
                             class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                             data-metadata-field="${fieldName}">${defaultValue}</textarea>`;
@@ -501,6 +514,7 @@ function addKnownFieldToForm(fieldName, value) {
   switch(config.type) {
     case 'text':
       inputHtml = `<input type="text"
+                          id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
                           value="${value}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -508,6 +522,7 @@ function addKnownFieldToForm(fieldName, value) {
       break;
     case 'date':
       inputHtml = `<input type="date"
+                          id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
                           value="${value}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -517,7 +532,8 @@ function addKnownFieldToForm(fieldName, value) {
       const options = config.options.map(opt =>
         `<option value="${opt}" ${opt === value ? 'selected' : ''}>${opt}</option>`
       ).join('');
-      inputHtml = `<select name="metadata_fields[${fieldName}]"
+      inputHtml = `<select id="metadata-field-${fieldName}"
+                          name="metadata_fields[${fieldName}]"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="${fieldName}">
                      <option value="">-- select --</option>
@@ -525,7 +541,8 @@ function addKnownFieldToForm(fieldName, value) {
                    </select>`;
       break;
     case 'textarea':
-      inputHtml = `<textarea name="metadata_fields[${fieldName}]"
+      inputHtml = `<textarea id="metadata-field-${fieldName}"
+                            name="metadata_fields[${fieldName}]"
                             rows="2"
                             class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                             data-metadata-field="${fieldName}">${value}</textarea>`;
@@ -554,6 +571,7 @@ function addKnownFieldToForm(fieldName, value) {
 
 function addCustomFieldToForm(key, value) {
   const container = document.getElementById('metadata-fields-container');
+  const sanitizedKey = key.replace(/[^a-z0-9_-]/gi, '-'); // Make safe ID
 
   const row = document.createElement('div');
   row.className = 'metadata-field-row flex items-start gap-2';
@@ -565,6 +583,7 @@ function addCustomFieldToForm(key, value) {
            class="font-mono text-xs px-2 py-1 border border-gray-300 w-32"
            data-custom-key>
     <input type="text"
+           id="metadata-field-${sanitizedKey}"
            value="${value}"
            placeholder="value"
            class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
@@ -591,12 +610,76 @@ if (form) {
   });
 }
 
+// Notify Stimulus controller of metadata changes
+function notifyMetadataChange() {
+  const finalYaml = isYamlView
+    ? document.getElementById('metadata-yaml').value
+    : formToYaml();
+
+  document.getElementById('metadata-final').value = finalYaml;
+
+  // Dispatch a custom event that the Stimulus controller can listen to
+  const event = new CustomEvent('metadata:changed', {
+    detail: { yaml: finalYaml }
+  });
+  document.dispatchEvent(event);
+}
+
+// Add change listeners to all metadata inputs
+function attachChangeListeners() {
+  // Listen to form field changes
+  document.querySelectorAll('[data-metadata-field], [data-custom-key], [data-custom-value]').forEach(input => {
+    input.removeEventListener('input', notifyMetadataChange); // Remove old listener
+    input.removeEventListener('change', notifyMetadataChange);
+    input.addEventListener('input', notifyMetadataChange);
+    input.addEventListener('change', notifyMetadataChange);
+  });
+
+  // Listen to YAML textarea changes
+  const yamlTextarea = document.getElementById('metadata-yaml');
+  if (yamlTextarea) {
+    yamlTextarea.removeEventListener('input', notifyMetadataChange);
+    yamlTextarea.addEventListener('input', notifyMetadataChange);
+  }
+}
+
+// Call on load
+attachChangeListeners();
+
+// Wrap existing functions to notify on changes
+const _addKnownField = addKnownField;
+addKnownField = function(fieldName) {
+  _addKnownField(fieldName);
+  attachChangeListeners();
+  notifyMetadataChange();
+};
+
+const _addCustomField = addCustomField;
+addCustomField = function() {
+  _addCustomField();
+  attachChangeListeners();
+  notifyMetadataChange();
+};
+
+const _removeMetadataField = removeMetadataField;
+removeMetadataField = function(button) {
+  _removeMetadataField(button);
+  notifyMetadataChange();
+};
+
+const _toggleMetadataView = toggleMetadataView;
+toggleMetadataView = function() {
+  _toggleMetadataView();
+  attachChangeListeners();
+  notifyMetadataChange();
+};
+
 // Make functions globally available
-  window.toggleAddFieldMenu = toggleAddFieldMenu;
-  window.addKnownField = addKnownField;
-  window.addCustomField = addCustomField;
-  window.removeMetadataField = removeMetadataField;
-  window.toggleMetadataView = toggleMetadataView;
-  window.toggleMetadataSection = toggleMetadataSection;
+window.toggleAddFieldMenu = toggleAddFieldMenu;
+window.addKnownField = addKnownField;
+window.addCustomField = addCustomField;
+window.removeMetadataField = removeMetadataField;
+window.toggleMetadataView = toggleMetadataView;
+window.toggleMetadataSection = toggleMetadataSection;
 })();
 </script>

@@ -1,5 +1,5 @@
 class SiteConfig < ApplicationRecord
-  SYSTEM_PATH = Rails.root.join('content', 'system')
+  SYSTEM_PATH = Rails.root.join('site', 'system')
   SITE_FILE = SYSTEM_PATH.join('site.yml')
   DEFAULTS_PATH = SYSTEM_PATH.join('defaults')
 
@@ -41,7 +41,7 @@ class SiteConfig < ApplicationRecord
     config_data = YAML.load_file(file_path)
     site_config = find_or_initialize_by(file_path: file_path.to_s)
     site_config.config = config_data
-    site_config.save!
+    site_config.touch  # Force timestamp update
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     site_config
@@ -59,6 +59,10 @@ class SiteConfig < ApplicationRecord
       type = "defaults/#{File.basename(file, '.yml')}"
       sync_from_file(type)
     end
+  end
+
+  def static_generation_enabled
+    config.dig('static_generation_enabled') || false
   end
 
   private

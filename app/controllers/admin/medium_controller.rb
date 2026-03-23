@@ -7,7 +7,7 @@ class Admin::MediumController < Admin::BaseController
     uploaded_file = params[:file]
 
     media_type = 'images'
-    folder_path = Rails.root.join("content/media/#{media_type}")
+    folder_path = Rails.root.join("site/media/#{media_type}")
     FileUtils.mkdir_p(folder_path)
 
     # Extract extension FIRST, before sanitizing
@@ -53,7 +53,7 @@ class Admin::MediumController < Admin::BaseController
 
   def destroy
     media = Medium.find(params[:id])
-    full_path = Rails.root.join("content#{media.file_path}")
+    full_path = Rails.root.join("site#{media.file_path}")
 
     # Delete file from filesystem
     File.delete(full_path) if File.exist?(full_path)
@@ -73,9 +73,9 @@ class Admin::MediumController < Admin::BaseController
       redirect_to browse_admin_medium_index_path and return
     end
 
-    # Use content/media/images instead of public
+    # Use site/media/images instead of public
     relative_path = @medium.file_path.delete_prefix('/')
-    old_path = Rails.root.join('content', relative_path)
+    old_path = Rails.root.join('site', relative_path)
     extension = File.extname(old_path)
     new_path = old_path.dirname.join("#{new_filename}#{extension}")
 

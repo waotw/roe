@@ -1,0 +1,10 @@
+# bin/fly-rsync
+#!/bin/bash
+# Pass this to rsync as the -e option to use fly ssh.
+# Usage: rsync -e ./bin/fly-rsync <local> <MACHINE_ID>:<remote>
+
+set -euo pipefail
+MACHINE="$1"
+shift
+CMD=$(printf " %q" "$@")
+fly ssh console --quiet --machine "$MACHINE" -C "$CMD"

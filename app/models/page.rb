@@ -28,6 +28,13 @@ class Page < ApplicationRecord
       page = existing_pages.first_or_initialize
     end
 
+    if parsed.front_matter['tags'].is_a?(String)
+      parsed.front_matter['tags'] = parsed.front_matter['tags']
+        .split(',')
+        .map(&:strip)
+        .reject(&:blank?)
+    end
+
     # Store ALL frontmatter in metadata JSON
     page.metadata = parsed.front_matter
     page.content = parsed.content
@@ -48,6 +55,12 @@ class Page < ApplicationRecord
     absolute_path = File.expand_path(file_path)
     find_by(file_path: absolute_path)&.destroy
   end
+
+  def self.public_pages
+    where("json_extract(metadata, '$.status') = ?", "published")
+  end
+
+  private
 
   # def to_html
   #   Kramdown::Document.new(

@@ -1,5 +1,5 @@
 class ConfigGenerator
-  SYSTEM_PATH = Rails.root.join('content', 'system')
+  SYSTEM_PATH = Rails.root.join('site', 'system')
   DEFAULTS_PATH = SYSTEM_PATH.join('defaults')
   ASSETS_PATH = SYSTEM_PATH.join('assets')
 
@@ -39,7 +39,7 @@ class ConfigGenerator
 
       # ──────────────────────────────────────────────────────────────
       # Custom Fonts (optional)
-      # Upload font files to content/system/assets/fonts/
+      # Upload font files to site/system/assets/fonts/
       # Supported formats: woff2 (recommended), woff, ttf
       #
       # Available variants for each font role:

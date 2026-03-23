@@ -1,0 +1,110 @@
+<div class="px-4 sm:px-0">
+  <div class="sm:flex sm:items-center mb-6">
+    <div class="sm:flex-auto">
+      <h1 class="text-3xl font-bold text-gray-900">Static Site Generation</h1>
+      <p class="mt-2 text-sm text-gray-700">
+        Generate, manage, and deploy your static HTML site.
+      </p>
+    </div>
+  </div>
+
+  <!-- Status Card -->
+  <div class="bg-white border border-gray-300 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Status</h2>
+
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-medium text-gray-700">Auto-Generation:</span>
+        <% if @generation_enabled %>
+          <span class="inline-flex items-center px-2 py-1 text-xs font-mono bg-green-100 text-green-800 rounded">
+            ENABLED
+          </span>
+        <% else %>
+          <span class="inline-flex items-center px-2 py-1 text-xs font-mono bg-gray-100 text-gray-800 rounded">
+            DISABLED
+          </span>
+        <% end %>
+      </div>
+
+      <% if @last_generation %>
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium text-gray-700">Last Generated:</span>
+          <span class="text-sm text-gray-600 font-mono">
+            <%= time_ago_in_words(@last_generation) %> ago
+          </span>
+        </div>
+      <% end %>
+
+      <% if @last_stats.any? %>
+        <div class="pt-3 border-t border-gray-200">
+          <p class="text-sm font-medium text-gray-700 mb-2">Last Generation Stats:</p>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div>Posts: <span class="font-mono"><%= @last_stats[:posts] || 0 %></span></div>
+            <div>Pages: <span class="font-mono"><%= @last_stats[:pages] || 0 %></span></div>
+            <div>Documentation: <span class="font-mono"><%= @last_stats[:documentation] || 0 %></span></div>
+            <div>Collections: <span class="font-mono"><%= @last_stats[:collection_pages] || 0 %></span></div>
+            <div>Duration: <span class="font-mono"><%= @last_stats[:duration]&.round(2) || 0 %>s</span></div>
+            <div>Errors: <span class="font-mono <%= 'text-red-600' if @last_stats[:errors]&.any? %>"><%= @last_stats[:errors]&.count || 0 %></span></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Actions Card -->
+  <div class="bg-white border border-gray-300 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
+
+    <div class="space-y-3">
+      <%= button_to "Generate Site", admin_generate_static_site_path,
+            method: :post,
+            class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none inline-block",
+            data: { confirm: "Generate static site now?" } %>
+
+      <%= button_to "Clean Static Files", admin_clean_static_site_path,
+            method: :post,
+            class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-yellow-200 hover:bg-yellow-300 font-mono rounded-xs leading-none inline-block",
+            data: { confirm: "Delete all generated static files?" } %>
+
+      <%= button_to "Rebuild (Clean + Generate)", admin_rebuild_static_site_path,
+            method: :post,
+            class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs leading-none inline-block",
+            data: { confirm: "This will delete all static files and regenerate from scratch. Continue?" } %>
+    </div>
+
+    <div class="mt-4 pt-4 border-t border-gray-200">
+      <p class="text-sm text-gray-600 mb-2">
+        <strong>Generate:</strong> Incremental build - only regenerates changed content
+      </p>
+      <p class="text-sm text-gray-600 mb-2">
+        <strong>Clean:</strong> Removes all generated static files
+      </p>
+      <p class="text-sm text-gray-600">
+        <strong>Rebuild:</strong> Full regeneration from scratch (useful after major changes)
+      </p>
+    </div>
+  </div>
+
+  <!-- Settings Card -->
+  <div class="bg-white border border-gray-300 p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Settings</h2>
+
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-700">Auto-Generation</p>
+          <p class="text-xs text-gray-600">Automatically generate static files when content changes</p>
+        </div>
+        <%= link_to "Configure", admin_edit_site_config_path(anchor: 'static-generation'),
+              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+        <div>
+          <p class="text-sm font-medium text-gray-700">Output Directory</p>
+          <p class="text-xs text-gray-600 font-mono">/public</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,7 +1,7 @@
 class Admin::SystemAssetsController < ApplicationController
   layout "application"
 
-  ASSETS_PATH = Rails.root.join('content/system/assets')
+  ASSETS_PATH = Rails.root.join('site/system/assets')
   FONTS_PATH = ASSETS_PATH.join('fonts')
 
   def index
@@ -91,6 +91,11 @@ class Admin::SystemAssetsController < ApplicationController
       Rails.logger.error "File not found at: #{file_path}"
       redirect_to browse_fonts_admin_system_assets_path, alert: "File not found: #{file_path}"
     end
+  end
+
+  def available_fonts
+    fonts = Dir.glob(FONTS_PATH.join('*')).map { |f| File.basename(f) }
+    render json: { fonts: fonts }
   end
 
   private

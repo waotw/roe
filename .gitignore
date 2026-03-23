@@ -4,6 +4,11 @@
 # belong in git's global ignore instead:
 # `$XDG_CONFIG_HOME/git/ignore` or `~/.config/git/ignore`
 
+# Ignore system files
+.DS_Store
+*/.DS_Store
+**/.DS_Store
+
 # Ignore bundler config.
 /.bundle
 
@@ -37,4 +42,13 @@
 /app/assets/builds/*
 !/app/assets/builds/.keep
 /app/assets/builds/*
+migrate-main.zip
+expressiveegg/
+migrate-main/
+
+# Entire site folder is on persistent volume
+/site/
 /content/
+
+# Static site generation output
+/public/

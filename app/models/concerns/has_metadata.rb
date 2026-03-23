@@ -3,11 +3,68 @@ module HasMetadata
 
   included do
     before_save :ensure_url_name_in_metadata
+
+    # Status scopes
+    scope :published, -> {
+      where("json_extract(metadata, '$.status') = ?", "published")
+    }
+
+    scope :unlisted, -> {
+      where("json_extract(metadata, '$.status') = ?", "unlisted")
+    }
+
+    scope :drafts, -> {
+      where("json_extract(metadata, '$.status') = ?", "draft")
+    }
+
+    scope :not_draft, -> {
+      where("json_extract(metadata, '$.status') != ? OR json_extract(metadata, '$.status') IS NULL", "draft")
+    }
+
+    scope :public_items, -> {
+      where("json_extract(metadata, '$.status') IN (?, ?) OR json_extract(metadata, '$.status') IS NULL",
+            "published", "unlisted")
+    }
+
+    # Tag scopes - optimized for JSON array searching
+    scope :tagged_with, ->(tags) {
+      tag_array = Array(tags)
+      return none if tag_array.empty?
+
+      # For SQLite JSON arrays, we need to check if the tag exists in the array
+      # This uses LIKE but is more precise than before
+      conditions = tag_array.map {
+        # Match tag in array: ["tag"] or ["tag","other"] or ["other","tag"]
+        "(json_extract(metadata, '$.tags') LIKE ? OR json_extract(metadata, '$.tags') LIKE ? OR json_extract(metadata, '$.tags') LIKE ?)"
+      }
+
+      params = tag_array.flat_map { |tag|
+        [ "%\"#{tag}\"%", "%[\"#{tag}\"]%", "%,\"#{tag}\"%" ]
+      }
+
+      where(conditions.join(' OR '), *params)
+    }
+
+    scope :with_post_type, ->(type) {
+      where("json_extract(metadata, '$.post_type') = ?", type)
+    }
+
+    # Date sorting
+    scope :by_date, -> {
+      order(Arel.sql("COALESCE(json_extract(metadata, '$.date'), created_at) DESC"))
+    }
+
+    scope :by_created, -> {
+      order(created_at: :desc)
+    }
   end
 
-  # Shared accessors
   def url_name
     metadata["url_name"] || calculate_url_name
+  end
+
+  def slug
+    url_name
   end
 
   def title
@@ -26,17 +83,39 @@ module HasMetadata
     metadata["excerpt"]
   end
 
-  # Status methods (shared by both)
+  # Tags accessor - handle both string and array formats
+  def tags
+    tags_value = metadata['tags']
+
+    case tags_value
+    when Array
+      tags_value
+    when String
+      tags_value.split(',').map(&:strip)
+    else
+      []
+    end
+  end
+
+  # Status methods
   def status
-    metadata["status"] || "draft"
+    metadata["status"] || "published"
   end
 
   def published?
     status == "published"
   end
 
+  def unlisted?
+    status == "unlisted"
+  end
+
   def draft?
     status == "draft"
+  end
+
+  def public?
+    published? || unlisted?
   end
 
   # Dynamic access to any metadata field
@@ -65,17 +144,6 @@ module HasMetadata
   def ensure_url_name_in_metadata
     if metadata["url_name"].blank?
       metadata["url_name"] = calculate_url_name
-    end
-  end
-
-  # Class methods
-  class_methods do
-    def published
-      where("json_extract(metadata, '$.status') = ?", "published")
-    end
-
-    def drafts
-      where("json_extract(metadata, '$.status') = ?", "draft")
     end
   end
 end

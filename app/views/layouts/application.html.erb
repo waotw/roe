@@ -73,6 +73,13 @@
   </head>
 
   <body class="bg-gray-100">
+    <% if flash.any? %>
+      <% flash.each do |type, message| %>
+        <div data-flash-message class="flash-floating <%= type %>" data-flash-message>
+          <%= message %>
+        </div>
+      <% end %>
+    <% end %>
     <!-- Admin Navigation -->
     <nav class="bg-white border-b border-gray-200">
       <div class="px-4 sm:px-6 lg:px-8">

@@ -7,16 +7,8 @@ class PostsController < ApplicationController
   end
 
   def show
-    puts "Looking for url_name: #{params[:url_name]}"
-
-    # Debug: show all post url_names
-    Post.all.each do |p|
-      puts "Post file: #{p.file_path}, url_name: #{p.url_name}"
-    end
 
     @post = Post.all.find { |p| p.url_name == params[:url_name] }
-
-    puts "Found post: #{@post.inspect}"
 
     raise ActiveRecord::RecordNotFound unless @post
 

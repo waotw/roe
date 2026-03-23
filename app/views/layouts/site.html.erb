@@ -43,14 +43,11 @@
 
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>
-    <!--<meta name="turbo-visit-control" content="reload">-->
+    <meta name="turbo-visit-control" content="restore">
   </head>
   <body>
-    <% logo_url = SiteConfig.get('logo') %>
-    <% logo_style = SiteConfig.get('logo_style') %>
-    <% has_logo = logo_url.present? && logo_url != 'none' %>
-    <header class="site-nav <%= 'logo' if has_logo %> <%= "logo-#{logo_style}" if has_logo && logo_style.present? %>">
-      <%= render_layout_file('navigation', current_page: @page) %>
+    <header class="site-nav <%= logo_classes %>">
+      <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
     <main>
       <%= yield %>

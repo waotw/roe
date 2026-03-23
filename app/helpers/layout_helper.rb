@@ -1,6 +1,6 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-    file_path = Rails.root.join('content', 'layout', "#{filename}.md")
+    file_path = Rails.root.join('site', 'layout', "#{filename}.md")
 
     return '' unless File.exist?(file_path)
 
@@ -18,32 +18,57 @@ module LayoutHelper
     ''
   end
 
+  def logo_classes
+    logo_url = SiteConfig.get('logo')
+    logo_style = SiteConfig.get('logo_style')
+    has_logo = logo_url.present? && logo_url != 'none'
+
+    classes = []
+    classes << 'logo' if has_logo
+    classes << "logo-#{logo_style}" if has_logo && logo_style.present?
+    classes.join(' ')
+  end
+
   private
 
   def add_active_nav_class(html, current_page)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
-    current_url_name = current_page&.url_name
 
-    return doc.to_html unless current_url_name
+    # Get current URL name from the actual content object (not page number)
+    current_url_name = if current_page.respond_to?(:url_name)
+      current_page.url_name
+    elsif defined?(@post) && @post&.respond_to?(:url_name)
+      @post.url_name
+    elsif defined?(@page) && @page&.respond_to?(:url_name)
+      @page.url_name
+    elsif defined?(@doc) && @doc&.respond_to?(:url_name)
+      @doc.url_name
+    end
+
+    # Get current path, handling both dynamic requests and static generation
+    current_path = begin
+      request.path if defined?(request) && request.respond_to?(:path)
+    rescue
+      nil
+    end
 
     doc.css('a').each do |link|
       href = link['href']
       next unless href
 
-      # Remove leading slash from href for comparison
-      link_path = href.sub(/^\//, '')
+      # Normalize href for comparison (remove leading slash and .html)
+      normalized_href = href.sub(/^\.\.\//, '').sub(/^\.\//, '').sub(/^\//, '').sub(/\.html$/, '')
 
-      # Handle root separately
-      if href == '/' && request.path == '/'
-        add_active_class(link)
+      # Handle root/home - href is '/' or empty
+      if href == '/' || href == './' || href.end_with?('index.html') || normalized_href.empty?
+        if current_url_name == 'home' || current_path == '/'
+          add_active_class(link)
+        end
         next
       end
 
-      # Skip root link when not on root
-      next if href == '/'
-
-      # Direct comparison with current page's url_name
-      if link_path == current_url_name
+      # Match other pages by url_name
+      if normalized_href == current_url_name
         add_active_class(link)
       end
     end

@@ -80,7 +80,7 @@ class Admin::PostsController < Admin::BaseController
 
   def create
     filename = sanitize_filename(params[:filename])
-    file_path = Rails.root.join("content/posts/#{filename}.md")
+    file_path = Rails.root.join("site/posts/#{filename}.md")
 
     if File.exist?(file_path)
       flash[:error] = "A post with that filename already exists"
@@ -193,7 +193,7 @@ class Admin::PostsController < Admin::BaseController
     file_path = @post.file_path
 
     begin
-      # Delete the file from content/posts/
+      # Delete the file from site/posts/
       File.delete(file_path) if File.exist?(file_path)
 
       # Delete the database record
@@ -256,7 +256,7 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def load_post_template
-    template_path = Rails.root.join("content/templates/post_template.md")
+    template_path = Rails.root.join("site/templates/post_template.md")
 
     if File.exist?(template_path)
       File.read(template_path)

@@ -11,7 +11,7 @@ class Admin::PagesController < Admin::BaseController
 
   def create
     filename = sanitize_filename(params[:filename])
-    file_path = Rails.root.join("content/pages/#{filename}.md")
+    file_path = Rails.root.join("site/pages/#{filename}.md")
 
     if File.exist?(file_path)
       flash[:error] = "A page with that filename already exists"
@@ -138,7 +138,7 @@ class Admin::PagesController < Admin::BaseController
     file_path = @page.file_path
 
     begin
-      # Delete the file from content/pages/
+      # Delete the file from site/pages/
       File.delete(file_path) if File.exist?(file_path)
 
       # Delete the database record
@@ -219,7 +219,7 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def load_page_template
-    template_path = Rails.root.join("content/templates/page_template.md")
+    template_path = Rails.root.join("site/templates/page_template.md")
 
     if File.exist?(template_path)
       File.read(template_path)

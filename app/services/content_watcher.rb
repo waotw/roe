@@ -1,5 +1,5 @@
 class ContentWatcher
-  WATCH_PATHS = [ 'content/posts', 'content/pages', 'content/documentation', 'content/system', 'content/media' ].freeze
+  WATCH_PATHS = [ 'site/posts', 'site/pages', 'site/documentation', 'site/system', 'site/media' ].freeze
 
   def self.start
     listener = Listen.to(*WATCH_PATHS) do |modified, added, removed|
@@ -54,22 +54,71 @@ class ContentWatcher
       remove_file(file)
       puts ""
     end
+
+    # After processing all changes, trigger static generation
+    if static_generation_enabled?
+      trigger_static_generation
+    else
+      puts "\nℹ️  Static generation disabled (enable in Site Config)"
+    end
+  end
+
+
+  def self.static_generation_enabled?
+    site_config = SiteConfig.first
+    site_config&.config&.dig('static_generation_enabled') == true  # Change to 'config'
+  rescue => e
+    Rails.logger.debug "Static generation check failed: #{e.message}"
+    false
+  end
+
+  def self.trigger_static_generation
+    puts "\n" + "=" * 60
+    puts "🔨 Regenerating static site..."
+    puts "=" * 60
+
+    start_time = Time.current
+
+    begin
+      generator = StaticGenerator.new
+      stats = generator.generate_all
+
+      duration = (Time.current - start_time).round(2)
+
+      if stats[:errors].empty?
+        puts "✅ Static site generated successfully in #{duration}s"
+        puts "   Posts: #{stats[:posts]}, Pages: #{stats[:pages]}, Collections: #{stats[:collection_pages]}"
+      else
+        puts "⚠️  Static site generated with #{stats[:errors].count} errors in #{duration}s"
+        stats[:errors].first(3).each do |error|
+          puts "   - #{error[:type]}: #{error[:message]}"
+        end
+      end
+    rescue => e
+      duration = (Time.current - start_time).round(2)
+      puts "❌ Static generation failed after #{duration}s: #{e.message}"
+      Rails.logger.error "Static generation error: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+    end
+
+    puts "=" * 60
+    puts ""
   end
 
   def self.process_file(file)
     absolute_file = File.expand_path(file)
 
-    if absolute_file.include?('content/system/site.yml')
+    if absolute_file.include?('site/system/site.yml')
       SiteConfig.sync_from_file('site')
       puts "\n   ✓ Site config reloaded\n"
 
-    elsif absolute_file.include?('content/system/defaults/')
+    elsif absolute_file.include?('site/system/defaults/')
       # Extract the type from the filename (e.g., 'cards' from 'cards.yml')
       type = File.basename(file, '.yml')
       SiteConfig.sync_from_file("defaults/#{type}")
       puts "\n   ✓ #{type.capitalize} defaults reloaded\n"
 
-    elsif absolute_file.include?('content/posts')
+    elsif absolute_file.include?('site/posts')
       result = Post.create_or_update_from_file(absolute_file)
 
       case result
@@ -81,14 +130,21 @@ class ContentWatcher
         puts "\n   ✓ Post saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('content/pages')
+    elsif absolute_file.include?('site/pages')
       result = Page.create_or_update_from_file(absolute_file)
 
       if result
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('content/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
+    elsif absolute_file.include?('site/documentation')
+      result = Documentation.create_or_update_from_file(absolute_file)
+
+      if result
+        puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
+      end
+
+    elsif absolute_file.include?('site/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
       # New media file added manually
       web_path = absolute_file.sub(Rails.root.join('content').to_s, '')
 
@@ -145,28 +201,28 @@ class ContentWatcher
     absolute_old = File.expand_path(old_path)
     absolute_new = File.expand_path(new_path)
 
-    if absolute_old.include?('content/posts')
+    if absolute_old.include?('site/posts')
       post = Post.find_by(file_path: absolute_old)
       if post
         post.update(file_path: absolute_new)
         Post.create_or_update_from_file(absolute_new)
         puts "   ✓ Post renamed in database"
       end
-    elsif absolute_old.include?('content/pages')
+    elsif absolute_old.include?('site/pages')
       page = Page.find_by(file_path: absolute_old)
       if page
         page.update(file_path: absolute_new)
         Page.create_or_update_from_file(absolute_new)
         puts "   ✓ Page renamed in database"
       end
-    elsif absolute_old.include?('content/documentation')
+    elsif absolute_old.include?('site/documentation')
       doc = Documentation.find_by(file_path: absolute_old)
       if doc
         doc.update(file_path: absolute_new)
         Documentation.create_or_update_from_file(absolute_new)
         puts "   ✓ Documentation renamed in database"
       end
-    elsif absolute_old.include?('content/media')
+    elsif absolute_old.include?('site/media')
       # Media files are stored with web paths like "/media/images/file.jpg"
       old_web_path = absolute_old.sub(Rails.root.join('content').to_s, '')
       new_web_path = absolute_new.sub(Rails.root.join('content').to_s, '')
@@ -184,16 +240,16 @@ class ContentWatcher
   def self.remove_file(file)
     absolute_file = File.expand_path(file)
 
-    if absolute_file.include?('content/posts')
+    if absolute_file.include?('site/posts')
       Post.remove_by_file_path(absolute_file)
       puts "   Removed post from database"
-    elsif absolute_file.include?('content/pages')
+    elsif absolute_file.include?('site/pages')
       Page.remove_by_file_path(absolute_file)
       puts "   Removed page from database"
-    elsif absolute_file.include?('content/documentation')
+    elsif absolute_file.include?('site/documentation')
       Documentation.remove_by_file_path(absolute_file)
       puts "   Removed documentation from database"
-    elsif absolute_file.include?('content/media')
+    elsif absolute_file.include?('site/media')
       web_path = absolute_file.sub(Rails.root.join('content').to_s, '')
       Medium.remove_by_file_path(web_path)
       puts "   Removed media file from database"

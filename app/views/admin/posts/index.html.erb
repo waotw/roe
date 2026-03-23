@@ -1,12 +1,12 @@
-<div class="px-4 sm:px-0">
+<div class="px-4 sm:px-0 font-mono">
   <div class="sm:flex sm:items-center">
-    <div class="sm:flex-auto">
+    <div class="sm:flex-auto font-sans">
       <h1 class="text-3xl font-bold text-gray-900"><%= @title || "Posts" %></h1>
       <p class="mt-2 text-sm text-gray-700"><%= @description || "A list of all posts including drafts and published." %></p>
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <%= link_to "New Post", new_admin_post_path, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium text-white bg-blue-600 hover:bg-blue-700" %>
-      <%= link_to "Edit Post Template", admin_settings_post_template_path, class: "inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 ml-3" %>
+      <%= link_to "New Post", new_admin_post_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      <%= link_to "Edit Post Template", admin_settings_post_template_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
     </div>
   </div>
 
@@ -29,11 +29,11 @@
           <table class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Title</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900">Filename <span class="text-xs text-gray-500 font-normal">(double click to rename)</span></th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900">Status</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900">Type</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900">Date</th>
+                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Title</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase ">Filename <span class="text-xs normal-case text-gray-500 font-normal">(double click to rename)</span></th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+                <!--<th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Type</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Date</th>-->
                 <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
                   <span class="sr-only">Actions</span>
                 </th>
@@ -60,13 +60,13 @@
                       <span class="inline-flex  bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Draft</span>
                     <% end %>
                   </td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500"><%= post.type %></td>
+                  <!--<td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500"><%= post.type %></td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                     <%= post.date&.strftime("%b %d, %Y") || "—" %>
-                  </td>
+                  </td>-->
                   <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-                    <%= link_to "Edit", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4" %>
-                    <%= link_to "View", post_path(url_name: post.url_name), class: "text-gray-600 hover:text-gray-900", target: "_blank" %>
+                    <%= link_to "Edit", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4 text-xs" %>
+                    <%= link_to "View", post_path(url_name: post.url_name), class: "text-gray-600 hover:text-gray-900 text-xs", target: "_blank" %>
                   </td>
                 </tr>
               <% end %>

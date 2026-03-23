@@ -1,0 +1,183 @@
+<% roles.each do |role_key, role_config| %>
+  <div class="font-role-section mb-6 pb-6 border-b border-gray-200 last:border-b-0">
+    <h4 class="text-sm font-semibold text-gray-800 mb-1"><%= role_config[:label] %></h4>
+    <p class="text-xs text-gray-600 mb-3"><%= role_config[:description] %></p>
+
+    <div class="space-y-2 pl-3">
+      <%
+        # Get existing variants for this role
+        role_data = config_hash.dig('fonts', role_key.to_s) || {}
+        family_value = role_data['family']
+        regular_value = role_data['regular']
+
+        # Other variants (excluding family and regular)
+        other_variants = role_data.except('family', 'regular')
+      %>
+
+      <!-- Family (required) -->
+      <div class="flex items-start gap-2">
+        <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2">family:</label>
+        <input type="text"
+               value="<%= family_value %>"
+               class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+               data-config-field="fonts.<%= role_key %>.family"
+               placeholder="e.g., 'Newsreader'">
+        <span class="text-xs text-gray-500 pt-2">(required)</span>
+      </div>
+
+      <!-- Regular (required) -->
+      <div class="flex items-start gap-2">
+        <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2">regular:</label>
+        <div class="flex-1">
+          <input type="text"
+                 value="<%= regular_value %>"
+                 class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                 data-config-field="fonts.<%= role_key %>.regular"
+                 data-validate-font="true"
+                 placeholder="filename.woff2">
+          <p class="text-xs text-red-600 mt-1 hidden" data-font-error="fonts.<%= role_key %>.regular">
+            Font file not found. Please upload it using the <strong>Fonts</strong> button above.
+          </p>
+        </div>
+        <span class="text-xs text-gray-500 pt-2">(required)</span>
+      </div>
+
+      <!-- Other variants -->
+      <div class="font-variants-container" data-role="<%= role_key %>">
+        <% other_variants.each do |variant_name, variant_value| %>
+          <div class="flex items-start gap-2 font-variant-row" data-variant="<%= variant_name %>">
+            <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2"><%= variant_name %>:</label>
+            <div class="flex-1">
+              <input type="text"
+                     value="<%= variant_value %>"
+                     class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                     data-config-field="fonts.<%= role_key %>.<%= variant_name %>"
+                     data-validate-font="true">
+              <p class="text-xs text-red-600 mt-1 hidden" data-font-error="fonts.<%= role_key %>.<%= variant_name %>">
+                Font file not found. Please upload it using the <strong>Fonts</strong> button above.
+              </p>
+            </div>
+            <button type="button"
+                    onclick="removeFontVariant(this)"
+                    class="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0">
+              ×
+            </button>
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Add Variant Button -->
+      <div class="mt-2">
+        <button type="button"
+                onclick="showAddVariantMenu(this, '<%= role_key %>')"
+                class="text-xs px-3 py-1 border border-gray-300 hover:bg-gray-100">
+          + Add Variant
+        </button>
+
+        <!-- Dropdown menu (hidden by default) -->
+        <div class="add-variant-menu hidden absolute bg-white border border-gray-800 shadow-lg z-10 mt-1"
+             data-role="<%= role_key %>">
+          <% role_config[:common_variants].each do |variant| %>
+            <button type="button"
+                    onclick="addFontVariant('<%= role_key %>', '<%= variant %>')"
+                    class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono">
+              <%= variant %>
+            </button>
+          <% end %>
+          <div class="border-t border-gray-200"></div>
+          <button type="button"
+                  onclick="addCustomFontVariant('<%= role_key %>')"
+                  class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono italic text-gray-600">
+            Custom variant...
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<script>
+(function() {
+  function showAddVariantMenu(button, role) {
+    // Close all other menus
+    document.querySelectorAll('.add-variant-menu').forEach(menu => {
+      menu.classList.add('hidden');
+    });
+
+    // Toggle this menu
+    const menu = button.nextElementSibling;
+    menu.classList.toggle('hidden');
+  }
+
+  function addFontVariant(role, variantName) {
+    const container = document.querySelector(`.font-variants-container[data-role="${role}"]`);
+    const menu = document.querySelector(`.add-variant-menu[data-role="${role}"]`);
+
+    // Check if variant already exists
+    if (container.querySelector(`[data-variant="${variantName}"]`)) {
+      alert(`${variantName} variant already exists`);
+      menu.classList.add('hidden');
+      return;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-2 font-variant-row';
+    row.dataset.variant = variantName;
+
+    row.innerHTML = `
+      <label class="font-mono text-xs text-gray-700 w-28 flex-shrink-0 pt-2">${variantName}:</label>
+      <div class="flex-1">
+        <input type="text"
+               value=""
+               class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+               data-config-field="fonts.${role}.${variantName}"
+               data-validate-font="true"
+               placeholder="filename.woff2">
+        <p class="text-xs text-red-600 mt-1 hidden" data-font-error="fonts.${role}.${variantName}">
+          Font file not found. Please upload it using the <strong>Fonts</strong> button above.
+        </p>
+      </div>
+      <button type="button"
+              onclick="removeFontVariant(this)"
+              class="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
+        ×
+      </button>
+    `;
+
+    container.appendChild(row);
+    menu.classList.add('hidden');
+
+    // Trigger font list fetch for newly added input
+    if (window.setupFontValidation) {
+      window.setupFontValidation();
+    }
+  }
+
+  function addCustomFontVariant(role) {
+    const variantName = prompt('Enter variant name (e.g., "semibold", "light"):');
+    if (!variantName) return;
+
+    const sanitized = variantName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    addFontVariant(role, sanitized);
+  }
+
+  function removeFontVariant(button) {
+    button.closest('.font-variant-row').remove();
+  }
+
+  // Close menus when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('[onclick*="showAddVariantMenu"]') &&
+        !e.target.closest('.add-variant-menu')) {
+      document.querySelectorAll('.add-variant-menu').forEach(menu => {
+        menu.classList.add('hidden');
+      });
+    }
+  });
+
+  window.showAddVariantMenu = showAddVariantMenu;
+  window.addFontVariant = addFontVariant;
+  window.addCustomFontVariant = addCustomFontVariant;
+  window.removeFontVariant = removeFontVariant;
+})();
+</script>

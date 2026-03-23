@@ -1,7 +1,7 @@
 class Admin::LayoutsController < Admin::BaseController
   LAYOUT_FILES = {
-    'navigation' => Rails.root.join('content/layout/navigation.md'),
-    'footer' => Rails.root.join('content/layout/footer.md')
+    'navigation' => Rails.root.join('site/layout/navigation.md'),
+    'footer' => Rails.root.join('site/layout/footer.md')
   }
 
   def index

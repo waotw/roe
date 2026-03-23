@@ -1,12 +1,20 @@
+# In config/initializers/content_management.rb
+
 # ONLY run when Puma is actually serving requests
 should_run = if ENV['RAILS_ENV'] == 'production'
+  puts "✓ Should run: production environment"
   true
 elsif Rails.env.development?
   # Check if we're running the server (not console, rake, etc.)
-  defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?
+  is_server = defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?
+  puts "✓ Development environment, server detected: #{is_server}"
+  is_server
 else
+  puts "✗ Not running (not production or development)"
   false
 end
+
+puts "Should run content watcher: #{should_run}"
 
 if should_run
   Rails.application.config.after_initialize do
@@ -22,6 +30,7 @@ if should_run
         ContentSync.sync_all
 
         if Rails.env.development?
+          puts "🎬 Starting content watcher..."
           ContentWatcher.start
         end
 
@@ -29,27 +38,7 @@ if should_run
       end
     rescue => e
       Rails.logger.error "Content sync failed: #{e.message}"
+      puts "❌ Content sync failed: #{e.message}"
     end
   end
 end
-
-# # ONLY run when Puma is actually serving requests
-# if ENV['RAILS_ENV'] == 'production' ||
-#    (Rails.env.development? && ARGV.any? { |arg| arg == 'server' || arg == 's' })
-
-#   Rails.application.config.after_initialize do
-#     begin
-#       if ActiveRecord::Base.connection.table_exists?('posts')
-#         ContentSync.sync_all
-
-#         if Rails.env.development?
-#           ContentWatcher.start
-#         end
-
-#         puts "🚀 Content management system ready!"
-#       end
-#     rescue => e
-#       Rails.logger.error "Content sync failed: #{e.message}"
-#     end
-#   end
-# end

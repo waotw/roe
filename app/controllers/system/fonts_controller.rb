@@ -3,7 +3,7 @@ class System::FontsController < ApplicationController
 
   def show
     filename = params[:filename]
-    file_path = Rails.root.join('content/system/assets/fonts', filename)
+    file_path = Rails.root.join('site/system/assets/fonts', filename)
 
     if File.exist?(file_path)
       # Set aggressive caching for fonts (they rarely change)

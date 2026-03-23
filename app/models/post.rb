@@ -3,19 +3,47 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
-  scope :tagged_with, ->(tag) {
-    where("json_extract(metadata, '$.tags') LIKE ?", "%#{tag}%")
-  }
-
+  # Additional post-specific scopes
   scope :by_type, ->(post_type) {
     where("json_extract(metadata, '$.post_type') = ?", post_type)
   }
+
+  scope :regular_posts, -> {
+    where("file_path NOT LIKE ?", "%site/docs/%")
+  }
+
+  scope :public_posts, -> {
+    public_items.regular_posts
+  }
+
+  scope :feed_posts, -> {
+    published.regular_posts
+  }
+
+  # Class method to get all unique post types efficiently
+  def self.all_post_types
+    pluck(Arel.sql("DISTINCT json_extract(metadata, '$.post_type')"))
+      .compact
+      .reject(&:blank?)
+      .sort
+  end
+
+  # Class method to get all unique tags efficiently
+  def self.all_tags
+    # Get all tag arrays, flatten, and uniquify
+    select("json_extract(metadata, '$.tags') as tag_json")
+      .where("json_extract(metadata, '$.tags') IS NOT NULL")
+      .map { |p| JSON.parse(p.tag_json) rescue [] }
+      .flatten
+      .uniq
+      .compact
+      .sort
+  end
 
   def self.create_or_update_from_file(file_path)
     absolute_path = File.expand_path(file_path)
     has_warnings = false
 
-    # Parse with error handling
     begin
       parsed = FrontMatterParser::Parser.parse_file(file_path)
     rescue => e
@@ -24,7 +52,6 @@ class Post < ApplicationRecord
       return nil
     end
 
-    # Validate date if present
     if parsed.front_matter['date'].present?
       begin
         Date.parse(parsed.front_matter['date'].to_s)
@@ -35,7 +62,6 @@ class Post < ApplicationRecord
       end
     end
 
-    # Check for required fields if published
     if parsed.front_matter['status'] == 'published'
       if parsed.front_matter['title'].blank?
         Rails.logger.warn "Published post missing title: #{file_path}"
@@ -50,11 +76,9 @@ class Post < ApplicationRecord
       end
     end
 
-    # Find or create post - with duplicate handling
     existing_posts = where(file_path: absolute_path)
 
     if existing_posts.count > 1
-      # Cleanup duplicates: keep newest, delete rest
       Rails.logger.warn "Found #{existing_posts.count} posts for #{file_path}, cleaning up duplicates"
       post = existing_posts.order(created_at: :desc).first
       existing_posts.where.not(id: post.id).destroy_all
@@ -63,11 +87,17 @@ class Post < ApplicationRecord
       post = existing_posts.first_or_initialize
     end
 
-    # Store ALL frontmatter in metadata JSON
+    # Convert comma-separated tags to array (preserves -tag syntax)
+    if parsed.front_matter['tags'].is_a?(String)
+      parsed.front_matter['tags'] = parsed.front_matter['tags']
+        .split(',')
+        .map(&:strip)
+        .reject(&:blank?)
+    end
+
     post.metadata = parsed.front_matter
     post.content = parsed.content
 
-    # Save with error handling
     begin
       post.save!
     rescue => e
@@ -76,7 +106,6 @@ class Post < ApplicationRecord
       return nil
     end
 
-    # Return warning status if there were warnings, otherwise return post
     has_warnings ? :warning : post
   end
 
@@ -104,19 +133,13 @@ class Post < ApplicationRecord
   end
 
   def date
-    # Handle both Date objects and strings
     date_value = metadata["date"]
-
     return nil if date_value.blank?
-
-    # If it's already a Date object, return it
     return date_value if date_value.is_a?(Date)
 
-    # Try to parse string
     begin
       Date.parse(date_value.to_s)
     rescue ArgumentError, TypeError
-      # If parsing fails, use file modification time as fallback
       File.mtime(file_path).to_date
     end
   end
@@ -142,12 +165,12 @@ class Post < ApplicationRecord
   #   where("json_extract(metadata, '$.type') = ?", type)
   # end
 
-  def type
-    metadata["type"] || "article"
+  def post_type
+    metadata["post_type"]
   end
 
-  def tags
-    metadata['tags']&.split(',')&.map(&:strip) || []
+  def type
+    metadata["type"] || "article"
   end
 
   # Class methods for filtering by type
@@ -172,20 +195,24 @@ class Post < ApplicationRecord
     where("json_extract(metadata, '$.status') = ?", "unlisted")
   end
 
-  def self.documentation
-    where("file_path LIKE ?", "%content/docs/%")
+  # def self.documentation
+  #   where("file_path LIKE ?", "%content/docs/%")
+  # end
+
+  def self.public_documentation
+    where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
   end
 
   def self.regular_posts
-    where("file_path NOT LIKE ?", "%content/docs/%")
+    where("file_path NOT LIKE ?", "%site/docs/%")
   end
 
   def self.public_posts
-    where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
-      .where("file_path NOT LIKE ?", "%content/docs/%")
+    where("json_extract(metadata, '$.status') = ?", "published")
+      .where("file_path NOT LIKE ?", "%site/docs/%")
   end
 
   def self.feed_posts
-    published.where("file_path NOT LIKE ?", "%content/docs/%")
+    published.where("file_path NOT LIKE ?", "%site/docs/%")
   end
 end
