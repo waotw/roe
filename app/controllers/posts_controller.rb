@@ -18,5 +18,10 @@ class PostsController < ApplicationController
     end
   end
 
+  def show_by_id
+    @post = Post.find(params[:id])
+    redirect_to post_path(@post.url_name), status: :moved_permanently
+  end
+
   private
 end

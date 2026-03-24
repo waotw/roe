@@ -89,6 +89,10 @@ Rails.application.routes.draw do
 
   # Public site (specific before catch-all)
   root "posts#index"
+
+  # Redirect post ID to slug (preserves anchor in browser)
+  get 'p/:id', to: 'posts#show_by_id', constraints: { id: /\d+/ }, as: :post_by_id
+
   get "posts/:url_name", to: "posts#show", as: :post
   get "documentation/:url_name", to: "documentation#show", as: :documentation
 
