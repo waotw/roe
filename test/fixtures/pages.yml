@@ -1,11 +1,48 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# Fixtures for testing Page model
 
-one:
-  file_path: MyString
-  content: MyText
-  metadata: 
+home_page:
+  file_path: site/pages/home.md
+  content: |
+    ---
+    title: Home
+    url_name: home
+    ---
+    
+    # Welcome
+    
+    This is the home page.
 
-two:
-  file_path: MyString
-  content: MyText
-  metadata: 
+about_page:
+  file_path: site/pages/about.md
+  content: |
+    ---
+    title: About
+    url_name: about
+    ---
+    
+    # About Us
+    
+    We are a test organization.
+
+contact_page:
+  file_path: site/pages/contact.md
+  content: |
+    ---
+    title: Contact
+    url_name: contact
+    ---
+    
+    # Contact Us
+    
+    Get in touch with us.
+
+no_metadata_page:
+  file_path: site/pages/simple.md
+  content: |
+    ---
+    title: Simple Page
+    ---
+    
+    # Simple Page
+    
+    A page without extensive metadata.

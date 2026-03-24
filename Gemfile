@@ -16,7 +16,7 @@ gem "jbuilder"
 gem "bcrypt", "~> 3.1.7"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
-gem "tzinfo-data", platforms: %i[ windows jruby ]
+gem "tzinfo-data", platforms: %i[ mingw jruby ]
 
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
@@ -44,7 +44,7 @@ gem "front_matter_parser", "~> 1.0"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
-  gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
+  gem "debug", platforms: %i[ mri ], require: "debug/prelude"
 
   # Audits gems for known security defects (use config/bundler-audit.yml to ignore issues)
   gem "bundler-audit", require: false
@@ -69,7 +69,7 @@ end
 
 gem "tailwindcss-rails", "~> 4.4"
 
-gem "tailwindcss-ruby", "~> 4.2"
+gem "tailwindcss-ruby", "~> 4.2.0"
 
 gem "dockerfile-rails", ">= 1.7", group: :development
 
@@ -84,3 +84,5 @@ gem "importmap-rails", "~> 2.2"
 gem "stimulus-rails", "~> 1.3"
 
 gem "webrick", "~> 1.9"
+
+gem "factory_bot", "~> 6.5"

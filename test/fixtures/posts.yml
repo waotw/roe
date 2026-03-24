@@ -1,17 +1,155 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# Fixtures for testing Post model
+# These use realistic data for comprehensive test coverage
 
-one:
-  title: MyString
-  url_name: MyString
-  date: 2026-02-20
-  author: MyString
-  file_path: MyString
-  content: MyText
+published_post:
+  file_path: site/posts/hello-world.md
+  content: |
+    ---
+    title: Hello World
+    date: 2024-01-15
+    tags:
+      - meta
+      - welcome
+    author: Test Author
+    ---
+    
+    # Hello World
+    
+    This is a test post for the CMS. It has all the basic metadata fields populated.
+    
+    ## Section One
+    
+    Some content here with a [link](https://example.com).
 
-two:
-  title: MyString
-  url_name: MyString
-  date: 2026-02-20
-  author: MyString
-  file_path: MyString
-  content: MyText
+draft_post:
+  file_path: site/posts/draft-idea.md
+  content: |
+    ---
+    title: Draft Idea
+    status: draft
+    tags:
+      - idea
+      - unfinished
+    ---
+    
+    # Draft Idea
+    
+    This is a draft post that should not be visible publicly.
+
+unlisted_post:
+  file_path: site/posts/hidden-gem.md
+  content: |
+    ---
+    title: Hidden Gem
+    date: 2024-02-20
+    status: unlisted
+    tags:
+      - music
+      - discovery
+    post_type: music
+    author: Test Author
+    ---
+    
+    # Hidden Gem
+    
+    An unlisted post that has a direct URL but doesn't appear in feeds.
+
+article_post:
+  file_path: site/posts/ruby-tutorial.md
+  content: |
+    ---
+    title: Ruby Tutorial
+    date: 2024-03-01
+    tags:
+      - tech
+      - ruby
+      - rails
+    post_type: article
+    author: Ruby Developer
+    ---
+    
+    # Ruby Tutorial
+    
+    A comprehensive guide to Ruby on Rails development.
+    
+    ## Getting Started
+    
+    First, install Ruby...
+
+music_post:
+  file_path: site/posts/new-album-review.md
+  content: |
+    ---
+    title: New Album Review
+    date: 2024-03-10
+    tags:
+      - music
+      - review
+    post_type: music
+    author: Music Critic
+    ---
+    
+    # New Album Review
+    
+    The latest release from our favorite artist.
+
+podcast_post:
+  file_path: site/posts/podcast-episode-1.md
+  content: |
+    ---
+    title: Podcast Episode 1
+    date: 2024-03-15
+    tags:
+      - podcast
+      - interview
+    post_type: podcast
+    author: Host Name
+    ---
+    
+    # Podcast Episode 1
+    
+    Our first episode featuring special guests.
+
+image_post:
+  file_path: site/posts/photo-collection.md
+  content: |
+    ---
+    title: Photo Collection
+    date: 2024-03-20
+    tags:
+      - photography
+      - travel
+    post_type: image
+    ---
+    
+    # Photo Collection
+    
+    A collection of photos from recent travels.
+
+no_tags_post:
+  file_path: site/posts/no-tags.md
+  content: |
+    ---
+    title: Post Without Tags
+    date: 2024-03-25
+    status: published
+    ---
+    
+    # No Tags
+    
+    This post has no tags at all.
+
+archived_post:
+  file_path: site/posts/old-post.md
+  content: |
+    ---
+    title: Old Archived Post
+    date: 2023-01-01
+    tags:
+      - archived
+      - old
+    ---
+    
+    # Old Archived Post
+    
+    This post has been archived.

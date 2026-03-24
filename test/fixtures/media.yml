@@ -1,11 +1,12 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# Media fixtures for testing
+# Each file_path must be unique due to database constraint
 
 one:
-  file_path: MyString
-  media_type: MyString
+  file_path: site/media/test-image-1.jpg
+  media_type: image
   uploaded_at: 2026-03-06 15:24:56
 
 two:
-  file_path: MyString
-  media_type: MyString
-  uploaded_at: 2026-03-06 15:24:56
+  file_path: site/media/test-image-2.jpg
+  media_type: image
+  uploaded_at: 2026-03-06 15:24:57

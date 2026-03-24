@@ -8,7 +8,7 @@ module HasInlineFootnotes
     footnotes = []
 
     # Match (*...*) or (*[marker] ...*)
-    processed = markdown.gsub(/\(\*(\[([^\]]+)\]\s*)?([^)]*)\*\)/) do
+    processed = markdown.gsub(/\(\*(\[([^\]]+)\]\s*)?(.*?)\*\)/m) do
       marker = $2
       content = $3.strip
 
