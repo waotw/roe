@@ -72,7 +72,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="bg-gray-100">
+  <body class="bg-gray-100 min-w-185.5">
     <% if flash.any? %>
       <% flash.each do |type, message| %>
         <div data-flash-message class="flash-floating <%= type %>" data-flash-message>
@@ -81,8 +81,8 @@
       <% end %>
     <% end %>
     <!-- Admin Navigation -->
-    <nav class="bg-white border-b border-gray-200">
-      <div class="px-4 sm:px-6 lg:px-8">
+    <nav class="bg-white border-b border-gray-200 min-w-185.5">
+      <div class="px-8">
         <div class="flex justify-between items-center h-16">
           <!-- Left: Roe CMS Title -->
           <div class="shrink-0">
@@ -109,7 +109,7 @@
     </nav>
 
     <!-- Page Content -->
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="max-w-7xl mx-auto py-6 px-8">
       <%= yield %>
     </main>
   </body>

@@ -19,7 +19,7 @@
       <div class="flex justify-between gap-4 items-center py-2 px-2">
         <button type="button"
                 data-action="click->editor#toggleTOC"
-                class="text-sm text-gray-600 hover:text-gray-900">
+                class="text-sm text-gray-600 hover:text-gray-900 text-nowrap">
           Table of Contents
           <span data-editor-target="tocArrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800">▶</span>
         </button>
@@ -35,7 +35,7 @@
           <div class="relative inline-flex">
             <button type="button"
                     data-action="click->editor#toggleCardMenu"
-                    class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+                    class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] text-nowrap">
               Card ▼
             </button>
             <div data-editor-target="cardMenu" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-20" style="min-width: 150px;">
@@ -53,7 +53,7 @@
             </div>
           </div>
           <button type="button" data-action="click->editor#insertCollection" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Collection</button>
-          <button type="button" data-action="click->editor#triggerMediaUpload" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Upload Media</button>
+          <button type="button" data-action="click->editor#triggerMediaUpload" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] text-nowrap">Upload Media</button>
           <input type="file"
                  data-editor-target="mediaUpload"
                  data-action="change->editor#handleMediaUpload"
