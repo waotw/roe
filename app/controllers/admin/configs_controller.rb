@@ -26,17 +26,6 @@ class Admin::ConfigsController < ApplicationController
       }
     },
 
-    static_generation: {
-      label: "Static Site Generation",
-      fields: {
-        'static_generation_enabled' => {
-          type: :checkbox,
-          label: 'Enable Auto-Generation',
-          hint: 'Automatically generate static files when content changes'
-        }
-      }
-    },
-
     branding: {
       label: "Branding",
       fields: {
@@ -57,6 +46,29 @@ class Admin::ConfigsController < ApplicationController
           label: 'Favicon',
           hint: 'Copy logo url from Global Images.',
           placeholder: "favicon.ico"
+        }
+      }
+    },
+
+    theme: {
+      label: "Theme",
+      fields: {
+        'active' => {
+          type: :select,
+          label: 'Active Theme',
+          options: ['egg', 'default'],
+          hint: 'Select the theme for your site'
+        }
+      }
+    },
+
+    static_generation: {
+      label: "Static Site Generation",
+      fields: {
+        'static_generation_enabled' => {
+          type: :checkbox,
+          label: 'Enable Auto-Generation',
+          hint: 'Automatically generate static files when content changes'
         }
       }
     },

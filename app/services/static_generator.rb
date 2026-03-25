@@ -261,7 +261,8 @@ class StaticGenerator
     {
       fonts: dir_checksum(Rails.root.join('site', 'system', 'assets', 'fonts')),
       images: dir_checksum(Rails.root.join('site', 'system', 'assets', 'images')),
-      media: dir_checksum(Rails.root.join('site', 'media'))
+      media: dir_checksum(Rails.root.join('site', 'media')),
+      theme: dir_checksum(Rails.root.join('site', 'theme'))
     }
   end
 
@@ -658,6 +659,7 @@ class StaticGenerator
     puts "🎨 Copying changed assets..."
     sync_directory(Rails.root.join('site', 'system', 'assets', 'fonts'), @output_dir.join('system', 'fonts'))
     sync_directory(Rails.root.join('site', 'system', 'assets', 'images'), @output_dir.join('system', 'images'))
+    sync_directory(Rails.root.join('site', 'theme'), @output_dir.join('theme'))
     puts "  ✓ Assets synced"
   end
 

@@ -101,6 +101,9 @@ Rails.application.routes.draw do
   get "feed.xml", to: "feeds#rss", defaults: { format: 'xml' }
   get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
 
+  # Theme CSS (before catch-all)
+  get 'theme/:filename.css', to: 'system/themes#show', defaults: { format: 'css' }
+
   # System assets
   get 'system/fonts/:filename', to: 'system/fonts#show', as: :system_font, constraints: { filename: /[^\/]+/ }
   get 'system/images/:filename', to: 'system/images#show', as: :system_image, constraints: { filename: /[^\/]+/ }
