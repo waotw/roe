@@ -452,11 +452,13 @@ DEPENDENCIES
   kramdown (~> 2.4)
   kramdown-parser-gfm (~> 1.1)
   listen (~> 3.8)
+  nokogiri (~> 1.19)
   propshaft
   puma (>= 5.0)
   rails (~> 8.1.2)
   rss (~> 0.3.2)
   rubocop-rails-omakase
+  rubyzip (~> 3.2)
   selenium-webdriver
   solid_cable
   solid_cache

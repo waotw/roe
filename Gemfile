@@ -86,3 +86,7 @@ gem "stimulus-rails", "~> 1.3"
 gem "webrick", "~> 1.9"
 
 gem "factory_bot", "~> 6.5"
+
+gem "nokogiri", "~> 1.19"
+
+gem "rubyzip", "~> 3.2"
