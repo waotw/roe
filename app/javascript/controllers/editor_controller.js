@@ -111,7 +111,16 @@ if (!window.EditorState || !window.EditorState.saveElement) {
 }
 
 export default class extends Controller {
-  static targets = ["textarea", "form", "metadata", "cardMenu", "mediaUpload"];
+  static targets = [
+    "textarea",
+    "form",
+    "metadata",
+    "cardMenu",
+    "mediaUpload",
+    "tocPanel",
+    "tocContent",
+    "tocArrow",
+  ];
 
   static values = {
     resourceType: String,
@@ -127,6 +136,28 @@ export default class extends Controller {
 
   connect() {
     console.log("Editor controller connected");
+
+    // Initialize TOC
+    this.updateTOC();
+
+    // Close TOC on typing
+    this.textareaTarget.addEventListener("input", () => {
+      if (
+        this.hasTocPanelTarget &&
+        !this.tocPanelTarget.classList.contains("hidden")
+      ) {
+        this.tocPanelTarget.classList.add("hidden");
+        if (this.hasTocArrowTarget) {
+          this.tocArrowTarget.textContent = "▶";
+        }
+      }
+    });
+
+    // Auto-expand textarea
+    this.autoExpandTextarea();
+    this.textareaTarget.addEventListener("input", () =>
+      this.autoExpandTextarea(),
+    );
 
     // Track last cursor position when textarea loses focus
     this.lastCursorPosition = null;
@@ -220,6 +251,36 @@ export default class extends Controller {
       ) {
         this.lastFocusedInput = e.target;
       }
+    });
+
+    this.scrollBeforeInput = window.scrollY;
+
+    this.textareaTarget.addEventListener("input", () => {
+      const savedScroll = this.scrollBeforeInput;
+
+      requestAnimationFrame(() => {
+        const currentScroll = window.scrollY;
+        const scrollDelta = currentScroll - savedScroll;
+
+        // Only allow small downward scrolls (typing at bottom)
+        if (scrollDelta > 0 && scrollDelta < 150) {
+          // Natural bottom scroll, allow it and add margin
+          window.scrollBy({ top: 0, behavior: "instant" }); // Add 30px extra margin
+        } else {
+          // Lock scroll
+          window.scrollTo({ top: savedScroll, behavior: "instant" });
+        }
+
+        this.scrollBeforeInput = window.scrollY;
+      });
+    });
+
+    let scrollTimeout;
+    window.addEventListener("scroll", () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        this.scrollBeforeInput = window.scrollY;
+      }, 100);
     });
 
     // Restore scrolls at the very end
@@ -334,6 +395,30 @@ export default class extends Controller {
   insertFootnote(event) {
     event.preventDefault();
     this.wrapSelectionWithSavedPosition("(*", "*)", "footnote text here");
+  }
+
+  // ========== GALLERY ACTIONS ==========
+
+  insertGallery(event) {
+    event.preventDefault();
+
+    const savedPos = this.lastCursorPosition;
+    this.textareaTarget.focus({ preventScroll: true });
+
+    if (savedPos !== null) {
+      this.textareaTarget.setSelectionRange(savedPos, savedPos);
+    }
+
+    const start = this.textareaTarget.selectionStart;
+    const galleryTemplate = "```gallery\n__PLACEHOLDER__\n```";
+
+    document.execCommand("insertText", false, galleryTemplate);
+
+    const placeholderStart = start + "```gallery\n".length;
+    const placeholderEnd = placeholderStart + "__PLACEHOLDER__".length;
+    this.textareaTarget.setSelectionRange(placeholderStart, placeholderEnd);
+
+    this.lastCursorPosition = null;
   }
 
   // ========== CARD ACTIONS ==========
@@ -717,6 +802,153 @@ export default class extends Controller {
     this.textareaTarget.scrollTop = (lines - 5) * lineHeight;
   }
 
+  // ========== TOC METHODS ==========
+
+  toggleTOC(event) {
+    event.preventDefault();
+
+    if (this.hasTocPanelTarget) {
+      this.tocPanelTarget.classList.toggle("hidden");
+
+      // Restore full background when opening
+      if (!this.tocPanelTarget.classList.contains("hidden")) {
+        this.tocPanelTarget.style.backgroundColor = "";
+      }
+
+      // Update arrow
+      if (this.hasTocArrowTarget) {
+        this.tocArrowTarget.textContent =
+          this.tocPanelTarget.classList.contains("hidden") ? "▶" : "▼";
+      }
+
+      this.textareaTarget.focus({ preventScroll: true });
+    }
+  }
+
+  updateTOC() {
+    if (!this.hasTocContentTarget) return;
+
+    const content = this.textareaTarget.value;
+    const lines = content.split("\n");
+
+    // Find all headings (h2-h4)
+    const headings = [];
+    lines.forEach((line, index) => {
+      const match = line.match(/^(#{2,4})\s+(.+)$/);
+      if (match) {
+        const level = match[1].length;
+        const text = match[2];
+        const slug = this.generateSlug(text);
+        headings.push({ level, text, slug, lineIndex: index });
+      }
+    });
+
+    if (headings.length === 0) {
+      this.tocContentTarget.innerHTML =
+        '<div class="text-gray-500">No headings found</div>';
+      return;
+    }
+
+    /// Render headings with hash symbols
+    this.tocContentTarget.innerHTML = headings
+      .map((heading) => {
+        const hashes = "#".repeat(heading.level); // ##, ###, or ####
+        return `
+        <div class="flex items-center justify-between py-1 hover:bg-gray-100 px-2 -mx-2 group">
+          <button type="button"
+                  data-action="click->editor#jumpToHeading"
+                  data-line="${heading.lineIndex}"
+                  class="flex-1 text-left truncate">
+            <span class="text-gray-400 mr-2">${hashes}</span><span class="text-gray-700 hover:text-gray-900">${this.escapeHtml(heading.text)}</span>
+          </button>
+          <button type="button"
+                  data-action="click->editor#copyHeadingLink"
+                  data-slug="${heading.slug}"
+                  class="ml-2 uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] opacity-0 group-hover:opacity-100 transition-opacity">
+            Copy
+          </button>
+        </div>
+      `;
+      })
+      .join("");
+  }
+
+  jumpToHeading(event) {
+    event.preventDefault();
+    const lineIndex = parseInt(event.currentTarget.dataset.line);
+
+    const lines = this.textareaTarget.value.split("\n");
+    const charPosition =
+      lines
+        .slice(0, lineIndex)
+        .reduce((sum, line) => sum + line.length + 1, 0) +
+      lines[lineIndex].length;
+
+    this.textareaTarget.setSelectionRange(charPosition, charPosition);
+    this.textareaTarget.focus();
+
+    // Fade TOC background after jumping
+    if (
+      this.hasTocPanelTarget &&
+      !this.tocPanelTarget.classList.contains("hidden")
+    ) {
+      this.tocPanelTarget.style.backgroundColor = "rgba(249, 250, 251, 0.3)";
+    }
+
+    // Update scroll lock position
+    setTimeout(() => {
+      this.scrollBeforeInput = window.scrollY;
+    }, 50);
+  }
+
+  restoreTocOpacity() {
+    if (this.hasTocPanelTarget) {
+      this.tocPanelTarget.style.backgroundColor = ""; // Remove inline style, return to bg-gray-50
+    }
+  }
+
+  copyHeadingLink(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+    const slug = button.dataset.slug;
+
+    // Get post ID from controller value
+    const postId = this.resourceIdValue;
+    const fullUrl = `${window.location.origin}/p/${postId}#${slug}`;
+
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      // Save original classes
+      const originalClasses = button.className;
+      const originalText = button.textContent;
+
+      // Success animation
+      button.className =
+        "ml-2 uppercase text-xs px-1.5 py-0 border border-green-800 bg-green-200 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]";
+      button.textContent = "✓ Copied!";
+
+      // Reset after 1.5 seconds
+      setTimeout(() => {
+        button.className = originalClasses;
+        button.textContent = originalText;
+      }, 1500);
+    });
+  }
+
+  generateSlug(text) {
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .trim();
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // ========== PREVIEW ACTION ==========
 
   preview(event) {
@@ -815,6 +1047,11 @@ export default class extends Controller {
   }
 
   // ========== HELPER METHODS ==========
+
+  autoExpandTextarea() {
+    this.textareaTarget.style.height = "auto";
+    this.textareaTarget.style.height = this.textareaTarget.scrollHeight + "px";
+  }
 
   wrapSelectionWithSavedPosition(prefix, suffix, placeholder = "") {
     console.log("[WRAP] START - savedPos:", this.lastCursorPosition);
