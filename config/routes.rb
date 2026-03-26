@@ -52,6 +52,14 @@ Rails.application.routes.draw do
 
     resources :configs, only: [ :index ]
 
+    resources :themes, only: [:index] do
+      member do
+        get :edit
+        patch :update
+        post :activate
+      end
+    end
+
     resources :system_assets, only: [ :index, :create ] do
       collection do
         get :browse_fonts

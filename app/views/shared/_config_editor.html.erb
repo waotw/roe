@@ -6,17 +6,22 @@
     config_hash = {}
   end
 
-  # Flatten nested font structure for easier form handling
-  # fonts.heading.family => value
+  # Flatten nested structures for easier form handling
   flattened_config = {}
 
   config_hash.each do |key, value|
     if key == 'fonts' && value.is_a?(Hash)
+      # Fonts are 2 levels: fonts.heading.family
       value.each do |role, role_data|
         next unless role_data.is_a?(Hash)
         role_data.each do |variant, variant_value|
           flattened_config["fonts.#{role}.#{variant}"] = variant_value
         end
+      end
+    elsif key == 'theme' && value.is_a?(Hash)
+      # Theme is 1 level: theme.active
+      value.each do |field, field_value|
+        flattened_config["theme.#{field}"] = field_value
       end
     else
       flattened_config[key] = value
@@ -93,7 +98,7 @@
                         class="w-full font-mono text-sm p-2 border border-gray-300"
                         data-config-field="theme.active">
                   <option value="">Select...</option>
-                  <% theme_options = config_schema.dig(:theme, :fields, :active, :options) || config_schema.dig("theme", "fields", "active", "options") || [] %>
+                  <% theme_options = config_schema.dig(:theme, :fields, 'active', :options) || [] %>
                   <% theme_options.each do |option| %>
                     <option value="<%= option %>" <%= 'selected' if theme_active == option %>><%= option %></option>
                   <% end %>

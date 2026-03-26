@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Theme: <%= @theme_name.capitalize %></title>
+</head>
+<body class="bg-white text-black p-5">
+
+  <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300">
+    <div class="flex items-center gap-2">
+      <%= link_to "← Back to Themes", admin_themes_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    </div>
+  </div>
+
+  <% if flash[:notice] %>
+    <div class="px-2.5 py-1 mb-5 border border-green-300 bg-green-50 text-green-800">
+      <%= flash[:notice] %>
+    </div>
+  <% end %>
+
+  <% if flash[:error] %>
+    <div class="px-2.5 py-1 mb-5 border border-red-300 bg-red-50 text-red-800">
+      <%= flash[:error] %>
+    </div>
+  <% end %>
+
+  <h1 class="text-3xl font-bold mb-5">Edit Theme: <%= @theme_name.capitalize %></h1>
+
+  <!-- Wrap in CSS Editor Stimulus controller -->
+  <div data-controller="css-editor"
+       data-css-editor-theme-name-value="<%= @theme_name %>"
+       data-css-editor-preview-id-value="<%= @preview_id %>">
+
+    <div class="mb-5 flex justify-between items-center sticky top-0 bg-white z-10 py-2 px-4">
+      <div class="flex gap-2.5 items-center">
+        <button type="submit"
+                form="theme-form"
+                data-action="click->css-editor#save"
+                class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+          Save
+        </button>
+
+        <button type="button"
+                data-action="click->css-editor#preview"
+                class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+          Preview
+        </button>
+
+        <%= link_to "Cancel",
+                    admin_themes_path,
+                    class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
+                    data: { action: "click->css-editor#confirmCancel" } %>
+      </div>
+
+      <div class="m-0 p-0 contents">
+        <span class="text-xs text-gray-500 font-mono">
+          <span data-css-editor-target="unsavedIndicator" class="hidden text-amber-600">● Unsaved changes</span>
+        </span>
+      </div>
+    </div>
+
+    <%= form_with url: admin_theme_path(@theme_name), method: :patch, id: "theme-form", class: "mb-5" do |form| %>
+      <%= form.text_area :content,
+                         value: @theme_content,
+                         data: {
+                           css_editor_target: "textarea",
+                           action: "input->css-editor#trackChanges"
+                         },
+                         class: "w-full font-mono text-sm p-4 border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500",
+                         style: "min-height: 70vh; tab-size: 2; overflow: hidden; resize: none;",
+                         spellcheck: "false" %>
+    <% end %>
+
+    <div class="text-xs text-gray-500 font-mono mt-2">
+      <p>💡 Press <kbd class="px-1 py-0.5 bg-gray-200 border border-gray-400 rounded">Cmd/Ctrl+S</kbd> to save</p>
+    </div>
+  </div>
+
+  <!-- Trigger preview refresh after save -->
+  <% if flash[:notice] == "#{@theme_name.capitalize} theme updated successfully" %>
+    <div id="theme-saved-trigger" data-trigger="refresh" style="display: none;"></div>
+  <% end %>
+</body>
+</html>

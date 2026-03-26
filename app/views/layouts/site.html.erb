@@ -26,9 +26,11 @@
       <%= font_face_css.html_safe %>
     </style>
     <!-- Public site theme -->
-    <% theme_config = SiteConfig.get('theme') %>
-    <% theme_name = theme_config&.dig('active') || 'default' %>
-    <link rel="stylesheet" href="/theme/<%= theme_name %>.css" data-turbo-track="reload">
+    <% if params[:preview_theme].present? %>
+      <%= stylesheet_link_tag "/theme/#{params[:preview_theme]}.css?v=#{Time.now.to_i}" %>
+    <% else %>
+      <%= stylesheet_link_tag "/theme/#{SiteConfig.get('theme.active') || 'default'}.css" %>
+    <% end %>
     <!-- Favicon -->
     <% if SiteConfig.get('favicon') %>
       <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
