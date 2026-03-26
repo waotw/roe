@@ -7,7 +7,12 @@ class SiteConfig < ApplicationRecord
 
   # Get site-level config
   def self.get(key)
-    current('site')&.config&.[](key.to_s)
+    return nil unless File.exist?(SITE_FILE)
+    config_data = YAML.load_file(SITE_FILE)
+    config_data&.dig(key.to_s)
+  rescue => e
+    Rails.logger.error "SiteConfig.get error: #{e.message}"
+    nil
   end
 
   # Get default config (cards, collections, etc.)

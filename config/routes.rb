@@ -52,6 +52,14 @@ Rails.application.routes.draw do
 
     resources :configs, only: [ :index ]
 
+    resources :themes, only: [:index] do
+      member do
+        get :edit
+        patch :update
+        post :activate
+      end
+    end
+
     resources :system_assets, only: [ :index, :create ] do
       collection do
         get :browse_fonts
@@ -104,6 +112,9 @@ Rails.application.routes.draw do
   get "feed", to: "feeds#rss", defaults: { format: 'xml' }, as: :feed
   get "feed.xml", to: "feeds#rss", defaults: { format: 'xml' }
   get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
+
+  # Theme CSS (before catch-all)
+  get 'theme/:filename.css', to: 'system/themes#show', defaults: { format: 'css' }
 
   # System assets
   get 'system/fonts/:filename', to: 'system/fonts#show', as: :system_font, constraints: { filename: /[^\/]+/ }
