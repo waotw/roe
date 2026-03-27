@@ -75,7 +75,7 @@
   <body class="bg-gray-100 min-w-185.5">
     <% if flash.any? %>
       <% flash.each do |type, message| %>
-        <div data-flash-message class="flash-floating <%= type %>" data-flash-message>
+        <div data-flash-message class="flash-floating <%= type %>">
           <%= message %>
         </div>
       <% end %>
