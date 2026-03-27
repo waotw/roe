@@ -29,7 +29,9 @@
     <% if params[:preview_theme].present? %>
       <%= stylesheet_link_tag "/theme/#{params[:preview_theme]}.css?v=#{Time.now.to_i}" %>
     <% else %>
-      <%= stylesheet_link_tag "/theme/#{SiteConfig.get('theme.active') || 'default'}.css" %>
+      <% theme_name = SiteConfig.get('theme.active') || 'default' %>
+      <% cache_buster = Rails.env.development? ? "?v=#{Time.now.to_i}" : "" %>
+      <%= stylesheet_link_tag "/theme/#{theme_name}.css#{cache_buster}" %>
     <% end %>
     <!-- Favicon -->
     <% if SiteConfig.get('favicon') %>

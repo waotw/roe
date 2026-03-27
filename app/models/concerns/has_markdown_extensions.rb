@@ -42,6 +42,7 @@ module HasMarkdownExtensions
     processed_content = process_collections(processed_content, preview: preview)
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
+    processed_content = process_strikethrough(processed_content)
 
     # Step 3: Restore code blocks
     code_blocks.each do |token, original|
@@ -51,8 +52,10 @@ module HasMarkdownExtensions
     # Step 4: Convert to HTML
     html = Kramdown::Document.new(
       processed_content,
-      input: 'GFM',
-      footnote_backlink: "↩"
+      input: "kramdown",
+      footnote_backlink: "",
+      footnote_backlinks_inline: true,
+      hard_wrap: false
     ).to_html
 
     # Step 5: Restore pullquote split markers AFTER Kramdown
@@ -60,16 +63,54 @@ module HasMarkdownExtensions
       html.gsub!(token, original)
     end
 
-    # Step 6: Process collection grids (detect consecutive collections)
+    # Step 6: Add custom footnote backlinks
+    html = add_footnote_backlinks(html)
+
+    # Step 7: Process collection grids (detect consecutive collections)
     html = CollectionGridProcessor.process(html)
 
-    # Step 7: Merge floated pullquotes into following paragraphs
+    # Step 8: Merge floated pullquotes into following paragraphs
     html = merge_floated_pullquotes(html)
 
     html
   end
 
   private
+
+  def process_strikethrough(markdown)
+    # Convert ~~text~~ to <del>text</del> (which Kramdown preserves)
+    markdown.gsub(/~~([^~]+)~~/, '<del>\1</del>')
+  end
+
+  def add_footnote_backlinks(html)
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    # Find all footnote list items
+    footnotes = doc.css('.footnotes ol li')
+
+    footnotes.each_with_index do |li, index|
+      footnote_id = li['id'] # e.g., "fn:1"
+      next unless footnote_id
+
+      # Extract the footnote number/name
+      ref_id = footnote_id.sub('fn:', 'fnref:')
+      number = index + 1
+
+      # Create backlink styled as a number
+      backlink = Nokogiri::XML::Node.new('a', doc)
+      backlink['href'] = "##{ref_id}"
+      backlink['class'] = 'footnote-backlink-number'
+      backlink['role'] = 'doc-backlink'
+      backlink['aria-label'] = "Return to reference #{number}"
+      backlink.content = "#{number}."
+
+      # Insert at the very beginning of the <li>
+      li.prepend_child(backlink)
+      li.prepend_child(Nokogiri::XML::Text.new(' ', doc)) # Add space after number
+    end
+
+    doc.to_html
+  end
 
   # GALLERIES
 

@@ -200,6 +200,17 @@ export default class extends Controller {
       history.scrollRestoration = "manual";
     }
 
+    // Combined Enter key handler for footnotes and lists
+    this.enterHandler = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        // Try list handling first (more common)
+        if (this.handleListEnter(e)) return;
+        // Then try footnote handling
+        if (this.handleFootnoteEnter(e)) return;
+      }
+    };
+    this.textareaTarget.addEventListener("keydown", this.enterHandler);
+
     // Add Turbo navigation warning
     this.turboBeforeVisitHandler = this.handleTurboBeforeVisit.bind(this);
     document.addEventListener(
@@ -222,6 +233,22 @@ export default class extends Controller {
         }
       }
     };
+
+    // Handle Tab key for indentation
+    this.tabHandler = (e) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+
+        if (e.shiftKey) {
+          // Shift+Tab: Remove indentation
+          this.outdentLine();
+        } else {
+          // Tab: Add indentation (2 spaces for Markdown)
+          document.execCommand("insertText", false, "  ");
+        }
+      }
+    };
+    this.textareaTarget.addEventListener("keydown", this.tabHandler);
 
     this.cardMenuKeyHandler = (e) => {
       if (
@@ -332,6 +359,19 @@ export default class extends Controller {
       this.metadataChangeHandler,
     );
 
+    // Remove combined enter handler
+    if (this.enterHandler) {
+      this.textareaTarget.removeEventListener("keydown", this.enterHandler);
+    }
+
+    // Remove tab handler
+    if (this.tabHandler) {
+      this.textareaTarget.removeEventListener("keydown", this.tabHandler);
+    }
+
+    // Remove footnote done button if it exists
+    this.removeFootnoteDoneButton();
+
     document.removeEventListener("click", this.cardMenuClickHandler);
     document.removeEventListener("keydown", this.cardMenuKeyHandler);
   }
@@ -394,7 +434,328 @@ export default class extends Controller {
 
   insertFootnote(event) {
     event.preventDefault();
-    this.wrapSelectionWithSavedPosition("(*", "*)", "footnote text here");
+
+    const content = this.textareaTarget.value;
+    const footnoteMatches = [...content.matchAll(/\[\^(\d+)\]/g)];
+    const footnoteNumbers = footnoteMatches.map((m) => parseInt(m[1]));
+    const nextNumber =
+      footnoteNumbers.length > 0 ? Math.max(...footnoteNumbers) + 1 : 1;
+
+    const originalPos = this.textareaTarget.selectionStart;
+    console.log("[FOOTNOTE] Original position:", originalPos);
+
+    this.textareaTarget.focus({ preventScroll: true });
+    this.textareaTarget.setSelectionRange(originalPos, originalPos);
+
+    const reference = `[^${nextNumber}]`;
+    document.execCommand("insertText", false, reference);
+
+    const positionAfterReference = originalPos + reference.length;
+
+    // Jump to end of document
+    const currentContent = this.textareaTarget.value;
+    const endPos = currentContent.length;
+
+    const needsNewlines = !currentContent.endsWith("\n\n");
+    const separator = needsNewlines ? "\n\n" : "";
+    const footnoteDefinition = `${separator}[^${nextNumber}]: `;
+
+    this.textareaTarget.setSelectionRange(endPos, endPos);
+    document.execCommand("insertText", false, footnoteDefinition);
+
+    const cursorPos = this.textareaTarget.value.length;
+    this.textareaTarget.setSelectionRange(cursorPos, cursorPos);
+    this.textareaTarget.scrollTop = this.textareaTarget.scrollHeight;
+    this.scrollBeforeInput = window.scrollY;
+
+    this.showFootnoteDoneButton(positionAfterReference);
+  }
+
+  handleFootnoteEnter(event) {
+    const cursorPos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+    const beforeCursor = content.substring(0, cursorPos);
+    const lines = beforeCursor.split("\n");
+    const currentLineNumber = lines.length - 1;
+
+    let footnoteDefLine = null;
+
+    for (let i = currentLineNumber; i >= 0; i--) {
+      const line = lines[i];
+      if (line.match(/^\[\^\d+\]:/)) {
+        footnoteDefLine = line;
+        break;
+      }
+      if (line.trim() === "") continue;
+      if (line.match(/^\s+/)) continue;
+      break;
+    }
+
+    if (footnoteDefLine) {
+      event.preventDefault();
+
+      // Kramdown expects 4 spaces for continuation, not visual alignment
+      const indent = "    "; // Always 4 spaces for Kramdown compatibility
+
+      document.execCommand("insertText", false, "\n" + indent);
+      console.log("[FOOTNOTE] Auto-indented with 4 spaces (Kramdown standard)");
+      return true;
+    }
+
+    return false;
+  }
+
+  showFootnoteDoneButton(returnPosition) {
+    // Remove any existing done button
+    this.removeFootnoteDoneButton();
+
+    // Create floating done button
+    const doneButton = document.createElement("button");
+    doneButton.type = "button";
+    doneButton.id = "footnote-done-button";
+    doneButton.className =
+      "fixed bottom-8 right-10 z-50 uppercase text-base px-1.5 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs";
+    doneButton.innerHTML = "✓ Done with Footnote";
+    doneButton.dataset.returnPosition = returnPosition;
+
+    // Click handler to return to original position
+    doneButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.returnFromFootnote(returnPosition);
+    });
+
+    // Add to page
+    document.body.appendChild(doneButton);
+
+    // Auto-remove on escape key
+    this.footnoteDoneKeyHandler = (e) => {
+      if (e.key === "Escape") {
+        this.returnFromFootnote(returnPosition);
+      }
+    };
+    document.addEventListener("keydown", this.footnoteDoneKeyHandler);
+  }
+
+  returnFromFootnote(returnPosition) {
+    console.log("[FOOTNOTE] Returning to position:", returnPosition);
+
+    // Focus textarea and jump back
+    this.textareaTarget.focus({ preventScroll: false });
+    this.textareaTarget.setSelectionRange(returnPosition, returnPosition);
+
+    // Scroll to make cursor visible
+    const lineHeight = parseInt(
+      window.getComputedStyle(this.textareaTarget).lineHeight,
+    );
+    const lines = this.textareaTarget.value
+      .substring(0, returnPosition)
+      .split("\n").length;
+    this.textareaTarget.scrollTop = Math.max(0, (lines - 10) * lineHeight);
+
+    // Update scroll lock position
+    setTimeout(() => {
+      this.scrollBeforeInput = window.scrollY;
+    }, 100);
+
+    // Remove done button
+    this.removeFootnoteDoneButton();
+  }
+
+  removeFootnoteDoneButton() {
+    const existingButton = document.getElementById("footnote-done-button");
+    if (existingButton) {
+      existingButton.remove();
+    }
+
+    // Remove escape key handler
+    if (this.footnoteDoneKeyHandler) {
+      document.removeEventListener("keydown", this.footnoteDoneKeyHandler);
+      this.footnoteDoneKeyHandler = null;
+    }
+  }
+
+  insertUnorderedList(event) {
+    event.preventDefault();
+
+    const savedPos = this.lastCursorPosition;
+    this.textareaTarget.focus({ preventScroll: true });
+
+    if (savedPos !== null) {
+      this.textareaTarget.setSelectionRange(savedPos, savedPos);
+    }
+
+    const pos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+
+    // Check if we're at the start of a line
+    const beforeCursor = content.substring(0, pos);
+    const needsNewline =
+      beforeCursor.length > 0 && !beforeCursor.endsWith("\n");
+
+    const insertion = (needsNewline ? "\n" : "") + "- ";
+    document.execCommand("insertText", false, insertion);
+
+    this.lastCursorPosition = null;
+  }
+
+  insertOrderedList(event) {
+    event.preventDefault();
+
+    const savedPos = this.lastCursorPosition;
+    this.textareaTarget.focus({ preventScroll: true });
+
+    if (savedPos !== null) {
+      this.textareaTarget.setSelectionRange(savedPos, savedPos);
+    }
+
+    const pos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+
+    // Check if we're at the start of a line
+    const beforeCursor = content.substring(0, pos);
+    const needsNewline =
+      beforeCursor.length > 0 && !beforeCursor.endsWith("\n");
+
+    const insertion = (needsNewline ? "\n" : "") + "1. ";
+    document.execCommand("insertText", false, insertion);
+
+    this.lastCursorPosition = null;
+  }
+
+  handleListEnter(event) {
+    const cursorPos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+    const beforeCursor = content.substring(0, cursorPos);
+    const afterCursor = content.substring(cursorPos);
+
+    // Get current line
+    const lines = beforeCursor.split("\n");
+    const currentLine = lines[lines.length - 1];
+
+    // Only handle Enter at end of line
+    const nextChar = afterCursor[0];
+    const atEndOfLine = !nextChar || nextChar === "\n";
+    if (!atEndOfLine) return false;
+
+    // Check for unordered list: "- " or "  - "
+    const unorderedMatch = currentLine.match(/^(\s*)-\s+(.*)$/);
+    if (unorderedMatch) {
+      event.preventDefault();
+      const indent = unorderedMatch[1];
+      const itemContent = unorderedMatch[2];
+
+      if (itemContent.trim() === "") {
+        // Empty list item - exit list (remove the "- ")
+        const lineStart = beforeCursor.length - currentLine.length;
+        this.textareaTarget.value =
+          content.substring(0, lineStart) + indent + afterCursor;
+        this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
+          lineStart + indent.length;
+      } else {
+        // Has content - create next list item
+        document.execCommand("insertText", false, "\n" + indent + "- ");
+      }
+      return true;
+    }
+
+    // Check for ordered list: "1. " or "  2. "
+    const orderedMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)$/);
+    if (orderedMatch) {
+      event.preventDefault();
+      const indent = orderedMatch[1];
+      const currentNumber = parseInt(orderedMatch[2]);
+      const itemContent = orderedMatch[3];
+
+      if (itemContent.trim() === "") {
+        // Empty list item - exit list
+        const lineStart = beforeCursor.length - currentLine.length;
+        this.textareaTarget.value =
+          content.substring(0, lineStart) + indent + afterCursor;
+        this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
+          lineStart + indent.length;
+      } else {
+        // Has content - create next list item
+        const nextNumber = currentNumber + 1;
+        document.execCommand(
+          "insertText",
+          false,
+          "\n" + indent + nextNumber + ". ",
+        );
+      }
+      return true;
+    }
+
+    return false; // Not a list
+  }
+
+  outdentLine() {
+    const cursorPos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+    const beforeCursor = content.substring(0, cursorPos);
+    const afterCursor = content.substring(cursorPos);
+
+    // Get current line
+    const lines = beforeCursor.split("\n");
+    const currentLine = lines[lines.length - 1];
+
+    // Check if line starts with spaces (remove up to 2 spaces)
+    const match = currentLine.match(/^( {1,2})/);
+    if (match) {
+      const spacesToRemove = match[1].length;
+      const lineStart = beforeCursor.length - currentLine.length;
+
+      // Remove the spaces
+      const newContent =
+        content.substring(0, lineStart) +
+        currentLine.substring(spacesToRemove) +
+        afterCursor;
+
+      this.textareaTarget.value = newContent;
+      this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
+        cursorPos - spacesToRemove;
+
+      console.log(`[OUTDENT] Removed ${spacesToRemove} spaces`);
+    }
+  }
+
+  insertLink(event) {
+    event.preventDefault();
+
+    // Check if textarea has focus and selection
+    const hasFocus = document.activeElement === this.textareaTarget;
+    const hasSelection =
+      this.textareaTarget.selectionStart !== this.textareaTarget.selectionEnd;
+
+    const shouldUseSavedPosition =
+      !hasFocus && !hasSelection && this.lastCursorPosition !== null;
+
+    // Focus textarea
+    this.textareaTarget.focus({ preventScroll: true });
+
+    // Restore saved position if needed
+    if (shouldUseSavedPosition) {
+      this.textareaTarget.setSelectionRange(
+        this.lastCursorPosition,
+        this.lastCursorPosition,
+      );
+    }
+
+    const start = this.textareaTarget.selectionStart;
+    const end = this.textareaTarget.selectionEnd;
+    const selectedText = this.textareaTarget.value.substring(start, end);
+
+    // Use selected text or placeholder
+    const linkText = selectedText || "link text";
+    const insertion = `[${linkText}]()`;
+
+    document.execCommand("insertText", false, insertion);
+
+    // Position cursor between the parentheses
+    const cursorPos = start + `[${linkText}](`.length;
+    this.textareaTarget.setSelectionRange(cursorPos, cursorPos);
+
+    // Clear saved position
+    this.lastCursorPosition = null;
   }
 
   // ========== GALLERY ACTIONS ==========
