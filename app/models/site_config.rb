@@ -9,7 +9,10 @@ class SiteConfig < ApplicationRecord
   def self.get(key)
     return nil unless File.exist?(SITE_FILE)
     config_data = YAML.load_file(SITE_FILE)
-    config_data&.dig(key.to_s)
+
+    # Handle nested keys like 'theme.active' or 'fonts.heading.family'
+    keys = key.to_s.split('.')
+    config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.get error: #{e.message}"
     nil
@@ -46,7 +49,7 @@ class SiteConfig < ApplicationRecord
     config_data = YAML.load_file(file_path)
     site_config = find_or_initialize_by(file_path: file_path.to_s)
     site_config.config = config_data
-    site_config.touch  # Force timestamp update
+    site_config.save!  # ← Added save! (was missing)
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     site_config
