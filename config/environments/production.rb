@@ -61,7 +61,7 @@ Rails.application.configure do
   config.action_mailer.default_url_options = { host: "example.com" }
 
   # Switch to serving static site files in production
-  # config.public_file_server.enabled = true
+  config.public_file_server.enabled = false
 
   # Specify outgoing SMTP server. Remember to add smtp/* credentials via bin/rails credentials:edit.
   # config.action_mailer.smtp_settings = {

@@ -42,6 +42,12 @@ echo "  3) Skip content push (code-only deploy)"
 echo ""
 read -p "Choose (1/2/3): " push_option
 
+# Add validation for empty input
+if [[ -z "$push_option" ]]; then
+    echo "❌ No option selected"
+    exit 1
+fi
+
 case $push_option in
   1)
     echo ""
@@ -57,7 +63,7 @@ case $push_option in
     echo "⏭️  Skipping content push"
     ;;
   *)
-    echo "❌ Invalid option"
+    echo "❌ Invalid option: '$push_option'"
     exit 1
     ;;
 esac

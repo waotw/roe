@@ -31,7 +31,8 @@ namespace :content do
   task :push_site do
     machine = machine_id
     puts "📤 Pushing site to #{app_name} (#{machine})..."
-    system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
+    # Add --size-only to skip files with matching size
+    system("rsync -rltzPi --size-only -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
     puts "✅ Push complete!"
   end
 
@@ -57,7 +58,6 @@ namespace :content do
     puts "✅ Backup saved to: #{backup_dir}"
   end
 
-  # NEW: Push specific folders to production
   desc "Push specific folders to production (e.g., rake content:push_folders[posts,theme])"
   task :push_folders, [:folders] do |t, args|
     unless args[:folders]
@@ -89,7 +89,8 @@ namespace :content do
       end
 
       puts "\n  → Syncing #{folder}/"
-      system("rsync -rltzPi --delete -e ./bin/fly-rsync #{local_path} #{remote_path}")
+      # Add --size-only here too
+      system("rsync -rltzPi --size-only --delete -e ./bin/fly-rsync #{local_path} #{remote_path}")
     end
 
     puts "\n✅ Push complete!"

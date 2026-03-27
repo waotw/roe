@@ -53,3 +53,4 @@ migrate-main/
 # Static site generation output
 /public/
 output/
+site_backups/
