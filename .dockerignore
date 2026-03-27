@@ -36,6 +36,17 @@
 !/app/assets/builds/.keep
 /public/assets
 
+/site/
+/site_backups/
+/output/
+public/posts/
+public/pages/
+public/media/
+public/documentation/
+public/system/
+public/collections/
+public/index.html
+
 # Ignore CI service files.
 /.github
 
