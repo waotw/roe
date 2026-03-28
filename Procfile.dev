@@ -1,2 +1,3 @@
 web: bin/rails server
 css: bin/rails tailwindcss:watch
+watcher: bin/rails runner "ContentWatcher.start; sleep"

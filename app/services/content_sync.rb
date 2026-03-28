@@ -9,6 +9,7 @@ class ContentSync
     sync_posts
     sync_pages
     sync_documentation
+    sync_media
   end
 
   def sync_posts
@@ -94,6 +95,40 @@ class ContentSync
 
     puts "=" * 60
     puts "✅ Pages sync complete! #{success_count} synced, #{error_count} errors\n\n"
+  end
+
+  def sync_media
+    # Sync images
+    image_files = Dir.glob("site/media/**/*.{jpg,jpeg,png,gif,webp,svg,bmp}")
+
+    puts "\n🖼️  Found #{image_files.count} media files"
+
+    # Handle orphaned media
+    handle_orphaned_media(image_files)
+
+    puts "=" * 60
+
+    success_count = 0
+
+    image_files.each do |file_path|
+      web_path = file_path.sub('site', '')
+
+      unless Medium.exists?(file_path: web_path)
+        media_type = File.extname(file_path).delete('.').downcase
+
+        Medium.create!(
+          file_path: web_path,
+          media_type: media_type,
+          uploaded_at: File.mtime(file_path)
+        )
+
+        puts "  ✓ Added: #{File.basename(file_path)}"
+        success_count += 1
+      end
+    end
+
+    puts "=" * 60
+    puts "✅ Media sync complete! #{success_count} new files\n\n"
   end
 
   def sync_documentation
@@ -209,6 +244,20 @@ class ContentSync
         puts "🧹 Removing orphaned documentation: #{File.basename(old_path)}"
         orphan.destroy
       end
+    end
+  end
+
+  def handle_orphaned_media(current_files)
+    # Convert to web paths for comparison
+    current_web_paths = current_files.map { |f| f.sub('site', '') }
+
+    orphans = Medium.where.not(file_path: current_web_paths)
+
+    return unless orphans.any?
+
+    orphans.each do |orphan|
+      puts "🧹 Removing orphaned media: #{File.basename(orphan.file_path)}"
+      orphan.destroy
     end
   end
 

@@ -1,44 +1,41 @@
-# In config/initializers/content_management.rb
+# config/initializers/content_management.rb
 
-# ONLY run when Puma is actually serving requests
-should_run = if ENV['RAILS_ENV'] == 'production'
-  puts "✓ Should run: production environment"
-  true
-elsif Rails.env.development?
-  # Check if we're running the server (not console, rake, etc.)
-  is_server = defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?
-  puts "✓ Development environment, server detected: #{is_server}"
-  is_server
+should_run = case Rails.env.to_sym
+when :production
+  defined?(Puma) && $PROGRAM_NAME.include?('puma')
+when :development
+  defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?
 else
-  puts "✗ Not running (not production or development)"
   false
 end
 
-puts "Should run content watcher: #{should_run}"
+puts "🔧 Content management initializer: #{should_run ? 'ENABLED' : 'DISABLED'} (#{$PROGRAM_NAME})"
 
 if should_run
   Rails.application.config.after_initialize do
     begin
       if ActiveRecord::Base.connection.table_exists?('posts')
-        # Generate default config files if they don't exist
+        puts "\n" + "=" * 60
+        puts "🚀 Initializing Content Management System"
+        puts "=" * 60
+
         ConfigGenerator.generate_all
-
-        # Generate default pages if they don't exist
         PageGenerator.generate_defaults
-
-        # Sync all content and configs to database
         ContentSync.sync_all
 
-        if Rails.env.development?
-          puts "🎬 Starting content watcher..."
-          ContentWatcher.start
-        end
+        # Start watcher in BOTH dev and production (single mode = safe)
+        puts "\n🎬 Starting content watcher..."
+        ContentWatcher.start
+        puts "✓ Watcher started - monitoring site/ folder for changes"
 
-        puts "🚀 Content management system ready!"
+        puts "\n" + "=" * 60
+        puts "✅ Content Management System Ready!"
+        puts "=" * 60 + "\n"
       end
     rescue => e
-      Rails.logger.error "Content sync failed: #{e.message}"
-      puts "❌ Content sync failed: #{e.message}"
+      Rails.logger.error "Content management initialization failed: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      puts "\n❌ Content management initialization failed: #{e.message}\n"
     end
   end
 end

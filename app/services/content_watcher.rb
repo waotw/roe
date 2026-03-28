@@ -146,7 +146,7 @@ class ContentWatcher
 
     elsif absolute_file.include?('site/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
       # New media file added manually
-      web_path = absolute_file.sub(Rails.root.join('content').to_s, '')
+      web_path = absolute_file.sub(Rails.root.join('site').to_s, '')
 
       unless Medium.exists?(file_path: web_path)
         Medium.create!(
