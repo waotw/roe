@@ -1,0 +1,25 @@
+<% if post.post_type == 'audio' && post.audio_file.present? %>
+  <div class="media-player audio-player">
+    <audio controls preload="metadata">
+      <source src="<%= post.audio_file %>" type="audio/mpeg">
+      <source src="<%= post.audio_file %>" type="audio/mp4">
+      <source src="<%= post.audio_file %>" type="audio/ogg">
+      Your browser doesn't support audio playback.
+    </audio>
+    <% if post.duration.present? %>
+      <div class="media-duration">
+        <span class="duration-label">Duration:</span>
+        <span class="duration-time"><%= post.duration %></span>
+      </div>
+    <% end %>
+  </div>
+<% elsif post.post_type == 'video' && post.video_file.present? %>
+  <div class="media-player video-player">
+    <video controls preload="metadata">
+      <source src="<%= post.video_file %>" type="video/mp4">
+      <source src="<%= post.video_file %>" type="video/webm">
+      <source src="<%= post.video_file %>" type="video/ogg">
+      Your browser doesn't support video playback.
+    </div>
+  </div>
+<% end %>

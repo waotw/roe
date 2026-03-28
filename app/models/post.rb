@@ -3,6 +3,54 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
+  # Post type definitions
+  POST_TYPES = {
+    article: {
+      label: "Article",
+      description: "Essay, blog post, newsletter…",
+      icon: "📝",
+      metadata_fields: []
+    },
+    audio: {
+      label: "Audio",
+      description: "Article with featured audio player",
+      icon: "🔊",
+      metadata_fields: [
+        { name: 'audio_file', type: :text, required: true, label: 'Audio File',
+          hint: 'Path to audio file (e.g., /media/my-song.mp3)' },
+        { name: 'duration', type: :text, label: 'Duration',
+          hint: 'Optional, e.g., "12:34"' }
+      ]
+    },
+    video: {
+      label: "Video",
+      description: "Article with featured video player",
+      icon: "🎬",
+      metadata_fields: [
+        { name: 'video_file', type: :text, required: true, label: 'Video File',
+          hint: 'Path to video file (e.g., /media/my-video.mp4)' },
+        { name: 'duration', type: :text, label: 'Duration',
+          hint: 'Optional, e.g., "12:34"' }
+      ]
+    }
+  }.freeze
+
+  def audio_file
+    metadata['audio_file']
+  end
+
+  def video_file
+    metadata['video_file']
+  end
+
+  def duration
+    metadata['duration']
+  end
+
+  def has_media?
+    post_type.in?(['audio', 'video']) && (audio_file.present? || video_file.present?)
+  end
+
   # Additional post-specific scopes
   scope :by_type, ->(post_type) {
     where("json_extract(metadata, '$.post_type') = ?", post_type)
@@ -166,7 +214,7 @@ class Post < ApplicationRecord
   # end
 
   def post_type
-    metadata["post_type"]
+    metadata["post_type"] || "article"  # Default to article if not specified
   end
 
   def type

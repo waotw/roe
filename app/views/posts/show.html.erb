@@ -1,27 +1,14 @@
-<article>
-  <header class="post-header">
-    <h1 class="page-title"><%= @post.title %></h1>
+<article class="post post--<%= @post.post_type %>">
+  <%= render 'posts/header', post: @post %>
 
-    <% if @post.subtitle %>
-      <p class="page-subtitle"><%= @post.subtitle %></p>
-    <% end %>
+  <% if lookup_context.exists?("posts/types/#{@post.post_type}", [], true) %>
+    <%= render "posts/types/#{@post.post_type}", post: @post %>
+  <% else %>
+    <%# Fallback to article if type partial doesn't exist %>
+    <%= render "posts/types/article", post: @post %>
+  <% end %>
 
-    <div class="post-meta">
-      <% if @post.date %>
-        <time datetime="<%= @post.date %>">
-          <%= @post.date.strftime("%B %d, %Y") %>
-        </time>
-      <% end %>
-      <% if @post.author %>
-        <span>• <%= @post.author %></span>
-      <% end %>
-    </div>
-  </header>
-
-  <div class="content">
-    <%= raw @post.to_html(preview: @preview_mode || false) %>
-  </div>
-
-  <%= link_to "← Back to all posts", root_path, class: "back-link" %>
+  <%= render 'posts/footer', post: @post %>
 </article>
+
 <%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>

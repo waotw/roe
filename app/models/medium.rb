@@ -1,6 +1,12 @@
 class Medium < ApplicationRecord
   before_save :normalize_media_type
 
+  # Scope helpers for filtering
+  scope :images, -> { where(media_type: 'images') }
+  scope :audio, -> { where(media_type: 'audio') }
+  scope :video, -> { where(media_type: 'video') }
+  scope :fonts, -> { where(media_type: 'fonts') }
+
   def self.remove_by_file_path(file_path)
     medium = find_by(file_path: file_path)
     medium&.destroy
@@ -8,12 +14,18 @@ class Medium < ApplicationRecord
 
   private
 
-    def normalize_media_type
-      # Normalize image extensions to 'images'
-      if %w[png jpg jpeg webp gif svg bmp].include?(media_type&.downcase)
-        self.media_type = 'images'
-      elsif %w[woff woff2 ttf otf].include?(media_type&.downcase)
-        self.media_type = 'fonts'
-      end
+  def normalize_media_type
+    extension = media_type&.downcase
+
+    case extension
+    when 'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp'
+      self.media_type = 'images'
+    when 'woff', 'woff2', 'ttf', 'otf'
+      self.media_type = 'fonts'
+    when 'mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac'
+      self.media_type = 'audio'
+    when 'mp4', 'webm', 'ogv', 'mov', 'avi', 'mkv'
+      self.media_type = 'video'
     end
+  end
 end
