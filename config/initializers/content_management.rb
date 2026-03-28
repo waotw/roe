@@ -2,7 +2,8 @@
 
 should_run = case Rails.env.to_sym
 when :production
-  defined?(Puma) && $PROGRAM_NAME.include?('puma')
+  # Check for both puma and rails server
+  defined?(Puma) && ($PROGRAM_NAME.include?('puma') || $PROGRAM_NAME.include?('rails'))
 when :development
   defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?
 else
