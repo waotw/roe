@@ -20,20 +20,17 @@ class Admin::PagesController < Admin::BaseController
       return
     end
 
-    # Load template and populate title from filename
     template_content = load_page_template
     title = filename_to_title(filename)
 
-    # Parse template and update title
     parsed = FrontMatterParser::Parser.new(:md).call(template_content)
     metadata = parsed.front_matter.merge("title" => title)
 
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
+    # Use formatted YAML
+    yaml_content = Page.format_metadata_yaml(metadata)
     content = "---\n#{yaml_content}\n---\n#{parsed.content}"
 
     normalize_and_write(file_path, content)
-
-    # Manually sync the file immediately
     ContentSync.sync_file(file_path)
 
     page = Page.find_by(file_path: file_path.to_s)
@@ -64,6 +61,7 @@ class Admin::PagesController < Admin::BaseController
     metadata_yaml = params[:metadata_final].presence || params[:metadata]
 
     begin
+      # Validate it's valid YAML
       metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
 
       unless metadata.is_a?(Hash)
@@ -78,7 +76,8 @@ class Admin::PagesController < Admin::BaseController
       return
     end
 
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
+    # Use the original YAML string (preserves formatting from JavaScript)
+    yaml_content = metadata_yaml.strip
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@page.file_path, full_content)
 

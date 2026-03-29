@@ -1,16 +1,10 @@
 <div class="media-player audio-player">
   <audio controls preload="metadata">
-    <source src="<%= post.audio_file %>" type="audio/mpeg">
-    <source src="<%= post.audio_file %>" type="audio/mp4">
-    <source src="<%= post.audio_file %>" type="audio/ogg">
+    <source src="<%= post.audio %>" type="audio/mpeg">
+    <source src="<%= post.audio %>" type="audio/mp4">
+    <source src="<%= post.audio %>" type="audio/ogg">
     Your browser doesn't support audio playback.
   </audio>
-
-  <% if post.duration.present? %>
-    <div class="media-meta">
-      <span class="duration"><%= post.duration %></span>
-    </div>
-  <% end %>
 </div>
 
 <div class="post-content">

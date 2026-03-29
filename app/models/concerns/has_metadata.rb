@@ -59,6 +59,50 @@ module HasMetadata
     }
   end
 
+  class_methods do
+    def format_metadata_yaml(metadata)
+      yaml_lines = []
+
+      metadata.each do |key, value|
+        formatted_value = case value
+        when Numeric
+          value.to_s
+        when TrueClass, FalseClass
+          value.to_s
+        when NilClass
+          '""'
+        when String
+          if value.empty?
+            '""'
+          elsif value.match?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)
+            "\"#{value}\""
+          else
+            "\"#{value.gsub('"', '\"')}\""
+          end
+        else
+          "\"#{value}\""
+        end
+
+        yaml_lines << "#{key}: #{formatted_value}"
+      end
+
+      yaml_lines.join("\n")
+    end
+  end
+
+  def raw_frontmatter
+    return '' unless File.exist?(file_path)
+
+    content = File.read(file_path)
+
+    # Extract everything between the --- delimiters
+    if content =~ /\A---\s*\n(.*?)\n---\s*\n/m
+      $1
+    else
+      ''
+    end
+  end
+
   def url_name
     metadata["url_name"] || calculate_url_name
   end

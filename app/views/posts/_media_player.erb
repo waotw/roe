@@ -1,9 +1,9 @@
-<% if post.post_type == 'audio' && post.audio_file.present? %>
+<% if post.post_type == 'audio' && post.audio.present? %>
   <div class="media-player audio-player">
     <audio controls preload="metadata">
-      <source src="<%= post.audio_file %>" type="audio/mpeg">
-      <source src="<%= post.audio_file %>" type="audio/mp4">
-      <source src="<%= post.audio_file %>" type="audio/ogg">
+      <source src="<%= post.audio %>" type="audio/mpeg">
+      <source src="<%= post.audio %>" type="audio/mp4">
+      <source src="<%= post.audio %>" type="audio/ogg">
       Your browser doesn't support audio playback.
     </audio>
     <% if post.duration.present? %>
@@ -13,12 +13,12 @@
       </div>
     <% end %>
   </div>
-<% elsif post.post_type == 'video' && post.video_file.present? %>
+<% elsif post.post_type == 'video' && post.video.present? %>
   <div class="media-player video-player">
     <video controls preload="metadata">
-      <source src="<%= post.video_file %>" type="video/mp4">
-      <source src="<%= post.video_file %>" type="video/webm">
-      <source src="<%= post.video_file %>" type="video/ogg">
+      <source src="<%= post.video %>" type="video/mp4">
+      <source src="<%= post.video %>" type="video/webm">
+      <source src="<%= post.video %>" type="video/ogg">
       Your browser doesn't support video playback.
     </div>
   </div>

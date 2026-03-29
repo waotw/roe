@@ -89,20 +89,17 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    # Load template and populate title from filename
     template_content = load_post_template
     title = filename_to_title(filename)
 
-    # Parse template and update title
     parsed = FrontMatterParser::Parser.new(:md).call(template_content)
     metadata = parsed.front_matter.merge("title" => title)
 
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
-      content = "---\n#{yaml_content}\n---\n#{parsed.content}"
+    # Format YAML consistently for new posts
+    yaml_content = Post.format_metadata_yaml(metadata)
+    content = "---\n#{yaml_content}\n---\n#{parsed.content}"
 
     normalize_and_write(file_path, content)
-
-    # Manually sync the file immediately (don't wait for file watcher)
     ContentSync.sync_file(file_path)
 
     post = Post.find_by(file_path: file_path.to_s)
@@ -133,6 +130,7 @@ class Admin::PostsController < Admin::BaseController
     metadata_yaml = params[:metadata_final].presence || params[:metadata]
 
     begin
+      # Validate it's valid YAML
       metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
 
       unless metadata.is_a?(Hash)
@@ -147,7 +145,8 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
+    # Use the original YAML string (preserves formatting from JavaScript)
+    yaml_content = metadata_yaml.strip
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@post.file_path, full_content)
 
@@ -301,14 +300,23 @@ class Admin::PostsController < Admin::BaseController
 
   def update_post_status(post, new_status)
     content = File.read(post.file_path)
-    parsed = FrontMatterParser::Parser.new(:md).call(content)
 
-    metadata = parsed.front_matter.merge("status" => new_status)
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip  # Add this line
-    new_content = "---\n#{yaml_content}\n---\n#{parsed.content}"  # Use yaml_content
+    # Extract frontmatter and body
+    if content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)/m
+      yaml_content = $1
+      body_content = $2
 
-    normalize_and_write(@post.file_path, new_content)
-    ContentSync.sync_file(post.file_path)
+      # Parse to update status
+      metadata = YAML.safe_load(yaml_content, permitted_classes: [Date, Time, Symbol])
+      metadata['status'] = new_status
+
+      # Re-format with consistent style
+      new_yaml = Post.format_metadata_yaml(metadata)
+      new_content = "---\n#{new_yaml}\n---\n#{body_content}"
+
+      normalize_and_write(post.file_path, new_content)
+      ContentSync.sync_file(post.file_path)
+    end
   end
 
   def normalize_and_write(file_path, content)

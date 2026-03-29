@@ -1,30 +1,46 @@
 <%
   # Parse existing metadata YAML into hash
   begin
-    metadata_hash = YAML.safe_load(metadata, permitted_classes: [Date, Time, Symbol]) || {}
-  rescue
+    parsed_metadata = YAML.safe_load(metadata, permitted_classes: [Date, Time, Symbol])
+
+    # Ensure it's a hash, not a string or other type
+    metadata_hash = if parsed_metadata.is_a?(Hash)
+      parsed_metadata
+    else
+      Rails.logger.warn "Metadata is not a hash: #{parsed_metadata.inspect}"
+      {}
+    end
+  rescue => e
+    Rails.logger.error "Failed to parse metadata: #{e.message}"
     metadata_hash = {}
   end
 
   # Define known fields for posts
   known_fields_config = if resource_type == 'post'
     {
+      # Core fields
       'title' => { type: :text, label: 'title', required: true },
-      'date' => { type: :date, label: 'date', required: true },
-      'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'subtitle' => { type: :text, label: 'subtitle' },
-      'post_type' => { type: :select, label: 'post_type', options: ['article', 'music', 'podcast', 'image'] },
+      'date' => { type: :datetime, label: 'date', required: true },
+      'post_type' => { type: :select, label: 'post_type', options: Post.post_type_options },
+      'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'author' => { type: :text, label: 'author', default_from_config: true },
       'tags' => { type: :text, label: 'tags', hint: 'comma-separated' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
-      'image' => { type: :text, label: 'image' },
-      'excerpt' => { type: :textarea, label: 'excerpt' }
+      'image' => { type: :text, label: 'image', hint: 'Featured/cover image' },
+      'excerpt' => { type: :textarea, label: 'excerpt' },
+
+      # Media fields
+      'audio' => { type: :text, label: 'audio', hint: 'Path to audio file' },
+      'video' => { type: :text, label: 'video', hint: 'Path to video file' },
+      'duration' => { type: :text, label: 'duration', hint: 'e.g., "12:34"' },
+      'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' }
     }
   else # pages
     {
       'title' => { type: :text, label: 'title', required: true },
-      'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'subtitle' => { type: :text, label: 'subtitle' },
+      'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'image' => { type: :text, label: 'image' },
       'excerpt' => { type: :textarea, label: 'excerpt' }
@@ -93,29 +109,43 @@
             <% end %>
 
             <% if is_custom %>
-              <!-- Custom field value (always text) -->
               <input type="text"
                     id="metadata-field-<%= field_name.parameterize %>"
                     name="metadata_fields[<%= field_name %>]"
-                    value="<%= value %>"
+                    value="<%= ERB::Util.html_escape(value.to_s) %>"
                     class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                     data-metadata-field="<%= field_name %>">
             <% else %>
               <% case config[:type] %>
-              <% when :text %>
-                <input type="text"
-                      id="metadata-field-<%= field_name %>"
-                      name="metadata_fields[<%= field_name %>]"
-                      value="<%= value %>"
-                      class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                      data-metadata-field="<%= field_name %>"
-                      <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                <% when :text %>
+                  <input type="text"
+                        id="metadata-field-<%= field_name %>"
+                        name="metadata_fields[<%= field_name %>]"
+                        value="<%= ERB::Util.html_escape(value.to_s) %>"
+                        class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                        data-metadata-field="<%= field_name %>"
+                        <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
 
               <% when :date %>
                 <input type="date"
                       id="metadata-field-<%= field_name %>"
                       name="metadata_fields[<%= field_name %>]"
                       value="<%= value&.to_s %>"
+                      class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                      data-metadata-field="<%= field_name %>">
+
+              <% when :datetime %>
+                <%
+                  # Convert ISO 8601 to datetime-local format (YYYY-MM-DDTHH:MM)
+                  datetime_value = value.to_s
+                  if datetime_value.include?('T')
+                    datetime_value = datetime_value[0..15]  # "2025-04-12T17:21:00.000Z" -> "2025-04-12T17:21"
+                  end
+                %>
+                <input type="datetime-local"
+                      id="metadata-field-<%= field_name %>"
+                      name="metadata_fields[<%= field_name %>]"
+                      value="<%= datetime_value %>"
                       class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                       data-metadata-field="<%= field_name %>">
 
@@ -130,12 +160,12 @@
                   <% end %>
                 </select>
 
-              <% when :textarea %>
-                <textarea id="metadata-field-<%= field_name %>"
-                          name="metadata_fields[<%= field_name %>]"
-                          rows="2"
-                          class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                          data-metadata-field="<%= field_name %>"><%= value %></textarea>
+                <% when :textarea %>
+                  <textarea id="metadata-field-<%= field_name %>"
+                            name="metadata_fields[<%= field_name %>]"
+                            rows="2"
+                            class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                            data-metadata-field="<%= field_name %>"><%= ERB::Util.html_escape(value.to_s) %></textarea>
               <% end %>
             <% end %>
 
@@ -163,7 +193,7 @@
         </button>
 
         <div id="add-field-menu"
-            class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-10 min-w-50">
+            class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 min-w-50">
           <% available_known_fields.each do |field_name| %>
             <button type="button"
                     onclick="addKnownField('<%= field_name %>')"
@@ -201,9 +231,14 @@
 
 <script>
 (function() {
-  // Store field configs for dynamic add
   const knownFieldsConfig = <%= raw known_fields_config.to_json %>;
   const defaultAuthor = <%= default_author.to_json.html_safe %>;
+
+  // Use RAW frontmatter from file, not parsed metadata
+  const rawFrontmatter = <%= raw (item&.raw_frontmatter || '').inspect %>;
+  const originalMetadata = <%= raw metadata_hash.to_json %>;
+  const removedFields = new Set();
+
   let isYamlView = false;
 
   // Restore metadata section state from sessionStorage
@@ -250,19 +285,25 @@ function addKnownField(fieldName) {
 
   switch(config.type) {
     case 'text':
+      const escapedValue = defaultValue.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       inputHtml = `<input type="text"
                           id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
-                          value="${defaultValue}"
+                          value="${escapedValue}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="${fieldName}"
                           ${config.hint ? `placeholder="${config.hint}"` : ''}>`;
       break;
-    case 'date':
-      inputHtml = `<input type="date"
+    case 'datetime':
+      // Convert ISO 8601 to datetime-local format (YYYY-MM-DDTHH:MM)
+      let datetimeValue = defaultValue;
+      if (defaultValue && defaultValue.includes('T')) {
+        datetimeValue = defaultValue.slice(0, 16); // "2025-04-12T17:21:00.000Z" -> "2025-04-12T17:21"
+      }
+      inputHtml = `<input type="datetime-local"
                           id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
-                          value="${defaultValue}"
+                          value="${datetimeValue}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="${fieldName}">`;
       break;
@@ -296,15 +337,21 @@ function addKnownField(fieldName) {
         ×
       </button>`;
 
-  row.innerHTML = `
-    <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
-      ${config.label}:
-    </label>
-    ${inputHtml}
-    ${deleteButton}
-  `;
+      row.innerHTML = `
+          <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+            ${config.label}:
+          </label>
+          ${inputHtml}
+          ${deleteButton}
+        `;
 
-  container.appendChild(row);
+        // INSERT IN CORRECT POSITION (instead of appendChild)
+        const insertBefore = findInsertionPoint(fieldName);
+        if (insertBefore) {
+          container.insertBefore(row, insertBefore);
+        } else {
+          container.appendChild(row);
+        }
 
   // Hide this field from the menu
   document.querySelector(`[data-available-field="${fieldName}"]`)?.remove();
@@ -317,6 +364,26 @@ function addKnownField(fieldName) {
   }
 
   toggleAddFieldMenu();
+}
+
+function findInsertionPoint(fieldName) {
+  const container = document.getElementById('metadata-fields-container');
+  const fieldOrder = Object.keys(knownFieldsConfig);
+  const targetIndex = fieldOrder.indexOf(fieldName);
+
+  if (targetIndex === -1) return null; // Not a known field
+
+  // Find the first existing field that should come AFTER this one
+  for (let i = targetIndex + 1; i < fieldOrder.length; i++) {
+    const laterFieldName = fieldOrder[i];
+    const laterRow = container.querySelector(`[data-field-name="${laterFieldName}"]`);
+
+    if (laterRow && laterRow.style.display !== 'none') {
+      return laterRow; // Insert before this row
+    }
+  }
+
+  return null; // No later field found, append to end
 }
 
 function addCustomField() {
@@ -353,32 +420,17 @@ function removeMetadataField(button) {
 
   // Double-check we're not removing a required field
   if (fieldName && knownFieldsConfig[fieldName]?.required) {
-    return; // Shouldn't happen, but safety check
+    return;
+  }
+
+  // Track that this field was explicitly removed
+  if (fieldName) {
+    removedFields.add(fieldName);
   }
 
   // If it's a known field, add it back to the menu
   if (fieldName && knownFieldsConfig[fieldName]) {
-    const menu = document.getElementById('add-field-menu');
-    const customButton = menu.querySelector('button[onclick*="addCustomField"]');
-
-    const fieldButton = document.createElement('button');
-    fieldButton.type = 'button';
-    fieldButton.onclick = function() { addKnownField(fieldName); };
-    fieldButton.className = 'block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono';
-    fieldButton.dataset.availableField = fieldName;
-    fieldButton.textContent = fieldName;
-
-    // Insert before the custom field option
-    const divider = menu.querySelector('.border-t');
-    if (divider) {
-      divider.before(fieldButton);
-    } else {
-      // Re-add divider if needed
-      const div = document.createElement('div');
-      div.className = 'border-t border-gray-200';
-      customButton.before(div);
-      div.before(fieldButton);
-    }
+    // ... existing menu logic ...
   }
 
   row.remove();
@@ -395,14 +447,13 @@ function toggleMetadataView() {
   isYamlView = !isYamlView;
 
   if (isYamlView) {
-    const yamlContent = formToYaml();
-    yamlTextarea.value = yamlContent;
+    // Show the RAW frontmatter from the file (with original quotes)
+    yamlTextarea.value = rawFrontmatter;
 
     formView.classList.add('hidden');
     yamlView.classList.remove('hidden');
     toggleBtn.textContent = 'Edit as Form';
 
-    // Open metadata section if closed
     if (metadataContent.classList.contains('hidden')) {
       metadataContent.classList.remove('hidden');
       arrow.textContent = '▼';
@@ -414,13 +465,13 @@ function toggleMetadataView() {
       yamlView.classList.add('hidden');
       toggleBtn.textContent = 'RAW';
 
-      // Open metadata section if closed
       if (metadataContent.classList.contains('hidden')) {
         metadataContent.classList.remove('hidden');
         arrow.textContent = '▼';
       }
     } catch(e) {
-      alert('Invalid YAML syntax. Please fix errors before switching to form view.');
+      console.error('YAML parsing error:', e);  // ADD THIS
+      alert('Invalid YAML syntax: ' + e.message);  // CHANGE THIS to show actual error
       return;
     }
   }
@@ -438,59 +489,142 @@ function toggleMetadataSection() {
   sessionStorage.setItem('metadataEditorOpen', !isHidden);
 }
 
-function formToYaml() {
-  const fields = {};
+// Helper: converts JavaScript values → YAML representation (adds quotes when needed)
+function formatYamlValue(value) {
+  if (value === null || value === undefined) {
+    return '""';
+  }
 
-  // Collect all known fields
+  const strValue = String(value);
+
+  // Empty string
+  if (strValue === '') {
+    return '""';
+  }
+
+  // Numbers stay unquoted
+  if (!isNaN(strValue) && strValue.trim() !== '') {
+    return strValue;
+  }
+
+  // Booleans stay unquoted
+  if (strValue === 'true' || strValue === 'false') {
+    return strValue;
+  }
+
+  // Datetime - always double-quoted
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(strValue)) {
+    // Simplify to minute precision (blog posts don't need second precision)
+    const minutePrecision = strValue.slice(0, 16); // "2026-01-29T15:38"
+    return `"${minutePrecision}Z"`;
+  }
+
+  // All other strings - always use double quotes for consistency
+  return `"${strValue.replace(/"/g, '\\"')}"`;
+}
+
+function formToYaml() {
+  const fields = { ...originalMetadata };
+
+  // Update with form values - ONLY VISIBLE FIELDS
   document.querySelectorAll('[data-metadata-field]').forEach(input => {
+    const row = input.closest('.metadata-field-row');
+
+    // Skip hidden fields
+    if (row && row.style.display === 'none') {
+      return;
+    }
+
     const fieldName = input.dataset.metadataField;
     let value = input.value.trim();
-
-    if (value !== '') {
-      fields[fieldName] = value;
-    }
+    fields[fieldName] = value;
   });
 
-  // Collect custom fields
+  // Remove fields that were explicitly deleted by user
+  removedFields.forEach(field => {
+    delete fields[field];
+  });
+
+  // Update with custom fields (only visible)
   document.querySelectorAll('[data-custom-key]').forEach(keyInput => {
+    const row = keyInput.closest('.metadata-field-row');
+
+    // Skip hidden fields
+    if (row && row.style.display === 'none') {
+      return;
+    }
+
     const valueInput = keyInput.nextElementSibling;
     const key = keyInput.value.trim();
     const value = valueInput.value.trim();
 
-    if (key !== '' && value !== '') {
+    if (key !== '') {
       fields[key] = value;
     }
   });
 
-  // Convert to YAML string
-  let yaml = '';
+  // Separate known fields from custom fields
+  const knownFields = {};
+  const customFields = {};
+
   for (const [key, value] of Object.entries(fields)) {
-    yaml += `${key}: ${value}\n`;
+    if (knownFieldsConfig[key]) {
+      knownFields[key] = value;
+    } else {
+      customFields[key] = value;
+    }
   }
+
+  // Build YAML: known fields first, then custom fields
+  let yaml = '';
+
+  // Output known fields in config order
+  Object.keys(knownFieldsConfig).forEach(key => {
+    if (knownFields.hasOwnProperty(key)) {
+      yaml += `${key}: ${formatYamlValue(knownFields[key])}\n`;
+    }
+  });
+
+  // Then output custom fields (sorted alphabetically)
+  Object.keys(customFields).sort().forEach(key => {
+    yaml += `${key}: ${formatYamlValue(customFields[key])}\n`;
+  });
 
   return yaml;
 }
 
 function yamlToForm(yamlText) {
-  // Simple YAML parser
   const lines = yamlText.split('\n');
   const fields = {};
 
   lines.forEach(line => {
-    const match = line.match(/^([^:]+):\s*(.*)$/);
-    if (match) {
-      fields[match[1].trim()] = match[2].trim();
+    // Skip empty lines
+    if (!line.trim()) return;
+
+    // Match key and value, accounting for quoted values with colons
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) return;
+
+    let key = line.substring(0, colonIndex).trim();
+    let value = line.substring(colonIndex + 1).trim();
+
+    // Strip quotes from values (both single and double)
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
     }
+
+    // Unescape escaped quotes
+    value = value.replace(/\\"/g, '"').replace(/\\'/g, "'");
+
+    fields[key] = value;
   });
 
   // Clear and rebuild form
   const container = document.getElementById('metadata-fields-container');
   container.innerHTML = '';
 
-  // Reset available fields menu
-  const menu = document.getElementById('add-field-menu');
-  // Rebuild menu with all known fields not in the YAML
-
+  // Rebuild the form fields
   for (const [key, value] of Object.entries(fields)) {
     if (knownFieldsConfig[key]) {
       addKnownFieldToForm(key, value);
@@ -513,18 +647,24 @@ function addKnownFieldToForm(fieldName, value) {
 
   switch(config.type) {
     case 'text':
+      const escapedValue = value.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       inputHtml = `<input type="text"
                           id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
-                          value="${value}"
+                          value="${escapedValue}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                          data-metadata-field="${fieldName}">`;
+                          data-metadata-field="${fieldName}"
+                          ${config.hint ? `placeholder="${config.hint}"` : ''}>`;
       break;
-    case 'date':
-      inputHtml = `<input type="date"
+    case 'datetime':
+      let datetimeValue = value;
+      if (value && value.includes('T')) {
+        datetimeValue = value.slice(0, 16);
+      }
+      inputHtml = `<input type="datetime-local"
                           id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
-                          value="${value}"
+                          value="${datetimeValue}"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="${fieldName}">`;
       break;
@@ -646,11 +786,90 @@ function attachChangeListeners() {
 // Call on load
 attachChangeListeners();
 
+// Pass POST_TYPES data from Ruby to JavaScript
+const postTypesConfig = <%= raw Post::POST_TYPES.to_json %>;
+
+// Define core fields that appear for all types
+const coreFieldNames = [
+  'title', 'subtitle', 'date', 'post_type', 'status',
+  'author', 'tags', 'url_name', 'image', 'excerpt',
+  'audio', 'video', 'duration', 'captions'
+];
+
+// Get field names for a specific post type
+function getFieldsForType(postType) {
+  if (!postType || !postTypesConfig[postType]) {
+    return [];
+  }
+
+  const typeConfig = postTypesConfig[postType];
+  return (typeConfig.metadata_fields || []).map(field => field.name);
+}
+
+// Handle post type changes
+function handlePostTypeChange(newType) {
+  const typeSpecificFields = getFieldsForType(newType);
+  const visibleFields = [...coreFieldNames, ...typeSpecificFields];
+
+  // Hide/show existing fields based on new type
+  document.querySelectorAll('.metadata-field-row').forEach(row => {
+    const fieldName = row.dataset.fieldName;
+
+    if (!fieldName) return; // Skip custom fields without fieldName
+
+    if (visibleFields.includes(fieldName) || !knownFieldsConfig[fieldName]) {
+      // Show: it's a core field, type-specific field, or custom field
+      row.style.display = '';
+    } else {
+      // Hide: it's a known field but not for this type
+      row.style.display = 'none';
+    }
+  });
+
+  // Add missing fields for this type
+  typeSpecificFields.forEach(fieldName => {
+    const existingRow = document.querySelector(`[data-field-name="${fieldName}"]`);
+
+    if (!existingRow && knownFieldsConfig[fieldName]) {
+      // Field doesn't exist at all - add it
+      addKnownField(fieldName);
+    } else if (existingRow && existingRow.style.display === 'none') {
+      // Field exists but is hidden - show it
+      existingRow.style.display = '';
+    }
+  });
+}
+
+// Listen for post_type changes
+function setupPostTypeListener() {
+  const postTypeField = document.querySelector('[data-metadata-field="post_type"]');
+
+  if (postTypeField) {
+    postTypeField.addEventListener('change', function(e) {
+      handlePostTypeChange(e.target.value);
+    });
+
+    // Run once on load to set initial visibility
+    if (postTypeField.value) {
+      handlePostTypeChange(postTypeField.value);
+    }
+  }
+}
+
+// Call after page loads
+setupPostTypeListener();
+
 // Wrap existing functions to notify on changes
 const _addKnownField = addKnownField;
 addKnownField = function(fieldName) {
   _addKnownField(fieldName);
   attachChangeListeners();
+
+  // If we just added the post_type field, set up its listener
+  if (fieldName === 'post_type') {
+    setupPostTypeListener();
+  }
+
   notifyMetadataChange();
 };
 
@@ -671,6 +890,7 @@ const _toggleMetadataView = toggleMetadataView;
 toggleMetadataView = function() {
   _toggleMetadataView();
   attachChangeListeners();
+  setupPostTypeListener();
   notifyMetadataChange();
 };
 

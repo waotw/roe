@@ -7,7 +7,7 @@ class Post < ApplicationRecord
   POST_TYPES = {
     article: {
       label: "Article",
-      description: "Essay, blog post, newsletter…",
+      description: "Standard blog post",
       icon: "📝",
       metadata_fields: []
     },
@@ -16,8 +16,8 @@ class Post < ApplicationRecord
       description: "Article with featured audio player",
       icon: "🔊",
       metadata_fields: [
-        { name: 'audio_file', type: :text, required: true, label: 'Audio File',
-          hint: 'Path to audio file (e.g., /media/my-song.mp3)' },
+        { name: 'audio', type: :text, required: true, label: 'Audio File',   # Changed
+          hint: 'Path to audio file (e.g., /media/audio/my-song.mp3)' },
         { name: 'duration', type: :text, label: 'Duration',
           hint: 'Optional, e.g., "12:34"' }
       ]
@@ -27,28 +27,32 @@ class Post < ApplicationRecord
       description: "Article with featured video player",
       icon: "🎬",
       metadata_fields: [
-        { name: 'video_file', type: :text, required: true, label: 'Video File',
-          hint: 'Path to video file (e.g., /media/my-video.mp4)' },
+        { name: 'video', type: :text, required: true, label: 'Video File',   # Changed
+          hint: 'Path to video file (e.g., /media/video/my-video.mp4)' },
         { name: 'duration', type: :text, label: 'Duration',
           hint: 'Optional, e.g., "12:34"' }
       ]
     }
   }.freeze
 
-  def audio_file
-    metadata['audio_file']
+  def audio
+    metadata['audio']
   end
 
-  def video_file
-    metadata['video_file']
+  def video
+    metadata['video']
   end
 
   def duration
     metadata['duration']
   end
 
+  def captions
+    metadata['captions']
+  end
+
   def has_media?
-    post_type.in?(['audio', 'video']) && (audio_file.present? || video_file.present?)
+    post_type.in?(['audio', 'video']) && (audio.present? || video.present?)
   end
 
   # Additional post-specific scopes
@@ -74,6 +78,19 @@ class Post < ApplicationRecord
       .compact
       .reject(&:blank?)
       .sort
+  end
+
+  def self.post_type_options
+    Rails.cache.fetch('post_type_options', expires_in: 1.hour) do
+      # Official types from POST_TYPES constant
+      official_types = POST_TYPES.keys.map(&:to_s)
+
+      # Types actually used in posts (for legacy/custom types)
+      discovered_types = all_post_types
+
+      # Merge, dedupe, and sort
+      (official_types + discovered_types).uniq.sort
+    end
   end
 
   # Class method to get all unique tags efficiently
@@ -148,6 +165,9 @@ class Post < ApplicationRecord
 
     begin
       post.save!
+
+      # Invalidate post_type cache if metadata changed
+      Rails.cache.delete('post_type_options') if post.saved_changes.key?('metadata')
     rescue => e
       Rails.logger.error "Failed to save #{file_path}: #{e.message}"
       puts "\n  ✗ Error saving: #{File.basename(file_path)} - #{e.message}\n"
