@@ -31,8 +31,7 @@ namespace :content do
   task :push_site do
     machine = machine_id
     puts "📤 Pushing site to #{app_name} (#{machine})..."
-    # Add --size-only to skip files with matching size
-    system("rsync -rltzPi --size-only -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
+    system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
     puts "✅ Push complete!"
   end
 
@@ -89,8 +88,7 @@ namespace :content do
       end
 
       puts "\n  → Syncing #{folder}/"
-      # Add --size-only here too
-      system("rsync -rltzPi --size-only --delete -e ./bin/fly-rsync #{local_path} #{remote_path}")
+      system("rsync -rltzPi --delete -e ./bin/fly-rsync #{local_path} #{remote_path}")
     end
 
     puts "\n✅ Push complete!"
