@@ -23,8 +23,11 @@ class System::ThemesController < ApplicationController
         # Use file modification time for caching
         last_modified = File.mtime(file_path)
 
+        # DEBUG: Add this header to see which file is being served
+        response.headers['X-Theme-Path'] = file_path.to_s
+        response.headers['X-Theme-Modified'] = last_modified.to_s
+
         # Force browser to revalidate (but still use cache if file unchanged)
-        response.headers['X-Served-By'] = 'ThemesController'
         response.headers['Cache-Control'] = 'no-cache, must-revalidate'
         response.headers['Last-Modified'] = last_modified.httpdate
         response.headers['ETag'] = last_modified.to_i.to_s
