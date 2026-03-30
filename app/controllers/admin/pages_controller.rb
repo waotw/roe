@@ -14,9 +14,10 @@ class Admin::PagesController < Admin::BaseController
     file_path = Rails.root.join("site/pages/#{filename}.md")
 
     if File.exist?(file_path)
-      flash[:error] = "A page with that filename already exists"
+      flash.now[:error] = "A page with that filename already exists"
       @template = params[:content]
-      render :new
+      @filename = filename
+      render :new, status: :unprocessable_entity
       return
     end
 

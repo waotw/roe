@@ -1,4 +1,4 @@
-import { Controller } from "@hotwired/stimulus"
+import { Controller } from "@hotwired/stimulus";
 
 // Connects to data-controller="metadata-editor"
 export default class extends Controller {
@@ -8,170 +8,190 @@ export default class extends Controller {
     rawFrontmatter: String,
     originalMetadata: Object,
     postTypes: Object,
-    resourceType: String
-  }
+    resourceType: String,
+  };
 
   static targets = [
-    "content", "arrow", "formView", "yamlView", "yamlTextarea",
-    "toggleBtn", "fieldsContainer", "addFieldMenu", "finalInput"
-  ]
+    "content",
+    "arrow",
+    "formView",
+    "yamlView",
+    "yamlTextarea",
+    "toggleBtn",
+    "fieldsContainer",
+    "addFieldMenu",
+    "finalInput",
+  ];
 
-  // Core fields that appear for all post types
   coreFieldNames = [
-    'title', 'subtitle', 'date', 'post_type', 'status',
-    'author', 'tags', 'url_name', 'image', 'excerpt'
-  ]
+    "title",
+    "subtitle",
+    "date",
+    "post_type",
+    "status",
+    "author",
+    "tags",
+    "url_name",
+    "image",
+    "excerpt",
+  ];
 
   connect() {
-    this.removedFields = new Set()
-    this.isYamlView = false
-    this.notifyMetadataChange = this._notifyMetadataChange.bind(this)
+    // Add initialization flag
+    this.isInitializing = true;
 
-    // Restore metadata section state from sessionStorage
-    this.restoreSectionState()
+    this.removedFields = new Set();
+    this.isYamlView = false;
+    this.notifyMetadataChange = this._notifyMetadataChange.bind(this);
 
-    // Set up form submission handler
-    this.setupFormHandler()
+    this.restoreSectionState();
+    this.setupFormHandler();
 
-    // Set up click-outside-to-close for add field menu
-    this.clickOutsideHandler = this.handleClickOutside.bind(this)
-    document.addEventListener('click', this.clickOutsideHandler)
+    document.addEventListener(
+      "click",
+      (this.clickOutsideHandler = this.handleClickOutside.bind(this)),
+    );
 
-    // Set up change listeners on existing fields
-    this.attachChangeListeners()
+    this.attachChangeListeners();
+    this.setupPostTypeListener();
 
-    // Set up post type listener
-    this.setupPostTypeListener()
-
-    // Set up event delegation for dynamically created remove buttons
-    this.fieldsContainerTarget.addEventListener('click', (e) => {
+    this.fieldsContainerTarget.addEventListener("click", (e) => {
       if (e.target.closest('[data-action*="removeMetadataField"]')) {
-        this.removeMetadataField(e)
+        this.removeMetadataField(e);
       }
-    })
+    });
+
+    // Initialization complete - now start tracking changes
+    // Use setTimeout to ensure all initial DOM updates are complete
+    setTimeout(() => {
+      this.isInitializing = false;
+    }, 100);
   }
 
   disconnect() {
-    document.removeEventListener('click', this.clickOutsideHandler)
+    document.removeEventListener("click", this.clickOutsideHandler);
 
     if (this.formHandler) {
-      this.formHandler.removeEventListener('submit', this.boundSubmitHandler)
+      this.formHandler.removeEventListener("submit", this.boundSubmitHandler);
     }
   }
 
   // ========== STATE MANAGEMENT ==========
 
   restoreSectionState() {
-    const savedState = sessionStorage.getItem('metadataEditorOpen')
+    const savedState = sessionStorage.getItem("metadataEditorOpen");
 
     if (savedState !== null) {
-      const shouldBeOpen = savedState === 'true'
+      const shouldBeOpen = savedState === "true";
       if (shouldBeOpen) {
-        this.contentTarget.classList.remove('hidden')
-        this.arrowTarget.textContent = '▼'
+        this.contentTarget.classList.remove("hidden");
+        this.arrowTarget.textContent = "▼";
       } else {
-        this.contentTarget.classList.add('hidden')
-        this.arrowTarget.textContent = '▶'
+        this.contentTarget.classList.add("hidden");
+        this.arrowTarget.textContent = "▶";
       }
     }
   }
 
   setupFormHandler() {
-    const form = document.getElementById(`${this.resourceTypeValue}-form`)
+    const form = document.getElementById(`${this.resourceTypeValue}-form`);
     if (form) {
-      this.formHandler = form
-      this.boundSubmitHandler = this.handleSubmit.bind(this)
-      form.addEventListener('submit', this.boundSubmitHandler)
+      this.formHandler = form;
+      this.boundSubmitHandler = this.handleSubmit.bind(this);
+      form.addEventListener("submit", this.boundSubmitHandler);
     }
   }
 
   handleSubmit(e) {
     const finalYaml = this.isYamlView
       ? this.yamlTextareaTarget.value
-      : this.formToYaml()
+      : this.formToYaml();
 
-    this.finalInputTarget.value = finalYaml
+    this.finalInputTarget.value = finalYaml;
   }
 
   // ========== TOGGLE ACTIONS ==========
 
   toggleMetadataSection() {
-    this.contentTarget.classList.toggle('hidden')
-    const isHidden = this.contentTarget.classList.contains('hidden')
-    this.arrowTarget.textContent = isHidden ? '▶' : '▼'
+    this.contentTarget.classList.toggle("hidden");
+    const isHidden = this.contentTarget.classList.contains("hidden");
+    this.arrowTarget.textContent = isHidden ? "▶" : "▼";
 
     // Save state to sessionStorage
-    sessionStorage.setItem('metadataEditorOpen', !isHidden)
+    sessionStorage.setItem("metadataEditorOpen", !isHidden);
   }
 
   toggleMetadataView() {
-    this.isYamlView = !this.isYamlView
+    this.isYamlView = !this.isYamlView;
 
     if (this.isYamlView) {
       // Show the RAW frontmatter from the file (with original quotes)
-      this.yamlTextareaTarget.value = this.rawFrontmatterValue
+      this.yamlTextareaTarget.value = this.rawFrontmatterValue;
 
-      this.formViewTarget.classList.add('hidden')
-      this.yamlViewTarget.classList.remove('hidden')
-      this.toggleBtnTarget.textContent = 'Edit as Form'
+      this.formViewTarget.classList.add("hidden");
+      this.yamlViewTarget.classList.remove("hidden");
+      this.toggleBtnTarget.textContent = "Edit as Form";
 
-      if (this.contentTarget.classList.contains('hidden')) {
-        this.contentTarget.classList.remove('hidden')
-        this.arrowTarget.textContent = '▼'
+      if (this.contentTarget.classList.contains("hidden")) {
+        this.contentTarget.classList.remove("hidden");
+        this.arrowTarget.textContent = "▼";
       }
     } else {
       try {
-        this.yamlToForm(this.yamlTextareaTarget.value)
-        this.formViewTarget.classList.remove('hidden')
-        this.yamlViewTarget.classList.add('hidden')
-        this.toggleBtnTarget.textContent = 'RAW'
+        this.yamlToForm(this.yamlTextareaTarget.value);
+        this.formViewTarget.classList.remove("hidden");
+        this.yamlViewTarget.classList.add("hidden");
+        this.toggleBtnTarget.textContent = "RAW";
 
-        if (this.contentTarget.classList.contains('hidden')) {
-          this.contentTarget.classList.remove('hidden')
-          this.arrowTarget.textContent = '▼'
+        if (this.contentTarget.classList.contains("hidden")) {
+          this.contentTarget.classList.remove("hidden");
+          this.arrowTarget.textContent = "▼";
         }
       } catch (e) {
-        console.error('YAML parsing error:', e)
-        alert('Invalid YAML syntax: ' + e.message)
-        return
+        console.error("YAML parsing error:", e);
+        alert("Invalid YAML syntax: " + e.message);
+        return;
       }
     }
 
-    this.attachChangeListeners()
-    this.setupPostTypeListener()
-    this._notifyMetadataChange()
+    this.attachChangeListeners();
+    this.setupPostTypeListener();
+    this._notifyMetadataChange();
   }
 
   toggleAddFieldMenu() {
-    this.addFieldMenuTarget.classList.toggle('hidden')
+    this.addFieldMenuTarget.classList.toggle("hidden");
   }
 
   handleClickOutside(e) {
-    if (this.hasAddFieldMenuTarget &&
-        !this.addFieldMenuTarget.classList.contains('hidden') &&
-        !e.target.closest('[data-action*="toggleAddFieldMenu"]') &&
-        !e.target.closest('[data-metadata-editor-target="addFieldMenu"]')) {
-      this.addFieldMenuTarget.classList.add('hidden')
+    if (
+      this.hasAddFieldMenuTarget &&
+      !this.addFieldMenuTarget.classList.contains("hidden") &&
+      !e.target.closest('[data-action*="toggleAddFieldMenu"]') &&
+      !e.target.closest('[data-metadata-editor-target="addFieldMenu"]')
+    ) {
+      this.addFieldMenuTarget.classList.add("hidden");
     }
   }
 
   // ========== FIELD ACTIONS ==========
 
   addKnownField(event) {
-    const fieldName = event.currentTarget.dataset.fieldName
-    const config = this.knownFieldsValue[fieldName]
-    const container = this.fieldsContainerTarget
+    const fieldName = event.currentTarget.dataset.fieldName;
+    const config = this.knownFieldsValue[fieldName];
+    const container = this.fieldsContainerTarget;
 
-    const row = document.createElement('div')
-    row.className = 'metadata-field-row flex items-start gap-2'
-    row.dataset.fieldName = fieldName
+    const row = document.createElement("div");
+    row.className = "metadata-field-row flex items-start gap-2";
+    row.dataset.fieldName = fieldName;
 
     // Use default author if adding author field
-    const defaultValue = (fieldName === 'author' && config.default_from_config)
-      ? this.defaultAuthorValue
-      : ''
+    const defaultValue =
+      fieldName === "author" && config.default_from_config
+        ? this.defaultAuthorValue
+        : "";
 
-    const inputHtml = this.buildInputHtml(fieldName, config, defaultValue)
+    const inputHtml = this.buildInputHtml(fieldName, config, defaultValue);
 
     // Conditionally add delete button (not for required fields)
     const deleteButton = config.required
@@ -180,7 +200,7 @@ export default class extends Controller {
                  data-action="click->metadata-editor#removeMetadataField"
                  class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
           ×
-        </button>`
+        </button>`;
 
     row.innerHTML = `
       <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
@@ -188,46 +208,50 @@ export default class extends Controller {
       </label>
       ${inputHtml}
       ${deleteButton}
-    `
+    `;
 
     // Insert in correct position
-    const insertBefore = this.findInsertionPoint(fieldName)
+    const insertBefore = this.findInsertionPoint(fieldName);
     if (insertBefore) {
-      container.insertBefore(row, insertBefore)
+      container.insertBefore(row, insertBefore);
     } else {
-      container.appendChild(row)
+      container.appendChild(row);
     }
 
     // Hide this field from the menu
-    this.addFieldMenuTarget.querySelector(`[data-available-field="${fieldName}"]`)?.remove()
+    this.addFieldMenuTarget
+      .querySelector(`[data-available-field="${fieldName}"]`)
+      ?.remove();
 
     // Check if menu is now empty (except custom field option)
-    const remainingFields = this.addFieldMenuTarget.querySelectorAll('[data-available-field]')
+    const remainingFields = this.addFieldMenuTarget.querySelectorAll(
+      "[data-available-field]",
+    );
     if (remainingFields.length === 0) {
-      this.addFieldMenuTarget.querySelector('.border-t')?.remove()
+      this.addFieldMenuTarget.querySelector(".border-t")?.remove();
     }
 
-    this.toggleAddFieldMenu()
-    this.attachChangeListeners()
+    this.toggleAddFieldMenu();
+    this.attachChangeListeners();
 
-    if (fieldName === 'post_type') {
-      this.setupPostTypeListener()
+    if (fieldName === "post_type") {
+      this.setupPostTypeListener();
     }
 
-    this._notifyMetadataChange()
+    this._notifyMetadataChange();
 
     // Focus the input
-    const input = row.querySelector('[data-metadata-field]')
+    const input = row.querySelector("[data-metadata-field]");
     if (input) {
-      input.focus()
+      input.focus();
     }
   }
 
   addCustomField() {
-    const container = this.fieldsContainerTarget
+    const container = this.fieldsContainerTarget;
 
-    const row = document.createElement('div')
-    row.className = 'metadata-field-row flex items-start gap-2'
+    const row = document.createElement("div");
+    row.className = "metadata-field-row flex items-start gap-2";
 
     row.innerHTML = `
       <input type="text"
@@ -245,94 +269,103 @@ export default class extends Controller {
               class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
         ×
       </button>
-    `
+    `;
 
-    container.appendChild(row)
-    this.toggleAddFieldMenu()
-    this.attachChangeListeners()
-    this._notifyMetadataChange()
+    container.appendChild(row);
+    this.toggleAddFieldMenu();
+    this.attachChangeListeners();
+    this._notifyMetadataChange();
 
     // Focus the key input
-    const keyInput = row.querySelector('[data-custom-key]')
+    const keyInput = row.querySelector("[data-custom-key]");
     if (keyInput) {
-      keyInput.focus()
+      keyInput.focus();
     }
   }
 
   removeMetadataField(event) {
     // When called via event delegation, find the actual button
-    const button = event.currentTarget.closest('[data-action*="removeMetadataField"]') || event.currentTarget
-    const row = button.closest('.metadata-field-row')
+    const button =
+      event.currentTarget.closest('[data-action*="removeMetadataField"]') ||
+      event.currentTarget;
+    const row = button.closest(".metadata-field-row");
 
-    if (!row) return
+    if (!row) return;
 
-    const fieldName = row.dataset.fieldName
+    const fieldName = row.dataset.fieldName;
 
     // Double-check we're not removing a required field
     if (fieldName && this.knownFieldsValue[fieldName]?.required) {
-      return
+      return;
     }
 
     // Track that this field was explicitly removed
     if (fieldName) {
-      this.removedFields.add(fieldName)
+      this.removedFields.add(fieldName);
 
       // Add field back to the Add Field menu if it's a known field
       if (this.knownFieldsValue[fieldName]) {
-        this.restoreFieldToMenu(fieldName)
+        this.restoreFieldToMenu(fieldName);
       }
     }
 
-    row.remove()
-    this._notifyMetadataChange()
+    row.remove();
+    this._notifyMetadataChange();
   }
 
   restoreFieldToMenu(fieldName) {
     // Don't add if already in menu
-    if (this.addFieldMenuTarget.querySelector(`[data-available-field="${fieldName}"]`)) {
-      return
+    if (
+      this.addFieldMenuTarget.querySelector(
+        `[data-available-field="${fieldName}"]`,
+      )
+    ) {
+      return;
     }
 
     // Create the menu button
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.dataset.action = 'click->metadata-editor#addKnownField'
-    button.dataset.fieldName = fieldName
-    button.className = 'block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono'
-    button.dataset.availableField = fieldName
-    button.textContent = fieldName
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.action = "click->metadata-editor#addKnownField";
+    button.dataset.fieldName = fieldName;
+    button.className =
+      "block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono";
+    button.dataset.availableField = fieldName;
+    button.textContent = fieldName;
 
     // Find correct insertion point based on known fields order
-    const fieldOrder = Object.keys(this.knownFieldsValue)
-    const targetIndex = fieldOrder.indexOf(fieldName)
+    const fieldOrder = Object.keys(this.knownFieldsValue);
+    const targetIndex = fieldOrder.indexOf(fieldName);
 
     // Find the first existing menu item that should come after this one
-    let insertBefore = null
+    let insertBefore = null;
     for (let i = targetIndex + 1; i < fieldOrder.length; i++) {
-      const laterField = fieldOrder[i]
-      const laterButton = this.addFieldMenuTarget.querySelector(`[data-available-field="${laterField}"]`)
+      const laterField = fieldOrder[i];
+      const laterButton = this.addFieldMenuTarget.querySelector(
+        `[data-available-field="${laterField}"]`,
+      );
       if (laterButton) {
-        insertBefore = laterButton
-        break
+        insertBefore = laterButton;
+        break;
       }
     }
 
     if (insertBefore) {
-      this.addFieldMenuTarget.insertBefore(button, insertBefore)
+      this.addFieldMenuTarget.insertBefore(button, insertBefore);
     } else {
       // Insert before the divider (last element before Custom field)
-      const divider = this.addFieldMenuTarget.querySelector('.border-t')
+      const divider = this.addFieldMenuTarget.querySelector(".border-t");
       if (divider) {
-        this.addFieldMenuTarget.insertBefore(button, divider)
+        this.addFieldMenuTarget.insertBefore(button, divider);
       } else {
-        this.addFieldMenuTarget.appendChild(button)
+        this.addFieldMenuTarget.appendChild(button);
       }
     }
 
     // Re-show the divider if it was hidden
-    const divider = this.addFieldMenuTarget.querySelector('.border-t')
+    const divider = this.addFieldMenuTarget.querySelector(".border-t");
     if (divider) {
-      divider.style.display = ''
+      divider.style.display = "";
     }
   }
 
@@ -340,236 +373,247 @@ export default class extends Controller {
 
   buildInputHtml(fieldName, config, value) {
     const escapedValue = String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
     switch (config.type) {
-      case 'text':
+      case "text":
         return `<input type="text"
                        id="metadata-field-${fieldName}"
                        name="metadata_fields[${fieldName}]"
                        value="${escapedValue}"
                        class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                        data-metadata-field="${fieldName}"
-                       ${config.hint ? `placeholder="${config.hint}"` : ''}>`
+                       ${config.hint ? `placeholder="${config.hint}"` : ""}>`;
 
-      case 'datetime':
-        let datetimeValue = value
-        if (value && value.includes('T')) {
-          datetimeValue = value.slice(0, 16)
+      case "datetime":
+        let datetimeValue = value;
+        if (value && value.includes("T")) {
+          datetimeValue = value.slice(0, 16);
         }
         return `<input type="datetime-local"
                        id="metadata-field-${fieldName}"
                        name="metadata_fields[${fieldName}]"
                        value="${datetimeValue}"
                        class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                       data-metadata-field="${fieldName}">`
+                       data-metadata-field="${fieldName}">`;
 
-      case 'select':
-        const options = config.options.map(opt =>
-          `<option value="${opt}" ${opt === value ? 'selected' : ''}>${opt}</option>`
-        ).join('')
+      case "select":
+        const options = config.options
+          .map(
+            (opt) =>
+              `<option value="${opt}" ${opt === value ? "selected" : ""}>${opt}</option>`,
+          )
+          .join("");
         return `<select id="metadata-field-${fieldName}"
                         name="metadata_fields[${fieldName}]"
                         class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                         data-metadata-field="${fieldName}">
                   <option value="">-- select --</option>
                   ${options}
-                </select>`
+                </select>`;
 
-      case 'textarea':
+      case "textarea":
         return `<textarea id="metadata-field-${fieldName}"
                           name="metadata_fields[${fieldName}]"
                           rows="2"
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                          data-metadata-field="${fieldName}">${value}</textarea>`
+                          data-metadata-field="${fieldName}">${value}</textarea>`;
 
       default:
-        return ''
+        return "";
     }
   }
 
   findInsertionPoint(fieldName) {
-    const container = this.fieldsContainerTarget
-    const fieldOrder = Object.keys(this.knownFieldsValue)
-    const targetIndex = fieldOrder.indexOf(fieldName)
+    const container = this.fieldsContainerTarget;
+    const fieldOrder = Object.keys(this.knownFieldsValue);
+    const targetIndex = fieldOrder.indexOf(fieldName);
 
-    if (targetIndex === -1) return null
+    if (targetIndex === -1) return null;
 
     // First, try to find a field that should come AFTER this one (existing behavior)
     for (let i = targetIndex + 1; i < fieldOrder.length; i++) {
-      const laterFieldName = fieldOrder[i]
-      const laterRow = container.querySelector(`.metadata-field-row[data-field-name="${laterFieldName}"]`)
+      const laterFieldName = fieldOrder[i];
+      const laterRow = container.querySelector(
+        `.metadata-field-row[data-field-name="${laterFieldName}"]`,
+      );
 
-      if (laterRow && laterRow.style.display !== 'none') {
-        return laterRow
+      if (laterRow && laterRow.style.display !== "none") {
+        return laterRow;
       }
     }
 
     // If no field found after, try to find a field that should come BEFORE this one
     // and insert after it (by finding the next field after that one)
     for (let i = targetIndex - 1; i >= 0; i--) {
-      const earlierFieldName = fieldOrder[i]
-      const earlierRow = container.querySelector(`.metadata-field-row[data-field-name="${earlierFieldName}"]`)
+      const earlierFieldName = fieldOrder[i];
+      const earlierRow = container.querySelector(
+        `.metadata-field-row[data-field-name="${earlierFieldName}"]`,
+      );
 
-      if (earlierRow && earlierRow.style.display !== 'none') {
+      if (earlierRow && earlierRow.style.display !== "none") {
         // Found a field before this one, insert after it
-        return earlierRow.nextElementSibling
+        return earlierRow.nextElementSibling;
       }
     }
 
-    return null
+    return null;
   }
 
   // ========== YAML CONVERSION ==========
 
   formatYamlValue(value) {
     if (value === null || value === undefined) {
-      return '""'
+      return '""';
     }
 
-    const strValue = String(value)
+    const strValue = String(value);
 
-    if (strValue === '') {
-      return '""'
+    if (strValue === "") {
+      return '""';
     }
 
-    if (!isNaN(strValue) && strValue.trim() !== '') {
-      return strValue
+    if (!isNaN(strValue) && strValue.trim() !== "") {
+      return strValue;
     }
 
-    if (strValue === 'true' || strValue === 'false') {
-      return strValue
+    if (strValue === "true" || strValue === "false") {
+      return strValue;
     }
 
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(strValue)) {
-      const minutePrecision = strValue.slice(0, 16)
-      return `"${minutePrecision}Z"`
+      const minutePrecision = strValue.slice(0, 16);
+      return `"${minutePrecision}Z"`;
     }
 
-    return `"${strValue.replace(/"/g, '\\"')}"`
+    return `"${strValue.replace(/"/g, '\\"')}"`;
   }
 
   formToYaml() {
-    const fields = { ...this.originalMetadataValue }
+    const fields = { ...this.originalMetadataValue };
 
     // Update with form values - ONLY VISIBLE FIELDS
-    this.element.querySelectorAll('[data-metadata-field]').forEach(input => {
-      const row = input.closest('.metadata-field-row')
+    this.element.querySelectorAll("[data-metadata-field]").forEach((input) => {
+      const row = input.closest(".metadata-field-row");
 
-      if (row && row.style.display === 'none') {
-        return
+      if (row && row.style.display === "none") {
+        return;
       }
 
-      const fieldName = input.dataset.metadataField
-      let value = input.value.trim()
-      fields[fieldName] = value
-    })
+      const fieldName = input.dataset.metadataField;
+      let value = input.value.trim();
+      fields[fieldName] = value;
+    });
 
     // Remove fields that were explicitly deleted by user
-    this.removedFields.forEach(field => {
-      delete fields[field]
-    })
+    this.removedFields.forEach((field) => {
+      delete fields[field];
+    });
 
     // Update with custom fields (only visible)
-    this.element.querySelectorAll('[data-custom-key]').forEach(keyInput => {
-      const row = keyInput.closest('.metadata-field-row')
+    this.element.querySelectorAll("[data-custom-key]").forEach((keyInput) => {
+      const row = keyInput.closest(".metadata-field-row");
 
-      if (row && row.style.display === 'none') {
-        return
+      if (row && row.style.display === "none") {
+        return;
       }
 
-      const valueInput = keyInput.nextElementSibling
-      const key = keyInput.value.trim()
-      const value = valueInput.value.trim()
+      const valueInput = keyInput.nextElementSibling;
+      const key = keyInput.value.trim();
+      const value = valueInput.value.trim();
 
-      if (key !== '') {
-        fields[key] = value
+      if (key !== "") {
+        fields[key] = value;
       }
-    })
+    });
 
     // Separate known fields from custom fields
-    const knownFields = {}
-    const customFields = {}
+    const knownFields = {};
+    const customFields = {};
 
     for (const [key, value] of Object.entries(fields)) {
       if (this.knownFieldsValue[key]) {
-        knownFields[key] = value
+        knownFields[key] = value;
       } else {
-        customFields[key] = value
+        customFields[key] = value;
       }
     }
 
-    let yaml = ''
+    let yaml = "";
 
     // Output known fields in config order
-    Object.keys(this.knownFieldsValue).forEach(key => {
+    Object.keys(this.knownFieldsValue).forEach((key) => {
       if (knownFields.hasOwnProperty(key)) {
-        yaml += `${key}: ${this.formatYamlValue(knownFields[key])}\n`
+        yaml += `${key}: ${this.formatYamlValue(knownFields[key])}\n`;
       }
-    })
+    });
 
     // Then output custom fields (sorted alphabetically)
-    Object.keys(customFields).sort().forEach(key => {
-      yaml += `${key}: ${this.formatYamlValue(customFields[key])}\n`
-    })
+    Object.keys(customFields)
+      .sort()
+      .forEach((key) => {
+        yaml += `${key}: ${this.formatYamlValue(customFields[key])}\n`;
+      });
 
-    return yaml
+    return yaml;
   }
 
   yamlToForm(yamlText) {
-    const lines = yamlText.split('\n')
-    const fields = {}
+    const lines = yamlText.split("\n");
+    const fields = {};
 
-    lines.forEach(line => {
-      if (!line.trim()) return
+    lines.forEach((line) => {
+      if (!line.trim()) return;
 
-      const colonIndex = line.indexOf(':')
-      if (colonIndex === -1) return
+      const colonIndex = line.indexOf(":");
+      if (colonIndex === -1) return;
 
-      let key = line.substring(0, colonIndex).trim()
-      let value = line.substring(colonIndex + 1).trim()
+      let key = line.substring(0, colonIndex).trim();
+      let value = line.substring(colonIndex + 1).trim();
 
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1)
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
       }
 
-      value = value.replace(/\\"/g, '"').replace(/\\'/g, "'")
+      value = value.replace(/\\"/g, '"').replace(/\\'/g, "'");
 
-      fields[key] = value
-    })
+      fields[key] = value;
+    });
 
     // Clear and rebuild form
-    const container = this.fieldsContainerTarget
-    container.innerHTML = ''
+    const container = this.fieldsContainerTarget;
+    container.innerHTML = "";
 
     // First add known fields in the correct order (based on knownFieldsValue order)
-    Object.keys(this.knownFieldsValue).forEach(key => {
+    Object.keys(this.knownFieldsValue).forEach((key) => {
       if (fields.hasOwnProperty(key)) {
-        this.addKnownFieldToForm(key, fields[key])
+        this.addKnownFieldToForm(key, fields[key]);
       }
-    })
+    });
 
     // Then add custom fields at the end
-    Object.keys(fields).forEach(key => {
+    Object.keys(fields).forEach((key) => {
       if (!this.knownFieldsValue[key]) {
-        this.addCustomFieldToForm(key, fields[key])
+        this.addCustomFieldToForm(key, fields[key]);
       }
-    })
+    });
   }
 
   addKnownFieldToForm(fieldName, value) {
-    const config = this.knownFieldsValue[fieldName]
-    const container = this.fieldsContainerTarget
+    const config = this.knownFieldsValue[fieldName];
+    const container = this.fieldsContainerTarget;
 
-    const row = document.createElement('div')
-    row.className = 'metadata-field-row flex items-start gap-2'
-    row.dataset.fieldName = fieldName
+    const row = document.createElement("div");
+    row.className = "metadata-field-row flex items-start gap-2";
+    row.dataset.fieldName = fieldName;
 
-    const inputHtml = this.buildInputHtml(fieldName, config, value)
+    const inputHtml = this.buildInputHtml(fieldName, config, value);
 
     const deleteButton = config.required
       ? '<div class="w-6 flex-shrink-0"></div>'
@@ -577,7 +621,7 @@ export default class extends Controller {
                  data-action="click->metadata-editor#removeMetadataField"
                  class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
           ×
-        </button>`
+        </button>`;
 
     row.innerHTML = `
       <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
@@ -585,28 +629,28 @@ export default class extends Controller {
       </label>
       ${inputHtml}
       ${deleteButton}
-    `
+    `;
 
     // Insert in correct position based on known_fields_config order
-    const insertBefore = this.findInsertionPoint(fieldName)
+    const insertBefore = this.findInsertionPoint(fieldName);
     if (insertBefore) {
-      container.insertBefore(row, insertBefore)
+      container.insertBefore(row, insertBefore);
     } else {
-      container.appendChild(row)
+      container.appendChild(row);
     }
 
     // Focus the input
-    const input = row.querySelector('[data-metadata-field]')
+    const input = row.querySelector("[data-metadata-field]");
     if (input) {
-      input.focus()
+      input.focus();
     }
   }
 
   addCustomFieldToForm(key, value) {
-    const container = this.fieldsContainerTarget
+    const container = this.fieldsContainerTarget;
 
-    const row = document.createElement('div')
-    row.className = 'metadata-field-row flex items-start gap-2'
+    const row = document.createElement("div");
+    row.className = "metadata-field-row flex items-start gap-2";
 
     row.innerHTML = `
       <input type="text"
@@ -624,123 +668,147 @@ export default class extends Controller {
               class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
         ×
       </button>
-    `
+    `;
 
-    container.appendChild(row)
+    container.appendChild(row);
 
     // Focus the key input
-    const keyInput = row.querySelector('[data-custom-key]')
+    const keyInput = row.querySelector("[data-custom-key]");
     if (keyInput) {
-      keyInput.focus()
+      keyInput.focus();
     }
   }
 
   // ========== POST TYPE HANDLING ==========
 
   getFieldsForType(postType) {
-    if (!postType || !this.postTypesValue) return []
+    if (!postType || !this.postTypesValue) return [];
 
-    const typeConfig = this.postTypesValue[postType]
-    if (!typeConfig) return []
+    const typeConfig = this.postTypesValue[postType];
+    if (!typeConfig) return [];
 
-    return (typeConfig.metadata_fields || []).map(field => field.name)
+    return (typeConfig.metadata_fields || []).map((field) => field.name);
   }
 
   handlePostTypeChange(event) {
-    const newType = event.target.value
-    this.updateFieldVisibility(newType)
+    const newType = event.target.value;
+    this.updateFieldVisibility(newType);
     // Don't notify on initial load - only when user actually changes something
   }
 
   setupPostTypeListener() {
-    const postTypeField = this.element.querySelector('[data-metadata-field="post_type"]')
+    const postTypeField = this.element.querySelector(
+      '[data-metadata-field="post_type"]',
+    );
 
     if (postTypeField) {
       // Remove old listener if exists
       if (this.postTypeHandler) {
-        postTypeField.removeEventListener('change', this.postTypeHandler)
+        postTypeField.removeEventListener("change", this.postTypeHandler);
       }
 
-      this.postTypeHandler = this.handlePostTypeChange.bind(this)
-      postTypeField.addEventListener('change', this.postTypeHandler)
+      this.postTypeHandler = this.handlePostTypeChange.bind(this);
+      postTypeField.addEventListener("change", this.postTypeHandler);
 
       // Always run on load to set initial field visibility
-      this.handlePostTypeChange({ target: postTypeField })
+      this.handlePostTypeChange({ target: postTypeField });
     }
   }
 
   // Update visibility of all fields based on current post type
   updateFieldVisibility(postType) {
-    const typeSpecificFields = this.getFieldsForType(postType)
-    const visibleFields = [...this.coreFieldNames, ...typeSpecificFields]
+    const typeSpecificFields = this.getFieldsForType(postType);
+    const visibleFields = [...this.coreFieldNames, ...typeSpecificFields];
 
     // Hide/show existing fields based on new type
-    const allRows = this.fieldsContainerTarget.querySelectorAll('.metadata-field-row')
+    const allRows = this.fieldsContainerTarget.querySelectorAll(
+      ".metadata-field-row",
+    );
 
-    allRows.forEach(row => {
-      const fieldName = row.dataset.fieldName
-      if (!fieldName) return
+    allRows.forEach((row) => {
+      const fieldName = row.dataset.fieldName;
+      if (!fieldName) return;
 
       // Show if it's a visible field, or if it's a custom field (not in knownFields)
-      if (visibleFields.includes(fieldName) || !this.knownFieldsValue[fieldName]) {
-        row.style.display = ''
+      if (
+        visibleFields.includes(fieldName) ||
+        !this.knownFieldsValue[fieldName]
+      ) {
+        row.style.display = "";
       } else {
         // Hide and clear value for type-specific fields that no longer apply
-        row.style.display = 'none'
-        const input = row.querySelector('[data-metadata-field]')
+        row.style.display = "none";
+        const input = row.querySelector("[data-metadata-field]");
         if (input) {
-          if (input.tagName === 'SELECT') {
-            input.selectedIndex = 0
+          if (input.tagName === "SELECT") {
+            input.selectedIndex = 0;
           } else {
-            input.value = ''
+            input.value = "";
           }
         }
       }
-    })
+    });
 
     // Add missing type-specific fields
-    typeSpecificFields.forEach(fieldName => {
+    typeSpecificFields.forEach((fieldName) => {
       // Only look in the fields container, not the menu
-      const existingRow = this.fieldsContainerTarget.querySelector(`.metadata-field-row[data-field-name="${fieldName}"]`)
+      const existingRow = this.fieldsContainerTarget.querySelector(
+        `.metadata-field-row[data-field-name="${fieldName}"]`,
+      );
 
       if (!existingRow && this.knownFieldsValue[fieldName]) {
         // Field doesn't exist at all - add it directly
-        this.addKnownFieldToForm(fieldName, '')
-        this.attachChangeListeners()
+        this.addKnownFieldToForm(fieldName, "");
+        this.attachChangeListeners();
       } else if (existingRow) {
         // Field exists - show it
-        existingRow.style.display = ''
-        existingRow.classList.remove('hidden')
+        existingRow.style.display = "";
+        existingRow.classList.remove("hidden");
       }
-    })
+    });
   }
 
   // ========== CHANGE NOTIFICATION ==========
 
   attachChangeListeners() {
-    this.element.querySelectorAll('[data-metadata-field], [data-custom-key], [data-custom-value]').forEach(input => {
-      input.removeEventListener('input', this.notifyMetadataChange)
-      input.removeEventListener('change', this.notifyMetadataChange)
-      input.addEventListener('input', this.notifyMetadataChange)
-      input.addEventListener('change', this.notifyMetadataChange)
-    })
+    this.element
+      .querySelectorAll(
+        "[data-metadata-field], [data-custom-key], [data-custom-value]",
+      )
+      .forEach((input) => {
+        input.removeEventListener("input", this.notifyMetadataChange);
+        input.removeEventListener("change", this.notifyMetadataChange);
+        input.addEventListener("input", this.notifyMetadataChange);
+        input.addEventListener("change", this.notifyMetadataChange);
+      });
 
     if (this.hasYamlTextareaTarget) {
-      this.yamlTextareaTarget.removeEventListener('input', this.notifyMetadataChange)
-      this.yamlTextareaTarget.addEventListener('input', this.notifyMetadataChange)
+      this.yamlTextareaTarget.removeEventListener(
+        "input",
+        this.notifyMetadataChange,
+      );
+      this.yamlTextareaTarget.addEventListener(
+        "input",
+        this.notifyMetadataChange,
+      );
     }
   }
 
   _notifyMetadataChange() {
+    // Don't notify during initialization
+    if (this.isInitializing) {
+      return;
+    }
+
     const finalYaml = this.isYamlView
       ? this.yamlTextareaTarget.value
-      : this.formToYaml()
+      : this.formToYaml();
 
-    this.finalInputTarget.value = finalYaml
+    this.finalInputTarget.value = finalYaml;
 
-    const event = new CustomEvent('metadata:changed', {
-      detail: { yaml: finalYaml }
-    })
-    document.dispatchEvent(event)
+    const event = new CustomEvent("metadata:changed", {
+      detail: { yaml: finalYaml },
+    });
+    document.dispatchEvent(event);
   }
 }

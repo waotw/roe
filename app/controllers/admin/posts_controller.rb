@@ -83,9 +83,10 @@ class Admin::PostsController < Admin::BaseController
     file_path = Rails.root.join("site/posts/#{filename}.md")
 
     if File.exist?(file_path)
-      flash[:error] = "A post with that filename already exists"
+      flash.now[:error] = "A post with that filename already exists"
       @template = params[:content]
-      render :new
+      @filename = filename
+      render :new, status: :unprocessable_entity
       return
     end
 

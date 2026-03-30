@@ -75,6 +75,8 @@
   <body class="bg-gray-100 min-w-185.5">
     <% if flash.any? %>
       <% flash.each do |type, message| %>
+        <%# Skip internal flags, only show user-facing messages %>
+        <% next unless ['notice', 'alert', 'error', 'success', 'warning'].include?(type.to_s) %>
         <div data-flash-message class="flash-floating <%= type %>">
           <%= message %>
         </div>
