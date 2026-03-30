@@ -1,4 +1,5 @@
 class Admin::PostsController < Admin::BaseController
+
   def index
     @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
     @title = "Posts"
@@ -273,6 +274,7 @@ class Admin::PostsController < Admin::BaseController
       date: #{Date.today}
       status: draft
       post_type: article
+      tags:
       ---
 
       Start writing...
