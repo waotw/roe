@@ -5,17 +5,20 @@
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
   <%= stylesheet_link_tag "application" %>
+  <%= javascript_include_tag "application", "data-turbo-track": "reload", defer: true %>
 </head>
-<body class="bg-white text-black p-5">
+<body class="bg-white text-black p-5"
+      data-controller="media-filter"
+      data-media-filter-total-value="<%= @media.count %>">
 
   <div class="mb-5 pb-2.5 border-b border-gray-300">
-    <h1 class="text-2xl font-bold">Select Image</h1>
+    <h1 class="text-2xl font-bold">Media Browser</h1>
   </div>
 
   <!-- Upload Form -->
   <div class="mb-5 p-4 border border-gray-300 bg-gray-50">
     <div class="flex gap-2 items-center">
-      <input type="file" id="browse-media-upload" accept="image/*" style="display: none;" onchange="handleBrowseUpload(event)">
+      <input type="file" id="browse-media-upload" accept="image/*,audio/*,video/*" style="display: none;" onchange="handleBrowseUpload(event)">
       <button type="button" onclick="document.getElementById('browse-media-upload').click()" class="uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
         Upload
       </button>
@@ -29,12 +32,101 @@
     </div>
   <% end %>
 
+  <!-- Tabs for Media Types -->
+  <div class="mb-4 border-b border-gray-200">
+    <nav class="-mb-px flex space-x-8">
+      <!-- Always show 'All' -->
+      <button
+        data-action="click->media-filter#filterByType"
+        data-type="all"
+        data-media-filter-target="tab"
+        class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+        All
+      </button>
+
+      <!-- Show tabs for types that exist -->
+      <% if @existing_types.include?('images') %>
+        <button data-action="click->media-filter#filterByType" data-type="images" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          Images
+        </button>
+      <% end %>
+
+      <% if @existing_types.include?('audio') %>
+        <button data-action="click->media-filter#filterByType" data-type="audio" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          Audio
+        </button>
+      <% end %>
+
+      <% if @existing_types.include?('video') %>
+        <button data-action="click->media-filter#filterByType" data-type="video" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          Video
+        </button>
+      <% end %>
+    </nav>
+  </div>
+
+  <!-- Filters & Search -->
+  <div class="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+    <!-- Sort Dropdown -->
+    <div class="flex-shrink-0">
+      <select
+        data-media-filter-target="sortFilter"
+        data-action="change->media-filter#sortBy"
+        class="block w-full bg-white rounded-xs border border-gray-500 text-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 pr-12 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.75rem_center] bg-no-repeat">
+        <option value="date-desc">Upload date (newest first)</option>
+        <option value="date-asc">Upload date (oldest first)</option>
+        <option value="name-asc">Filename (A-Z)</option>
+        <option value="name-desc">Filename (Z-A)</option>
+        <option value="size-desc">File size (largest first)</option>
+        <option value="size-asc">File size (smallest first)</option>
+      </select>
+    </div>
+
+    <!-- Search Input -->
+    <div class="flex-grow">
+      <input
+        type="text"
+        data-media-filter-target="search"
+        data-action="input->media-filter#filterBySearch"
+        placeholder="Search by filename..."
+        class="block w-full rounded-xs border border-gray-500 focus:bg-blue-50 focus:ring-blue-300 sm:text-sm font-mono px-4 py-2 bg-white"
+>
+    </div>
+  </div>
+
+  <!-- Results Counter -->
+  <p class="mb-4 text-xs text-gray-500 font-sans">
+    Showing <span data-media-filter-target="count"><%= @media.count %></span> of <%= @media.count %> files
+  </p>
+
   <!-- Media Grid -->
   <% if @media.any? %>
-    <div class="grid grid-cols-4 gap-4">
+    <div class="grid grid-cols-4 gap-4" data-media-filter-target="grid">
       <% @media.each do |media| %>
-        <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative" onclick="selectMedia('<%= j(media.file_path) %>', '<%= j(File.basename(media.file_path)) %>')">
-          <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2" %>
+        <div class="border border-gray-300 p-2 hover:bg-gray-50 cursor-pointer group relative"
+             data-media-filter-target="item"
+             data-media-type="<%= media.media_type %>"
+             data-filename="<%= File.basename(media.file_path).downcase %>"
+             data-uploaded-at="<%= media.created_at.to_i %>"
+             data-file-size="<%= File.size?(Rails.root.join('public', media.file_path)) || 0 %>"
+             data-searchable="<%= File.basename(media.file_path).downcase %>"
+             onclick="selectMedia('<%= j(media.file_path) %>', '<%= j(File.basename(media.file_path)) %>')">
+
+          <% if media.media_type == 'images' %>
+            <%= image_tag media.file_path,
+                alt: File.basename(media.file_path),
+                class: "w-full h-32 object-cover mb-2",
+                loading: "lazy" %>
+          <% elsif media.media_type == 'audio' %>
+            <div class="w-full h-32 bg-gray-200 mb-2 flex items-center justify-center">
+              <span class="text-4xl">🎵</span>
+            </div>
+          <% elsif media.media_type == 'video' %>
+            <div class="w-full h-32 bg-gray-200 mb-2 flex items-center justify-center">
+              <span class="text-4xl">🎬</span>
+            </div>
+          <% end %>
+
           <div class="mb-1">
             <%= render 'shared/inline_rename_media', media: media %>
           </div>
@@ -51,7 +143,7 @@
                 method: :delete,
                 class: "absolute top-1 right-1 w-6 h-6 bg-red-600 text-white hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-center leading-none",
                 form: {
-                  onsubmit: "event.stopPropagation(); return confirm('Delete this image?')",
+                  onsubmit: "event.stopPropagation(); return confirm('Delete this file?')",
                   class: "inline"
                 } %>
           </div>
@@ -59,7 +151,7 @@
       <% end %>
     </div>
   <% else %>
-    <p class="text-gray-600">No images uploaded yet.</p>
+    <p class="text-gray-600">No media uploaded yet.</p>
   <% end %>
 
   <script>
@@ -97,55 +189,47 @@
     event.target.value = '';
   }
 
-    function selectMedia(path, filename) {
-      // Send message to parent window (the editor)
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'media-selected',
-          path: path,
-          filename: filename
-        }, '*');
-        window.close();
-      }
+  function selectMedia(path, filename) {
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'media-selected',
+        path: path,
+        filename: filename
+      }, '*');
+      window.close();
     }
+  }
 
-    function copyMarkdown(event, path, filename) {
-      const markdown = `![${filename}](${path})`;
+  function copyMarkdown(event, path, filename) {
+    const markdown = `![${filename}](${path})`;
+    navigator.clipboard.writeText(markdown).then(() => {
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('bg-green-200');
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove('bg-green-200');
+      }, 1500);
+    }).catch(err => {
+      alert('Failed to copy: ' + err);
+    });
+  }
 
-      // Copy to clipboard
-      navigator.clipboard.writeText(markdown).then(() => {
-        // Show temporary feedback
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = 'Copied!';
-        btn.classList.add('bg-green-200');
-
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.classList.remove('bg-green-200');
-        }, 1500);
-      }).catch(err => {
-        alert('Failed to copy: ' + err);
-      });
-    }
-
-    function copyUrl(event, path) {
-      // Copy just the path to clipboard
-      navigator.clipboard.writeText(path).then(() => {
-        // Show temporary feedback
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = 'Copied!';
-        btn.classList.add('bg-green-200');
-
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.classList.remove('bg-green-200');
-        }, 1500);
-      }).catch(err => {
-        alert('Failed to copy: ' + err);
-      });
-    }
+  function copyUrl(event, path) {
+    navigator.clipboard.writeText(path).then(() => {
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('bg-green-200');
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove('bg-green-200');
+      }, 1500);
+    }).catch(err => {
+      alert('Failed to copy: ' + err);
+    });
+  }
   </script>
 
 </body>

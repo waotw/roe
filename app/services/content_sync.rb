@@ -98,19 +98,19 @@ class ContentSync
   end
 
   def sync_media
-    # Sync images
-    image_files = Dir.glob("site/media/**/*.{jpg,jpeg,png,gif,webp,svg,bmp}")
+    # Sync all media types (images, audio, video)
+    media_files = Dir.glob("site/media/**/*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}")
 
-    puts "\n🖼️  Found #{image_files.count} media files"
+    puts "\n🎬 Found #{media_files.count} media files"
 
     # Handle orphaned media
-    handle_orphaned_media(image_files)
+    handle_orphaned_media(media_files)
 
     puts "=" * 60
 
     success_count = 0
 
-    image_files.each do |file_path|
+    media_files.each do |file_path|
       web_path = file_path.sub('site', '')
 
       unless Medium.exists?(file_path: web_path)
@@ -118,7 +118,7 @@ class ContentSync
 
         Medium.create!(
           file_path: web_path,
-          media_type: media_type,
+          media_type: media_type,  # Model's normalize_media_type will categorize it
           uploaded_at: File.mtime(file_path)
         )
 

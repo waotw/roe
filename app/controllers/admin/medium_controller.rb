@@ -1,8 +1,10 @@
 class Admin::MediumController < Admin::BaseController
   def browse
-    # Get media_type from params, default to 'images'
-    @media_type = params[:type] || 'images'
-    @media = Medium.where(media_type: @media_type).order(uploaded_at: :desc)
+    # Load ALL media (filtering happens client-side now)
+    @media = Medium.order(created_at: :desc)
+
+    # Get distinct media types that exist (already normalized: 'images', 'audio', 'video', 'fonts')
+    @existing_types = Medium.distinct.pluck(:media_type).compact
   end
 
   def create
