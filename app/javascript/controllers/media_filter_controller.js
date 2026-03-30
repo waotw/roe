@@ -52,16 +52,14 @@ export default class extends Controller {
     const query = this.searchTarget.value.toLowerCase().trim();
     let visibleItems = [];
 
-    // Filter items
     this.itemTargets.forEach((item) => {
       let matches = true;
 
-      // Filter by media type
-      if (
-        this.currentType !== "all" &&
-        item.dataset.mediaType !== this.currentType
-      ) {
-        matches = false;
+      // Filter by type or unused status
+      if (this.currentType === "unused") {
+        matches = item.dataset.hasReferences === "false";
+      } else if (this.currentType !== "all") {
+        matches = item.dataset.mediaType === this.currentType;
       }
 
       // Filter by search query
@@ -77,10 +75,7 @@ export default class extends Controller {
       }
     });
 
-    // Sort visible items
     this.sortItems(visibleItems);
-
-    // Update count
     this.countTarget.textContent = visibleItems.length;
   }
 

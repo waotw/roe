@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_10_184153) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_30_170410) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -27,6 +27,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_10_184153) do
     t.datetime "updated_at", null: false
     t.datetime "uploaded_at"
     t.index ["file_path"], name: "index_media_on_file_path", unique: true
+  end
+
+  create_table "media_references", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "medium_id", null: false
+    t.integer "post_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["medium_id"], name: "index_media_references_on_medium_id"
+    t.index ["post_id", "medium_id"], name: "index_media_references_on_post_id_and_medium_id", unique: true
+    t.index ["post_id"], name: "index_media_references_on_post_id"
   end
 
   create_table "pages", force: :cascade do |t|
@@ -70,5 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_10_184153) do
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
+  add_foreign_key "media_references", "media"
+  add_foreign_key "media_references", "posts"
   add_foreign_key "sessions", "users"
 end

@@ -1,4 +1,7 @@
 class Medium < ApplicationRecord
+  has_many :media_references, dependent: :destroy
+  has_many :posts, through: :media_references
+
   before_save :normalize_media_type
 
   # Scope helpers for filtering
@@ -6,6 +9,10 @@ class Medium < ApplicationRecord
   scope :audio, -> { where(media_type: 'audio') }
   scope :video, -> { where(media_type: 'video') }
   scope :fonts, -> { where(media_type: 'fonts') }
+  scope :unused, -> {
+      left_joins(:media_references)
+        .where(media_references: { id: nil })
+    }
 
   def self.remove_by_file_path(file_path)
     medium = find_by(file_path: file_path)

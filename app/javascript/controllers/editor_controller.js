@@ -132,6 +132,7 @@ export default class extends Controller {
     pullquoteTemplate: String,
     knownFields: Array,
     defaultAuthor: String,
+    highlightMedia: String,
   };
 
   connect() {
@@ -331,6 +332,10 @@ export default class extends Controller {
         sessionStorage.removeItem(`scroll:${window.location.pathname}:window`);
       }
     });
+
+    if (this.hasHighlightMediaValue && this.highlightMediaValue) {
+      setTimeout(() => this.highlightMediaReference(), 100);
+    }
   }
 
   disconnect() {
@@ -1566,5 +1571,75 @@ export default class extends Controller {
     if (typeof window.EditorState !== "undefined") {
       window.EditorState.save("content-textarea");
     }
+  }
+
+  highlightMediaReference() {
+    const mediaPath = this.highlightMediaValue;
+    const content = this.textareaTarget.value;
+
+    // First, try to find it in content
+    let position = content.indexOf(mediaPath);
+
+    if (position !== -1) {
+      // Found in content - highlight there
+      this.textareaTarget.setSelectionRange(position, position);
+      this.textareaTarget.focus();
+      this.textareaTarget.style.caretColor = "red";
+
+      const resetCursor = () => {
+        this.textareaTarget.style.caretColor = "";
+      };
+
+      this.textareaTarget.addEventListener("click", resetCursor, {
+        once: true,
+      });
+      this.textareaTarget.addEventListener("keydown", resetCursor, {
+        once: true,
+      });
+
+      console.log("[HIGHLIGHT] Found in content at position:", position);
+      return;
+    }
+
+    // Not in content - check metadata fields
+    const metadataFields = [
+      "image",
+      "audio",
+      "video",
+      "thumbnail",
+      "cover",
+      "poster",
+    ];
+
+    for (const fieldName of metadataFields) {
+      const input = document.querySelector(
+        `input[name="metadata[${fieldName}]"], input[id*="${fieldName}"]`,
+      );
+
+      if (input && input.value === mediaPath) {
+        // Found in metadata field - highlight the input
+        input.focus();
+        input.select();
+        input.style.caretColor = "red";
+        input.style.borderColor = "red";
+
+        const resetInput = () => {
+          input.style.caretColor = "";
+          input.style.borderColor = "";
+        };
+
+        input.addEventListener("click", resetInput, { once: true });
+        input.addEventListener("keydown", resetInput, { once: true });
+        input.addEventListener("blur", resetInput, { once: true });
+
+        // Scroll the input into view
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        console.log("[HIGHLIGHT] Found in metadata field:", fieldName);
+        return;
+      }
+    }
+
+    console.log("[HIGHLIGHT] Media not found in content or metadata");
   }
 }

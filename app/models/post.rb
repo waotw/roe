@@ -3,6 +3,11 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
+  has_many :media_references, dependent: :destroy
+  has_many :media, through: :media_references, source: :medium
+
+  after_save :update_media_references
+
   # Post type definitions
   POST_TYPES = {
     article: {
@@ -282,5 +287,44 @@ class Post < ApplicationRecord
 
   def self.feed_posts
     published.where("file_path NOT LIKE ?", "%site/docs/%")
+  end
+
+  private
+
+  def update_media_references
+    # Extract media paths from content
+    media_paths = extract_media_paths
+
+    # Find matching Medium records
+    referenced_media = Medium.where(file_path: media_paths)
+
+    # Replace all references for this post
+    self.media_references.destroy_all
+    referenced_media.each do |medium|
+      self.media_references.create(medium: medium)
+    end
+  end
+
+  def extract_media_paths
+    paths = []
+
+    # Extract from content
+    if content.present?
+      paths += content.scan(/!\[.*?\]\((\/media\/[^\)]+)\)/).flatten
+      paths += content.scan(/<img[^>]+src=["'](\/media\/[^"']+)["']/).flatten
+      paths += content.scan(/<(?:audio|video)[^>]+src=["'](\/media\/[^"']+)["']/).flatten
+    end
+
+    # Extract from metadata fields (image, audio, video, thumbnail, etc.)
+    if metadata.present?
+      ['image', 'audio', 'video', 'thumbnail', 'cover', 'poster'].each do |field|
+        value = metadata[field]
+        if value.is_a?(String) && value.start_with?('/media/')
+          paths << value
+        end
+      end
+    end
+
+    paths.uniq
   end
 end
