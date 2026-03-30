@@ -1,4 +1,7 @@
-<div class="px-4 sm:px-0 font-mono">
+<div class="px-4 sm:px-0 font-mono"
+     data-controller="posts-filter"
+     data-posts-filter-total-value="<%= @posts.count %>">
+
   <div class="sm:flex sm:items-center">
     <div class="sm:flex-auto font-sans">
       <h1 class="text-3xl font-bold text-gray-900"><%= @title || "Posts" %></h1>
@@ -10,7 +13,75 @@
     </div>
   </div>
 
-  <div class="mt-8 flex flex-col">
+  <!-- Tabs for Post Types -->
+  <div class="mt-6 border-b border-gray-200">
+    <nav class="-mb-px flex space-x-8" data-posts-filter-target="tabContainer">
+      <!-- Always show 'All' -->
+      <button data-action="click->posts-filter#filterByType" data-type="all" data-posts-filter-target="tab"
+              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+        All
+      </button>
+
+      <!-- Show tabs for types that exist -->
+      <% ['article', 'podcast', 'music', 'audio', 'video', 'docs'].each do |type| %>
+        <% if @existing_types.include?(type) %>
+          <button data-action="click->posts-filter#filterByType" data-type="<%= type %>" data-posts-filter-target="tab"
+                  class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            <%= type %>
+          </button>
+        <% end %>
+      <% end %>
+    </nav>
+  </div>
+
+  <!-- Filters & Search -->
+  <div class="mt-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+    <!-- Status Filter -->
+    <div class="flex-shrink-0">
+      <select
+        data-posts-filter-target="statusFilter"
+        data-action="change->posts-filter#filterByStatus"
+        class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat">
+        <option value="all">All</option>
+        <option value="draft">Drafts</option>
+        <option value="published">Published</option>
+        <option value="unlisted">Unlisted</option>
+      </select>
+    </div>
+
+    <!-- Sort Dropdown -->
+    <div class="flex-shrink-0">
+      <select
+        data-posts-filter-target="sortFilter"
+        data-action="change->posts-filter#sortBy"
+        class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat">
+        <option value="date-desc">Date (newest first)</option>
+        <option value="date-asc">Date (oldest first)</option>
+        <option value="title-asc">Title (A-Z)</option>
+        <option value="title-desc">Title (Z-A)</option>
+        <option value="updated-desc">Recently Modified</option>
+      </select>
+    </div>
+
+    <!-- Search Input -->
+    <div class="flex-grow">
+      <!--<label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Search</label>-->
+      <input
+        type="text"
+        data-posts-filter-target="search"
+        data-action="input->posts-filter#filterBySearch"
+        placeholder="Search by title, filename, tags..."
+        class="block w-full rounded-xs border border-gray-500 focus:bg-blue-50 focus:ring-blue-300 text-xs font-mono px-4 py-2 bg-white"
+>
+    </div>
+  </div>
+
+  <!-- Results Counter -->
+  <p class="mt-3 text-xs text-gray-500 font-sans">
+    Showing <span data-posts-filter-target="count"><%= @posts.count %></span> of <%= @posts.count %> posts
+  </p>
+
+  <div class="mt-4 flex flex-col">
     <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
         <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
@@ -18,40 +89,44 @@
             <thead class="bg-gray-50">
               <tr>
                 <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Title</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase ">Filename <span class="text-xs normal-case text-gray-500 font-normal">(double click to rename)</span></th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Filename</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
-                <!--<th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Type</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Date</th>-->
                 <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
                   <span class="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
+            <tbody class="divide-y divide-gray-200 bg-white" data-posts-filter-target="tbody">
               <% @posts.each do |post| %>
-                <tr>
+                <tr data-posts-filter-target="row"
+                    data-post-type="<%= post.metadata['post_type'] || 'article' %>"
+                    data-status="<%= post.status %>"
+                    data-date="<%= post.date&.to_time&.to_i || 0 %>"
+                    data-title="<%= post.title %>"
+                    data-updated-at="<%= post.updated_at.to_i %>"
+                    data-searchable="<%= [
+                      post.title,
+                      post.url_name,
+                      post.metadata['post_type'],
+                      post.metadata['tags']&.join(' '),
+                      post.status
+                    ].compact.join(' ').downcase %>">
                   <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
                     <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4" %>
                   </td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
-                    <%= render 'shared/inline_rename',
-                        resource: post,
-                        resource_type: 'post' %>
+                    <%= render 'shared/inline_rename', resource: post, resource_type: 'post' %>
                   </td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                     <% case post.status %>
                     <% when 'published' %>
-                      <span class="inline-flex  bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Published</span>
+                      <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Published</span>
                     <% when 'unlisted' %>
-                      <span class="inline-flex  bg-yellow-100 px-2 text-xs font-semibold leading-5 text-yellow-800">Unlisted</span>
+                      <span class="inline-flex bg-yellow-100 px-2 text-xs font-semibold leading-5 text-yellow-800">Unlisted</span>
                     <% else %>
-                      <span class="inline-flex  bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Draft</span>
+                      <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Draft</span>
                     <% end %>
                   </td>
-                  <!--<td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500"><%= post.type %></td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
-                    <%= post.date&.strftime("%b %d, %Y") || "—" %>
-                  </td>-->
                   <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
                     <%= link_to "Edit", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4 text-xs" %>
                     <%= link_to "View", post_path(url_name: post.url_name), class: "text-gray-600 hover:text-gray-900 text-xs", target: "_blank" %>

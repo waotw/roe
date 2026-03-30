@@ -2,6 +2,12 @@ class Admin::PostsController < Admin::BaseController
 
   def index
     @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+
+    # Get all post types that exist in the database
+    @existing_types = Post.pluck(Arel.sql("json_extract(metadata, '$.post_type')"))
+                          .compact
+                          .uniq
+
     @title = "Posts"
     @description = "All posts including drafts, published, and unlisted."
   end
