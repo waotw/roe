@@ -27,14 +27,28 @@
       'author' => { type: :text, label: 'author', default_from_config: true },
       'tags' => { type: :text, label: 'tags', hint: 'comma-separated' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
-      'image' => { type: :text, label: 'image', hint: 'Featured/cover image' },
+      'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
 
       # Media fields
-      'audio' => { type: :text, label: 'audio', hint: 'Path to audio file' },
-      'video' => { type: :text, label: 'video', hint: 'Path to video file' },
-      'duration' => { type: :text, label: 'duration', hint: 'e.g., "12:34"' },
-      'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' }
+      'audio' => { type: :text, label: 'audio', hint: "Example: /media/audio/audio-file.mp3" },
+      'video' => { type: :text, label: 'video', hint: "Example: /media/video/video-file.mp4" },
+      'duration' => { type: :text, label: 'duration', hint: 'e.g., "12:34" or seconds' },
+      'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' },
+
+      # Podcast-specific fields
+      'podcast' => {
+        type: :select,
+        label: 'podcast',
+        options: PodcastConfig.podcast_keys,  # ← Call directly (not a proc)
+        required: true,
+        hint: 'Which podcast feed?'
+      },
+      'guid' => { type: :text, label: 'guid', hint: 'Auto-generated UUID (do not edit)' },
+      'explicit' => { type: :select, label: 'explicit', options: ['false', 'true'], hint: 'Explicit content?' },
+      'episode_number' => { type: :text, label: 'episode_number', hint: 'Episode number' },
+      'season' => { type: :text, label: 'season', hint: 'Season number' },
+      'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' }
     }
   else # pages
     {
@@ -67,6 +81,7 @@
      data-metadata-editor-original-metadata-value="<%= metadata_hash.to_json %>"
      data-metadata-editor-post-types-value="<%= Post::POST_TYPES.to_json %>"
      data-metadata-editor-resource-type-value="<%= resource_type %>"
+     data-metadata-editor-podcast-configs-value="<%= PodcastConfig.all_podcasts.to_json %>"
      class="mb-5">
   <div class="flex items-center justify-between mb-2">
     <button type="button"
@@ -97,7 +112,7 @@
           <% value = metadata_hash[field_name] %>
           <div class="metadata-field-row flex items-start gap-2" data-field-name="<%= field_name %>">
             <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 shrink-0 pt-1.5">
-              <%= config[:label] %>:
+              <%= config[:label] %>:<% if config[:required] %><span class="text-red-600 relative -top-0.5"><sup>*</sup></span><% end %>
             </label>
             <% case config[:type] %>
             <% when :text %>

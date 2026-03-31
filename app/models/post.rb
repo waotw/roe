@@ -45,7 +45,7 @@ class Post < ApplicationRecord
       metadata_fields: [
         { name: 'audio', type: :text, required: true, label: 'Audio File',
           hint: 'Path to audio file (e.g., /media/audio/episode-1.mp3)' },
-        { name: 'duration', type: :text, label: 'Duration',
+        { name: 'duration', type: :text, required: true, label: 'Duration',  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
         { name: 'podcast', type: :select, required: true, label: 'Podcast',
           hint: 'Which podcast feed does this episode belong to?',

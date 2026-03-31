@@ -9,6 +9,7 @@ export default class extends Controller {
     originalMetadata: Object,
     postTypes: Object,
     resourceType: String,
+    podcastConfigs: Object,
   };
 
   static targets = [
@@ -54,6 +55,7 @@ export default class extends Controller {
 
     this.attachChangeListeners();
     this.setupPostTypeListener();
+    this.setupPodcastListener();
 
     this.fieldsContainerTarget.addEventListener("click", (e) => {
       if (e.target.closest('[data-action*="removeMetadataField"]')) {
@@ -371,6 +373,29 @@ export default class extends Controller {
 
   // ========== HELPER METHODS ==========
 
+  isFieldRequired(fieldName) {
+    // Check base config first
+    if (this.knownFieldsValue[fieldName]?.required) {
+      return true;
+    }
+
+    // Check post-type-specific requirements
+    const postTypeField = this.element.querySelector(
+      '[data-metadata-field="post_type"]',
+    );
+    if (!postTypeField) return false;
+
+    const currentType = postTypeField.value;
+    if (!currentType || !this.postTypesValue[currentType]) return false;
+
+    const typeConfig = this.postTypesValue[currentType];
+    const fieldConfig = typeConfig.metadata_fields?.find(
+      (f) => f.name === fieldName,
+    );
+
+    return fieldConfig?.required === true;
+  }
+
   buildInputHtml(fieldName, config, value) {
     const escapedValue = String(value)
       .replace(/&/g, "&amp;")
@@ -613,9 +638,17 @@ export default class extends Controller {
     row.className = "metadata-field-row flex items-start gap-2";
     row.dataset.fieldName = fieldName;
 
+    // Build input HTML
     const inputHtml = this.buildInputHtml(fieldName, config, value);
 
-    const deleteButton = config.required
+    // Check if required (base config OR post-type-specific)
+    const isRequired = this.isFieldRequired(fieldName);
+    const asterisk = isRequired
+      ? '<span class="text-red-600 ml-0.5">*</span>'
+      : "";
+
+    // Define delete button (must be BEFORE row.innerHTML)
+    const deleteButton = isRequired
       ? '<div class="w-6 flex-shrink-0"></div>'
       : `<button type="button"
                  data-action="click->metadata-editor#removeMetadataField"
@@ -623,9 +656,10 @@ export default class extends Controller {
           ×
         </button>`;
 
+    // Now use all the variables
     row.innerHTML = `
       <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
-        ${config.label}:
+        ${config.label}${asterisk}:
       </label>
       ${inputHtml}
       ${deleteButton}
@@ -715,6 +749,78 @@ export default class extends Controller {
     }
   }
 
+  setupPostTypeListener() {
+    const postTypeField = this.element.querySelector(
+      '[data-metadata-field="post_type"]',
+    );
+
+    if (postTypeField) {
+      // Remove old listener if exists
+      if (this.postTypeHandler) {
+        postTypeField.removeEventListener("change", this.postTypeHandler);
+      }
+
+      this.postTypeHandler = this.handlePostTypeChange.bind(this);
+      postTypeField.addEventListener("change", this.postTypeHandler);
+
+      // Always run on load to set initial field visibility
+      this.handlePostTypeChange({ target: postTypeField });
+    }
+  }
+
+  // ========== PODCAST CONFIG AUTO-POPULATION ==========
+
+  setupPodcastListener() {
+    const podcastField = this.element.querySelector(
+      '[data-metadata-field="podcast"]',
+    );
+
+    if (podcastField) {
+      // Remove old listener if exists
+      if (this.podcastHandler) {
+        podcastField.removeEventListener("change", this.podcastHandler);
+      }
+
+      this.podcastHandler = this.handlePodcastChange.bind(this);
+      podcastField.addEventListener("change", this.podcastHandler);
+    }
+  }
+
+  handlePodcastChange(event) {
+    const selectedPodcast = event.target.value;
+    if (!selectedPodcast || !this.podcastConfigsValue[selectedPodcast]) return;
+
+    const podcastConfig = this.podcastConfigsValue[selectedPodcast];
+
+    // Auto-populate explicit if not already set
+    const explicitField = this.element.querySelector(
+      '[data-metadata-field="explicit"]',
+    );
+    if (explicitField && (!explicitField.value || explicitField.value === "")) {
+      explicitField.value =
+        podcastConfig.explicit !== undefined
+          ? String(podcastConfig.explicit)
+          : "false";
+    }
+
+    // Auto-populate author if not already set (podcast config overrides site config)
+    const authorField = this.element.querySelector(
+      '[data-metadata-field="author"]',
+    );
+    if (
+      authorField &&
+      (!authorField.value ||
+        authorField.value === "" ||
+        authorField.value === this.defaultAuthorValue)
+    ) {
+      authorField.value = podcastConfig.author || this.defaultAuthorValue;
+    }
+
+    this._notifyMetadataChange();
+  }
+
+  // ========== POST TYPE HANDLING ==========
+
   // Update visibility of all fields based on current post type
   updateFieldVisibility(postType) {
     const typeSpecificFields = this.getFieldsForType(postType);
@@ -751,21 +857,52 @@ export default class extends Controller {
 
     // Add missing type-specific fields
     typeSpecificFields.forEach((fieldName) => {
-      // Only look in the fields container, not the menu
       const existingRow = this.fieldsContainerTarget.querySelector(
         `.metadata-field-row[data-field-name="${fieldName}"]`,
       );
 
       if (!existingRow && this.knownFieldsValue[fieldName]) {
-        // Field doesn't exist at all - add it directly
-        this.addKnownFieldToForm(fieldName, "");
+        // Field doesn't exist - add it with default value if applicable
+        const config = this.knownFieldsValue[fieldName];
+
+        // Determine default value based on field
+        const defaultValue = (() => {
+          if (fieldName === "author" && config.default_from_config) {
+            return this.defaultAuthorValue;
+          }
+          if (fieldName === "episode_type") {
+            return "full";
+          }
+          if (fieldName === "podcast") {
+            // Auto-select first podcast (or only podcast if there's just one)
+            const podcastOptions = config.options || [];
+            return podcastOptions.length > 0 ? podcastOptions[0] : "";
+          }
+          return "";
+        })();
+
+        this.addKnownFieldToForm(fieldName, defaultValue);
         this.attachChangeListeners();
+
+        // Set up podcast listener when field is added (but don't trigger yet)
+        if (fieldName === "podcast") {
+          this.setupPodcastListener();
+        }
       } else if (existingRow) {
-        // Field exists - show it
+        // Field exists but was hidden - show it
         existingRow.style.display = "";
         existingRow.classList.remove("hidden");
       }
     });
+
+    // AFTER all fields are added, trigger podcast config population
+    const podcastField = this.element.querySelector(
+      '[data-metadata-field="podcast"]',
+    );
+    if (podcastField && podcastField.value) {
+      // Trigger population from podcast config
+      this.handlePodcastChange({ target: podcastField });
+    }
   }
 
   // ========== CHANGE NOTIFICATION ==========
