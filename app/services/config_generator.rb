@@ -12,6 +12,7 @@ class ConfigGenerator
     generate_site_config unless File.exist?(SYSTEM_PATH.join('site.yml'))
     generate_cards_defaults unless File.exist?(DEFAULTS_PATH.join('cards.yml'))
     generate_collections_defaults unless File.exist?(DEFAULTS_PATH.join('collections.yml'))
+    generate_podcast_defaults unless File.exist?(DEFAULTS_PATH.join('podcast.yml'))
   end
 
   private
@@ -70,6 +71,30 @@ class ConfigGenerator
 
     File.write(SYSTEM_PATH.join('site.yml'), content)
     puts "✓ Generated site.yml"
+  end
+
+  def generate_podcast_defaults
+    content = <<~YAML
+      # Podcast Configuration
+      # Define one or more podcast feeds for your site
+
+      my-podcast:
+        title: "My Podcast"
+        description: "A podcast about things"
+        author: "Your Name"
+        email: "you@example.com"
+        category: "Technology"
+        subcategory: ""
+        language: "en"
+        copyright: "2026 Your Name"
+        explicit: false
+        type: "episodic"
+        artwork: ""
+        link: "https://yoursite.com"
+    YAML
+
+    File.write(DEFAULTS_PATH.join('podcast.yml'), content)
+    puts "✓ Generated podcast.yml"
   end
 
   def generate_cards_defaults

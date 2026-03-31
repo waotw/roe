@@ -80,6 +80,9 @@ Rails.application.routes.draw do
     get 'configs/site/edit', to: 'configs#edit_site', as: 'edit_site_config'
     patch 'configs/site', to: 'configs#update_site', as: 'site_config'
 
+    get 'configs/podcast/edit', to: 'configs#edit_podcast', as: 'edit_podcast_config'
+    patch 'configs/podcast', to: 'configs#update_podcast', as: 'podcast_config'
+
     get 'configs/cards/edit', to: 'configs#edit_cards', as: 'edit_cards_config'
     patch 'configs/cards', to: 'configs#update_cards', as: 'cards_config'
 

@@ -21,7 +21,7 @@ class Post < ApplicationRecord
       description: "Article with featured audio player",
       icon: "🔊",
       metadata_fields: [
-        { name: 'audio', type: :text, required: true, label: 'Audio File',   # Changed
+        { name: 'audio', type: :text, required: true, label: 'Audio File',
           hint: 'Path to audio file (e.g., /media/audio/my-song.mp3)' },
         { name: 'duration', type: :text, label: 'Duration',
           hint: 'Optional, e.g., "12:34"' }
@@ -32,10 +32,42 @@ class Post < ApplicationRecord
       description: "Article with featured video player",
       icon: "🎬",
       metadata_fields: [
-        { name: 'video', type: :text, required: true, label: 'Video File',   # Changed
+        { name: 'video', type: :text, required: true, label: 'Video File',
           hint: 'Path to video file (e.g., /media/video/my-video.mp4)' },
         { name: 'duration', type: :text, label: 'Duration',
           hint: 'Optional, e.g., "12:34"' }
+      ]
+    },
+    podcast: {
+      label: "Podcast",
+      description: "Podcast episode with RSS feed integration",
+      icon: "🎙️",
+      metadata_fields: [
+        { name: 'audio', type: :text, required: true, label: 'Audio File',
+          hint: 'Path to audio file (e.g., /media/audio/episode-1.mp3)' },
+        { name: 'duration', type: :text, label: 'Duration',
+          hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
+        { name: 'podcast', type: :select, required: true, label: 'Podcast',
+          hint: 'Which podcast feed does this episode belong to?',
+          options: -> { PodcastConfig.podcast_keys } },
+        { name: 'author', type: :text, label: 'Author',
+          hint: 'Override podcast default author for this episode' },
+        { name: 'explicit', type: :select, label: 'Explicit Content',
+          hint: 'Does this episode contain explicit content?',
+          options: ['false', 'true'] },
+        { name: 'episode_number', type: :text, label: 'Episode Number',
+          hint: 'Episode number (e.g., "1")' },
+        { name: 'season', type: :text, label: 'Season',
+          hint: 'Season number (e.g., "1")' },
+        { name: 'episode_type', type: :select, label: 'Episode Type',
+          hint: 'Type of episode',
+          options: ['full', 'trailer', 'bonus'] },
+        { name: 'image', type: :text, label: 'Episode Artwork',
+          hint: 'Override podcast artwork for this episode (e.g., /media/images/episode-1.jpg)' },
+        { name: 'subtitle', type: :text, label: 'Subtitle',
+          hint: 'Short episode description' },
+        { name: 'captions', type: :text, label: 'Captions/Transcript',
+          hint: 'Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)' }
       ]
     }
   }.freeze

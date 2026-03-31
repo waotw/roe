@@ -35,5 +35,11 @@
                form_url: admin_collections_config_path,
                config_content: @config_content,
                config_hash: @config_hash %>
+  <% elsif @config_type == 'podcast' %>
+    <%= render 'shared/config_editor',
+               form_url: admin_podcast_config_path,
+               config_content: @config_content,
+               config_hash: @config_hash,
+               field_options: @field_options %>
   <% end %>
 </div>

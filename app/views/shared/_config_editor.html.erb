@@ -169,21 +169,51 @@
 
                           <div class="space-y-3">
                             <% value.each do |subkey, subvalue| %>
+                              <%
+                                # Skip subcategory fields - they're dynamically managed
+                                next if subkey == 'subcategory' || subkey == 'subcategory_2'
+                              %>
+
                               <div class="config-field-row">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
                                   <%= subkey.humanize %>
                                 </label>
 
                                 <% nested_field_key = "#{key}.#{subkey}" %>
-                                <% if @field_options&.key?(nested_field_key) %>
-                                  <!-- Select dropdown for nested field with options -->
+                                <%
+                                  # Skip subcategory fields - they're dynamically managed
+                                  next if subkey == 'subcategory' || subkey == 'subcategory_2'
+                                %>
+
+                                <% field_options_key = @field_options&.key?(nested_field_key) ? nested_field_key : subkey %>
+                                <% if @field_options&.key?(field_options_key) %>
+                                  <!-- Select dropdown (no extra wrapper/label) -->
                                   <select name="config_fields[<%= key %>][<%= subkey %>]"
                                           class="w-full font-mono text-sm p-2 border border-gray-300"
                                           data-config-field="<%= nested_field_key %>">
-                                    <% @field_options[nested_field_key].each do |option| %>
-                                      <option value="<%= option %>" <%= 'selected' if subvalue.to_s == option.to_s %>><%= option %></option>
+                                    <% @field_options[field_options_key].each do |option| %>
+                                      <% display_text = option.blank? ? '-- select --' : option %>
+                                      <option value="<%= option %>" <%= 'selected' if subvalue.to_s == option.to_s %>><%= display_text %></option>
                                     <% end %>
                                   </select>
+
+                                  <%# Add subcategory container after primary category %>
+                                  <% if subkey == 'category' %>
+                                    <div class="category-subcategories mt-2"
+                                         data-podcast-key="<%= key %>"
+                                         data-category-type="primary">
+                                      <!-- Subcategories added here by JS -->
+                                    </div>
+                                  <% end %>
+
+                                  <%# Add subcategory container after secondary category %>
+                                  <% if subkey == 'category_2' %>
+                                    <div class="category-subcategories mt-2"
+                                         data-podcast-key="<%= key %>"
+                                         data-category-type="secondary">
+                                      <!-- Subcategories added here by JS -->
+                                    </div>
+                                  <% end %>
                                 <% else %>
                                   <!-- Regular text input for nested field -->
                                   <input type="text"
@@ -638,17 +668,48 @@
 
   // Form submit handler (defined outside to allow removal)
   function handleFormSubmit(e) {
-  const finalYaml = window.isYamlView
-  ? document.getElementById('config-yaml').value
-  : formToYaml();
+    const finalYaml = window.isYamlView
+      ? document.getElementById('config-yaml').value
+      : formToYaml();
 
-  document.getElementById('config-final').value = finalYaml;
+    console.log('📤 Submitting YAML:', finalYaml);
+    document.getElementById('config-final').value = finalYaml;
 
-  // Save scroll position
-  sessionStorage.setItem('configScrollPosition', window.scrollY);
+    // Save scroll position
+    sessionStorage.setItem('configScrollPosition', window.scrollY);
 
-  // Clear unsaved changes flag before submit
-  window.hasUnsavedChanges = false;
+    // Clear unsaved changes flag before submit
+    window.hasUnsavedChanges = false;
+  }
+
+  function formatYamlValue(value) {
+    if (value === null || value === undefined) {
+      return '""';
+    }
+
+    const strValue = String(value);
+
+    if (strValue === "") {
+      return '""';
+    }
+
+    // Numbers (not quoted)
+    if (!isNaN(strValue) && strValue.trim() !== "") {
+      return strValue;
+    }
+
+    // Booleans (not quoted)
+    if (strValue === "true" || strValue === "false") {
+      return strValue;
+    }
+
+    // Multi-line strings (block scalar)
+    if (strValue.includes('\n')) {
+      return null; // Signal to use block scalar format
+    }
+
+    // All other strings (quoted and escaped)
+    return `"${strValue.replace(/"/g, '\\"')}"`;
   }
 
   function formToYaml() {
@@ -681,6 +742,27 @@
       }
     });
 
+    // Collect subcategories as arrays
+    console.log('🔍 Looking for subcategory selects...');
+    const subcatSelects = document.querySelectorAll('[data-subcategory-for]');
+    console.log(`Found ${subcatSelects.length} subcategory selects`);
+
+    subcatSelects.forEach(select => {
+      const podcastKey = select.dataset.subcategoryFor;
+      const subcategoryField = select.dataset.subcategoryField;
+      const value = select.value.trim();
+
+      console.log('Subcategory select:', { podcastKey, subcategoryField, value, element: select });
+
+      if (value) {
+        if (!fields[podcastKey]) fields[podcastKey] = {};
+        if (!fields[podcastKey][subcategoryField]) {
+          fields[podcastKey][subcategoryField] = [];
+        }
+        fields[podcastKey][subcategoryField].push(value);
+      }
+    });
+
     return simpleYamlStringify(fields, 0);
   }
 
@@ -689,27 +771,80 @@
     const spaces = '  '.repeat(indent);
 
     for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        // Nested object
+      // CHECK ARRAYS FIRST (before objects)
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          yaml += `${spaces}${key}: []\n`;
+        } else {
+          const quotedValues = value.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
+          yaml += `${spaces}${key}: [${quotedValues.join(', ')}]\n`;
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Nested object (like podcast configs)
         yaml += `${spaces}${key}:\n`;
-        yaml += simpleYamlStringify(value, indent + 1);
-      } else if (typeof value === 'string' && value.includes('\n')) {
-        // Multi-line string - use block scalar
-        yaml += `${spaces}${key}: |-\n`;
-        const lines = value.split('\n');
-        lines.forEach(line => {
-          yaml += `${spaces}  ${line}\n`;
+
+        const nestedEntries = Object.entries(value);
+
+        nestedEntries.forEach(([nestedKey, nestedValue]) => {
+          // Skip subcategory fields - they'll be output after their parent category
+          if (nestedKey === 'subcategory' || nestedKey === 'subcategory_2') {
+            return;
+          }
+
+          // Output the field
+          if (Array.isArray(nestedValue)) {
+            if (nestedValue.length === 0) {
+              yaml += `${spaces}  ${nestedKey}: []\n`;
+            } else {
+              const quotedValues = nestedValue.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
+              yaml += `${spaces}  ${nestedKey}: [${quotedValues.join(', ')}]\n`;
+            }
+          } else if (typeof nestedValue === 'object' && nestedValue !== null) {
+            yaml += simpleYamlStringify({ [nestedKey]: nestedValue }, indent + 1);
+          } else {
+            const formattedValue = formatYamlValue(nestedValue);
+            if (formattedValue === null) {
+              yaml += `${spaces}  ${nestedKey}: |-\n`;
+              const lines = String(nestedValue).split('\n');
+              lines.forEach(line => {
+                yaml += `${spaces}    ${line}\n`;
+              });
+            } else {
+              yaml += `${spaces}  ${nestedKey}: ${formattedValue}\n`;
+            }
+          }
+
+          // After category, immediately output subcategory if it exists
+          if (nestedKey === 'category' && value['subcategory']) {
+            const subcats = value['subcategory'];
+            if (Array.isArray(subcats) && subcats.length > 0) {
+              const quotedValues = subcats.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
+              yaml += `${spaces}  subcategory: [${quotedValues.join(', ')}]\n`;
+            }
+          }
+
+          // After category_2, immediately output subcategory_2 if it exists
+          if (nestedKey === 'category_2' && value['subcategory_2']) {
+            const subcats = value['subcategory_2'];
+            if (Array.isArray(subcats) && subcats.length > 0) {
+              const quotedValues = subcats.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
+              yaml += `${spaces}  subcategory_2: [${quotedValues.join(', ')}]\n`;
+            }
+          }
         });
       } else {
-        // Simple value
-        const needsQuotes = typeof value === 'string' &&
-                           (value.includes(':') ||
-                            value.includes('#') ||
-                            value.match(/^\d/) ||
-                            value.includes('→') ||
-                            value.includes('__'));
-        const formattedValue = needsQuotes ? `"${value}"` : value;
-        yaml += `${spaces}${key}: ${formattedValue}\n`;
+        // Format the value
+        const formattedValue = formatYamlValue(value);
+
+        if (formattedValue === null) {
+          yaml += `${spaces}${key}: |-\n`;
+          const lines = String(value).split('\n');
+          lines.forEach(line => {
+            yaml += `${spaces}  ${line}\n`;
+          });
+        } else {
+          yaml += `${spaces}${key}: ${formattedValue}\n`;
+        }
       }
     }
 
@@ -727,4 +862,210 @@
   window.setupFontValidation = setupFontValidation;
   window.checkDependencies = checkDependencies;
   })();
+
+  // ========== PODCAST CATEGORY/SUBCATEGORY MANAGEMENT ==========
+
+  if (typeof subcategoryMap === 'undefined') {
+    var subcategoryMap = <%= raw @itunes_subcategories.to_json %>;
+  }
+
+  function setupPodcastCategories() {
+    // Clear any existing dynamic subcategory fields first (Turbo cache issue)
+    document.querySelectorAll('.subcategory-field').forEach(el => el.remove());
+    document.querySelectorAll('.add-subcategory-btn').forEach(el => el.remove());
+
+    // Now set up fresh from the file content
+    document.querySelectorAll('[data-podcast-key]').forEach(container => {
+      const podcastKey = container.dataset.podcastKey;
+      const categoryType = container.dataset.categoryType; // 'primary' or 'secondary'
+      const categoryField = categoryType === 'primary' ? 'category' : 'category_2';
+      const subcategoryField = categoryType === 'primary' ? 'subcategory' : 'subcategory_2';
+
+      const categorySelect = document.querySelector(`select[data-config-field="${podcastKey}.${categoryField}"]`);
+      if (!categorySelect) return;
+
+      // Initialize from existing YAML data
+      initializeSubcategories(container, podcastKey, categoryField, subcategoryField, categorySelect.value);
+
+      // Listen for category changes
+      categorySelect.addEventListener('change', function() {
+        updateSubcategoryUI(container, podcastKey, categoryField, subcategoryField, this.value);
+      });
+    });
+  }
+
+  function initializeSubcategories(container, podcastKey, categoryField, subcategoryField, categoryValue) {
+    console.log(`🎬 initializeSubcategories called for ${podcastKey}.${subcategoryField}`);
+    // Read existing subcategory values from YAML data
+    const yamlTextarea = document.getElementById('config-yaml');
+    if (yamlTextarea && yamlTextarea.value) {
+      try {
+        // Parse the YAML to extract subcategory values
+        const yamlContent = yamlTextarea.value;
+        const lines = yamlContent.split('\n');
+
+        let inPodcast = false;
+        let existingSubcats = [];
+
+        lines.forEach(line => {
+          if (line.trim() === `${podcastKey}:`) {
+            inPodcast = true;
+          } else if (inPodcast && line.match(/^\S/)) {
+            inPodcast = false; // Left the podcast block
+          }
+
+          if (inPodcast && line.includes(`${subcategoryField}:`)) {
+            // Extract array values from flow style: ["Value1", "Value2"]
+            const match = line.match(/\[(.*?)\]/);
+            if (match) {
+              const arrayContent = match[1];
+              existingSubcats = arrayContent.split(',').map(v =>
+                v.trim().replace(/^"/, '').replace(/"$/, '')
+              ).filter(v => v);
+            }
+          }
+        });
+
+        // Populate the UI with existing values
+        if (existingSubcats.length > 0) {
+          console.log(`Found existing subcats:`, existingSubcats);
+          existingSubcats.forEach(value => {
+            addSubcategoryField(container, podcastKey, subcategoryField, categoryValue, value);
+          });
+          updateAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue);
+          return; // Already initialized
+        }
+      } catch (e) {
+        console.error('Failed to parse existing subcategories:', e);
+      }
+    }
+
+    // If no existing data, just set up the UI
+    updateSubcategoryUI(container, podcastKey, categoryField, subcategoryField, categoryValue);
+  }
+
+  function updateSubcategoryUI(container, podcastKey, categoryField, subcategoryField, categoryValue) {
+    // Clear existing subcategory UI
+    const existingSubcats = container.querySelectorAll('.subcategory-field');
+    const existingButton = container.querySelector('.add-subcategory-btn');
+
+    // Collect current values before clearing
+    const currentValues = Array.from(existingSubcats).map(field =>
+      field.querySelector('select')?.value || ''
+    ).filter(v => v);
+
+    existingSubcats.forEach(el => el.remove());
+    if (existingButton) existingButton.remove();
+
+    // If no category selected, hide everything
+    if (!categoryValue || categoryValue === '') {
+      return;
+    }
+
+    // Check if this category has subcategories
+    const availableSubcats = subcategoryMap[categoryValue];
+    if (!availableSubcats || availableSubcats.length === 0) {
+      return;
+    }
+
+    // Re-add existing subcategory fields with values
+    currentValues.forEach(value => {
+      addSubcategoryField(container, podcastKey, subcategoryField, categoryValue, value);
+    });
+
+    // Show "add subcategory" button if < 2 subcategories
+    if (currentValues.length < 2) {
+      showAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue);
+    }
+  }
+
+  function addSubcategoryField(container, podcastKey, subcategoryField, categoryValue, selectedValue = '') {
+    const subcatCount = container.querySelectorAll('.subcategory-field').length;
+    if (subcatCount >= 2) return; // Max 2
+
+    const availableSubcats = subcategoryMap[categoryValue];
+
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = 'subcategory-field flex items-center gap-2 mt-2';
+
+    const select = document.createElement('select');
+    select.className = 'flex-1 font-mono text-sm p-2 border border-gray-300';
+    select.dataset.subcategoryFor = podcastKey;
+    select.dataset.subcategoryField = subcategoryField;
+
+    // Add options
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = '-- select subcategory --';
+    select.appendChild(emptyOption);
+
+    availableSubcats.forEach(subcat => {
+      const option = document.createElement('option');
+      option.value = subcat;
+      option.textContent = subcat;
+      if (subcat === selectedValue) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    // Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'px-2 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = function() {
+      fieldDiv.remove();
+      updateAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue);
+    };
+
+    fieldDiv.appendChild(select);
+    fieldDiv.appendChild(removeBtn);
+
+    // Insert before the add button (if it exists) or append
+    const addBtn = container.querySelector('.add-subcategory-btn');
+    if (addBtn) {
+      container.insertBefore(fieldDiv, addBtn);
+    } else {
+      container.appendChild(fieldDiv);
+    }
+
+    // Update button visibility
+    updateAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue);
+  }
+
+  function showAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue) {
+    // Don't add if already exists
+    if (container.querySelector('.add-subcategory-btn')) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'add-subcategory-btn mt-2 text-sm px-3 py-1 border border-gray-300 hover:bg-gray-100 rounded';
+    button.textContent = '+ add subcategory';
+    button.onclick = function() {
+      addSubcategoryField(container, podcastKey, subcategoryField, categoryValue);
+    };
+
+    container.appendChild(button);
+  }
+
+  function updateAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue) {
+    const subcatCount = container.querySelectorAll('.subcategory-field').length;
+    const addBtn = container.querySelector('.add-subcategory-btn');
+
+    if (subcatCount >= 2) {
+      // Hide button if 2 subcategories exist
+      if (addBtn) addBtn.remove();
+    } else {
+      // Show button if < 2
+      if (!addBtn) {
+        showAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue);
+      }
+    }
+  }
+
+  // Run on page load
+  document.addEventListener('turbo:load', function() {
+    setupPodcastCategories();
+  });
 </script>

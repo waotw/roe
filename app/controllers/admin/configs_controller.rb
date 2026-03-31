@@ -101,6 +101,25 @@ class Admin::ConfigsController < ApplicationController
     }
   }.freeze
 
+  def itunes_subcategories
+    {
+      'Arts' => ['Books', 'Design', 'Fashion & Beauty', 'Food', 'Performing Arts', 'Visual Arts'],
+      'Business' => ['Careers', 'Entrepreneurship', 'Investing', 'Management', 'Marketing', 'Non-Profit'],
+      'Comedy' => ['Comedy Interviews', 'Improv', 'Stand-Up'],
+      'Education' => ['Courses', 'How To', 'Language Learning', 'Self-Improvement'],
+      'Fiction' => ['Comedy Fiction', 'Drama', 'Science Fiction'],
+      'Health & Fitness' => ['Alternative Health', 'Fitness', 'Medicine', 'Mental Health', 'Nutrition', 'Sexuality'],
+      'Kids & Family' => ['Education for Kids', 'Parenting', 'Pets & Animals', 'Stories for Kids'],
+      'Leisure' => ['Animation & Manga', 'Automotive', 'Aviation', 'Crafts', 'Games', 'Hobbies', 'Home & Garden', 'Video Games'],
+      'Music' => ['Music Commentary', 'Music History', 'Music Interviews'],
+      'News' => ['Business News', 'Daily News', 'Entertainment News', 'News Commentary', 'Politics', 'Sports News', 'Tech News'],
+      'Religion & Spirituality' => ['Buddhism', 'Christianity', 'Hinduism', 'Islam', 'Judaism', 'Religion', 'Spirituality'],
+      'Science' => ['Astronomy', 'Chemistry', 'Earth Sciences', 'Life Sciences', 'Mathematics', 'Natural Sciences', 'Nature', 'Physics', 'Social Sciences'],
+      'Society & Culture' => ['Documentary', 'Personal Journals', 'Philosophy', 'Places & Travel', 'Relationships'],
+      'Sports' => ['Baseball', 'Basketball', 'Cricket', 'Fantasy Sports', 'Football', 'Golf', 'Hockey', 'Rugby', 'Running', 'Soccer', 'Swimming', 'Tennis', 'Volleyball', 'Wilderness', 'Wrestling']
+    }
+  end
+
   def index
     @config_files = [
       {
@@ -113,7 +132,8 @@ class Admin::ConfigsController < ApplicationController
         section: "📁 Defaults",
         files: [
           { name: "cards.yml", path: admin_edit_cards_config_path, description: "Default card templates" },
-          { name: "collections.yml", path: admin_edit_collections_config_path, description: "Default collection settings" }
+          { name: "collections.yml", path: admin_edit_collections_config_path, description: "Default collection settings" },
+          { name: "podcast.yml", path: admin_edit_podcast_config_path, description: "Podcast feed configuration" }  # ← Add this
         ]
       }
     ]
@@ -128,6 +148,19 @@ class Admin::ConfigsController < ApplicationController
 
   def update_site
     update_config('site', SiteConfig::SITE_FILE)
+  end
+
+  def edit_podcast
+    @config_type = 'podcast'
+    @config_content = File.read(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+    @config_hash = YAML.load(@config_content) || {}
+    @field_options = build_field_options_for_podcast
+    @itunes_subcategories = itunes_subcategories  # ← Add this
+    render :edit
+  end
+
+  def update_podcast
+    update_config('defaults/podcast', SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
   end
 
   def edit_cards
@@ -175,6 +208,45 @@ class Admin::ConfigsController < ApplicationController
 
   private
 
+  def build_field_options_for_podcast
+    # Flatten all subcategories into one array (will be filtered by JS)
+    all_subcategories = itunes_subcategories.values.flatten.sort
+
+    base_options = {
+      'type' => ['episodic', 'serial'],
+      'category' => [
+        '', # Blank option
+        'Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government',
+        'Health & Fitness', 'History', 'Kids & Family', 'Leisure', 'Music',
+        'News', 'Religion & Spirituality', 'Science', 'Society & Culture',
+        'Sports', 'Technology', 'True Crime', 'TV & Film'
+      ],
+      'category_2' => [
+        '',
+        'Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government',
+        'Health & Fitness', 'History', 'Kids & Family', 'Leisure', 'Music',
+        'News', 'Religion & Spirituality', 'Science', 'Society & Culture',
+        'Sports', 'Technology', 'True Crime', 'TV & Film'
+      ],
+      # Note: subcategory/subcategory_2 are arrays, handled by JS
+      'language' => ['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh', 'ko', 'ru'],
+      'explicit' => ['false', 'true'],
+      'episode_type' => ['full', 'trailer', 'bonus']
+    }
+
+    # Build prefixed versions separately
+    prefixed_options = {}
+    config_hash = YAML.load(@config_content) || {}
+    config_hash.keys.each do |podcast_key|
+      base_options.each do |field, options|
+        prefixed_options["#{podcast_key}.#{field}"] = options
+      end
+    end
+
+    # Merge and return
+    base_options.merge(prefixed_options)
+  end
+
   def build_field_options_for_collections
     existing_post_types = Post.all.map(&:post_type).compact.uniq.sort
 
@@ -216,17 +288,9 @@ class Admin::ConfigsController < ApplicationController
     config_name = type.split('/').last.capitalize
     flash[:notice] = "#{config_name} configuration updated successfully"
 
-    # Redirect back to the appropriate edit page
-    case type
-    when 'site'
-      redirect_to admin_edit_site_config_path
-    when 'defaults/cards'
-      redirect_to admin_edit_cards_config_path
-    when 'defaults/collections'
-      redirect_to admin_edit_collections_config_path
-    else
-      redirect_to admin_configs_path
-    end
+    # Dynamic redirect based on type
+    config_key = type.split('/').last
+    redirect_to send("admin_edit_#{config_key}_config_path")
   rescue => e
     flash.now[:error] = "Failed to update configuration: #{e.message}"
     @config_type = type.split('/').last
