@@ -103,6 +103,13 @@ class Admin::PostsController < Admin::BaseController
     parsed = FrontMatterParser::Parser.new(:md).call(template_content)
     metadata = parsed.front_matter.merge("title" => title)
 
+    # Ensure podcast GUID (if podcast type + published)
+    metadata = ensure_podcast_guid(metadata, Post.new)
+
+    if metadata['tags'].nil? || metadata['tags'] == ''
+      metadata['tags'] = []
+    end
+
     # Format YAML consistently for new posts
     yaml_content = Post.format_metadata_yaml(metadata)
     content = "---\n#{yaml_content}\n---\n#{parsed.content}"
@@ -145,6 +152,23 @@ class Admin::PostsController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      if metadata['tags'].is_a?(String)
+        if metadata['tags'].strip.empty? || metadata['tags'] == '[]'
+          metadata['tags'] = []
+        else
+          # Handle comma-separated or corrupted tags
+          metadata['tags'] = metadata['tags'].split(',').map(&:strip).reject(&:empty?)
+        end
+      elsif metadata['tags'].nil?
+        metadata['tags'] = []
+      end
+
+      # Ensure podcast GUID (if podcast type + published)
+      metadata = ensure_podcast_guid(metadata, @post)
+
+      # Re-serialize to YAML after potential GUID modification
+      yaml_content = Post.format_metadata_yaml(metadata)
+
     rescue => e
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
@@ -153,8 +177,7 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    # Use the original YAML string (preserves formatting from JavaScript)
-    yaml_content = metadata_yaml.strip
+    # Use the formatted YAML (includes GUID if added/restored)
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@post.file_path, full_content)
 
@@ -252,6 +275,36 @@ class Admin::PostsController < Admin::BaseController
   end
 
   private
+
+  def ensure_podcast_guid(metadata_hash, post)
+    # Only process for podcast posts
+    return metadata_hash unless metadata_hash['post_type'] == 'podcast'
+
+    # Only process if status is published
+    return metadata_hash unless metadata_hash['status'] == 'published'
+
+    # If this is an existing published podcast with a GUID in the database
+    if post.persisted?
+      existing_guid = post.metadata['guid']
+
+      if existing_guid.present?
+        # ALWAYS restore the database GUID (prevents editing/deletion)
+        if metadata_hash['guid'] != existing_guid
+          metadata_hash['guid'] = existing_guid
+          Rails.logger.warn "🔒 Restored immutable GUID for '#{metadata_hash['title']}'"
+        end
+        return metadata_hash  # GUID is set and immutable
+      end
+    end
+
+    # No existing GUID - generate one (first publish)
+    if metadata_hash['guid'].blank?
+      metadata_hash['guid'] = SecureRandom.uuid
+      Rails.logger.info "✨ Generated new GUID for '#{metadata_hash['title']}'"
+    end
+
+    metadata_hash
+  end
 
   def sanitize_filename(filename)
     filename = filename.to_s.sub(/\.md$/, '')

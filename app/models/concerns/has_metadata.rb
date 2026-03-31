@@ -61,6 +61,9 @@ module HasMetadata
 
   class_methods do
     def format_metadata_yaml(metadata)
+      # Extract guid to place at the end (and deduplicate if needed)
+      guid_value = metadata.delete('guid')
+
       yaml_lines = []
 
       metadata.each do |key, value|
@@ -84,6 +87,18 @@ module HasMetadata
         end
 
         yaml_lines << "#{key}: #{formatted_value}"
+      end
+
+      # Add GUID at the end (if present)
+      if guid_value.present?
+        formatted_guid = case guid_value
+        when String
+          guid_value.empty? ? '""' : "\"#{guid_value.gsub('"', '\"')}\""
+        else
+          "\"#{guid_value}\""
+        end
+
+        yaml_lines << "guid: #{formatted_guid}"
       end
 
       yaml_lines.join("\n")

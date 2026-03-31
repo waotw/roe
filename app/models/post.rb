@@ -6,6 +6,8 @@ class Post < ApplicationRecord
   has_many :media_references, dependent: :destroy
   has_many :media, through: :media_references, source: :medium
 
+  before_save :preserve_podcast_guid
+  after_save :cleanup_podcast_yaml, if: :should_cleanup_yaml?
   after_save :update_media_references
 
   # Post type definitions
@@ -358,5 +360,67 @@ class Post < ApplicationRecord
     end
 
     paths.uniq
+  end
+
+  def should_cleanup_yaml?
+    metadata['post_type'] == 'podcast' && metadata['status'] == 'published'
+  end
+
+  def cleanup_podcast_yaml
+    return unless File.exist?(file_path)
+    return unless metadata['guid'].present? # Only run if post has a GUID
+
+    begin
+      content = File.read(file_path)
+
+      # Check if GUID in file matches database
+      if content =~ /\A---\s*\n(.*?)\n---\s*\n/m
+        frontmatter = $1
+
+        # Extract current GUID from file (if any)
+        file_guid = nil
+        if frontmatter =~ /^\s*guid\s*:\s*"?([^"\n]+)"?\s*$/
+          file_guid = $1.strip
+        end
+
+        # Only rewrite if GUID is wrong or missing
+        db_guid = metadata['guid']
+
+        if file_guid != db_guid
+          # Remove all existing guid lines
+          cleaned_frontmatter = frontmatter.lines.reject { |line| line =~ /^\s*guid\s*:/ }.join
+
+          # Add correct GUID at the end
+          cleaned_frontmatter = cleaned_frontmatter.rstrip + "\nguid: \"#{db_guid}\"\n"
+
+          # Reconstruct file
+          body = content.sub(/\A---\s*\n.*?\n---\s*\n/m, '')
+          new_content = "---\n#{cleaned_frontmatter}---\n#{body}"
+
+          File.write(file_path, new_content)
+          Rails.logger.info "🔒 Fixed GUID for '#{metadata['title']}'"
+        end
+      end
+
+    rescue => e
+      Rails.logger.error "❌ Failed to fix GUID for '#{metadata['title']}': #{e.message}"
+    end
+  end
+
+  def preserve_podcast_guid
+    return unless metadata['post_type'] == 'podcast'
+    return unless metadata['status'] == 'published'
+
+    # Check if GUID is being removed or changed
+    if metadata_changed? && metadata_was.present?
+      old_guid = metadata_was['guid']
+      new_guid = metadata['guid']
+
+      # If GUID existed and is now missing/different, restore it
+      if old_guid.present? && (new_guid.blank? || new_guid != old_guid)
+        self.metadata = metadata.merge('guid' => old_guid)
+        Rails.logger.warn "🔒 Prevented GUID modification for '#{metadata['title']}' (restored: #{old_guid})"
+      end
+    end
   end
 end
