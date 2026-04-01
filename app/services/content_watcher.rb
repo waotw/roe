@@ -260,7 +260,10 @@ class ContentWatcher
   def self.remove_file(file)
     absolute_file = File.expand_path(file)
 
-    if absolute_file.include?('site/posts')
+    # Handle config files first
+    if absolute_file.include?('site/system')
+      handle_config_removed(absolute_file)
+    elsif absolute_file.include?('site/posts')
       Post.remove_by_file_path(absolute_file)
       puts "   Removed post from database"
     elsif absolute_file.include?('site/pages')
@@ -273,6 +276,53 @@ class ContentWatcher
       web_path = absolute_file.sub(Rails.root.join('site').to_s, '')
       Medium.remove_by_file_path(web_path)
       puts "   Removed media file from database"
+    end
+  end
+
+  def self.handle_config_removed(file_path)
+    filename = File.basename(file_path)
+
+    case filename
+    when 'site.yml'
+      restore_required_config('site', file_path)
+    when 'cards.yml'
+      restore_required_config('defaults/cards', file_path)
+    when 'collections.yml'
+      restore_required_config('defaults/collections', file_path)
+    when 'podcast.yml'
+      # Optional config - allow deletion
+      SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
+      puts "   🗑️  Podcast config removed from database (optional)"
+    else
+      puts "   ℹ️  Unknown config file removed: #{filename}"
+    end
+  end
+
+  def self.restore_required_config(config_type, file_path)
+    filename = config_type.split('/').last
+    site_config = SiteConfig.find_by("file_path LIKE ?", "%#{filename}.yml")
+
+    if site_config&.config.present?
+      # Restore from database backup
+      File.write(file_path, YAML.dump(site_config.config))
+      puts "   🔄 Restored #{filename}.yml from database (required config)"
+    else
+      # Generate fresh defaults
+      generator = ConfigGenerator.new
+      generator.send(:ensure_directories)
+
+      case config_type
+      when 'site'
+        generator.send(:generate_site_config)
+      when 'defaults/cards'
+        generator.send(:generate_cards_defaults)
+      when 'defaults/collections'
+        generator.send(:generate_collections_defaults)
+      end
+
+      # Sync new file to database
+      SiteConfig.sync_from_file(config_type)
+      puts "   ✨ Regenerated default #{filename}.yml (required config)"
     end
   end
 end

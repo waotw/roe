@@ -1,0 +1,49 @@
+<div class="podcast-episode">
+  <% if post.metadata['image'].present? %>
+    <div class="episode-artwork">
+      <%= image_tag post.metadata['image'], alt: post.title, loading: "lazy" %>
+    </div>
+  <% end %>
+
+  <div class="episode-meta">
+    <% if post.metadata['season'].present? || post.metadata['episode_number'].present? %>
+      <p class="episode-info">
+        <% if post.metadata['season'].present? %>
+          <span class="season">Season <%= post.metadata['season'] %></span>
+        <% end %>
+        <% if post.metadata['episode_number'].present? %>
+          <span class="episode">Episode <%= post.metadata['episode_number'] %></span>
+        <% end %>
+        <% if post.metadata['duration'].present? %>
+          <span class="duration"><%= format_duration(post.metadata['duration']) %></span>
+        <% end %>
+      </p>
+    <% end %>
+  </div>
+
+  <div class="media-player audio-player">
+    <audio controls preload="metadata">
+      <source src="<%= post.audio %>" type="audio/mpeg">
+      <source src="<%= post.audio %>" type="audio/mp4">
+      <source src="<%= post.audio %>" type="audio/ogg">
+      <% if post.metadata['captions'].present? %>
+        <track kind="captions" src="<%= post.metadata['captions'] %>" srclang="en" label="English">
+      <% end %>
+      Your browser doesn't support audio playback.
+    </audio>
+  </div>
+
+  <div class="show-notes">
+    <%= raw post.to_html(preview: @preview_mode || false) %>
+  </div>
+
+  <% if post.metadata['podcast'].present? %>
+    <div class="podcast-subscribe">
+      <p>Subscribe:</p>
+      <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="subscribe-link rss" target="_blank">
+        RSS Feed
+      </a>
+      <!-- Add more subscribe links here later: Apple Podcasts, Spotify, etc. -->
+    </div>
+  <% end %>
+</div>

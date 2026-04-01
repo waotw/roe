@@ -108,7 +108,9 @@ class Admin::ConfigsController < ApplicationController
       'Comedy' => ['Comedy Interviews', 'Improv', 'Stand-Up'],
       'Education' => ['Courses', 'How To', 'Language Learning', 'Self-Improvement'],
       'Fiction' => ['Comedy Fiction', 'Drama', 'Science Fiction'],
+      'Government' => [],  # ← Add these categories with empty arrays
       'Health & Fitness' => ['Alternative Health', 'Fitness', 'Medicine', 'Mental Health', 'Nutrition', 'Sexuality'],
+      'History' => [],  # ← No subcategories
       'Kids & Family' => ['Education for Kids', 'Parenting', 'Pets & Animals', 'Stories for Kids'],
       'Leisure' => ['Animation & Manga', 'Automotive', 'Aviation', 'Crafts', 'Games', 'Hobbies', 'Home & Garden', 'Video Games'],
       'Music' => ['Music Commentary', 'Music History', 'Music Interviews'],
@@ -116,7 +118,10 @@ class Admin::ConfigsController < ApplicationController
       'Religion & Spirituality' => ['Buddhism', 'Christianity', 'Hinduism', 'Islam', 'Judaism', 'Religion', 'Spirituality'],
       'Science' => ['Astronomy', 'Chemistry', 'Earth Sciences', 'Life Sciences', 'Mathematics', 'Natural Sciences', 'Nature', 'Physics', 'Social Sciences'],
       'Society & Culture' => ['Documentary', 'Personal Journals', 'Philosophy', 'Places & Travel', 'Relationships'],
-      'Sports' => ['Baseball', 'Basketball', 'Cricket', 'Fantasy Sports', 'Football', 'Golf', 'Hockey', 'Rugby', 'Running', 'Soccer', 'Swimming', 'Tennis', 'Volleyball', 'Wilderness', 'Wrestling']
+      'Sports' => ['Baseball', 'Basketball', 'Cricket', 'Fantasy Sports', 'Football', 'Golf', 'Hockey', 'Rugby', 'Running', 'Soccer', 'Swimming', 'Tennis', 'Volleyball', 'Wilderness', 'Wrestling'],
+      'Technology' => [],  # ← No subcategories
+      'True Crime' => [],  # ← No subcategories
+      'TV & Film' => ['After Shows', 'Film History', 'Film Interviews', 'Film Reviews', 'TV Reviews']  # ← Was missing
     }
   end
 
@@ -125,18 +130,26 @@ class Admin::ConfigsController < ApplicationController
       {
         section: "📁 Site",
         files: [
-          { name: "site.yml", path: admin_edit_site_config_path, description: "Site metadata, branding, and fonts" }
+          { name: "site.yml", path: admin_edit_site_config_path, description: "Global site & feed settings, logo, and fonts" }
         ]
       },
       {
         section: "📁 Defaults",
         files: [
-          { name: "cards.yml", path: admin_edit_cards_config_path, description: "Default card templates" },
-          { name: "collections.yml", path: admin_edit_collections_config_path, description: "Default collection settings" },
-          { name: "podcast.yml", path: admin_edit_podcast_config_path, description: "Podcast feed configuration" }  # ← Add this
+          { name: "cards.yml", path: admin_edit_cards_config_path, description: "Global Card settings & templates" },
+          { name: "collections.yml", path: admin_edit_collections_config_path, description: "Global Collection settings & template" }
         ]
       }
     ]
+
+    # Add podcast config to list if it exists
+      if File.exist?(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+        @config_files[1][:files] << {
+          name: "podcast.yml",
+          path: admin_edit_podcast_config_path,
+          description: "Global Podcast & feed settings"
+        }
+      end
   end
 
   def edit_site
@@ -151,11 +164,22 @@ class Admin::ConfigsController < ApplicationController
   end
 
   def edit_podcast
+    podcast_config_path = SiteConfig::DEFAULTS_PATH.join('podcast.yml')
+
+    # Check if file exists
+    unless File.exist?(podcast_config_path)
+      # Clean up orphaned database record
+      SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
+
+      flash[:alert] = "Podcast configuration doesn't exist. Click 'Add Podcast Config' to create one."
+      redirect_to admin_configs_path and return
+    end
+
     @config_type = 'podcast'
-    @config_content = File.read(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+    @config_content = File.read(podcast_config_path)
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_podcast
-    @itunes_subcategories = itunes_subcategories  # ← Add this
+    @itunes_subcategories = itunes_subcategories
     render :edit
   end
 
@@ -204,6 +228,35 @@ class Admin::ConfigsController < ApplicationController
     else
       nil
     end
+  end
+
+  def generate_podcast
+    if File.exist?(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+      flash[:alert] = "Podcast configuration already exists"
+    else
+      ConfigGenerator.generate_podcast
+      SiteConfig.sync_from_file('defaults/podcast')
+      flash[:notice] = "Podcast configuration created successfully"
+    end
+
+    redirect_to admin_configs_path
+  end
+
+  def delete_podcast
+    file_path = SiteConfig::DEFAULTS_PATH.join('podcast.yml')
+
+    # Delete file
+    File.delete(file_path) if File.exist?(file_path)
+
+    # Delete from database
+    SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
+
+    # Clear cache
+    SiteConfig.reload!('defaults/podcast')
+    PodcastConfig.reload!
+
+    flash[:notice] = "Podcast configuration deleted successfully"
+    redirect_to admin_configs_path
   end
 
   private

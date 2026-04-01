@@ -21,17 +21,6 @@ class FeedGenerator
     end
   end
 
-  private
-
-  def default_site_config
-    {
-      title: "My Blog",
-      description: "Blog posts and updates",
-      url: "http://localhost:3000",
-      author: "Site Author"
-    }
-  end
-
   def generate_rss
     require 'rss'
 
@@ -95,31 +84,6 @@ class FeedGenerator
     feed.to_s
   end
 
-  def feed_description(post)
-    # Priority: subtitle > excerpt > first paragraph
-    return post.subtitle if post.subtitle.present?
-    return post.excerpt if post.excerpt.present?
-
-    # Extract first paragraph from content
-    clean_content = post.content
-      .gsub(/```card\r?\n.*?```/m, '') # Remove card blocks
-      .gsub(/```collection\r?\n.*?```/m, '') # Remove collection blocks
-
-    # Convert to HTML
-    html = Kramdown::Document.new(clean_content, input: 'GFM').to_html
-
-    # Extract first <p> tag content
-    doc = Nokogiri::HTML.fragment(html)
-    first_paragraph = doc.css('p').first&.text
-
-    if first_paragraph.present?
-      first_paragraph.squish.truncate(200)
-    else
-      # Fallback: strip all tags and truncate
-      ActionController::Base.helpers.strip_tags(html).squish.truncate(200)
-    end
-  end
-
   def generate_podcast_rss
     require 'nokogiri'
 
@@ -168,7 +132,12 @@ class FeedGenerator
             xml.item do
               xml.title post.title
               xml.link "#{site_config[:url]}/posts/#{post.url_name}"
-              xml.description episode_description(post)
+
+              # Full content as HTML for description
+              xml.description do
+                xml.cdata episode_content_html(post)
+              end
+
               xml.pubDate post.date.to_time.rfc822 if post.date
 
               # Immutable GUID
@@ -189,7 +158,10 @@ class FeedGenerator
               # iTunes episode elements
               xml['itunes'].title post.title
               xml['itunes'].author post.metadata['author'] || podcast_config['author']
-              xml['itunes'].summary post.subtitle || post.excerpt || episode_description(post)
+
+              # Summary: excerpt > subtitle > first sentence
+              xml['itunes'].summary episode_summary(post)
+
               xml['itunes'].duration post.metadata['duration'] if post.metadata['duration'].present?
               xml['itunes'].explicit(post.metadata['explicit'] == true ? 'true' : 'false')
               xml['itunes'].episode post.metadata['episode_number'] if post.metadata['episode_number'].present?
@@ -207,6 +179,42 @@ class FeedGenerator
     end
 
     builder.to_xml
+  end
+
+  private
+
+  def default_site_config
+    {
+      title: "My Blog",
+      description: "Blog posts and updates",
+      url: "http://localhost:3000",
+      author: "Site Author"
+    }
+  end
+
+  def feed_description(post)
+    # Priority: subtitle > excerpt > first paragraph
+    return post.subtitle if post.subtitle.present?
+    return post.excerpt if post.excerpt.present?
+
+    # Extract first paragraph from content
+    clean_content = post.content
+      .gsub(/```card\r?\n.*?```/m, '') # Remove card blocks
+      .gsub(/```collection\r?\n.*?```/m, '') # Remove collection blocks
+
+    # Convert to HTML
+    html = Kramdown::Document.new(clean_content, input: 'GFM').to_html
+
+    # Extract first <p> tag content
+    doc = Nokogiri::HTML.fragment(html)
+    first_paragraph = doc.css('p').first&.text
+
+    if first_paragraph.present?
+      first_paragraph.squish.truncate(200)
+    else
+      # Fallback: strip all tags and truncate
+      ActionController::Base.helpers.strip_tags(html).squish.truncate(200)
+    end
   end
 
   def add_itunes_categories_xml(xml, config)
@@ -273,5 +281,51 @@ class FeedGenerator
     when '.ogg' then 'audio/ogg'
     else 'audio/mpeg' # default
     end
+  end
+
+  def episode_summary(post)
+    # Get the source text
+    source = if post.excerpt.present?
+      post.excerpt
+    elsif post.subtitle.present?
+      post.subtitle
+    else
+      # Extract first sentence from content
+      return extract_first_sentence(post.content)
+    end
+
+    # Convert excerpt/subtitle markdown to plain text
+    convert_markdown_to_plain(source)
+  end
+
+  def convert_markdown_to_plain(text)
+    # Convert markdown to HTML, then strip tags
+    html = Kramdown::Document.new(text, input: 'GFM').to_html
+    ActionController::Base.helpers.strip_tags(html).squish.truncate(300)
+  end
+
+  def episode_content_html(post)
+    # Convert full markdown content to HTML for show notes
+    clean_content = post.content
+      .gsub(/```card\r?\n.*?```/m, '')         # Remove card blocks
+      .gsub(/```collection\r?\n.*?```/m, '')   # Remove collection blocks
+
+    # Convert markdown to HTML
+    Kramdown::Document.new(clean_content, input: 'GFM').to_html
+  end
+
+  def extract_first_sentence(content)
+    # Clean content
+    clean_content = content
+      .gsub(/```card\r?\n.*?```/m, '')
+      .gsub(/```collection\r?\n.*?```/m, '')
+
+    # Convert to plain text
+    html = Kramdown::Document.new(clean_content, input: 'GFM').to_html
+    text = ActionController::Base.helpers.strip_tags(html).squish
+
+    # Extract first sentence
+    match = text.match(/^[^.!?]+[.!?]/)
+    match ? match[0].strip : text.truncate(200)
   end
 end

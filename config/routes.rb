@@ -51,7 +51,12 @@ Rails.application.routes.draw do
 
     resources :documentation, only: [ :index, :new, :create, :edit, :update, :destroy ]
 
-    resources :configs, only: [ :index ]
+    resources :configs, only: [:index] do
+      collection do
+        post :generate_podcast
+        delete :delete_podcast
+      end
+    end
 
     resources :themes, only: [:index] do
       member do

@@ -302,7 +302,7 @@
     <!-- Hidden field to store final config YAML -->
     <%= form.hidden_field :content, id: "config-final", value: "" %>
 
-    <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 bg-white">
+    <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 right-10 bg-white">
       <%= form.submit "Save Configuration",
                       class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
       <%= link_to "Cancel", admin_configs_path,
@@ -896,6 +896,13 @@
 
   function initializeSubcategories(container, podcastKey, categoryField, subcategoryField, categoryValue) {
     console.log(`🎬 initializeSubcategories called for ${podcastKey}.${subcategoryField}`);
+
+    // Guard: Check if subcategoryMap exists
+      if (!subcategoryMap || typeof subcategoryMap !== 'object') {
+        console.warn('⚠️  subcategoryMap not loaded');
+        return;
+      }
+
     // Read existing subcategory values from YAML data
     const yamlTextarea = document.getElementById('config-yaml');
     if (yamlTextarea && yamlTextarea.value) {
@@ -958,15 +965,22 @@
     if (existingButton) existingButton.remove();
 
     // If no category selected, hide everything
-    if (!categoryValue || categoryValue === '') {
-      return;
-    }
+      if (!categoryValue || categoryValue === '') {
+        return;
+      }
 
-    // Check if this category has subcategories
-    const availableSubcats = subcategoryMap[categoryValue];
-    if (!availableSubcats || availableSubcats.length === 0) {
-      return;
-    }
+      // Guard: Check if subcategoryMap exists and is valid
+      if (!subcategoryMap || typeof subcategoryMap !== 'object') {
+        console.warn('⚠️  subcategoryMap not loaded');
+        return;
+      }
+
+      // Check if this category has subcategories
+      const availableSubcats = subcategoryMap[categoryValue];
+      if (!availableSubcats || availableSubcats.length === 0) {
+        console.log(`ℹ️  "${categoryValue}" has no subcategories (this is normal)`);
+        return; // Category has no subcategories - perfectly valid!
+      }
 
     // Re-add existing subcategory fields with values
     currentValues.forEach(value => {
@@ -1012,7 +1026,7 @@
     // Remove button
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
-    removeBtn.className = 'px-2 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded';
+    removeBtn.className = 'px-2 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-700';
     removeBtn.textContent = '×';
     removeBtn.onclick = function() {
       fieldDiv.remove();

@@ -1,6 +1,17 @@
 <div class="px-4 sm:px-0">
-  <h1 class="text-3xl font-bold text-gray-900">Configuration Files</h1>
-  <p class="mt-2 text-sm text-gray-700">Edit YAML configuration files for your site.</p>
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">Configuration Files</h1>
+      <p class="mt-2 text-sm text-gray-700">Edit YAML configuration files for your site.</p>
+    </div>
+
+    <% unless File.exist?(Rails.root.join('site', 'system', 'defaults', 'podcast.yml')) %>
+      <%= button_to "Add Podcast",
+                    generate_podcast_admin_configs_path,
+                    method: :post,
+                    class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    <% end %>
+  </div>
 
   <div class="mt-8 space-y-8">
     <% @config_files.each do |section| %>
@@ -11,7 +22,8 @@
             <% section[:files].each do |file| %>
               <tr>
                 <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 font-mono">
-                  <%= link_to file[:name], file[:path], class: "text-blue-600 hover:text-blue-900" %>
+                  <%= link_to file[:name], file[:path], class: "text-blue-600 hover:text-blue-900 block mb-0.5" %>
+                  <span class="text-xs text-gray-400"><%= file[:description] %></span>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right text-sm">
                   <%= link_to "Edit", file[:path], class: "text-blue-600 hover:text-blue-900" %>

@@ -81,6 +81,23 @@ class StaticGenerator
     # Clean up deleted content
     cleanup_deleted_files
 
+    # Reload only the configs that actually changed
+    if changes[:changed_configs][:site]
+      puts "  🔄 Reloading site config..."
+      SiteConfig.reload!('site')
+    end
+
+    if changes[:changed_configs][:collections]
+      puts "  🔄 Reloading collections config..."
+      SiteConfig.reload!('defaults/collections')
+    end
+
+    if changes[:changed_configs][:podcast]
+      puts "  🔄 Reloading podcast config..."
+      SiteConfig.reload!('defaults/podcast')
+      PodcastConfig.reload!
+    end
+
     # Log what changed
     puts "📊 Change detection:"
     puts "  Home: #{changes[:home] ? 'changed' : 'unchanged'}"
@@ -99,6 +116,7 @@ class StaticGenerator
     generate_documentation(changes[:documentation]) if changes[:documentation].any?
     generate_collection_archives if changes[:collections]
     generate_feeds if changes[:feeds]
+    generate_podcast_feeds if changes[:podcast_feeds]
 
     copy_assets if changes[:assets]
     copy_media if changes[:media]
@@ -157,7 +175,8 @@ class StaticGenerator
       configs: {
         'site' => SiteConfig.find_by("file_path LIKE ?", "%site.yml")&.updated_at&.iso8601(6),
         'defaults/collections' => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
-        'defaults/cards' => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6)
+        'defaults/cards' => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
+        'defaults/podcast' => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6)
       },
       layouts: layout_checksums,
       assets: asset_checksums
@@ -176,18 +195,35 @@ class StaticGenerator
     pages = changed_items(Page.not_draft, 'pages')
     docs = changed_items(Documentation.not_draft, 'documentation')
 
-    global_changed = config_changed? || layouts_changed?
+    podcast_posts = posts.select { |p| p.metadata['post_type'] == 'podcast' }
+
+    # Track which specific configs changed
+    site_config_changed = config_file_changed?('site')
+    collections_config_changed = config_file_changed?('defaults/collections')
+    cards_config_changed = config_file_changed?('defaults/cards')
+    podcast_config_changed = config_file_changed?('defaults/podcast')
+
+    global_changed = site_config_changed || collections_config_changed || cards_config_changed || layouts_changed?
 
     {
-      home: home_changed? || global_changed,
+      home: home_changed? || site_config_changed || layouts_changed?,
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? Page.not_draft.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
-      collections: global_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
-      feeds: global_changed || posts.any? || @manifest['generated_at'].nil?,
+      collections: collections_config_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
+      feeds: site_config_changed || posts.any? || @manifest['generated_at'].nil?,
+      podcast_feeds: podcast_config_changed || podcast_posts.any? || @manifest['generated_at'].nil?,
       assets: assets_changed?,
       media: media_changed?,
-      config: global_changed
+      config: global_changed,
+
+      # Track which configs actually changed
+      changed_configs: {
+        site: site_config_changed,
+        collections: collections_config_changed,
+        cards: cards_config_changed,
+        podcast: podcast_config_changed
+      }
     }
   end
 
@@ -212,6 +248,10 @@ class StaticGenerator
 
     last_generated = manifest_entry.is_a?(Hash) ? manifest_entry['updated_at'] : manifest_entry
     !last_generated || home.updated_at > Time.parse(last_generated)
+  end
+
+  def podcast_config_changed?
+    config_file_changed?('defaults/podcast')
   end
 
   def config_changed?
@@ -635,6 +675,43 @@ class StaticGenerator
     log_error('feeds', nil, e)
   end
 
+  def generate_podcast_feeds
+    puts "🎙️  Generating podcast RSS feeds..."
+
+    podcast_keys = PodcastConfig.podcast_keys
+    return puts "  ⊘ No podcasts configured" if podcast_keys.empty?
+
+    podcast_keys.each do |podcast_key|
+      generate_podcast_feed(podcast_key)
+    rescue => e
+      log_error('podcast_feed', podcast_key, e)
+    end
+
+    puts "  ✓ Generated #{podcast_keys.count} podcast feeds"
+  end
+
+  def generate_podcast_feed(podcast_key)
+    podcast_config = PodcastConfig.get(podcast_key)
+    episodes = Post.published
+      .where("json_extract(metadata, '$.post_type') = ?", 'podcast')
+      .where("json_extract(metadata, '$.podcast') = ?", podcast_key)
+      .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
+
+    feed_xml = FeedGenerator.new(
+      posts: episodes,
+      format: :podcast,
+      site_config: {
+        title: podcast_config['title'],
+        description: podcast_config['description'],
+        url: "https://#{site_host}",
+        author: podcast_config['author']
+      },
+      podcast_config: podcast_config
+    ).generate
+
+    write_file("podcast/#{podcast_key}.xml", feed_xml)
+  end
+
   def render_feed(format:)
     controller = FeedsController.new
     controller.request = ActionDispatch::TestRequest.create('HTTP_HOST' => site_host, 'HTTPS' => 'on')
@@ -733,6 +810,49 @@ class StaticGenerator
 
   def render_with_layout(template:, assigns: {})
     ApplicationController.render(template: template, assigns: assigns, layout: 'site')
+  rescue ActionController::UrlGenerationError => e
+    # Extract context from error
+    context_info = ["Template: #{template}"]
+
+    # Identify which content item is being rendered
+    if assigns[:post]
+      context_info << "Post: '#{assigns[:post].title}' (#{assigns[:post].file_path})"
+    elsif assigns[:page]
+      context_info << "Page: '#{assigns[:page].title}' (#{assigns[:page].file_path})"
+    elsif assigns[:doc]
+      context_info << "Doc: '#{assigns[:doc].title}' (#{assigns[:doc].file_path})"
+    elsif assigns[:items]&.any?
+      context_info << "Collection with #{assigns[:items].count} items"
+    end
+
+    # Extract the parameter causing the issue
+    if e.message.match(/filename=>"([^"]*)"/)
+      param_value = $1
+      context_info << "Problem: Empty filename parameter (filename='#{param_value}')"
+      context_info << "💡 Check for empty image/media/audio/video fields in metadata"
+    end
+
+    puts "\n" + "=" * 70
+    puts "❌ URL GENERATION ERROR"
+    puts "=" * 70
+    context_info.each { |info| puts "   #{info}" }
+    puts "\n   Error: #{e.message}"
+    puts "=" * 70 + "\n"
+
+    raise e # Re-raise to stop generation
+  rescue StandardError => e
+    puts "\n" + "=" * 70
+    puts "❌ RENDERING ERROR"
+    puts "=" * 70
+    puts "   Template: #{template}"
+    puts "   Error: #{e.class}: #{e.message}"
+    if e.backtrace
+      puts "\n   Backtrace:"
+      e.backtrace.first(5).each { |line| puts "      #{line}" }
+    end
+    puts "=" * 70 + "\n"
+
+    raise e
   end
 
   def site_host

@@ -38,7 +38,15 @@ class SiteConfig < ApplicationRecord
       Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     else
       # Clear all config caches
-      Rails.cache.delete_matched("#{CACHE_KEY_PREFIX}_*")
+      # SolidCache doesn't support delete_matched, so delete each key explicitly
+      [
+        'site',
+        'defaults/collections',
+        'defaults/cards',
+        'defaults/podcast'
+      ].each do |config_type|
+        Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{config_type}")
+      end
     end
   end
 

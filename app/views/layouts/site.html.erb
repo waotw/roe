@@ -39,8 +39,8 @@
       <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
     <% end %>
     <!-- Apple touch icon -->
-    <% if SiteConfig.get('logo') %>
-      <link rel="apple-touch-icon" href="<%= system_image_path(SiteConfig.get('logo')) %>">
+    <% if SiteConfig.get('logo').present? %>
+      <%= image_tag safe_system_image_path(SiteConfig.get('logo')), alt: site_title %>
     <% end %>
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>

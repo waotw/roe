@@ -1,14 +1,16 @@
-<article class="post post--<%= @post.post_type %>">
-  <%= render 'posts/header', post: @post %>
+<div class="content">
+  <article class="post post--<%= @post.post_type %>">
+    <%= render 'posts/header', post: @post %>
 
-  <% if lookup_context.exists?("posts/types/#{@post.post_type}", [], true) %>
-    <%= render "posts/types/#{@post.post_type}", post: @post %>
-  <% else %>
-    <%# Fallback to article if type partial doesn't exist %>
-    <%= render "posts/types/article", post: @post %>
-  <% end %>
+    <% if lookup_context.exists?("posts/types/#{@post.post_type}", [], true) %>
+      <%= render "posts/types/#{@post.post_type}", post: @post %>
+    <% else %>
+      <%# Fallback to article if type partial doesn't exist %>
+      <%= render "posts/types/article", post: @post %>
+    <% end %>
 
-  <%= render 'posts/footer', post: @post %>
-</article>
+    <%= render 'posts/footer', post: @post %>
+  </article>
 
-<%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>
+  <%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>
+</div>

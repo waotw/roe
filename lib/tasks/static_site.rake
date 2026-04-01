@@ -125,6 +125,13 @@ namespace :site do
       end
     end
 
+    # Remove podcast feeds
+    if Dir.exist?(public_dir.join('podcast'))
+      podcast_files = Dir.glob(public_dir.join('podcast', '*.xml')).count
+      FileUtils.rm_rf(public_dir.join('podcast'))
+      files_deleted += podcast_files
+    end
+
     # Remove manifest (forces full regeneration)
     if File.exist?(public_dir.join('.generation_manifest.json'))
       File.delete(public_dir.join('.generation_manifest.json'))

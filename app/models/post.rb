@@ -144,6 +144,43 @@ class Post < ApplicationRecord
       .sort
   end
 
+  def tags
+    tag_data = metadata['tags']
+
+    case tag_data
+    when Array
+      # Filter out blank entries AND the literal string "[]"
+      tag_data.reject { |tag| tag.blank? || tag.to_s.strip == "[]" }
+    when String
+      normalized = tag_data.strip
+
+      # Handle empty or "[]" strings
+      return [] if normalized.empty? || normalized == "[]"
+
+      # Try parsing as JSON array first
+      if normalized.start_with?('[') && normalized.end_with?(']')
+        begin
+          parsed = JSON.parse(normalized)
+          return parsed.is_a?(Array) ? parsed.reject { |t| t.blank? || t == "[]" } : []
+        rescue JSON::ParserError
+          return [] if normalized == "[]"
+        end
+      end
+
+      # Comma-separated tags
+      if normalized.include?(',')
+        return normalized.split(',').map(&:strip).reject(&:blank?)
+      end
+
+      # Single tag
+      [normalized]
+    when nil
+      []
+    else
+      []
+    end
+  end
+
   def self.create_or_update_from_file(file_path)
     absolute_path = File.expand_path(file_path)
     has_warnings = false
