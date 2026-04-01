@@ -25,7 +25,7 @@
       'post_type' => { type: :select, label: 'post_type', options: Post.post_type_options },
       'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'author' => { type: :text, label: 'author', default_from_config: true },
-      'tags' => { type: :text, label: 'tags', hint: 'comma-separated' },
+      'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
@@ -33,7 +33,12 @@
       # Media fields
       'audio' => { type: :text, label: 'audio', hint: "Example: /media/audio/audio-file.mp3" },
       'video' => { type: :text, label: 'video', hint: "Example: /media/video/video-file.mp4" },
-      'duration' => { type: :text, label: 'duration', hint: 'e.g., "12:34" or seconds' },
+      'duration' => {
+        type: :text,
+        label: 'duration',
+        hint: 'Auto-calculated from media file',
+        readonly: true  # Add this
+      },
       'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' },
 
       # Podcast-specific fields
@@ -98,7 +103,7 @@
   </div>
   <% if defined?(item) && item.persisted? && item.url_name.present? %>
     <div class="mb-3 p-2 bg-blue-50 border border-blue-200 text-sm font-mono">
-      <span class="text-blue-800 font-semibold">URL:</span>
+      <span class="text-blue-800 font-semibold">url_name:</span>
       <code class="text-xs ml-2"><%= item.url_name %></code>
     </div>
   <% end %>
@@ -115,14 +120,27 @@
               <%= config[:label] %>:<% if config[:required] %><span class="text-red-600 relative -top-0.5"><sup>*</sup></span><% end %>
             </label>
             <% case config[:type] %>
-            <% when :text %>
-              <input type="text"
-                      id="metadata-field-<%= field_name %>"
-                      name="metadata_fields[<%= field_name %>]"
-                      value="<%= ERB::Util.html_escape(value.to_s) %>"
-                      class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                      data-metadata-field="<%= field_name %>"
-                      <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+              <% when :text %>
+                <%
+                  # Special handling for tags - show as comma-separated, not array notation
+                  display_value = if field_name == 'tags'
+                    if value.is_a?(Array)
+                      value.join(', ')
+                    else
+                      value.to_s == '[]' ? '' : value.to_s
+                    end
+                  else
+                    value.to_s
+                  end
+                %>
+                <input type="text"
+                        id="metadata-field-<%= field_name %>"
+                        name="metadata_fields[<%= field_name %>]"
+                        value="<%= ERB::Util.html_escape(display_value) %>"
+                        class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'bg-gray-200 text-gray-600' if config[:readonly] %>"
+                        data-metadata-field="<%= field_name %>"
+                        <% if config[:readonly] %>readonly<% end %>
+                        <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
             <% when :date %>
               <input type="date"
                       id="metadata-field-<%= field_name %>"

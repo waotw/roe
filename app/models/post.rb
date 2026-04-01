@@ -147,36 +147,64 @@ class Post < ApplicationRecord
   def self.create_or_update_from_file(file_path)
     absolute_path = File.expand_path(file_path)
     has_warnings = false
+    yaml_parse_error = nil
 
     begin
       parsed = FrontMatterParser::Parser.parse_file(file_path)
     rescue => e
-      Rails.logger.error "Failed to parse #{file_path}: #{e.message}"
-      puts "\n  ✗ Error parsing: #{File.basename(file_path)} - #{e.message}\n"
-      return nil
-    end
+      # First attempt: Try to fix GUID specifically
+      if fix_guid_in_file(file_path)
+        # Try parsing again after GUID fix
+        begin
+          parsed = FrontMatterParser::Parser.parse_file(file_path)
+          puts "\n  ✓ Auto-fixed malformed GUID in #{File.basename(file_path)}\n"
+          yaml_parse_error = nil
+        rescue => e2
+          # Still broken after GUID fix - use fallback
+          Rails.logger.error "Failed to parse #{file_path} even after GUID fix: #{e2.message}"
+          puts "\n  ⚠️  YAML parsing error: #{File.basename(file_path)}"
+          puts "     #{e2.message}"
+          puts "     Post saved with broken metadata - edit in admin to fix\n"
 
-    if parsed.front_matter['date'].present?
-      begin
-        Date.parse(parsed.front_matter['date'].to_s)
-      rescue ArgumentError, TypeError => e
-        Rails.logger.error "Invalid date in #{file_path}: #{parsed.front_matter['date']}"
-        puts "\n  ✗ Invalid date: #{File.basename(file_path)} - '#{parsed.front_matter['date']}' is not a valid date\n"
-        return nil
+          yaml_parse_error = e2.message
+          parsed = extract_broken_frontmatter(file_path)
+        end
+      else
+        # GUID fix didn't apply or failed - use fallback
+        Rails.logger.error "Failed to parse #{file_path}: #{e.message}"
+        puts "\n  ⚠️  YAML parsing error: #{File.basename(file_path)}"
+        puts "     #{e.message}"
+        puts "     Post saved with broken metadata - edit in admin to fix\n"
+
+        yaml_parse_error = e.message
+        parsed = extract_broken_frontmatter(file_path)
       end
     end
 
-    if parsed.front_matter['status'] == 'published'
-      if parsed.front_matter['title'].blank?
-        Rails.logger.warn "Published post missing title: #{file_path}"
-        puts "\n  ⚠ Missing title: #{File.basename(file_path)}"
-        has_warnings = true
+    # Rest of validation (skip for broken YAML)
+    unless yaml_parse_error
+      if parsed.front_matter['date'].present?
+        begin
+          Date.parse(parsed.front_matter['date'].to_s)
+        rescue ArgumentError, TypeError => e
+          Rails.logger.error "Invalid date in #{file_path}: #{parsed.front_matter['date']}"
+          puts "\n  ✗ Invalid date: #{File.basename(file_path)} - '#{parsed.front_matter['date']}' is not a valid date\n"
+          return nil
+        end
       end
 
-      if parsed.front_matter['date'].blank?
-        Rails.logger.warn "Published post missing date: #{file_path}"
-        puts "  ⚠ Missing date: #{File.basename(file_path)}\n"
-        has_warnings = true
+      if parsed.front_matter['status'] == 'published'
+        if parsed.front_matter['title'].blank?
+          Rails.logger.warn "Published post missing title: #{file_path}"
+          puts "\n  ⚠ Missing title: #{File.basename(file_path)}"
+          has_warnings = true
+        end
+
+        if parsed.front_matter['date'].blank?
+          Rails.logger.warn "Published post missing date: #{file_path}"
+          puts "  ⚠ Missing date: #{File.basename(file_path)}\n"
+          has_warnings = true
+        end
       end
     end
 
@@ -201,6 +229,11 @@ class Post < ApplicationRecord
 
     post.metadata = parsed.front_matter
     post.content = parsed.content
+
+    # Mark if YAML was broken
+    if yaml_parse_error
+      post.metadata['_yaml_parse_error'] = yaml_parse_error
+    end
 
     begin
       post.save!
@@ -324,6 +357,84 @@ class Post < ApplicationRecord
   end
 
   private
+
+  def self.fix_guid_in_file(file_path)
+    return false unless File.exist?(file_path)
+
+    content = File.read(file_path)
+
+    # Check if file has frontmatter
+    return false unless content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)/m
+
+    frontmatter = $1
+    body = $2
+
+    # Check if there's a guid line (even malformed)
+    return false unless frontmatter =~ /^\s*guid\s*:/m
+
+    # Find existing post to get the authoritative GUID
+    absolute_path = File.expand_path(file_path)
+    post = find_by(file_path: absolute_path)
+
+    return false unless post&.metadata&.dig('guid').present?
+
+    correct_guid = post.metadata['guid']
+
+    # Remove ALL guid lines (in case there are duplicates or malformed ones)
+    fixed_frontmatter = frontmatter.lines.reject { |line| line =~ /^\s*guid\s*:/ }.join
+
+    # Add correct GUID at the end
+    fixed_frontmatter = fixed_frontmatter.rstrip + "\nguid: \"#{correct_guid}\"\n"
+
+    # Write fixed content back
+    fixed_content = "---\n#{fixed_frontmatter}---\n#{body}"
+    File.write(file_path, fixed_content)
+
+    Rails.logger.info "🔧 Auto-fixed malformed GUID in #{File.basename(file_path)}"
+    true
+  rescue => e
+    Rails.logger.error "Failed to auto-fix GUID: #{e.message}"
+    false
+  end
+
+  def self.extract_broken_frontmatter(file_path)
+    content = File.read(file_path)
+
+    # Try to extract frontmatter block even if YAML is broken
+    if content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)/m
+      raw_yaml = $1
+      body = $2
+
+      # Parse line by line, skipping broken lines
+      metadata = {}
+      raw_yaml.each_line do |line|
+        next if line.strip.empty?
+
+        if line =~ /^(\w+):\s*(.*)$/
+          key = $1
+          value = $2.strip
+          # Remove quotes if present and complete
+          if (value.start_with?('"') && value.end_with?('"')) ||
+             (value.start_with?("'") && value.end_with?("'"))
+            value = value[1..-2]
+          end
+          metadata[key] = value
+        end
+      end
+
+      # Create a parsed-like object
+      OpenStruct.new(
+        front_matter: metadata,
+        content: body
+      )
+    else
+      # No frontmatter found
+      OpenStruct.new(
+        front_matter: { 'title' => File.basename(file_path, '.md') },
+        content: content
+      )
+    end
+  end
 
   def update_media_references
     # Extract media paths from content

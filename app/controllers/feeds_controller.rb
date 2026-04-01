@@ -27,6 +27,34 @@ class FeedsController < ApplicationController
     render xml: feed_xml
   end
 
+  def podcast
+    @podcast_key = params[:podcast_key]
+
+    # Validate podcast exists in config
+    podcast_config = PodcastConfig.get(@podcast_key)
+    unless podcast_config
+      head :not_found
+      return
+    end
+
+    # Get published podcast episodes for this show
+    @episodes = Post
+      .published
+      .where("json_extract(metadata, '$.post_type') = ?", 'podcast')
+      .where("json_extract(metadata, '$.podcast') = ?", @podcast_key)
+      .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
+
+    feed_xml = FeedGenerator.new(
+      posts: @episodes,
+      format: :podcast,
+      site_config: site_config,
+      podcast_config: podcast_config
+    ).generate
+
+    response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+    render xml: feed_xml
+  end
+
   private
 
   def site_config

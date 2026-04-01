@@ -13,10 +13,15 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def drafts
-    @posts = Post.drafts.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
-    @title = "Drafts"
-    @description = "Posts that haven't been published yet."
-    render :index
+    @posts = Post.draft.order(created_at: :desc)
+
+    # Get distinct post types that exist (ADD THIS!)
+    @existing_types = Post.distinct
+      .pluck(Arel.sql("json_extract(metadata, '$.post_type')"))
+      .compact
+      .uniq
+
+    render :index  # or whatever you're rendering
   end
 
   def unlisted
@@ -131,11 +136,36 @@ class Admin::PostsController < Admin::BaseController
     @post = Post.find(params[:id])
     raw_content = File.read(@post.file_path)
 
-    parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
+    begin
+      parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
 
-    # Convert hash to YAML without document separator
-    @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
-    @content = parsed.content
+      # Convert hash to YAML without document separator
+      @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
+      @content = parsed.content
+
+    rescue Psych::SyntaxError, StandardError => e
+      # First attempt: Try to fix GUID specifically
+      if Post.fix_guid_in_file(@post.file_path)
+        # Reload and try again
+        raw_content = File.read(@post.file_path)
+
+        begin
+          parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
+          @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
+          @content = parsed.content
+
+          flash.now[:notice] = "Auto-fixed malformed GUID formatting"
+
+        rescue => e2
+          # Still broken - show fallback
+          handle_broken_yaml(raw_content, e2)
+        end
+      else
+        # GUID fix didn't apply - show fallback
+        handle_broken_yaml(raw_content, e)
+      end
+    end
+
     @preview_path = preview_admin_post_path(@post)
   end
 
@@ -152,11 +182,13 @@ class Admin::PostsController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # Remove the error flag if it exists (YAML is now fixed)
+      metadata.delete('_yaml_parse_error')
+
       if metadata['tags'].is_a?(String)
         if metadata['tags'].strip.empty? || metadata['tags'] == '[]'
           metadata['tags'] = []
         else
-          # Handle comma-separated or corrupted tags
           metadata['tags'] = metadata['tags'].split(',').map(&:strip).reject(&:empty?)
         end
       elsif metadata['tags'].nil?
@@ -304,6 +336,24 @@ class Admin::PostsController < Admin::BaseController
     end
 
     metadata_hash
+  end
+
+  def handle_broken_yaml(raw_content, error)
+    Rails.logger.error "Failed to parse file for editing: #{error.message}"
+
+    # Extract content body if possible
+    if raw_content =~ /\A---\s*\n.*?\n---\s*\n(.*)/m
+      @content = $1
+    else
+      @content = raw_content
+    end
+
+    # Use metadata from database (last known good state) and add error flag
+    db_metadata = @post.metadata.dup
+    db_metadata['_yaml_parse_error'] = error.message
+    @metadata = db_metadata.to_yaml.sub(/\A---\n/, '')
+
+    flash.now[:alert] = "YAML parsing error detected. The form shows the last valid metadata from the database. Saving will fix the file formatting."
   end
 
   def sanitize_filename(filename)

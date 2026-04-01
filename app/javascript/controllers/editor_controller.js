@@ -137,6 +137,7 @@ export default class extends Controller {
 
   connect() {
     console.log("Editor controller connected");
+    this.isSaving = false;
 
     // Initialize TOC
     this.updateTOC();
@@ -261,6 +262,16 @@ export default class extends Controller {
       }
     };
 
+    // Store original values for dirty checking
+    this.originalContent = this.textareaTarget.value;
+    this.originalMetadata = this.hasMetadataTarget
+      ? this.metadataTarget.value
+      : "";
+
+    // Listen for metadata changes from metadata_editor_controller
+    this.metadataChangeHandler = this.handleMetadataChange.bind(this);
+    document.addEventListener("metadata:changed", this.metadataChangeHandler);
+
     // Add global keyboard shortcut handler
     this.globalKeydownHandler = this.handleKeydown.bind(this);
     document.addEventListener("keydown", this.globalKeydownHandler);
@@ -382,6 +393,12 @@ export default class extends Controller {
   }
 
   handleTurboBeforeVisit(event) {
+    // If we're in the middle of saving, don't show warning
+    if (this.isSaving) {
+      console.log("[TURBO] Saving in progress, skipping dirty check");
+      return;
+    }
+
     const currentContent = this.textareaTarget.value;
     const currentMetadata = this.hasMetadataTarget
       ? this.metadataTarget.value
@@ -412,8 +429,7 @@ export default class extends Controller {
   }
 
   handleMetadataChange(event) {
-    // Update the hidden field value and refresh our original metadata reference
-    // so subsequent changes are tracked correctly
+    // Update the hidden field value
     const metadataField = this.element.querySelector('[name="metadata"]');
     if (metadataField) {
       metadataField.value = event.detail.yaml;
@@ -1332,6 +1348,11 @@ export default class extends Controller {
   // ========== FORM ACTIONS ==========
 
   save(event) {
+    console.log("[SAVE] Starting save...");
+
+    // Mark that we're saving to skip dirty checks
+    this.isSaving = true;
+
     // Save the currently focused element
     const elementToSave = this.lastFocusedInput || this.textareaTarget;
     window.EditorState.saveElement(elementToSave);
@@ -1348,15 +1369,20 @@ export default class extends Controller {
 
     // Mark content as saved
     this.originalContent = this.textareaTarget.value;
-    this.originalMetadata = this.hasMetadataTarget
-      ? this.metadataTarget.value
-      : "";
+
+    // Get the current metadata from the hidden field (most up-to-date)
+    const metadataField = this.element.querySelector('[name="metadata"]');
+    if (metadataField) {
+      this.originalMetadata = metadataField.value;
+    }
 
     // Remove beforeunload handler
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
 
     // Broadcast refresh to preview
     this.previewChannel.postMessage({ action: "refresh" });
+
+    console.log("[SAVE] Dirty state cleared, form will submit");
   }
 
   restoreScrollPosition() {
@@ -1397,6 +1423,8 @@ export default class extends Controller {
       event.preventDefault();
       return;
     }
+
+    this.isSaving = true;
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
   }
 
@@ -1409,6 +1437,8 @@ export default class extends Controller {
       event.preventDefault();
       return;
     }
+
+    this.isSaving = true; // ← Add this
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
   }
 

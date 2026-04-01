@@ -42,6 +42,7 @@ Rails.application.routes.draw do
     resources :medium, only: [ :index, :create, :destroy ] do
       collection do
         get :browse
+        get :duration
       end
       member do
         patch :rename
@@ -115,6 +116,7 @@ Rails.application.routes.draw do
   get "feed", to: "feeds#rss", defaults: { format: 'xml' }, as: :feed
   get "feed.xml", to: "feeds#rss", defaults: { format: 'xml' }
   get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
+  get '/podcast/:podcast_key.xml', to: 'feeds#podcast', as: :podcast_feed
 
   # Theme CSS (before catch-all)
   get 'theme/:filename.css', to: 'system/themes#show', defaults: { format: 'css' }

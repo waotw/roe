@@ -106,6 +106,31 @@ class Admin::MediumController < Admin::BaseController
     redirect_to browse_admin_medium_index_path(type: media_type)
   end
 
+  def duration
+    media_path = params[:path]
+
+    unless media_path.present?
+      render json: { error: 'Missing path parameter' }, status: :bad_request
+      return
+    end
+
+    # Convert /media/audio/file.mp3 to absolute path (as STRING)
+    file_path = Rails.root.join('site', media_path.delete_prefix('/')).to_s  # ← Add .to_s
+
+    unless File.exist?(file_path)
+      render json: { error: 'File not found' }, status: :not_found
+      return
+    end
+
+    duration = MediaDurationExtractor.extract(file_path)
+
+    if duration
+      render json: { duration: duration }
+    else
+      render json: { error: 'Could not extract duration' }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def determine_media_type(extension)

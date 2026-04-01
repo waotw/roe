@@ -33,6 +33,9 @@ export default class extends Controller {
     this.currentStatus = status;
     this.currentSort = sort;
 
+    // Highlight active status filter
+    this.updateFilterIndicators();
+
     // Update UI to match state
     this.setActiveTab(type);
     this.statusFilterTarget.value = status;
@@ -41,6 +44,32 @@ export default class extends Controller {
 
     // Apply filters
     this.applyFilters();
+  }
+
+  updateFilterIndicators() {
+    // Status filter
+    const statusFilter = this.element.querySelector(
+      '[data-posts-filter-target="statusFilter"]',
+    );
+    if (
+      statusFilter &&
+      statusFilter.value !== "all" &&
+      statusFilter.value !== ""
+    ) {
+      statusFilter.classList.add("bg-yellow-100", "border-yellow-500");
+    }
+
+    // Sort filter
+    const sortFilter = this.element.querySelector(
+      '[data-posts-filter-target="sortFilter"]',
+    );
+    if (
+      sortFilter &&
+      sortFilter.value !== "date-desc" &&
+      sortFilter.value !== ""
+    ) {
+      sortFilter.classList.add("bg-yellow-100", "border-yellow-500");
+    }
   }
 
   filterByType(event) {
@@ -56,6 +85,14 @@ export default class extends Controller {
     this.saveState();
     this.updateURL();
     this.applyFilters();
+
+    // Update visual indicator
+    if (this.currentStatus === "all" || this.currentStatus === "") {
+      // ← Use this.currentStatus
+      event.target.classList.remove("bg-yellow-100", "border-yellow-500");
+    } else {
+      event.target.classList.add("bg-yellow-100", "border-yellow-500");
+    }
   }
 
   sortBy(event) {

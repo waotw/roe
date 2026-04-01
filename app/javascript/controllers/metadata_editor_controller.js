@@ -40,6 +40,7 @@ export default class extends Controller {
   connect() {
     // Add initialization flag
     this.isInitializing = true;
+    this.isProgrammaticChange = false;
 
     this.removedFields = new Set();
     this.isYamlView = false;
@@ -56,6 +57,7 @@ export default class extends Controller {
     this.attachChangeListeners();
     this.setupPostTypeListener();
     this.setupPodcastListener();
+    this.setupMediaDurationListeners();
 
     this.fieldsContainerTarget.addEventListener("click", (e) => {
       if (e.target.closest('[data-action*="removeMetadataField"]')) {
@@ -240,6 +242,11 @@ export default class extends Controller {
       this.setupPostTypeListener();
     }
 
+    // Add listeners for audio/video fields
+    if (fieldName === "audio" || fieldName === "video") {
+      this.setupMediaDurationListeners();
+    }
+
     this._notifyMetadataChange();
 
     // Focus the input
@@ -405,13 +412,18 @@ export default class extends Controller {
 
     switch (config.type) {
       case "text":
+        const readonlyClass = config.readonly
+          ? " bg-gray-100 text-gray-600"
+          : "";
+        const readonlyAttr = config.readonly ? " readonly" : "";
+
         return `<input type="text"
-                       id="metadata-field-${fieldName}"
-                       name="metadata_fields[${fieldName}]"
-                       value="${escapedValue}"
-                       class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                       data-metadata-field="${fieldName}"
-                       ${config.hint ? `placeholder="${config.hint}"` : ""}>`;
+                         id="metadata-field-${fieldName}"
+                         name="metadata_fields[${fieldName}]"
+                         value="${escapedValue}"
+                         class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300${readonlyClass}"
+                         data-metadata-field="${fieldName}"
+                         ${config.hint ? `placeholder="${config.hint}"` : ""}${readonlyAttr}>`;
 
       case "datetime":
         let datetimeValue = value;
@@ -490,7 +502,33 @@ export default class extends Controller {
 
   // ========== YAML CONVERSION ==========
 
-  formatYamlValue(value) {
+  formatYamlValue(value, fieldName = null) {
+    // Special handling for tags field - convert comma-separated to array
+    if (fieldName === "tags") {
+      if (value === null || value === undefined || value === "") {
+        return "[]";
+      }
+
+      const strValue = String(value).trim();
+      if (strValue === "" || strValue === "[]") {
+        return "[]";
+      }
+
+      // Parse comma-separated tags
+      const tags = strValue
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter((tag) => tag !== "");
+
+      if (tags.length === 0) {
+        return "[]";
+      }
+
+      // Format as YAML array with quotes
+      return "[" + tags.map((tag) => `"${tag}"`).join(", ") + "]";
+    }
+
+    // Standard formatting for other fields
     if (value === null || value === undefined) {
       return '""';
     }
@@ -572,7 +610,7 @@ export default class extends Controller {
     // Output known fields in config order
     Object.keys(this.knownFieldsValue).forEach((key) => {
       if (knownFields.hasOwnProperty(key)) {
-        yaml += `${key}: ${this.formatYamlValue(knownFields[key])}\n`;
+        yaml += `${key}: ${this.formatYamlValue(knownFields[key], key)}\n`;
       }
     });
 
@@ -580,7 +618,7 @@ export default class extends Controller {
     Object.keys(customFields)
       .sort()
       .forEach((key) => {
-        yaml += `${key}: ${this.formatYamlValue(customFields[key])}\n`;
+        yaml += `${key}: ${this.formatYamlValue(customFields[key], key)}\n`;
       });
 
     return yaml;
@@ -599,6 +637,26 @@ export default class extends Controller {
       let key = line.substring(0, colonIndex).trim();
       let value = line.substring(colonIndex + 1).trim();
 
+      // Special handling for tags array
+      if (key === "tags") {
+        if (value === "[]" || value === "") {
+          fields[key] = "";
+          return;
+        }
+
+        // Parse array format: ["tag1", "tag2"]
+        if (value.startsWith("[") && value.endsWith("]")) {
+          const arrayContent = value.slice(1, -1);
+          const tags = arrayContent
+            .split(",")
+            .map((tag) => tag.trim().replace(/^["']|["']$/g, ""))
+            .filter((tag) => tag !== "");
+          fields[key] = tags.join(", ");
+          return;
+        }
+      }
+
+      // Standard parsing for other fields
       if (
         (value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))
@@ -933,7 +991,7 @@ export default class extends Controller {
 
   _notifyMetadataChange() {
     // Don't notify during initialization
-    if (this.isInitializing) {
+    if (this.isInitializing || this.isProgrammaticChange) {
       return;
     }
 
@@ -947,5 +1005,190 @@ export default class extends Controller {
       detail: { yaml: finalYaml },
     });
     document.dispatchEvent(event);
+  }
+
+  // ========== MEDIA DURATION AUTO-POPULATION ==========
+
+  setupMediaDurationListeners() {
+    // Watch audio and video fields
+    const audioField = this.element.querySelector(
+      '[data-metadata-field="audio"]',
+    );
+    const videoField = this.element.querySelector(
+      '[data-metadata-field="video"]',
+    );
+
+    if (audioField) {
+      audioField.addEventListener("blur", (e) =>
+        this.handleMediaFieldChange(e),
+      );
+    }
+
+    if (videoField) {
+      videoField.addEventListener("blur", (e) =>
+        this.handleMediaFieldChange(e),
+      );
+    }
+
+    // Check on initial load if duration should be visible
+    this.updateDurationFieldVisibility();
+  }
+
+  handleMediaFieldChange(event) {
+    const mediaPath = event.target.value.trim();
+
+    if (mediaPath === "") {
+      // Media removed - hide duration field
+      this.updateDurationFieldVisibility();
+      return;
+    }
+
+    // Media path entered - fetch duration
+    this.fetchAndPopulateDuration(mediaPath);
+  }
+
+  async fetchAndPopulateDuration(mediaPath) {
+    const extension = mediaPath.split(".").pop().toLowerCase();
+    const isAudio = ["mp3", "m4a", "wav", "ogg", "flac", "aac"].includes(
+      extension,
+    );
+    const isVideo = ["mp4", "webm", "ogv", "mov", "avi", "mkv"].includes(
+      extension,
+    );
+
+    if (!isAudio && !isVideo) {
+      console.warn("Not a supported audio/video file");
+      return;
+    }
+
+    try {
+      // Create a temporary media element to load the file
+      const mediaElement = isAudio
+        ? new Audio()
+        : document.createElement("video");
+
+      // Wait for metadata to load
+      const duration = await new Promise((resolve, reject) => {
+        mediaElement.addEventListener("loadedmetadata", () => {
+          resolve(mediaElement.duration);
+        });
+
+        mediaElement.addEventListener("error", (e) => {
+          reject(new Error("Failed to load media file"));
+        });
+
+        // Set source and load
+        mediaElement.src = mediaPath;
+        mediaElement.load();
+      });
+
+      // Format duration as HH:MM:SS
+      const formatted = this.formatDuration(Math.floor(duration));
+
+      // Mark as programmatic change to avoid triggering save warning
+      this.isProgrammaticChange = true;
+
+      // Populate duration field
+      const durationField = this.element.querySelector(
+        '[data-metadata-field="duration"]',
+      );
+
+      if (durationField) {
+        durationField.value = formatted;
+        this._notifyMetadataChange();
+      } else {
+        // Duration field doesn't exist - add it
+        this.addDurationField(formatted);
+      }
+
+      // Reset flag after a short delay
+      setTimeout(() => {
+        this.isProgrammaticChange = false;
+      }, 100);
+    } catch (error) {
+      console.error("Error extracting duration:", error);
+    }
+  }
+
+  formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  }
+
+  addDurationField(durationValue) {
+    // Check if duration field is in known fields but not rendered
+    if (!this.knownFieldsValue["duration"]) return;
+
+    // Add the duration field with the value
+    const container = this.fieldsContainerTarget;
+    const config = this.knownFieldsValue["duration"];
+
+    const row = document.createElement("div");
+    row.className = "metadata-field-row flex items-start gap-2";
+    row.dataset.fieldName = "duration";
+
+    row.innerHTML = `
+        <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+          duration:
+        </label>
+        <input type="text"
+               id="metadata-field-duration"
+               name="metadata_fields[duration]"
+               value="${durationValue}"
+               class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 bg-gray-200 text-gray-600"
+               data-metadata-field="duration"
+               placeholder="${config.hint || ""}"
+               readonly>
+        <div class="w-6 flex-shrink-0"></div>
+      `;
+
+    // Insert in correct position
+    const insertBefore = this.findInsertionPoint("duration");
+    if (insertBefore) {
+      container.insertBefore(row, insertBefore);
+    } else {
+      container.appendChild(row);
+    }
+
+    // Remove from "Add Field" menu if present
+    this.addFieldMenuTarget
+      .querySelector('[data-available-field="duration"]')
+      ?.remove();
+
+    this._notifyMetadataChange();
+  }
+
+  updateDurationFieldVisibility() {
+    const audioField = this.element.querySelector(
+      '[data-metadata-field="audio"]',
+    );
+    const videoField = this.element.querySelector(
+      '[data-metadata-field="video"]',
+    );
+    const durationRow = this.element.querySelector(
+      '[data-field-name="duration"]',
+    );
+
+    const hasMedia =
+      audioField?.value.trim() || videoField?.value.trim() ? true : false;
+
+    if (!hasMedia && durationRow) {
+      // No media - remove duration field
+      durationRow.remove();
+
+      // Add back to menu if not already there
+      if (
+        !this.addFieldMenuTarget.querySelector(
+          '[data-available-field="duration"]',
+        )
+      ) {
+        this.restoreFieldToMenu("duration");
+      }
+
+      this._notifyMetadataChange();
+    }
   }
 }
