@@ -2,32 +2,37 @@ module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
   def to_html(preview: false)
-    # Step 1: Protect ALL fenced code blocks (4+ backticks)
+    # Step 1: Convert backtick fenced code blocks to HTML
     code_blocks = {}
     counter = 0
 
-    processed_content = content.gsub(/````+.*?\n(.*?)````+/m) do
+    # Handle 4+ backticks first
+    processed_content = content.gsub(/````+(\w*)\r?\n(.*?)````+/m) do
+      lang = $1.empty? ? 'text' : $1
+      code = $2
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
-      code_blocks[token] = $~.to_s
+      code_blocks[token] = render_code_block(code, lang)
       counter += 1
       token
     end
 
-    # Then protect regular 3-backtick blocks that aren't collection/card/gallery
+    # Handle 3-backtick blocks (skip collection/card/gallery)
     processed_content = processed_content.gsub(/```(\w+)\r?\n(.*?)```/m) do
       lang = $1
       code = $2
 
-      # Skip if it's a collection, card, or gallery block
-      next $~.to_s if [ 'collection', 'card', 'gallery' ].include?(lang)
+      # Skip special blocks
+      if ['collection', 'card', 'gallery'].include?(lang)
+        next $~.to_s
+      end
 
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
-      code_blocks[token] = "```#{lang}\n#{code}```"
+      code_blocks[token] = render_code_block(code, lang)
       counter += 1
       token
     end
 
-    # NEW: Protect || split markers from Kramdown table processing
+    # Protect || split markers
     pullquote_splits = {}
     processed_content = processed_content.gsub(/\|\|/) do
       token = "PULLQUOTE_SPLIT_#{counter}"
@@ -36,7 +41,7 @@ module HasMarkdownExtensions
       token
     end
 
-    # Step 2: Process galleries, collections and cards
+    # Process galleries, collections, cards, etc.
     processed_content = process_auto_galleries(processed_content)
     processed_content = process_galleries(processed_content, preview: preview)
     processed_content = process_collections(processed_content, preview: preview)
@@ -44,12 +49,7 @@ module HasMarkdownExtensions
     processed_content = process_inline_footnotes(processed_content)
     processed_content = process_strikethrough(processed_content)
 
-    # Step 3: Restore code blocks
-    code_blocks.each do |token, original|
-      processed_content.gsub!(token, original)
-    end
-
-    # Step 4: Convert to HTML
+    # Convert to HTML with standard Kramdown
     html = Kramdown::Document.new(
       processed_content,
       input: "kramdown",
@@ -58,24 +58,35 @@ module HasMarkdownExtensions
       hard_wrap: false
     ).to_html
 
-    # Step 5: Restore pullquote split markers AFTER Kramdown
+    # Restore code blocks (now as HTML)
+    code_blocks.each do |token, html_code|
+      html.gsub!(token, html_code)
+    end
+
+    # Restore pullquote splits
     pullquote_splits.each do |token, original|
       html.gsub!(token, original)
     end
 
-    # Step 6: Add custom footnote backlinks
+    # Add footnote backlinks
     html = add_footnote_backlinks(html)
 
-    # Step 7: Process collection grids (detect consecutive collections)
+    # Process collection grids
     html = CollectionGridProcessor.process(html)
 
-    # Step 8: Merge floated pullquotes into following paragraphs
+    # Merge floated pullquotes
     html = merge_floated_pullquotes(html)
 
     html
   end
 
   private
+
+  def render_code_block(code, language)
+    escaped_code = CGI.escapeHTML(code)
+    lang_class = language.empty? ? '' : " class=\"language-#{CGI.escapeHTML(language)}\""
+    "<pre><code#{lang_class}>#{escaped_code}</code></pre>"
+  end
 
   def process_strikethrough(markdown)
     # Convert ~~text~~ to <del>text</del> (which Kramdown preserves)
