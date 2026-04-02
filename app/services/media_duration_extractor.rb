@@ -1,5 +1,3 @@
-require 'streamio-ffmpeg'
-
 class MediaDurationExtractor
   # Extract duration from audio/video file
   # Returns duration in HH:MM:SS format

@@ -18,19 +18,19 @@ fi
 # 1. Backup production first
 echo ""
 echo "💾 Step 1: Backing up production..."
-rake content:backup_site
+rake site:backup
 
 # 2. Pull latest changes
 echo ""
 echo "📥 Step 2: Pulling production changes..."
-rake content:pull_site
+rake site:pull
 
 # 3. Preview changes (optional)
 echo ""
 read -p "Preview what would sync? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    rake content:preview_changes
+    rake site:preview_changes
 fi
 
 # 4. Choose push strategy
@@ -51,13 +51,13 @@ fi
 case $push_option in
   1)
     echo ""
-    rake content:push_site
+    rake site:push
     ;;
   2)
     echo ""
     echo "Available folders: posts, pages, media, theme, system"
     read -p "Enter folders to push (comma-separated): " folders
-    rake content:push_folders[$folders]
+    rake site:push_folders[$folders]
     ;;
   3)
     echo "⏭️  Skipping content push"

@@ -1,4 +1,4 @@
-namespace :content do
+namespace :site do
   def app_name
     ENV['FLY_APP_NAME'] || 'roe'
   end
@@ -12,7 +12,7 @@ namespace :content do
   end
 
   desc "Sync site folder with production (bidirectional)"
-  task :sync_site do
+  task :sync do
     machine = machine_id
     puts "🔄 Syncing site with #{app_name} (#{machine})..."
 
@@ -28,7 +28,7 @@ namespace :content do
   end
 
   desc "Push site folder to production"
-  task :push_site do
+  task :push do
     machine = machine_id
     puts "📤 Pushing site to #{app_name} (#{machine})..."
     system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
@@ -36,7 +36,7 @@ namespace :content do
   end
 
   desc "Pull site folder from production"
-  task :pull_site do
+  task :pull do
     machine = machine_id
     puts "📥 Pulling site from #{app_name} (#{machine})..."
     system("rsync -rltzPi -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
@@ -44,7 +44,7 @@ namespace :content do
   end
 
   desc "Backup production site with incremental hard-link snapshots (keeps 15)"
-  task :backup_site do
+  task :backup do
     machine = machine_id
     timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
     backup_dir = "./site_backups/#{timestamp}"
@@ -102,10 +102,10 @@ namespace :content do
     puts "🔗 Latest: site_backups/latest"
   end
 
-  desc "Push specific folders to production (e.g., rake content:push_folders[posts,theme])"
+  desc "Push specific folders to production (e.g., rake site:push_folders[posts,theme])"
   task :push_folders, [:folders] do |t, args|
     unless args[:folders]
-      puts "❌ Usage: rake content:push_folders[posts,theme]"
+      puts "❌ Usage: rake site:push_folders[posts,theme]"
       exit 1
     end
 
@@ -152,8 +152,8 @@ namespace :content do
 
   # Add this to lib/tasks/content.rake
 
-  desc "Restore production from backup (interactive or direct: rake content:rollback_site[latest])"
-  task :rollback_site, [:backup_name] do |t, args|
+  desc "Restore production from backup (interactive or direct: rake site:rollback_site[latest])"
+  task :rollback, [:backup_name] do |t, args|
     backup_name = args[:backup_name]
 
     # --- Direct Mode (with argument) ---
