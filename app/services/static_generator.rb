@@ -98,6 +98,12 @@ class StaticGenerator
       PodcastConfig.reload!
     end
 
+    if changes[:changed_configs][:members]
+      puts "  🔄 Reloading members config..."
+      SiteConfig.reload!('defaults/members')
+      Rails.cache.clear
+    end
+
     # Log what changed
     puts "📊 Change detection:"
     puts "  Home: #{changes[:home] ? 'changed' : 'unchanged'}"
@@ -176,7 +182,8 @@ class StaticGenerator
         'site' => SiteConfig.find_by("file_path LIKE ?", "%site.yml")&.updated_at&.iso8601(6),
         'defaults/collections' => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
         'defaults/cards' => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
-        'defaults/podcast' => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6)
+        'defaults/podcast' => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
+        'defaults/members' => SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.updated_at&.iso8601(6)
       },
       layouts: layout_checksums,
       assets: asset_checksums
@@ -202,15 +209,16 @@ class StaticGenerator
     collections_config_changed = config_file_changed?('defaults/collections')
     cards_config_changed = config_file_changed?('defaults/cards')
     podcast_config_changed = config_file_changed?('defaults/podcast')
+    members_config_changed = config_file_changed?('defaults/members')
 
-    global_changed = site_config_changed || collections_config_changed || cards_config_changed || layouts_changed?
+    global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed?
 
     {
-      home: home_changed? || site_config_changed || layouts_changed?,
+      home: home_changed? || site_config_changed || collections_config_changed || members_config_changed || layouts_changed?,
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? Page.not_draft.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
-      collections: collections_config_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
+      collections: collections_config_changed || members_config_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
       feeds: site_config_changed || posts.any? || @manifest['generated_at'].nil?,
       podcast_feeds: podcast_config_changed || podcast_posts.any? || @manifest['generated_at'].nil?,
       assets: assets_changed?,
@@ -222,7 +230,8 @@ class StaticGenerator
         site: site_config_changed,
         collections: collections_config_changed,
         cards: cards_config_changed,
-        podcast: podcast_config_changed
+        podcast: podcast_config_changed,
+        members: members_config_changed
       }
     }
   end
@@ -561,6 +570,9 @@ class StaticGenerator
     else
       Post.public_posts
     end
+
+    # Apply paid content filter (before ordering!)
+    items = CollectionMembersFilter.filter(items, config)
 
     apply_collection_order(items, order)
   end

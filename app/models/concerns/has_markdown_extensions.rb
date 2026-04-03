@@ -335,6 +335,9 @@ module HasMarkdownExtensions
       []
     end
 
+    # Apply paid content filter (before ordering!)
+    items = CollectionMembersFilter.filter(items, config)
+
     # Apply ordering based on order parameter
     items = apply_collection_order(items, order_by)
 
@@ -434,8 +437,10 @@ module HasMarkdownExtensions
       output << '<div class="collection-item list" markdown="1">'
       output << ""
 
-      # Title (linked)
-      output << "### [#{item.title || 'Untitled'}](#{item_path(item)})"
+      # Title (linked) with optional lock icon
+      title_html = item.title || 'Untitled'
+      title_html += " #{paid_lock_icon}" if show_paid_indicator?(item)
+      output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
 
@@ -463,7 +468,8 @@ module HasMarkdownExtensions
   def render_compact(items)
     items.map do |item|
       date_str = item.respond_to?(:date) && item.date ? " • #{item.date.strftime('%b %d, %Y')}" : ""
-      "- [#{item.title || 'Untitled'}](#{item_path(item)})#{date_str}"
+      lock_icon = show_paid_indicator?(item) ? " #{paid_lock_icon}" : ""
+      "- [#{item.title || 'Untitled'}#{lock_icon}](#{item_path(item)})#{date_str}"
     end.join("\n")
   end
 
@@ -473,8 +479,10 @@ module HasMarkdownExtensions
       output << '<div class="collection-item links" markdown="1">'
       output << ""
 
-      # Title (linked)
-      output << "### [#{item.title || 'Untitled'}](#{item_path(item)})"
+      # Title (linked) with optional lock icon
+      title_html = item.title || 'Untitled'
+      title_html += " #{paid_lock_icon}" if show_paid_indicator?(item)
+      output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
 
@@ -560,6 +568,22 @@ module HasMarkdownExtensions
     else
       base_url
     end
+  end
+
+  def show_paid_indicator?(item)
+    return false unless item.metadata['audience'] == 'paid'
+    return false unless members_enabled?
+
+    # Check if indicator should be shown (from members config)
+    SiteConfig.default('members', 'non-members')&.dig('show_paid_indicator') != false
+  end
+
+  def members_enabled?
+    File.exist?(Rails.root.join('site/system/defaults/members.yml'))
+  end
+
+  def paid_lock_icon
+    '<svg class="paid-lock-icon" viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M7.88 15.76c4.36 0 7.89-3.53 7.89-7.88 0-4.36-3.53-7.88-7.89-7.88C3.54 0 0 3.52 0 7.88c0 4.35 3.54 7.88 7.88 7.88zm0-1.48c-3.54 0-6.39-2.86-6.39-6.4 0-3.54 2.85-6.4 6.39-6.4 3.54 0 6.4 2.86 6.4 6.4 0 3.54-2.86 6.4-6.4 6.4z"/><path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/></svg>'
   end
 
   ## CARDS

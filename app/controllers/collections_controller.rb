@@ -87,6 +87,10 @@ class CollectionsController < ApplicationController
       )
     end
 
+    # Apply paid content filter (before ordering!)
+    filter_config = { show_paid: params[:show_paid] }
+    @items = CollectionMembersFilter.filter(@items, filter_config)
+
     # Apply ordering
     @items = apply_ordering(@items, @order)
 

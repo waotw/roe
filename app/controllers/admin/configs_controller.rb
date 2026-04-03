@@ -417,17 +417,30 @@ class Admin::ConfigsController < ApplicationController
     # Sync to database and clear cache
     SiteConfig.sync_from_file(type)
 
-    # Handle site config changes
-    if type == 'site'
+    # Handle different config types
+    case type
+    when 'site'
       Rails.cache.clear
 
-      # If static generation was just enabled, generate the site
+      # Auto-generate when enabling static mode
       if old_config && !old_config['static_generation_enabled'] && new_config['static_generation_enabled']
         StaticGenerator.new.generate_all
         flash[:notice] = "Site configuration updated and static site generated successfully"
       else
-        flash[:notice] = "#{type.split('/').last.capitalize} configuration updated successfully"
+        flash[:notice] = "Site configuration updated successfully"
       end
+
+    when 'defaults/members'
+      Rails.cache.clear
+
+      # Regenerate collections if static mode is enabled
+      if SiteConfig.current('site')&.static_generation_enabled
+        StaticGenerator.new.generate_all
+        flash[:notice] = "Members configuration updated and static site regenerated"
+      else
+        flash[:notice] = "Members configuration updated successfully"
+      end
+
     else
       flash[:notice] = "#{type.split('/').last.capitalize} configuration updated successfully"
     end

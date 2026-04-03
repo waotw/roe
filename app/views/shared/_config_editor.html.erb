@@ -1088,6 +1088,74 @@
 
   // ========== STATIC SITE GENERATION PROGRESS ==========
 
+  function setupMembersConfigProgress() {
+    const configForm = document.getElementById('config-form');
+    if (!configForm) return;
+
+    // Only run on members config page
+    const isMembersConfig = '<%= @config_type %>' === 'members';
+    if (!isMembersConfig) return;
+
+    // Check if static generation is enabled
+    const staticEnabled = <%= SiteConfig.current('site')&.static_generation_enabled || false %>;
+    if (!staticEnabled) return;
+
+    configForm.addEventListener('submit', function(e) {
+      showMembersProgress();
+    });
+  }
+
+  function showMembersProgress() {
+    const overlay = document.createElement('div');
+    overlay.id = 'members-progress-overlay';
+    overlay.className = 'fixed inset-0 flex items-center justify-center z-50';
+    overlay.innerHTML = `
+      <div class="bg-gray-900 border-2 border-blue-600 p-8 font-mono text-blue-500 max-w-2xl">
+        <div class="mb-4 text-center">
+          <div class="text-2xl mb-2">╔═══════════════════════════════════════╗</div>
+          <div class="text-2xl mb-2">║   REGENERATING COLLECTIONS           ║</div>
+          <div class="text-2xl mb-4">╚═══════════════════════════════════════╝</div>
+        </div>
+
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Updating member access settings...</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Regenerating home page...</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Regenerating collection archives...</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Updating posts and pages...</span>
+          </div>
+        </div>
+
+        <div class="mt-6 text-center text-xs text-blue-300">
+          <span class="animate-pulse">⏳ Please wait...</span>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+  }
+
+  // Run on page load
+  document.addEventListener('turbo:load', function() {
+    setupMembersConfigProgress();
+
+    // Remove overlay when page reloads
+    const existingOverlay = document.getElementById('members-progress-overlay');
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+  });
+
   function setupStaticGenerationProgress() {
     const configForm = document.getElementById('config-form');
     if (!configForm) return;
