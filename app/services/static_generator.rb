@@ -809,7 +809,11 @@ class StaticGenerator
   # ============================================================================
 
   def render_with_layout(template:, assigns: {})
-    ApplicationController.render(template: template, assigns: assigns, layout: 'site')
+    ApplicationController.render(
+      template: template,
+      assigns: assigns.merge(static_generation: true),
+      layout: 'site'
+    )
   rescue ActionController::UrlGenerationError => e
     # Extract context from error
     context_info = ["Template: #{template}"]

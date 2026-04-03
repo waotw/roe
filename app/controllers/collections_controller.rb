@@ -35,12 +35,17 @@ class CollectionsController < ApplicationController
     @post_type = nil
     @tags = []
 
+    # If heading param exists, path is just for URL aesthetics
+    # Don't parse it as tags/filters
+    if @heading.present?
+      return
+    end
+
     # Check if first segment could be a heading (not a type- prefix, not 'all')
     first_segment = segments.first
 
     if first_segment && !first_segment.start_with?('type-') && first_segment != 'all'
-      # This might be a heading-based collection
-      # For now, treat it as tags (we'll enhance this later)
+      # Treat as tags
       @tags.concat(first_segment.split(','))
     end
 

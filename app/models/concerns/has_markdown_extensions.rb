@@ -513,6 +513,7 @@ module HasMarkdownExtensions
     tags = config[:tags]
     post_type = config[:post_type] unless config[:post_type] == 'all'
     order = config[:order]
+    source = config[:source] || 'posts'  # ← ADD THIS
 
     # Build base URL
     base_url = if heading.present?
@@ -535,9 +536,27 @@ module HasMarkdownExtensions
       archive_page ? '/archive' : '/posts'
     end
 
-    # Add order as query param if non-default
-    if order.present? && order != 'date'
-      "#{base_url}?order=#{order}"
+    # Build query params (NEW)
+    query_params = []
+
+    # Always pass source if non-default
+    query_params << "source=#{source}" if source != 'posts'
+
+    # Pass heading if it's a heading-based collection (so controller knows it's not a tag)
+    query_params << "heading=#{CGI.escape(heading)}" if heading.present?
+
+    # Add order if non-default
+    query_params << "order=#{order}" if order.present? && order != 'date'
+
+    # Add exclude tags if present
+    if tags.present?
+      exclude_tags = tags.split(',').map(&:strip).select { |t| t.start_with?('-') }.map { |t| t.sub('-', '') }
+      query_params << "exclude=#{exclude_tags.join(',')}" if exclude_tags.any?
+    end
+
+    # Combine base URL with query params
+    if query_params.any?
+      "#{base_url}?#{query_params.join('&')}"
     else
       base_url
     end

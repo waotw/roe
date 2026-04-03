@@ -1,0 +1,70 @@
+<div class="px-4 sm:px-0 max-w-2xl mx-auto mt-12">
+  <div class="bg-white border-2 border-gray-900 p-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Enable Members Feature</h1>
+
+    <div class="mb-6">
+      <p class="text-gray-700 mb-4">
+        The members feature will be enabled. You can manage member accounts from the
+        <strong>Members</strong> section of the admin nav. ↗
+      </p>
+
+      <p class="text-gray-700 mb-4">
+        How would you like paid content to appear on your site?
+      </p>
+    </div>
+
+    <%= form_with url: create_members_admin_configs_path, method: :post, class: "space-y-6" do |f| %>
+      <div class="bg-gray-50 border border-gray-300 p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">Gobal Collection Settings</h3>
+
+        <p class="text-sm text-gray-700 mb-4">
+          Should paid posts appear in collections (like your blog archive or filtered lists)?
+        </p>
+
+        <div class="space-y-3">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <%= f.radio_button :show_paid_content, 'true', checked: true, class: "mt-1" %>
+            <div>
+              <div class="font-medium text-gray-900">Show paid posts with lock icon</div>
+              <div class="text-sm text-gray-600">
+                Paid posts appear in collections with a
+                <span class="inline-block w-4 h-4 align-text-bottom">
+                  <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M7.88 15.76c4.36 0 7.89-3.53 7.89-7.88 0-4.36-3.53-7.88-7.89-7.88C3.54 0 0 3.52 0 7.88c0 4.35 3.54 7.88 7.88 7.88zm0-1.48c-3.54 0-6.39-2.86-6.39-6.4 0-3.54 2.85-6.4 6.39-6.4 3.54 0 6.4 2.86 6.4 6.4 0 3.54-2.86 6.4-6.4 6.4z"/>
+                    <path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/>
+                  </svg>
+                </span>
+                indicator. Users can click to sign in.
+              </div>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 cursor-pointer">
+            <%= f.radio_button :show_paid_content, 'false', class: "mt-1" %>
+            <div>
+              <div class="font-medium text-gray-900">Hide paid posts from collections</div>
+              <div class="text-sm text-gray-600">
+                Only show public content. Paid posts are accessible via direct links only.
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-300 p-4">
+        <p class="text-sm text-gray-700 leading-7">
+          <strong>Note:</strong> You can change this setting anytime in
+          <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">site.yml</code>
+          configuration, and override it per-collection using <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">show_paid: true</code> or <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">show_paid: false</code> .
+        </p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <%= f.submit "Enable Members",
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+        <%= link_to "Cancel", admin_configs_path,
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+      </div>
+    <% end %>
+  </div>
+</div>

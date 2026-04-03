@@ -1,6 +1,7 @@
 class Documentation < ApplicationRecord
   self.table_name = 'documentation'
 
+  include HasAudience
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes

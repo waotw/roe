@@ -1,4 +1,5 @@
 class Page < ApplicationRecord
+  include HasAudience
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes

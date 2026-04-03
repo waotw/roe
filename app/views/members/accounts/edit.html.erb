@@ -1,0 +1,22 @@
+<div class="auth-container">
+  <div class="auth-form">
+    <h1>Edit Account</h1>
+
+    <%= form_with model: @member, url: account_path, method: :patch, local: true do |f| %>
+      <div class="form-field">
+        <%= f.label :name %>
+        <%= f.text_field :name, required: true %>
+      </div>
+
+      <div class="form-field">
+        <%= f.label :email %>
+        <%= f.email_field :email, required: true, autocomplete: "email" %>
+      </div>
+
+      <div class="form-actions">
+        <%= f.submit "Save Changes", class: "btn-primary" %>
+        <%= link_to "Cancel", account_path, class: "btn-secondary" %>
+      </div>
+    <% end %>
+  </div>
+</div>

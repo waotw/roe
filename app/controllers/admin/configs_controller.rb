@@ -142,14 +142,30 @@ class Admin::ConfigsController < ApplicationController
       }
     ]
 
-    # Add podcast config to list if it exists
-      if File.exist?(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
-        @config_files[1][:files] << {
-          name: "podcast.yml",
-          path: admin_edit_podcast_config_path,
-          description: "Global Podcast & feed settings"
-        }
-      end
+    defaults_files = [
+      { name: "cards.yml", path: admin_edit_cards_config_path, description: "Global Card settings & templates" },
+      { name: "collections.yml", path: admin_edit_collections_config_path, description: "Global Collection settings & template" }
+    ]
+
+    # Add members config if it exists
+    if File.exist?(SiteConfig::DEFAULTS_PATH.join('members.yml'))
+      defaults_files << {
+        name: "members.yml",
+        path: admin_edit_members_config_path,
+        description: "Membership & paid content settings"
+      }
+    end
+
+    # Add podcast config if it exists
+    if File.exist?(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+      defaults_files << {
+        name: "podcast.yml",
+        path: admin_edit_podcast_config_path,
+        description: "Global Podcast & feed settings"
+      }
+    end
+
+    @config_files[1][:files] = defaults_files
   end
 
   def edit_site
@@ -259,6 +275,56 @@ class Admin::ConfigsController < ApplicationController
     redirect_to admin_configs_path
   end
 
+  def edit_members
+    members_config_path = SiteConfig::DEFAULTS_PATH.join('members.yml')
+
+    unless File.exist?(members_config_path)
+      flash[:alert] = "Members configuration doesn't exist."
+      redirect_to admin_configs_path and return
+    end
+
+    @config_type = 'members'
+    @config_content = File.read(members_config_path)
+    @config_hash = YAML.load(@config_content) || {}
+    @field_options = build_field_options_for_members
+
+    render :edit
+  end
+
+  def update_members
+    update_config('defaults/members', SiteConfig::DEFAULTS_PATH.join('members.yml'))
+  end
+
+  def new_members_setup
+    if File.exist?(SiteConfig::DEFAULTS_PATH.join('members.yml'))
+      flash[:alert] = "Members configuration already exists"
+      redirect_to admin_configs_path
+    else
+      render :new_members_modal
+    end
+  end
+
+  def create_members
+    show_paid = params[:show_paid_content] == 'true'
+
+    ConfigGenerator.new.generate_members_defaults(show_paid_content: show_paid)
+    SiteConfig.sync_from_file('defaults/members')
+
+    flash[:notice] = "Members feature enabled successfully"
+    redirect_to admin_configs_path
+  end
+
+  def delete_members
+    file_path = SiteConfig::DEFAULTS_PATH.join('members.yml')
+
+    File.delete(file_path) if File.exist?(file_path)
+    SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.destroy
+    SiteConfig.reload!('defaults/members')
+
+    flash[:notice] = "Members feature disabled successfully"
+    redirect_to admin_configs_path
+  end
+
   private
 
   def build_field_options_for_podcast
@@ -319,12 +385,25 @@ class Admin::ConfigsController < ApplicationController
     }
   end
 
+  def build_field_options_for_members
+    {
+      'non-members.show_paid_content' => ['true', 'false'],
+      'non-members.show_paid_indicator' => ['true', 'false']
+    }
+  end
+
   def update_config(type, file_path)
     content = params[:content]
 
+    # Load old config to compare (only for site config)
+    old_config = nil
+    if type == 'site' && File.exist?(file_path)
+      old_config = YAML.load_file(file_path) rescue {}
+    end
+
     # Validate YAML syntax
     begin
-      YAML.load(content)
+      new_config = YAML.load(content)
     rescue Psych::SyntaxError => e
       flash.now[:error] = "Invalid YAML syntax: #{e.message}"
       @config_type = type.split('/').last
@@ -338,8 +417,20 @@ class Admin::ConfigsController < ApplicationController
     # Sync to database and clear cache
     SiteConfig.sync_from_file(type)
 
-    config_name = type.split('/').last.capitalize
-    flash[:notice] = "#{config_name} configuration updated successfully"
+    # Handle site config changes
+    if type == 'site'
+      Rails.cache.clear
+
+      # If static generation was just enabled, generate the site
+      if old_config && !old_config['static_generation_enabled'] && new_config['static_generation_enabled']
+        StaticGenerator.new.generate_all
+        flash[:notice] = "Site configuration updated and static site generated successfully"
+      else
+        flash[:notice] = "#{type.split('/').last.capitalize} configuration updated successfully"
+      end
+    else
+      flash[:notice] = "#{type.split('/').last.capitalize} configuration updated successfully"
+    end
 
     # Dynamic redirect based on type
     config_key = type.split('/').last

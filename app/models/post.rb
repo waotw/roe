@@ -1,4 +1,5 @@
 class Post < ApplicationRecord
+  include HasAudience
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes

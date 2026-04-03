@@ -202,7 +202,7 @@ export default class extends Controller {
       ? '<div class="w-6 flex-shrink-0"></div>'
       : `<button type="button"
                  data-action="click->metadata-editor#removeMetadataField"
-                 class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
+                 class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
           ×
         </button>`;
 
@@ -275,7 +275,7 @@ export default class extends Controller {
              data-custom-value>
       <button type="button"
               data-action="click->metadata-editor#removeMetadataField"
-              class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
+              class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
         ×
       </button>
     `;
@@ -710,7 +710,7 @@ export default class extends Controller {
       ? '<div class="w-6 flex-shrink-0"></div>'
       : `<button type="button"
                  data-action="click->metadata-editor#removeMetadataField"
-                 class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
+                 class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
           ×
         </button>`;
 
@@ -757,7 +757,7 @@ export default class extends Controller {
              data-custom-value>
       <button type="button"
               data-action="click->metadata-editor#removeMetadataField"
-              class="mt-[1px] px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
+              class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
         ×
       </button>
     `;

@@ -1,0 +1,135 @@
+<div class="px-4 sm:px-0 font-mono"
+     data-controller="members-filter"
+     data-members-filter-total-value="<%= @members.count %>">
+
+  <div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto font-sans">
+      <h1 class="text-3xl font-bold text-gray-900">Members</h1>
+      <p class="mt-2 text-sm text-gray-700">Manage free and paid members, access tokens, and membership status.</p>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+      <%= link_to "New Member", new_admin_member_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    </div>
+  </div>
+
+  <!-- Tabs for Tiers -->
+  <div class="mt-6 border-b border-gray-200">
+    <nav class="-mb-px flex space-x-8" data-members-filter-target="tabContainer">
+      <button data-action="click->members-filter#filterByTier" data-tier="all" data-members-filter-target="tab"
+              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+        All
+      </button>
+      <button data-action="click->members-filter#filterByTier" data-tier="free" data-members-filter-target="tab"
+              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+        Free
+      </button>
+      <button data-action="click->members-filter#filterByTier" data-tier="paid" data-members-filter-target="tab"
+              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+        Paid
+      </button>
+    </nav>
+  </div>
+
+  <!-- Filters & Search -->
+  <div class="mt-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+    <!-- Status Filter -->
+    <div class="flex-shrink-0">
+      <select
+        data-members-filter-target="statusFilter"
+        data-action="change->members-filter#filterByStatus"
+        class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat <%= 'bg-yellow-200 border-yellow-500' if params[:status].present? && params[:status] != 'all' %>">
+        <option value="all">All Statuses</option>
+        <option value="active" <%= 'selected' if params[:status] == 'active' %>>Active</option>
+        <option value="cancelled" <%= 'selected' if params[:status] == 'cancelled' %>>Cancelled</option>
+      </select>
+    </div>
+
+    <!-- Sort Dropdown -->
+    <div class="flex-shrink-0">
+      <select
+        data-members-filter-target="sortFilter"
+        data-action="change->members-filter#sortBy"
+        class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat">
+        <option value="created-desc">Newest First</option>
+        <option value="created-asc">Oldest First</option>
+        <option value="email-asc">Email (A-Z)</option>
+        <option value="email-desc">Email (Z-A)</option>
+      </select>
+    </div>
+
+    <!-- Search Input -->
+    <div class="flex-grow">
+      <input
+        type="text"
+        data-members-filter-target="search"
+        data-action="input->members-filter#filterBySearch"
+        placeholder="Search by email or name..."
+        class="block w-full rounded-xs border border-gray-500 focus:bg-blue-50 focus:ring-blue-300 text-xs font-mono px-4 py-2 bg-white">
+    </div>
+  </div>
+
+  <!-- Results Counter -->
+  <p class="mt-3 text-xs text-gray-500 font-sans">
+    Showing <span data-members-filter-target="count"><%= @members.count %></span> of <%= @members.count %> members
+  </p>
+
+  <div class="mt-4 flex flex-col">
+    <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+      <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+        <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
+          <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Email</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Name</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Tier</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Joined</th>
+                <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
+                  <span class="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white" data-members-filter-target="tbody">
+              <% @members.each do |member| %>
+                <tr data-members-filter-target="row"
+                    data-tier="<%= member.tier %>"
+                    data-status="<%= member.status %>"
+                    data-created-at="<%= member.created_at.to_i %>"
+                    data-email="<%= member.email %>"
+                    data-searchable="<%= [member.email, member.name].compact.join(' ').downcase %>">
+                  <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
+                    <%= link_to member.email, admin_member_path(member), class: "text-blue-600 hover:text-blue-900" %>
+                  </td>
+                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                    <%= member.name %>
+                  </td>
+                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                    <% if member.paid? %>
+                      <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800">Paid</span>
+                    <% else %>
+                      <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Free</span>
+                    <% end %>
+                  </td>
+                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                    <% if member.active? %>
+                      <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Active</span>
+                    <% else %>
+                      <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">Cancelled</span>
+                    <% end %>
+                  </td>
+                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                    <%= member.subscribed_at&.strftime("%b %d, %Y") || member.created_at.strftime("%b %d, %Y") %>
+                  </td>
+                  <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                    <%= link_to "View/Edit", admin_member_path(member), class: "text-blue-600 hover:text-blue-900 mr-4 text-xs" %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

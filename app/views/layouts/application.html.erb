@@ -98,14 +98,20 @@
           </div>
         </div>
 
-        <!-- Navigation Links Row (wraps on smaller screens) -->
-        <div class="flex flex-wrap gap-x-6 gap-y-2 pb-3 border-t border-gray-100 pt-3">
-          <%= link_to "Dashboard", admin_root_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-          <%= link_to "Pages", admin_pages_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-          <%= link_to "Posts", admin_posts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-          <%= link_to "Media", browse_admin_medium_index_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-          <%= link_to "Layouts", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-          <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+        <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 pb-3 border-t border-gray-100 pt-3">
+          <!-- Left side: Main navigation -->
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
+            <%= link_to "Dashboard", admin_root_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%= link_to "Pages", admin_pages_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%= link_to "Posts", admin_posts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%= link_to "Media", browse_admin_medium_index_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%= link_to "Layouts", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          </div>
+
+          <% if true %> <!-- //bw replace with SiteConfig setting -->
+            <%= link_to "Members", admin_members_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+          <% end %>
         </div>
       </div>
     </nav>

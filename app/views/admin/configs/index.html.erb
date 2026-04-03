@@ -5,12 +5,20 @@
       <p class="mt-2 text-sm text-gray-700">Edit YAML configuration files for your site.</p>
     </div>
 
-    <% unless File.exist?(Rails.root.join('site', 'system', 'defaults', 'podcast.yml')) %>
-      <%= button_to "Add Podcast",
-                    generate_podcast_admin_configs_path,
-                    method: :post,
-                    class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
-    <% end %>
+    <div class="flex gap-2">
+      <% unless File.exist?(Rails.root.join('site', 'system', 'defaults', 'members.yml')) %>
+        <%= link_to "Enable Members",
+                    new_members_setup_admin_configs_path,
+                    class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs" %>
+      <% end %>
+
+      <% unless File.exist?(Rails.root.join('site', 'system', 'defaults', 'podcast.yml')) %>
+        <%= button_to "Enable Podcasts",
+                      generate_podcast_admin_configs_path,
+                      method: :post,
+                      class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      <% end %>
+    </div>
   </div>
 
   <div class="mt-8 space-y-8">

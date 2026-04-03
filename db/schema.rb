@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_30_170410) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_02_200949) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -37,6 +37,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_30_170410) do
     t.index ["medium_id"], name: "index_media_references_on_medium_id"
     t.index ["post_id", "medium_id"], name: "index_media_references_on_post_id_and_medium_id", unique: true
     t.index ["post_id"], name: "index_media_references_on_post_id"
+  end
+
+  create_table "members", force: :cascade do |t|
+    t.string "access_token", limit: 36, null: false
+    t.datetime "cancelled_at"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.json "metadata", default: {}
+    t.string "name"
+    t.string "password_digest"
+    t.integer "status", default: 0, null: false
+    t.datetime "subscribed_at"
+    t.integer "tier", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["access_token"], name: "index_members_on_access_token", unique: true
+    t.index ["email"], name: "index_members_on_email", unique: true
+    t.index ["status"], name: "index_members_on_status"
+    t.index ["tier", "status"], name: "index_members_on_tier_and_status"
   end
 
   create_table "pages", force: :cascade do |t|

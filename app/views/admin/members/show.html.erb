@@ -1,0 +1,135 @@
+<div class="px-4 sm:px-0 font-mono">
+  <div class="sm:flex sm:items-center sm:justify-between">
+    <div class="font-sans">
+      <h1 class="text-3xl font-bold text-gray-900"><%= @member.name || @member.email %></h1>
+      <p class="mt-2 text-sm text-gray-700"><%= @member.email %></p>
+    </div>
+    <div class="mt-4 sm:mt-0 flex gap-2">
+      <%= link_to "Edit", edit_admin_member_path(@member), class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
+      <%= link_to "← Back to Members", admin_members_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
+    </div>
+  </div>
+
+  <!-- Member Details Card -->
+  <div class="mt-8 bg-white border border-gray-300 rounded-xs overflow-hidden">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Member Information</h3>
+      <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <dt class="text-sm font-medium text-gray-500 uppercase">Tier</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @member.paid? %>
+              <span class="inline-flex bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-500">Paid</span>
+            <% else %>
+              <span class="inline-flex bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">Free</span>
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500 uppercase">Status</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @member.active? %>
+              <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Active</span>
+            <% else %>
+              <span class="inline-flex bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">Cancelled</span>
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500 uppercase">Joined</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @member.subscribed_at&.strftime("%B %d, %Y at %I:%M %p") || @member.created_at.strftime("%B %d, %Y at %I:%M %p") %></dd>
+        </div>
+
+        <% if @member.cancelled_at %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500 uppercase">Cancelled</dt>
+            <dd class="mt-1 text-sm text-gray-900"><%= @member.cancelled_at.strftime("%B %d, %Y at %I:%M %p") %></dd>
+          </div>
+        <% end %>
+
+        <div class="sm:col-span-2">
+          <dt class="text-sm font-medium text-gray-500 uppercase">Access Token</dt>
+          <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border border-gray-200 rounded-xs break-all">
+            <%= @member.access_token %>
+          </dd>
+          <p class="mt-1 text-xs text-gray-500 font-sans">Used to verify member access to premium content</p>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Actions Card -->
+  <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Member Actions</h3>
+      <div class="mt-5 space-y-4">
+        <!-- Upgrade/Downgrade -->
+        <div class="flex items-center justify-between">
+          <% if @member.free? %>
+
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Upgrade to Paid</h4>
+              <p class="text-sm text-gray-500 font-sans">Grant premium access and generate login password</p>
+            </div>
+            <%= button_to "Upgrade to Paid", upgrade_to_paid_admin_member_path(@member),
+                method: :patch,
+                class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs",
+                form: { data: { turbo_confirm: "This will upgrade the member to paid tier and generate a password. Continue?" } } %>
+
+          <% else %>
+
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Downgrade to Free</h4>
+              <p class="text-sm text-gray-500 font-sans">Remove premium access and password</p>
+            </div>
+            <%= button_to "Downgrade to Free", downgrade_to_free_admin_member_path(@member),
+                method: :patch,
+                class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-yellow-200 hover:bg-yellow-300 font-mono rounded-xs",
+                form: { data: { turbo_confirm: "This will remove premium access. Continue?" } } %>
+
+          <% end %>
+        </div>
+
+        <!-- Cancel/Reactivate -->
+        <div class="flex items-center justify-between border-t border-gray-200 pt-4">
+          <% if @member.active? %>
+
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Cancel Membership</h4>
+              <p class="text-sm text-gray-500 font-sans">Revoke access while preserving account data</p>
+            </div>
+            <%= button_to "Cancel Membership", cancel_membership_admin_member_path(@member),
+                method: :patch,
+                class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs",
+                form: { data: { turbo_confirm: "Cancel this membership?" } } %>
+
+          <% else %>
+
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Reactivate Membership</h4>
+              <p class="text-sm text-gray-500 font-sans">Restore access to this account</p>
+            </div>
+            <%= button_to "Reactivate", reactivate_membership_admin_member_path(@member),
+                method: :patch,
+                class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs" %>
+
+          <% end %>
+        </div>
+
+        <!-- Delete -->
+        <div class="flex items-center justify-between border-t border-gray-200 pt-4">
+          <div>
+            <h4 class="text-sm font-medium text-gray-900">Delete Member</h4>
+            <p class="text-sm text-gray-500 font-sans">Permanently remove this member and all data</p>
+          </div>
+          <%= button_to "Delete Member", admin_member_path(@member),
+              method: :delete,
+              class: "inline-flex items-center uppercase text-sm text-red-800 px-3 py-2 border border-red-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs",
+              form: { data: { turbo_confirm: "This cannot be undone. Delete this member?" } } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

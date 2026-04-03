@@ -42,6 +42,23 @@ class ConfigGenerator
     puts "✓ Generated podcast.yml"
   end
 
+  def self.generate_members
+    new.generate_members_defaults
+  end
+
+  def generate_members_defaults(show_paid_content: true)
+    content = <<~YAML
+      non-members:
+        show_paid_content: #{show_paid_content}
+        show_paid_indicator: true
+
+      members:
+    YAML
+
+    File.write(DEFAULTS_PATH.join('members.yml'), content)
+    puts "✓ Generated members.yml"
+  end
+
   private
 
   def ensure_directories
@@ -137,42 +154,17 @@ class ConfigGenerator
 
   def generate_collections_defaults
     content = <<~YAML
-      # Collections Default Configuration
-      # These values are used when a collection doesn't specify these parameters
-
-      # Default source for collections
-      # Options: posts, pages, documentation
       default_source: posts
-
-      # Default post type to display (only applies when source is 'posts')
-      # Options: all, article, music, video, note, link
-      # Use 'all' to show all post types
       default_post_type: all
-
-      # Default ordering method
-      # Options:
-      #   - date: Sort by date (newest first)
-      #   - date-asc: Sort by date (oldest first)
-      #   - title: Sort alphabetically by title
-      #   - filename: Sort by filename
       default_order: date
-
-      # Default number of items to show
-      # Set to a number (e.g., 10) or use 'all' to show everything
       default_limit: 10
-
-      # Default template for displaying collections
-      # Options:
-      #   - list: Simple list of titles with links
-      #   - compact: Condensed view with minimal spacing
-      #   - full: Full view with excerpts and metadata
       default_template: list
+      show_paid_content: false
 
-      # Button template - used when inserting a new collection via editor button
       button_template: |-
-        heading:
+        heading: __PLACEHOLDER__
         limit: 5
-        post_type:
+        post_type: all
         template: list
     YAML
 

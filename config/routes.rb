@@ -55,6 +55,9 @@ Rails.application.routes.draw do
       collection do
         post :generate_podcast
         delete :delete_podcast
+        get :new_members_setup
+        post :create_members
+        delete :delete_members
       end
     end
 
@@ -71,6 +74,15 @@ Rails.application.routes.draw do
         get :browse_fonts
         get :browse_images
         get :available_fonts
+      end
+    end
+
+    resources :members do
+      member do
+        patch :upgrade_to_paid
+        patch :downgrade_to_free
+        patch :cancel_membership
+        patch :reactivate_membership
       end
     end
 
@@ -95,6 +107,9 @@ Rails.application.routes.draw do
     get 'configs/collections/edit', to: 'configs#edit_collections', as: 'edit_collections_config'
     patch 'configs/collections', to: 'configs#update_collections', as: 'collections_config'
 
+    get 'configs/members/edit', to: 'configs#edit_members', as: 'edit_members_config'
+    patch 'configs/members', to: 'configs#update_members', as: 'members_config'
+
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
     patch "settings/post_template", to: "settings#update_post_template"
@@ -103,6 +118,17 @@ Rails.application.routes.draw do
 
   # Health check
   get '/health', to: 'health#check'
+
+  # Member authentication (public-facing)
+  get "signin", to: "members/sessions#new"
+  post "signin", to: "members/sessions#create"
+  delete "signout", to: "members/sessions#destroy"
+
+  # Member account management
+  get "account", to: "members/accounts#show"
+  get "account/edit", to: "members/accounts#edit"
+  patch "account", to: "members/accounts#update"
+  get "upgrade", to: "members/accounts#upgrade"
 
   # Public site (specific before catch-all)
   root "posts#index"

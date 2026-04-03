@@ -35,23 +35,19 @@
                form_url: admin_collections_config_path,
                config_content: @config_content,
                config_hash: @config_hash %>
+  <% elsif @config_type == 'members' %>
+    <%= render 'shared/config_editor',
+               form_url: admin_members_config_path,
+               config_content: @config_content,
+               config_hash: @config_hash %>
   <% elsif @config_type == 'podcast' %>
     <%= render 'shared/config_editor',
                form_url: admin_podcast_config_path,
                config_content: @config_content,
                config_hash: @config_hash,
                field_options: @field_options %>
-               <div class="px-8 py-4 bg-red-50 border-t border-red-200">
-                   <h4 class="text-sm font-semibold text-red-900 mb-2">Danger Zone</h4>
-                   <p class="text-xs text-red-700 mb-3">Deleting this will remove all podcast configuration and feeds.</p>
-
-                   <%= button_to "Delete Podcast",
-                                 delete_podcast_admin_configs_path,
-                                 method: :delete,
-                                 data: {
-                                   turbo_confirm: "Are you sure? This will permanently delete your podcast configuration and remove all podcast feeds."
-                                 },
-                                 class: "uppercase text-xs px-2 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
-                 </div>
+    <div class="px-8 py-4 bg-red-50 border-t border-red-200">
+      <!-- podcast delete button -->
+    </div>
   <% end %>
 </div>

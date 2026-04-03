@@ -30,9 +30,15 @@
 %>
 
 <div id="config-container" class="mb-5 bg-white p-8">
-  <div class="flex items-center justify-between mb-2">
+  <div class="flex items-center justify-between mb-6">
     <!--<h2 class="text-lg font-semibold text-gray-900">Configuration</h2>-->
-    <h2 class="text-xl font-semibold text-gray-900"><%= @config_type.capitalize %></h2>
+    <h2 class="text-xl font-semibold text-gray-900">
+      <% if @config_type == 'members' %>
+        Membership & Paid Content Settings
+      <% else %>
+        <%= @config_type.capitalize %>
+      <% end %>
+    </h2>
     <button type="button"
             onclick="toggleConfigView()"
             class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem]"
@@ -158,14 +164,16 @@
               <!-- Defaults Section -->
               <% if defaults.any? %>
                 <div class="mb-8">
-                  <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Defaults</h3>
+                  <% unless @config_type == 'members' %>
+                      <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Defaults</h3>
+                  <% end %>
 
                   <div class="space-y-6">
                     <% defaults.each do |key, value| %>
                       <% if value.is_a?(Hash) %>
                         <!-- Nested section (like post-link, aside, pullquote) -->
                         <div class="config-subsection pl-4 border-l-2 border-gray-300">
-                          <h5 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h5>
+                          <h4 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h4>
 
                           <div class="space-y-3">
                             <% value.each do |subkey, subvalue| %>
@@ -1078,8 +1086,93 @@
     }
   }
 
+  // ========== STATIC SITE GENERATION PROGRESS ==========
+
+  function setupStaticGenerationProgress() {
+    const configForm = document.getElementById('config-form');
+    if (!configForm) return;
+
+    // Only run on site.yml edit page
+    const isSiteConfig = '<%= @config_type %>' === 'site';
+    console.log('🔍 Static generation setup - isSiteConfig:', isSiteConfig);
+
+    if (!isSiteConfig) return;
+
+    // Store original value on page load
+    const staticEnabledCheckbox = document.querySelector('input[data-config-field="static_generation_enabled"]');
+    console.log('🔍 Found checkbox:', staticEnabledCheckbox);
+
+    if (staticEnabledCheckbox) {
+      const originalValue = staticEnabledCheckbox.checked;
+      console.log('🔍 Original value:', originalValue);
+
+      staticEnabledCheckbox.dataset.originalValue = originalValue ? 'true' : 'false';
+
+      // Listen for form submission
+      configForm.addEventListener('submit', function(e) {
+        const wasEnabled = staticEnabledCheckbox.dataset.originalValue === 'true';
+        const isNowEnabled = staticEnabledCheckbox.checked;
+
+        console.log('📤 Form submit - wasEnabled:', wasEnabled, 'isNowEnabled:', isNowEnabled);
+
+        if (!wasEnabled && isNowEnabled) {
+          console.log('✨ Showing generation progress');
+          showGenerationProgress();
+        }
+      });
+    }
+  }
+
+  function showGenerationProgress() {
+    const overlay = document.createElement('div');
+    overlay.id = 'generation-progress-overlay';
+    overlay.className = 'fixed inset-0 flex items-center justify-center z-50';
+    overlay.innerHTML = `
+      <div class="bg-gray-900 border-2 border-blue-600 p-8 font-mono text-blue-500 max-w-2xl">
+        <div class="mb-4 text-center">
+          <div class="text-2xl mb-2">╔═══════════════════════════════════════╗</div>
+          <div class="text-2xl mb-2">║   STATIC SITE GENERATION ACTIVE      ║</div>
+          <div class="text-2xl mb-4">╚═══════════════════════════════════════╝</div>
+        </div>
+
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Syncing content from markdown files...</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Rendering pages and posts...</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Generating collections and feeds...</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="animate-pulse">▶</span>
+            <span>Copying assets and media...</span>
+          </div>
+        </div>
+
+        <div class="mt-6 text-center text-xs text-blue-300">
+          <span class="animate-pulse">⏳ Please wait...</span>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    console.log('✅ Progress overlay added to DOM');
+  }
+
   // Run on page load
   document.addEventListener('turbo:load', function() {
-    setupPodcastCategories();
+    setupStaticGenerationProgress();
+
+    // Remove overlay when page reloads
+    const existingOverlay = document.getElementById('generation-progress-overlay');
+    if (existingOverlay) {
+      existingOverlay.remove();
+      console.log('🧹 Removed existing overlay');
+    }
   });
 </script>
