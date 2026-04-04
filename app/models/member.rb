@@ -7,7 +7,7 @@ class Member < ApplicationRecord
   has_secure_password validations: false
 
   # Auto-generate access token on create
-  has_secure_token :access_token
+  # has_secure_token :access_token
 
   # Validations
   validates :email, presence: true,
@@ -38,6 +38,11 @@ class Member < ApplicationRecord
 
   # Callbacks
   before_create :set_subscribed_at
+  before_create :generate_memorable_token
+
+  def regenerate_token!
+    update!(access_token: self.class.generate_password)
+  end
 
   # Instance methods
   def paid?
@@ -87,12 +92,58 @@ class Member < ApplicationRecord
 
   # Generate a readable password for manual upgrades
   def self.generate_password
-    # 3 words + 2 digits (e.g., "sunset-river-moon-42")
-    words = %w[sunset ocean mountain river forest moon star cloud wind fire]
+    # Expanded word list for memorable passwords
+    words = %w[
+      adventure amber anchor anthem atlas autumn ballad beacon bear
+      birch blossom breeze cascade cedar cherry chorus cloud coast
+      compass crystal dragon eagle echo emerald explore falcon fire
+      forest fountain garden golden granite harbor harmony haiku
+      horizon ikigai island jade journey kintsugi lake lens
+      lighthouse lion maple marble meadow melody mirror moon
+      mountain nagomi oak ocean pearl petal phoenix pine prism
+      quartz quest reef rhythm river ruby sake sapphire shore
+      silver slate sonnet spring star stream summer sunset sushi
+      thunder tiger topaz tsunami velvet voyage wabisabi willow
+      wind winter wolf zen
+    ]
+
+    # 3 random words + 2 digits (e.g., "crystal-river-sunset-42")
     "#{words.sample}-#{words.sample}-#{words.sample}-#{rand(10..99)}"
   end
 
+  # Upgrade to paid tier with Stripe payment
+  def upgrade_to_paid_with_stripe!(customer_id:, payment_intent_id:, password:)
+    transaction do
+      update!(
+        tier: :paid,
+        password: password,
+        password_confirmation: password,
+        stripe_customer_id: customer_id,
+        stripe_payment_intent_id: payment_intent_id,
+        paid_at: Time.current
+      )
+    end
+  end
+
+  # Check if member has a Stripe customer
+  def stripe_customer?
+    stripe_customer_id.present?
+  end
+
+  # Get Stripe customer (if exists)
+  def stripe_customer
+    return nil unless stripe_customer?
+
+    @stripe_customer ||= Stripe::Customer.retrieve(stripe_customer_id)
+  rescue Stripe::InvalidRequestError
+    nil
+  end
+
   private
+
+  def generate_memorable_token
+    self.access_token ||= self.class.generate_password
+  end
 
   def set_subscribed_at
     self.subscribed_at ||= Time.current

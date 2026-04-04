@@ -61,6 +61,10 @@ class Page < ApplicationRecord
     where("json_extract(metadata, '$.status') = ?", "published")
   end
 
+  def filename
+    File.basename(file_path, '.md') if file_path.present?
+  end
+
   private
 
   # def to_html

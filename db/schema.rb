@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_02_200949) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_04_151309) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -46,14 +46,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_200949) do
     t.string "email", null: false
     t.json "metadata", default: {}
     t.string "name"
+    t.datetime "paid_at"
     t.string "password_digest"
     t.integer "status", default: 0, null: false
+    t.string "stripe_customer_id"
+    t.string "stripe_payment_intent_id"
     t.datetime "subscribed_at"
     t.integer "tier", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["access_token"], name: "index_members_on_access_token", unique: true
     t.index ["email"], name: "index_members_on_email", unique: true
     t.index ["status"], name: "index_members_on_status"
+    t.index ["stripe_customer_id"], name: "index_members_on_stripe_customer_id", unique: true
     t.index ["tier", "status"], name: "index_members_on_tier_and_status"
   end
 
@@ -88,6 +92,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_02_200949) do
     t.string "file_path", null: false
     t.datetime "updated_at", null: false
     t.index ["file_path"], name: "index_site_configs_on_file_path", unique: true
+  end
+
+  create_table "stripe_configs", force: :cascade do |t|
+    t.datetime "connected_at"
+    t.datetime "created_at", null: false
+    t.string "currency"
+    t.integer "mode", default: 0, null: false
+    t.string "price_id"
+    t.string "product_id"
+    t.text "publishable_key_live"
+    t.text "publishable_key_test"
+    t.text "secret_key_live"
+    t.text "secret_key_test"
+    t.datetime "updated_at", null: false
   end
 
   create_table "users", force: :cascade do |t|

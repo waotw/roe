@@ -1,0 +1,17 @@
+# app/views/checkout/cancel.html.erb
+
+<div class="max-w-2xl mx-auto p-8">
+  <div class="bg-gray-50 border border-gray-300 p-6">
+    <h1 class="text-2xl font-bold text-gray-900 mb-2">Payment Cancelled</h1>
+    <p class="text-gray-700 mb-4">
+      You cancelled the checkout process. No charges were made.
+    </p>
+
+    <div class="space-y-3">
+      <%= link_to "Try Again", create_checkout_path, method: :post,
+                  class: "block text-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700" %>
+      <%= link_to "Back to Home", root_path,
+                  class: "block text-center px-4 py-2 bg-gray-200 hover:bg-gray-300" %>
+    </div>
+  </div>
+</div>

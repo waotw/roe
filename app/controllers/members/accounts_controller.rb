@@ -23,11 +23,6 @@ module Members
       end
     end
 
-    def upgrade
-      @member = current_member
-      # Show upgrade page
-    end
-
     private
 
     def account_params

@@ -1,6 +1,6 @@
 module Members
   class SessionsController < BaseController
-    skip_before_action :set_current_member, only: [:new, :create]
+    skip_before_action :set_current_member, only: [:new, :create, :signin_with_token]
     before_action :redirect_if_signed_in, only: [:new, :create]
 
     def new
@@ -8,24 +8,45 @@ module Members
     end
 
     def create
-      @member = Member.find_by(email: params[:email].downcase.strip)
+      member = Member.find_by(email: params[:member][:email])
 
-      if @member&.authenticate(params[:password])
-        if @member.active?
-          session[:member_id] = @member.id
-          redirect_back_or_to account_path, notice: "Welcome back!"
+      if member&.active?
+        member.regenerate_token!
+
+        if Rails.env.development?
+          MemberMailer.magic_link(member).deliver_now
         else
-          redirect_to signin_path, alert: "Your membership has been cancelled. Please contact support."
+          MemberMailer.magic_link(member).deliver_later
+        end
+
+        # Redirect to confirmation page instead of home
+        check_email_page = Page.find_by(file_path: Rails.root.join('site', 'pages', 'check-email.md').to_s)
+        if check_email_page
+          redirect_to "/#{check_email_page.url_name}"
+        else
+          redirect_to root_path, notice: "Check your email for a sign-in link!"
         end
       else
-        flash.now[:alert] = "Invalid email or password"
-        render :new, status: :unprocessable_entity
+        flash.now[:alert] = "No account found with that email"
+        @page = Page.find_by(file_path: Rails.root.join('site', 'pages', 'signin.md').to_s)
+        render 'pages/show', status: :unprocessable_entity
       end
     end
 
     def destroy
       session.delete(:member_id)
       redirect_to root_path, notice: "Signed out successfully"
+    end
+
+    def signin_with_token
+      member = Member.find_by(access_token: params[:token])
+
+      if member&.active?
+        session[:member_id] = member.id
+        redirect_to root_path, notice: "Signed in successfully"
+      else
+        redirect_to signin_path, alert: "Invalid or expired link"
+      end
     end
 
     private

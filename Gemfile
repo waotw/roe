@@ -54,6 +54,8 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  gem 'letter_opener'
 end
 
 group :development do
@@ -90,3 +92,5 @@ gem "factory_bot", "~> 6.5"
 gem "nokogiri", "~> 1.19"
 
 gem "rubyzip", "~> 3.2"
+
+gem "stripe", "~> 19.0"

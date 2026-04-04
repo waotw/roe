@@ -1,0 +1,130 @@
+<div class="max-w-3xl mx-auto p-8 bg-white">
+  <div class="mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-2">Stripe Configuration</h2>
+    <p class="text-sm text-gray-600">
+      Connect your Stripe account to accept payments for paid memberships.
+    </p>
+  </div>
+
+  <%= form_with model: @stripe_config, url: admin_stripe_config_path, method: :patch, class: "space-y-8" do |form| %>
+
+    <!-- Connection Status -->
+    <div class="p-4 border <%= @stripe_config.connected? ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50' %>">
+      <div class="flex items-center gap-2">
+        <% if @stripe_config.connected? %>
+          <span class="text-green-600 font-semibold">✓ Connected</span>
+          <span class="text-sm text-gray-600">
+            (Mode: <%= @stripe_config.mode_test? ? 'Test' : 'Live' %>)
+          </span>
+        <% else %>
+          <span class="text-gray-600">⚠ Not Connected</span>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Test Mode Keys -->
+    <div class="config-section">
+      <h3 class="text-base font-semibold text-gray-900 mb-1">Test Mode Keys</h3>
+      <p class="text-xs text-gray-500 mb-3">
+        Use these for testing. Get your keys from
+        <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" class="text-blue-600 underline">
+          Stripe Dashboard → Developers → API Keys
+        </a>
+      </p>
+
+      <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Publishable Key (Test)
+          </label>
+          <%= form.text_field :publishable_key_test,
+                              value: @stripe_config.publishable_key_test,
+                              class: "w-full font-mono text-sm p-2 border border-gray-300",
+                              placeholder: "pk_test_..." %>
+          <p class="text-xs text-gray-500 mt-1">Starts with pk_test_</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Secret Key (Test)
+          </label>
+          <%= form.password_field :secret_key_test,
+                                  value: @stripe_config.secret_key_test,
+                                  class: "w-full font-mono text-sm p-2 border border-gray-300",
+                                  placeholder: "sk_test_..." %>
+          <p class="text-xs text-gray-500 mt-1">Starts with sk_test_ (kept secret)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Mode Keys (Optional) -->
+    <div class="config-section">
+      <h3 class="text-base font-semibold text-gray-900 mb-1">Live Mode Keys (Optional)</h3>
+      <p class="text-xs text-gray-500 mb-3">
+        Only add these when you're ready to accept real payments.
+      </p>
+
+      <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Publishable Key (Live)
+          </label>
+          <%= form.text_field :publishable_key_live,
+                              value: @stripe_config.publishable_key_live,
+                              class: "w-full font-mono text-sm p-2 border border-gray-300",
+                              placeholder: "pk_live_..." %>
+          <p class="text-xs text-gray-500 mt-1">Starts with pk_live_</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Secret Key (Live)
+          </label>
+          <%= form.password_field :secret_key_live,
+                                  value: @stripe_config.secret_key_live,
+                                  class: "w-full font-mono text-sm p-2 border border-gray-300",
+                                  placeholder: "sk_live_..." %>
+          <p class="text-xs text-gray-500 mt-1">Starts with sk_live_ (kept secret)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Selection (show if connected) -->
+    <% if @stripe_config.connected? %>
+      <div class="config-section">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Active Mode</h3>
+
+        <div class="space-y-2 pl-4 border-l-2 border-gray-200">
+          <label class="flex items-center gap-2">
+            <%= form.radio_button :mode, :test, class: "form-radio" %>
+            <span class="text-sm">Test Mode (no real charges)</span>
+          </label>
+
+          <label class="flex items-center gap-2">
+            <%= form.radio_button :mode, :live, class: "form-radio", disabled: !@stripe_config.live_mode_ready? %>
+            <span class="text-sm <%= @stripe_config.live_mode_ready? ? 'font-semibold text-red-600' : 'text-gray-400' %>">
+              Live Mode <%= @stripe_config.live_mode_ready? ? '(real charges!)' : '(add live keys first)' %>
+            </span>
+          </label>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+      <%= form.submit "Save Configuration",
+                      class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+
+      <%= link_to "Back to Configs", admin_configs_path,
+                  class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+
+      <% if @stripe_config.connected? %>
+        <%= button_to "Disconnect Stripe",
+                      admin_stripe_config_path,
+                      method: :delete,
+                      data: { turbo_confirm: "Are you sure? This will remove all Stripe keys." },
+                      class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-red-100 hover:bg-red-200 font-mono rounded-xs ml-auto" %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

@@ -1,6 +1,12 @@
 class Admin::PagesController < Admin::BaseController
   def index
-    @pages = Page.order(:created_at)
+    all_pages = Page.order(:created_at)
+
+    # Separate member-related pages from content pages
+    @member_pages, @content_pages = all_pages.partition do |page|
+      member_page?(page)
+    end
+
     @title = "Pages"
     @description = "All pages on your site."
   end
@@ -208,6 +214,11 @@ class Admin::PagesController < Admin::BaseController
   # end
 
   private
+
+  def member_page?(page)
+    filename = File.basename(page.file_path, '.md')
+    %w[signup signin check-email account upgrade benefits perks].include?(filename)
+  end
 
   def sanitize_filename(filename)
     filename = filename.to_s.sub(/\.md$/, '')

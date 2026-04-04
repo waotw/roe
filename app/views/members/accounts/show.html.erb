@@ -23,6 +23,13 @@
         <span><%= @member.status.titleize %></span>
       </div>
 
+      <% if @member.paid? && @member.paid_at %>
+        <div class="detail-row">
+          <strong>Upgraded:</strong>
+          <span><%= @member.paid_at.strftime("%B %d, %Y") %></span>
+        </div>
+      <% end %>
+
       <div class="detail-row">
         <strong>Member since:</strong>
         <span><%= @member.subscribed_at.strftime("%B %d, %Y") %></span>
@@ -33,7 +40,10 @@
       <%= link_to "Edit Account", account_edit_path, class: "btn-secondary" %>
 
       <% if @member.free? %>
-        <%= link_to "Upgrade to Paid", upgrade_path, class: "btn-primary" %>
+        <% upgrade_page = Page.find_by(file_path: Rails.root.join('site', 'pages', 'upgrade.md').to_s) %>
+        <% if upgrade_page %>
+          <%= link_to "Upgrade to Paid", "/#{upgrade_page.url_name}", class: "btn-primary" %>
+        <% end %>
       <% end %>
 
       <%= button_to "Sign Out", signout_path, method: :delete, class: "btn-outline" %>

@@ -101,7 +101,7 @@
                   Active Theme
                 </label>
                 <select name="config_fields[theme][active]"
-                        class="w-full font-mono text-sm p-2 border border-gray-300"
+                        class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                         data-config-field="theme.active">
                   <option value="">Select...</option>
                   <% theme_options = config_schema.dig(:theme, :fields, 'active', :options) || [] %>
@@ -197,7 +197,7 @@
                                 <% if @field_options&.key?(field_options_key) %>
                                   <!-- Select dropdown (no extra wrapper/label) -->
                                   <select name="config_fields[<%= key %>][<%= subkey %>]"
-                                          class="w-full font-mono text-sm p-2 border border-gray-300"
+                                          class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                           data-config-field="<%= nested_field_key %>">
                                     <% @field_options[field_options_key].each do |option| %>
                                       <% display_text = option.blank? ? '-- select --' : option %>
@@ -230,6 +230,10 @@
                                          class="w-full font-mono text-sm p-2 border border-gray-300"
                                          data-config-field="<%= nested_field_key %>">
                                 <% end %>
+                                <!-- Add hint text here ↓ -->
+                                <% if @field_hints&.key?(nested_field_key) %>
+                                  <p class="text-xs text-gray-500 mt-1"><%= @field_hints[nested_field_key] %></p>
+                                <% end %>
                               </div>
                             <% end %>
                           </div>
@@ -245,7 +249,7 @@
                           <% if @field_options&.key?(key) %>
                             <!-- Select dropdown for field with options -->
                             <select name="config_fields[<%= key %>]"
-                                    class="w-full font-mono text-sm p-2 border border-gray-300"
+                                    class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                     data-config-field="<%= key %>">
                               <% @field_options[key].each do |option| %>
                                 <option value="<%= option %>" <%= 'selected' if value.to_s == option.to_s %>><%= option %></option>
@@ -1232,15 +1236,36 @@
     console.log('✅ Progress overlay added to DOM');
   }
 
+  // ========== PAYMENTS ENABLED INDICATOR ==========
+
+  function updatePaymentsEnabledIndicator() {
+    const paymentsEnabledField = document.querySelector('[data-config-field="payments.enabled"]');
+    if (!paymentsEnabledField) return;
+
+    const value = paymentsEnabledField.value;
+
+    // Remove existing classes
+    paymentsEnabledField.classList.remove(
+      'bg-green-100', 'border-green-500',
+      'bg-red-100', 'border-red-300'
+    );
+
+    // Add classes based on value
+    if (value === 'true') {
+      paymentsEnabledField.classList.add('bg-green-100', 'border-green-500');
+    } else if (value === 'false') {
+      paymentsEnabledField.classList.add('bg-red-100', 'border-red-300');
+    }
+  }
+
   // Run on page load
   document.addEventListener('turbo:load', function() {
-    setupStaticGenerationProgress();
+    updatePaymentsEnabledIndicator();
 
-    // Remove overlay when page reloads
-    const existingOverlay = document.getElementById('generation-progress-overlay');
-    if (existingOverlay) {
-      existingOverlay.remove();
-      console.log('🧹 Removed existing overlay');
+    // Listen for changes
+    const paymentsEnabledField = document.querySelector('[data-config-field="payments.enabled"]');
+    if (paymentsEnabledField) {
+      paymentsEnabledField.addEventListener('change', updatePaymentsEnabledIndicator);
     }
   });
 </script>

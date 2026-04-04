@@ -394,6 +394,10 @@ class Post < ApplicationRecord
     published.where("file_path NOT LIKE ?", "%site/docs/%")
   end
 
+  def filename
+    File.basename(file_path, '.md') if file_path.present?
+  end
+
   private
 
   def self.fix_guid_in_file(file_path)

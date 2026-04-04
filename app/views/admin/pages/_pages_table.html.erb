@@ -1,0 +1,53 @@
+<div class="overflow-hidden ring-1 ring-black ring-opacity-5">
+  <table class="min-w-full divide-y divide-gray-300">
+    <thead class="bg-gray-50">
+      <tr>
+        <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Title</th>
+        <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Filename <span class="text-xs normal-case text-gray-500 font-normal">(double click to rename)</span></th>
+        <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+        <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
+          <span class="sr-only">Actions</span>
+        </th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200 bg-white">
+      <% if pages.empty? %>
+        <tr>
+          <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500">
+            No pages yet
+          </td>
+        </tr>
+      <% else %>
+        <% pages.each do |page| %>
+          <tr>
+            <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
+              <%= link_to page.title || "Untitled", edit_admin_page_path(page), class: "text-blue-600 hover:text-blue-900 mr-4" %>
+              <% if local_assigns[:show_member_badge] %>
+                <span class="inline-flex bg-blue-100 px-2 text-xs font-mono leading-5 text-blue-800">Member</span>
+              <% end %>
+            </td>
+            <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+              <%= render 'shared/inline_rename',
+                  resource: page,
+                  resource_type: 'page' %>
+            </td>
+            <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+              <% case page.status %>
+              <% when 'published' %>
+                <span class="inline-flex bg-green-100 px-2 text-xs font-mono leading-5 text-green-800">Published</span>
+              <% when 'unlisted' %>
+                <span class="inline-flex bg-yellow-100 px-2 text-xs font-mono leading-5 text-yellow-800">Unlisted</span>
+              <% else %>
+                <span class="inline-flex bg-gray-100 px-2 text-xs font-mono leading-5 text-gray-800">Draft</span>
+              <% end %>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-xs font-medium">
+              <%= link_to "Edit", edit_admin_page_path(page), class: "text-blue-600 hover:text-blue-900 mr-4" %>
+              <%= link_to "View", page_path(url_name: page.url_name), class: "text-gray-600 hover:text-gray-900", target: "_blank" %>
+            </td>
+          </tr>
+        <% end %>
+      <% end %>
+    </tbody>
+  </table>
+</div>

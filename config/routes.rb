@@ -61,6 +61,9 @@ Rails.application.routes.draw do
       end
     end
 
+    # Stripe Configuration (add this with your other config routes)
+    resource :stripe_config, only: [:edit, :update, :destroy]
+
     resources :themes, only: [:index] do
       member do
         get :edit
@@ -120,15 +123,21 @@ Rails.application.routes.draw do
   get '/health', to: 'health#check'
 
   # Member authentication (public-facing)
-  get "signin", to: "members/sessions#new"
   post "signin", to: "members/sessions#create"
   delete "signout", to: "members/sessions#destroy"
+  get 'signin/:token', to: 'members/sessions#signin_with_token', as: :token_signin
+
+  post 'signup', to: 'members/registrations#create'
 
   # Member account management
   get "account", to: "members/accounts#show"
   get "account/edit", to: "members/accounts#edit"
   patch "account", to: "members/accounts#update"
-  get "upgrade", to: "members/accounts#upgrade"
+
+  # Public checkout
+  post 'checkout', to: 'checkout#create', as: :create_checkout
+  get 'checkout/success', to: 'checkout#success', as: :checkout_success
+  get 'checkout/cancel', to: 'checkout#cancel', as: :checkout_cancel
 
   # Public site (specific before catch-all)
   root "posts#index"
@@ -158,6 +167,9 @@ Rails.application.routes.draw do
 
   # Media files
   get '/media/*path', to: 'media#show', format: false
+
+  # Stripe webhooks
+  post 'webhooks/stripe', to: 'webhooks#stripe', as: :stripe_webhook
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page

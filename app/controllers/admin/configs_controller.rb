@@ -287,6 +287,7 @@ class Admin::ConfigsController < ApplicationController
     @config_content = File.read(members_config_path)
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_members
+    @field_hints = build_field_hints_for_members  # ← Add this
 
     render :edit
   end
@@ -310,6 +311,9 @@ class Admin::ConfigsController < ApplicationController
     ConfigGenerator.new.generate_members_defaults(show_paid_content: show_paid)
     SiteConfig.sync_from_file('defaults/members')
 
+    # Sync the new upgrade page
+    ContentSyncService.sync_all_pages
+
     flash[:notice] = "Members feature enabled successfully"
     redirect_to admin_configs_path
   end
@@ -326,6 +330,29 @@ class Admin::ConfigsController < ApplicationController
   end
 
   private
+
+  def sync_stripe_payments(members_config)
+    payments_config = members_config&.dig('payments')
+
+    # If payments not configured or not enabled, just return success
+    unless payments_config && (payments_config['enabled'] == true || payments_config['enabled'] == 'true')
+      return { success: true, message: "Members configuration updated successfully" }
+    end
+
+    # Check if Stripe is connected
+    stripe_config = StripeConfig.current
+    unless stripe_config.connected?
+      return { success: false, message: "Members configuration updated but Stripe not connected" }
+    end
+
+    # Sync product/price with Stripe
+    manager = StripeProductManager.new
+    if manager.sync_from_config(payments_config)
+      { success: true, message: "Members configuration updated and Stripe synced (price: #{payments_config['price']})" }
+    else
+      { success: false, message: "Members configuration updated but Stripe sync failed: #{manager.errors.join(', ')}" }
+    end
+  end
 
   def build_field_options_for_podcast
     # Flatten all subcategories into one array (will be filtered by JS)
@@ -388,7 +415,19 @@ class Admin::ConfigsController < ApplicationController
   def build_field_options_for_members
     {
       'non-members.show_paid_content' => ['true', 'false'],
-      'non-members.show_paid_indicator' => ['true', 'false']
+      'non-members.show_paid_indicator' => ['true', 'false'],
+      'payments.enabled' => ['false', 'true']
+    }
+  end
+
+  def build_field_hints_for_members
+    # Get currency from Stripe if connected
+    stripe_config = StripeConfig.current
+    currency = stripe_config.connected? ? stripe_config.default_currency.upcase : 'USD'
+
+    {
+      'payments.enabled' => 'Turn on paid memberships (requires connection to your Stripe account)',
+      'payments.price' => "One-time payment amount in #{currency} (e.g., 49.00)"
     }
   end
 
@@ -433,12 +472,15 @@ class Admin::ConfigsController < ApplicationController
     when 'defaults/members'
       Rails.cache.clear
 
+      # Sync Stripe product/price if payments are enabled
+      sync_result = sync_stripe_payments(new_config)
+
       # Regenerate collections if static mode is enabled
       if SiteConfig.current('site')&.static_generation_enabled
         StaticGenerator.new.generate_all
-        flash[:notice] = "Members configuration updated and static site regenerated"
+        flash[:notice] = sync_result[:message] + " and static site regenerated"
       else
-        flash[:notice] = "Members configuration updated successfully"
+        flash[:notice] = sync_result[:message]
       end
 
     else

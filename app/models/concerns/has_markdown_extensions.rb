@@ -22,7 +22,7 @@ module HasMarkdownExtensions
       code = $2
 
       # Skip special blocks
-      if ['collection', 'card', 'gallery'].include?(lang)
+      if ['collection', 'card', 'gallery', 'form'].include?(lang)
         next $~.to_s
       end
 
@@ -46,6 +46,7 @@ module HasMarkdownExtensions
     processed_content = process_galleries(processed_content, preview: preview)
     processed_content = process_collections(processed_content, preview: preview)
     processed_content = process_cards(processed_content, preview: preview)
+    processed_content = process_forms(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
     processed_content = process_strikethrough(processed_content)
 
@@ -862,6 +863,99 @@ module HasMarkdownExtensions
         </div>
       </div>
     HTML
+  end
+
+  # FORMS
+
+  def process_forms(content, preview: false)
+    content.gsub(/```form\r?\n(.*?)```/m) do
+      yaml_content = $1
+
+      begin
+        form_config = YAML.safe_load(yaml_content)
+        render_form(form_config)
+      rescue => e
+        Rails.logger.error "Form YAML parsing error: #{e.message}"
+        ""
+      end
+    end
+  end
+
+  def render_form(config)
+    form_type = config['for']
+    button_text = config['button-text'] || config['button_text'] || default_button_text(form_type)
+
+    case form_type
+    when 'signup'
+      render_signup_form(button_text)
+    when 'signin'
+      render_signin_form(button_text)
+    when 'checkout'
+      render_checkout_form(button_text)
+    else
+      ""
+    end
+  rescue => e
+    Rails.logger.error "Form rendering error: #{e.message}"
+    ""
+  end
+
+  def default_button_text(form_type)
+    {
+      'signup' => 'Sign Up',
+      'signin' => 'Sign In',
+      'checkout' => 'Upgrade Now'
+    }[form_type] || 'Submit'
+  end
+
+  def render_signup_form(button_text)
+    <<~HTML
+      <form action="/signup" method="post" class="signup-form">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+
+        <div class="form-field">
+          <label for="member_name">Name</label>
+          <input type="text" name="member[name]" id="member_name" required>
+        </div>
+
+        <div class="form-field">
+          <label for="member_email">Email</label>
+          <input type="email" name="member[email]" id="member_email" required>
+        </div>
+
+        <button type="submit" class="signup-button">#{button_text}</button>
+      </form>
+    HTML
+  end
+
+  def render_signin_form(button_text = 'Send Magic Link')
+    <<~HTML
+      <form action="/signin" method="post" class="signin-form">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+
+        <div class="form-field">
+          <label for="member_email">Email</label>
+          <input type="email" name="member[email]" id="member_email" required>
+        </div>
+
+        <button type="submit" class="signin-button">#{button_text}</button>
+      </form>
+    HTML
+  end
+
+  def render_checkout_form(button_text = 'Upgrade Now')
+    <<~HTML
+      <form action="/checkout" method="post" class="upgrade-form" data-turbo="false">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+        <button type="submit" class="upgrade-button">#{button_text}</button>
+      </form>
+    HTML
+  end
+
+  def form_authenticity_token
+    # You might need to pass this in from the view context
+    # For now, return a placeholder that will be replaced in the view
+    "AUTHENTICITY_TOKEN_PLACEHOLDER"
   end
 
   def find_post_by_slug(slug_or_path)

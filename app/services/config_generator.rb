@@ -47,16 +47,162 @@ class ConfigGenerator
   end
 
   def generate_members_defaults(show_paid_content: true)
+    # Generate members.yml
     content = <<~YAML
       non-members:
         show_paid_content: #{show_paid_content}
         show_paid_indicator: true
+
+      payments:
+        enabled: false
+        price: "0.00"
 
       members:
     YAML
 
     File.write(DEFAULTS_PATH.join('members.yml'), content)
     puts "✓ Generated members.yml"
+
+    # Generate member pages
+    generate_member_pages
+  end
+
+  def generate_member_pages
+    pages_path = Rails.root.join('site', 'pages')
+    FileUtils.mkdir_p(pages_path)
+
+    # Generate signup page
+    generate_signup_page(pages_path)
+
+    # Generate signin page
+    generate_signin_page(pages_path)
+
+    # Generate check email confirmation page
+    generate_check_email_page(pages_path)
+
+    # Generate upgrade page
+    generate_upgrade_page
+  end
+
+  def generate_upgrade_page
+    pages_path = Rails.root.join('site', 'pages')
+    FileUtils.mkdir_p(pages_path)
+
+    upgrade_content = <<~MARKDOWN
+      ---
+      title: Upgrade
+      status: published
+      audience: everyone
+      ---
+
+      # Unlock Premium Content
+
+      Get access to all paid articles, podcast episodes, and more…
+
+      ## What You Get
+
+      - Full access to premium articles
+      - Exclusive member-only podcast episodes
+      - An ebook of your choice
+      - Support independent publishing
+
+      ## Ready to Upgrade?
+
+      ```form
+      for: checkout
+      button-text: Upgrade Now
+      ```
+
+      Secure payment powered by Stripe. You'll receive your login password after payment.
+    MARKDOWN
+
+    File.write(pages_path.join('upgrade.md'), upgrade_content)
+    puts "✓ Generated upgrade.md page"
+  end
+
+  def generate_signup_page(pages_path)
+    signup_content = <<~MARKDOWN
+      ---
+      title: Sign Up
+      status: published
+      audience: everyone
+      ---
+
+      # Sign up for the newsletter
+
+      It's free.
+
+      ## What You Get
+
+      - Newsletter to your inbox
+      - No spam, ever[^1]
+
+      ```form
+      for: signup
+      button-text: Sign up
+      ```
+
+      Already have an account? [Sign in](/sign-in)
+
+
+      [^1]: I will never sell your data either.
+    MARKDOWN
+
+    File.write(pages_path.join('signup.md'), signup_content)
+    puts "✓ Generated signup.md page"
+  end
+
+  def generate_signin_page(pages_path)
+    signin_content = <<~MARKDOWN
+      ---
+      title: Sign In
+      status: published
+      audience: everyone
+      ---
+
+      # Welcome Back
+
+      Sign in to access your account.
+
+      **Free members:** You don't need a password - just enter your email.
+
+      **Paid members:** Enter your email and password.
+
+      ```form
+      for: signin
+      button-text: Sign In
+      ```
+
+      Don't have an account? [Sign up](/sign-up)
+    MARKDOWN
+
+    File.write(pages_path.join('signin.md'), signin_content)
+    puts "✓ Generated signin.md page"
+  end
+
+  def generate_check_email_page(pages_path)
+    check_email_content = <<~MARKDOWN
+      ---
+      title: Check Your Email
+      status: published
+      audience: everyone
+      ---
+
+      # Check Your Email
+
+      We've sent you a magic link to sign in.
+
+      **Check your inbox** and click the link to continue.
+
+      The link will sign you in automatically.
+
+      ---
+
+      Didn't receive it? [Try again](/sign-in)
+    MARKDOWN
+
+    File.write(pages_path.join('check-email.md'), check_email_content)
+    puts "✓ Generated check-email.md page"
   end
 
   private
@@ -70,47 +216,26 @@ class ConfigGenerator
 
   def generate_site_config
     content = <<~YAML
-      # Site Configuration
-      # Basic metadata used throughout your site and in RSS/Atom feeds
-
-      title: My Site
-      description: A description of my site
-      author: Your Name
-
-      # Branding
-      # logo: logo.svg
-      # logo_style: beside_text  # Options: beside_text, replace_text
-      # favicon: favicon.ico
-
-      # ──────────────────────────────────────────────────────────────
-      # Custom Fonts (optional)
-      # Upload font files to site/system/assets/fonts/
-      # Supported formats: woff2 (recommended), woff, ttf
-      #
-      # Available variants for each font role:
-      #   - regular (required)
-      #   - bold (optional)
-      #   - italic (optional)
-      #   - bold_italic (optional)
-      #
-      # If variants aren't specified, the browser will synthesize them from regular.
-
-      # fonts:
-      #   heading:
-      #     family: "Custom Heading"
-      #     regular: heading-regular.woff2
-      #     bold: heading-bold.woff2
-      #
-      #   body:
-      #     family: "Custom Body"
-      #     regular: body-regular.woff2
-      #     bold: body-bold.woff2
-      #     italic: body-italic.woff2
-      #     bold_italic: body-bold-italic.woff2
-      #
-      #   mono:
-      #     family: "Custom Mono"
-      #     regular: mono-regular.woff2
+      title: ""
+      description: ""
+      author: ""
+      author_email: ""
+      logo: ""
+      logo_style: ""
+      favicon: ""
+      theme:
+        active: "default"
+      static_generation_enabled: false
+      fonts:
+        heading:
+          family: "Manrope"
+          source: "google"
+        body:
+          family: "Source Serif 4"
+          source: "google"
+        mono:
+          family: "Inconsolata"
+          source: "google"
     YAML
 
     File.write(SYSTEM_PATH.join('site.yml'), content)
@@ -119,30 +244,22 @@ class ConfigGenerator
 
   def generate_cards_defaults
     content = <<~YAML
-      # Card Defaults Configuration
-
       post-link:
         default_image: /media/images/default-post.jpg
         default_style: small
         default_link_text: "Read full story →"
-
       aside:
         default_link_text: "→"
-
-      # Button templates - used when inserting cards via editor buttons
-
       aside_button_template: |-
         type: aside
         text: __PLACEHOLDER__
         link:
         link_text:
         image:
-
       post_link_button_template: |-
         type: post-link
         style: small
         post:
-
       pullquote_button_template: |-
         type: pullquote
         text: __PLACEHOLDER__

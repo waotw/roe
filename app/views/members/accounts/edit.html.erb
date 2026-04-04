@@ -3,6 +3,17 @@
     <h1>Edit Account</h1>
 
     <%= form_with model: @member, url: account_path, method: :patch, local: true do |f| %>
+      <% if @member.errors.any? %>
+        <div class="form-errors">
+          <h3>Please fix these errors:</h3>
+          <ul>
+            <% @member.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
       <div class="form-field">
         <%= f.label :name %>
         <%= f.text_field :name, required: true %>
