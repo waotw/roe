@@ -82,6 +82,9 @@ class ConfigGenerator
 
     # Generate upgrade page
     generate_upgrade_page
+
+    # Generate email templates
+    generate_member_emails
   end
 
   def generate_upgrade_page
@@ -207,6 +210,51 @@ class ConfigGenerator
 
     File.write(pages_path.join('check-email.md'), check_email_content)
     puts "✓ Generated check-email.md page"
+  end
+
+  def generate_member_emails
+    emails_path = Rails.root.join('site', 'emails')
+    FileUtils.mkdir_p(emails_path)
+
+    # Generate magic link email
+    magic_link_content = <<~MARKDOWN
+      # Sign in to @site_title
+
+      Hi @member_name,
+
+      Click the link below to sign in:
+
+      [@signin_url](@signin_url)
+
+      ---
+
+      This link will sign you in automatically and expires in 24 hours.
+
+      If you didn't request this, you can safely ignore this email.
+    MARKDOWN
+
+    File.write(emails_path.join('magic_link.md'), magic_link_content)
+    puts "✓ Generated magic_link.md email template"
+
+    # Generate email confirmation email
+    email_confirmation_content = <<~MARKDOWN
+      # Confirm your email address
+
+      Hi @member_name,
+
+      You changed your email address. Click the link below to confirm your new email:
+
+      [@confirmation_url](@confirmation_url)
+
+      ---
+
+      This link expires in 24 hours.
+
+      If you didn't request this change, you can safely ignore this email and your email address will remain unchanged.
+    MARKDOWN
+
+    File.write(emails_path.join('email_confirmation.md'), email_confirmation_content)
+    puts "✓ Generated email_confirmation.md email template"
   end
 
   private
