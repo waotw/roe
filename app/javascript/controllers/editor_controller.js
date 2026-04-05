@@ -1128,6 +1128,35 @@ export default class extends Controller {
     console.log("[COLLECTION] END");
   }
 
+  insertPaywall(event) {
+    event.preventDefault();
+
+    const savedPos = this.lastCursorPosition;
+    this.textareaTarget.focus({ preventScroll: true });
+
+    if (savedPos !== null) {
+      this.textareaTarget.setSelectionRange(savedPos, savedPos);
+    }
+
+    const start = this.textareaTarget.selectionStart;
+
+    const paywallTemplate = [
+      "```form",
+      "for: paid_content",
+      "text: This is premium content. Upgrade to continue reading.",
+      "button-text: Become a paid member",
+      "```",
+    ].join("\n");
+
+    document.execCommand("insertText", false, paywallTemplate);
+
+    // Position cursor at end of inserted block
+    const cursorPos = start + paywallTemplate.length;
+    this.textareaTarget.setSelectionRange(cursorPos, cursorPos);
+
+    this.lastCursorPosition = null;
+  }
+
   // ========== MEDIA ACTIONS ==========
 
   triggerMediaUpload(event) {

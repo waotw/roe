@@ -14,5 +14,5 @@
 </div>
 
 <div class="post-content">
-  <%= raw post.to_html(preview: @preview_mode || false) %>
+  <%= render_post_content(post) %>
 </div>

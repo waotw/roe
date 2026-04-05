@@ -97,7 +97,7 @@ class ConfigGenerator
 
       # Unlock Premium Content
 
-      Get access to all paid articles, podcast episodes, and more…
+      This is a one-time payment, no subscription required, access forever[^1].
 
       ## What You Get
 
@@ -110,10 +110,13 @@ class ConfigGenerator
 
       ```form
       for: checkout
-      button-text: Upgrade Now
+      member-button-text: Upgrade Now
+      non-member-button-text: Sign up as paid member
       ```
 
       Secure payment powered by Stripe. You'll receive your login password after payment.
+
+      [^1]: As long as this site is around (and perhaps even longer).
     MARKDOWN
 
     File.write(pages_path.join('upgrade.md'), upgrade_content)
@@ -139,7 +142,8 @@ class ConfigGenerator
 
       ```form
       for: signup
-      button-text: Sign up
+      button-text: Free Account
+      upgrade-button-text: Paid member
       ```
 
       Already have an account? [Sign in](/sign-in)

@@ -128,11 +128,13 @@ Rails.application.routes.draw do
   get 'signin/:token', to: 'members/sessions#signin_with_token', as: :token_signin
 
   post 'signup', to: 'members/registrations#create'
+  post 'signup_and_checkout', to: 'members/registrations#create_and_checkout'
 
   # Member account management
   get "account", to: "members/accounts#show"
   get "account/edit", to: "members/accounts#edit"
   patch "account", to: "members/accounts#update"
+  get "account/confirm-email", to: "members/accounts#confirm_email", as: :confirm_email
 
   # Public checkout
   post 'checkout', to: 'checkout#create', as: :create_checkout
@@ -160,6 +162,9 @@ Rails.application.routes.draw do
 
   # Theme CSS (before catch-all)
   get 'theme/:filename.css', to: 'system/themes#show', defaults: { format: 'css' }
+  get 'theme/:filename.js', to: 'system/themes#show', defaults: { format: 'js' }
+  # Theme assets (CSS and JS)
+  # get 'theme/:filename', to: 'system/themes#show'
 
   # System assets
   get 'system/fonts/:filename', to: 'system/fonts#show', as: :system_font, constraints: { filename: /[^\/]+/ }

@@ -54,7 +54,7 @@
     <main>
       <% flash.each do |type, message| %>
         <div class="flash flash-<%= type %>">
-          <%= message %>
+          <mark> • <%= message %> • </mark>
         </div>
       <% end %>
       <%= yield %>
@@ -89,6 +89,7 @@
         })();
       </script>
     <% end %>
+    <script src="/theme/checkout.js"></script>
     <% if current_member %>
       <%= link_to account_path, class: "member-account-icon", title: "My Account" do %>
         <svg viewBox="0 0 16.1328 15.7715" xmlns="http://www.w3.org/2000/svg">

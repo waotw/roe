@@ -94,17 +94,29 @@ class Member < ApplicationRecord
   def self.generate_password
     # Expanded word list for memorable passwords
     words = %w[
-      adventure amber anchor anthem atlas autumn ballad beacon bear
-      birch blossom breeze cascade cedar cherry chorus cloud coast
-      compass crystal dragon eagle echo emerald explore falcon fire
-      forest fountain garden golden granite harbor harmony haiku
-      horizon ikigai island jade journey kintsugi lake lens
-      lighthouse lion maple marble meadow melody mirror moon
-      mountain nagomi oak ocean pearl petal phoenix pine prism
-      quartz quest reef rhythm river ruby sake sapphire shore
-      silver slate sonnet spring star stream summer sunset sushi
-      thunder tiger topaz tsunami velvet voyage wabisabi willow
-      wind winter wolf zen
+      adventure akihabara amber anchor anime april army atlas
+      autumn ballad beacon bear bento birch blade blossom blue
+      bonsai breeze bushido california cascade castle cedar cherry
+      chibi chorus cloud coast compass crystal dango diaries
+      dragon dobermann dorama dozo eagle emerald explore express
+      falcon fiction fire five forest fountain four futon garden
+      geisha golden granite haiku hanami harbor harmony hibiki
+      hikikomori hinoki horizon house ikigai inari island izakaya
+      jade journey kabuki kaizen kakigori kamikaze karaoke
+      kawaii killbill kiki kintsugi koi komorebi lake lens
+      lighthouse lion maboroshi machete maple marble master
+      matsuri meadow melody memories manga marine mirror miso
+      moon mountain nagomi netsuke ninja nodachi oak ocean
+      once origami otaku paper pearl petal phoenix pine
+      pokemon porco prism pulpfiction quartz quest ramen
+      reservoirdogs reservoir rhythm river ronin ruby sake
+      sakura samurai sapphire sensei shore shuriken silver
+      slate sonnet spirit spring star stream summer sumimasen
+      sumo sunset sushi taiko takoyaki tanuki tatami
+      tempura teru-teru-bozu thunder tiger time tofu topaz
+      torii train true trueromance tsunami ukiyo-e umami
+      velvet voyage wabisabi wakaresaseya wasabi wind winter
+      wolf yakuza yukata zen
     ]
 
     # 3 random words + 2 digits (e.g., "crystal-river-sunset-42")
@@ -137,6 +149,34 @@ class Member < ApplicationRecord
     @stripe_customer ||= Stripe::Customer.retrieve(stripe_customer_id)
   rescue Stripe::InvalidRequestError
     nil
+  end
+
+  def generate_email_confirmation_token!
+    update!(
+      email_confirmation_token: self.class.generate_password,
+      email_confirmation_sent_at: Time.current
+    )
+  end
+
+  def confirm_email!(token)
+    return false unless email_confirmation_token == token
+    return false if email_confirmation_expired?
+
+    transaction do
+      update!(
+        email: pending_email,
+        pending_email: nil,
+        email_confirmation_token: nil,
+        email_confirmation_sent_at: nil
+      )
+    end
+
+    true
+  end
+
+  def email_confirmation_expired?
+    return false unless email_confirmation_sent_at
+    email_confirmation_sent_at < 24.hours.ago
   end
 
   private

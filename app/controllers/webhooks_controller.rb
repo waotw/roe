@@ -25,7 +25,24 @@ class WebhooksController < ApplicationController
 
   def handle_checkout_completed(session)
     member_id = session.metadata.member_id
-    member = Member.find(member_id)
+
+    unless member_id.present?
+      Rails.logger.error "Webhook: No member_id in checkout session metadata"
+      return
+    end
+
+    member = Member.find_by(id: member_id)
+
+    unless member
+      Rails.logger.error "Webhook: Member #{member_id} not found"
+      return
+    end
+
+    # Skip if already paid (in case webhook fires twice)
+    if member.paid?
+      Rails.logger.info "Webhook: Member #{member.email} already paid, skipping"
+      return
+    end
 
     # Generate password
     password = Member.generate_password
@@ -41,5 +58,9 @@ class WebhooksController < ApplicationController
     Rails.cache.write("member_#{member.id}_password", password, expires_in: 1.hour)
 
     Rails.logger.info "✓ Member #{member.email} upgraded to paid"
+  rescue => e
+    Rails.logger.error "Webhook error handling checkout: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    # Don't re-raise - we already logged it and Stripe will retry anyway
   end
 end

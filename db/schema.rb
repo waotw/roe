@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_04_151309) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_05_202652) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -44,10 +44,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_04_151309) do
     t.datetime "cancelled_at"
     t.datetime "created_at", null: false
     t.string "email", null: false
+    t.datetime "email_confirmation_sent_at"
+    t.string "email_confirmation_token"
     t.json "metadata", default: {}
     t.string "name"
     t.datetime "paid_at"
     t.string "password_digest"
+    t.string "pending_email"
     t.integer "status", default: 0, null: false
     t.string "stripe_customer_id"
     t.string "stripe_payment_intent_id"

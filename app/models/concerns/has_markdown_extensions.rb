@@ -886,12 +886,19 @@ module HasMarkdownExtensions
     button_text = config['button-text'] || config['button_text'] || default_button_text(form_type)
 
     case form_type
+    when 'paid_content'
+      text = config['text'] || 'This is premium content. Upgrade to continue reading.'
+      button_text = config['button-text'] || config['button_text'] || 'Become a paid member'
+      render_paid_content_form(text, button_text)
     when 'signup'
-      render_signup_form(button_text)
+      upgrade_text = config['upgrade-button-text'] || config['upgrade_button_text']
+      render_signup_form(button_text, upgrade_text)
     when 'signin'
       render_signin_form(button_text)
     when 'checkout'
-      render_checkout_form(button_text)
+      member_text = config['member-button-text'] || config['member_button_text'] || button_text
+      non_member_text = config['non-member-button-text'] || config['non_member_button_text']
+      render_checkout_form(member_text, non_member_text)
     else
       ""
     end
@@ -904,11 +911,35 @@ module HasMarkdownExtensions
     {
       'signup' => 'Sign Up',
       'signin' => 'Sign In',
-      'checkout' => 'Upgrade Now'
+      'checkout' => 'Upgrade'
     }[form_type] || 'Submit'
   end
 
-  def render_signup_form(button_text)
+  def render_paid_content_form(text, button_text)
+    # This will act as a content gate - everything after this is paid
+    <<~HTML
+      <!-- PAID_CONTENT_GATE -->
+      <div class="paid-content-gate">
+        <p class="paywall-message">#{text}</p>
+        <a href="/upgrade" class="upgrade-button">#{button_text}</a>
+      </div>
+    HTML
+  end
+
+  def render_signup_form(button_text, upgrade_button_text = nil)
+    # Check if payments are actually enabled
+    payments_enabled = SiteConfig.default('members', 'payments')&.dig('enabled')
+    payments_enabled = (payments_enabled == true || payments_enabled == 'true')
+
+    # Only show upgrade button if payments are enabled AND text is provided
+    upgrade_button = if upgrade_button_text.present? && payments_enabled
+      <<~HTML
+        <button type="submit" formaction="/signup_and_checkout" class="signup-button signup-button-upgrade btn-primary">#{upgrade_button_text}</button>
+      HTML
+    else
+      ""
+    end
+
     <<~HTML
       <form action="/signup" method="post" class="signup-form">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
@@ -923,7 +954,8 @@ module HasMarkdownExtensions
           <input type="email" name="member[email]" id="member_email" required>
         </div>
 
-        <button type="submit" class="signup-button">#{button_text}</button>
+        <button type="submit" class="signup-button btn-outline">#{button_text}</button>
+        #{upgrade_button}
       </form>
     HTML
   end
@@ -943,12 +975,27 @@ module HasMarkdownExtensions
     HTML
   end
 
-  def render_checkout_form(button_text = 'Upgrade Now')
+  def render_checkout_form(member_button_text, non_member_button_text = nil)
+    if non_member_button_text.blank?
+      return <<~HTML
+        <form action="/checkout" method="post" class="upgrade-form checkout-form" data-turbo="false">
+          <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+          <button type="submit" class="upgrade-button btn-primary">#{member_button_text}</button>
+        </form>
+      HTML
+    end
+
     <<~HTML
-      <form action="/checkout" method="post" class="upgrade-form" data-turbo="false">
-        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
-        <button type="submit" class="upgrade-button">#{button_text}</button>
-      </form>
+      <div class="checkout-form-wrapper MEMBER_STATUS_PLACEHOLDER">
+        <form action="/checkout" method="post" class="upgrade-form member-checkout checkout-form" data-turbo="false">
+          <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+          <button type="submit" class="upgrade-button btn-primary">#{member_button_text}</button>
+        </form>
+
+        <div class="non-member-checkout">
+          <a href="/sign-up" class="upgrade-button btn-primary" data-turbo="false">#{non_member_button_text}</a>
+        </div>
+      </div>
     HTML
   end
 

@@ -38,15 +38,17 @@
 
     <div class="account-actions">
       <%= link_to "Edit Account", account_edit_path, class: "btn-secondary" %>
+      <% if @member.free? %>
+        <%= button_to "Upgrade to Paid", create_checkout_path,
+            class: "btn-primary",
+            form_class: "checkout-form",
+            data: { turbo: false } %>
+      <% end %>
+      <%= button_to "Sign Out", signout_path, method: :delete, class: "btn-outline" %>
 
       <% if @member.free? %>
-        <% upgrade_page = Page.find_by(file_path: Rails.root.join('site', 'pages', 'upgrade.md').to_s) %>
-        <% if upgrade_page %>
-          <%= link_to "Upgrade to Paid", "/#{upgrade_page.url_name}", class: "btn-primary" %>
-        <% end %>
+        <p class="upgrade-link">Find out about <a href="/upgrade">paid membership</a></p>
       <% end %>
-
-      <%= button_to "Sign Out", signout_path, method: :delete, class: "btn-outline" %>
     </div>
   </div>
 </div>

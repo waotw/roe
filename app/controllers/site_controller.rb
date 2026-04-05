@@ -19,11 +19,21 @@ class SiteController < ApplicationController
     return unless members_enabled?
     return unless item.metadata['audience'] == 'paid'
 
-    # Need this back:
-    if current_member&.paid? && current_member&.active?
-      return  # Let paid members through
-    end
+    # Paid members get full access
+    return if current_member&.paid? && current_member&.active?
 
-    redirect_to signin_path, alert: "This content requires a paid membership"
+    # Check if content has a paid_content form (acts as paywall)
+    has_paywall_form = item.content.include?('for: paid_content')
+
+    if has_paywall_form
+      # Let the page load - content will be truncated at the form
+      return
+    else
+      # No form = redirect to upgrade page
+      upgrade_page = Page.find_by("file_path LIKE ?", "%upgrade.md")
+      upgrade_path = upgrade_page ? "/#{upgrade_page.url_name}" : '/upgrade'
+
+      redirect_to upgrade_path, alert: "This content requires a paid membership"
+    end
   end
 end

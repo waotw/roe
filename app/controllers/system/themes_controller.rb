@@ -1,43 +1,67 @@
 class System::ThemesController < ApplicationController
   skip_before_action :require_authentication
+  skip_before_action :verify_authenticity_token
 
   def show
-      filename = params[:filename]
-      filename = "#{filename}.css" unless filename.end_with?('.css')
+    filename = params[:filename]
+    format = params[:format] || 'css'
 
-      # Check user's installed themes first
-      user_file_path = Rails.root.join('site', 'theme', filename)
+    # Build full filename with extension
+    full_filename = "#{filename}.#{format}"
 
-      # Fall back to app themes if not installed
-      app_file_path = Rails.root.join('app', 'themes', filename)
+    # Determine MIME type
+    content_type = format == 'js' ? 'application/javascript' : 'text/css'
 
-      file_path = if File.exist?(user_file_path)
-        user_file_path
-      elsif File.exist?(app_file_path)
-        app_file_path
-      else
-        nil
-      end
+    # Check user's installed themes first
+    user_file_path = Rails.root.join('site', 'theme', full_filename)
 
-      if file_path
-        # Use file modification time for caching
-        last_modified = File.mtime(file_path)
+    # Fall back to app themes if not installed
+    app_file_path = Rails.root.join('app', 'themes', full_filename)
 
-        # DEBUG: Add this header to see which file is being served
-        response.headers['X-Theme-Path'] = file_path.to_s
-        response.headers['X-Theme-Modified'] = last_modified.to_s
-
-        # Force browser to revalidate (but still use cache if file unchanged)
-        response.headers['Cache-Control'] = 'no-cache, must-revalidate'
-        response.headers['Last-Modified'] = last_modified.httpdate
-        response.headers['ETag'] = last_modified.to_i.to_s
-
-        # Check if browser's cached version is still valid
-        if stale?(last_modified: last_modified, etag: last_modified.to_i)
-          send_file file_path, type: 'text/css', disposition: 'inline'
-        end
-      else
-        head :not_found
-      end
+    file_path = if File.exist?(user_file_path)
+      user_file_path
+    elsif File.exist?(app_file_path)
+      app_file_path
+    else
+      head :not_found
+      return
     end
+
+    # Use file modification time for caching
+    last_modified = File.mtime(file_path)
+
+    # Cache headers
+    response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+    response.headers['Last-Modified'] = last_modified.httpdate
+    response.headers['ETag'] = last_modified.to_i.to_s
+
+    # Check if browser's cached version is still valid
+    if stale?(last_modified: last_modified, etag: last_modified.to_i)
+      send_file file_path, type: content_type, disposition: 'inline'
+    end
+  end
+
+  private
+
+  def detect_extension(filename)
+    # If no extension, check what exists
+    if File.exist?(Rails.root.join('site', 'theme', "#{filename}.css"))
+      '.css'
+    elsif File.exist?(Rails.root.join('site', 'theme', "#{filename}.js"))
+      '.js'
+    else
+      '.css' # Default fallback
+    end
+  end
+
+  def mime_type_for(extension)
+    case extension
+    when '.css'
+      'text/css'
+    when '.js'
+      'application/javascript'
+    else
+      'text/plain'
+    end
+  end
 end
