@@ -64,6 +64,11 @@ Rails.application.routes.draw do
     # Stripe Configuration (add this with your other config routes)
     resource :stripe_config, only: [:edit, :update, :destroy]
 
+    # Mailjet Configuration
+    resource :mailjet_config, only: [:edit, :update, :destroy] do
+      post :sync_all, on: :collection
+    end
+
     resources :themes, only: [:index] do
       member do
         get :edit

@@ -112,6 +112,7 @@
           <% if members_enabled? %>
               <div class="flex gap-x-6">
                 <%= link_to "Members", admin_members_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+                <%= link_to "Mailjet", edit_admin_mailjet_config_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
                 <%= link_to "Emails", admin_emails_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
                 <%= link_to "Payments", edit_admin_stripe_config_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             </div>

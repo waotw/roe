@@ -2,6 +2,7 @@ class Member < ApplicationRecord
   # Enums (integer-backed for SQLite performance)
   enum :tier, { free: 0, paid: 1 }, prefix: true
   enum :status, { active: 0, cancelled: 1 }, prefix: true
+  enum :newsletter_status, { subscribed: 0, unsubscribed: 1, bounced: 2 }, prefix: true
 
   # Password authentication (only for paid tier)
   has_secure_password validations: false
@@ -25,6 +26,9 @@ class Member < ApplicationRecord
   scope :cancelled, -> { where(status: :cancelled) }
   scope :free_tier, -> { where(tier: :free) }
   scope :paid_tier, -> { where(tier: :paid) }
+  scope :newsletter_subscribed, -> { where(newsletter_status: :subscribed) }
+  scope :newsletter_unsubscribed, -> { where(newsletter_status: :unsubscribed) }
+  scope :newsletter_active, -> { active.newsletter_subscribed }
 
   # Scope for newsletter recipients based on content audience
   scope :for_newsletter, ->(audience) {
@@ -39,6 +43,8 @@ class Member < ApplicationRecord
   # Callbacks
   before_create :set_subscribed_at
   before_create :generate_memorable_token
+  after_create :sync_to_mailjet
+  after_update :sync_to_mailjet, if: :should_sync_to_mailjet?
 
   def regenerate_token!
     update!(access_token: self.class.generate_password)
@@ -179,6 +185,24 @@ class Member < ApplicationRecord
     email_confirmation_sent_at < 24.hours.ago
   end
 
+  # NEWSLETTER
+
+  def newsletter_subscribed?
+    newsletter_status_subscribed?
+  end
+
+  def newsletter_unsubscribed?
+    newsletter_status_unsubscribed?
+  end
+
+  def unsubscribe_from_newsletter!
+    update!(newsletter_status: :unsubscribed)
+  end
+
+  def resubscribe_to_newsletter!
+    update!(newsletter_status: :subscribed)
+  end
+
   private
 
   def generate_memorable_token
@@ -187,5 +211,19 @@ class Member < ApplicationRecord
 
   def set_subscribed_at
     self.subscribed_at ||= Time.current
+  end
+
+  def sync_to_mailjet
+    return unless MailjetConfig.configured?
+
+    # Sync in background to avoid blocking web requests
+    SyncMemberToMailjetJob.perform_later(self.id)
+  end
+
+  def should_sync_to_mailjet?
+    # Sync if email, name, or newsletter status changed
+    saved_change_to_email? ||
+      saved_change_to_name? ||
+      saved_change_to_newsletter_status?
   end
 end
