@@ -20,6 +20,14 @@ class EmailRenderer
     wrap_in_email_layout(html)
   end
 
+  def self.render_content(content)
+    # Convert markdown to HTML
+    html = Kramdown::Document.new(content).to_html
+
+    # Wrap in basic email styling
+    wrap_in_email_layout(html)
+  end
+
   private
 
   def self.wrap_in_email_layout(html)

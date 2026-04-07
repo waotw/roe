@@ -89,6 +89,13 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :emails, only: [:index, :edit, :update] do
+      member do
+        post :preview
+        get :preview
+      end
+    end
+
     get 'static_site', to: 'static_site#index', as: :static_site
     post 'static_site/generate', to: 'static_site#generate', as: :generate_static_site
     post 'static_site/clean', to: 'static_site#clean', as: :clean_static_site

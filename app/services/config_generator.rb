@@ -217,44 +217,92 @@ class ConfigGenerator
     FileUtils.mkdir_p(emails_path)
 
     # Generate magic link email
-    magic_link_content = <<~MARKDOWN
-      # Sign in to @site_title
+    unless File.exist?(emails_path.join('magic_link.md'))
+      magic_link_content = <<~MARKDOWN
+        # Sign in to @site_name
 
-      Hi @member_name,
+        Hi @member_name,
 
-      Click the link below to sign in:
+        Click the link below to sign in:
 
-      [@signin_url](@signin_url)
+        [@magic_link](@magic_link)
 
-      ---
+        ---
 
-      This link will sign you in automatically and expires in 24 hours.
+        This link will sign you in automatically and expires in 24 hours.
 
-      If you didn't request this, you can safely ignore this email.
-    MARKDOWN
+        If you didn't request this, you can safely ignore this email.
+      MARKDOWN
 
-    File.write(emails_path.join('magic_link.md'), magic_link_content)
-    puts "✓ Generated magic_link.md email template"
+      File.write(emails_path.join('magic_link.md'), magic_link_content)
+      puts "✓ Generated magic_link.md email template"
+    end
 
     # Generate email confirmation email
-    email_confirmation_content = <<~MARKDOWN
-      # Confirm your email address
+    unless File.exist?(emails_path.join('email_confirmation.md'))
+      email_confirmation_content = <<~MARKDOWN
+        # Confirm your email address
 
-      Hi @member_name,
+        Hi @member_name,
 
-      You changed your email address. Click the link below to confirm your new email:
+        You changed your email address. Click the link below to confirm your new email:
 
-      [@confirmation_url](@confirmation_url)
+        [@confirmation_url](@confirmation_url)
 
-      ---
+        ---
 
-      This link expires in 24 hours.
+        This link expires in 24 hours.
 
-      If you didn't request this change, you can safely ignore this email and your email address will remain unchanged.
-    MARKDOWN
+        If you didn't request this change, you can safely ignore this email and your email address will remain unchanged.
+      MARKDOWN
 
-    File.write(emails_path.join('email_confirmation.md'), email_confirmation_content)
-    puts "✓ Generated email_confirmation.md email template"
+      File.write(emails_path.join('email_confirmation.md'), email_confirmation_content)
+      puts "✓ Generated email_confirmation.md email template"
+    end
+
+    # Generate payment failed email
+    unless File.exist?(emails_path.join('payment_failed.md'))
+      payment_failed_content = <<~MARKDOWN
+        # Payment Update Required
+
+        Hi @member_name,
+
+        We weren't able to process your payment for @site_name.
+
+        **Your free access will continue**, please try again if wish to access the best stuff on the internet/support the site.
+
+        [Update Payment Method](@update_payment_url)
+
+        ---
+
+        Questions? Just reply to this email.
+      MARKDOWN
+
+      File.write(emails_path.join('payment_failed.md'), payment_failed_content)
+      puts "✓ Generated payment_failed.md email template"
+    end
+
+    # Generate account deletion email
+    unless File.exist?(emails_path.join('account_deletion.md'))
+      account_deletion_content = <<~MARKDOWN
+        # Your account has been deleted
+
+        Hi @member_name,
+
+        This confirms that your account at @site_name has been permanently deleted.
+
+        All of your data has been removed from our system.
+
+        We're sorry to see you go. If you'd like to return in the future, you're always welcome to sign up again.
+
+        ---
+
+        @site_name
+      MARKDOWN
+
+      File.write(emails_path.join('account_deletion.md'), account_deletion_content)
+      puts "✓ Generated account_deletion.md email template"
+    end
   end
 
   private

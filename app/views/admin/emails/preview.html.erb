@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Email Preview</title>
+  <script>
+    // Listen for refresh messages from editor
+    const channel = new BroadcastChannel('preview-email-<%= @filename %>');
+    channel.onmessage = (event) => {
+      if (event.data.action === 'refresh') {
+        location.reload();
+      }
+    };
+  </script>
+</head>
+<body style="margin: 0; padding: 20px; background: #f3f4f6;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div style="background: white; padding: 20px; margin-bottom: 20px; border: 1px solid #e5e7eb;">
+      <h3 style="margin: 0 0 10px 0; font-family: sans-serif; font-size: 14px; color: #6b7280;">
+        Preview with Example Data
+      </h3>
+      <p style="margin: 0; font-family: monospace; font-size: 12px; color: #9ca3af;">
+        This shows how the email will look with sample data.
+      </p>
+    </div>
+
+    <%= @preview_html.html_safe %>
+  </div>
+</body>
+</html>
