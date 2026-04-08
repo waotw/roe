@@ -23,8 +23,75 @@ class NewsletterRenderer
     post.to_html
   end
 
+  def convert_action_text_attachments(html)
+    return html if html.blank?
+
+    doc = Nokogiri::HTML.fragment(html)
+
+    doc.css('action-text-attachment[content-type="image"]').each do |attachment|
+      url = attachment['url']
+      caption = attachment['caption']
+
+      # Create img tag
+      img = doc.document.create_element('img')
+      img['src'] = url
+      img['alt'] = caption if caption.present?
+      img['style'] = 'max-width: 100%; height: auto;'
+
+      # Add caption if present
+      if caption.present?
+        figure = doc.document.create_element('figure')
+        figure['style'] = 'margin: 1.5rem 0;'
+
+        figcaption = doc.document.create_element('figcaption')
+        figcaption['style'] = 'font-size: 0.875rem; color: #666; margin-top: 0.5rem; text-align: center;'
+        figcaption.content = caption
+
+        figure.add_child(img)
+        figure.add_child(figcaption)
+        attachment.replace(figure)
+      else
+        attachment.replace(img)
+      end
+    end
+
+    doc.to_html
+  end
+
+  def convert_relative_urls(html)
+    return html if html.blank?
+
+    site_url = SiteConfig.current('site')&.config&.dig('url')
+
+    # Fallback to localhost for dev if not set
+    site_url ||= 'http://localhost:3000'
+
+    # Remove trailing slash
+    site_url = site_url.sub(/\/$/, '')
+
+    doc = Nokogiri::HTML.fragment(html)
+
+    # Convert image src
+    doc.css('img[src^="/"]').each do |img|
+      img['src'] = "#{site_url}#{img['src']}"
+    end
+
+    # Convert link href
+    doc.css('a[href^="/"]').each do |link|
+      link['href'] = "#{site_url}#{link['href']}"
+    end
+
+    doc.to_html
+  end
+
   # Wrap post HTML in email template structure
   def wrap_in_email_template(content_html)
+    # 1. Convert Action Text attachments to img tags
+    content_html = convert_action_text_attachments(content_html)
+
+    # 2. Convert relative URLs to absolute
+    content_html = convert_relative_urls(content_html)
+
     <<~HTML
       <!DOCTYPE html>
       <html>
@@ -182,6 +249,22 @@ class NewsletterRenderer
         background: #f5f5f5;
         padding: 0.2em 0.4em;
         border-radius: 3px;
+      }
+
+      /* Hide default footnote list numbers (we have custom backlink numbers) */
+      .footnotes ol {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .footnotes li {
+        margin-bottom: 0.5rem;
+      }
+
+      .footnote-backlink-number {
+        font-weight: bold;
+        text-decoration: none;
+        margin-right: 0.5rem;
       }
     CSS
   end

@@ -1853,4 +1853,150 @@ export default class extends Controller {
 
     console.log("[HIGHLIGHT] Media not found in content or metadata");
   }
+
+  // ========== TEST EMAIL METHODS ==========
+
+  sendTestEmail(event) {
+    event.preventDefault();
+
+    const url = event.currentTarget.dataset.editorTestEmailUrl;
+    const defaultEmail = event.currentTarget.dataset.editorDefaultEmail || "";
+
+    this.showTestEmailModal(url, defaultEmail);
+  }
+
+  showTestEmailModal(url, defaultEmail) {
+    const overlay = document.createElement("div");
+    overlay.id = "test-email-modal";
+    overlay.className = "fixed inset-0 flex items-center justify-center z-50";
+    overlay.style.cssText = "background-color: rgba(0, 0, 0, 0.2);";
+
+    overlay.innerHTML = `
+      <div class="bg-white p-6 w-96 border border-gray-400">
+        <h3 class="font-mono text-sm mb-4 uppercase">Send Test Newsletter</h3>
+        <input
+          type="email"
+          id="test-email-input"
+          value="${this.escapeHtml(defaultEmail)}"
+          placeholder="your@email.com"
+          class="w-full px-3 py-2 border border-gray-300 mb-4 font-mono text-sm"
+        >
+        <div id="test-email-status" class="mb-4 text-sm hidden"></div>
+        <div class="flex justify-end gap-2">
+          <button type="button"
+                  id="test-email-cancel"
+                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            Cancel
+          </button>
+          <button type="button"
+                  id="test-email-send"
+                  class="uppercase text-xs px-1.5 py-0 border border-blue-600 bg-blue-200 hover:bg-blue-300 text-blue-700 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            Send
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById("test-email-input");
+    const sendButton = document.getElementById("test-email-send");
+    const cancelButton = document.getElementById("test-email-cancel");
+    const statusDiv = document.getElementById("test-email-status");
+
+    input.focus();
+    input.select();
+
+    // Send button
+    sendButton.addEventListener("click", () => {
+      const email = input.value.trim();
+      if (!email) {
+        this.showTestEmailError(statusDiv, "Please enter an email address");
+        return;
+      }
+
+      this.sendTestEmailRequest(url, email, statusDiv, sendButton);
+    });
+
+    // Cancel button
+    cancelButton.addEventListener("click", () => this.closeTestEmailModal());
+
+    // Keyboard shortcuts
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendButton.click();
+      } else if (e.key === "Escape") {
+        this.closeTestEmailModal();
+      }
+    });
+
+    // Close on overlay click
+    overlay.addEventListener("click", (e) => {
+      if (e.target.id === "test-email-modal") {
+        this.closeTestEmailModal();
+      }
+    });
+  }
+
+  async sendTestEmailRequest(url, email, statusDiv, sendButton) {
+    sendButton.disabled = true;
+    sendButton.textContent = "Sending...";
+
+    try {
+      const token = document.querySelector('meta[name="csrf-token"]').content;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": token,
+        },
+        body: JSON.stringify({ email: email }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.showTestEmailSuccess(statusDiv, `✓ Test email sent to ${email}!`);
+        setTimeout(() => this.closeTestEmailModal(), 2000);
+      } else {
+        this.showTestEmailError(
+          statusDiv,
+          data.error || "Failed to send email",
+        );
+        sendButton.disabled = false;
+        sendButton.textContent = "Send";
+      }
+    } catch (error) {
+      this.showTestEmailError(statusDiv, "Network error: " + error.message);
+      sendButton.disabled = false;
+      sendButton.textContent = "Send";
+    }
+  }
+
+  showTestEmailSuccess(statusDiv, message) {
+    statusDiv.textContent = message;
+    statusDiv.className =
+      "mb-4 text-sm text-green-700 bg-green-50 p-2 border border-green-300 rounded-xs";
+    statusDiv.classList.remove("hidden");
+  }
+
+  showTestEmailError(statusDiv, message) {
+    statusDiv.textContent = message;
+    statusDiv.className =
+      "mb-4 text-sm text-red-700 bg-red-50 p-2 border border-red-300 rounded-xs";
+    statusDiv.classList.remove("hidden");
+  }
+
+  closeTestEmailModal() {
+    const modal = document.getElementById("test-email-modal");
+    if (modal) {
+      modal.remove();
+    }
+
+    if (this.hasTextareaTarget) {
+      this.textareaTarget.focus({ preventScroll: true });
+    }
+  }
 }

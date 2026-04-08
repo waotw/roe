@@ -22,7 +22,7 @@ class Member < ApplicationRecord
   validates :status, presence: true
 
   # Password required for paid tier
-  validates :password, presence: true, if: -> { tier_paid? && password_digest.blank? }
+  # validates :password, presence: true, if: -> { tier_paid? && password_digest.blank? }
 
   # Scopes
   scope :active, -> { where(status: :active) }

@@ -74,6 +74,137 @@ class MailjetService
       { success: false, error: e.message }
     end
 
+    def send_newsletter(to_email:, to_name:, subject:, html_content:)
+      return { success: false, error: "Mailjet not configured" } unless configured?
+
+      config = MailjetConfig.current
+      from_email = SiteConfig.current('site')&.config&.dig('author_email') || 'noreply@example.com'
+      from_name = SiteConfig.current('site')&.config&.dig('author') || 'Newsletter'
+
+      uri = URI('https://api.mailjet.com/v3.1/send')
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+
+      request = Net::HTTP::Post.new(uri.path)
+      request['Content-Type'] = 'application/json'
+      request.basic_auth(config.api_key, config.secret_key)
+
+      request.body = {
+        Messages: [{
+          From: { Email: from_email, Name: from_name },
+          To: [{ Email: to_email, Name: to_name }],
+          Subject: subject,
+          HTMLPart: html_content,
+          TextPart: strip_html(html_content)
+        }]
+      }.to_json
+
+      response = http.request(request)
+
+      if response.code == '200'
+        data = JSON.parse(response.body)
+        { success: true, message_id: data.dig('Messages', 0, 'To', 0, 'MessageID') }
+      else
+        error_data = JSON.parse(response.body) rescue {}
+        { success: false, error: error_data['ErrorMessage'] || response.body }
+      end
+    rescue => e
+      Rails.logger.error "Mailjet send failed: #{e.message}"
+      { success: false, error: e.message }
+    end
+
+    def send_newsletter_bulk(messages:)
+      return { success: false, error: "Mailjet not configured" } unless configured?
+
+      # DRY RUN MODE - Simulate sending without calling API
+      if ENV['NEWSLETTER_DRY_RUN'] == 'true'
+        Rails.logger.info "🧪 DRY RUN: Would send #{messages.size} emails"
+
+        # Simulate API response
+        fake_results = messages.map.with_index do |msg, i|
+          {
+            'Status' => 'success',
+            'To' => [{
+              'Email' => msg[:To][0][:Email],
+              'MessageID' => "dry-run-#{Time.current.to_i}-#{i}",
+              'MessageUUID' => SecureRandom.uuid
+            }]
+          }
+        end
+
+        # Simulate realistic API delay (20ms per email)
+        sleep(messages.size * 0.02)
+
+        return { success: true, results: fake_results }
+      end
+
+      # REAL MODE - Actually send via Mailjet
+      config = MailjetConfig.current
+
+      uri = URI('https://api.mailjet.com/v3.1/send')
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+
+      request = Net::HTTP::Post.new(uri.path)
+      request['Content-Type'] = 'application/json'
+      request.basic_auth(config.api_key, config.secret_key)
+
+      request.body = { Messages: messages }.to_json
+
+      response = http.request(request)
+
+      if response.code == '200'
+        data = JSON.parse(response.body)
+        { success: true, results: data['Messages'] }
+      else
+        error_data = JSON.parse(response.body) rescue {}
+        { success: false, error: error_data['ErrorMessage'] || response.body }
+      end
+    rescue => e
+      Rails.logger.error "Mailjet bulk send failed: #{e.message}"
+      { success: false, error: e.message }
+    end
+
+    # def send_newsletter(to_email:, to_name:, subject:, html_content:)
+    #   return { success: false, error: "Mailjet not configured" } unless configured?
+
+    #   configure_client
+
+    #   # Get sender email from config
+    #   from_email = SiteConfig.current('site')&.config&.dig('author_email') || 'noreply@example.com'
+    #   from_name = SiteConfig.current('site')&.config&.dig('author') || SiteConfig.current('site')&.config&.dig('title') || 'Newsletter'
+
+    #   # Send via Mailjet Send API v3.1
+    #   response = Mailjet::Send.create(
+    #     Messages: [{
+    #       From: {
+    #         Email: from_email,
+    #         Name: from_name
+    #       },
+    #       To: [{
+    #         Email: to_email,
+    #         Name: to_name
+    #       }],
+    #       Subject: subject,
+    #       HTMLPart: html_content,
+    #       TextPart: strip_html(html_content) # Plain text fallback
+    #     }]
+    #   )
+
+    #   if response.success?
+    #     message_id = response.dig(0, 'To', 0, 'MessageID')
+    #     { success: true, message_id: message_id }
+    #   else
+    #     { success: false, error: "Failed to send email" }
+    #   end
+    # rescue Mailjet::ApiError => e
+    #   Rails.logger.error "Mailjet Send API Error: #{e.message}"
+    #   { success: false, error: "Mailjet API Error: #{e.message}" }
+    # rescue => e
+    #   Rails.logger.error "Failed to send newsletter: #{e.message}"
+    #   { success: false, error: e.message }
+    # end
+
     def create_contact(member)
       configure_client
 
@@ -200,6 +331,7 @@ class MailjetService
       Mailjet.configure do |config|
         config.api_key = api_key
         config.secret_key = secret_key
+        config.api_version = "v3.1"
         config.default_from = SiteConfig.get('author_email') || 'noreply@example.com'
       end
     end
@@ -228,6 +360,11 @@ class MailjetService
       Mailjet::Contactdata.find(contact_id).update_attributes(
         data: [{ Name: "subscribed_at", Value: member.subscribed_at&.iso8601 }]
       )
+    end
+
+    def strip_html(html)
+      # Simple HTML stripping for plain text version
+      html.gsub(/<[^>]*>/, '').gsub(/\s+/, ' ').strip
     end
   end
 end

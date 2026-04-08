@@ -60,6 +60,54 @@ class Admin::PostsController < Admin::BaseController
     render template: 'posts/show', layout: 'site'
   end
 
+  def send_test_email
+    @post = Post.find(params[:id])
+    email = params[:email]
+
+    # Validate email
+    unless email.present? && email.match?(URI::MailTo::EMAIL_REGEXP)
+      render json: { success: false, error: 'Invalid email address' }
+      return
+    end
+
+    # Check if newsletters are enabled
+    unless helpers.newsletters_enabled?
+      render json: { success: false, error: 'Newsletter feature is not enabled' }
+      return
+    end
+
+    # Check if Mailjet is configured
+    unless MailjetConfig.configured?
+      render json: { success: false, error: 'Mailjet is not configured. Check Settings > Mailjet.' }
+      return
+    end
+
+    begin
+      # Render the newsletter HTML
+      renderer = NewsletterRenderer.new(@post)
+      html_content = renderer.render
+
+      # Send via Mailjet
+      result = MailjetService.send_newsletter(
+        to_email: email,
+        to_name: email.split('@').first.titleize,
+        subject: @post.title || 'Newsletter Preview',
+        html_content: html_content
+      )
+
+      if result[:success]
+        render json: { success: true }
+      else
+        render json: { success: false, error: result[:error] || 'Failed to send email' }
+      end
+
+    rescue => e
+      Rails.logger.error "Test email failed: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      render json: { success: false, error: "Error: #{e.message}" }
+    end
+  end
+
   # def preview
   #   # Reconstruct content from params
   #   metadata_yaml = params[:metadata]
@@ -309,8 +357,17 @@ class Admin::PostsController < Admin::BaseController
 
     # Sync to DB
     ContentSync.sync_file(@post.file_path)
+    @post.reload
 
-    flash[:notice] = "Post published"
+    # Send newsletter if published_to includes newsletter
+    if should_send_newsletter?(@post)
+      # Queue background job instead of sending immediately
+      SendNewsletterJob.perform_later(@post.id)
+      flash[:notice] = "Post published. Newsletter is being sent in the background."
+    else
+      flash[:notice] = "Post published"
+    end
+
     redirect_to edit_admin_post_path(@post)
   end
 
@@ -345,6 +402,19 @@ class Admin::PostsController < Admin::BaseController
   end
 
   private
+
+  def should_send_newsletter?(post)
+    published_to = post.metadata['published_to'] || post.published_to
+    published_to.in?(['newsletter', 'both'])
+  end
+
+  def send_newsletter(post)
+    sender = NewsletterSender.new(post)
+    sender.send_to_audience
+  rescue => e
+    Rails.logger.error "Newsletter send failed: #{e.message}"
+    { success: false, error: e.message }
+  end
 
   def ensure_podcast_guid(metadata_hash, post)
     # Only process for podcast posts

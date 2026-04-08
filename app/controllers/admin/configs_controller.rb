@@ -12,6 +12,13 @@ class Admin::ConfigsController < ApplicationController
           required: true,
           hint: 'Used in page titles, feeds, and site header'
         },
+        'url' => {  # ← ADD THIS
+          type: :text,
+          label: 'Site URL',
+          required: true,
+          hint: 'Full URL of your site (e.g., https://example.com) - used in emails and feeds',
+          placeholder: 'https://example.com'
+        },
         'description' => {
           type: :textarea,
           label: 'Site Description',
@@ -22,6 +29,11 @@ class Admin::ConfigsController < ApplicationController
           type: :text,
           label: 'Author Name',
           hint: 'Default author for posts and pages'
+        },
+        'author_email' => {
+          type: :text,
+          label: 'Author Email',
+          hint: 'Email address of the site author'
         }
       }
     },
