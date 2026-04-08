@@ -4,8 +4,19 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
+  enum :published_to, {
+    site: 0,
+    newsletter: 1,
+    both: 2
+  }, prefix: true
+
+  scope :for_newsletter, -> { where(published_to: [:newsletter, :both]) }
+  scope :newsletter_ready, -> { published.for_newsletter }
+
   has_many :media_references, dependent: :destroy
   has_many :media, through: :media_references, source: :medium
+  has_many :newsletter_sends, dependent: :destroy
+  has_many :newsletter_recipients, through: :newsletter_sends, source: :member
 
   before_save :preserve_podcast_guid
   after_save :cleanup_podcast_yaml, if: :should_cleanup_yaml?
@@ -351,6 +362,10 @@ class Post < ApplicationRecord
     metadata["type"] || "article"
   end
 
+  def send_as_newsletter?
+    published_to_newsletter? || published_to_both?
+  end
+
   # Class methods for filtering by type
   def self.articles
     where("json_extract(metadata, '$.type') = ?", "article")
@@ -379,15 +394,6 @@ class Post < ApplicationRecord
 
   def self.public_documentation
     where("json_extract(metadata, '$.status') IN ('published', 'unlisted')")
-  end
-
-  def self.regular_posts
-    where("file_path NOT LIKE ?", "%site/docs/%")
-  end
-
-  def self.public_posts
-    where("json_extract(metadata, '$.status') = ?", "published")
-      .where("file_path NOT LIKE ?", "%site/docs/%")
   end
 
   def self.feed_posts

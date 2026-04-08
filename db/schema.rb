@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_07_165913) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -75,6 +75,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_165913) do
     t.index ["tier", "status"], name: "index_members_on_tier_and_status"
   end
 
+  create_table "newsletter_sends", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "mailjet_message_id"
+    t.integer "member_id", null: false
+    t.integer "post_id", null: false
+    t.datetime "sent_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mailjet_message_id"], name: "index_newsletter_sends_on_mailjet_message_id"
+    t.index ["member_id"], name: "index_newsletter_sends_on_member_id"
+    t.index ["post_id", "member_id"], name: "index_newsletter_sends_on_post_id_and_member_id", unique: true
+    t.index ["post_id"], name: "index_newsletter_sends_on_post_id"
+  end
+
   create_table "pages", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -88,6 +101,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_165913) do
     t.datetime "created_at", null: false
     t.string "file_path"
     t.json "metadata", default: {}
+    t.integer "published_to", default: 0, null: false
     t.datetime "updated_at", null: false
   end
 

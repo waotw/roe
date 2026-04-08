@@ -35,6 +35,8 @@ export default class extends Controller {
     "url_name",
     "image",
     "excerpt",
+    "audience",
+    "published_to",
   ];
 
   connect() {

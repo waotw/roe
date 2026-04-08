@@ -29,6 +29,20 @@
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
+      'audience' => {
+        type: :select,
+        label: 'audience',
+        options: ['everyone', 'paid'],
+        hint: 'Who should see/receive this post?',
+        required: members_enabled?
+      },
+      'published_to' => {
+        type: :select,
+        label: 'published_to',
+        options: ['site', 'newsletter', 'both'],
+        hint: 'Where should this be published?',
+        required: newsletters_enabled?
+      },
 
       # Media fields
       'audio' => { type: :text, label: 'audio', hint: "Example: /media/audio/audio-file.mp3" },
@@ -37,7 +51,7 @@
         type: :text,
         label: 'duration',
         hint: 'Auto-calculated from media file',
-        readonly: true  # Add this
+        readonly: true
       },
       'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' },
 

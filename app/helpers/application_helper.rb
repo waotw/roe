@@ -29,4 +29,24 @@ module ApplicationHelper
     Rails.logger.warn "⚠️  Invalid media URL: #{filename}"
     nil
   end
+
+  def members_enabled?
+    File.exist?(Rails.root.join('site/system/defaults/members.yml'))
+  end
+
+  def newsletters_enabled?
+    members_enabled? && SiteConfig.default('members', 'newsletter')&.dig('enabled') == true
+  end
+
+  def mailjet_configured?
+    MailjetConfig.exists? && MailjetConfig.current.connected?
+  end
+
+  def requires_audience_on_publish?
+    members_enabled?
+  end
+
+  def requires_published_to_on_publish?
+    newsletters_enabled? && mailjet_configured?
+  end
 end

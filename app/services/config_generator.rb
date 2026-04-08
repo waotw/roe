@@ -52,12 +52,11 @@ class ConfigGenerator
       non-members:
         show_paid_content: #{show_paid_content}
         show_paid_indicator: true
-
       payments:
         enabled: false
         price: "0.00"
-
-      members:
+      newsletter:
+        enabled: false
     YAML
 
     File.write(DEFAULTS_PATH.join('members.yml'), content)

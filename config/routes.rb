@@ -22,6 +22,8 @@ Rails.application.routes.draw do
       end
       member do
         patch :publish
+        get :publish_modal
+        post :confirm_publish
         patch :unpublish
         post :preview
         get :preview

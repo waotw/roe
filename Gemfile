@@ -96,3 +96,5 @@ gem "rubyzip", "~> 3.2"
 gem "stripe", "~> 19.0"
 
 gem 'mailjet', '~> 1.7'
+
+gem "premailer-rails", "~> 1.12"

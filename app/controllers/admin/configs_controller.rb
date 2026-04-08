@@ -416,7 +416,8 @@ class Admin::ConfigsController < ApplicationController
     {
       'non-members.show_paid_content' => ['true', 'false'],
       'non-members.show_paid_indicator' => ['true', 'false'],
-      'payments.enabled' => ['false', 'true']
+      'payments.enabled' => ['false', 'true'],
+      'newsletter.enabled' => ['false', 'true']
     }
   end
 
@@ -427,7 +428,8 @@ class Admin::ConfigsController < ApplicationController
 
     {
       'payments.enabled' => 'Turn on paid memberships (requires connection to your Stripe account)',
-      'payments.price' => "One-time payment amount in #{currency} (e.g., 49.00)"
+      'payments.price' => "One-time payment amount in #{currency} (e.g., 49.00)",
+      'newsletter.enabled' => 'Enable newsletter sending via Mailjet (requires Mailjet configuration)'
     }
   end
 

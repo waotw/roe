@@ -272,6 +272,9 @@ export default class extends Controller {
     this.metadataChangeHandler = this.handleMetadataChange.bind(this);
     document.addEventListener("metadata:changed", this.metadataChangeHandler);
 
+    // CHECK BUTTON ON INITIAL LOAD
+    this.checkInitialButtonState();
+
     // Add global keyboard shortcut handler
     this.globalKeydownHandler = this.handleKeydown.bind(this);
     document.addEventListener("keydown", this.globalKeydownHandler);
@@ -433,6 +436,96 @@ export default class extends Controller {
     const metadataField = this.element.querySelector('[name="metadata"]');
     if (metadataField) {
       metadataField.value = event.detail.yaml;
+    }
+
+    // Update publish/unpublish button based on status
+    this.updatePublishButton(event.detail.yaml);
+  }
+
+  updatePublishButton(yaml) {
+    // Parse status from YAML
+    const statusMatch = yaml.match(/^status:\s*["']?(\w+)["']?$/m);
+    if (!statusMatch) return;
+
+    const newStatus = statusMatch[1];
+
+    // Find the button
+    const publishButton = this.element.querySelector(
+      '[data-action*="confirmPublish"]',
+    );
+    const unpublishButton = this.element.querySelector(
+      '[data-action*="confirmUnpublish"]',
+    );
+
+    // Determine current button state
+    const currentlyShowingPublish = publishButton !== null;
+    const shouldShowPublish = newStatus === "draft";
+
+    // Only update if state changed
+    if (currentlyShowingPublish === shouldShowPublish) return;
+
+    // Get the button container
+    const buttonContainer =
+      publishButton?.parentElement || unpublishButton?.parentElement;
+    if (!buttonContainer) return;
+
+    // Get post ID from existing button
+    const postId =
+      publishButton?.dataset.editorPostId ||
+      unpublishButton?.closest("form")?.action.match(/\/posts\/(\d+)\//)?.[1];
+    if (!postId) return;
+
+    // Get requirements from existing button (if publish button exists)
+    const requiresAudience =
+      publishButton?.dataset.editorRequiresAudience || "false";
+    const requiresPublishedTo =
+      publishButton?.dataset.editorRequiresPublishedTo || "false";
+
+    // Build new button HTML
+    const authToken =
+      document.querySelector('meta[name="csrf-token"]')?.content || "";
+
+    if (shouldShowPublish) {
+      // Show Publish button
+      buttonContainer.innerHTML = `
+        <form action="/admin/posts/${postId}/publish"
+              method="post"
+              data-turbo="false"
+              data-action="submit->editor#confirmPublish"
+              data-editor-requires-audience="${requiresAudience}"
+              data-editor-requires-published-to="${requiresPublishedTo}"
+              data-editor-post-id="${postId}">
+          <input type="hidden" name="_method" value="patch">
+          <input type="hidden" name="authenticity_token" value="${authToken}">
+          <button type="submit"
+                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            Publish
+          </button>
+        </form>
+      `;
+    } else {
+      // Show Unpublish button
+      buttonContainer.innerHTML = `
+        <form action="/admin/posts/${postId}/unpublish"
+              method="post"
+              data-turbo="false"
+              data-action="submit->editor#confirmUnpublish">
+          <input type="hidden" name="_method" value="patch">
+          <input type="hidden" name="authenticity_token" value="${authToken}">
+          <button type="submit"
+                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            Unpublish
+          </button>
+        </form>
+      `;
+    }
+  }
+
+  checkInitialButtonState() {
+    // Get initial metadata from the form
+    const metadataField = this.element.querySelector('[name="metadata"]');
+    if (metadataField && metadataField.value) {
+      this.updatePublishButton(metadataField.value);
     }
   }
 
@@ -1443,18 +1536,77 @@ export default class extends Controller {
 
   // ========== PUBLISH/UNPUBLISH CONFIRMATIONS ==========
 
-  confirmPublish(event) {
-    if (
-      !confirm(
-        "Publishing this post will save your changes and make it live on your site. Continue?",
-      )
-    ) {
-      event.preventDefault();
+  showPublishModal(
+    requiresAudience,
+    requiresPublishedTo,
+    currentAudience,
+    currentPublishedTo,
+  ) {
+    // Get post ID from form data
+    const postId = event.target.dataset.editorPostId;
+
+    if (!postId) {
+      console.error("Post ID not found");
       return;
     }
 
+    // Build query params
+    const params = new URLSearchParams({
+      requires_audience: requiresAudience,
+      requires_published_to: requiresPublishedTo,
+      current_audience: currentAudience || "",
+      current_published_to: currentPublishedTo || "",
+    });
+
+    // Load modal via Turbo Frame
+    const modalUrl = `/admin/posts/${postId}/publish_modal?${params}`;
+
+    // Create modal container if it doesn't exist
+    let modalContainer = document.getElementById("publish-modal-container");
+    if (!modalContainer) {
+      modalContainer = document.createElement("turbo-frame");
+      modalContainer.id = "publish-modal-container";
+      document.body.appendChild(modalContainer);
+    }
+
+    // Load the modal
+    modalContainer.src = modalUrl;
+  }
+
+  confirmPublish(event) {
+    event.preventDefault();
+
+    const form = event.target;
+
+    // Always show modal - set saving state first
     this.isSaving = true;
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
+
+    // Get current metadata values from the editor
+    const metadataEditor = document.querySelector(
+      '[data-controller="metadata-editor"]',
+    );
+    const audienceField = metadataEditor?.querySelector(
+      '[data-metadata-field="audience"]',
+    );
+    const publishedToField = metadataEditor?.querySelector(
+      '[data-metadata-field="published_to"]',
+    );
+
+    const currentAudience = audienceField?.value || "";
+    const currentPublishedTo = publishedToField?.value || "";
+
+    // Check which fields are enabled
+    const requiresAudience = form.dataset.editorRequiresAudience === "true";
+    const requiresPublishedTo =
+      form.dataset.editorRequiresPublishedTo === "true";
+
+    this.showPublishModal(
+      requiresAudience,
+      requiresPublishedTo,
+      currentAudience,
+      currentPublishedTo,
+    );
   }
 
   confirmUnpublish(event) {
@@ -1467,7 +1619,7 @@ export default class extends Controller {
       return;
     }
 
-    this.isSaving = true; // ← Add this
+    this.isSaving = true;
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
   }
 

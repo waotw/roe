@@ -1,0 +1,103 @@
+<turbo-frame id="publish-modal-container">
+  <div class="fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Publish Post</h2>
+
+      <p class="text-gray-700 mb-6">
+        <% if @requires_audience || @requires_published_to %>
+
+          Confirm your publication settings:
+
+        <% else %>
+
+          Are you ready to publish this post? It will be live on your site.
+
+        <% end %>
+      </p>
+
+      <%= form_with url: confirm_publish_admin_post_path(@post),
+                    method: :post,
+                    class: "space-y-6",
+                    data: { turbo_frame: "_top" } do |f| %>
+
+        <% if @requires_audience %>
+          <div class="bg-gray-50 border border-gray-300 p-6">
+            <h3 class="font-semibold text-gray-900 mb-3">Audience</h3>
+            <p class="text-sm text-gray-700 mb-4">Who should be able to see this post?</p>
+
+            <div class="space-y-3">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <%= f.radio_button :audience, 'everyone',
+                    checked: @current_audience.blank? || @current_audience == 'everyone',
+                    class: "mt-1" %>
+                <div>
+                  <div class="font-medium text-gray-900">Everyone</div>
+                  <div class="text-sm text-gray-600">Public content visible to all visitors</div>
+                </div>
+              </label>
+
+              <label class="flex items-start gap-3 cursor-pointer">
+                <%= f.radio_button :audience, 'paid',
+                    checked: @current_audience == 'paid',
+                    class: "mt-1" %>
+                <div>
+                  <div class="font-medium text-gray-900">Paid Members Only</div>
+                  <div class="text-sm text-gray-600">Only accessible to paid members</div>
+                </div>
+              </label>
+            </div>
+          </div>
+        <% end %>
+
+        <% if @requires_published_to %>
+          <div class="bg-gray-50 border border-gray-300 p-6">
+            <h3 class="font-semibold text-gray-900 mb-3">Distribution</h3>
+            <p class="text-sm text-gray-700 mb-4">Where should this post be published?</p>
+
+            <div class="space-y-3">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <%= f.radio_button :published_to, 'both',
+                    checked: @current_published_to.blank? || @current_published_to == 'both',
+                    class: "mt-1" %>
+                <div>
+                  <div class="font-medium text-gray-900">Site & Newsletter</div>
+                  <div class="text-sm text-gray-600">Publish to site and send as newsletter</div>
+                </div>
+              </label>
+
+              <label class="flex items-start gap-3 cursor-pointer">
+                <%= f.radio_button :published_to, 'site',
+                    checked: @current_published_to == 'site',
+                    class: "mt-1" %>
+                <div>
+                  <div class="font-medium text-gray-900">Site Only</div>
+                  <div class="text-sm text-gray-600">Publish to site, don't send newsletter</div>
+                </div>
+              </label>
+
+              <label class="flex items-start gap-3 cursor-pointer">
+                <%= f.radio_button :published_to, 'newsletter',
+                    checked: @current_published_to == 'newsletter',
+                    class: "mt-1" %>
+                <div>
+                  <div class="font-medium text-gray-900">Newsletter Only</div>
+                  <div class="text-sm text-gray-600">Send as newsletter, don't publish to site</div>
+                </div>
+              </label>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="flex items-center gap-3">
+          <%= f.submit "Publish",
+              class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+          <button type="button"
+                  onclick="document.getElementById('publish-modal-container').innerHTML = ''"
+                  class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs">
+            Cancel
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</turbo-frame>

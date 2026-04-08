@@ -106,7 +106,10 @@ class Admin::PostsController < Admin::BaseController
     title = filename_to_title(filename)
 
     parsed = FrontMatterParser::Parser.new(:md).call(template_content)
-    metadata = parsed.front_matter.merge("title" => title)
+      metadata = parsed.front_matter.merge(
+        "title" => title,
+        "date" => Time.current.strftime("%Y-%m-%dT%H:%M")
+      )
 
     # Ensure podcast GUID (if podcast type + published)
     metadata = ensure_podcast_guid(metadata, Post.new)
@@ -272,6 +275,41 @@ class Admin::PostsController < Admin::BaseController
   def publish
     @post = Post.find(params[:id])
     update_post_status(@post, 'published')
+    flash[:notice] = "Post published"
+    redirect_to edit_admin_post_path(@post)
+  end
+
+  def publish_modal
+    @post = Post.find(params[:id])
+    @requires_audience = params[:requires_audience] == 'true'
+    @requires_published_to = params[:requires_published_to] == 'true'
+    @current_audience = params[:current_audience].presence
+    @current_published_to = params[:current_published_to].presence
+
+    render partial: 'publish_modal', layout: false
+  end
+
+  def confirm_publish
+    @post = Post.find(params[:id])
+
+    # Read current content
+    raw_content = File.read(@post.file_path)
+    parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
+    metadata = parsed.front_matter
+
+    # Update metadata
+    metadata['status'] = 'published'
+    metadata['audience'] = params[:audience] if params[:audience].present?
+    metadata['published_to'] = params[:published_to] if params[:published_to].present?
+
+    # Write back to file
+    yaml_content = Post.format_metadata_yaml(metadata)
+    full_content = "---\n#{yaml_content}\n---\n#{parsed.content}"
+    normalize_and_write(@post.file_path, full_content)
+
+    # Sync to DB
+    ContentSync.sync_file(@post.file_path)
+
     flash[:notice] = "Post published"
     redirect_to edit_admin_post_path(@post)
   end
