@@ -899,6 +899,8 @@ module HasMarkdownExtensions
       member_text = config['member-button-text'] || config['member_button_text'] || button_text
       non_member_text = config['non-member-button-text'] || config['non_member_button_text']
       render_checkout_form(member_text, non_member_text)
+    when 'unsubscribe'  # ADD THIS
+      render_unsubscribe_form(button_text)
     else
       ""
     end
@@ -913,6 +915,16 @@ module HasMarkdownExtensions
       'signin' => 'Sign In',
       'checkout' => 'Upgrade'
     }[form_type] || 'Submit'
+  end
+
+  def render_unsubscribe_form(button_text)
+    # Token will be in URL, form will POST to same path
+    <<~HTML
+      <form action="" method="post" class="unsubscribe-form">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+        <button type="submit" class="unsubscribe-button btn-destructive">#{button_text}</button>
+      </form>
+    HTML
   end
 
   def render_paid_content_form(text, button_text)

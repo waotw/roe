@@ -1,7 +1,7 @@
 class SendNewsletterJob < ApplicationJob
   queue_as :default
 
-  BULK_BATCH_SIZE = 50
+  BULK_BATCH_SIZE = 100
   MAX_RETRIES = 3
 
   def perform(post_id, member_ids)
@@ -22,15 +22,24 @@ class SendNewsletterJob < ApplicationJob
 
     # Build messages array with member association
     messages_with_members = members_to_send.map do |member|
+      # Render newsletter WITH member-specific unsubscribe link
+      renderer = NewsletterRenderer.new(post, member)
+      html_content = renderer.render
+
       message = {
-        From: { Email: from_email, Name: from_name },
-        To: [{ Email: member.email, Name: member.name }],
+        From: "#{from_name} <#{from_email}>",
+        To: "#{member.name} <#{member.email}>",
         Subject: post.title || 'Newsletter',
-        HTMLPart: html_content,
-        TextPart: strip_html(html_content),
-        CustomID: "post_#{post.id}_member_#{member.id}"
+        HtmlBody: html_content,
+        TextBody: strip_html(html_content),
+        MessageStream: 'broadcast',
+        Tag: 'newsletter',
+        Metadata: {
+          post_id: post.id.to_s,
+          member_id: member.id.to_s
+        }
       }
-      [member, message]  # Return [member, message] tuple
+      [member, message]
     end
 
     # Send in bulk batches
@@ -48,19 +57,19 @@ class SendNewsletterJob < ApplicationJob
         result[:results].each_with_index do |msg_result, index|
           member = batch_members[index]
 
-          if msg_result['Status'] == 'success'
-            message_id = msg_result.dig('To', 0, 'MessageID')
+          if msg_result['ErrorCode'] == 0
+            message_id = msg_result['MessageID']
 
             # Use find_or_create_by to avoid duplicates
             NewsletterSend.find_or_create_by!(post: post, member: member) do |ns|
               ns.sent_at = Time.current
-              ns.mailjet_message_id = message_id
+              ns.message_id = message_id
             end
 
             sent_count += 1
           else
             failed_count += 1
-            Rails.logger.error "Failed to send to #{member.email}: #{msg_result.inspect}"
+            Rails.logger.error "Failed to send to #{member.email}: #{msg_result['Message']}"
           end
         end
       else
@@ -80,8 +89,9 @@ class SendNewsletterJob < ApplicationJob
   private
 
   def send_batch_with_retry(batch, attempt = 1)
-    result = MailjetService.send_newsletter_bulk(messages: batch)
+    result = PostmarkService.send_newsletter_batch(messages: batch)
 
+    # Postmark returns 429 for rate limiting (though rare)
     if !result[:success] && result[:error].to_s.include?('429')
       if attempt <= MAX_RETRIES
         wait_time = 2 ** attempt

@@ -441,7 +441,7 @@ class Admin::ConfigsController < ApplicationController
     {
       'payments.enabled' => 'Turn on paid memberships (requires connection to your Stripe account)',
       'payments.price' => "One-time payment amount in #{currency} (e.g., 49.00)",
-      'newsletter.enabled' => 'Enable newsletter sending via Mailjet (requires Mailjet configuration)'
+      'newsletter.enabled' => 'Enable newsletter sending via Postmark (requires Postmark account & configuration)'
     }
   end
 

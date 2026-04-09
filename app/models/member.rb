@@ -46,11 +46,15 @@ class Member < ApplicationRecord
   # Callbacks
   before_create :set_subscribed_at
   before_create :generate_memorable_token
-  after_create :sync_to_mailjet
-  after_update :sync_to_mailjet, if: :should_sync_to_mailjet?
 
   def regenerate_token!
     update!(access_token: self.class.generate_password)
+  end
+
+  def generate_unsubscribe_token
+    self.access_token ||= generate_memorable_token
+    save if changed?
+    access_token
   end
 
   # Instance methods
@@ -188,6 +192,10 @@ class Member < ApplicationRecord
     email_confirmation_sent_at < 24.hours.ago
   end
 
+  def unsubscribe_from_newsletter!
+    update!(newsletter_status: 'unsubscribed')
+  end
+
   # NEWSLETTER
 
   def newsletter_subscribed?
@@ -214,19 +222,5 @@ class Member < ApplicationRecord
 
   def set_subscribed_at
     self.subscribed_at ||= Time.current
-  end
-
-  def sync_to_mailjet
-    return unless MailjetConfig.configured?
-
-    # Sync in background to avoid blocking web requests
-    SyncMemberToMailjetJob.perform_later(self.id)
-  end
-
-  def should_sync_to_mailjet?
-    # Sync if email, name, or newsletter status changed
-    saved_change_to_email? ||
-      saved_change_to_name? ||
-      saved_change_to_newsletter_status?
   end
 end

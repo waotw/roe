@@ -29,13 +29,13 @@ module MemberAuthentication
   def require_member
     unless member_signed_in?
       store_location
-      redirect_to signin_path, alert: "Please sign in to continue"
+      redirect_to "/sign-in", alert: "Please sign in to continue"  # Use path string, not named route
     end
   end
 
   def require_paid_member
     unless can_access_premium?
-      redirect_to upgrade_path, alert: "This content requires a paid membership"
+      redirect_to "/upgrade", alert: "This content requires a paid membership"
     end
   end
 

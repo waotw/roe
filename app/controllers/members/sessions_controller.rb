@@ -13,14 +13,11 @@ module Members
       if member&.active?
         member.regenerate_token!
 
-        if Rails.env.development?
-          MemberMailer.magic_link(member).deliver_now
-        else
-          MemberMailer.magic_link(member).deliver_later
-        end
+        # Send magic link email immediately (no .deliver_now needed)
+        MemberMailer.magic_link(member)
 
         # Redirect to confirmation page instead of home
-        check_email_page = Page.find_by(file_path: Rails.root.join('site', 'pages', 'check-email.md').to_s)
+        check_email_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'check-email')
         if check_email_page
           redirect_to "/#{check_email_page.url_name}"
         else
@@ -28,7 +25,7 @@ module Members
         end
       else
         flash.now[:alert] = "No account found with that email"
-        @page = Page.find_by(file_path: Rails.root.join('site', 'pages', 'signin.md').to_s)
+        @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'sign-in')
         render 'pages/show', status: :unprocessable_entity
       end
     end

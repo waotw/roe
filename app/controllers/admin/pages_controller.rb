@@ -216,8 +216,8 @@ class Admin::PagesController < Admin::BaseController
   private
 
   def member_page?(page)
-    filename = File.basename(page.file_path, '.md')
-    %w[signup signin check-email account upgrade benefits perks].include?(filename)
+    # Check if the parent directory is 'members'
+    Pathname.new(page.file_path).parent.basename.to_s == 'members'
   end
 
   def sanitize_filename(filename)

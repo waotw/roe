@@ -127,6 +127,29 @@ class NewsletterRenderer
     HTML
   end
 
+  def email_footer
+    unsubscribe_url = if member
+      Rails.application.routes.url_helpers.unsubscribe_url(
+        token: member.generate_unsubscribe_token,
+        host: SiteConfig.site_url
+      )
+    else
+      "{{unsubscribe_url}}"
+    end
+
+    account_url = "#{SiteConfig.site_url}/account"
+
+    <<~HTML
+      <footer style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #eee; font-size: 0.875rem; color: #666;">
+        <p>You're receiving this because you're subscribed to #{site_title}.</p>
+        <p>
+          <a href="#{unsubscribe_url}" style="color: #666;">Unsubscribe</a> |
+          <a href="#{account_url}" style="color: #666;">Manage your account</a>
+        </p>
+      </footer>
+    HTML
+  end
+
   # Get CSS from active theme
   def theme_css
     theme_name = active_theme

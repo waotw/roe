@@ -64,35 +64,33 @@ class Admin::PostsController < Admin::BaseController
     @post = Post.find(params[:id])
     email = params[:email]
 
-    # Validate email
     unless email.present? && email.match?(URI::MailTo::EMAIL_REGEXP)
       render json: { success: false, error: 'Invalid email address' }
       return
     end
 
-    # Check if newsletters are enabled
     unless helpers.newsletters_enabled?
       render json: { success: false, error: 'Newsletter feature is not enabled' }
       return
     end
 
-    # Check if Mailjet is configured
-    unless MailjetConfig.configured?
-      render json: { success: false, error: 'Mailjet is not configured. Check Settings > Mailjet.' }
+    # Change to Postmark
+    unless PostmarkConfig.configured?
+      render json: { success: false, error: 'Postmark is not configured. Check Settings > Postmark.' }
       return
     end
 
     begin
-      # Render the newsletter HTML
       renderer = NewsletterRenderer.new(@post)
       html_content = renderer.render
 
-      # Send via Mailjet
-      result = MailjetService.send_newsletter(
+      # Change to Postmark
+      result = PostmarkService.send_transactional_email(
         to_email: email,
         to_name: email.split('@').first.titleize,
         subject: @post.title || 'Newsletter Preview',
-        html_content: html_content
+        html_content: html_content,
+        tag: 'test-newsletter'
       )
 
       if result[:success]
@@ -103,7 +101,6 @@ class Admin::PostsController < Admin::BaseController
 
     rescue => e
       Rails.logger.error "Test email failed: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
       render json: { success: false, error: "Error: #{e.message}" }
     end
   end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_09_163533) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -18,14 +18,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
     t.json "metadata", default: {}
     t.datetime "updated_at", null: false
     t.index ["file_path"], name: "index_documentation_on_file_path", unique: true
-  end
-
-  create_table "mailjet_configs", force: :cascade do |t|
-    t.string "api_key"
-    t.datetime "connected_at"
-    t.datetime "created_at", null: false
-    t.string "secret_key"
-    t.datetime "updated_at", null: false
   end
 
   create_table "media", force: :cascade do |t|
@@ -54,7 +46,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
     t.string "email", null: false
     t.datetime "email_confirmation_sent_at"
     t.string "email_confirmation_token"
-    t.string "mailjet_contact_id"
     t.json "metadata", default: {}
     t.string "name"
     t.integer "newsletter_status", default: 0, null: false
@@ -69,7 +60,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
     t.datetime "updated_at", null: false
     t.index ["access_token"], name: "index_members_on_access_token", unique: true
     t.index ["email"], name: "index_members_on_email", unique: true
-    t.index ["mailjet_contact_id"], name: "index_members_on_mailjet_contact_id"
     t.index ["status"], name: "index_members_on_status"
     t.index ["stripe_customer_id"], name: "index_members_on_stripe_customer_id", unique: true
     t.index ["tier", "status"], name: "index_members_on_tier_and_status"
@@ -77,13 +67,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
 
   create_table "newsletter_sends", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.string "mailjet_message_id"
     t.integer "member_id", null: false
+    t.string "message_id"
     t.integer "post_id", null: false
     t.datetime "sent_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["mailjet_message_id"], name: "index_newsletter_sends_on_mailjet_message_id"
     t.index ["member_id"], name: "index_newsletter_sends_on_member_id"
+    t.index ["message_id"], name: "index_newsletter_sends_on_message_id"
     t.index ["post_id", "member_id"], name: "index_newsletter_sends_on_post_id_and_member_id", unique: true
     t.index ["post_id"], name: "index_newsletter_sends_on_post_id"
   end
@@ -93,6 +83,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_201421) do
     t.datetime "created_at", null: false
     t.string "file_path"
     t.json "metadata"
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "postmark_configs", force: :cascade do |t|
+    t.datetime "connected_at"
+    t.datetime "created_at", null: false
+    t.text "server_token"
     t.datetime "updated_at", null: false
   end
 

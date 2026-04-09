@@ -109,7 +109,7 @@ class Admin::EmailsController < Admin::BaseController
       'member_email' => 'jane@example.com',
       'magic_link' => 'https://yoursite.com/auth/verify/zen-mountain-haiku-42',
       'confirmation_url' => 'https://yoursite.com/confirm-email/crystal-river-sunset-73',
-      'site_name' => SiteConfig.get('site.title') || 'Your Site',
+      'site_name' => SiteConfig.get('title') || 'Your Site',
       'password' => 'smooth-river-dawn-17',
       'account_url' => "#{request.base_url}/account",
       'update_payment_url' => "#{request.base_url}/account/payment",

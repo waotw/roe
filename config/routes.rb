@@ -64,13 +64,11 @@ Rails.application.routes.draw do
       end
     end
 
-    # Stripe Configuration (add this with your other config routes)
+    # Stripe Configuration
     resource :stripe_config, only: [:edit, :update, :destroy]
 
-    # Mailjet Configuration
-    resource :mailjet_config, only: [:edit, :update, :destroy] do
-      post :sync_all, on: :collection
-    end
+    # Postmark Configuration
+    resource :postmark_config, only: [:edit, :update, :destroy]
 
     resources :themes, only: [:index] do
       member do
@@ -150,6 +148,8 @@ Rails.application.routes.draw do
   get "account/edit", to: "members/accounts#edit"
   patch "account", to: "members/accounts#update"
   get "account/confirm-email", to: "members/accounts#confirm_email", as: :confirm_email
+  get '/unsubscribe/:token', to: 'members/subscriptions#unsubscribe', as: :unsubscribe
+  post '/unsubscribe/:token', to: 'members/subscriptions#confirm_unsubscribe'
 
   # Public checkout
   post 'checkout', to: 'checkout#create', as: :create_checkout

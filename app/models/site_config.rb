@@ -106,4 +106,21 @@ class SiteConfig < ApplicationRecord
     Rails.logger.error "Failed to load #{type} config: #{e.message}"
     nil
   end
+
+  def self.site_url
+    domain = current('site')&.config&.dig('url') || 'localhost:3000'
+
+    # Remove any trailing slashes
+    domain = domain.sub(/\/$/, '')
+
+    # If it already has a protocol, use it as-is
+    return domain if domain.match?(/^https?:\/\//)
+
+    # Otherwise, add the appropriate protocol
+    if domain.include?('localhost') || domain.match?(/^127\.0\.0\.1/)
+      "http://#{domain}"
+    else
+      "https://#{domain}"
+    end
+  end
 end

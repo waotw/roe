@@ -38,8 +38,8 @@ module ApplicationHelper
     members_enabled? && SiteConfig.default('members', 'newsletter')&.dig('enabled') == true
   end
 
-  def mailjet_configured?
-    MailjetConfig.exists? && MailjetConfig.current.connected?
+  def postmark_configured?
+    PostmarkConfig.exists? && PostmarkConfig.current.connected?
   end
 
   def requires_audience_on_publish?
@@ -47,6 +47,6 @@ module ApplicationHelper
   end
 
   def requires_published_to_on_publish?
-    newsletters_enabled? && mailjet_configured?
+    newsletters_enabled? && postmark_configured?
   end
 end
