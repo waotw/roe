@@ -44,6 +44,19 @@
       </select>
     </div>
 
+    <!-- Newsletter Status Filter -->
+    <div class="flex-shrink-0">
+      <select
+        data-members-filter-target="newsletterStatusFilter"
+        data-action="change->members-filter#filterByNewsletterStatus"
+        class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat">
+        <option value="all">All Newsletter Status</option>
+        <option value="subscribed">📬 Subscribed</option>
+        <option value="unsubscribed">🔕 Unsubscribed</option>
+        <option value="bounced">⚠️ Bounced</option>
+      </select>
+    </div>
+
     <!-- Sort Dropdown -->
     <div class="flex-shrink-0">
       <select
@@ -84,6 +97,7 @@
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Name</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Tier</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Newsletter</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Joined</th>
                 <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
                   <span class="sr-only">Actions</span>
@@ -95,6 +109,7 @@
                 <tr data-members-filter-target="row"
                     data-tier="<%= member.tier %>"
                     data-status="<%= member.status %>"
+                    data-newsletter-status="<%= member.newsletter_status %>"
                     data-created-at="<%= member.created_at.to_i %>"
                     data-email="<%= member.email %>"
                     data-searchable="<%= [member.email, member.name].compact.join(' ').downcase %>">
@@ -116,6 +131,16 @@
                       <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Active</span>
                     <% else %>
                       <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">Cancelled</span>
+                    <% end %>
+                  </td>
+                  <!-- NEW: Newsletter Status Column -->
+                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                    <% if member.newsletter_subscribed? %>
+                      <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">📬 Subscribed</span>
+                    <% elsif member.newsletter_status == 'bounced' %>
+                      <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">⚠️ Bounced</span>
+                    <% else %>
+                      <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">🔕 Unsubscribed</span>
                     <% end %>
                   </td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">

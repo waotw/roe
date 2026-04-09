@@ -235,7 +235,7 @@ class ConfigGenerator
     puts "✓ Generated members/upgrade.md page"
   end
 
-  generate_unsubscribe_page(pages_path)
+  def generate_unsubscribe_page(pages_path)
     return if File.exist?(pages_path.join('unsubscribe.md'))
 
     unsubscribe_content = <<~MARKDOWN

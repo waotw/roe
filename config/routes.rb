@@ -68,7 +68,9 @@ Rails.application.routes.draw do
     resource :stripe_config, only: [:edit, :update, :destroy]
 
     # Postmark Configuration
-    resource :postmark_config, only: [:edit, :update, :destroy]
+    resource :postmark_config, only: [:edit, :update, :destroy] do
+      post :regenerate_webhook_token, on: :member
+    end
 
     resources :themes, only: [:index] do
       member do
@@ -150,6 +152,7 @@ Rails.application.routes.draw do
   get "account/confirm-email", to: "members/accounts#confirm_email", as: :confirm_email
   get '/unsubscribe/:token', to: 'members/subscriptions#unsubscribe', as: :unsubscribe
   post '/unsubscribe/:token', to: 'members/subscriptions#confirm_unsubscribe'
+  post 'webhooks/postmark/:token', to: 'webhooks/postmark#create', as: :admin_postmark_webhook
 
   # Public checkout
   post 'checkout', to: 'checkout#create', as: :create_checkout

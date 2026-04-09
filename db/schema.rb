@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_09_163533) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_09_181720) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -91,6 +91,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_09_163533) do
     t.datetime "created_at", null: false
     t.text "server_token"
     t.datetime "updated_at", null: false
+    t.string "webhook_token"
   end
 
   create_table "posts", force: :cascade do |t|

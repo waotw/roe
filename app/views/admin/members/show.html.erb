@@ -27,12 +27,26 @@
         </div>
 
         <div>
-          <dt class="text-sm font-medium text-gray-500 uppercase">Status</dt>
+          <dt class="text-sm font-medium text-gray-500 uppercase">Account Status</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <% if @member.active? %>
               <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Active</span>
             <% else %>
               <span class="inline-flex bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">Cancelled</span>
+            <% end %>
+          </dd>
+        </div>
+
+        <!-- NEW: Newsletter Status -->
+        <div>
+          <dt class="text-sm font-medium text-gray-500 uppercase">Newsletter Status</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @member.newsletter_subscribed? %>
+              <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">📬 Subscribed</span>
+            <% elsif @member.newsletter_status == 'bounced' %>
+              <span class="inline-flex bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">⚠️ Bounced</span>
+            <% else %>
+              <span class="inline-flex bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">🔕 Unsubscribed</span>
             <% end %>
           </dd>
         </div>

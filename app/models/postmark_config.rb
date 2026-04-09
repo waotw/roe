@@ -4,6 +4,7 @@ class PostmarkConfig < ApplicationRecord
 
   # Callbacks
   before_create :set_connected_at
+  before_create :generate_webhook_token
 
   # Singleton pattern
   def self.current
@@ -38,7 +39,25 @@ class PostmarkConfig < ApplicationRecord
     )
   end
 
+  # Encrypted webhook token getter/setter
+  def webhook_token
+    decrypt(self[:webhook_token])
+  end
+
+  def webhook_token=(value)
+    self[:webhook_token] = encrypt(value)
+  end
+
+  # Regenerate webhook token (useful if compromised)
+  def regenerate_webhook_token!
+    update!(webhook_token: SecureRandom.hex(32))
+  end
+
   private
+
+  def generate_webhook_token
+    self.webhook_token ||= SecureRandom.hex(32)
+  end
 
   def set_connected_at
     self.connected_at ||= Time.current if self[:server_token].present?

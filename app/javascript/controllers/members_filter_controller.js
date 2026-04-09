@@ -1,4 +1,3 @@
-// app/javascript/controllers/members_filter_controller.js
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
@@ -8,6 +7,7 @@ export default class extends Controller {
     "tab",
     "search",
     "statusFilter",
+    "newsletterStatusFilter",
     "sortFilter",
     "tbody",
   ];
@@ -29,6 +29,13 @@ export default class extends Controller {
   filterByStatus(event) {
     this.currentStatus = event.target.value;
     this.updateURL({ status: this.currentStatus });
+    this.filterRows();
+  }
+
+  // Newsletter status filter
+  filterByNewsletterStatus(event) {
+    this.currentNewsletterStatus = event.target.value;
+    this.updateURL({ newsletter_status: this.currentNewsletterStatus });
     this.filterRows();
   }
 
@@ -54,10 +61,15 @@ export default class extends Controller {
         !this.currentStatus ||
         this.currentStatus === "all" ||
         row.dataset.status === this.currentStatus;
+      // Newsletter status matching
+      const newsletterStatusMatch =
+        !this.currentNewsletterStatus ||
+        this.currentNewsletterStatus === "all" ||
+        row.dataset.newsletterStatus === this.currentNewsletterStatus;
       const searchMatch =
         !this.searchTerm || row.dataset.searchable.includes(this.searchTerm);
 
-      if (tierMatch && statusMatch && searchMatch) {
+      if (tierMatch && statusMatch && newsletterStatusMatch && searchMatch) {
         row.style.display = "";
         visibleCount++;
       } else {
@@ -121,9 +133,11 @@ export default class extends Controller {
     const url = new URL(window.location);
     const tier = url.searchParams.get("tier") || "all";
     const status = url.searchParams.get("status") || "all";
+    const newsletterStatus = url.searchParams.get("newsletter_status") || "all";
 
     this.currentTier = tier;
     this.currentStatus = status;
+    this.currentNewsletterStatus = newsletterStatus;
 
     // Set active tab
     const activeTab = this.tabTargets.find((tab) => tab.dataset.tier === tier);
@@ -132,6 +146,11 @@ export default class extends Controller {
     // Set status filter
     if (this.hasStatusFilterTarget) {
       this.statusFilterTarget.value = status;
+    }
+
+    // Set newsletter status filter
+    if (this.hasNewsletterStatusFilterTarget) {
+      this.newsletterStatusFilterTarget.value = newsletterStatus;
     }
 
     this.filterRows();
