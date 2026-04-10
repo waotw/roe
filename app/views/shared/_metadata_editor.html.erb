@@ -136,24 +136,22 @@
                 <strong>Newsletter sent to <%= send_count %> members</strong>
                 <% last_send = NewsletterSend.where(post: item).maximum(:sent_at) %>
                 <% if last_send %>
-                  <div class="text-xs text-gray-600 mt-0.5">
-                    <%= time_ago_in_words(last_send) %> ago
-                  </div>
-                <% end %>
-              </div>
+                  <% new_members = Member.newsletter_subscribed.active.where('subscribed_at > ?', last_send) %>
+                  <% new_members = new_members.paid_tier if item.audience == 'paid' %>
+                  <% new_members_count = new_members.count %>
 
-              <!-- Resend Button -->
-              <% new_members_count = Member.newsletter_subscribed.active.where('subscribed_at > ?', last_send).count if last_send %>
-              <% if new_members_count && new_members_count > 0 %>
-                <%= button_to "Resend to #{new_members_count} new #{'member'.pluralize(new_members_count)}",
-                    resend_newsletter_admin_post_path(item),
-                    method: :post,
-                    class: "mt-2 text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded border-0",
-                    data: {
-                      turbo_confirm: "Send this newsletter to #{new_members_count} new #{'member'.pluralize(new_members_count)}?",
-                      turbo: false
-                    } %>
-              <% end %>
+                  <% if new_members_count > 0 %>
+                    <%= link_to "Resend to #{new_members_count} new #{'member'.pluralize(new_members_count)}",
+                        resend_newsletter_admin_post_path(item),
+                        method: :post,
+                        class: "mt-2 inline-block text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded border-0",
+                        data: {
+                          turbo_method: :post,
+                          turbo_confirm: "Send this newsletter to #{new_members_count} new #{'member'.pluralize(new_members_count)}?",
+                          turbo: true
+                        } %>
+                  <% end %>
+                <% end %>
             </div>
           </div>
         <% end %>

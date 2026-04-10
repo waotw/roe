@@ -323,11 +323,7 @@ class Admin::PostsController < Admin::BaseController
     end
 
     # Queue newsletter sending job
-    QueueNewsletterBatchesJob.perform_later(
-      @post.id,
-      new_members.pluck(:id),
-      dry_run: false
-    )
+    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
 
     flash[:notice] = "Newsletter queued for #{new_members.count} new #{'member'.pluralize(new_members.count)}"
     redirect_to edit_admin_post_path(@post)
