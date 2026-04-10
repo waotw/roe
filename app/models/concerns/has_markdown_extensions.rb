@@ -49,6 +49,7 @@ module HasMarkdownExtensions
     processed_content = process_forms(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
     processed_content = process_strikethrough(processed_content)
+    processed_content = escape_inline_pipes(processed_content)
 
     # Convert to HTML with standard Kramdown
     html = Kramdown::Document.new(
@@ -92,6 +93,58 @@ module HasMarkdownExtensions
   def process_strikethrough(markdown)
     # Convert ~~text~~ to <del>text</del> (which Kramdown preserves)
     markdown.gsub(/~~([^~]+)~~/, '<del>\1</del>')
+  end
+
+  def table_separator_line?(line)
+    # Matches separator lines like: | --- | --- | or |:---|---:|
+    # With optional blockquote marker: > | --- | --- |
+    line.match?(/^\s*>?\s*\|?\s*:?-+:?\s*\|[\s\|:-]+$/)
+  end
+
+  def part_of_table?(line, prev_line, next_line)
+    # Is this line itself a separator?
+    return true if table_separator_line?(line)
+
+    # Is the next line a separator? (current line is a table header)
+    return true if next_line && table_separator_line?(next_line)
+
+    # Is the previous line a separator? (current line is a table data row)
+    return true if prev_line && table_separator_line?(prev_line)
+
+    false
+  end
+
+  def escape_inline_pipes(content)
+    lines = content.split("\n")
+    in_table = false
+
+    lines.map.with_index do |line, i|
+      next_line = i < lines.length - 1 ? lines[i + 1] : nil
+
+      # Check if we're entering a table (next line is separator)
+      if next_line && table_separator_line?(next_line)
+        in_table = true
+      end
+
+      # Check if this is a separator line
+      if table_separator_line?(line)
+        in_table = true
+        next line
+      end
+
+      # If in table and line starts with pipe, it's a table row
+      if in_table && line.match?(/^\s*>?\s*\|/)
+        next line
+      end
+
+      # If we were in a table but this line doesn't start with pipe, we've exited
+      if in_table && !line.match?(/^\s*>?\s*\|/)
+        in_table = false
+      end
+
+      # Not in table, escape pipes
+      line.gsub(/\|/, '&#124;')
+    end.join("\n")
   end
 
   def add_footnote_backlinks(html)

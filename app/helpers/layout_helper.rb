@@ -1,22 +1,26 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-    file_path = Rails.root.join('site', 'layout', "#{filename}.md")
+      file_path = Rails.root.join('site', 'layout', "#{filename}.md")
 
-    return '' unless File.exist?(file_path)
+      return '' unless File.exist?(file_path)
 
-    content = File.read(file_path)
-    html = Kramdown::Document.new(content).to_html
+      content = File.read(file_path)
 
-    # Add active class to navigation links if this is the navigation file
-    if filename == 'navigation'
-      html = add_active_nav_class(html, current_page)
+      # Escape inline pipes (same logic as HasMarkdownExtensions)
+      content = escape_inline_pipes_for_layout(content)
+
+      html = Kramdown::Document.new(content).to_html
+
+      # Add active class to navigation links if this is the navigation file
+      if filename == 'navigation'
+        html = add_active_nav_class(html, current_page)
+      end
+
+      html.html_safe
+    rescue => e
+      Rails.logger.error "Error rendering layout file #{filename}: #{e.message}"
+      ''
     end
-
-    html.html_safe
-  rescue => e
-    Rails.logger.error "Error rendering layout file #{filename}: #{e.message}"
-    ''
-  end
 
   def logo_classes
     logo_url = SiteConfig.get('logo')
@@ -83,4 +87,41 @@ module LayoutHelper
     existing_class = link['class'].to_s
     link['class'] = existing_class.blank? ? 'active' : "#{existing_class} active"
   end
+
+  def escape_inline_pipes_for_layout(content)
+      lines = content.split("\n")
+      in_table = false
+
+      lines.map.with_index do |line, i|
+        next_line = i < lines.length - 1 ? lines[i + 1] : nil
+
+        # Check if we're entering a table (next line is separator)
+        if next_line && table_separator_line?(next_line)
+          in_table = true
+        end
+
+        # Check if this is a separator line
+        if table_separator_line?(line)
+          in_table = true
+          next line
+        end
+
+        # If in table and line starts with pipe, it's a table row
+        if in_table && line.match?(/^\s*>?\s*\|/)
+          next line
+        end
+
+        # If we were in a table but this line doesn't start with pipe, we've exited
+        if in_table && !line.match?(/^\s*>?\s*\|/)
+          in_table = false
+        end
+
+        # Not in table, escape pipes
+        line.gsub(/\|/, '&#124;')
+      end.join("\n")
+    end
+
+    def table_separator_line?(line)
+      line.match?(/^\s*>?\s*\|?\s*:?-+:?\s*\|[\s\|:-]+$/)
+    end
 end
