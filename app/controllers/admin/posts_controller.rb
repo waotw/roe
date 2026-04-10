@@ -298,6 +298,41 @@ class Admin::PostsController < Admin::BaseController
     redirect_to admin_posts_path
   end
 
+  def resend_newsletter
+    @post = Post.find(params[:id])
+
+    # Find last send time
+    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
+
+    unless last_send
+      flash[:error] = "This newsletter hasn't been sent yet"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Find new members who joined after last send
+    new_members = Member.newsletter_subscribed
+                        .active
+                        .where('subscribed_at > ?', last_send)
+
+    # Filter by audience if needed
+    new_members = new_members.paid_tier if @post.audience == 'paid'
+
+    if new_members.empty?
+      flash[:notice] = "No new members to send to"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Queue newsletter sending job
+    QueueNewsletterBatchesJob.perform_later(
+      @post.id,
+      new_members.pluck(:id),
+      dry_run: false
+    )
+
+    flash[:notice] = "Newsletter queued for #{new_members.count} new #{'member'.pluralize(new_members.count)}"
+    redirect_to edit_admin_post_path(@post)
+  end
+
   def destroy
     @post = Post.find(params[:id])
     file_path = @post.file_path
@@ -359,7 +394,7 @@ class Admin::PostsController < Admin::BaseController
     # Send newsletter if published_to includes newsletter
     if should_send_newsletter?(@post)
       # Queue background job instead of sending immediately
-      SendNewsletterJob.perform_later(@post.id)
+      QueueNewsletterBatchesJob.perform_later(@post.id)
       flash[:notice] = "Post published. Newsletter is being sent in the background."
     else
       flash[:notice] = "Post published"

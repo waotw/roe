@@ -29,6 +29,7 @@ Rails.application.routes.draw do
         get :preview
         patch :rename
         post :send_test_email
+        post :resend_newsletter
       end
     end
 

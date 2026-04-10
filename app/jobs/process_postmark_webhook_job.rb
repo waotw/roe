@@ -29,14 +29,29 @@ class ProcessPostmarkWebhookJob < ApplicationJob
   private
 
   def handle_bounce(member, data)
-    bounce_type = data['Type'] # HardBounce, SoftBounce, etc.
+    bounce_type = data['Type']
 
-    # Only mark as bounced for hard bounces
     if bounce_type == 'HardBounce'
       member.update!(newsletter_status: :bounced)
       Rails.logger.info "Member #{member.email} marked as bounced (#{data['Description']})"
     else
-      Rails.logger.info "Soft bounce for #{member.email}: #{data['Description']}"
+      # Track soft bounces
+      metadata = member.metadata || {}
+      count = (metadata['soft_bounce_count'] || 0) + 1
+      metadata['soft_bounce_count'] = count
+      metadata['last_soft_bounce_at'] = Time.current.iso8601
+
+      if count >= 5
+        # Too many soft bounces, treat as hard bounce
+        member.update!(
+          newsletter_status: :bounced,
+          metadata: metadata
+        )
+        Rails.logger.warn "Member #{member.email} marked as bounced after #{count} soft bounces"
+      else
+        member.update!(metadata: metadata)
+        Rails.logger.info "Soft bounce ##{count} for #{member.email}: #{data['Description']}"
+      end
     end
   end
 

@@ -148,11 +148,13 @@
           <div class="mt-4 space-y-2 text-sm text-gray-700">
             <p class="font-semibold">To configure in Postmark:</p>
             <ol class="list-decimal list-inside space-y-1 ml-2">
-              <li>Go to your Postmark Server → Settings → Webhooks</li>
+              <li>Go to your Postmark Server → Choose your broadcast stream → Settings → Webhooks</li>
               <li>Click "Add webhook"</li>
               <li>Paste the URL above</li>
-              <li>Enable: <strong>Bounce</strong>, <strong>Spam Complaint</strong>, and <strong>Delivery</strong></li>
+              <li>Enable: <strong>Delivery</strong>, <strong>Bounce</strong> (include message content) and <strong>Spam Complaint</strong> (include message content)</li>
+              <li>Test all 3 using the <b>Send Test</b> button (you'll see a green 200 notice on Postmark for all three if things are set up correctly.</li>
               <li>Click "Save webhook"</li>
+              <li>Repeat steps 1-6 for your transactional stream as well.
             </ol>
           </div>
 
