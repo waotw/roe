@@ -51,7 +51,7 @@
     <header class="site-nav <%= logo_classes %>">
       <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
-    <main>
+    <main data-controller="footnote-tooltip">
       <% flash.each do |type, message| %>
         <div class="flash flash-<%= type %>">
           <mark> • <%= message %> • </mark>
