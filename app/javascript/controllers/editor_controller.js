@@ -1999,4 +1999,96 @@ export default class extends Controller {
       this.textareaTarget.focus({ preventScroll: true });
     }
   }
+
+  closeTestEmailModal() {
+    const modal = document.getElementById("test-email-modal");
+    if (modal) {
+      modal.remove();
+    }
+
+    EditorState.restore("test-email");
+    preventScroll: false;
+  }
+
+  showResendModal(event) {
+    const button = event.currentTarget;
+    const postId = button.dataset.postId;
+    const modalUrl = `/admin/posts/${postId}/resend_modal`;
+
+    let modalContainer = document.getElementById("resend-modal-container");
+    if (!modalContainer) {
+      modalContainer = document.createElement("div");
+      modalContainer.id = "resend-modal-container";
+      document.body.appendChild(modalContainer);
+    }
+
+    fetch(modalUrl)
+      .then((response) => response.text())
+      .then((html) => {
+        modalContainer.innerHTML = html;
+      });
+  }
+
+  toggleAllMembers(event) {
+    const button = event.currentTarget;
+    const additionalMembers = document.getElementById("additional-members");
+
+    if (additionalMembers.classList.contains("hidden")) {
+      additionalMembers.classList.remove("hidden");
+      button.textContent = "Show fewer members";
+    } else {
+      additionalMembers.classList.add("hidden");
+      const memberCount = button.textContent.match(/\d+/)[0];
+      button.textContent = `Show all ${memberCount} members`;
+    }
+  }
+
+  closeResendModal(event) {
+    // Only close on successful submission
+    if (event.detail.success !== false) {
+      const modalContainer = document.getElementById("resend-modal-container");
+      if (modalContainer) {
+        modalContainer.innerHTML = "";
+      }
+
+      // Show "Sending..." state
+      const postId = this.resourceIdValue;
+      const statusDiv = document.getElementById(`newsletter-status-${postId}`);
+      if (statusDiv) {
+        statusDiv.innerHTML = `
+          <hr class="text-gray-300 my-2">
+          <div class="flex items-start gap-2">
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18.9844 13.3496" class="w-4 h-4 mt-0.5 flex-shrink-0">
+              <path d="M2.49023 13.3496L16.4062 13.3496C17.793 13.3496 18.623 12.5391 18.623 10.8984L18.623 2.46094C18.623 0.820312 17.7832 0.00976562 16.1328 0.00976562L2.2168 0.00976562C0.820312 0.00976562 0 0.820312 0 2.46094L0 10.8984C0 12.5391 0.830078 13.3496 2.49023 13.3496ZM2.43164 12.0215C1.73828 12.0215 1.33789 11.6406 1.33789 10.8984L1.33789 2.45117C1.73789 1.71875 1.73828 1.33789 2.43164 1.33789L16.1816 1.33789C16.8848 1.33789 17.2852 1.71875 17.2852 2.46094L17.2852 10.9082C17.2852 11.6406 16.8848 12.0215 16.1816 12.0215ZM13.5645 5.13672L15.5078 5.13672C15.8496 5.13672 16.1035 4.88281 16.1035 4.54102L16.1035 3.125C16.1035 2.7832 15.8496 2.5293 15.5078 2.5293L13.5645 2.5293C13.2227 2.5293 12.9688 2.7832 12.9688 3.125L12.9688 4.54102C12.9688 4.88281 13.2227 5.13672 13.5645 5.13672ZM6.36719 7.95898L12.2461 7.95898C12.5488 7.95898 12.7832 7.72461 12.7832 7.42188C12.7832 7.12891 12.5488 6.89453 12.2461 6.89453L6.36719 6.89453C6.07422 6.89453 5.83008 7.12891 5.83008 7.42188C5.83008 7.72461 6.07422 7.95898 6.36719 7.95898ZM6.36719 10.0293L10.791 10.0293C11.0938 10.0293 11.3281 9.78516 11.3281 9.49219C11.3281 9.19922 11.0938 8.95508 10.791 8.95508L6.36719 8.95508C6.07422 8.95508 5.83008 9.19922 5.83008 9.49219C5.83008 9.78516 6.07422 10.0293 6.36719 10.0293Z" fill="currentColor"/>
+            </svg>
+            <div class="flex-1">
+              <div>
+                <strong class="text-blue-600">Sending newsletter...</strong>
+                <span class="ml-2 inline-block">
+                  <svg class="animate-spin h-4 w-4 text-blue-600 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // After 3 seconds, reload the page to show updated numbers
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      }
+    }
+  }
+
+  refreshNewsletterStatus(event) {
+    const postId = this.resourceIdValue;
+    const frame = document.getElementById(`newsletter-status-${postId}`);
+    if (frame) {
+      frame.src = `/admin/posts/${postId}/newsletter_status`;
+      frame.reload();
+    }
+  }
 }

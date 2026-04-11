@@ -1,0 +1,90 @@
+<div id="resend-modal-container">
+  <div class="fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50"
+       onclick="if(event.target === this) document.getElementById('resend-modal-container').innerHTML = ''">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-3xl mx-auto max-h-[90vh] overflow-y-auto">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Resend Newsletter</h2>
+
+      <p class="text-gray-700 mb-6">
+        This newsletter will be sent to <strong><%= @new_members_count %></strong> new <%= 'member'.pluralize(@new_members_count) %> who subscribed since the last send.
+      </p>
+
+      <div class="bg-gray-50 border border-gray-300 p-4 mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-900">Recipients</h3>
+          <% if @new_members_count > 10 %>
+            <button type="button"
+                    id="toggle-all-members"
+                    class="text-sm text-blue-600 hover:text-blue-800"
+                    data-action="click->editor#toggleAllMembers">
+              Show all <%= @new_members_count %> members
+            </button>
+          <% end %>
+        </div>
+
+        <div class="space-y-2">
+          <% @new_members.first(10).each do |member| %>
+            <div class="flex items-center gap-3 text-sm py-2 border-b border-gray-200">
+              <div class="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-blue-800 font-semibold">
+                <%= member.name.present? ? member.name[0].upcase : member.email[0].upcase %>
+              </div>
+              <div class="flex-1">
+                <div class="font-medium text-gray-900">
+                  <%= member.name.present? ? member.name : 'No name' %>
+                  <% if member.tier == 'paid' %>
+                    <span class="ml-2 inline-block px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">Paid</span>
+                  <% end %>
+                </div>
+                <div class="text-gray-600 text-xs"><%= member.email %></div>
+              </div>
+              <div class="text-gray-500 text-xs">
+                Joined <%= time_ago_in_words(member.subscribed_at) %> ago
+              </div>
+            </div>
+          <% end %>
+
+          <% if @new_members_count > 10 %>
+            <div id="additional-members" class="hidden">
+              <% @new_members.offset(10).each do |member| %>
+                <div class="flex items-center gap-3 text-sm py-2 border-b border-gray-200">
+                  <div class="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-blue-800 font-semibold">
+                    <%= member.name.present? ? member.name[0].upcase : member.email[0].upcase %>
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-900">
+                      <%= member.name.present? ? member.name : 'No name' %>
+                      <% if member.tier == 'paid' %>
+                        <span class="ml-2 inline-block px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">Paid</span>
+                      <% end %>
+                    </div>
+                    <div class="text-gray-600 text-xs"><%= member.email %></div>
+                  </div>
+                  <div class="text-gray-500 text-xs">
+                    Joined <%= time_ago_in_words(member.subscribed_at) %> ago
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <%= form_with url: confirm_resend_admin_post_path(@post),
+                    method: :post,
+                    class: "space-y-6",
+                    data: {
+                      action: "turbo:submit-end->editor#closeResendModal"
+                    } do |f| %>
+
+        <div class="flex items-center gap-3">
+          <%= f.submit "Send Newsletter",
+              class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+          <button type="button"
+                  onclick="document.getElementById('resend-modal-container').innerHTML = ''"
+                  class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs">
+            Cancel
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
