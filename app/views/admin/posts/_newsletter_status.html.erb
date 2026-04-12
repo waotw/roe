@@ -24,7 +24,14 @@
             </svg>
           </span>
         <% else %>
-          <strong>Newsletter sent to <%= unique_member_count %> members</strong>
+        <strong>Newsletter sent to <%= unique_member_count %> members</strong>
+        <span class="text-xs text-gray-500">
+          <% if last_send > 24.hours.ago %>
+            (<%= time_ago_in_words(last_send) %> ago)
+          <% else %>
+            (on <%= last_send.strftime('%b %d, %Y') %>)
+          <% end %>
+        </span>
         <% end %>
 
         <% if last_send && !sending_job %>

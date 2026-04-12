@@ -151,7 +151,13 @@
               <li>Go to your Postmark Server → Choose your broadcast stream → Settings → Webhooks</li>
               <li>Click "Add webhook"</li>
               <li>Paste the URL above</li>
-              <li>Enable: <strong>Delivery</strong>, <strong>Bounce</strong> (include message content) and <strong>Spam Complaint</strong> (include message content)</li>
+              <li>Enable:
+                <ul class="list-disc ml-8">
+                  <li><strong>Delivery</strong></li>
+                  <li><strong>Bounce</strong> (include message content)</li>
+                  <li><strong>Spam Complaint</strong> (include message content)</li>
+                </ul>
+              </li>
               <li>Test all 3 using the <b>Send Test</b> button (you'll see a green 200 notice on Postmark for all three if things are set up correctly.</li>
               <li>Click "Save webhook"</li>
               <li>Repeat steps 1-6 for your transactional stream as well.

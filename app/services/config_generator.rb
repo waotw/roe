@@ -46,17 +46,16 @@ class ConfigGenerator
     new.generate_members_defaults
   end
 
-  def generate_members_defaults(show_paid_content: true)
+  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", newsletter_enabled: false)
     # Generate members.yml
     content = <<~YAML
-      non-members:
-        show_paid_content: #{show_paid_content}
-        show_paid_indicator: true
       payments:
-        enabled: false
-        price: "0.00"
+        enabled: #{payments_enabled}
+        price: "#{payment_price}"
       newsletter:
-        enabled: false
+        enabled: #{newsletter_enabled}
+      everyone:
+        show_paid_content: #{show_paid_content}
     YAML
 
     File.write(DEFAULTS_PATH.join('members.yml'), content)

@@ -628,8 +628,8 @@ module HasMarkdownExtensions
     return false unless item.metadata['audience'] == 'paid'
     return false unless members_enabled?
 
-    # Check if indicator should be shown (from members config)
-    SiteConfig.default('members', 'non-members')&.dig('show_paid_indicator') != false
+    # Always show indicator for paid content
+    true
   end
 
   def members_enabled?
