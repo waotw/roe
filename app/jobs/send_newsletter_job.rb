@@ -83,10 +83,24 @@ class SendNewsletterJob < ApplicationJob
 
     Rails.logger.info "Batch complete for post #{post_id}: #{sent_count} sent, #{failed_count} failed"
 
+    # Broadcast update to refresh newsletter status
+    broadcast_newsletter_status(post)
+
     { sent: sent_count, failed: failed_count }
   end
 
   private
+
+  def broadcast_newsletter_status(post)
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "post_#{post.id}_newsletter_status",
+      target: "newsletter-status-#{post.id}",
+      partial: "admin/posts/newsletter_status",
+      locals: { post: post }
+    )
+  rescue => e
+    Rails.logger.error "Failed to broadcast newsletter status: #{e.message}"
+  end
 
   def send_batch_with_retry(batch, attempt = 1)
     result = PostmarkService.send_newsletter_batch(messages: batch)

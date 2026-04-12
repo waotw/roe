@@ -1999,18 +1999,6 @@ export default class extends Controller {
       this.textareaTarget.focus({ preventScroll: true });
     }
   }
-<<<<<<< Updated upstream
-=======
-
-  closeTestEmailModal() {
-    const modal = document.getElementById("test-email-modal");
-    if (modal) {
-      modal.remove();
-    }
-
-    EditorState.restore("test-email");
-    preventScroll: false;
-  }
 
   showResendModal(event) {
     const button = event.currentTarget;
@@ -2173,5 +2161,4 @@ export default class extends Controller {
       form.submit();
     }
   }
->>>>>>> Stashed changes
 }

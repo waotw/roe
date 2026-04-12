@@ -1379,36 +1379,40 @@
     console.log('✅ Progress overlay added to DOM');
   }
 
-  // ========== PAYMENTS ENABLED INDICATOR ==========
+  // ========== BOOLEAN FIELD INDICATORS ==========
 
-  function updatePaymentsEnabledIndicator() {
-    const paymentsEnabledField = document.querySelector('[data-config-field="payments.enabled"]');
-    if (!paymentsEnabledField) return;
+  function updateBooleanFieldIndicators() {
+    // Find all select fields with true/false options
+    document.querySelectorAll('select[data-config-field]').forEach(field => {
+      const options = Array.from(field.options).map(opt => opt.value);
 
-    const value = paymentsEnabledField.value;
+      // Check if this is a boolean field (has 'true' and 'false' options)
+      if (options.includes('true') && options.includes('false')) {
+        const value = field.value;
 
-    // Remove existing classes
-    paymentsEnabledField.classList.remove(
-      'bg-green-100', 'border-green-500',
-      'bg-red-100', 'border-red-300'
-    );
+        // Remove existing classes
+        field.classList.remove(
+          'bg-green-100', 'border-green-500',
+          'bg-red-100', 'border-red-300'
+        );
 
-    // Add classes based on value
-    if (value === 'true') {
-      paymentsEnabledField.classList.add('bg-green-100', 'border-green-500');
-    } else if (value === 'false') {
-      paymentsEnabledField.classList.add('bg-red-100', 'border-red-300');
-    }
+        // Add classes based on value
+        if (value === 'true') {
+          field.classList.add('bg-green-100', 'border-green-500');
+        } else if (value === 'false') {
+          field.classList.add('bg-red-100', 'border-red-300');
+        }
+      }
+    });
   }
 
   // Run on page load
   document.addEventListener('turbo:load', function() {
-    updatePaymentsEnabledIndicator();
+    updateBooleanFieldIndicators();
 
-    // Listen for changes
-    const paymentsEnabledField = document.querySelector('[data-config-field="payments.enabled"]');
-    if (paymentsEnabledField) {
-      paymentsEnabledField.addEventListener('change', updatePaymentsEnabledIndicator);
-    }
+    // Listen for changes on all config fields
+    document.querySelectorAll('select[data-config-field]').forEach(field => {
+      field.addEventListener('change', updateBooleanFieldIndicators);
+    });
   });
 </script>

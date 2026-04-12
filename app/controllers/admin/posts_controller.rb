@@ -298,6 +298,104 @@ class Admin::PostsController < Admin::BaseController
     redirect_to admin_posts_path
   end
 
+  def resend_newsletter
+    @post = Post.find(params[:id])
+
+    # Find last send time
+    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
+
+    unless last_send
+      flash[:error] = "This newsletter hasn't been sent yet"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Find new members who joined after last send
+    new_members = Member.newsletter_subscribed
+                        .active
+                        .where('subscribed_at > ?', last_send)
+
+    # Filter by audience if needed
+    new_members = new_members.paid_tier if @post.audience == 'paid'
+
+    if new_members.empty?
+      flash[:notice] = "No new members to send to"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Queue newsletter sending job
+    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
+
+    flash[:notice] = "Newsletter queued for #{new_members.count} new #{'member'.pluralize(new_members.count)}"
+    redirect_to edit_admin_post_path(@post)
+  end
+
+  def confirm_resend
+    @post = Post.find(params[:id])
+
+    # Find last send time
+    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
+
+    unless last_send
+      flash[:error] = "This newsletter hasn't been sent yet"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Find members who haven't received this newsletter yet
+    received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
+    new_members = Member.newsletter_subscribed
+                        .active
+                        .where.not(id: received_member_ids)
+
+    # Filter by audience if needed
+    new_members = new_members.paid_tier if @post.audience == 'paid'
+
+    if new_members.empty?
+      flash[:notice] = "No new members to send to"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Queue newsletter sending job
+    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
+
+    head :ok
+  end
+
+  def resend_modal
+    @post = Post.find(params[:id])
+
+    # Find last send time (for display purposes)
+    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
+
+    unless last_send
+      flash[:error] = "This newsletter hasn't been sent yet"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    # Find members who haven't received this newsletter yet
+    received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
+    @new_members = Member.newsletter_subscribed
+                         .active
+                         .where.not(id: received_member_ids)
+                         .order(subscribed_at: :desc)
+
+    # Filter by audience if needed
+    @new_members = @new_members.paid_tier if @post.audience == 'paid'
+
+    @new_members_count = @new_members.count
+
+    if @new_members_count == 0
+      flash[:notice] = "No new members to send to"
+      redirect_to edit_admin_post_path(@post) and return
+    end
+
+    render partial: 'resend_modal', layout: false
+  end
+
+  def newsletter_status
+    @post = Post.find(params[:id])
+    render partial: 'newsletter_status', layout: false
+  end
+
   def destroy
     @post = Post.find(params[:id])
     file_path = @post.file_path
@@ -359,13 +457,21 @@ class Admin::PostsController < Admin::BaseController
     # Send newsletter if published_to includes newsletter
     if should_send_newsletter?(@post)
       # Queue background job instead of sending immediately
-      SendNewsletterJob.perform_later(@post.id)
+      QueueNewsletterBatchesJob.perform_later(@post.id)
       flash[:notice] = "Post published. Newsletter is being sent in the background."
     else
       flash[:notice] = "Post published"
     end
 
-    redirect_to edit_admin_post_path(@post)
+    respond_to do |format|
+      format.html { redirect_to edit_admin_post_path(@post) }
+      format.turbo_stream {
+        render turbo_stream: turbo_stream.replace(
+          "newsletter-status-#{@post.id}",
+          partial: 'newsletter_status'
+        )
+      }
+    end
   end
 
   def unpublish

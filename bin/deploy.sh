@@ -15,19 +15,41 @@ if ! fly auth whoami &> /dev/null; then
     exit 1
 fi
 
-# 1. Backup production first
+# 1. Sync local theme changes to app/themes (for version control)
 echo ""
-echo "💾 Step 1: Backing up production..."
+echo "🎨 Step 1: Syncing local theme to app/themes..."
+echo "===================="
+
+if [ -d "site/theme" ]; then
+    rsync -av --delete site/theme/ app/themes/
+    echo "✅ Theme synced from site/theme → app/themes"
+
+    # Check if there are uncommitted theme changes
+    if ! git diff --quiet app/themes/; then
+        echo ""
+        echo "⚠️  Theme changes detected in app/themes/"
+        echo ""
+        read -p "Review and commit theme changes now? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            git add app/themes/
+            read -p "Commit message: " commit_msg
+            git commit -m "${commit_msg:-Update theme CSS}"
+            echo "✅ Theme changes committed"
+        fi
+    fi
+else
+    echo "⚠️  No site/theme folder found"
+fi
+
+# 2. Backup production
+echo ""
+echo "💾 Step 2: Backing up production..."
 rake site:backup
 
-# 2. Pull latest changes
+# 3. Preview what will be pushed to production
 echo ""
-echo "📥 Step 2: Pulling production changes..."
-rake site:pull
-
-# 3. Preview changes (optional)
-echo ""
-read -p "Preview what would sync? (y/n) " -n 1 -r
+read -p "Preview what would sync to production? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     rake site:preview_changes

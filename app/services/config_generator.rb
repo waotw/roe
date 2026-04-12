@@ -46,29 +46,23 @@ class ConfigGenerator
   end
 
   def self.generate_members
-    new.generate_members_defaults
-  end
+      new.generate_members_defaults
+    end
 
-<<<<<<< Updated upstream
-  def generate_members_defaults(show_paid_content: true)
-    # Generate members.yml
-=======
-  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", newsletter_enabled: false)
-    # Generate members.yml in features/
->>>>>>> Stashed changes
-    content = <<~YAML
-      non-members:
-        show_paid_content: #{show_paid_content}
-        show_paid_indicator: true
-      payments:
-        enabled: false
-        price: "0.00"
-      newsletter:
-        enabled: false
-    YAML
+    def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", newsletter_enabled: false)
+      # Generate members.yml in features/
+      content = <<~YAML
+        payments:
+          enabled: #{payments_enabled}
+          price: "#{payment_price}"
+        newsletter:
+          enabled: #{newsletter_enabled}
+        everyone:
+          show_paid_content: #{show_paid_content}
+      YAML
 
-    File.write(FEATURES_PATH.join('members.yml'), content)
-    puts "✓ Generated features/members.yml"
+      File.write(FEATURES_PATH.join('members.yml'), content)
+      puts "✓ Generated features/members.yml"
 
     # Generate member pages
     generate_member_pages

@@ -4,13 +4,9 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
-  enum :published_to, {
-    site: 0,
-    newsletter: 1,
-    both: 2
-  }, prefix: true
-
-  scope :for_newsletter, -> { where(published_to: [:newsletter, :both]) }
+  scope :for_newsletter, -> {
+    where("json_extract(metadata, '$.published_to') IN ('newsletter', 'both')")
+  }
   scope :newsletter_ready, -> { published.for_newsletter }
 
   has_many :media_references, dependent: :destroy
@@ -122,6 +118,30 @@ class Post < ApplicationRecord
   scope :feed_posts, -> {
     published.regular_posts
   }
+
+  scope :for_newsletter, -> {
+    where("json_extract(metadata, '$.published_to') IN ('newsletter', 'both')")
+  }
+
+  scope :newsletter_ready, -> {
+    published.for_newsletter
+  }
+
+  def published_to
+    metadata['published_to'] || 'site'  # Default to 'site' if not set
+  end
+
+  def published_to_site?
+    published_to == 'site'
+  end
+
+  def published_to_newsletter?
+    published_to == 'newsletter'
+  end
+
+  def published_to_both?
+    published_to == 'both'
+  end
 
   # Class method to get all unique post types efficiently
   def self.all_post_types

@@ -360,12 +360,20 @@ class Admin::ConfigsController < ApplicationController
 
   def create_members
     show_paid = params[:show_paid_content] == 'true'
+    payments_enabled = params[:payments_enabled] == 'true'
+    payment_price = params[:payment_price].presence || "0.00"
+    newsletter_enabled = params[:newsletter_enabled] == 'true'
 
-    ConfigGenerator.new.generate_members_defaults(show_paid_content: show_paid)
+    ConfigGenerator.new.generate_members_defaults(
+      show_paid_content: show_paid,
+      payments_enabled: payments_enabled,
+      payment_price: payment_price,
+      newsletter_enabled: newsletter_enabled
+    )
     SiteConfig.sync_from_file('defaults/members')
 
     # Sync the new upgrade page
-    ContentSyncService.sync_all_pages
+    ContentSync.new.sync_pages
 
     flash[:notice] = "Members feature enabled successfully"
     redirect_to admin_configs_path
@@ -521,10 +529,9 @@ class Admin::ConfigsController < ApplicationController
 
   def build_field_options_for_members
     {
-      'non-members.show_paid_content' => ['true', 'false'],
-      'non-members.show_paid_indicator' => ['true', 'false'],
       'payments.enabled' => ['false', 'true'],
-      'newsletter.enabled' => ['false', 'true']
+      'newsletter.enabled' => ['false', 'true'],
+      'everyone.show_paid_content' => ['true', 'false']
     }
   end
 
@@ -536,7 +543,8 @@ class Admin::ConfigsController < ApplicationController
     {
       'payments.enabled' => 'Turn on paid memberships (requires connection to your Stripe account)',
       'payments.price' => "One-time payment amount in #{currency} (e.g., 49.00)",
-      'newsletter.enabled' => 'Enable newsletter sending via Postmark (requires Postmark account & configuration)'
+      'newsletter.enabled' => 'Enable newsletter sending via Postmark (requires Postmark account & configuration)',
+      'everyone.show_paid_content' => 'Show paid content to public visitors and free members'
     }
   end
 

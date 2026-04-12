@@ -29,8 +29,13 @@ Rails.application.routes.draw do
         get :preview
         patch :rename
         post :send_test_email
+        get :resend_modal
+        post :confirm_resend
+        post :resend_newsletter
+        get :newsletter_status
       end
     end
+
 
     resources :pages, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       member do

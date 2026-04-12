@@ -10,11 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-<<<<<<< Updated upstream
-ActiveRecord::Schema[8.1].define(version: 2026_04_09_181720) do
-=======
 ActiveRecord::Schema[8.1].define(version: 2026_04_12_185012) do
->>>>>>> Stashed changes
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -103,7 +99,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_185012) do
     t.datetime "created_at", null: false
     t.string "file_path"
     t.json "metadata", default: {}
-    t.integer "published_to", default: 0, null: false
     t.datetime "updated_at", null: false
   end
 

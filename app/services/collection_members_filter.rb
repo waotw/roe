@@ -29,10 +29,6 @@ class CollectionMembersFilter
     return @config[:show_paid] == 'true' if @config.key?(:show_paid)
 
     # Global default from members.yml
-<<<<<<< Updated upstream
-    SiteConfig.default('members', 'non-members')&.dig('show_paid_content') || false
-=======
     SiteConfig.feature('members', 'everyone.show_paid_content') || false
->>>>>>> Stashed changes
   end
 end
