@@ -1,7 +1,11 @@
 class SiteConfig < ApplicationRecord
   SYSTEM_PATH = Rails.root.join('site', 'system')
-  SITE_FILE = SYSTEM_PATH.join('site.yml')
+  SITE_PATH = SYSTEM_PATH.join('global')
+  FEATURES_PATH = SYSTEM_PATH.join('features')
   DEFAULTS_PATH = SYSTEM_PATH.join('defaults')
+
+  SITE_FILE = SITE_PATH.join('site.yml')
+  FONTS_FILE = SITE_PATH.join('fonts.yml')
 
   CACHE_KEY_PREFIX = 'site_config'
 
@@ -10,7 +14,7 @@ class SiteConfig < ApplicationRecord
     return nil unless File.exist?(SITE_FILE)
     config_data = YAML.load_file(SITE_FILE)
 
-    # Handle nested keys like 'theme.active' or 'fonts.heading.family'
+    # Handle nested keys like 'theme.active'
     keys = key.to_s.split('.')
     config_data&.dig(*keys)
   rescue => e
@@ -18,9 +22,37 @@ class SiteConfig < ApplicationRecord
     nil
   end
 
-  # Get default config (cards, collections, etc.)
+  # Get fonts config
+  def self.fonts(key = nil)
+    return nil unless File.exist?(FONTS_FILE)
+    config_data = YAML.load_file(FONTS_FILE)
+
+    return config_data unless key
+
+    keys = key.to_s.split('.')
+    config_data&.dig(*keys)
+  rescue => e
+    Rails.logger.error "SiteConfig.fonts error: #{e.message}"
+    nil
+  end
+
+  # Get default config (cards, collections)
   def self.default(type, key)
     current("defaults/#{type}")&.config&.[](key.to_s)
+  end
+
+  # Get feature config (members, podcast, store)
+  def self.feature(type, key = nil)
+    config = current("features/#{type}")&.config
+    return config unless key
+
+    keys = key.to_s.split('.')
+    config&.dig(*keys)
+  end
+
+  # Check if feature is enabled (file exists)
+  def self.feature_enabled?(type)
+    File.exist?(FEATURES_PATH.join("#{type}.yml"))
   end
 
   # Get current config by type
@@ -38,12 +70,14 @@ class SiteConfig < ApplicationRecord
       Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     else
       # Clear all config caches
-      # SolidCache doesn't support delete_matched, so delete each key explicitly
       [
         'site',
+        'fonts',
         'defaults/collections',
         'defaults/cards',
-        'defaults/podcast'
+        'features/members',
+        'features/podcast',
+        'features/store'
       ].each do |config_type|
         Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{config_type}")
       end
@@ -57,7 +91,7 @@ class SiteConfig < ApplicationRecord
     config_data = YAML.load_file(file_path)
     site_config = find_or_initialize_by(file_path: file_path.to_s)
     site_config.config = config_data
-    site_config.save!  # ← Added save! (was missing)
+    site_config.save!
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     site_config
@@ -67,12 +101,19 @@ class SiteConfig < ApplicationRecord
   end
 
   def self.sync_all
-    # Sync main site config
+    # Sync site configs
     sync_from_file('site') if File.exist?(SITE_FILE)
+    sync_from_file('fonts') if File.exist?(FONTS_FILE)
 
     # Sync all defaults
     Dir.glob(DEFAULTS_PATH.join('*.yml')).each do |file|
       type = "defaults/#{File.basename(file, '.yml')}"
+      sync_from_file(type)
+    end
+
+    # Sync all features
+    Dir.glob(FEATURES_PATH.join('*.yml')).each do |file|
+      type = "features/#{File.basename(file, '.yml')}"
       sync_from_file(type)
     end
   end
@@ -84,12 +125,19 @@ class SiteConfig < ApplicationRecord
   private
 
   def self.file_path_for(type)
-    if type == 'site'
+    case type
+    when 'site'
       SITE_FILE
-    else
-      # type will be like "defaults/cards"
+    when 'fonts'
+      FONTS_FILE
+    when /^features\//
+      filename = type.split('/').last
+      FEATURES_PATH.join("#{filename}.yml")
+    when /^defaults\//
       filename = type.split('/').last
       DEFAULTS_PATH.join("#{filename}.yml")
+    else
+      SITE_FILE
     end
   end
 

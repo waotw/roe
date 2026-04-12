@@ -8,7 +8,7 @@
       </p>
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
     </div>
   </div>
 
@@ -25,6 +25,12 @@
                config_hash: @config_hash,
                flattened_config: @flattened_config,
                config_schema: @config_schema %>
+  <% elsif @config_type == 'fonts' %>
+    <%= render 'shared/config_editor',
+              form_url: admin_fonts_config_path,
+              config_content: @config_content,
+              config_hash: @config_hash,
+              config_schema: @config_schema %>
   <% elsif @config_type == 'cards' %>
     <%= render 'shared/config_editor',
                form_url: admin_cards_config_path,
@@ -57,5 +63,21 @@
                              },
                              class: "uppercase text-xs px-2 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
               </div>
+  <% elsif @config_type == 'store' %>
+    <%= render 'shared/config_editor',
+                form_url: admin_store_config_path,
+                config_content: @config_content,
+                config_hash: @config_hash %>
+    <div class="px-8 py-4 bg-red-50 border-t border-red-200">
+      <h4 class="text-sm font-semibold text-red-900 mb-2">Danger Zone</h4>
+      <p class="text-xs text-red-700 mb-3">Deleting this will remove all store configuration.</p>
+      <%= button_to "Delete Store",
+                  delete_store_admin_configs_path,
+                  method: :delete,
+                  data: {
+                    turbo_confirm: "Are you sure? This will permanently delete your store configuration."
+                  },
+                  class: "uppercase text-xs px-2 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
+    </div>
   <% end %>
 </div>

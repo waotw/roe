@@ -15,8 +15,8 @@
   <%= form_with url: admin_settings_post_template_path, method: :patch do |f| %>
     <%= f.text_area :content, class: "w-full h-96 font-mono text-sm p-2 border border-gray-300 bg-gray-50", value: @template_content %>
     <div class="flex gap-2">
-    <p><button type="submit" class="uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Save Template</button></p>
-    <%= link_to "cancel", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+    <p><button type="submit" class="uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Save Template</button></p>
+    <%= link_to "cancel", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
     </div>
   <% end %>
 </body>

@@ -1,5 +1,7 @@
 class ConfigGenerator
   SYSTEM_PATH = Rails.root.join('site', 'system')
+  SITE_PATH = SYSTEM_PATH.join('global')
+  FEATURES_PATH = SYSTEM_PATH.join('features')
   DEFAULTS_PATH = SYSTEM_PATH.join('defaults')
   ASSETS_PATH = SYSTEM_PATH.join('assets')
 
@@ -13,7 +15,8 @@ class ConfigGenerator
 
   def generate_all
     ensure_directories
-    generate_site_config unless File.exist?(SYSTEM_PATH.join('site.yml'))
+    generate_site_config unless File.exist?(SITE_PATH.join('site.yml'))
+    generate_fonts_config unless File.exist?(SITE_PATH.join('fonts.yml'))
     generate_cards_defaults unless File.exist?(DEFAULTS_PATH.join('cards.yml'))
     generate_collections_defaults unless File.exist?(DEFAULTS_PATH.join('collections.yml'))
   end
@@ -38,16 +41,21 @@ class ConfigGenerator
         link: "https://yoursite.com"
     YAML
 
-    File.write(DEFAULTS_PATH.join('podcast.yml'), content)
-    puts "✓ Generated podcast.yml"
+    File.write(FEATURES_PATH.join('podcast.yml'), content)
+    puts "✓ Generated features/podcast.yml"
   end
 
   def self.generate_members
     new.generate_members_defaults
   end
 
+<<<<<<< Updated upstream
   def generate_members_defaults(show_paid_content: true)
     # Generate members.yml
+=======
+  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", newsletter_enabled: false)
+    # Generate members.yml in features/
+>>>>>>> Stashed changes
     content = <<~YAML
       non-members:
         show_paid_content: #{show_paid_content}
@@ -59,11 +67,32 @@ class ConfigGenerator
         enabled: false
     YAML
 
-    File.write(DEFAULTS_PATH.join('members.yml'), content)
-    puts "✓ Generated members.yml"
+    File.write(FEATURES_PATH.join('members.yml'), content)
+    puts "✓ Generated features/members.yml"
 
     # Generate member pages
     generate_member_pages
+  end
+
+  def self.generate_store
+    new.generate_store_defaults
+  end
+
+  def generate_store_defaults(currency: "usd", default_domain: "")
+    # Generate store.yml in features/
+    content = <<~YAML
+      enabled: true
+      currency: "#{currency}"
+      default_domain: "#{default_domain}"
+      snipcart:
+        load_strategy: "on-user-interaction"
+        modal_style: "side"
+        show_taxes: true
+        show_quantity: true
+    YAML
+
+    File.write(FEATURES_PATH.join('store.yml'), content)
+    puts "✓ Generated features/store.yml"
   end
 
   def generate_member_pages
@@ -471,6 +500,8 @@ class ConfigGenerator
 
   def ensure_directories
     FileUtils.mkdir_p(SYSTEM_PATH)
+    FileUtils.mkdir_p(SITE_PATH)
+    FileUtils.mkdir_p(FEATURES_PATH)
     FileUtils.mkdir_p(DEFAULTS_PATH)
     FileUtils.mkdir_p(ASSETS_PATH.join('fonts'))
     FileUtils.mkdir_p(ASSETS_PATH.join('images'))
@@ -488,20 +519,27 @@ class ConfigGenerator
       theme:
         active: "default"
       static_generation_enabled: false
-      fonts:
-        heading:
-          family: "Manrope"
-          source: "google"
-        body:
-          family: "Source Serif 4"
-          source: "google"
-        mono:
-          family: "Inconsolata"
-          source: "google"
     YAML
 
-    File.write(SYSTEM_PATH.join('site.yml'), content)
-    puts "✓ Generated site.yml"
+    File.write(SITE_PATH.join('site.yml'), content)
+    puts "✓ Generated site/site.yml"
+  end
+
+  def generate_fonts_config
+    content = <<~YAML
+      heading:
+        family: "Manrope"
+        source: "google"
+      body:
+        family: "Source Serif 4"
+        source: "google"
+      mono:
+        family: "Inconsolata"
+        source: "google"
+    YAML
+
+    File.write(SITE_PATH.join('fonts.yml'), content)
+    puts "✓ Generated site/fonts.yml"
   end
 
   def generate_cards_defaults
@@ -528,7 +566,7 @@ class ConfigGenerator
     YAML
 
     File.write(DEFAULTS_PATH.join('cards.yml'), content)
-    puts "✓ Generated cards.yml"
+    puts "✓ Generated defaults/cards.yml"
   end
 
   def generate_collections_defaults
@@ -548,6 +586,6 @@ class ConfigGenerator
     YAML
 
     File.write(DEFAULTS_PATH.join('collections.yml'), content)
-    puts "✓ Generated collections.yml"
+    puts "✓ Generated defaults/collections.yml"
   end
 end

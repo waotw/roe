@@ -6,7 +6,7 @@
 <body>
   <div class="flex justify-between items-center">
     <h1 class="text-2xl font-bold mb-6">New Post</h1>
-    <%= link_to "← Back to Posts", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-2 py-2 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
+    <%= link_to "← Back to Posts", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
   </div>
 
   <%= form_with url: admin_posts_path, method: :post do |f| %>
@@ -19,7 +19,7 @@
     <%= f.hidden_field :content, value: @template %>
 
     <p class="mt-5">
-      <button type="submit" class="uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Create Post</button>
+      <button type="submit" class="uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Create Post</button>
       <span class="text-gray-500 text-xs">(Enter/Return)</span>
     </p>
   <% end %>

@@ -1,5 +1,5 @@
 class ContentWatcher
-  WATCH_PATHS = [ 'site/posts', 'site/pages', 'site/documentation', 'site/system', 'site/media' ].freeze
+  WATCH_PATHS = [ 'site/posts', 'site/pages', 'site/documentation', 'site/products', 'site/system', 'site/media' ].freeze
 
   # Define what file types we process
     ALLOWED_EXTENSIONS = %w[
@@ -122,12 +122,20 @@ class ContentWatcher
   def self.process_file(file)
     absolute_file = File.expand_path(file)
 
-    if absolute_file.include?('site/system/site.yml')
-      SiteConfig.sync_from_file('site')
-      puts "\n   ✓ Site config reloaded\n"
+    # Handle global configs (site.yml, fonts.yml)
+    if absolute_file.include?('site/system/global/')
+      filename = File.basename(file, '.yml')
+      SiteConfig.sync_from_file(filename)
+      puts "\n   ✓ #{filename.capitalize} config reloaded\n"
 
+    # Handle feature configs (members.yml, podcast.yml, store.yml)
+    elsif absolute_file.include?('site/system/features/')
+      type = File.basename(file, '.yml')
+      SiteConfig.sync_from_file("features/#{type}")
+      puts "\n   ✓ #{type.capitalize} feature config reloaded\n"
+
+    # Handle default configs (cards.yml, collections.yml)
     elsif absolute_file.include?('site/system/defaults/')
-      # Extract the type from the filename (e.g., 'cards' from 'cards.yml')
       type = File.basename(file, '.yml')
       SiteConfig.sync_from_file("defaults/#{type}")
       puts "\n   ✓ #{type.capitalize} defaults reloaded\n"
@@ -156,6 +164,13 @@ class ContentWatcher
 
       if result
         puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
+      end
+
+    elsif absolute_file.include?('site/products')
+      result = Product.create_or_update_from_file(absolute_file)
+
+      if result
+        puts "\n   ✓ Product saved: #{result.title || File.basename(file)}\n"
       end
 
     elsif absolute_file.include?('site/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg|mp3|m4a|wav|ogg|flac|aac|mp4|webm|ogv|mov|avi|mkv)$/i)
@@ -282,19 +297,66 @@ class ContentWatcher
   def self.handle_config_removed(file_path)
     filename = File.basename(file_path)
 
+    # Handle OLD structure (for backward compatibility during migration)
+    if file_path.include?('site/system/') && !file_path.include?('defaults/') && !file_path.include?('global/') && !file_path.include?('features/')
+      # Old root-level config (site.yml) - ignore it, should be in global/ now
+      puts "   ℹ️  Ignoring old config location: #{filename} (should be in global/ or features/)"
+      return
+    end
+
+    # Determine config type based on NEW directory structure
+    if file_path.include?('system/global')
+      handle_global_config_removed(filename, file_path)
+    elsif file_path.include?('system/defaults')
+      handle_defaults_config_removed(filename, file_path)
+    elsif file_path.include?('system/features')
+      handle_features_config_removed(filename, file_path)
+    else
+      puts "   ℹ️  Unknown config file removed: #{filename}"
+    end
+  end
+
+  def self.handle_global_config_removed(filename, file_path)
     case filename
     when 'site.yml'
       restore_required_config('site', file_path)
+    when 'fonts.yml'
+      restore_required_config('fonts', file_path)
+    else
+      puts "   ℹ️  Unknown global config file removed: #{filename}"
+    end
+  end
+
+  def self.handle_global_config_removed(filename, file_path)
+    case filename
+    when 'site.yml'
+      restore_required_config('site', file_path)
+    when 'fonts.yml'
+      restore_required_config('fonts', file_path)
+    else
+      puts "   ℹ️  Unknown global config file removed: #{filename}"
+    end
+  end
+
+  def self.handle_defaults_config_removed(filename, file_path)
+    case filename
     when 'cards.yml'
       restore_required_config('defaults/cards', file_path)
     when 'collections.yml'
       restore_required_config('defaults/collections', file_path)
-    when 'podcast.yml'
-      # Optional config - allow deletion
-      SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
-      puts "   🗑️  Podcast config removed from database (optional)"
     else
-      puts "   ℹ️  Unknown config file removed: #{filename}"
+      puts "   ℹ️  Unknown defaults config file removed: #{filename}"
+    end
+  end
+
+  def self.handle_features_config_removed(filename, file_path)
+    # Features are optional - allow deletion
+    case filename
+    when 'members.yml', 'podcast.yml', 'store.yml'
+      SiteConfig.find_by("file_path LIKE ?", "%#{filename}")&.destroy
+      puts "   🗑️  #{filename.gsub('.yml', '').capitalize} feature disabled (file removed)"
+    else
+      puts "   ℹ️  Unknown feature config file removed: #{filename}"
     end
   end
 
@@ -314,6 +376,8 @@ class ContentWatcher
       case config_type
       when 'site'
         generator.send(:generate_site_config)
+      when 'fonts'
+        generator.send(:generate_fonts_config)
       when 'defaults/cards'
         generator.send(:generate_cards_defaults)
       when 'defaults/collections'

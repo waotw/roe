@@ -97,5 +97,12 @@
         </svg>
       <% end %>
     <% end %>
+    <!-- Snipcart Integration -->
+    <% if snipcart_connected? %>
+      <% snipcart = SnipcartConfig.current %>
+      <% if snipcart.snippet.present? %>
+        <%= snipcart.snippet.html_safe %>
+      <% end %>
+    <% end %>
   </body>
 </html>

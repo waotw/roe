@@ -58,17 +58,17 @@
     <div class="space-y-3">
       <%= button_to "Generate Site", admin_generate_static_site_path,
             method: :post,
-            class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none inline-block",
+            class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none inline-block",
             data: { confirm: "Generate static site now?" } %>
 
       <%= button_to "Clean Static Files", admin_clean_static_site_path,
             method: :post,
-            class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-yellow-200 hover:bg-yellow-300 font-mono rounded-xs leading-none inline-block",
+            class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-yellow-200 hover:bg-yellow-300 font-mono rounded-xs leading-none inline-block",
             data: { confirm: "Delete all generated static files?" } %>
 
       <%= button_to "Rebuild (Clean + Generate)", admin_rebuild_static_site_path,
             method: :post,
-            class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs leading-none inline-block",
+            class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs leading-none inline-block",
             data: { confirm: "This will delete all static files and regenerate from scratch. Continue?" } %>
     </div>
 

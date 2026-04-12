@@ -1,6 +1,10 @@
 module AssetsHelper
   def font_face_css
-    fonts_config = SiteConfig.get('fonts')
+    # Get fonts config - this returns the whole fonts.yml content
+    fonts_data = SiteConfig.fonts
+
+    # Extract the 'fonts' key if it exists, otherwise use the data as-is
+    fonts_config = fonts_data.is_a?(Hash) ? (fonts_data['fonts'] || fonts_data) : nil
 
     css = []
 
@@ -11,12 +15,17 @@ module AssetsHelper
 
         font_data = fonts_config[role]
         family = font_data['family']
+        next unless family # Skip if no family is defined
 
-        # Generate rule for each variant
-        generate_font_face(css, family, font_data['regular'], 400, 'normal') if font_data['regular']
-        generate_font_face(css, family, font_data['bold'], 700, 'normal') if font_data['bold']
-        generate_font_face(css, family, font_data['italic'], 400, 'italic') if font_data['italic']
-        generate_font_face(css, family, font_data['bold_italic'], 700, 'italic') if font_data['bold_italic']
+        # Generate @font-face rule for each variant dynamically
+        font_data.each do |variant_name, filename|
+          next if variant_name == 'family' # Skip the family key itself
+          next unless filename.present? # Skip empty variants
+
+          # Map variant names to font-weight and font-style
+          weight, style = variant_to_weight_style(variant_name)
+          generate_font_face(css, family, filename, weight, style)
+        end
       end
     end
 
@@ -69,6 +78,51 @@ module AssetsHelper
   end
 
   private
+
+  # Map variant names to CSS font-weight and font-style values
+  def variant_to_weight_style(variant_name)
+    case variant_name.to_s.downcase
+    when 'regular', 'normal'
+      [400, 'normal']
+    when 'bold'
+      [700, 'normal']
+    when 'italic'
+      [400, 'italic']
+    when 'bold_italic', 'bolditalic'
+      [700, 'italic']
+    when 'light'
+      [300, 'normal']
+    when 'light_italic', 'lightitalic'
+      [300, 'italic']
+    when 'medium'
+      [500, 'normal']
+    when 'medium_italic', 'mediumitalic'
+      [500, 'italic']
+    when 'semibold'
+      [600, 'normal']
+    when 'semibold_italic', 'semibolditalic'
+      [600, 'italic']
+    when 'black', 'heavy'
+      [900, 'normal']
+    when 'black_italic', 'blackitalic', 'heavy_italic'
+      [900, 'italic']
+    when 'thin'
+      [100, 'normal']
+    when 'thin_italic', 'thinitalic'
+      [100, 'italic']
+    when 'extralight', 'extra_light'
+      [200, 'normal']
+    when 'extralight_italic', 'extra_light_italic'
+      [200, 'italic']
+    when 'extrabold', 'extra_bold'
+      [800, 'normal']
+    when 'extrabold_italic', 'extra_bold_italic'
+      [800, 'italic']
+    else
+      # Default fallback for unknown variants - assume normal weight/style
+      [400, 'normal']
+    end
+  end
 
   def generate_font_face(css, family, filename, weight, style)
     css << <<~CSS

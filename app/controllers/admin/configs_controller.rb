@@ -12,7 +12,7 @@ class Admin::ConfigsController < ApplicationController
           required: true,
           hint: 'Used in page titles, feeds, and site header'
         },
-        'url' => {  # ← ADD THIS
+        'url' => {
           type: :text,
           label: 'Site URL',
           required: true,
@@ -83,8 +83,10 @@ class Admin::ConfigsController < ApplicationController
           hint: 'Automatically generate static files when content changes'
         }
       }
-    },
+    }
+  }.freeze
 
+  FONTS_CONFIG_SCHEMA = {
     fonts: {
       label: "Custom Fonts",
       help_text: "Upload font files with the Fonts button and copy url…",
@@ -138,51 +140,88 @@ class Admin::ConfigsController < ApplicationController
   end
 
   def index
-    @config_files = [
+    # Site-level configs
+    site_file = {
+      name: "site.yml",
+      path: "global/site.yml",
+      type: "site",
+      edit_path: admin_edit_site_config_path
+    }
+
+    fonts_file = {
+      name: "fonts.yml",
+      path: "global/fonts.yml",
+      type: "fonts",
+      edit_path: admin_edit_fonts_config_path
+    }
+
+    # Feature configs
+    features_files = []
+
+    if File.exist?(SiteConfig::FEATURES_PATH.join('members.yml'))
+      features_files << {
+        name: "members.yml",
+        path: "features/members.yml",
+        type: "features/members",
+        edit_path: admin_edit_members_config_path
+      }
+    end
+
+    if File.exist?(SiteConfig::FEATURES_PATH.join('podcast.yml'))
+      features_files << {
+        name: "podcast.yml",
+        path: "features/podcast.yml",
+        type: "features/podcast",
+        edit_path: admin_edit_podcast_config_path
+      }
+    end
+
+    if File.exist?(SiteConfig::FEATURES_PATH.join('store.yml'))
+      features_files << {
+        name: "store.yml",
+        path: "features/store.yml",
+        type: "features/store",
+        edit_path: admin_edit_store_config_path
+      }
+    end
+
+    # Default configs
+    defaults_files = [
       {
-        section: "📁 Site",
-        files: [
-          { name: "site.yml", path: admin_edit_site_config_path, description: "Global site & feed settings, logo, and fonts" }
-        ]
+        name: "cards.yml",
+        path: "defaults/cards.yml",
+        type: "defaults/cards",
+        edit_path: admin_edit_cards_config_path
       },
       {
-        section: "📁 Defaults",
-        files: [
-          { name: "cards.yml", path: admin_edit_cards_config_path, description: "Global Card settings & templates" },
-          { name: "collections.yml", path: admin_edit_collections_config_path, description: "Global Collection settings & template" }
-        ]
+        name: "collections.yml",
+        path: "defaults/collections.yml",
+        type: "defaults/collections",
+        edit_path: admin_edit_collections_config_path
       }
     ]
 
-    defaults_files = [
-      { name: "cards.yml", path: admin_edit_cards_config_path, description: "Global Card settings & templates" },
-      { name: "collections.yml", path: admin_edit_collections_config_path, description: "Global Collection settings & template" }
+    # Build the config_files structure for the view
+    @config_files = [
+      {
+        section: "Global",
+        files: [site_file, fonts_file]
+      },
+      {
+        section: "Features",
+        files: features_files
+      },
+      {
+        section: "Defaults",
+        files: defaults_files
+      }
     ]
-
-    # Add members config if it exists
-    if File.exist?(SiteConfig::DEFAULTS_PATH.join('members.yml'))
-      defaults_files << {
-        name: "members.yml",
-        path: admin_edit_members_config_path,
-        description: "Membership & paid content settings"
-      }
-    end
-
-    # Add podcast config if it exists
-    if File.exist?(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
-      defaults_files << {
-        name: "podcast.yml",
-        path: admin_edit_podcast_config_path,
-        description: "Global Podcast & feed settings"
-      }
-    end
-
-    @config_files[1][:files] = defaults_files
   end
 
   def edit_site
     @config_type = 'site'
     @config_content = File.read(SiteConfig::SITE_FILE)
+    @config_hash = YAML.load(@config_content) || {}
     @config_schema = SITE_CONFIG_SCHEMA
     render :edit
   end
@@ -191,14 +230,23 @@ class Admin::ConfigsController < ApplicationController
     update_config('site', SiteConfig::SITE_FILE)
   end
 
+  def edit_fonts
+    @config_type = 'fonts'
+    @config_content = File.read(SiteConfig::FONTS_FILE)
+    @config_hash = YAML.load(@config_content) || {}
+    @config_schema = FONTS_CONFIG_SCHEMA
+    render :edit
+  end
+
+  def update_fonts
+    update_config('fonts', SiteConfig::FONTS_FILE)
+  end
+
   def edit_podcast
-    podcast_config_path = SiteConfig::DEFAULTS_PATH.join('podcast.yml')
+    podcast_config_path = SiteConfig::FEATURES_PATH.join('podcast.yml')
 
-    # Check if file exists
     unless File.exist?(podcast_config_path)
-      # Clean up orphaned database record
       SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
-
       flash[:alert] = "Podcast configuration doesn't exist. Click 'Add Podcast Config' to create one."
       redirect_to admin_configs_path and return
     end
@@ -207,12 +255,11 @@ class Admin::ConfigsController < ApplicationController
     @config_content = File.read(podcast_config_path)
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_podcast
-    @itunes_subcategories = itunes_subcategories
     render :edit
   end
 
   def update_podcast
-    update_config('defaults/podcast', SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+    update_config('features/podcast', SiteConfig::FEATURES_PATH.join('podcast.yml'))
   end
 
   def edit_cards
@@ -259,11 +306,11 @@ class Admin::ConfigsController < ApplicationController
   end
 
   def generate_podcast
-    if File.exist?(SiteConfig::DEFAULTS_PATH.join('podcast.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join('podcast.yml'))
       flash[:alert] = "Podcast configuration already exists"
     else
       ConfigGenerator.generate_podcast
-      SiteConfig.sync_from_file('defaults/podcast')
+      SiteConfig.sync_from_file('features/podcast')
       flash[:notice] = "Podcast configuration created successfully"
     end
 
@@ -271,24 +318,18 @@ class Admin::ConfigsController < ApplicationController
   end
 
   def delete_podcast
-    file_path = SiteConfig::DEFAULTS_PATH.join('podcast.yml')
+    file_path = SiteConfig::FEATURES_PATH.join('podcast.yml')
 
-    # Delete file
     File.delete(file_path) if File.exist?(file_path)
-
-    # Delete from database
     SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
-
-    # Clear cache
-    SiteConfig.reload!('defaults/podcast')
-    PodcastConfig.reload!
+    SiteConfig.reload!('features/podcast')
 
     flash[:notice] = "Podcast configuration deleted successfully"
     redirect_to admin_configs_path
   end
 
   def edit_members
-    members_config_path = SiteConfig::DEFAULTS_PATH.join('members.yml')
+    members_config_path = SiteConfig::FEATURES_PATH.join('members.yml')
 
     unless File.exist?(members_config_path)
       flash[:alert] = "Members configuration doesn't exist."
@@ -305,11 +346,11 @@ class Admin::ConfigsController < ApplicationController
   end
 
   def update_members
-    update_config('defaults/members', SiteConfig::DEFAULTS_PATH.join('members.yml'))
+    update_config('features/members', SiteConfig::FEATURES_PATH.join('members.yml'))
   end
 
   def new_members_setup
-    if File.exist?(SiteConfig::DEFAULTS_PATH.join('members.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join('members.yml'))
       flash[:alert] = "Members configuration already exists"
       redirect_to admin_configs_path
     else
@@ -331,13 +372,67 @@ class Admin::ConfigsController < ApplicationController
   end
 
   def delete_members
-    file_path = SiteConfig::DEFAULTS_PATH.join('members.yml')
+    file_path = SiteConfig::FEATURES_PATH.join('members.yml')
 
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.destroy
-    SiteConfig.reload!('defaults/members')
+    SiteConfig.reload!('features/members')
 
     flash[:notice] = "Members feature disabled successfully"
+    redirect_to admin_configs_path
+  end
+
+  def new_store_setup
+    if File.exist?(SiteConfig::FEATURES_PATH.join('store.yml'))
+      flash[:alert] = "Store configuration already exists"
+      redirect_to admin_configs_path
+    else
+      render :new_store_modal
+    end
+  end
+
+  def create_store
+    currency = params[:currency].presence || "usd"
+    default_domain = params[:default_domain].presence || ""
+
+    # Create store.yml with configuration (no API keys)
+    ConfigGenerator.new.generate_store_defaults(
+      currency: currency,
+      default_domain: default_domain
+    )
+    SiteConfig.sync_from_file('features/store')
+
+    flash[:notice] = "Store feature enabled! Now configure your Snipcart API keys."
+    redirect_to edit_admin_snipcart_config_path
+  end
+
+  def edit_store
+    store_config_path = SiteConfig::FEATURES_PATH.join('store.yml')
+
+    unless File.exist?(store_config_path)
+      SiteConfig.find_by("file_path LIKE ?", "%store.yml")&.destroy
+      flash[:alert] = "Store configuration doesn't exist. Click 'Enable Store' to create one."
+      redirect_to admin_configs_path and return
+    end
+
+    @config_type = 'store'
+    @config_content = File.read(store_config_path)
+    @config_hash = YAML.load(@config_content) || {}
+    render :edit
+  end
+
+  def update_store
+    update_config('features/store', SiteConfig::FEATURES_PATH.join('store.yml'))
+  end
+
+  def delete_store
+    file_path = SiteConfig::FEATURES_PATH.join('store.yml')
+
+    File.delete(file_path) if File.exist?(file_path)
+    SiteConfig.find_by("file_path LIKE ?", "%store.yml")&.destroy
+    SiteConfig.reload!('features/store')
+
+    flash[:notice] = "Store feature disabled successfully"
     redirect_to admin_configs_path
   end
 

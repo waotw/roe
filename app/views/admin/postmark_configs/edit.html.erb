@@ -98,14 +98,14 @@
 
         <div class="flex gap-4">
           <%= f.submit "Save Configuration",
-              class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+              class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
 
           <% if @postmark_config.connected? %>
             <%= button_to "Disconnect",
                 admin_postmark_config_path,
                 method: :delete,
                 data: { confirm: "Are you sure? This will disconnect Postmark integration." },
-                class: "uppercase text-sm px-2 py-2 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs" %>
+                class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs" %>
           <% end %>
         </div>
       </div>

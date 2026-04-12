@@ -24,15 +24,15 @@ class CollectionMembersFilter
     @items = @items.where("json_extract(metadata, '$.audience') IS NULL OR json_extract(metadata, '$.audience') != ?", 'paid')
   end
 
-  def members_enabled?
-    File.exist?(Rails.root.join('site/system/defaults/members.yml'))
-  end
-
   def should_show_paid?
     # Per-collection override
     return @config[:show_paid] == 'true' if @config.key?(:show_paid)
 
     # Global default from members.yml
+<<<<<<< Updated upstream
     SiteConfig.default('members', 'non-members')&.dig('show_paid_content') || false
+=======
+    SiteConfig.feature('members', 'everyone.show_paid_content') || false
+>>>>>>> Stashed changes
   end
 end

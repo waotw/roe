@@ -1,0 +1,67 @@
+<div class="px-4 sm:px-0 max-w-2xl mx-auto mt-12">
+  <div class="bg-white border-2 border-gray-900 p-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Enable Store Feature</h1>
+
+    <div class="mb-6">
+      <p class="text-gray-700 mb-4">
+        Enable Snipcart integration to sell products on your site. Once enabled, you'll see a Store link in the upper right to configure your Snipcart API keys ↗
+      </p>
+      <div class="bg-blue-50 border border-blue-300 p-4">
+        <p class="text-sm text-gray-700 leading-7">
+          <strong>Note:</strong> You can change these settings anytime at: <br>
+          <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">Settings → Features → store.yml</code>
+        </p>
+      </div>
+    </div>
+
+    <%= form_with url: create_store_admin_configs_path, method: :post, class: "space-y-6" do |f| %>
+
+      <!-- Currency -->
+      <div class="bg-gray-50 border border-gray-300 p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">Default Currency</h3>
+
+        <label class="block">
+          <span class="text-sm font-medium text-gray-900">Currency Code</span>
+          <div class="mt-2">
+            <%= f.select :currency,
+                options_for_select([
+                  ['USD - US Dollar', 'usd'],
+                  ['EUR - Euro', 'eur'],
+                  ['GBP - British Pound', 'gbp'],
+                  ['CAD - Canadian Dollar', 'cad'],
+                  ['AUD - Australian Dollar', 'aud'],
+                  ['JPY - Japanese Yen', 'jpy']
+                ], 'usd'),
+                {},
+                class: "w-full px-3 py-2 border border-gray-300 rounded text-sm" %>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Can be changed later or offer multiple currencies</p>
+        </label>
+      </div>
+
+      <!-- Domain -->
+      <div class="bg-gray-50 border border-gray-300 p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">Default Domain</h3>
+
+        <label class="block">
+          <span class="text-sm font-medium text-gray-900">Domain Name</span>
+          <div class="mt-2">
+            <%= f.text_field :default_domain,
+                placeholder: "yourdomain.com",
+                class: "w-full px-3 py-2 border border-gray-300 rounded text-sm font-mono" %>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">
+            Used for order validation. Add this domain in Snipcart dashboard → Store configurations → Domains & URLs
+          </p>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <%= f.submit "Enable Store",
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+        <%= link_to "Cancel", admin_configs_path,
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+      </div>
+    <% end %>
+  </div>
+</div>

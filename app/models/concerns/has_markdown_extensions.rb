@@ -632,10 +632,6 @@ module HasMarkdownExtensions
     SiteConfig.default('members', 'non-members')&.dig('show_paid_indicator') != false
   end
 
-  def members_enabled?
-    File.exist?(Rails.root.join('site/system/defaults/members.yml'))
-  end
-
   def paid_lock_icon
     '<svg class="paid-lock-icon" viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M7.88 15.76c4.36 0 7.89-3.53 7.89-7.88 0-4.36-3.53-7.88-7.89-7.88C3.54 0 0 3.52 0 7.88c0 4.35 3.54 7.88 7.88 7.88zm0-1.48c-3.54 0-6.39-2.86-6.39-6.4 0-3.54 2.85-6.4 6.39-6.4 3.54 0 6.4 2.86 6.4 6.4 0 3.54-2.86 6.4-6.4 6.4z"/><path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/></svg>'
   end
@@ -993,7 +989,7 @@ module HasMarkdownExtensions
 
   def render_signup_form(button_text, upgrade_button_text = nil)
     # Check if payments are actually enabled
-    payments_enabled = SiteConfig.default('members', 'payments')&.dig('enabled')
+    payments_enabled = SiteConfig.feature('members', 'payments.enabled')
     payments_enabled = (payments_enabled == true || payments_enabled == 'true')
 
     # Only show upgrade button if payments are enabled AND text is provided

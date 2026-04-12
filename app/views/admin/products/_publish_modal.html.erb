@@ -1,0 +1,161 @@
+<turbo-frame id="publish-modal-container">
+  <div class="fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-3xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Publish Product</h2>
+
+      <% if @missing_sku %>
+        <div class="bg-yellow-50 border border-yellow-200 p-4 mb-6">
+          <p class="text-sm text-yellow-800">
+            <strong>SKU Required:</strong> Every product needs a unique Stock Keeping Unit (SKU) identifier.
+          </p>
+        </div>
+
+        <!-- SKU Pattern Examples -->
+        <div class="bg-blue-50 border border-blue-200 p-4 mb-6 font-mono text-xs">
+          <p class="font-bold text-blue-900 mb-2 font-sans">SKU Pattern Examples:</p>
+          <div class="space-y-1 text-blue-800">
+            <div><span class="text-blue-600">Books:</span> BOOK-001-THEFIRESERMON</div>
+            <div><span class="text-blue-600">Posters:</span> POSTER-001-LETSBEFRIENDS</div>
+            <div><span class="text-blue-600">T-Shirts:</span> TSHIRT-001-LETSBEFRIENDS-L-RED</div>
+          </div>
+          <p class="mt-2 text-blue-700 font-sans text-xs">Pattern: <code class="bg-blue-100 px-1">{CATEGORY}-{NUMBER}-{DETAILS}</code></p>
+        </div>
+
+        <%= form_with url: confirm_publish_admin_product_path(@product),
+                      method: :post,
+                      class: "space-y-6",
+                      data: {
+                        turbo_frame: "_top",
+                        controller: "sku-generator",
+                        sku_generator_product_id_value: @product.id
+                      } do |f| %>
+
+          <!-- SKU Generator -->
+          <div class="bg-gray-50 border border-gray-300 p-6">
+            <h3 class="font-semibold text-gray-900 mb-3">SKU Generator (Optional)</h3>
+            <p class="text-sm text-gray-700 mb-4">Use the generator below or enter your own SKU directly.</p>
+
+            <div class="grid grid-cols-3 gap-4 mb-4">
+              <!-- Category -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Category</label>
+                <input type="text"
+                       data-sku-generator-target="category"
+                       data-action="input->sku-generator#updatePreview"
+                       value="<%= @product.metadata['category']&.upcase || 'PROD' %>"
+                       placeholder="BOOK"
+                       class="w-full px-2 py-1.5 border border-gray-300 rounded font-mono text-xs uppercase">
+                <p class="text-xs text-gray-500 mt-1">e.g., BOOK, POSTER</p>
+              </div>
+
+              <!-- Number -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Number</label>
+                <input type="text"
+                       data-sku-generator-target="number"
+                       data-action="input->sku-generator#updatePreview"
+                       value="<%= sprintf('%03d', Product.next_number_for_category(@product.metadata['category'])) %>"
+                       placeholder="001"
+                       class="w-full px-2 py-1.5 border border-gray-300 rounded font-mono text-xs">
+                <p class="text-xs text-gray-500 mt-1">Next: <%= sprintf('%03d', Product.next_number_for_category(@product.metadata['category'])) %></p>
+              </div>
+
+              <!-- Details -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Details</label>
+                <input type="text"
+                       data-sku-generator-target="details"
+                       data-action="input->sku-generator#updatePreview"
+                       value="<%= @product.title.to_s.parameterize.upcase.gsub('-', '').first(20) %>"
+                       placeholder="TITLESLUG"
+                       class="w-full px-2 py-1.5 border border-gray-300 rounded font-mono text-xs uppercase">
+                <p class="text-xs text-gray-500 mt-1">From title (optional)</p>
+              </div>
+            </div>
+
+            <!-- Preview -->
+            <div class="bg-white border border-gray-300 p-3 mb-3">
+              <p class="text-xs text-gray-600 mb-1">Preview:</p>
+              <p class="font-mono text-sm font-bold text-gray-900" data-sku-generator-target="preview">
+                <%= @product.generate_sku_suggestion %>
+              </p>
+            </div>
+
+            <button type="button"
+                    data-action="click->sku-generator#useSuggestion"
+                    class="uppercase text-xs px-3 py-1.5 border border-blue-600 bg-blue-50 hover:bg-blue-100 text-blue-700 font-mono rounded-xs">
+              Use This SKU ↓
+            </button>
+          </div>
+
+          <!-- Main SKU Field -->
+          <div class="bg-gray-50 border border-gray-300 p-6">
+            <h3 class="font-semibold text-gray-900 mb-3">Product SKU</h3>
+
+            <label class="block">
+              <span class="text-sm font-medium text-gray-900">SKU (Stock Keeping Unit)</span>
+              <div class="mt-2">
+                <%= f.text_field :sku,
+                    data: {
+                      sku_generator_target: "skuField",
+                      action: "input->sku-generator#checkDuplicate"
+                    },
+                    placeholder: "Enter SKU or use generator above",
+                    class: "w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm uppercase",
+                    autofocus: true %>
+              </div>
+
+              <!-- Validation Messages -->
+              <div data-sku-generator-target="validation" class="mt-2 text-sm">
+                <!-- Populated by JavaScript -->
+              </div>
+            </label>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <%= f.submit "Save SKU & Publish",
+                data: { sku_generator_target: "submitBtn" },
+                class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+            <button type="button"
+                    onclick="document.getElementById('publish-modal-container').innerHTML = ''"
+                    class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs">
+              Cancel
+            </button>
+          </div>
+        <% end %>
+
+      <% else %>
+        <!-- SKU exists, just confirm publication -->
+        <p class="text-gray-700 mb-4">
+          Are you ready to publish this product? It will be live on your store at:
+        </p>
+
+        <div class="bg-blue-50 border border-blue-200 p-4 mb-4">
+          <p class="text-sm font-mono text-blue-900"><%= @product.public_url %></p>
+        </div>
+
+        <div class="bg-gray-50 border border-gray-200 p-4 mb-6">
+          <p class="text-xs text-gray-600 mb-1">SKU:</p>
+          <p class="font-mono text-sm font-bold text-gray-900"><%= @product.sku %></p>
+        </div>
+
+        <%= form_with url: confirm_publish_admin_product_path(@product),
+                      method: :post,
+                      class: "space-y-6",
+                      data: { turbo_frame: "_top" } do |f| %>
+
+          <div class="flex items-center gap-3">
+            <%= f.submit "Publish",
+                class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+            <button type="button"
+                    onclick="document.getElementById('publish-modal-container').innerHTML = ''"
+                    class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs">
+              Cancel
+            </button>
+          </div>
+        <% end %>
+
+      <% end %>
+    </div>
+  </div>
+</turbo-frame>

@@ -10,11 +10,6 @@ class ApplicationController < ActionController::Base
   # Render 404 for RecordNotFound
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
-  def members_enabled?
-    File.exist?(Rails.root.join('site/system/defaults/members.yml'))
-  end
-  helper_method :members_enabled?
-
   private
 
   def setup_theme_preview

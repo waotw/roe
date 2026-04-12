@@ -10,7 +10,11 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
+<<<<<<< Updated upstream
 ActiveRecord::Schema[8.1].define(version: 2026_04_09_181720) do
+=======
+ActiveRecord::Schema[8.1].define(version: 2026_04_12_185012) do
+>>>>>>> Stashed changes
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -103,6 +107,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_09_181720) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "products", force: :cascade do |t|
+    t.text "content"
+    t.datetime "created_at", null: false
+    t.string "file_path"
+    t.json "metadata", default: {}
+    t.datetime "updated_at", null: false
+    t.index ["file_path"], name: "index_products_on_file_path", unique: true
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -118,6 +131,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_09_181720) do
     t.string "file_path", null: false
     t.datetime "updated_at", null: false
     t.index ["file_path"], name: "index_site_configs_on_file_path", unique: true
+  end
+
+  create_table "snipcart_configs", force: :cascade do |t|
+    t.text "api_key_live"
+    t.text "api_key_test"
+    t.datetime "connected_at"
+    t.datetime "created_at", null: false
+    t.integer "mode", default: 0, null: false
+    t.text "snippet"
+    t.datetime "updated_at", null: false
   end
 
   create_table "stripe_configs", force: :cascade do |t|

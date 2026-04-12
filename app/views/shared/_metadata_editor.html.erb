@@ -59,7 +59,7 @@
       'podcast' => {
         type: :select,
         label: 'podcast',
-        options: PodcastConfig.podcast_keys,  # ← Call directly (not a proc)
+        options: PodcastConfig.podcast_keys,
         required: true,
         hint: 'Which podcast feed?'
       },
@@ -68,6 +68,18 @@
       'episode_number' => { type: :text, label: 'episode_number', hint: 'Episode number' },
       'season' => { type: :text, label: 'season', hint: 'Season number' },
       'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' }
+    }
+  elsif resource_type == 'product'
+    {
+      # Core product fields
+      'title' => { type: :text, label: 'title', required: true },
+      'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
+      'status' => { type: :select, label: 'status', options: ['draft', 'published'], required: true },
+      'price' => { type: :text, label: 'price', required: true, hint: 'Price in dollars (e.g., 29.99)' },
+      'sku' => { type: :text, label: 'sku', hint: 'Product SKU (required for publishing)' },
+      'image' => { type: :text, label: 'image', hint: 'Product image: /media/images/product.jpg' },
+      'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
+      'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' }
     }
   else # pages
     {

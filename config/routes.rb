@@ -54,6 +54,20 @@ Rails.application.routes.draw do
 
     resources :documentation, only: [ :index, :new, :create, :edit, :update, :destroy ]
 
+    resources :products do
+      collection do
+        get :check_sku
+      end
+      member do
+        get :publish_modal
+        post :confirm_publish
+        patch :publish
+        patch :unpublish
+        post :preview
+        get :preview
+      end
+    end
+
     resources :configs, only: [:index] do
       collection do
         post :generate_podcast
@@ -61,6 +75,9 @@ Rails.application.routes.draw do
         get :new_members_setup
         post :create_members
         delete :delete_members
+        get :new_store_setup
+        post :create_store
+        delete :delete_store
       end
     end
 
@@ -71,6 +88,9 @@ Rails.application.routes.draw do
     resource :postmark_config, only: [:edit, :update, :destroy] do
       post :regenerate_webhook_token, on: :member
     end
+
+    # Snipcart Configuration
+    resource :snipcart_config, only: [:edit, :update, :destroy]
 
     resources :themes, only: [:index] do
       member do
@@ -116,6 +136,9 @@ Rails.application.routes.draw do
     get 'configs/site/edit', to: 'configs#edit_site', as: 'edit_site_config'
     patch 'configs/site', to: 'configs#update_site', as: 'site_config'
 
+    get 'configs/fonts/edit', to: 'configs#edit_fonts', as: 'edit_fonts_config'
+    patch 'configs/fonts', to: 'configs#update_fonts', as: 'fonts_config'
+
     get 'configs/podcast/edit', to: 'configs#edit_podcast', as: 'edit_podcast_config'
     patch 'configs/podcast', to: 'configs#update_podcast', as: 'podcast_config'
 
@@ -127,6 +150,9 @@ Rails.application.routes.draw do
 
     get 'configs/members/edit', to: 'configs#edit_members', as: 'edit_members_config'
     patch 'configs/members', to: 'configs#update_members', as: 'members_config'
+
+    get 'configs/store/edit', to: 'configs#edit_store', as: 'edit_store_config'
+    patch 'configs/store', to: 'configs#update_store', as: 'store_config'
 
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
@@ -159,7 +185,7 @@ Rails.application.routes.draw do
   get 'checkout/success', to: 'checkout#success', as: :checkout_success
   get 'checkout/cancel', to: 'checkout#cancel', as: :checkout_cancel
 
-  # Public site (specific before catch-all)
+  # Public site
   root "posts#index"
 
   # Redirect post ID to slug (preserves anchor in browser)
@@ -167,6 +193,7 @@ Rails.application.routes.draw do
 
   get "posts/:url_name", to: "posts#show", as: :post
   get "documentation/:url_name", to: "documentation#show", as: :documentation
+  get "store/:url_name", to: "products#show", as: :product
 
   # Collections and posts archive
   get 'posts', to: 'collections#show', defaults: { filters: 'all' }
@@ -178,7 +205,7 @@ Rails.application.routes.draw do
   get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
   get '/podcast/:podcast_key.xml', to: 'feeds#podcast', as: :podcast_feed
 
-  # Theme CSS (before catch-all)
+  # Theme CSS
   get 'theme/:filename.css', to: 'system/themes#show', defaults: { format: 'css' }
   get 'theme/:filename.js', to: 'system/themes#show', defaults: { format: 'js' }
   # Theme assets (CSS and JS)

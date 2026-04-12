@@ -31,11 +31,19 @@ module ApplicationHelper
   end
 
   def members_enabled?
-    File.exist?(Rails.root.join('site/system/defaults/members.yml'))
+    File.exist?(Rails.root.join('site/system/features/members.yml'))
+  end
+
+  def store_enabled?
+    File.exist?(Rails.root.join('site', 'system', 'features', 'store.yml'))
+  end
+
+  def snipcart_connected?
+    store_enabled? && SnipcartConfig.current&.connected?
   end
 
   def newsletters_enabled?
-    members_enabled? && SiteConfig.default('members', 'newsletter')&.dig('enabled') == true
+    members_enabled? && SiteConfig.feature('members', 'newsletter.enabled') == true
   end
 
   def postmark_configured?

@@ -10,6 +10,7 @@ class ContentSync
     sync_pages
     sync_documentation
     sync_media
+    sync_products
   end
 
   def sync_posts
@@ -162,6 +163,78 @@ class ContentSync
     puts "✅ Documentation sync complete! #{success_count} synced, #{error_count} errors\n\n"
   end
 
+  def sync_products
+    relative_paths = Dir.glob("site/products/**/*.md")
+    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+
+    puts "\n🛍️  Found #{markdown_files.count} markdown files in site/products"
+
+    handle_orphaned_products(markdown_files)
+
+    puts "=" * 60
+
+    success_count = 0
+    error_count = 0
+    error_files = []
+
+    markdown_files.each do |file_path|
+      begin
+        relative_path = file_path.sub(Rails.root.to_s + "/", "")
+        content = File.read(file_path)
+
+        # Parse frontmatter
+        if content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)\z/m
+          frontmatter = YAML.safe_load($1, permitted_classes: [Date, Time, Symbol])
+          body = $2
+        else
+          puts "⚠️  Skipping #{relative_path}: No frontmatter found"
+          next
+        end
+
+        # Find or initialize product
+        product = Product.find_by(file_path: relative_path) || Product.new
+
+        # Update attributes
+        product.assign_attributes(
+          content: body,
+          file_path: relative_path,
+          metadata: frontmatter || {}
+        )
+
+        if product.save
+          puts "✓ Synced: #{relative_path}"
+          success_count += 1
+        else
+          puts "✗ Failed: #{relative_path}"
+          puts "  Errors: #{product.errors.full_messages.join(', ')}"
+          error_count += 1
+          error_files << relative_path
+        end
+      rescue => e
+        puts "✗ Error processing #{relative_path}: #{e.message}"
+        error_count += 1
+        error_files << relative_path
+      end
+    end
+
+    puts "=" * 60
+    puts "✓ Success: #{success_count}"
+    puts "✗ Errors: #{error_count}" if error_count > 0
+  end
+
+  def handle_orphaned_products(markdown_files)
+    relative_paths = markdown_files.map { |path| path.sub(Rails.root.to_s + "/", "") }
+    orphaned_products = Product.where.not(file_path: relative_paths)
+
+    if orphaned_products.any?
+      puts "\n🗑️  Found #{orphaned_products.count} orphaned products (deleted from filesystem)"
+      orphaned_products.each do |product|
+        puts "  - Deleting: #{product.file_path}"
+        product.destroy
+      end
+    end
+  end
+
   private
 
   def handle_orphaned_posts(current_files)
@@ -266,6 +339,8 @@ class ContentSync
       Post.create_or_update_from_file(file_path)
     elsif file_path.to_s.include?('/pages/')
       Page.create_or_update_from_file(file_path)
+    elsif file_path.to_s.include?('/products/')
+      Product.create_or_update_from_file(file_path)
     end
 
     if result.is_a?(Symbol) && result == :warning
