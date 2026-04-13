@@ -386,6 +386,10 @@ module HasMarkdownExtensions
       collection = Documentation.public_documentation
       collection = apply_tag_filters(collection, tags) if tags
       collection
+  when "products"
+      collection = Product.published
+      collection = apply_tag_filters(collection, tags) if tags
+      collection
     else
       []
     end
@@ -413,8 +417,9 @@ module HasMarkdownExtensions
       display_items = items.is_a?(Array) ? items.take(default_limit) : items.limit(default_limit).to_a
     end
 
-    # Render based on template
-    template = config[:template] || SiteConfig.default('collections', 'default_template') || 'list'
+    # Render based on template, default to 'grid' for products, otherwise use configured default
+    default_template = source == 'products' ? 'grid' : (SiteConfig.default('collections', 'default_template') || 'list')
+    template = config[:template] || default_template
     list_markdown = render_template(display_items, template, config)
 
     # Build output with proper spacing
@@ -475,6 +480,8 @@ module HasMarkdownExtensions
 
   def render_template(items, template, config)
     case template
+    when 'grid'
+      render_product_grid(items, config)
     when 'compact'
       render_compact(items)
     when 'links'
@@ -555,6 +562,90 @@ module HasMarkdownExtensions
     end.join("\n")
   end
 
+  def render_product_grid(items, config)
+    # Get currency symbol from store config
+    currency_symbol = get_currency_symbol
+
+    # Check if description should be shown
+    show_description = config[:show_description] == 'true' || config[:show_description] == true
+
+    # Get aspect ratio setting (default to 'auto')
+    aspect_ratio = config[:aspect_ratio] || 'auto'
+    image_class = "img-#{aspect_ratio}"
+
+    output = []
+    output << '<div class="product-grid">'
+
+    items.each do |item|
+      output << '  <div class="grid-item">'
+
+      # Product image
+      image_url = item.respond_to?(:image) ? item.image : nil
+      image_url ||= '/media/images/404.png' # Fallback image (you'll add this later)
+
+      output << %Q{    <div class="grid-item-image">}
+      output << %Q{      <a href="#{item_path(item)}">}
+      output << %Q{        <img src="#{image_url}" alt="#{item.title || 'Product'}" class="#{image_class}" loading="lazy">}
+      output << %Q{      </a>}
+      output << %Q{    </div>}
+
+      # Product title (linked)
+      output << %Q{    <div class="grid-item-title">}
+      output << %Q{      <a href="#{item_path(item)}">#{item.title || 'Untitled'}</a>}
+      output << %Q{    </div>}
+
+      # Optional description
+      if show_description && item.respond_to?(:description) && item.description.present?
+        # Truncate to ~100 characters
+        desc = item.description.length > 100 ? item.description[0..97] + '...' : item.description
+        output << %Q{    <div class="grid-item-description">#{desc}</div>}
+      end
+
+      # Price and Add to Cart button
+      output << '    <div class="grid-item-footer">'
+
+      if item.respond_to?(:price)
+        price_formatted = "#{currency_symbol}#{sprintf('%.2f', item.price)}"
+        output << %Q{      <span class="grid-item-price">#{price_formatted}</span>}
+      end
+
+      # Add to Cart button (if product has SKU)
+      if item.respond_to?(:sku) && item.sku.present?
+        output << %Q{      <button class="snipcart-add-item grid-item-button"}
+        output << %Q{              data-item-id="#{item.sku}"}
+        output << %Q{              data-item-name="#{item.title}"}
+        output << %Q{              data-item-price="#{item.price}"}
+        output << %Q{              data-item-url="#{item_path(item)}"}
+        if item.respond_to?(:description) && item.description.present?
+          output << %Q{              data-item-description="#{item.description.gsub('"', '&quot;')}"}
+        end
+        if item.respond_to?(:image) && item.image.present?
+          output << %Q{              data-item-image="#{item.image}"}
+        end
+        output << %Q{      >Add to Cart</button>}
+      end
+
+      output << '    </div>' # Close grid-item-footer
+      output << '  </div>' # Close grid-item
+    end
+
+    output << '</div>' # Close product-grid
+    output.join("\n")
+  end
+
+  def get_currency_symbol
+    currency = SiteConfig.feature('store', 'currency') || 'usd'
+    case currency.downcase
+    when 'usd' then '$'
+    when 'eur' then '€'
+    when 'gbp' then '£'
+    when 'cad' then 'CA$'
+    when 'aud' then 'A$'
+    when 'jpy' then '¥'
+    else currency.upcase
+    end
+  end
+
   def render_titles(items)
     items.map do |item|
       "- #{item.title || 'Untitled'}"
@@ -566,6 +657,8 @@ module HasMarkdownExtensions
       "/posts/#{item.url_name}"
     elsif item.is_a?(Documentation)
       "/documentation/#{item.url_name}"
+    elsif item.is_a?(Product)
+      "/store/#{item.url_name}"
     else
       "/#{item.url_name}"
     end
@@ -627,7 +720,7 @@ module HasMarkdownExtensions
 
   def show_paid_indicator?(item)
     return false unless item.metadata['audience'] == 'paid'
-    return false unless members_enabled?
+    return false unless SiteConfig.feature_enabled?('members')
 
     # Always show indicator for paid content
     true

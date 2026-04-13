@@ -130,6 +130,8 @@ export default class extends Controller {
     asideTemplate: String,
     postLinkTemplate: String,
     pullquoteTemplate: String,
+    productTemplate: String,
+    currencySymbol: String,
     knownFields: Array,
     defaultAuthor: String,
     highlightMedia: String,
@@ -1173,6 +1175,13 @@ export default class extends Controller {
   showProductPrompt(event) {
     event.preventDefault();
 
+    // Save cursor position FIRST (for both paths)
+    this.savedCursorBeforeModal = this.textareaTarget.selectionStart;
+    console.log(
+      "[PRODUCT] Saved cursor position:",
+      this.savedCursorBeforeModal,
+    );
+
     // Check if we're on a product page
     const resourceType = this.resourceTypeValue;
     const resourceId = this.resourceIdValue;
@@ -1202,6 +1211,7 @@ export default class extends Controller {
             id="product-search-input"
             placeholder="Search for a product..."
             class="w-full px-3 py-2 border border-gray-300"
+            autocomplete="off"
           >
           <div id="product-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 max-h-60 overflow-y-auto z-10"></div>
         </div>
@@ -1230,6 +1240,7 @@ export default class extends Controller {
     let searchTimeout;
     let selectedIndex = -1;
 
+    // Handle product selection - use event delegation
     resultsDiv.addEventListener("click", (e) => {
       const button = e.target.closest("button[data-product]");
       if (button) {
@@ -1311,7 +1322,7 @@ export default class extends Controller {
           .map(
             (product) => `
           <button type="button"
-                  data-product='${JSON.stringify(product)}'
+                  data-product='${JSON.stringify(product).replace(/'/g, "&apos;")}'
                   class="w-full text-left px-3 py-2 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
             <div class="font-medium text-sm">${this.escapeHtml(product.title)}</div>
             <div class="text-xs text-gray-600">${this.escapeHtml(product.sku)} - £${product.price}</div>
@@ -1332,34 +1343,33 @@ export default class extends Controller {
 
   insertProductTemplate(product) {
     console.log("[INSERT PRODUCT] Called with:", product);
+    console.log("[INSERT PRODUCT] Saved cursor:", this.savedCursorBeforeModal);
 
-    // Build template as a single string with no indentation
-    const currencySymbol = "£";
+    // Get template and currency symbol
+    const template = this.productTemplateValue || "";
+    const currencySymbol = this.getCurrencySymbol();
 
-    let template = "";
+    // Use fallback for empty description
+    const description =
+      product.description && product.description.trim()
+        ? product.description
+        : "Product description";
 
-    if (product.image) {
-      template += "![Product Image](" + product.image + ")\n\n";
-    }
+    // Replace placeholders
+    let finalTemplate = template
+      .replace(/@image/g, product.image || "")
+      .replace(/@title/g, product.title || "")
+      .replace(/@price/g, currencySymbol + (product.price || "0.00"))
+      .replace(/@description/g, description)
+      .replace(/@sku/g, product.sku || "");
 
-    template += "# " + (product.title || "") + "\n\n";
-    template +=
-      "**Price:** " + currencySymbol + (product.price || "0.00") + "\n\n";
-
-    if (product.description) {
-      template += product.description + "\n\n";
-    }
-
-    template += "```button\n";
-    template += "sku: " + (product.sku || "") + "\n";
-    template += "text: Add to Cart\n";
-    template += "style: primary\n";
-    template += "```";
+    // Clean up extra blank lines (reduce 3+ newlines to 2)
+    finalTemplate = finalTemplate.replace(/\n{3,}/g, "\n\n");
 
     // Focus textarea
     this.textareaTarget.focus({ preventScroll: true });
 
-    // Restore cursor position
+    // Restore saved cursor position
     if (
       this.savedCursorBeforeModal !== null &&
       this.savedCursorBeforeModal !== undefined
@@ -1368,10 +1378,14 @@ export default class extends Controller {
         this.savedCursorBeforeModal,
         this.savedCursorBeforeModal,
       );
+      console.log("[PRODUCT] Restored cursor to:", this.savedCursorBeforeModal);
     }
 
-    // Insert using execCommand
-    document.execCommand("insertText", false, template);
+    // Insert template
+    document.execCommand("insertText", false, finalTemplate);
+
+    // Clear saved position
+    this.savedCursorBeforeModal = null;
 
     this.closeProductModal();
 
@@ -1387,6 +1401,11 @@ export default class extends Controller {
     if (this.hasTextareaTarget) {
       this.textareaTarget.focus({ preventScroll: true });
     }
+  }
+
+  getCurrencySymbol() {
+    // Use Stimulus value accessor
+    return this.hasCurrencySymbolValue ? this.currencySymbolValue : "$";
   }
 
   // ========== COLLECTION ACTION ==========

@@ -16,7 +16,7 @@ class SiteController < ApplicationController
 
   # Check if user can access paid content
   def check_paid_access!(item)
-    return unless members_enabled?
+    return unless helpers.members_enabled?
     return unless item.metadata['audience'] == 'paid'
 
     # Paid members get full access

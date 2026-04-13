@@ -14,11 +14,13 @@
         <div class="bg-blue-50 border border-blue-200 p-4 mb-6 font-mono text-xs">
           <p class="font-bold text-blue-900 mb-2 font-sans">SKU Pattern Examples:</p>
           <div class="space-y-1 text-blue-800">
-            <div><span class="text-blue-600">Books:</span> BOOK-001-BOOKTITLE</div>
-            <div><span class="text-blue-600">Posters:</span> POSTER-001-POSTERTITLE</div>
-            <div><span class="text-blue-600">T-Shirts:</span> TSHIRT-001-SHIRTNAME-RED-L</div>
+            <div><span class="text-blue-600">Book Simple:</span> BOOK-001-BOOKTITLE</div>
+            <div><span class="text-blue-600">Ebook Simple:</span> EBOOK-001-BOOKTITLE</div>
+            <div><span class="text-blue-600">Book Alt:</span> NOVEL-001-BOOKTITLE-PAPERBACK</div>
+            <div><span class="text-blue-600">Poster:</span> POSTER-001-POSTERTITLE</div>
+            <div><span class="text-blue-600">T-Shirt:</span> TSHIRT-001-SHIRTNAME-RED-L</div>
           </div>
-          <p class="mt-2 text-blue-700 font-sans text-xs">Pattern: <code class="bg-blue-100 px-1">{CATEGORY}-{NUMBER}-{TITLE/NAME}-{SPECIFIC}-{DETAILS}</code></p>
+          <p class="mt-2 text-blue-700 font-sans text-xs">Suggested Pattern: <code class="bg-blue-100 px-1">{CATEGORY}-{NUMBER}-{TITLE/NAME}-{SPECIFIC}-{DETAILS}</code></p>
         </div>
 
         <%= form_with url: confirm_publish_admin_product_path(@product),

@@ -17,8 +17,11 @@ class CollectionMembersFilter
   private
 
   def apply_paid_content_filter
-    return unless members_enabled?
+    return unless SiteConfig.feature_enabled?('members')
     return if should_show_paid?
+
+    # Return early if items is an array (empty collection or already filtered)
+    return @items if @items.is_a?(Array)
 
     # Hide paid posts
     @items = @items.where("json_extract(metadata, '$.audience') IS NULL OR json_extract(metadata, '$.audience') != ?", 'paid')

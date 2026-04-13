@@ -21,7 +21,9 @@
   <!-- Wrap everything in Stimulus controller -->
   <div data-controller="editor"
        data-editor-resource-type-value="product"
-       data-editor-resource-id-value="<%= @product.id %>">
+       data-editor-resource-id-value="<%= @product.id %>"
+       data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
+       data-editor-currency-symbol-value="<%= store_currency_symbol %>">
 
     <% if @product.persisted? && @product.url_name.present? %>
       <div class="mb-3 p-2 bg-blue-50 border border-blue-200 text-sm font-mono mb-4">

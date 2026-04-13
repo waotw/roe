@@ -28,6 +28,8 @@
        data-editor-aside-template-value="<%= SiteConfig.default('cards', 'aside_button_template') %>"
        data-editor-page-link-template-value="<%= SiteConfig.default('cards', 'page_link_button_template') %>"
        data-editor-pullquote-template-value="<%= SiteConfig.default('cards', 'pullquote_button_template') %>"
+       data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
+       data-editor-currency-symbol-value="<%= store_currency_symbol %>"
        data-action="keydown->editor#handleKeydown visibilitychange@document->editor#handleVisibilityChange">
 
     <div class="mb-5 flex justify-between items-center">

@@ -46,6 +46,8 @@
        data-editor-aside-template-value="<%= SiteConfig.default('cards', 'aside_button_template') %>"
        data-editor-post-link-template-value="<%= SiteConfig.default('cards', 'post_link_button_template') %>"
        data-editor-pullquote-template-value="<%= SiteConfig.default('cards', 'pullquote_button_template') %>"
+       data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
+       data-editor-currency-symbol-value="<%= store_currency_symbol %>"
        data-editor-highlight-media-value="<%= params[:highlight] %>">
 
     <% if @post.persisted? && @post.url_name.present? %>
