@@ -57,4 +57,17 @@ module ApplicationHelper
   def requires_published_to_on_publish?
     newsletters_enabled? && postmark_configured?
   end
+
+  def store_currency_symbol
+    currency = SiteConfig.feature('store', 'currency') || 'usd'
+    case currency.downcase
+    when 'usd' then '$'
+    when 'eur' then '€'
+    when 'gbp' then '£'
+    when 'cad' then 'CA$'
+    when 'aud' then 'A$'
+    when 'jpy' then '¥'
+    else currency.upcase
+    end
+  end
 end

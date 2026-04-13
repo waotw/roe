@@ -73,6 +73,19 @@
     {
       # Core product fields
       'title' => { type: :text, label: 'title', required: true },
+      'category' => {
+        type: :text,
+        label: 'category',
+        hint: begin
+          categories = ProductCategory.all rescue []
+          if categories.any?
+            examples = categories.first(3).join(', ')
+            "Add one: e.g., #{examples}"
+          else
+            'Add one: e.g., book, ebook, poster'
+          end
+        end
+      },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'status' => { type: :select, label: 'status', options: ['draft', 'published'], required: true },
       'price' => { type: :text, label: 'price', required: true, hint: 'Price in dollars (e.g., 29.99)' },
@@ -113,6 +126,9 @@
      data-metadata-editor-post-types-value="<%= Post::POST_TYPES.to_json %>"
      data-metadata-editor-resource-type-value="<%= resource_type %>"
      data-metadata-editor-podcast-configs-value="<%= PodcastConfig.all_podcasts.to_json %>"
+     <% if resource_type == 'product' %>
+     data-metadata-editor-product-categories-value="<%= (ProductCategory.all rescue []).to_json %>"
+     <% end %>
      class="mb-5">
   <div class="flex items-center justify-between mb-2">
     <button type="button"
@@ -153,14 +169,36 @@
                     value.to_s
                   end
                 %>
-                <input type="text"
-                        id="metadata-field-<%= field_name %>"
-                        name="metadata_fields[<%= field_name %>]"
-                        value="<%= ERB::Util.html_escape(display_value) %>"
-                        class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'bg-gray-200 text-gray-600' if config[:readonly] %>"
-                        data-metadata-field="<%= field_name %>"
-                        <% if config[:readonly] %>readonly<% end %>
-                        <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                <% if field_name == 'category' && resource_type == 'product' %>
+                    <!-- Autocomplete wrapper for category -->
+                    <div class="flex-1 relative"
+                         data-controller="autocomplete"
+                         data-autocomplete-options-value="<%= (ProductCategory.all rescue []).to_json %>">
+                      <input type="text"
+                              id="metadata-field-<%= field_name %>"
+                              name="metadata_fields[<%= field_name %>]"
+                              value="<%= ERB::Util.html_escape(display_value) %>"
+                              autocomplete="off"
+                              class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                              data-metadata-field="<%= field_name %>"
+                              data-autocomplete-target="input"
+                              data-action="input->autocomplete#filter focus->autocomplete#showDropdown keydown->autocomplete#navigate"
+                              <% if config[:hint] %>placeholder="<%= config[:hint].respond_to?(:call) ? config[:hint].call : config[:hint] %>"<% end %>>
+                      <div data-autocomplete-target="dropdown"
+                           class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
+                      </div>
+                    </div>
+                  <% else %>
+                    <!-- Regular text input -->
+                    <input type="text"
+                            id="metadata-field-<%= field_name %>"
+                            name="metadata_fields[<%= field_name %>]"
+                            value="<%= ERB::Util.html_escape(display_value) %>"
+                            class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'bg-gray-200 text-gray-600' if config[:readonly] %>"
+                            data-metadata-field="<%= field_name %>"
+                            <% if config[:readonly] %>readonly<% end %>
+                            <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                  <% end %>
             <% when :date %>
               <input type="date"
                       id="metadata-field-<%= field_name %>"

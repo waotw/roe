@@ -22,7 +22,7 @@ module HasMarkdownExtensions
       code = $2
 
       # Skip special blocks
-      if ['collection', 'card', 'gallery', 'form'].include?(lang)
+      if ['collection', 'card', 'gallery', 'form', 'button'].include?(lang)
         next $~.to_s
       end
 
@@ -47,6 +47,7 @@ module HasMarkdownExtensions
     processed_content = process_collections(processed_content, preview: preview)
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_forms(processed_content, preview: preview)
+    processed_content = process_buttons(processed_content, preview: preview)
     processed_content = process_inline_footnotes(processed_content)
     processed_content = process_strikethrough(processed_content)
     processed_content = escape_inline_pipes(processed_content)
@@ -1079,5 +1080,40 @@ module HasMarkdownExtensions
         </div>
       </div>
     HTML
+  end
+
+  # BUTTONS
+
+  def process_buttons(content, preview: false)
+    content.gsub(/```button\r?\n(.*?)```/m) do
+      config_text = $1
+
+      begin
+        config = parse_button_config(config_text)
+
+        # Build context for button renderer
+        context = {
+          current_product: (self.is_a?(Product) ? self : nil),
+          authenticated: preview # In preview mode, treat as authenticated
+        }
+
+        ProductButtonRenderer.render(config, context)
+      rescue => e
+        Rails.logger.error "Button rendering error: #{e.message}"
+        preview ? "<div class=\"error\">Button error: #{e.message}</div>" : ''
+      end
+    end
+  end
+
+  def parse_button_config(config_text)
+    config = {}
+    config_text.each_line do |line|
+      if line =~ /^\s*(\w+):\s*(.+)$/
+        key = $1.strip
+        value = $2.strip
+        config[key] = value
+      end
+    end
+    config
   end
 end

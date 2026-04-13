@@ -1,5 +1,5 @@
 class Admin::ProductsController < Admin::BaseController
-  before_action :set_product, only: [:edit, :update, :destroy]
+  before_action :set_product, only: [:edit, :update, :show, :destroy]
 
   def index
     @products = Product.by_newest
@@ -106,6 +106,46 @@ class Admin::ProductsController < Admin::BaseController
 
     flash[:notice] = "Product saved"
     redirect_to edit_admin_product_path(@product)
+  end
+
+  def show
+    @product = Product.find(params[:id])
+
+    respond_to do |format|
+      format.json do
+        render json: {
+          id: @product.id,
+          title: @product.title,
+          sku: @product.sku,
+          price: @product.price,
+          image: @product.image,
+          description: @product.description,
+          url_name: @product.url_name
+        }
+      end
+    end
+  end
+
+  def search
+    query = params[:query].to_s.downcase
+
+    products = Product.published
+                      .select { |p| p.title.to_s.downcase.include?(query) }
+                      .first(10)
+
+    results = products.map do |product|
+      {
+        id: product.id,
+        title: product.title,
+        sku: product.sku,
+        price: product.price,
+        image: product.image,
+        description: product.description,
+        url_name: product.url_name
+      }
+    end
+
+    render json: results
   end
 
   def destroy
@@ -231,6 +271,7 @@ class Admin::ProductsController < Admin::BaseController
         ---
         title:
         url_name:
+        category:
         status: draft
         price: 0.00
         sku:

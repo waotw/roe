@@ -1,0 +1,24 @@
+<%
+  # Get Snipcart config
+  snipcart_config = SnipcartConfig.current rescue nil
+
+  # Only show button if Snipcart is configured
+  if snipcart_config&.connected?
+%>
+  <button class="snipcart-add-item product-button"
+          <%= product.snipcart_attributes.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ').html_safe %>>
+    <span class="product-button__text">Add to Cart</span>
+  </button>
+<% else %>
+  <!-- Fallback if Snipcart not configured -->
+  <div class="product-notice product-notice--warning">
+    <p class="product-notice__text">
+      <strong>Store not configured.</strong>
+      <% if authenticated? %>
+        Please configure Snipcart in the <%= link_to 'admin area', edit_admin_snipcart_config_path %>.
+      <% else %>
+        Please check back later.
+      <% end %>
+    </p>
+  </div>
+<% end %>

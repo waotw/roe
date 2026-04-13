@@ -1,9 +1,13 @@
 class Product < ApplicationRecord
   include HasMetadata
+  include HasMarkdownExtensions
+  include HasInlineFootnotes
 
   # Validations
   validates :file_path, presence: true, uniqueness: true
   validate :validate_required_metadata
+
+  after_save :register_category
 
   # Scopes
   scope :published, -> { where("metadata->>'status' = ?", 'published') }
@@ -88,12 +92,6 @@ class Product < ApplicationRecord
       return nil
     end
 
-    if parsed.front_matter['sku'].blank?
-      Rails.logger.warn "Product missing SKU: #{file_path}"
-      puts "\n  ✗ Missing SKU: #{File.basename(file_path)}\n"
-      return nil
-    end
-
     relative_path = absolute_path.sub(Rails.root.to_s + "/", "")
 
     product = Product.find_or_initialize_by(file_path: relative_path)
@@ -155,6 +153,13 @@ class Product < ApplicationRecord
   end
 
   private
+
+  def register_category
+    return if metadata['category'].blank?
+
+    category = metadata['category'].strip.downcase
+    ProductCategory.add(category)
+  end
 
   def validate_required_metadata
     errors.add(:metadata, "must include title") if metadata['title'].blank?

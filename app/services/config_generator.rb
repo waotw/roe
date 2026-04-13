@@ -72,12 +72,19 @@ class ConfigGenerator
     new.generate_store_defaults
   end
 
-  def generate_store_defaults(currency: "usd", default_domain: "")
-    # Generate store.yml in features/
+  def generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
+    # Parse categories if it's a string
+    categories = if product_categories.is_a?(String)
+      product_categories.split(',').map(&:strip).map(&:downcase).reject(&:blank?)
+    else
+      product_categories || []
+    end
+
     content = <<~YAML
       enabled: true
       currency: "#{currency}"
       default_domain: "#{default_domain}"
+      product_categories: #{categories.to_yaml.gsub(/^---\n/, '').strip}
       snipcart:
         load_strategy: "on-user-interaction"
         modal_style: "side"

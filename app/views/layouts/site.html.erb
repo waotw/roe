@@ -97,11 +97,18 @@
         </svg>
       <% end %>
     <% end %>
-    <!-- Snipcart Integration -->
     <% if snipcart_connected? %>
       <% snipcart = SnipcartConfig.current %>
+
       <% if snipcart.snippet.present? %>
         <%= snipcart.snippet.html_safe %>
+
+        <script>
+          // Override currency after snippet loads but before Snipcart initializes
+          if (window.SnipcartSettings) {
+            window.SnipcartSettings.currency = '<%= snipcart.currency.downcase %>';
+          }
+        </script>
       <% end %>
     <% end %>
   </body>

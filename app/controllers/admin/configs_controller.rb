@@ -404,9 +404,10 @@ class Admin::ConfigsController < ApplicationController
     default_domain = params[:default_domain].presence || ""
 
     # Create store.yml with configuration (no API keys)
-    ConfigGenerator.new.generate_store_defaults(
-      currency: currency,
-      default_domain: default_domain
+    ConfigGenerator.generate_store_defaults(
+      currency: params[:currency],
+      default_domain: params[:default_domain],
+      product_categories: params[:product_categories]
     )
     SiteConfig.sync_from_file('features/store')
 

@@ -10,6 +10,7 @@ export default class extends Controller {
     postTypes: Object,
     resourceType: String,
     podcastConfigs: Object,
+    productCategories: Array,
   };
 
   static targets = [
@@ -419,10 +420,40 @@ export default class extends Controller {
           : "";
         const readonlyAttr = config.readonly ? " readonly" : "";
 
+        // Special handling for category field with autocomplete
+        if (fieldName === "category" && this.resourceTypeValue === "product") {
+          const categories = this.hasProductCategoriesValue
+            ? this.productCategoriesValue
+            : [];
+          const escapedCategories = JSON.stringify(categories).replace(
+            /"/g,
+            "&quot;",
+          );
+
+          return `<div class="flex-1 relative"
+                       data-controller="autocomplete"
+                       data-autocomplete-options-value="${escapedCategories}">
+                    <input type="text"
+                           id="metadata-field-${fieldName}"
+                           name="metadata_fields[${fieldName}]"
+                           value="${escapedValue}"
+                           autocomplete="off"
+                           class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                           data-metadata-field="${fieldName}"
+                           data-autocomplete-target="input"
+                           data-action="input->autocomplete#filter focus->autocomplete#showDropdown keydown->autocomplete#navigate"
+                           ${config.hint ? `placeholder="${config.hint}"` : ""}>
+                    <div data-autocomplete-target="dropdown"
+                         class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
+                    </div>
+                  </div>`;
+        }
+
         return `<input type="text"
                          id="metadata-field-${fieldName}"
                          name="metadata_fields[${fieldName}]"
                          value="${escapedValue}"
+                         autocomplete="off"
                          class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300${readonlyClass}"
                          data-metadata-field="${fieldName}"
                          ${config.hint ? `placeholder="${config.hint}"` : ""}${readonlyAttr}>`;

@@ -62,6 +62,7 @@ Rails.application.routes.draw do
     resources :products do
       collection do
         get :check_sku
+        get :search
       end
       member do
         get :publish_modal

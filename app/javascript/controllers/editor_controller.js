@@ -1168,6 +1168,227 @@ export default class extends Controller {
     }
   }
 
+  // ========== PRODUCT ACTIONS ==========
+
+  showProductPrompt(event) {
+    event.preventDefault();
+
+    // Check if we're on a product page
+    const resourceType = this.resourceTypeValue;
+    const resourceId = this.resourceIdValue;
+
+    if (resourceType === "product" && resourceId) {
+      // On product page - insert immediately
+      fetch(`/admin/products/${resourceId}.json`)
+        .then((response) => response.json())
+        .then((product) => this.insertProductTemplate(product))
+        .catch((error) => console.error("Error fetching product:", error));
+      return;
+    }
+
+    // Not on product page - show search modal
+    this.savedCursorBeforeModal = this.textareaTarget.selectionStart;
+
+    const overlay = document.createElement("div");
+    overlay.id = "product-modal";
+    overlay.className = "fixed inset-0 flex items-center justify-center z-50";
+    overlay.style.cssText = "background-color: rgba(0, 0, 0, 0.2);";
+    overlay.innerHTML = `
+      <div class="bg-white p-6 w-96 border border-gray-400">
+        <h3 class="text-lg font-bold mb-4">Insert Product</h3>
+        <div class="relative mb-4">
+          <input
+            type="text"
+            id="product-search-input"
+            placeholder="Search for a product..."
+            class="w-full px-3 py-2 border border-gray-300"
+          >
+          <div id="product-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 max-h-60 overflow-y-auto z-10"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button"
+                  id="product-cancel"
+                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById("product-search-input");
+    const resultsDiv = document.getElementById("product-search-results");
+    const cancelButton = document.getElementById("product-cancel");
+
+    input.focus();
+
+    cancelButton.addEventListener("click", () => {
+      this.closeProductModal();
+    });
+
+    let searchTimeout;
+    let selectedIndex = -1;
+
+    resultsDiv.addEventListener("click", (e) => {
+      const button = e.target.closest("button[data-product]");
+      if (button) {
+        e.preventDefault();
+        const productData = JSON.parse(button.dataset.product);
+        this.insertProductTemplate(productData);
+      }
+    });
+
+    input.addEventListener("keydown", (e) => {
+      const buttons = resultsDiv.querySelectorAll("button");
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, buttons.length - 1);
+        updateSelection(buttons, selectedIndex);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, -1);
+        updateSelection(buttons, selectedIndex);
+      } else if (
+        e.key === "Enter" &&
+        selectedIndex >= 0 &&
+        selectedIndex < buttons.length
+      ) {
+        e.preventDefault();
+        buttons[selectedIndex].click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.closeProductModal();
+      }
+    });
+
+    const updateSelection = (buttons, index) => {
+      buttons.forEach((btn, i) => {
+        if (i === index) {
+          btn.classList.add("bg-blue-100");
+          btn.scrollIntoView({ block: "nearest" });
+        } else {
+          btn.classList.remove("bg-blue-100");
+        }
+      });
+    };
+
+    input.addEventListener("input", (e) => {
+      clearTimeout(searchTimeout);
+      selectedIndex = -1;
+      const query = e.target.value.trim();
+
+      if (query.length < 2) {
+        resultsDiv.classList.add("hidden");
+        return;
+      }
+
+      searchTimeout = setTimeout(() => this.searchProducts(query), 300);
+    });
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target.id === "product-modal") {
+        this.closeProductModal();
+      }
+    });
+  }
+
+  searchProducts(query) {
+    const resultsDiv = document.getElementById("product-search-results");
+
+    fetch(`/admin/products/search?query=${encodeURIComponent(query)}`)
+      .then((response) => response.json())
+      .then((products) => {
+        if (products.length === 0) {
+          resultsDiv.innerHTML =
+            '<div class="p-2 text-sm text-gray-500">No products found</div>';
+          resultsDiv.classList.remove("hidden");
+          return;
+        }
+
+        resultsDiv.innerHTML = products
+          .map(
+            (product) => `
+          <button type="button"
+                  data-product='${JSON.stringify(product)}'
+                  class="w-full text-left px-3 py-2 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
+            <div class="font-medium text-sm">${this.escapeHtml(product.title)}</div>
+            <div class="text-xs text-gray-600">${this.escapeHtml(product.sku)} - £${product.price}</div>
+          </button>
+        `,
+          )
+          .join("");
+
+        resultsDiv.classList.remove("hidden");
+      })
+      .catch((error) => {
+        console.error("Product search error:", error);
+        resultsDiv.innerHTML =
+          '<div class="p-2 text-sm text-red-500">Search failed</div>';
+        resultsDiv.classList.remove("hidden");
+      });
+  }
+
+  insertProductTemplate(product) {
+    console.log("[INSERT PRODUCT] Called with:", product);
+
+    // Build template as a single string with no indentation
+    const currencySymbol = "£";
+
+    let template = "";
+
+    if (product.image) {
+      template += "![Product Image](" + product.image + ")\n\n";
+    }
+
+    template += "# " + (product.title || "") + "\n\n";
+    template +=
+      "**Price:** " + currencySymbol + (product.price || "0.00") + "\n\n";
+
+    if (product.description) {
+      template += product.description + "\n\n";
+    }
+
+    template += "```button\n";
+    template += "sku: " + (product.sku || "") + "\n";
+    template += "text: Add to Cart\n";
+    template += "style: primary\n";
+    template += "```";
+
+    // Focus textarea
+    this.textareaTarget.focus({ preventScroll: true });
+
+    // Restore cursor position
+    if (
+      this.savedCursorBeforeModal !== null &&
+      this.savedCursorBeforeModal !== undefined
+    ) {
+      this.textareaTarget.setSelectionRange(
+        this.savedCursorBeforeModal,
+        this.savedCursorBeforeModal,
+      );
+    }
+
+    // Insert using execCommand
+    document.execCommand("insertText", false, template);
+
+    this.closeProductModal();
+
+    console.log("[INSERT PRODUCT] Template inserted");
+  }
+
+  closeProductModal() {
+    const modal = document.getElementById("product-modal");
+    if (modal) {
+      modal.remove();
+    }
+
+    if (this.hasTextareaTarget) {
+      this.textareaTarget.focus({ preventScroll: true });
+    }
+  }
+
   // ========== COLLECTION ACTION ==========
 
   insertCollection(event) {
