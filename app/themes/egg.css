@@ -24,6 +24,7 @@
   --text-4xl: 2.25rem;
 
   /* Spacing */
+  --space-0: 0rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -108,6 +109,16 @@ a:visited {
 
 a:hover {
   color: var(--color-code-text);
+}
+
+/* Form elements font inheritance */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 /* ==========================================
@@ -1239,4 +1250,211 @@ a.member-account-icon svg {
   position: fixed;
   bottom: var(--space-8);
   right: var(--space-8);
+}
+
+/* ==========================================
+   PRODUCT GRID (SINGLE COLLECTION)
+   ========================================== */
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 2rem;
+  margin: var(--space-8) 0;
+}
+
+@media (max-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grid-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.grid-item-image img {
+  display: block;
+}
+
+.grid-item-title {
+  font-size: var(--text-lg);
+  font-weight: 400;
+  text-align: center;
+  margin-bottom: var(--space-2);
+}
+
+.grid-item-title a {
+  color: var(--color-heading);
+  text-decoration: none;
+}
+
+.grid-item-title a:hover {
+  text-decoration: underline;
+}
+
+.grid-item-description {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
+}
+
+.grid-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
+
+.grid-item-price {
+  font-size: var(--text-lg);
+  font-weight: 400;
+  color: var(--color-heading);
+}
+
+.grid-item-button {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-heading);
+  color: var(--color-bg);
+  border: 1px solid var(--color-heading);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.grid-item-button:hover {
+  background: var(--color-bg);
+  color: var(--color-heading);
+}
+
+/* Button style variants */
+.button-primary {
+  /* Same as grid-item-button above */
+}
+
+.button-secondary {
+  background: transparent;
+  color: var(--color-heading);
+  border: 1px solid var(--color-heading);
+}
+
+.button-secondary:hover {
+  background: var(--color-heading);
+  color: var(--color-bg);
+}
+
+/* Product Grid Images */
+
+.content .grid-item-image img {
+  margin: var(--space-0);
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg); /* or a light gray like #f5f5f5 */
+}
+
+/* Product Grid Images */
+.grid-item-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  margin-bottom: var(--space-4);
+}
+
+/* Set container heights based on aspect ratio class on the image */
+.grid-item-image:has(.img-auto) {
+  max-height: 395px;
+  min-height: 395px;
+}
+
+.grid-item-image:has(.img-square) {
+  aspect-ratio: 1 / 1;
+}
+
+.grid-item-image:has(.img-portrait) {
+  aspect-ratio: 3 / 4;
+}
+
+.grid-item-image:has(.img-landscape) {
+  aspect-ratio: 4 / 3;
+}
+
+.grid-item-image:has(.img-wide) {
+  aspect-ratio: 16 / 9;
+}
+
+/* Make the link flex too so it doesn't break centering */
+.grid-item-image a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Images - contain so they don't crop */
+.img-auto,
+.img-square,
+.img-portrait,
+.img-landscape,
+.img-wide {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* Navigation Cart Link */
+.nav-cart-wrapper {
+  float: right;
+  margin-left: auto;
+}
+
+.nav-cart {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.nav-cart sup {
+  font-size: 0.7em;
+  margin-left: 0.2em;
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+  margin-bottom: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.breadcrumb-link {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-text,
+.breadcrumb-current {
+  color: var(--color-text);
+}
+
+.breadcrumb-current {
+  font-weight: 600;
 }
