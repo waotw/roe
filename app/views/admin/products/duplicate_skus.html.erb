@@ -1,0 +1,15 @@
+<h1>Duplicate SKUs</h1>
+
+<% @duplicates.each do |sku, products| %>
+  <div class="duplicate-group mb-6 p-4 border border-red-300 bg-red-50">
+    <h2 class="font-bold text-lg">SKU: <%= sku %> (used by <%= products.count %> products)</h2>
+    <ul class="mt-2">
+      <% products.each do |product| %>
+        <li class="mb-2">
+          <%= link_to product.title, edit_admin_product_path(product), class: "text-blue-600 underline" %>
+          <span class="text-sm text-gray-600"><%= product.file_path %></span>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

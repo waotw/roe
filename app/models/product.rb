@@ -146,10 +146,23 @@ class Product < ApplicationRecord
     number ||= self.class.next_number_for_category(category)
 
     # Generate title slug (limit to 20 chars, uppercase)
-    title_slug = title.to_s.parameterize.upcase.gsub('-', '').first(20)
+    title_slug = title.to_s.parameterize.gsub('-', '').upcase.first(30)
 
     # Format: CATEGORY-NUMBER-TITLESLUG
     "#{category.upcase}-#{number.to_s.rjust(3, '0')}-#{title_slug}"
+  end
+
+  def self.duplicate_skus
+    # Find all published products with SKUs
+    published_with_skus = where("metadata->>'status' = ? AND metadata->>'sku' IS NOT NULL AND metadata->>'sku' != ''", 'published')
+
+    # Group by SKU and find duplicates
+    sku_counts = published_with_skus.group("metadata->>'sku'").count
+    duplicate_skus = sku_counts.select { |sku, count| count > 1 }.keys
+
+    # Return products with duplicate SKUs
+    published_with_skus.select { |p| duplicate_skus.include?(p.sku) }
+                       .group_by(&:sku)
   end
 
   private

@@ -209,6 +209,13 @@ class Admin::ProductsController < Admin::BaseController
       return
     end
 
+    # Check SKU uniqueness (server-side validation)
+    if Product.where("metadata->>'sku' = ? AND id != ?", @product.sku, @product.id).exists?
+      flash[:error] = "SKU '#{@product.sku}' is already in use by another product"
+      redirect_to edit_admin_product_path(@product)
+      return
+    end
+
     @product.metadata['status'] = 'published'
     save_product_to_file(@product)
 
@@ -251,6 +258,10 @@ class Admin::ProductsController < Admin::BaseController
     sku = params[:sku]
     exists = Product.sku_exists?(sku)
     render json: { exists: exists }
+  end
+
+  def duplicate_skus
+    @duplicates = Product.duplicate_skus
   end
 
   private

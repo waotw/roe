@@ -64,6 +64,7 @@ Rails.application.routes.draw do
         get :check_sku
         get :search
         get :next_sku_number
+        get :duplicate_skus
       end
       member do
         get :publish_modal
@@ -202,7 +203,7 @@ Rails.application.routes.draw do
   get "posts/:url_name", to: "posts#show", as: :post
   get "documentation/:url_name", to: "documentation#show", as: :documentation
   get "store/:url_name", to: "products#show", as: :product
-  get "store/:url_name/validate", to: "products#validate", as: :product_validate, defaults: { format: :json }
+  # get "store/:url_name/validate", to: "products#validate", as: :product_validate, defaults: { format: :json }
 
   # Collections and posts archive
   get 'posts', to: 'collections#show', defaults: { filters: 'all' }

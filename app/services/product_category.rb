@@ -25,8 +25,19 @@ class ProductCategory
 
   def self.update_store_config(categories)
     store_path = Rails.root.join('site/system/features/store.yml')
-    config = YAML.load_file(store_path)
-    config['product_categories'] = categories
-    File.write(store_path, config.to_yaml)
+
+    begin
+      # Load existing config or start with empty hash
+      config = File.exist?(store_path) ? YAML.load_file(store_path) : {}
+      config['product_categories'] = categories
+      File.write(store_path, config.to_yaml)
+    rescue Errno::ENOENT, Errno::EACCES => e
+      Rails.logger.error "Failed to update product categories: #{e.message}"
+      # Don't raise - this is a non-critical operation
+      false
+    rescue Psych::SyntaxError => e
+      Rails.logger.error "Invalid YAML in store.yml: #{e.message}"
+      false
+    end
   end
 end

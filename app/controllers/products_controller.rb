@@ -30,8 +30,12 @@ class ProductsController < SiteController
     if Rails.env.production?
       # Use configured domain from store.yml
       domain = SiteConfig.feature('store', 'default_domain') || request.host
-      protocol = domain.include?('localhost') ? 'http' : 'https'
-      "#{protocol}://#{domain}/store/#{product.url_name}.json"
+
+      # Remove protocol prefix and trailing slashes
+      clean_domain = domain.to_s.sub(/\Ahttps?:\/\//, '').sub(/\/+\z/, '')
+
+      protocol = clean_domain.include?('localhost') ? 'http' : 'https'
+      "#{protocol}://#{clean_domain}/store/#{product.url_name}.json"
     else
       # Development: use request base URL
       "#{request.base_url}/store/#{product.url_name}.json"

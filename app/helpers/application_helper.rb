@@ -105,4 +105,16 @@ module ApplicationHelper
 
     content_tag(:nav, crumbs.join(' › ').html_safe, class: 'breadcrumbs', 'aria-label': 'Breadcrumb')
   end
+
+  def duplicate_sku_warning
+    duplicates = Product.duplicate_skus
+    return nil if duplicates.empty?
+
+    count = duplicates.values.flatten.count
+    {
+      message: "#{duplicates.keys.count} duplicate SKU(s) found affecting #{count} products",
+      path: duplicate_skus_admin_products_path,
+      severity: :error
+    }
+  end
 end

@@ -47,7 +47,14 @@ class ProductButtonRenderer
   def render_button(product, text, style, quantity)
     # Get the domain for Snipcart validation
     domain = SiteConfig.feature('store', 'default_domain')
-    validation_url = domain ? "https://#{domain}/store/#{product.url_name}" : "/store/#{product.url_name}"
+
+    validation_url = if domain.present?
+      # Remove protocol prefix and trailing slashes
+      clean_domain = domain.to_s.sub(/\Ahttps?:\/\//, '').sub(/\/+\z/, '')
+      "https://#{clean_domain}/store/#{product.url_name}"
+    else
+      "/store/#{product.url_name}"
+    end
 
     attrs = {
       'data-item-id' => product.sku,
