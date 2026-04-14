@@ -45,14 +45,28 @@ class ProductButtonRenderer
   private
 
   def render_button(product, text, style, quantity)
-    attrs = product.snipcart_attributes.merge({
+    # Get the domain for Snipcart validation
+    domain = SiteConfig.feature('store', 'default_domain')
+    validation_url = domain ? "https://#{domain}/store/#{product.url_name}" : "/store/#{product.url_name}"
+
+    attrs = {
+      'data-item-id' => product.sku,
+      'data-item-name' => product.title,
+      'data-item-price' => product.price,
+      'data-item-url' => validation_url,
       'data-item-quantity' => quantity
-    })
+    }
+
+    # Add optional attributes
+    attrs['data-item-description'] = product.description if product.description.present?
+    attrs['data-item-image'] = product.image if product.image.present?
 
     attr_string = attrs.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ')
 
     <<~HTML.strip
-      <button class="snipcart-add-item button-#{ERB::Util.html_escape(style)}" #{attr_string}>
+      <button class="snipcart-add-item button-#{ERB::Util.html_escape(style)}"
+              data-turbo="false"
+              #{attr_string}>
         #{ERB::Util.html_escape(text)}
       </button>
     HTML

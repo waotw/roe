@@ -16,7 +16,7 @@ Rails.application.configure do
   config.server_timing = true
 
   # Around line 8 or wherever config.hosts is mentioned
-  config.hosts << "3373-2600-1700-5d50-6cb0-182c-bf73-d6b9-5ad6.ngrok-free.app"
+  config.hosts << "19ce-2600-1700-5d50-6cb0-3472-8a05-1bf6-6464.ngrok-free.app"
 
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.

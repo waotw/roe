@@ -51,10 +51,15 @@
     <h3 class="font-semibold text-blue-900 mb-2">Getting Started with Snipcart</h3>
     <ol class="text-sm text-blue-800 space-y-1 list-decimal list-inside">
       <li>Sign up at <a href="https://app.snipcart.com/register" target="_blank" class="underline">app.snipcart.com/register</a></li>
-      <li>In your Snipcart dashboard, go to <strong>Account → API keys</strong></li>
-      <li>Copy your <strong>Test</strong> public API key and paste it below</li>
-      <li>Add your domain (<code class="bg-white px-1 font-mono text-xs"><%= @snipcart_config.default_domain || 'yourdomain.com' %></code>) in Snipcart dashboard → <strong>Store configurations → Domains & URLs</strong></li>
-      <li>When ready to go live, add your <strong>Live</strong> API key and switch mode below</li>
+      <li>Snipcart has a Get started with Snipcart checklist which is helpful. There is plenty to do here but the important steps for Roe are:
+      <ol class="list-[lower-roman] ml-6 my-2">
+        <li>Add your domain (<code class="bg-white px-1 font-mono text-xs"><%= @snipcart_config.default_domain || 'yourdomain.com' %></code>) to Settings → DOMAINS & URLS</li>
+        <li>Copy your <strong>Test</strong> public API key from Settings → API KEYS and paste it below</li>
+        <li>Copy the Snippet from the API KEYS page and paste below (this installs Snipcart)</li>
+        <li>Add your currency to Settings → REGIONAL SETTINGS (you can skip this if using USD)</li>
+      </ol>
+      <li>When you're done testing and ready to take orders, add a credit card to Settings → BILLING & PAYMENTS</li>
+      <li>Copy your <b>LIVE</b> API KEY from Settings → API KEYS and paste it below</li>
     </ol>
   </div>
 

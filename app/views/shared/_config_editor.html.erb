@@ -224,6 +224,22 @@
                         <p class="text-xs text-gray-500 mt-1">Comma-separated list of product categories for organization and SKU generation</p>
                       </div>
 
+                      <!-- Product Button Template -->
+                      <div class="config-field-row">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                          Product Button Template
+                        </label>
+                        <textarea name="config_fields[product_button_template]"
+                                  rows="12"
+                                  placeholder="![Add Image Description](@image)&#10;&#10;# @title&#10;&#10;**Price:** @price&#10;&#10;@description&#10;&#10;```button&#10;sku: @sku&#10;text: Add to Cart&#10;style: primary&#10;```"
+                                  class="w-full font-mono text-xs px-2 py-1.5 border border-gray-300"
+                                  data-config-field="product_button_template"><%= flattened_config['product_button_template'] %></textarea>
+                        <p class="text-xs text-gray-500 mt-1">
+                          Template used when inserting products via PRODUCT button in editor.
+                          Use placeholders: @image, @title, @price, @description, @sku
+                        </p>
+                      </div>
+
                     </div>
                   </div>
 
@@ -938,6 +954,8 @@
   function simpleYamlStringify(obj, indent) {
     let yaml = '';
     const spaces = '  '.repeat(indent);
+    const configType = '<%= @config_type %>';
+    const yamlOperator = (configType === 'store') ? '|' : '|-';
 
     for (const [key, value] of Object.entries(obj)) {
       // CHECK ARRAYS FIRST (before objects)
@@ -973,7 +991,7 @@
           } else {
             const formattedValue = formatYamlValue(nestedValue);
             if (formattedValue === null) {
-              yaml += `${spaces}  ${nestedKey}: |-\n`;
+              yaml += `${spaces}  ${nestedKey}: ${yamlOperator}\n`;
               const lines = String(nestedValue).split('\n');
               lines.forEach(line => {
                 yaml += `${spaces}    ${line}\n`;
@@ -1006,7 +1024,7 @@
         const formattedValue = formatYamlValue(value);
 
         if (formattedValue === null) {
-          yaml += `${spaces}${key}: |-\n`;
+          yaml += `${spaces}${key}: ${yamlOperator}\n`;
           const lines = String(value).split('\n');
           lines.forEach(line => {
             yaml += `${spaces}  ${line}\n`;

@@ -361,11 +361,16 @@ module HasMarkdownExtensions
     collection
   end
 
+  def apply_category_filter(collection, category)
+    collection.where("json_extract(metadata, '$.category') = ?", category.strip)
+  end
+
   def render_collection(config)
     heading = config[:heading]
     source = config[:source] || SiteConfig.default('collections', 'default_source') || "posts"
     order_by = config[:order] || SiteConfig.default('collections', 'default_order') || "date"
     tags = config[:tags]
+    category = config[:category]
 
     # Get post_type from config or default, treating 'all' as nil (no filter)
     post_type = config[:post_type]
@@ -388,6 +393,7 @@ module HasMarkdownExtensions
       collection
   when "products"
       collection = Product.published
+      collection = apply_category_filter(collection, category) if category
       collection = apply_tag_filters(collection, tags) if tags
       collection
     else
@@ -581,7 +587,7 @@ module HasMarkdownExtensions
 
       # Product image
       image_url = item.respond_to?(:image) ? item.image : nil
-      image_url ||= '/media/images/404.png' # Fallback image (you'll add this later)
+      image_url = '/media/images/404.png' if image_url.blank?
 
       output << %Q{    <div class="grid-item-image">}
       output << %Q{      <a href="#{item_path(item)}">}
@@ -611,11 +617,17 @@ module HasMarkdownExtensions
 
       # Add to Cart button (if product has SKU)
       if item.respond_to?(:sku) && item.sku.present?
+        # Get validation URL using item_path helper
+        product_url = item_path(item)
+        domain = SiteConfig.feature('store', 'default_domain')
+        validation_url = domain ? "https://#{domain}#{product_url}" : product_url
+
         output << %Q{      <button class="snipcart-add-item grid-item-button"}
+        output << %Q{              data-turbo="false"}
         output << %Q{              data-item-id="#{item.sku}"}
         output << %Q{              data-item-name="#{item.title}"}
         output << %Q{              data-item-price="#{item.price}"}
-        output << %Q{              data-item-url="#{item_path(item)}"}
+        output << %Q{              data-item-url="#{validation_url}"}
         if item.respond_to?(:description) && item.description.present?
           output << %Q{              data-item-description="#{item.description.gsub('"', '&quot;')}"}
         end

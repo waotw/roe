@@ -82,9 +82,23 @@ class ConfigGenerator
 
     content = <<~YAML
       enabled: true
-      currency: "#{currency}"
-      default_domain: "#{default_domain}"
-      product_categories: #{categories.to_yaml.gsub(/^---\n/, '').strip}
+      currency: "gbp"
+      default_domain: "19ce-2600-1700-5d50-6cb0-3472-8a05-1bf6-6464.ngrok-free.app"
+      product_categories: "book, ebook, file, paperback, pin, poster"
+      product_button_template: |
+        ![Add Image Description](@image)
+
+        # @title
+
+        **Price:** @price
+
+        @description
+
+        ```button
+        sku: @sku
+        text: Add to Cart
+        style: primary
+        ```
       snipcart:
         load_strategy: "on-user-interaction"
         modal_style: "side"
@@ -506,6 +520,20 @@ class ConfigGenerator
     FileUtils.mkdir_p(DEFAULTS_PATH)
     FileUtils.mkdir_p(ASSETS_PATH.join('fonts'))
     FileUtils.mkdir_p(ASSETS_PATH.join('images'))
+
+    # Copy default 404 image if it doesn't exist
+    copy_default_404_image
+  end
+
+  def copy_default_404_image
+    source = Rails.root.join('app', 'assets', 'images', '404.png')
+    dest = ASSETS_PATH.join('images', '404.png')
+
+    # Only copy if source exists and dest doesn't
+    if File.exist?(source) && !File.exist?(dest)
+      FileUtils.cp(source, dest)
+      puts "  ✓ Copied default 404.png to system assets"
+    end
   end
 
   def generate_site_config

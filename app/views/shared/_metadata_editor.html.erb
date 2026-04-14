@@ -76,6 +76,7 @@
       'category' => {
         type: :text,
         label: 'category',
+        required: true,
         hint: begin
           categories = ProductCategory.all rescue []
           if categories.any?
@@ -89,8 +90,8 @@
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'status' => { type: :select, label: 'status', options: ['draft', 'published'], required: true },
       'price' => { type: :text, label: 'price', required: true, hint: 'Price in dollars (e.g., 29.99)' },
-      'sku' => { type: :text, label: 'sku', hint: 'Product SKU (required for publishing)' },
-      'image' => { type: :text, label: 'image', hint: 'Product image: /media/images/product.jpg' },
+      'sku' => { type: :text, label: 'sku', required: true, hint: 'Product SKU (required for publishing)' },
+      'image' => { type: :text, label: 'image', required: true, hint: 'Product image: /media/images/product.jpg' },
       'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
       'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' }
     }
@@ -170,26 +171,43 @@
                   end
                 %>
                 <% if field_name == 'category' && resource_type == 'product' %>
-                    <!-- Autocomplete wrapper for category -->
-                    <div class="flex-1 relative"
-                         data-controller="autocomplete"
-                         data-autocomplete-options-value="<%= (ProductCategory.all rescue []).to_json %>">
+                  <!-- Autocomplete wrapper for category -->
+                  <div class="flex-1 relative"
+                        data-controller="autocomplete"
+                        data-autocomplete-options-value="<%= (ProductCategory.all rescue []).to_json %>">
+                    <input type="text"
+                            id="metadata-field-<%= field_name %>"
+                            name="metadata_fields[<%= field_name %>]"
+                            value="<%= ERB::Util.html_escape(display_value) %>"
+                            autocomplete="off"
+                            class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                            data-metadata-field="<%= field_name %>"
+                            data-autocomplete-target="input"
+                            data-action="input->autocomplete#filter focus->autocomplete#showDropdown keydown->autocomplete#navigate"
+                            <% if config[:hint] %>placeholder="<%= config[:hint].respond_to?(:call) ? config[:hint].call : config[:hint] %>"<% end %>>
+                    <div data-autocomplete-target="dropdown"
+                          class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
+                    </div>
+                  </div>
+                  <% elsif field_name == 'sku' && resource_type == 'product' %>
+                    <!-- SKU field with generator link -->
+                    <div class="flex-1">
                       <input type="text"
                               id="metadata-field-<%= field_name %>"
                               name="metadata_fields[<%= field_name %>]"
                               value="<%= ERB::Util.html_escape(display_value) %>"
-                              autocomplete="off"
                               class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
                               data-metadata-field="<%= field_name %>"
-                              data-autocomplete-target="input"
-                              data-action="input->autocomplete#filter focus->autocomplete#showDropdown keydown->autocomplete#navigate"
-                              <% if config[:hint] %>placeholder="<%= config[:hint].respond_to?(:call) ? config[:hint].call : config[:hint] %>"<% end %>>
-                      <div data-autocomplete-target="dropdown"
-                           class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
-                      </div>
+                              <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <% if defined?(item) && item.persisted? %>
+                        <%= link_to "Generate SKU →",
+                            sku_generator_admin_product_path(item),
+                            data: { turbo_frame: "sku-generator-modal" },
+                            class: "text-xs text-blue-600 hover:text-blue-800 underline mt-0.5 inline-block" %>
+                      <% end %>
                     </div>
                   <% else %>
-                    <!-- Regular text input -->
+                  <!-- Regular text input -->
                     <input type="text"
                             id="metadata-field-<%= field_name %>"
                             name="metadata_fields[<%= field_name %>]"

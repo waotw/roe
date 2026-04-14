@@ -1,0 +1,103 @@
+<turbo-frame id="sku-generator-modal">
+  <div class="fixed inset-0  bg-blue-200/35 flex items-center justify-center z-50">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl w-full mx-4"
+         data-controller="sku-generator"
+         data-sku-generator-product-id-value="<%= product.id %>">
+
+      <h2 class="text-2xl font-bold mb-6">Generate SKU</h2>
+
+      <!-- SKU Pattern Examples -->
+      <div class="bg-blue-50 border border-blue-200 p-4 mb-6 font-mono text-xs">
+        <p class="font-bold text-blue-900 mb-2 font-sans">SKU Pattern Examples:</p>
+        <div class="space-y-1 text-blue-800">
+          <div><span class="text-blue-600">Book Simple:</span> BOOK-001-BOOKTITLE</div>
+          <div><span class="text-blue-600">Ebook Simple:</span> EBOOK-001-BOOKTITLE</div>
+          <div><span class="text-blue-600">Book Alt:</span> NOVEL-001-BOOKTITLE-PAPERBACK</div>
+          <div><span class="text-blue-600">Poster:</span> POSTER-001-POSTERTITLE</div>
+          <div><span class="text-blue-600">T-Shirt:</span> TSHIRT-001-SHIRTNAME-RED-L</div>
+        </div>
+        <p class="mt-2 text-blue-700 font-sans text-xs">Suggested Pattern: <code class="bg-blue-100 px-1">{CATEGORY}-{NUMBER}-{TITLE/NAME}-{SPECIFIC}-{DETAILS}</code></p>
+      </div>
+
+      <!-- SKU Generator -->
+      <div class="bg-gray-50 border border-gray-300 p-6 mb-6">
+        <h3 class="font-semibold text-gray-900 mb-3">SKU Generator</h3>
+
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <!-- Category -->
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Category</label>
+            <div class="relative"
+                 data-controller="autocomplete"
+                 data-autocomplete-options-value="<%= (ProductCategory.all rescue []).to_json %>">
+              <input type="text"
+                     data-sku-generator-target="category"
+                     data-autocomplete-target="input"
+                     data-action="input->sku-generator#updatePreview input->autocomplete#filter focus->autocomplete#showDropdown keydown->autocomplete#navigate"
+                     value="<%= product.metadata['category']&.upcase || 'PROD' %>"
+                     placeholder="BOOK"
+                     autocomplete="off"
+                     class="w-full px-2 py-1.5 border border-gray-300 font-mono text-xs uppercase">
+              <div data-autocomplete-target="dropdown"
+                   class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
+              </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">e.g., BOOK, POSTER</p>
+          </div>
+
+          <!-- Number -->
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Number</label>
+            <input type="text"
+                   data-sku-generator-target="number"
+                   data-action="input->sku-generator#updatePreview"
+                   value="<%= sprintf('%03d', Product.next_number_for_category(product.metadata['category'])) %>"
+                   placeholder="001"
+                   class="w-full px-2 py-1.5 border border-gray-300 font-mono text-xs">
+            <p class="text-xs text-gray-500 mt-1">Next: <%= sprintf('%03d', Product.next_number_for_category(product.metadata['category'])) %></p>
+          </div>
+
+          <!-- Details -->
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Details</label>
+            <input type="text"
+                   data-sku-generator-target="details"
+                   data-action="input->sku-generator#updatePreview"
+                   value="<%= product.title.to_s.parameterize.upcase.gsub('-', '').first(20) %>"
+                   placeholder="TITLESLUG"
+                   class="w-full px-2 py-1.5 border border-gray-300 font-mono text-xs uppercase">
+            <p class="text-xs text-gray-500 mt-1">From title (optional)</p>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div class="bg-white border border-gray-300 p-3">
+          <p class="text-xs text-gray-600 mb-1">Generated SKU:</p>
+          <p class="font-mono text-lg font-bold text-gray-900" data-sku-generator-target="preview">
+            <%= product.generate_sku_suggestion %>
+          </p>
+        </div>
+
+        <!-- Validation Messages -->
+        <div data-sku-generator-target="validation" class="mt-3 text-sm">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex justify-between gap-3">
+        <button type="button"
+                onclick="document.getElementById('sku-generator-modal').innerHTML = ''"
+                class="uppercase text-xs px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono">
+          Cancel
+        </button>
+        <button type="button"
+                data-action="click->sku-generator#insertToMetadata"
+                data-sku-generator-target="insertBtn"
+                class="uppercase text-xs px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono">
+          Insert SKU
+        </button>
+      </div>
+    </div>
+  </div>
+</turbo-frame>

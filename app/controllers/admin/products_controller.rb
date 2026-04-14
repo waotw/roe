@@ -231,6 +231,22 @@ class Admin::ProductsController < Admin::BaseController
     redirect_to edit_admin_product_path(@product)
   end
 
+  def sku_generator
+    @product = Product.find(params[:id])
+
+    # Get current metadata values
+    @title = @product.title
+    @category = @product.metadata['category']
+
+    render partial: 'sku_generator_modal', locals: { product: @product }
+  end
+
+  def next_sku_number
+    category = params[:category] || 'PROD'
+    next_number = Product.next_number_for_category(category)
+    render json: { next_number: next_number }
+  end
+
   def check_sku
     sku = params[:sku]
     exists = Product.sku_exists?(sku)

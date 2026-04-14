@@ -70,4 +70,39 @@ module ApplicationHelper
     else currency.upcase
     end
   end
+
+  def product_breadcrumbs(product)
+    return '' unless product
+    return '' if product.metadata['breadcrumbs'] == false
+
+    crumbs = []
+
+    # Home
+    crumbs << link_to('Home', '/', class: 'breadcrumb-link')
+
+    # Store
+    store_page = Page.find_by("metadata->>'url_name' = ?", 'store')
+    if store_page
+      crumbs << link_to('Store', '/store', class: 'breadcrumb-link')
+    else
+      crumbs << content_tag(:span, 'Store', class: 'breadcrumb-text')
+    end
+
+    # Category (if exists)
+    if product.metadata['category'].present?
+      category = product.metadata['category']
+      category_page = Page.find_by("metadata->>'url_name' = ?", "store/#{category.parameterize}")
+
+      if category_page
+        crumbs << link_to(category.titleize, "/store/#{category.parameterize}", class: 'breadcrumb-link')
+      else
+        crumbs << content_tag(:span, category.titleize, class: 'breadcrumb-text')
+      end
+    end
+
+    # Current product (not linked)
+    crumbs << content_tag(:span, product.title, class: 'breadcrumb-current')
+
+    content_tag(:nav, crumbs.join(' › ').html_safe, class: 'breadcrumbs', 'aria-label': 'Breadcrumb')
+  end
 end

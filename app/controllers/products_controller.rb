@@ -10,32 +10,31 @@ class ProductsController < SiteController
       raise ActiveRecord::RecordNotFound
     end
 
-    # Handle Snipcart validation requests
-    if request.headers['User-Agent']&.include?('Snipcart') ||
-       request.headers['HTTP_X_SNIPCART_REQUESTTOKEN'].present?
-
-      Rails.logger.info "Snipcart validation request for: #{@product.url_name}"
-
-      response_data = {
-        id: @product.sku,
-        price: @product.price.to_f,
-        url: product_url(@product.url_name),
-        name: @product.title,
-        description: @product.description || ''
-      }
-
-      Rails.logger.info "Snipcart validation response: #{response_data.inspect}"
-
-      render json: response_data
-      return
+    respond_to do |format|
+      format.html # Render the normal product page
+      format.json do
+        # Snipcart validation response
+        render json: {
+          id: @product.sku,
+          price: @product.price.to_f,
+          url: product_url_for_validation(@product)
+        }
+      end
     end
-
-    # Normal page view - layout is set by SiteController
   end
 
   private
 
-  def product_url(url_name)
-    "#{request.base_url}/store/#{url_name}"
+  def product_url_for_validation(product)
+    # Use the full URL for Snipcart validation
+    if Rails.env.production?
+      # Use configured domain from store.yml
+      domain = SiteConfig.feature('store', 'default_domain') || request.host
+      protocol = domain.include?('localhost') ? 'http' : 'https'
+      "#{protocol}://#{domain}/store/#{product.url_name}.json"
+    else
+      # Development: use request base URL
+      "#{request.base_url}/store/#{product.url_name}.json"
+    end
   end
 end

@@ -1,26 +1,27 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-      file_path = Rails.root.join('site', 'layout', "#{filename}.md")
+    file_path = Rails.root.join('site', 'layout', "#{filename}.md")
 
-      return '' unless File.exist?(file_path)
+    return '' unless File.exist?(file_path)
 
-      content = File.read(file_path)
+    content = File.read(file_path)
 
-      # Escape inline pipes (same logic as HasMarkdownExtensions)
-      content = escape_inline_pipes_for_layout(content)
+    # Escape inline pipes (same logic as HasMarkdownExtensions)
+    content = escape_inline_pipes_for_layout(content)
 
-      html = Kramdown::Document.new(content).to_html
+    html = Kramdown::Document.new(content).to_html
 
-      # Add active class to navigation links if this is the navigation file
-      if filename == 'navigation'
-        html = add_active_nav_class(html, current_page)
-      end
-
-      html.html_safe
-    rescue => e
-      Rails.logger.error "Error rendering layout file #{filename}: #{e.message}"
-      ''
+    # Add active class to navigation links if this is the navigation file
+    if filename == 'navigation'
+      html = add_active_nav_class(html, current_page)
+      html = add_cart_link(html) if store_enabled?
     end
+
+    html.html_safe
+  rescue => e
+    Rails.logger.error "Error rendering layout file #{filename}: #{e.message}"
+    ''
+  end
 
   def logo_classes
     logo_url = SiteConfig.get('logo')
@@ -54,6 +55,32 @@ module LayoutHelper
       request.path if defined?(request) && request.respond_to?(:path)
     rescue
       nil
+    end
+
+    def add_cart_link(html)
+      doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+      # Find the paragraph containing the nav links (the one with pipes)
+      nav_paragraph = doc.css('p').find { |p| p.text.include?('|') }
+
+      return html unless nav_paragraph
+
+      # Create cart link with Snipcart class
+      cart_link = Nokogiri::XML::Node.new('a', doc)
+      cart_link['href'] = '#'
+      cart_link['class'] = 'snipcart-checkout nav-cart'
+      cart_link.inner_html = 'Cart <sup class="snipcart-items-count"></sup>'
+
+      # Wrap in span for positioning
+      cart_wrapper = Nokogiri::XML::Node.new('span', doc)
+      cart_wrapper['class'] = 'nav-cart-wrapper'
+      cart_wrapper.add_child(cart_link)
+
+      # Add to the end of the nav paragraph
+      nav_paragraph.add_child(' ')
+      nav_paragraph.add_child(cart_wrapper)
+
+      doc.to_html
     end
 
     doc.css('a').each do |link|
