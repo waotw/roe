@@ -11,36 +11,37 @@ namespace :site do
     exit 1
   end
 
-  desc "Sync site folder with production (bidirectional)"
-  task :sync do
-    machine = machine_id
-    puts "🔄 Syncing site with #{app_name} (#{machine})..."
+  # desc "Sync site folder with production (bidirectional)"
+  # task :sync do
+  #   machine = machine_id
+  #   puts "🔄 Syncing site with #{app_name} (#{machine})..."
 
-    # Pull from production (files newer on remote)
-    puts "\n📥 Pulling changes from production..."
-    system("rsync -rltzPi -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
+  #   # Pull from production (files newer on remote)
+  #   puts "\n📥 Pulling changes from production..."
+  #   system("rsync -rltzPi -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
 
-    # Push to production (files newer locally)
-    puts "\n📤 Pushing local changes..."
-    system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
+  #   # Push to production (files newer locally)
+  #   puts "\n📤 Pushing local changes..."
+  #   system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
 
-    puts "\n✅ Sync complete!"
-  end
+  #   puts "\n✅ Sync complete!"
+  # end
 
   desc "Push site folder to production"
   task :push do
     machine = machine_id
     puts "📤 Pushing site to #{app_name} (#{machine})..."
+    puts "⚠️  This will OVERWRITE all content on production!"
+    print "Type 'yes' to confirm: "
+
+    confirmation = STDIN.gets.chomp
+    unless confirmation == 'yes'
+      puts "❌ Aborted"
+      exit 0
+    end
+
     system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
     puts "✅ Push complete!"
-  end
-
-  desc "Pull site folder from production"
-  task :pull do
-    machine = machine_id
-    puts "📥 Pulling site from #{app_name} (#{machine})..."
-    system("rsync -rltzPi -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
-    puts "✅ Pull complete!"
   end
 
   desc "Backup production site with incremental hard-link snapshots (keeps 15)"
