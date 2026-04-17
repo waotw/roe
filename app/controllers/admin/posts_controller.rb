@@ -481,15 +481,8 @@ class Admin::PostsController < Admin::BaseController
       flash[:notice] = "Post published"
     end
 
-    respond_to do |format|
-      format.html { redirect_to edit_admin_post_path(@post) }
-      format.turbo_stream {
-        render turbo_stream: turbo_stream.replace(
-          "newsletter-status-#{@post.id}",
-          partial: 'newsletter_status'
-        )
-      }
-    end
+    # Always redirect - this ensures the modal closes and page refreshes
+    redirect_to edit_admin_post_path(@post), status: :see_other
   end
 
   def unpublish
