@@ -21,7 +21,7 @@
       </div>
       <div>
         <span class="text-sm text-gray-500">Current Phase</span>
-        <div class="mt-1 text-lg font-medium"><%= @import.phase %> / 4</div>
+        <div class="mt-1 text-lg font-medium"><%= @import.current_phase %> / 4</div>
         <div class="text-xs text-gray-500 mt-1">
           <% if @import.phase_completed?(1) %>✓ Upload<% end %>
           <% if @import.phase_completed?(2) %>, ✓ Posts<% end %>
@@ -118,15 +118,12 @@
     <% if resolved_media.present? && resolved_media.any? %>
       <div class="mt-4">
         <h3 class="text-sm font-medium text-green-700 mb-2">Connected Media (<%= resolved_media.count %>)</h3>
-        <div class="bg-green-50 p-4 max-h-32 overflow-y-auto">
+        <div class="bg-green-50 p-4 max-h-64 overflow-y-auto">
           <ul class="text-sm text-green-700 list-disc list-inside">
-            <% resolved_media.first(5).each do |entry| %>
+            <% resolved_media.each do |entry| %>
               <li>
                 <%= entry["slug"] %>: <%= entry["local_path"] || entry["items"].first["expected_path"] %>
               </li>
-            <% end %>
-            <% if resolved_media.count > 5 %>
-              <li>... and <%= resolved_media.count - 5 %> more</li>
             <% end %>
           </ul>
         </div>

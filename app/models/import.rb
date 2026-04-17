@@ -67,6 +67,14 @@ class Import < ApplicationRecord
     completed_phases.include?(phase_number)
   end
 
+  # Derive current phase from status and completed phases
+  def current_phase
+    return 4 if status_completed? || status_importing_deliveries?
+    return 3 if status_importing_members? || phase_completed?(2)
+    return 2 if status_importing_posts? || status_importing_media? || phase_completed?(1)
+    1 # Default to phase 1 (upload/configure)
+  end
+
   # Rollback support
   def can_rollback?
     !status_rolled_back? && (status_importing_posts? || status_importing_media? ||

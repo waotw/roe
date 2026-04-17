@@ -19,10 +19,17 @@
           <li>Files should be named: [post-slug]-cover.ext (images), [post-slug].mp3 (audio), or [post-slug].mp4 (video)</li>
         </ul>
       </div>
-      <%= button_to "Verify All Media Connections", reconnect_media_admin_import_path(@import),
-          method: :post,
-          class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-400 hover:bg-amber-300 font-mono rounded-xs mb-6",
-          data: { confirm: "This will scan all media files and verify they're properly connected to posts. Continue?" } %>
+      <div class="flex gap-2 mb-6">
+              <%= button_to "Retry Live Fetch", retry_live_fetch_admin_import_path(@import),
+                  method: :post,
+                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-400 hover:bg-blue-300 font-mono rounded-xs",
+                  data: { confirm: "This will fetch fresh URLs from Substack's live site and attempt to download missing media. Continue?" } %>
+
+              <%= button_to "Verify All Media Connections", reconnect_media_admin_import_path(@import),
+                  method: :post,
+                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-400 hover:bg-amber-300 font-mono rounded-xs",
+                  data: { confirm: "This will scan all media files and verify they're properly connected to posts. Continue?" } %>
+            </div>
     </div>
     <div class="space-y-4">
       <% @missing_items.each_with_index do |entry, index| %>

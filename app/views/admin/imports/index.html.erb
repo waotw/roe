@@ -33,10 +33,10 @@
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <%= time_ago_in_words(import.created_at) %> ago
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <%= link_to "View", admin_import_path(import), class: "text-blue-600 hover:text-blue-900 mr-3" %>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
+                <%= link_to "View", admin_import_path(import), class: "uppercase text-xs px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
                 <% if import.can_rollback? %>
-                  <%= button_to "Rollback", rollback_admin_import_path(import), method: :post, class: "text-red-600 hover:text-red-900", data: { confirm: "Are you sure? This will delete all posts and media from this import." } %>
+                  <%= button_to "Rollback", rollback_admin_import_path(import), method: :post, class: "uppercase text-xs px-1.5 py-0.5 border border-red-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs", data: { confirm: "Are you sure? This will delete all posts and media from this import." } %>
                 <% end %>
               </td>
             </tr>

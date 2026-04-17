@@ -1,5 +1,5 @@
 class Admin::ImportsController < Admin::BaseController
-  before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media ]
+  before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch ]
 
   def index
     @imports = Import.order(created_at: :desc)
@@ -519,6 +519,128 @@ class Admin::ImportsController < Admin::BaseController
       redirect_to resolve_missing_media_admin_import_path(@import), notice: "Verified #{results.count} media connections: #{results.join(', ')}"
     else
       redirect_to resolve_missing_media_admin_import_path(@import), alert: "No media files found. Make sure files are downloaded to the expected locations."
+    end
+  end
+
+  def retry_live_fetch
+    missing_items = @import.stats["missing_media"] || []
+
+    # Filter out already resolved or skipped items
+    unresolved_items = missing_items.reject { |e| e["resolved"] || e["skipped"] }
+
+    if unresolved_items.empty?
+      redirect_to resolve_missing_media_admin_import_path(@import), notice: "No unresolved media items to fetch."
+      return
+    end
+
+    # Extract unique post slugs from missing items
+    post_slugs = unresolved_items.map { |e| e["slug"] }.uniq
+
+    # Find the actual Post records by querying metadata->url_name
+    posts_to_fetch = Post.where(import: @import).where(
+      post_slugs.map { |slug| "json_extract(metadata, '$.url_name') = ?" }.join(" OR "),
+      *post_slugs
+    )
+
+    if posts_to_fetch.empty?
+      redirect_to resolve_missing_media_admin_import_path(@import), alert: "Could not find posts for missing media items."
+      return
+    end
+
+    # Convert Post records back to SubstackImporter::Post structs for LiveFetcher
+    # We need to recreate the struct with the necessary fields
+    require "ostruct"
+    fetcher_posts = posts_to_fetch.map do |post|
+      OpenStruct.new(
+        id: post.metadata["substack_post_id"],
+        slug: post.url_name,
+        title: post.title,
+        type: post.post_type == "article" ? "newsletter" : post.post_type,
+        audience: post.audience == "everyone" ? "free" : post.audience,
+        is_published: post.published?,
+        cover_image: post.image,
+        podcast_url: post.audio,
+        video_mux_playback_id: post.metadata["video_mux_playback_id"]
+      )
+    end
+
+    # Run LiveFetcher on these posts
+    base_url = @import.base_url
+    if base_url.blank?
+      redirect_to resolve_missing_media_admin_import_path(@import), alert: "No base URL configured. Please set a base URL in Phase 2."
+      return
+    end
+
+    Rails.logger.info "[Admin::ImportsController] Retrying live fetch for #{fetcher_posts.count} posts with missing media"
+
+    live_fetcher = SubstackImporter::LiveFetcher.new(base_url: base_url, verbose: Rails.env.development?)
+    live_fetcher.fetch_posts(fetcher_posts)
+
+    # Now attempt to download media with the updated URLs
+    site_root = Rails.root.join("site").to_s
+    media_handler = SubstackImporter::MediaHandler.new(
+      site_root: site_root,
+      import: @import,
+      verbose: Rails.env.development?
+    )
+
+    frontmatter = SubstackImporter::Frontmatter.new(site_root: site_root)
+
+    resolved_count = 0
+    still_missing_count = 0
+
+    fetcher_posts.each do |fetcher_post|
+      # Download media for this post
+      local_media = media_handler.download_post_media(fetcher_post)
+
+      # Find the corresponding Post record
+      post_record = posts_to_fetch.find { |p| p.url_name == fetcher_post.slug }
+      next unless post_record
+
+      # Update the post's frontmatter with new media paths
+      file_path = Rails.root.join("site", "posts", "#{fetcher_post.slug}.md")
+      next unless File.exist?(file_path)
+
+      # Read current file
+      content = File.read(file_path)
+
+      # Extract body (everything after frontmatter)
+      body = content.split(/^---\s*$/, 3)[2]&.strip || ""
+
+      # Build new frontmatter with updated media
+      new_frontmatter = frontmatter.to_yaml(fetcher_post, local_media: local_media)
+
+      # Write updated file
+      File.write(file_path, "#{new_frontmatter}\n#{body}\n")
+
+      # Sync the post back to the database
+      Post.create_or_update_from_file(file_path)
+
+      # Update missing_media stats
+      if local_media[:missing].empty?
+        resolved_count += 1
+        # Mark this entry as resolved in stats
+        missing_items.each do |entry|
+          if entry["slug"] == fetcher_post.slug
+            entry["resolved"] = true
+            entry["local_path"] = local_media[:cover_image] || local_media[:audio] || local_media[:video]
+          end
+        end
+      else
+        still_missing_count += 1
+      end
+    end
+
+    # Save updated stats
+    @import.stats["missing_media"] = missing_items
+    @import.save!
+
+    if resolved_count > 0
+      redirect_to resolve_missing_media_admin_import_path(@import),
+        notice: "Live fetch complete! Resolved #{resolved_count} items. #{still_missing_count} still need attention."
+    else
+      redirect_to resolve_missing_media_admin_import_path(@import),
+        alert: "Live fetch complete, but could not resolve any items. URLs may still be unavailable."
     end
   end
 

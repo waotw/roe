@@ -84,6 +84,9 @@ module SubstackImporter
         src = img[:src]
         next if src.nil? || src.empty? || src.start_with?("/")
 
+        # Skip cover image - it's handled separately by download_cover_image
+        next if post.cover_image.present? && src == post.cover_image
+
         ext = File.extname(URI.parse(src).path).split("?").first
         ext = ".jpg" if ext.nil? || ext.empty?
         filename = "#{post.slug}-#{i + 1}#{ext}"

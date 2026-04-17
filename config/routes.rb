@@ -142,6 +142,7 @@ Rails.application.routes.draw do
         post :resolve_manually
         post :skip_missing_media
         post :reconnect_media
+        post :retry_live_fetch
       end
     end
 
