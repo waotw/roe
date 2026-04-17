@@ -117,14 +117,15 @@
 
       <%= link_to "Back to Configs", admin_configs_path,
                   class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
-
-      <% if @stripe_config.connected? %>
-        <%= button_to "Disconnect Stripe",
-                      admin_stripe_config_path,
-                      method: :delete,
-                      data: { turbo_confirm: "Are you sure? This will remove all Stripe keys." },
-                      class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-red-100 hover:bg-red-200 font-mono rounded-xs ml-auto" %>
-      <% end %>
     </div>
+  <% end %>
+
+  <!-- Disconnect form (outside main form) -->
+  <% if @stripe_config.connected? %>
+    <%= form_with url: admin_stripe_config_path, method: :delete, class: "mt-4" do |disconnect_form| %>
+      <%= disconnect_form.submit "Disconnect Stripe",
+                    data: { turbo_confirm: "Are you sure? This will remove all Stripe keys." },
+                    class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-red-100 hover:bg-red-200 font-mono rounded-xs" %>
+    <% end %>
   <% end %>
 </div>

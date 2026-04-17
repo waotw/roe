@@ -117,4 +117,38 @@ module ApplicationHelper
       severity: :error
     }
   end
+
+  def duplicate_sku_warning
+    duplicates = Product.duplicate_skus
+    return nil if duplicates.empty?
+
+    count = duplicates.values.flatten.count
+    {
+      message: "#{duplicates.keys.count} duplicate SKU(s) found affecting #{count} products",
+      path: duplicate_skus_admin_products_path,
+      severity: :error
+    }
+  end
+
+  # Render an SVG icon from app/assets/images/icons/
+  def icon_svg(name, options = {})
+    file_path = Rails.root.join('app', 'assets', 'images', 'icons', "#{name}.svg")
+
+    return '' unless File.exist?(file_path)
+
+    svg_content = File.read(file_path)
+    css_class = options[:class] || 'w-5 h-5'
+
+    # Parse the SVG and add the class to the svg element
+    doc = Nokogiri::HTML::DocumentFragment.parse(svg_content)
+    svg = doc.at_css('svg')
+
+    if svg
+      existing_class = svg['class']
+      svg['class'] = existing_class ? "#{existing_class} #{css_class}" : css_class
+      doc.to_html.html_safe
+    else
+      svg_content.html_safe
+    end
+  end
 end
