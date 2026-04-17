@@ -1,14 +1,15 @@
 class Medium < ApplicationRecord
   has_many :media_references, dependent: :destroy
   has_many :posts, through: :media_references
+  belongs_to :import, optional: true
 
   before_save :normalize_media_type
 
   # Scope helpers for filtering
-  scope :images, -> { where(media_type: 'images') }
-  scope :audio, -> { where(media_type: 'audio') }
-  scope :video, -> { where(media_type: 'video') }
-  scope :fonts, -> { where(media_type: 'fonts') }
+  scope :images, -> { where(media_type: "images") }
+  scope :audio, -> { where(media_type: "audio") }
+  scope :video, -> { where(media_type: "video") }
+  scope :fonts, -> { where(media_type: "fonts") }
   scope :unused, -> {
       left_joins(:media_references)
         .where(media_references: { id: nil })
@@ -22,17 +23,22 @@ class Medium < ApplicationRecord
   private
 
   def normalize_media_type
+    # If media_type is blank, extract from file_path
+    if media_type.blank? && file_path.present?
+      self.media_type = File.extname(file_path).delete_prefix(".").downcase
+    end
+
     extension = media_type&.downcase
 
     case extension
-    when 'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp'
-      self.media_type = 'images'
-    when 'woff', 'woff2', 'ttf', 'otf'
-      self.media_type = 'fonts'
-    when 'mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac'
-      self.media_type = 'audio'
-    when 'mp4', 'webm', 'ogv', 'mov', 'avi', 'mkv'
-      self.media_type = 'video'
+    when "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "heic", "heif"
+      self.media_type = "images"
+    when "woff", "woff2", "ttf", "otf"
+      self.media_type = "fonts"
+    when "mp3", "m4a", "wav", "ogg", "flac", "aac"
+      self.media_type = "audio"
+    when "mp4", "webm", "ogv", "mov", "avi", "mkv"
+      self.media_type = "video"
     end
   end
 end

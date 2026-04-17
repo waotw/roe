@@ -1,7 +1,7 @@
 module HasAudience
   extend ActiveSupport::Concern
 
-  AUDIENCES = %w[everyone paid].freeze
+  AUDIENCES = %w[everyone paid only_paid].freeze
 
   included do
     # Validation for metadata-based audience

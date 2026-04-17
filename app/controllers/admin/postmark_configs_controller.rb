@@ -42,9 +42,16 @@ class Admin::PostmarkConfigsController < Admin::BaseController
       end
     end
 
-  def destroy
+    def destroy
     @postmark_config = PostmarkConfig.current
+
+    Rails.logger.info "BEFORE disconnect - server_token present?: #{@postmark_config[:server_token].present?}"
+
     @postmark_config.disconnect!
+
+    @postmark_config.reload
+    Rails.logger.info "AFTER disconnect - server_token present?: #{@postmark_config[:server_token].present?}"
+    Rails.logger.info "AFTER disconnect - connected?: #{@postmark_config.connected?}"
 
     flash[:notice] = "Postmark disconnected"
     redirect_to edit_admin_postmark_config_path

@@ -1,5 +1,4 @@
 class Admin::PostsController < Admin::BaseController
-
   def index
     @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
 
@@ -314,6 +313,11 @@ class Admin::PostsController < Admin::BaseController
                         .active
                         .where('subscribed_at > ?', last_send)
 
+    # If this is a Substack-imported post, exclude Substack-imported members
+    if @post.metadata['substack_post_id'].present?
+      new_members = new_members.where(import_id: nil)  # ← Fixed: was @new_members
+    end
+
     # Filter by audience if needed
     new_members = new_members.paid_tier if @post.audience == 'paid'
 
@@ -345,6 +349,11 @@ class Admin::PostsController < Admin::BaseController
     new_members = Member.newsletter_subscribed
                         .active
                         .where.not(id: received_member_ids)
+
+    # If this is a Substack-imported post, exclude Substack-imported members
+    if @post.metadata['substack_post_id'].present?
+      new_members = new_members.where(import_id: nil)  # ← Fixed: was @new_members, also moved before audience filter
+    end
 
     # Filter by audience if needed
     new_members = new_members.paid_tier if @post.audience == 'paid'
@@ -380,6 +389,11 @@ class Admin::PostsController < Admin::BaseController
 
     # Filter by audience if needed
     @new_members = @new_members.paid_tier if @post.audience == 'paid'
+
+    # If this is a Substack-imported post, exclude Substack-imported members
+    if @post.metadata['substack_post_id'].present?
+      @new_members = @new_members.where(import_id: nil)
+    end
 
     @new_members_count = @new_members.count
 
@@ -508,7 +522,7 @@ class Admin::PostsController < Admin::BaseController
 
   def should_send_newsletter?(post)
     published_to = post.metadata['published_to'] || post.published_to
-    published_to.in?(['newsletter', 'both'])
+    published_to.in?([ 'newsletter', 'both' ])
   end
 
   def send_newsletter(post)
@@ -630,7 +644,7 @@ class Admin::PostsController < Admin::BaseController
       body_content = $2
 
       # Parse to update status
-      metadata = YAML.safe_load(yaml_content, permitted_classes: [Date, Time, Symbol])
+      metadata = YAML.safe_load(yaml_content, permitted_classes: [ Date, Time, Symbol ])
       metadata['status'] = new_status
 
       # Re-format with consistent style

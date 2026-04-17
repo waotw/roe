@@ -5,6 +5,8 @@ class Admin::MediumController < Admin::BaseController
 
     # Get distinct media types that exist (already normalized: 'images', 'audio', 'video', 'fonts')
     @existing_types = Medium.distinct.pluck(:media_type).compact
+
+    render layout: 'application'
   end
 
   def create

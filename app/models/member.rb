@@ -4,6 +4,8 @@ class Member < ApplicationRecord
   enum :status, { active: 0, cancelled: 1 }, prefix: true
   enum :newsletter_status, { subscribed: 0, unsubscribed: 1, bounced: 2 }, prefix: true
 
+  belongs_to :import, optional: true
+
   has_many :newsletter_sends, dependent: :destroy
   has_many :newsletters_received, through: :newsletter_sends, source: :post
 
@@ -193,7 +195,7 @@ class Member < ApplicationRecord
   end
 
   def unsubscribe_from_newsletter!
-    update!(newsletter_status: 'unsubscribed')
+    update!(newsletter_status: "unsubscribed")
   end
 
   # NEWSLETTER

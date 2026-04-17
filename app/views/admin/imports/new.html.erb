@@ -1,0 +1,30 @@
+<% content_for :title, "New Import" %>
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold mb-6">Import from Substack</h1>
+  <div class="bg-white shadow p-6">
+    <%= form_with model: [:admin, @import], local: true, multipart: true do |f| %>
+      <% if @import.errors.any? %>
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 mb-6">
+          <h2 class="text-sm font-medium"><%= pluralize(@import.errors.count, "error") %> prohibited this import from being saved:</h2>
+          <ul class="mt-2 text-sm list-disc list-inside">
+            <% @import.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+      <div class="mb-6">
+        <h2 class="text-lg font-medium mb-4">Phase 1: Upload Archive</h2>
+        <div class="mb-4">
+          <%= f.label :archive_file, "Substack Export ZIP", class: "block text-sm font-medium text-gray-700 mb-2" %>
+          <%= f.file_field :archive_file, accept: ".zip", class: "block w-full text-sm font-mono text-gray-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:border file:border-green-800 file:bg-green-100 file:text-green-700 hover:file:bg-green-200", required: true %>
+          <p class="mt-1 text-sm text-gray-500">Upload your Substack export ZIP file (posts.csv and posts/ folder)</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <%= link_to "Cancel", admin_imports_path, class: "uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+        <%= f.submit "Upload & Continue", class: "uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      </div>
+    <% end %>
+  </div>
+</div>

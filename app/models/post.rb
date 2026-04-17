@@ -14,6 +14,8 @@ class Post < ApplicationRecord
   has_many :newsletter_sends, dependent: :destroy
   has_many :newsletter_recipients, through: :newsletter_sends, source: :member
 
+  belongs_to :import, optional: true
+
   before_save :preserve_podcast_guid
   after_save :cleanup_podcast_yaml, if: :should_cleanup_yaml?
   after_save :update_media_references
@@ -31,9 +33,9 @@ class Post < ApplicationRecord
       description: "Article with featured audio player",
       icon: "🔊",
       metadata_fields: [
-        { name: 'audio', type: :text, required: true, label: 'Audio File',
-          hint: 'Path to audio file (e.g., /media/audio/my-song.mp3)' },
-        { name: 'duration', type: :text, label: 'Duration',
+        { name: "audio", type: :text, required: true, label: "Audio File",
+          hint: "Path to audio file (e.g., /media/audio/my-song.mp3)" },
+        { name: "duration", type: :text, label: "Duration",
           hint: 'Optional, e.g., "12:34"' }
       ]
     },
@@ -42,9 +44,9 @@ class Post < ApplicationRecord
       description: "Article with featured video player",
       icon: "🎬",
       metadata_fields: [
-        { name: 'video', type: :text, required: true, label: 'Video File',
-          hint: 'Path to video file (e.g., /media/video/my-video.mp4)' },
-        { name: 'duration', type: :text, label: 'Duration',
+        { name: "video", type: :text, required: true, label: "Video File",
+          hint: "Path to video file (e.g., /media/video/my-video.mp4)" },
+        { name: "duration", type: :text, label: "Duration",
           hint: 'Optional, e.g., "12:34"' }
       ]
     },
@@ -53,53 +55,53 @@ class Post < ApplicationRecord
       description: "Podcast episode with RSS feed integration",
       icon: "🎙️",
       metadata_fields: [
-        { name: 'audio', type: :text, required: true, label: 'Audio File',
-          hint: 'Path to audio file (e.g., /media/audio/episode-1.mp3)' },
-        { name: 'duration', type: :text, required: true, label: 'Duration',  # ← Mark as required
+        { name: "audio", type: :text, required: true, label: "Audio File",
+          hint: "Path to audio file (e.g., /media/audio/episode-1.mp3)" },
+        { name: "duration", type: :text, required: true, label: "Duration",  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
-        { name: 'podcast', type: :select, required: true, label: 'Podcast',
-          hint: 'Which podcast feed does this episode belong to?',
+        { name: "podcast", type: :select, required: true, label: "Podcast",
+          hint: "Which podcast feed does this episode belong to?",
           options: -> { PodcastConfig.podcast_keys } },
-        { name: 'author', type: :text, label: 'Author',
-          hint: 'Override podcast default author for this episode' },
-        { name: 'explicit', type: :select, label: 'Explicit Content',
-          hint: 'Does this episode contain explicit content?',
-          options: ['false', 'true'] },
-        { name: 'episode_number', type: :text, label: 'Episode Number',
+        { name: "author", type: :text, label: "Author",
+          hint: "Override podcast default author for this episode" },
+        { name: "explicit", type: :select, label: "Explicit Content",
+          hint: "Does this episode contain explicit content?",
+          options: [ "false", "true" ] },
+        { name: "episode_number", type: :text, label: "Episode Number",
           hint: 'Episode number (e.g., "1")' },
-        { name: 'season', type: :text, label: 'Season',
+        { name: "season", type: :text, label: "Season",
           hint: 'Season number (e.g., "1")' },
-        { name: 'episode_type', type: :select, label: 'Episode Type',
-          hint: 'Type of episode',
-          options: ['full', 'trailer', 'bonus'] },
-        { name: 'image', type: :text, label: 'Episode Artwork',
-          hint: 'Override podcast artwork for this episode (e.g., /media/images/episode-1.jpg)' },
-        { name: 'subtitle', type: :text, label: 'Subtitle',
-          hint: 'Short episode description' },
-        { name: 'captions', type: :text, label: 'Captions/Transcript',
-          hint: 'Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)' }
+        { name: "episode_type", type: :select, label: "Episode Type",
+          hint: "Type of episode",
+          options: [ "full", "trailer", "bonus" ] },
+        { name: "image", type: :text, label: "Episode Artwork",
+          hint: "Override podcast artwork for this episode (e.g., /media/images/episode-1.jpg)" },
+        { name: "subtitle", type: :text, label: "Subtitle",
+          hint: "Short episode description" },
+        { name: "captions", type: :text, label: "Captions/Transcript",
+          hint: "Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)" }
       ]
     }
   }.freeze
 
   def audio
-    metadata['audio']
+    metadata["audio"]
   end
 
   def video
-    metadata['video']
+    metadata["video"]
   end
 
   def duration
-    metadata['duration']
+    metadata["duration"]
   end
 
   def captions
-    metadata['captions']
+    metadata["captions"]
   end
 
   def has_media?
-    post_type.in?(['audio', 'video']) && (audio.present? || video.present?)
+    post_type.in?([ "audio", "video" ]) && (audio.present? || video.present?)
   end
 
   # Additional post-specific scopes
@@ -128,19 +130,19 @@ class Post < ApplicationRecord
   }
 
   def published_to
-    metadata['published_to'] || 'site'  # Default to 'site' if not set
+    metadata["published_to"] || "site"  # Default to 'site' if not set
   end
 
   def published_to_site?
-    published_to == 'site'
+    published_to == "site"
   end
 
   def published_to_newsletter?
-    published_to == 'newsletter'
+    published_to == "newsletter"
   end
 
   def published_to_both?
-    published_to == 'both'
+    published_to == "both"
   end
 
   # Class method to get all unique post types efficiently
@@ -152,7 +154,7 @@ class Post < ApplicationRecord
   end
 
   def self.post_type_options
-    Rails.cache.fetch('post_type_options', expires_in: 1.hour) do
+    Rails.cache.fetch("post_type_options", expires_in: 1.hour) do
       # Official types from POST_TYPES constant
       official_types = POST_TYPES.keys.map(&:to_s)
 
@@ -177,7 +179,7 @@ class Post < ApplicationRecord
   end
 
   def tags
-    tag_data = metadata['tags']
+    tag_data = metadata["tags"]
 
     case tag_data
     when Array
@@ -190,7 +192,7 @@ class Post < ApplicationRecord
       return [] if normalized.empty? || normalized == "[]"
 
       # Try parsing as JSON array first
-      if normalized.start_with?('[') && normalized.end_with?(']')
+      if normalized.start_with?("[") && normalized.end_with?("]")
         begin
           parsed = JSON.parse(normalized)
           return parsed.is_a?(Array) ? parsed.reject { |t| t.blank? || t == "[]" } : []
@@ -200,12 +202,12 @@ class Post < ApplicationRecord
       end
 
       # Comma-separated tags
-      if normalized.include?(',')
-        return normalized.split(',').map(&:strip).reject(&:blank?)
+      if normalized.include?(",")
+        return normalized.split(",").map(&:strip).reject(&:blank?)
       end
 
       # Single tag
-      [normalized]
+      [ normalized ]
     when nil
       []
     else
@@ -252,9 +254,9 @@ class Post < ApplicationRecord
 
     # Rest of validation (skip for broken YAML)
     unless yaml_parse_error
-      if parsed.front_matter['date'].present?
+      if parsed.front_matter["date"].present?
         begin
-          Date.parse(parsed.front_matter['date'].to_s)
+          Date.parse(parsed.front_matter["date"].to_s)
         rescue ArgumentError, TypeError => e
           Rails.logger.error "Invalid date in #{file_path}: #{parsed.front_matter['date']}"
           puts "\n  ✗ Invalid date: #{File.basename(file_path)} - '#{parsed.front_matter['date']}' is not a valid date\n"
@@ -262,14 +264,14 @@ class Post < ApplicationRecord
         end
       end
 
-      if parsed.front_matter['status'] == 'published'
-        if parsed.front_matter['title'].blank?
+      if parsed.front_matter["status"] == "published"
+        if parsed.front_matter["title"].blank?
           Rails.logger.warn "Published post missing title: #{file_path}"
           puts "\n  ⚠ Missing title: #{File.basename(file_path)}"
           has_warnings = true
         end
 
-        if parsed.front_matter['date'].blank?
+        if parsed.front_matter["date"].blank?
           Rails.logger.warn "Published post missing date: #{file_path}"
           puts "  ⚠ Missing date: #{File.basename(file_path)}\n"
           has_warnings = true
@@ -289,9 +291,9 @@ class Post < ApplicationRecord
     end
 
     # Convert comma-separated tags to array (preserves -tag syntax)
-    if parsed.front_matter['tags'].is_a?(String)
-      parsed.front_matter['tags'] = parsed.front_matter['tags']
-        .split(',')
+    if parsed.front_matter["tags"].is_a?(String)
+      parsed.front_matter["tags"] = parsed.front_matter["tags"]
+        .split(",")
         .map(&:strip)
         .reject(&:blank?)
     end
@@ -301,14 +303,14 @@ class Post < ApplicationRecord
 
     # Mark if YAML was broken
     if yaml_parse_error
-      post.metadata['_yaml_parse_error'] = yaml_parse_error
+      post.metadata["_yaml_parse_error"] = yaml_parse_error
     end
 
     begin
       post.save!
 
       # Invalidate post_type cache if metadata changed
-      Rails.cache.delete('post_type_options') if post.saved_changes.key?('metadata')
+      Rails.cache.delete("post_type_options") if post.saved_changes.key?("metadata")
     rescue => e
       Rails.logger.error "Failed to save #{file_path}: #{e.message}"
       puts "\n  ✗ Error saving: #{File.basename(file_path)} - #{e.message}\n"
@@ -421,7 +423,7 @@ class Post < ApplicationRecord
   end
 
   def filename
-    File.basename(file_path, '.md') if file_path.present?
+    File.basename(file_path, ".md") if file_path.present?
   end
 
   private
@@ -444,9 +446,9 @@ class Post < ApplicationRecord
     absolute_path = File.expand_path(file_path)
     post = find_by(file_path: absolute_path)
 
-    return false unless post&.metadata&.dig('guid').present?
+    return false unless post&.metadata&.dig("guid").present?
 
-    correct_guid = post.metadata['guid']
+    correct_guid = post.metadata["guid"]
 
     # Remove ALL guid lines (in case there are duplicates or malformed ones)
     fixed_frontmatter = frontmatter.lines.reject { |line| line =~ /^\s*guid\s*:/ }.join
@@ -498,7 +500,7 @@ class Post < ApplicationRecord
     else
       # No frontmatter found
       OpenStruct.new(
-        front_matter: { 'title' => File.basename(file_path, '.md') },
+        front_matter: { "title" => File.basename(file_path, ".md") },
         content: content
       )
     end
@@ -530,9 +532,9 @@ class Post < ApplicationRecord
 
     # Extract from metadata fields (image, audio, video, thumbnail, etc.)
     if metadata.present?
-      ['image', 'audio', 'video', 'thumbnail', 'cover', 'poster'].each do |field|
+      [ "image", "audio", "video", "thumbnail", "cover", "poster" ].each do |field|
         value = metadata[field]
-        if value.is_a?(String) && value.start_with?('/media/')
+        if value.is_a?(String) && value.start_with?("/media/")
           paths << value
         end
       end
@@ -542,12 +544,12 @@ class Post < ApplicationRecord
   end
 
   def should_cleanup_yaml?
-    metadata['post_type'] == 'podcast' && metadata['status'] == 'published'
+    metadata["post_type"] == "podcast" && metadata["status"] == "published"
   end
 
   def cleanup_podcast_yaml
     return unless File.exist?(file_path)
-    return unless metadata['guid'].present? # Only run if post has a GUID
+    return unless metadata["guid"].present? # Only run if post has a GUID
 
     begin
       content = File.read(file_path)
@@ -563,7 +565,7 @@ class Post < ApplicationRecord
         end
 
         # Only rewrite if GUID is wrong or missing
-        db_guid = metadata['guid']
+        db_guid = metadata["guid"]
 
         if file_guid != db_guid
           # Remove all existing guid lines
@@ -573,7 +575,7 @@ class Post < ApplicationRecord
           cleaned_frontmatter = cleaned_frontmatter.rstrip + "\nguid: \"#{db_guid}\"\n"
 
           # Reconstruct file
-          body = content.sub(/\A---\s*\n.*?\n---\s*\n/m, '')
+          body = content.sub(/\A---\s*\n.*?\n---\s*\n/m, "")
           new_content = "---\n#{cleaned_frontmatter}---\n#{body}"
 
           File.write(file_path, new_content)
@@ -587,17 +589,17 @@ class Post < ApplicationRecord
   end
 
   def preserve_podcast_guid
-    return unless metadata['post_type'] == 'podcast'
-    return unless metadata['status'] == 'published'
+    return unless metadata["post_type"] == "podcast"
+    return unless metadata["status"] == "published"
 
     # Check if GUID is being removed or changed
     if metadata_changed? && metadata_was.present?
-      old_guid = metadata_was['guid']
-      new_guid = metadata['guid']
+      old_guid = metadata_was["guid"]
+      new_guid = metadata["guid"]
 
       # If GUID existed and is now missing/different, restore it
       if old_guid.present? && (new_guid.blank? || new_guid != old_guid)
-        self.metadata = metadata.merge('guid' => old_guid)
+        self.metadata = metadata.merge("guid" => old_guid)
         Rails.logger.warn "🔒 Prevented GUID modification for '#{metadata['title']}' (restored: #{old_guid})"
       end
     end

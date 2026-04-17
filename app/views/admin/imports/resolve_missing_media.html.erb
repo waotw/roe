@@ -1,0 +1,148 @@
+<% content_for :title, "Resolve Missing Media - Import ##{@import.id}" %>
+<div class="max-w-4xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Resolve Missing Media</h1>
+    <%= link_to "Back to Import", admin_import_path(@import), class: "text-blue-600 hover:text-blue-900" %>
+  </div>
+  <% if @missing_items.empty? %>
+    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+      No missing media to resolve!
+    </div>
+  <% else %>
+    <div class="mb-6">
+      <div class="bg-blue-50 border border-blue-200 p-4 mb-4">
+        <h3 class="font-medium text-blue-900 mb-2">How This Works</h3>
+        <ul class="text-sm text-blue-800 list-disc list-inside space-y-1">
+          <li>Posts already have the expected media URLs in their frontmatter (e.g., <code>audio: /media/audio/post-slug.mp3</code>)</li>
+          <li>You just need to download the files and place them at those locations</li>
+          <li>The system will automatically detect when files exist and connect them to posts</li>
+          <li>Files should be named: [post-slug]-cover.ext (images), [post-slug].mp3 (audio), or [post-slug].mp4 (video)</li>
+        </ul>
+      </div>
+      <%= button_to "Verify All Media Connections", reconnect_media_admin_import_path(@import),
+          method: :post,
+          class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-400 hover:bg-amber-300 font-mono rounded-xs mb-6",
+          data: { confirm: "This will scan all media files and verify they're properly connected to posts. Continue?" } %>
+    </div>
+    <div class="space-y-4">
+      <% @missing_items.each_with_index do |entry, index| %>
+        <% item = entry["items"].first %>
+        <% next if entry["resolved"] || entry["skipped"] %>
+        <% is_connected = entry["medium_exists"] || entry["downloaded"] %>
+        <% expected_path = item["expected_path"] %>
+        <div class="bg-white shadow p-6" id="missing-item-<%= index %>">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="font-medium text-lg"><%= entry["slug"] %></h3>
+              <p class="text-sm text-gray-500">
+                Type: <%= item["type"].capitalize %>
+                <% if item["reason"].present? %>
+                  | Reason: <%= item["reason"] %>
+                <% end %>
+              </p>
+            </div>
+            <span class="px-2 py-1 text-xs font-semibold <%= is_connected ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800' %>">
+              <%= is_connected ? 'Connected to Post' : 'Awaiting File' %>
+            </span>
+          </div>
+          <% if expected_path.present? %>
+            <div class="text-sm text-gray-600 mb-2">
+              <strong>Expected in frontmatter:</strong> <%= expected_path %>
+            </div>
+          <% end %>
+          <% if item["url"].present? || item["mux_id"].present? %>
+            <div class="text-sm text-gray-600 mb-4">
+              <strong>Source:</strong>
+              <%= item["url"] || "Mux ID: #{item["mux_id"]}" %>
+            </div>
+          <% end %>
+          <% if is_connected %>
+            <!-- Already connected - show verify option -->
+            <div class="bg-green-50 border border-green-200 p-4 mb-4">
+              <p class="text-sm text-green-800 mb-2">
+                <strong>✓ File connected at:</strong> <%= expected_path %>
+              </p>
+              <p class="text-xs text-green-600 mb-3">
+                The frontmatter already references this path. The post will find the media once the file exists at this location.
+              </p>
+            </div>
+          <% else %>
+            <!-- File doesn't exist - show download options -->
+            <!-- Attempt Download Form -->
+            <%= form_with url: attempt_download_admin_import_path(@import), method: :post, local: true, class: "mb-8", data: { controller: "download", action: "submit->download#start" } do |f| %>
+              <%= f.hidden_field :item_index, value: index %>
+              <div class="flex gap-2 items-start">
+                <%= f.text_field :url,
+                    value: item["url"],
+                    placeholder: "Paste URL here...",
+                    class: "flex-1 pl-2 bg-gray-100 focus:border-blue-500 focus:ring-blue-500 sm:text-sm" %>
+                <%= f.submit "Attempt Download",
+                    class: "uppercase text-xs px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs",
+                    data: { download_target: "button" } %>
+              </div>
+              <div data-download-target="spinner" class="hidden mt-2 text-sm text-blue-600">
+                <span class="animate-pulse">Downloading... please wait, this may take a while for large files.</span>
+              </div>
+            <% end %>
+            <!-- Divider -->
+            <div class="border-t border-gray-200 my-4"></div>
+            <!-- Manual download option -->
+            <div class="bg-gray-50 p-4">
+              <p class="text-sm text-gray-700 mb-2">
+                <strong>Or download manually:</strong>
+              </p>
+              <p class="text-xs text-gray-600 mb-3">
+                1. Download the file yourself<br>
+                2. Place it in <code>/site/media/<%= item["type"] == 'video' ? 'video' : (item["type"] == 'audio' || item["type"] == 'podcast' ? 'audio' : 'images') %>/</code><br>
+                3. Name it: <code><%= entry["slug"] %>.<%= item["type"] == 'video' ? 'mp4' : (item["type"] == 'audio' || item["type"] == 'podcast' ? 'mp3' : 'jpg') %></code>
+              </p>
+              <%= form_with url: resolve_manually_admin_import_path(@import), method: :post, local: true do |f| %>
+                <%= f.hidden_field :item_index, value: index %>
+                <%= f.submit "Check for Manually Downloaded File", class: "uppercase text-xs px-1.5 py-0.5 border border-green-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs" %>
+              <% end %>
+            </div>
+            <!-- Skip option -->
+            <div class="border-t border-gray-200 my-4 pt-4">
+              <%= form_with url: skip_missing_media_admin_import_path(@import), method: :post, local: true, class: "flex gap-2 items-center" do |f| %>
+                <%= f.hidden_field :item_index, value: index %>
+                <%= f.text_field :reason,
+                    placeholder: "Reason for skipping (optional)...",
+                    class: "flex-1 pl-2 bg-gray-100 text-sm focus:border-gray-500 focus:ring-gray-500" %>
+                <%= f.submit "Skip This Item", class: "uppercase text-xs px-1.5 py-0.5 border border-gray-600 bg-gray-300 hover:bg-gray-400 font-mono rounded-xs" %>
+              <% end %>
+              <p class="text-xs text-gray-500 mt-1">
+                Mark as skipped if the file is no longer available or you don't want to resolve it.
+              </p>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+    <% resolved_count = @missing_items.count { |e| e["resolved"] } %>
+    <% skipped_count = @missing_items.count { |e| e["skipped"] } %>
+    <% if resolved_count > 0 %>
+      <div class="mt-8 bg-green-50 border border-green-200 p-4">
+        <h3 class="font-medium text-green-900 mb-2">Resolved Items (<%= resolved_count %>)</h3>
+        <ul class="text-sm text-green-800 space-y-1">
+          <% @missing_items.select { |e| e["resolved"] }.each do |entry| %>
+            <li>
+              <%= entry["slug"] %>: <%= entry["local_path"] %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+    <% if skipped_count > 0 %>
+      <div class="mt-8 bg-gray-50 border border-gray-200 p-4">
+        <h3 class="font-medium text-gray-900 mb-2">Skipped Items (<%= skipped_count %>)</h3>
+        <ul class="text-sm text-gray-800 space-y-1">
+          <% @missing_items.select { |e| e["skipped"] }.each do |entry| %>
+            <li>
+              <%= entry["slug"] %>: <%= entry["skip_reason"] || "Skipped" %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+  <% end %>
+</div>

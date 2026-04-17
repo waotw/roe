@@ -1,0 +1,53 @@
+<% content_for :title, "Imports" %>
+<div class="max-w-6xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Substack Imports</h1>
+    <%= link_to "New Import", new_admin_import_path, class: "uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+  </div>
+  <% if @imports.any? %>
+    <div class="bg-white overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phase</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @imports.each do |import| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <%= link_to "Import ##{import.id}", admin_import_path(import), class: "text-blue-600 hover:text-blue-900" %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold <%= status_badge_class(import.status) %>">
+                  <%= import.status.humanize %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <%= import.phase %> / 4
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <%= time_ago_in_words(import.created_at) %> ago
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <%= link_to "View", admin_import_path(import), class: "text-blue-600 hover:text-blue-900 mr-3" %>
+                <% if import.can_rollback? %>
+                  <%= button_to "Rollback", rollback_admin_import_path(import), method: :post, class: "text-red-600 hover:text-red-900", data: { confirm: "Are you sure? This will delete all posts and media from this import." } %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="bg-white shadow p-8 text-center">
+      <p class="text-gray-500 mb-4">No imports yet.</p>
+      <%= link_to "Start your first import", new_admin_import_path, class: "uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    </div>
+  <% end %>
+</div>

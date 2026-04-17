@@ -1,0 +1,364 @@
+<% content_for :title, "Import ##{@import.id}" %>
+<div class="max-w-4xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Import #<%= @import.id %></h1>
+    <%= link_to "← Back to Imports", admin_imports_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+  </div>
+  <!-- Status Card -->
+  <div class="bg-white shadow p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <span class="text-sm text-gray-500">Status</span>
+        <div class="flex items-center mt-1">
+          <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold <%= status_badge_class(@import.status) %>">
+            <% if @import.status_completed? %>
+              <%= @import.completed_phases.last == 4 ? "Import Complete" : "Phase #{@import.completed_phases.last} Complete" %>
+            <% else %>
+              <%= @import.status.humanize %>
+            <% end %>
+          </span>
+        </div>
+      </div>
+      <div>
+        <span class="text-sm text-gray-500">Current Phase</span>
+        <div class="mt-1 text-lg font-medium"><%= @import.phase %> / 4</div>
+        <div class="text-xs text-gray-500 mt-1">
+          <% if @import.phase_completed?(1) %>✓ Upload<% end %>
+          <% if @import.phase_completed?(2) %>, ✓ Posts<% end %>
+          <% if @import.phase_completed?(3) %>, ✓ Members<% end %>
+          <% if @import.phase_completed?(4) %>, ✓ Deliveries<% end %>
+        </div>
+      </div>
+      <div>
+        <span class="text-sm text-gray-500">Created</span>
+        <div class="mt-1 text-lg font-medium"><%= @import.created_at.strftime("%b %d, %Y %H:%M") %></div>
+      </div>
+    </div>
+    <% if @import.error_message.present? && @import.status_failed? %>
+      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 mt-4">
+        <strong>Error:</strong> <%= @import.error_message %>
+      </div>
+    <% end %>
+    <% if @import.status_importing_posts? || @import.status_importing_media? || @import.status_importing_members? || @import.status_importing_deliveries? %>
+      <div class="mt-4">
+        <div class="flex items-center">
+          <div class="animate-spin h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+          <span class="text-gray-600">Import in progress...</span>
+        </div>
+        <p class="text-sm text-gray-500 mt-2">Importing data, please wait...</p>
+      </div>
+    <% end %>
+  </div>
+  <!-- Stats -->
+  <% if @import.stats.present? && (
+    @import.stats["posts_created"].to_i > 0 ||
+    @import.stats["posts_skipped"].to_i > 0 ||
+    @import.stats["media_downloaded"].to_i > 0 ||
+    @import.stats["media_reused"].to_i > 0 ||
+    (@import.stats["missing_media"].present? && @import.stats["missing_media"].any?) ||
+    (@import.stats["errors"].present? && @import.stats["errors"].any?)
+  ) %>
+  <div class="bg-white shadow p-6 mb-6">
+    <h2 class="text-lg font-medium mb-4">Import Statistics</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <% if @import.stats["posts_created"].to_i > 0 %>
+        <div class="bg-green-50 p-4">
+          <div class="text-2xl font-bold text-green-700"><%= @import.stats["posts_created"] %></div>
+          <div class="text-sm text-green-600">Posts Created</div>
+        </div>
+      <% end %>
+      <% if @import.stats["posts_skipped"].to_i > 0 %>
+        <div class="bg-yellow-50 p-4">
+          <div class="text-2xl font-bold text-yellow-700"><%= @import.stats["posts_skipped"] %></div>
+          <div class="text-sm text-yellow-600">Posts Skipped</div>
+        </div>
+      <% end %>
+      <% if @import.stats["media_downloaded"].to_i > 0 %>
+        <div class="bg-blue-50 p-4">
+          <div class="text-2xl font-bold text-blue-700"><%= @import.stats["media_downloaded"] %></div>
+          <div class="text-sm text-blue-600">Media Downloaded</div>
+        </div>
+      <% end %>
+      <% if @import.stats["media_reused"].to_i > 0 %>
+        <div class="bg-purple-50  p-4">
+          <div class="text-2xl font-bold text-purple-700"><%= @import.stats["media_reused"] %></div>
+          <div class="text-sm text-purple-600">Media Reused</div>
+        </div>
+      <% end %>
+    </div>
+    <%# Filter to only show unresolved missing media %>
+    <% unresolved_media = @import.stats["missing_media"].reject { |m| m["resolved"] || m["skipped"] } if @import.stats["missing_media"].present? %>
+    <% resolved_media = @import.stats["missing_media"].select { |m| m["resolved"] } if @import.stats["missing_media"].present? %>
+    <% skipped_media = @import.stats["missing_media"].select { |m| m["skipped"] } if @import.stats["missing_media"].present? %>
+    <% if unresolved_media.present? && unresolved_media.any? %>
+      <div class="mt-4">
+        <h3 class="text-sm font-medium text-orange-700 mb-2">Awaiting Media (<%= unresolved_media.sum { |m| m["items"].count } %>)</h3>
+        <div class="bg-orange-50 p-4 max-h-48 overflow-y-auto">
+          <p class="text-sm text-orange-700 mb-2">The following media needs to be downloaded and connected:</p>
+          <ul class="text-sm text-orange-700 list-disc list-inside">
+            <% unresolved_media.first(10).each do |entry| %>
+              <% entry["items"].each do |item| %>
+                <li>
+                  <% expected = item["expected_path"] || "/media/#{item["type"] == 'video' ? 'video' : (item["type"] == 'audio' || item["type"] == 'podcast' ? 'audio' : 'images')}/#{entry["slug"]}.#{item["type"] == 'video' ? 'mp4' : (item["type"] == 'audio' || item["type"] == 'podcast' ? 'mp3' : 'jpg')}" %>
+                  <%= item["type"].capitalize %>: <%= entry["slug"] %> → <%= expected %>
+                  <% if item["url"].present? %>
+                    <br>
+                    <span class="text-xs">(Source: <%= item["url"] %>)</span>
+                  <% end %>
+                </li>
+              <% end %>
+            <% end %>
+            <% if unresolved_media.count > 10 %>
+              <li>... and <%= unresolved_media.count - 10 %> more</li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+    <% if resolved_media.present? && resolved_media.any? %>
+      <div class="mt-4">
+        <h3 class="text-sm font-medium text-green-700 mb-2">Connected Media (<%= resolved_media.count %>)</h3>
+        <div class="bg-green-50 p-4 max-h-32 overflow-y-auto">
+          <ul class="text-sm text-green-700 list-disc list-inside">
+            <% resolved_media.first(5).each do |entry| %>
+              <li>
+                <%= entry["slug"] %>: <%= entry["local_path"] || entry["items"].first["expected_path"] %>
+              </li>
+            <% end %>
+            <% if resolved_media.count > 5 %>
+              <li>... and <%= resolved_media.count - 5 %> more</li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+    <% if skipped_media.present? && skipped_media.any? %>
+      <div class="mt-4">
+        <h3 class="text-sm font-medium text-gray-700 mb-2">Skipped Media (<%= skipped_media.count %>)</h3>
+        <div class="bg-gray-50 p-4 max-h-32 overflow-y-auto">
+          <ul class="text-sm text-gray-700 list-disc list-inside">
+            <% skipped_media.first(5).each do |entry| %>
+              <li>
+                <%= entry["slug"] %>: <%= entry["skip_reason"] || "Skipped" %>
+              </li>
+            <% end %>
+            <% if skipped_media.count > 5 %>
+              <li>... and <%= skipped_media.count - 5 %> more</li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+    <%# Member Import Stats %>
+    <% if @import.stats["members_imported"].to_i > 0 || @import.stats["members_updated"].to_i > 0 || @import.stats["members_discarded"].to_i > 0 %>
+      <div class="mt-6 pt-6 border-t border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Member Import Results</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <% if @import.stats["members_imported"].to_i > 0 %>
+            <div class="bg-green-50 p-4">
+              <div class="text-2xl font-bold text-green-700"><%= @import.stats["members_imported"] %></div>
+              <div class="text-sm text-green-600">Members Created</div>
+            </div>
+          <% end %>
+          <% if @import.stats["members_updated"].to_i > 0 %>
+            <div class="bg-blue-50 p-4">
+              <div class="text-2xl font-bold text-blue-700"><%= @import.stats["members_updated"] %></div>
+              <div class="text-sm text-blue-600">Members Updated</div>
+            </div>
+          <% end %>
+          <% if @import.stats["members_discarded"].to_i > 0 %>
+            <div class="bg-yellow-50 p-4">
+              <div class="text-2xl font-bold text-yellow-700"><%= @import.stats["members_discarded"] %></div>
+              <div class="text-sm text-yellow-600">Discarded</div>
+            </div>
+          <% end %>
+        </div>
+        <% if @import.stats["members_by_plan"].present? && @import.stats["members_by_plan"].any? %>
+          <div class="mt-4">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Breakdown by Plan</h4>
+            <div class="bg-gray-50 p-4">
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                <% @import.stats["members_by_plan"].each do |plan, count| %>
+                  <div class="flex justify-between">
+                    <span class="capitalize"><%= plan %>:</span>
+                    <span class="font-medium"><%= count %></span>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+    <% if @import.stats["errors"].present? && @import.stats["errors"].any? %>
+      <div class="mt-4">
+        <h3 class="text-sm font-medium text-red-700 mb-2">Errors (<%= @import.stats["errors"].count %>)</h3>
+        <div class="bg-red-50 p-4 max-h-48 overflow-y-auto">
+          <ul class="text-sm text-red-700 list-disc list-inside">
+            <% @import.stats["errors"].first(10).each do |error| %>
+              <li><%= error %></li>
+            <% end %>
+            <% if @import.stats["errors"].count > 10 %>
+              <li>... and <%= @import.stats["errors"].count - 10 %> more</li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+<!-- Actions -->
+<div class="bg-white shadow p-6">
+  <h2 class="text-lg font-medium mb-4">Actions</h2>
+  <div class="flex flex-wrap gap-3">
+    <% if @import.can_rollback? %>
+      <%= button_to "Rollback Import", rollback_admin_import_path(@import), method: :post, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs", data: { confirm: "Are you sure? This will permanently delete all posts and media files created by this import." } %>
+    <% end %>
+    <%# Allow deletion of any import record (posts/media remain in the system) %>
+    <%= button_to "Delete Import Record", admin_import_path(@import), method: :delete, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border red-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs", data: { confirm: "This will delete the import tracking record only. Posts and media will remain. Are you sure?" } %>
+    <% if @import.stats["missing_media"].present? && @import.stats["missing_media"].any? { |m| !m["resolved"] && !m["skipped"] } %>
+      <%= link_to "Resolve Missing Media →", resolve_missing_media_admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-400 hover:bg-amber-300 font-mono rounded-xs" %>
+    <% end %>
+    <% if @import.phase_completed?(2) && !@import.phase_completed?(3) %>
+      <%= link_to "Continue to Members Import →", phase_3_admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    <% end %>
+    <% if @import.phase_completed?(3) && !@import.phase_completed?(4) %>
+      <%= link_to "Continue to Deliveries Import →", phase_4_admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    <% end %>
+    <% if @import.phase_completed?(4) %>
+      <span class="inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-green-800 bg-green-200 font-mono rounded-xs text-green-800">
+        ✓ Import Complete
+      </span>
+    <% end %>
+  </div>
+</div>
+<%# Delivery Stats %>
+<% if @import.stats["deliveries_created"].to_i > 0 || @import.stats["posts_with_deliveries"].to_i > 0 %>
+  <div class="mt-6 bg-white shadow p-6">
+    <h2 class="text-lg font-medium mb-4">Delivery Import Results</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      <% if @import.stats["deliveries_created"].to_i > 0 %>
+        <div class="bg-green-50 p-4">
+          <div class="text-2xl font-bold text-green-700"><%= @import.stats["deliveries_created"] %></div>
+          <div class="text-sm text-green-600">Deliveries Created</div>
+        </div>
+      <% end %>
+      <% if @import.stats["posts_with_deliveries"].to_i > 0 %>
+        <div class="bg-blue-50 p-4">
+          <div class="text-2xl font-bold text-blue-700"><%= @import.stats["posts_with_deliveries"] %></div>
+          <div class="text-sm text-blue-600">Posts with Deliveries</div>
+        </div>
+      <% end %>
+      <% if @import.stats["members_who_received"].to_i > 0 %>
+        <div class="bg-purple-50 p-4">
+          <div class="text-2xl font-bold text-purple-700"><%= @import.stats["members_who_received"] %></div>
+          <div class="text-sm text-purple-600">Members Reached</div>
+        </div>
+      <% end %>
+      <% if @import.stats["deliveries_skipped_no_member"].to_i > 0 %>
+        <div class="bg-yellow-50 p-4">
+          <div class="text-2xl font-bold text-yellow-700"><%= @import.stats["deliveries_skipped_no_member"] %></div>
+          <div class="text-sm text-yellow-600">Skipped (No Member)</div>
+        </div>
+      <% end %>
+      <% if @import.stats["deliveries_skipped_no_post"].to_i > 0 %>
+        <div class="bg-orange-50 p-4">
+          <div class="text-2xl font-bold text-orange-700"><%= @import.stats["deliveries_skipped_no_post"] %></div>
+          <div class="text-sm text-orange-600">Skipped (No Post)</div>
+        </div>
+      <% end %>
+      <% if @import.stats["deliveries_skipped_exists"].to_i > 0 %>
+        <div class="bg-gray-50 p-4">
+          <div class="text-2xl font-bold text-gray-700"><%= @import.stats["deliveries_skipped_exists"] %></div>
+          <div class="text-sm text-gray-600">Skipped (Duplicate)</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+<%# Data Verification - Sample deliveries to verify accuracy %>
+<% if @import.phase_completed?(4) && @import.stats["deliveries_created"].to_i > 0 %>
+  <div class="mt-6 bg-white shadow p-6">
+    <h2 class="text-lg font-medium mb-4">Data Verification (Sample)</h2>
+    <p class="text-sm text-gray-600 mb-4">Verify deliveries were linked correctly by checking these sample records:</p>
+    <% sample_deliveries = NewsletterSend.where(import: @import).limit(5).includes(:post, :member) %>
+    <% if sample_deliveries.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left">Post</th>
+              <th class="px-4 py-2 text-left">Member</th>
+              <th class="px-4 py-2 text-left">Sent At</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <% sample_deliveries.each do |delivery| %>
+              <tr>
+                <td class="px-4 py-2">
+                  <% if delivery.post %>
+                    <%= link_to delivery.post.title, admin_post_path(delivery.post), class: "text-blue-600 hover:underline" %>
+                  <% else %>
+                    <span class="text-red-600">Post missing!</span>
+                  <% end %>
+                </td>
+                <td class="px-4 py-2">
+                  <% if delivery.member %>
+                    <%= delivery.member.email %>
+                  <% else %>
+                    <span class="text-red-600">Member missing!</span>
+                  <% end %>
+                </td>
+                <td class="px-4 py-2 text-gray-600">
+                  <%= delivery.sent_at&.strftime("%b %d, %Y %H:%M") || "Unknown" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <% total_deliveries = NewsletterSend.where(import: @import).count %>
+      <% orphaned_posts = NewsletterSend.where(import: @import).where.missing(:post).count %>
+      <% orphaned_members = NewsletterSend.where(import: @import).where.missing(:member).count %>
+      <% orphaned = orphaned_posts + orphaned_members %>
+      <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <div class="bg-gray-50 p-3 rounded">
+          <span class="text-gray-600">Total deliveries for this import:</span>
+          <span class="font-medium ml-2"><%= total_deliveries %></span>
+        </div>
+        <div class="<%= orphaned > 0 ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800' %> p-3 rounded">
+          <span>Orphaned records (missing post/member):</span>
+          <span class="font-medium ml-2"><%= orphaned %></span>
+        </div>
+      </div>
+      <div class="mt-4 text-xs text-gray-500">
+        <p>To verify accuracy, compare these numbers with your Substack analytics:</p>
+        <ul class="list-disc list-inside mt-1 ml-2">
+          <li>Total deliveries should match your total email sends</li>
+          <li>Posts with deliveries should match your published post count</li>
+          <li>Members reached should match your active subscriber count</li>
+          <li>Orphaned records should be 0 (indicates data integrity issues)</li>
+        </ul>
+      </div>
+    <% else %>
+      <p class="text-yellow-600">No delivery records found for this import.</p>
+    <% end %>
+  </div>
+<% end %>
+<!-- Debug Stats - moved to bottom -->
+<% if @import.stats.present? && Rails.env.development? %>
+  <div class="mt-8 bg-gray-100 p-4 text-xs font-mono">
+    <p class="font-bold mb-2">Debug - Raw Stats:</p>
+    <pre class="max-h-64 overflow-y-auto"><%= JSON.pretty_generate(@import.stats) %></pre>
+  </div>
+<% end %>
+</div>
+<%# Auto-refresh for in-progress imports %>
+<% if @import.status_importing_posts? || @import.status_importing_media? || @import.status_importing_members? || @import.status_importing_deliveries? %>
+  <script>
+    // Auto-refresh every 3 seconds while import is in progress
+    setTimeout(function() {
+      window.location.reload();
+    }, 3000);
+  </script>
+<% end %>

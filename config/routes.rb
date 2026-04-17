@@ -77,7 +77,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :configs, only: [:index] do
+    resources :configs, only: [ :index ] do
       collection do
         post :generate_podcast
         delete :delete_podcast
@@ -91,17 +91,17 @@ Rails.application.routes.draw do
     end
 
     # Stripe Configuration
-    resource :stripe_config, only: [:edit, :update, :destroy]
+    resource :stripe_config, only: [ :edit, :update, :destroy ]
 
     # Postmark Configuration
-    resource :postmark_config, only: [:edit, :update, :destroy] do
+    resource :postmark_config, only: [ :edit, :update, :destroy ] do
       post :regenerate_webhook_token, on: :member
     end
 
     # Snipcart Configuration
-    resource :snipcart_config, only: [:edit, :update, :destroy]
+    resource :snipcart_config, only: [ :edit, :update, :destroy ]
 
-    resources :themes, only: [:index] do
+    resources :themes, only: [ :index ] do
       member do
         get :edit
         patch :update
@@ -126,79 +126,98 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :emails, only: [:index, :edit, :update] do
+    resources :imports, only: [ :index, :new, :create, :show, :destroy ] do
+      member do
+        get :phase_2
+        post :phase_2_run
+        get :phase_3
+        post :phase_3_run
+        get :phase_4
+        post :phase_4_run
+        post :rollback
+        post :rollback_members
+        post :rollback_deliveries
+        get :resolve_missing_media
+        post :attempt_download
+        post :resolve_manually
+        post :skip_missing_media
+        post :reconnect_media
+      end
+    end
+
+    resources :emails, only: [ :index, :edit, :update ] do
       member do
         post :preview
         get :preview
       end
     end
 
-    get 'static_site', to: 'static_site#index', as: :static_site
-    post 'static_site/generate', to: 'static_site#generate', as: :generate_static_site
-    post 'static_site/clean', to: 'static_site#clean', as: :clean_static_site
-    post 'static_site/rebuild', to: 'static_site#rebuild', as: :rebuild_static_site
-    get 'static_site/status', to: 'static_site#status', as: :status_static_site
+    get "static_site", to: "static_site#index", as: :static_site
+    post "static_site/generate", to: "static_site#generate", as: :generate_static_site
+    post "static_site/clean", to: "static_site#clean", as: :clean_static_site
+    post "static_site/rebuild", to: "static_site#rebuild", as: :rebuild_static_site
+    get "static_site/status", to: "static_site#status", as: :status_static_site
 
-    delete 'system_assets/:id', to: 'system_assets#destroy', as: 'system_asset', constraints: { id: /[^\/]+/ }
+    delete "system_assets/:id", to: "system_assets#destroy", as: "system_asset", constraints: { id: /[^\/]+/ }
 
     # Separate config edit routes
-    get 'configs/site/edit', to: 'configs#edit_site', as: 'edit_site_config'
-    patch 'configs/site', to: 'configs#update_site', as: 'site_config'
+    get "configs/site/edit", to: "configs#edit_site", as: "edit_site_config"
+    patch "configs/site", to: "configs#update_site", as: "site_config"
 
-    get 'configs/fonts/edit', to: 'configs#edit_fonts', as: 'edit_fonts_config'
-    patch 'configs/fonts', to: 'configs#update_fonts', as: 'fonts_config'
+    get "configs/fonts/edit", to: "configs#edit_fonts", as: "edit_fonts_config"
+    patch "configs/fonts", to: "configs#update_fonts", as: "fonts_config"
 
-    get 'configs/podcast/edit', to: 'configs#edit_podcast', as: 'edit_podcast_config'
-    patch 'configs/podcast', to: 'configs#update_podcast', as: 'podcast_config'
+    get "configs/podcast/edit", to: "configs#edit_podcast", as: "edit_podcast_config"
+    patch "configs/podcast", to: "configs#update_podcast", as: "podcast_config"
 
-    get 'configs/cards/edit', to: 'configs#edit_cards', as: 'edit_cards_config'
-    patch 'configs/cards', to: 'configs#update_cards', as: 'cards_config'
+    get "configs/cards/edit", to: "configs#edit_cards", as: "edit_cards_config"
+    patch "configs/cards", to: "configs#update_cards", as: "cards_config"
 
-    get 'configs/collections/edit', to: 'configs#edit_collections', as: 'edit_collections_config'
-    patch 'configs/collections', to: 'configs#update_collections', as: 'collections_config'
+    get "configs/collections/edit", to: "configs#edit_collections", as: "edit_collections_config"
+    patch "configs/collections", to: "configs#update_collections", as: "collections_config"
 
-    get 'configs/members/edit', to: 'configs#edit_members', as: 'edit_members_config'
-    patch 'configs/members', to: 'configs#update_members', as: 'members_config'
+    get "configs/members/edit", to: "configs#edit_members", as: "edit_members_config"
+    patch "configs/members", to: "configs#update_members", as: "members_config"
 
-    get 'configs/store/edit', to: 'configs#edit_store', as: 'edit_store_config'
-    patch 'configs/store', to: 'configs#update_store', as: 'store_config'
+    get "configs/store/edit", to: "configs#edit_store", as: "edit_store_config"
+    patch "configs/store", to: "configs#update_store", as: "store_config"
 
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"
     patch "settings/post_template", to: "settings#update_post_template"
-    get 'posts/search', to: 'posts#search'
+    get "posts/search", to: "posts#search"
   end
 
   # Health check
-  get '/health', to: 'health#check'
+  get "/health", to: "health#check"
 
   # Member authentication (public-facing)
   post "signin", to: "members/sessions#create"
   delete "signout", to: "members/sessions#destroy"
-  get 'signin/:token', to: 'members/sessions#signin_with_token', as: :token_signin
+  get "signin/:token", to: "members/sessions#signin_with_token", as: :token_signin
 
-  post 'signup', to: 'members/registrations#create'
-  post 'signup_and_checkout', to: 'members/registrations#create_and_checkout'
+  post "signup", to: "members/registrations#create"
+  post "signup_and_checkout", to: "members/registrations#create_and_checkout"
 
   # Member account management
   get "account", to: "members/accounts#show"
   get "account/edit", to: "members/accounts#edit"
   patch "account", to: "members/accounts#update"
   get "account/confirm-email", to: "members/accounts#confirm_email", as: :confirm_email
-  get '/unsubscribe/:token', to: 'members/subscriptions#unsubscribe', as: :unsubscribe
-  post '/unsubscribe/:token', to: 'members/subscriptions#confirm_unsubscribe'
-  post 'webhooks/postmark/:token', to: 'webhooks/postmark#create', as: :admin_postmark_webhook
+  get "/unsubscribe/:token", to: "members/subscriptions#unsubscribe", as: :unsubscribe
+  post "/unsubscribe/:token", to: "members/subscriptions#confirm_unsubscribe"
+  post "webhooks/postmark/:token", to: "webhooks/postmark#create", as: :admin_postmark_webhook
 
   # Public checkout
-  post 'checkout', to: 'checkout#create', as: :create_checkout
-  get 'checkout/success', to: 'checkout#success', as: :checkout_success
-  get 'checkout/cancel', to: 'checkout#cancel', as: :checkout_cancel
+  post "checkout", to: "checkout#create", as: :create_checkout
+  get "checkout/success", to: "checkout#success", as: :checkout_success
+  get "checkout/cancel", to: "checkout#cancel", as: :checkout_cancel
 
   # Public site
   root "posts#index"
 
   # Redirect post ID to slug (preserves anchor in browser)
-  get 'p/:id', to: 'posts#show_by_id', constraints: { id: /\d+/ }, as: :post_by_id
+  get "p/:id", to: "posts#show_by_id", constraints: { id: /\d+/ }, as: :post_by_id
 
   get "posts/:url_name", to: "posts#show", as: :post
   get "documentation/:url_name", to: "documentation#show", as: :documentation
@@ -206,30 +225,30 @@ Rails.application.routes.draw do
   # get "store/:url_name/validate", to: "products#validate", as: :product_validate, defaults: { format: :json }
 
   # Collections and posts archive
-  get 'posts', to: 'collections#show', defaults: { filters: 'all' }
-  get 'collections/*filters', to: 'collections#show', as: :collection
+  get "posts", to: "collections#show", defaults: { filters: "all" }
+  get "collections/*filters", to: "collections#show", as: :collection
 
   # Feeds
-  get "feed", to: "feeds#rss", defaults: { format: 'xml' }, as: :feed
-  get "feed.xml", to: "feeds#rss", defaults: { format: 'xml' }
-  get "feed.atom", to: "feeds#atom", defaults: { format: 'xml' }, as: :feed_atom
-  get '/podcast/:podcast_key.xml', to: 'feeds#podcast', as: :podcast_feed
+  get "feed", to: "feeds#rss", defaults: { format: "xml" }, as: :feed
+  get "feed.xml", to: "feeds#rss", defaults: { format: "xml" }
+  get "feed.atom", to: "feeds#atom", defaults: { format: "xml" }, as: :feed_atom
+  get "/podcast/:podcast_key.xml", to: "feeds#podcast", as: :podcast_feed
 
   # Theme CSS
-  get 'theme/:filename.css', to: 'system/themes#show', defaults: { format: 'css' }
-  get 'theme/:filename.js', to: 'system/themes#show', defaults: { format: 'js' }
+  get "theme/:filename.css", to: "system/themes#show", defaults: { format: "css" }
+  get "theme/:filename.js", to: "system/themes#show", defaults: { format: "js" }
   # Theme assets (CSS and JS)
   # get 'theme/:filename', to: 'system/themes#show'
 
   # System assets
-  get 'system/fonts/:filename', to: 'system/fonts#show', as: :system_font, constraints: { filename: /[^\/]+/ }
-  get 'system/images/:filename', to: 'system/images#show', as: :system_image, constraints: { filename: /[^\/]+/ }
+  get "system/fonts/:filename", to: "system/fonts#show", as: :system_font, constraints: { filename: /[^\/]+/ }
+  get "system/images/:filename", to: "system/images#show", as: :system_image, constraints: { filename: /[^\/]+/ }
 
   # Media files
-  get '/media/*path', to: 'media#show', format: false
+  get "/media/*path", to: "media#show", format: false
 
   # Stripe webhooks
-  post 'webhooks/stripe', to: 'webhooks#stripe', as: :stripe_webhook
+  post "webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page

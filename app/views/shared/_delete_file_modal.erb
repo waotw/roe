@@ -1,5 +1,5 @@
-<div id="delete-modal-<%= resource_type %>" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-  <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+<div id="delete-modal-<%= resource_type %>" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6  shadow-xl max-w-md w-full mx-4">
     <h3 class="text-lg font-bold text-gray-900 mb-2">Delete "<span id="delete-item-title-<%= resource_type %>"></span>"?</h3>
     <p class="text-sm text-gray-600 mb-4">
       This will permanently delete the file from <code class="bg-gray-100 px-1">content/<%= resource_type %>s/</code>.
@@ -11,14 +11,14 @@
       </label>
       <input type="text"
              id="delete-confirmation-input-<%= resource_type %>"
-             class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-red-500 focus:border-red-500"
+             class="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500"
              placeholder="DELETE"
              autocomplete="off">
     </div>
     <div class="flex gap-3 justify-end">
       <button type="button"
               onclick="hideDeleteConfirmation('<%= resource_type %>')"
-              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded">
+              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
         Cancel
       </button>
       <%= button_to "Delete Permanently",
@@ -26,7 +26,7 @@
           method: :delete,
           id: "delete-confirm-btn-#{resource_type}",
           disabled: true,
-          class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50 disabled:cursor-not-allowed",
+          class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed",
           form: {
             onsubmit: "return document.getElementById('delete-confirmation-input-#{resource_type}').value === 'DELETE'",
             style: "display: inline; margin: 0;"

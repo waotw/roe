@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_15_121554) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_16_161846) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -69,6 +69,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_15_121554) do
     t.string "email", null: false
     t.datetime "email_confirmation_sent_at"
     t.string "email_confirmation_token"
+    t.integer "import_id"
     t.json "metadata", default: {}
     t.string "name"
     t.integer "newsletter_status", default: 0, null: false
@@ -83,6 +84,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_15_121554) do
     t.datetime "updated_at", null: false
     t.index ["access_token"], name: "index_members_on_access_token", unique: true
     t.index ["email"], name: "index_members_on_email", unique: true
+    t.index ["import_id"], name: "index_members_on_import_id"
     t.index ["status"], name: "index_members_on_status"
     t.index ["stripe_customer_id"], name: "index_members_on_stripe_customer_id", unique: true
     t.index ["tier", "status"], name: "index_members_on_tier_and_status"
@@ -90,11 +92,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_15_121554) do
 
   create_table "newsletter_sends", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.integer "import_id"
     t.integer "member_id", null: false
     t.string "message_id"
     t.integer "post_id", null: false
     t.datetime "sent_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["import_id"], name: "index_newsletter_sends_on_import_id"
     t.index ["member_id"], name: "index_newsletter_sends_on_member_id"
     t.index ["message_id"], name: "index_newsletter_sends_on_message_id"
     t.index ["post_id", "member_id"], name: "index_newsletter_sends_on_post_id_and_member_id", unique: true
@@ -188,6 +192,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_15_121554) do
   add_foreign_key "media", "imports"
   add_foreign_key "media_references", "media"
   add_foreign_key "media_references", "posts"
+  add_foreign_key "members", "imports"
+  add_foreign_key "newsletter_sends", "imports"
   add_foreign_key "posts", "imports"
   add_foreign_key "sessions", "users"
 end

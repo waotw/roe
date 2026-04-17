@@ -1,6 +1,7 @@
 class NewsletterSend < ApplicationRecord
   belongs_to :post
   belongs_to :member
+  belongs_to :import, optional: true
 
   validates :post_id, presence: true
   validates :member_id, presence: true

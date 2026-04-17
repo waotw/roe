@@ -1,6 +1,6 @@
 class PostmarkConfig < ApplicationRecord
   # Validations
-  validates :server_token, presence: true, if: :connected?
+  # validates :server_token, presence: true, if: :connected?
 
   # Callbacks
   before_create :set_connected_at

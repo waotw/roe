@@ -6,8 +6,8 @@ module HasMarkdownExtensions
     code_blocks = {}
     counter = 0
 
-    # Handle 4+ backticks first
-    processed_content = content.gsub(/````+(\w*)\r?\n(.*?)````+/m) do
+    # Handle 4+ backticks first (allow optional whitespace after language)
+    processed_content = content.gsub(/````+(\w*)\s*\r?\n(.*?)````+/m) do
       lang = $1.empty? ? 'text' : $1
       code = $2
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
@@ -17,12 +17,12 @@ module HasMarkdownExtensions
     end
 
     # Handle 3-backtick blocks (skip collection/card/gallery)
-    processed_content = processed_content.gsub(/```(\w+)\r?\n(.*?)```/m) do
+    processed_content = processed_content.gsub(/```(\w+)\s*\r?\n(.*?)```/m) do
       lang = $1
       code = $2
 
       # Skip special blocks
-      if ['collection', 'card', 'gallery', 'form', 'button'].include?(lang)
+      if [ 'collection', 'card', 'gallery', 'form', 'button' ].include?(lang)
         next $~.to_s
       end
 
@@ -391,7 +391,7 @@ module HasMarkdownExtensions
       collection = Documentation.public_documentation
       collection = apply_tag_filters(collection, tags) if tags
       collection
-  when "products"
+    when "products"
       collection = Product.published
       collection = apply_category_filter(collection, category) if category
       collection = apply_tag_filters(collection, tags) if tags
@@ -589,22 +589,22 @@ module HasMarkdownExtensions
       image_url = item.respond_to?(:image) ? item.image : nil
       image_url = '/media/images/404.png' if image_url.blank?
 
-      output << %Q{    <div class="grid-item-image">}
-      output << %Q{      <a href="#{item_path(item)}">}
-      output << %Q{        <img src="#{image_url}" alt="#{item.title || 'Product'}" class="#{image_class}" loading="lazy">}
-      output << %Q{      </a>}
-      output << %Q{    </div>}
+      output << %Q(    <div class="grid-item-image">)
+      output << %Q(      <a href="#{item_path(item)}">)
+      output << %Q(        <img src="#{image_url}" alt="#{item.title || 'Product'}" class="#{image_class}" loading="lazy">)
+      output << %Q(      </a>)
+      output << %Q(    </div>)
 
       # Product title (linked)
-      output << %Q{    <div class="grid-item-title">}
-      output << %Q{      <a href="#{item_path(item)}">#{item.title || 'Untitled'}</a>}
-      output << %Q{    </div>}
+      output << %Q(    <div class="grid-item-title">)
+      output << %Q(      <a href="#{item_path(item)}">#{item.title || 'Untitled'}</a>)
+      output << %Q(    </div>)
 
       # Optional description
       if show_description && item.respond_to?(:description) && item.description.present?
         # Truncate to ~100 characters
         desc = item.description.length > 100 ? item.description[0..97] + '...' : item.description
-        output << %Q{    <div class="grid-item-description">#{desc}</div>}
+        output << %Q(    <div class="grid-item-description">#{desc}</div>)
       end
 
       # Price and Add to Cart button
@@ -612,7 +612,7 @@ module HasMarkdownExtensions
 
       if item.respond_to?(:price)
         price_formatted = "#{currency_symbol}#{sprintf('%.2f', item.price)}"
-        output << %Q{      <span class="grid-item-price">#{price_formatted}</span>}
+        output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
       end
 
       # Add to Cart button (if product has SKU)
@@ -622,19 +622,19 @@ module HasMarkdownExtensions
         domain = SiteConfig.feature('store', 'default_domain')
         validation_url = domain ? "https://#{domain}#{product_url}" : product_url
 
-        output << %Q{      <button class="snipcart-add-item grid-item-button"}
-        output << %Q{              data-turbo="false"}
-        output << %Q{              data-item-id="#{item.sku}"}
-        output << %Q{              data-item-name="#{item.title}"}
-        output << %Q{              data-item-price="#{item.price}"}
-        output << %Q{              data-item-url="#{validation_url}"}
+        output << %Q(      <button class="snipcart-add-item grid-item-button")
+        output << %Q(              data-turbo="false")
+        output << %Q(              data-item-id="#{item.sku}")
+        output << %Q(              data-item-name="#{item.title}")
+        output << %Q(              data-item-price="#{item.price}")
+        output << %Q(              data-item-url="#{validation_url}")
         if item.respond_to?(:description) && item.description.present?
-          output << %Q{              data-item-description="#{item.description.gsub('"', '&quot;')}"}
+          output << %Q(              data-item-description="#{item.description.gsub('"', '&quot;')}")
         end
         if item.respond_to?(:image) && item.image.present?
-          output << %Q{              data-item-image="#{item.image}"}
+          output << %Q(              data-item-image="#{item.image}")
         end
-        output << %Q{      >Add to Cart</button>}
+        output << %Q(      >Add to Cart</button>)
       end
 
       output << '    </div>' # Close grid-item-footer
@@ -894,9 +894,10 @@ module HasMarkdownExtensions
         # Start with post's actual data - only include image if it exists
         post_data = {
           title: referenced_post.title || 'Untitled',
-          author: referenced_post.author || '',
+          author: referenced_post.author || '',  # Will be further processed below
           date: referenced_post.date,
-          excerpt: referenced_post.excerpt || '',
+          subtitle: referenced_post.metadata['subtitle'] || '',
+          excerpt: referenced_post.metadata['excerpt'] || '',
           url: "/posts/#{referenced_post.url_name}"
         }
 
@@ -913,11 +914,23 @@ module HasMarkdownExtensions
 
     style = config[:style] || 'small'
     title = config[:title] || 'Untitled'
-    author = config[:author] || ''
     date_raw = config[:date] || ''
+    subtitle = config[:subtitle] || ''
     excerpt = config[:excerpt] || ''
     url = config[:url] || '#'
     link_text = config[:link_text] || SiteConfig.default('cards', 'post-link')&.[]('default_link_text') || 'Read full story →'
+
+    # Author fallback chain: card config -> post metadata -> site config -> blank
+    author = if config[:author].present?
+      config[:author]  # 1. Explicitly provided in card
+    elsif config[:post].present?
+      referenced_post = find_post_by_slug(config[:post])
+      referenced_post&.author.presence  # 2. From post metadata
+    else
+      nil
+    end
+    author ||= SiteConfig.get('author')  # 3. From site config (FIXED)
+    author ||= ''  # 4. Blank if none found
 
     # Handle image with priority: explicit > post metadata > default
     image = if config.key?(:image)
@@ -948,28 +961,49 @@ module HasMarkdownExtensions
       end
     end
 
-    # Build metadata line
+    # Build metadata line (author • date)
     metadata_parts = [ author, date ].reject(&:blank?)
     metadata = metadata_parts.join(' • ')
 
-    # Only show excerpt for large style, truncate if needed
-    excerpt_html = ''
-    if style == 'large' && excerpt.present?
-      truncated = excerpt.length > 200 ? excerpt[0..197] + '...' : excerpt
-      excerpt_html = "<p class=\"card-excerpt\">#{truncated}</p>"
+    # For large style: show subtitle if available, fallback to excerpt, otherwise nothing
+    body_html = ''
+    if style == 'large'
+      body_text = subtitle.present? ? subtitle : excerpt
+      if body_text.present?
+        truncated = body_text.length > 200 ? body_text[0..197] + '...' : body_text
+        body_html = "<p class=\"card-body\">#{truncated}</p>"
+      end
     end
 
-    <<~HTML
-      <div class="card post-link-#{style}">
-        #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
-        <div class="card-content">
-          <h4 class="card-title-#{style}">#{title}</h4>
-          #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
-          #{excerpt_html}
-          <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+    # Build HTML based on style
+    if style == 'large'
+      # Large style: title, metadata, image, body, link
+      <<~HTML
+        <div class="card post-link-#{style}">
+          <div class="card-content">
+            <h4 class="card-title-#{style}">#{title}</h4>
+            #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
+          </div>
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+          <div class="card-content">
+            #{body_html}
+            <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+          </div>
         </div>
-      </div>
-    HTML
+      HTML
+    else
+      # Small style: image, title, metadata, link
+      <<~HTML
+        <div class="card post-link-#{style}">
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+          <div class="card-content">
+            <h4 class="card-title-#{style}">#{title}</h4>
+            #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
+            <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+          </div>
+        </div>
+      HTML
+    end
   end
 
   ### ASIDES
