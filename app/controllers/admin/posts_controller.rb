@@ -214,6 +214,9 @@ class Admin::PostsController < Admin::BaseController
     end
 
     @preview_path = preview_admin_post_path(@post)
+
+    # Calculate new members count for newsletter status
+    calculate_new_members_count
   end
 
   def update
@@ -407,6 +410,7 @@ class Admin::PostsController < Admin::BaseController
 
   def newsletter_status
     @post = Post.find(params[:id])
+    calculate_new_members_count
     render partial: 'newsletter_status', layout: false
   end
 
@@ -519,6 +523,28 @@ class Admin::PostsController < Admin::BaseController
   end
 
   private
+
+  def calculate_new_members_count
+    # Calculate new members count with same logic as resend_modal
+    if @post.persisted? && NewsletterSend.exists?(post: @post)
+      received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
+      new_members = Member.newsletter_subscribed
+                          .active
+                          .where.not(id: received_member_ids)
+
+      # Filter by audience if needed
+      new_members = new_members.paid_tier if @post.audience == 'paid'
+
+      # If this is a Substack-imported post, exclude Substack-imported members
+      if @post.metadata['substack_post_id'].present?
+        new_members = new_members.where(import_id: nil)
+      end
+
+      @new_members_count = new_members.count
+    else
+      @new_members_count = 0
+    end
+  end
 
   def should_send_newsletter?(post)
     published_to = post.metadata['published_to'] || post.published_to
