@@ -2,6 +2,31 @@
   <h1 class="text-2xl font-bold">Media Browser</h1>
 </div>
 
+<!-- System Status Notice -->
+<% pending_images = Medium.images.with_pending_variants.count %>
+<% if !ImageVariantGenerator.available? %>
+  <div class="mb-5 p-3 border border-amber-300 bg-amber-50 rounded">
+    <div class="flex items-start gap-2">
+      <span class="text-amber-600">⚠️</span>
+      <div>
+        <p class="text-sm text-amber-800 font-medium">Image optimization disabled</p>
+        <p class="text-xs text-amber-700 mt-1">libvips is not installed on your Mac. Install in <code class="bg-amber-200 px-1 rounded-xs">Terminal</code> with <code class="bg-amber-200 px-1 rounded-xs">brew install vips</code> and the system will automatically create image variants locally.</p>
+        <p class="text-xs text-amber-700 mt-1">This only applies to your local machine. When you deploy your site to a webhost, image optimization will work automatically.</p>
+      </div>
+    </div>
+  </div>
+<% elsif pending_images > 0 %>
+  <div class="mb-5 p-3 border border-blue-300 bg-blue-50 rounded">
+    <div class="flex items-start gap-2">
+      <span class="text-blue-600">🖼️</span>
+      <div>
+        <p class="text-sm text-blue-800 font-medium">Processing <%= pending_images %> <%= 'image'.pluralize(pending_images) %></p>
+        <p class="text-xs text-blue-700 mt-1">Image variants are being generated in the background. This page will update automatically.</p>
+      </div>
+    </div>
+  </div>
+<% end %>
+
 <!-- Upload Form -->
 <div class="mb-5 p-4 border border-gray-300 bg-gray-50">
   <div class="flex gap-2 items-center">
@@ -108,7 +133,21 @@
 
           <!-- Image/Icon -->
           <% if media.media_type == 'images' %>
-            <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
+            <div class="relative">
+              <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
+              <% if ImageVariantGenerator.available? %>
+                <% variant_stats = media.variant_stats %>
+                <% if variant_stats && !variant_stats[:ready] %>
+                  <div class="absolute top-1 left-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded">
+                    ⏳ <%= variant_stats[:generated] %>/<%= variant_stats[:total] %>
+                  </div>
+                <% elsif variant_stats && variant_stats[:ready] %>
+                  <div class="absolute top-1 left-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded" title="Variants ready: <%= ImageVariantGenerator::VARIANTS.keys.join(', ') %>">
+                    ✓
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
           <% elsif media.media_type == 'audio' %>
             <div class="w-full h-32 bg-gray-200 mb-2 flex items-center justify-center">
               <span class="text-4xl">🎵</span>

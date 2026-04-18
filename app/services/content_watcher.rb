@@ -184,12 +184,17 @@ class ContentWatcher
       else
         puts "DEBUG: Creating new record..."
         extension = File.extname(absolute_file).delete_prefix('.')
-        Medium.create!(
+        medium = Medium.create!(
           file_path: web_path,
           media_type: extension,
           uploaded_at: Time.current
         )
         puts "\n   ✓ Media file added: #{File.basename(file)}\n"
+
+        # Queue variant generation for images
+        if medium.image? && ImageVariantGenerator.available?
+          puts "   🖼️  Queued for variant generation\n"
+        end
       end
     end
   end

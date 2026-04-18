@@ -110,26 +110,47 @@ class ContentSync
     puts "=" * 60
 
     success_count = 0
+    error_count = 0
+    image_count = 0
 
     media_files.each do |file_path|
       web_path = file_path.sub('site', '')
 
-      unless Medium.exists?(file_path: web_path)
-        media_type = File.extname(file_path).delete('.').downcase
+      begin
+        unless Medium.exists?(file_path: web_path)
+          media_type = File.extname(file_path).delete('.').downcase
 
-        Medium.create!(
-          file_path: web_path,
-          media_type: media_type,  # Model's normalize_media_type will categorize it
-          uploaded_at: File.mtime(file_path)
-        )
+          medium = Medium.create!(
+            file_path: web_path,
+            media_type: media_type,
+            uploaded_at: File.mtime(file_path)
+          )
 
-        puts "  ✓ Added: #{File.basename(file_path)}"
-        success_count += 1
+          puts "  ✓ Added: #{File.basename(file_path)}"
+          success_count += 1
+
+          # Queue variant generation for images
+          if medium.image? && ImageVariantGenerator.available?
+            GenerateImageVariantsJob.perform_later(web_path, medium.id)
+            image_count += 1
+          end
+        end
+      rescue => e
+        Rails.logger.error "[ContentSync] Failed to sync #{file_path}: #{e.message}"
+        puts "  ✗ Error: #{File.basename(file_path)} - #{e.message}"
+        error_count += 1
       end
     end
 
     puts "=" * 60
-    puts "✅ Media sync complete! #{success_count} new files\n\n"
+    puts "✅ Media sync complete! #{success_count} new files"
+    puts "❌ #{error_count} errors" if error_count > 0
+
+    # Show queue message
+    if image_count > 0
+      puts "🖼️  Queued #{image_count} images for variant generation"
+    end
+    puts ""
   end
 
   def sync_documentation
@@ -184,7 +205,7 @@ class ContentSync
 
         # Parse frontmatter
         if content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)\z/m
-          frontmatter = YAML.safe_load($1, permitted_classes: [Date, Time, Symbol])
+          frontmatter = YAML.safe_load($1, permitted_classes: [ Date, Time, Symbol ])
           body = $2
         else
           puts "⚠️  Skipping #{relative_path}: No frontmatter found"

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_16_161846) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_18_000718) do
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -47,9 +47,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_16_161846) do
     t.string "source_url"
     t.datetime "updated_at", null: false
     t.datetime "uploaded_at"
+    t.datetime "variants_generated_at"
+    t.string "variants_status", default: "pending"
     t.index ["file_path"], name: "index_media_on_file_path", unique: true
     t.index ["import_id"], name: "index_media_on_import_id"
     t.index ["source_url"], name: "index_media_on_source_url"
+    t.index ["variants_status"], name: "index_media_on_variants_status"
   end
 
   create_table "media_references", force: :cascade do |t|

@@ -4,6 +4,7 @@ class Medium < ApplicationRecord
   belongs_to :import, optional: true
 
   before_save :normalize_media_type
+  after_create :queue_variant_generation, if: :image?
 
   # Scope helpers for filtering
   scope :images, -> { where(media_type: "images") }
@@ -14,6 +15,33 @@ class Medium < ApplicationRecord
       left_joins(:media_references)
         .where(media_references: { id: nil })
     }
+  scope :with_pending_variants, -> { where(variants_status: ["pending", "processing"]) }
+  scope :with_complete_variants, -> { where(variants_status: "complete") }
+
+  def image?
+    media_type == "images"
+  end
+
+  def variants_ready?
+    return false unless image?
+    variants_status == "complete"
+  end
+
+  def variant_path(variant_name)
+    return nil unless image?
+    ImageVariantGenerator.variant_path_for(file_path, variant_name)
+  end
+
+  def variant_stats
+    ImageVariantGenerator.stats_for(self)
+  end
+
+  def queue_variant_generation
+    return unless image?
+    return unless ImageVariantGenerator.available?
+
+    GenerateImageVariantsJob.perform_later(file_path, id)
+  end
 
   def self.remove_by_file_path(file_path)
     medium = find_by(file_path: file_path)

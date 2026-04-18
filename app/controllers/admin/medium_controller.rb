@@ -1,7 +1,7 @@
 class Admin::MediumController < Admin::BaseController
   def browse
-    # Load ALL media (filtering happens client-side now)
-    @media = Medium.order(created_at: :desc)
+    # Load ALL media with posts preloaded to avoid N+1
+    @media = Medium.includes(:posts).order(created_at: :desc)
 
     # Get distinct media types that exist (already normalized: 'images', 'audio', 'video', 'fonts')
     @existing_types = Medium.distinct.pluck(:media_type).compact
@@ -43,15 +43,28 @@ class Admin::MediumController < Admin::BaseController
 
     # Create database record
     relative_path = "/media/#{media_type}/#{filename}"
-    Medium.create!(
+    medium = Medium.create!(
       file_path: relative_path,
-      media_type: extension,  # Store original extension, normalize_media_type will categorize it
+      media_type: media_type,  # Store normalized type (images/audio/video), not extension
       uploaded_at: Time.current
     )
 
+    # Queue variant generation with error handling
+    if medium.image? && ImageVariantGenerator.available?
+      begin
+        GenerateImageVariantsJob.perform_later(relative_path, medium.id)
+        notice_message = "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
+      rescue => e
+        Rails.logger.error "[MediumController] Failed to queue variants: #{e.message}"
+        notice_message = "#{media_type.singularize.capitalize} uploaded (variant generation failed to queue)"
+      end
+    else
+      notice_message = "#{media_type.singularize.capitalize} uploaded"
+    end
+
     respond_to do |format|
       format.json { render json: { success: true, path: relative_path } }
-      format.html { redirect_to browse_admin_medium_index_path(type: media_type), notice: "#{media_type.singularize.capitalize} uploaded" }
+      format.html { redirect_to browse_admin_medium_index_path(type: media_type), notice: notice_message }
     end
   rescue => e
     respond_to do |format|
