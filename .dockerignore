@@ -29,6 +29,7 @@
 !/storage/.keep
 /tmp/storage/*
 !/tmp/storage/.keep
+tmp/imports/
 
 # Ignore assets.
 /node_modules/
@@ -36,9 +37,9 @@
 !/app/assets/builds/.keep
 /public/assets
 
-/site/
-/site_backups/
-/output/
+site/
+site_backups/
+output/
 public/posts/
 public/pages/
 public/media/

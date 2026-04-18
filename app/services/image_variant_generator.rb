@@ -173,10 +173,18 @@ class ImageVariantGenerator
 
     def normalize_path(path)
       # Handle both web paths (/media/images/...) and absolute paths
-      if path.start_with?("/")
-        Rails.root.join("site", path.sub(%r{^/}, "")).to_s
-      elsif path.start_with?(Rails.root.to_s)
+      path = path.to_s
+
+      # If already an absolute path to /rails/site, use it
+      if path.start_with?("/rails/site/")
         path
+      # If it's a web path starting with /media
+      elsif path.start_with?("/media/")
+        Rails.root.join("site", path.sub(%r{^/}, "")).to_s
+      # If it starts with Rails.root but not /rails/site
+      elsif path.start_with?(Rails.root.to_s) && !path.start_with?("/rails/site/")
+        path
+      # Otherwise assume it's relative
       else
         Rails.root.join("site", path).to_s
       end
