@@ -15,7 +15,9 @@ class Medium < ApplicationRecord
       left_joins(:media_references)
         .where(media_references: { id: nil })
     }
-  scope :with_pending_variants, -> { where(variants_status: ["pending", "processing"]) }
+  # Add this scope
+  scope :originals_only, -> { where.not("file_path LIKE ?", "%/variants/%") }
+  scope :with_pending_variants, -> { where(variants_status: [ "pending", "processing" ]) }
   scope :with_complete_variants, -> { where(variants_status: "complete") }
 
   def image?

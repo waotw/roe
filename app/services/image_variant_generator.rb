@@ -9,7 +9,7 @@ class ImageVariantGenerator
   }.freeze
 
   WEBP_QUALITY = 85  # Quality for WebP conversion
-  GENERATE_WEBP = false  # Set to true when helpers support WebP
+  GENERATE_WEBP = true  # Set to true when helpers support WebP
 
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
 

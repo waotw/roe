@@ -1,9 +1,11 @@
 class Admin::MediumController < Admin::BaseController
   def browse
-    # Load ALL media with posts preloaded to avoid N+1
-    @media = Medium.includes(:posts).order(created_at: :desc)
+    # Load only original media files (exclude variants)
+    @media = Medium.originals_only
+                   .includes(:posts)
+                   .order(created_at: :desc)
 
-    # Get distinct media types that exist (already normalized: 'images', 'audio', 'video', 'fonts')
+    # Get distinct media types that exist
     @existing_types = Medium.distinct.pluck(:media_type).compact
 
     render layout: 'application'
