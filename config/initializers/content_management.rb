@@ -3,7 +3,7 @@
 # Detect if we're running console or runner commands
 is_console = defined?(Rails::Console)
 is_runner = caller.any? { |line| line.include?('rails/commands/runner') }
-is_rake = defined?(Rake)
+is_rake = defined?(Rake::Task) && Rake.application.top_level_tasks.any?
 
 should_run = case Rails.env.to_sym
 when :production
