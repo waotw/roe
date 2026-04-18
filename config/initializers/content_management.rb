@@ -7,8 +7,8 @@ is_rake = defined?(Rake)
 
 should_run = case Rails.env.to_sym
 when :production
-  # Only run for web server
-  defined?(Puma) && !is_console && !is_runner && !is_rake
+  # Run unless we're in console, runner, or rake
+  !is_console && !is_runner && !is_rake
 when :development
   # In dev, only run for server
   (defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?) && !is_console && !is_runner && !is_rake
