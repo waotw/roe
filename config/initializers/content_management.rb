@@ -18,6 +18,7 @@ end
 
 puts "🔧 Content management initializer: #{should_run ? 'ENABLED' : 'DISABLED'}"
 puts "   Console: #{is_console}, Runner: #{is_runner}, Rake: #{is_rake}"
+puts "   Rails.env: #{Rails.env}, Puma: #{defined?(Puma)}"
 
 
 if should_run
