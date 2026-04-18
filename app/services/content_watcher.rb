@@ -1,7 +1,7 @@
 class ContentWatcher
   WATCH_PATHS = [ 'site/posts', 'site/pages', 'site/documentation', 'site/products', 'site/system', 'site/media' ].freeze
 
-  # Define what file types we process
+    # Define what file types we process
     ALLOWED_EXTENSIONS = %w[
       md yml
       jpg jpeg png gif webp svg
@@ -174,6 +174,12 @@ class ContentWatcher
       end
 
     elsif absolute_file.include?('site/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg|mp3|m4a|wav|ogg|flac|aac|mp4|webm|ogv|mov|avi|mkv)$/i)
+      # Skip variant files - they shouldn't be tracked in media table
+      if absolute_file.include?('/variants/')
+        puts "DEBUG: Skipping variant file: #{absolute_file}"
+        return
+      end
+
       puts "DEBUG: Processing media file: #{absolute_file}"
 
       web_path = absolute_file.sub(Rails.root.join('site').to_s, '')

@@ -2,11 +2,11 @@
 
 should_run = case Rails.env.to_sym
 when :production
-  # Check for both puma and rails server (but NOT rails runner)
-  defined?(Puma) && ($PROGRAM_NAME.include?('puma') || $PROGRAM_NAME.include?('rails')) && !$PROGRAM_NAME.include?('runner')
+  # Only run for web server, not rails runner or console
+  defined?(Puma) && !ARGV.include?('runner') && !ARGV.include?('console')
 when :development
-  # In dev, only run for server, not console or runner
-  (defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?) && !$PROGRAM_NAME.include?('runner') && !defined?(Rails::Console)
+  # In dev, only run for server
+  (defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?) && !ARGV.include?('runner') && !ARGV.include?('console')
 else
   false
 end
