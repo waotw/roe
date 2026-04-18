@@ -1,13 +1,13 @@
 # config/initializers/content_management.rb
 
-# Detect if we're running console or runner commands
+# Detect if we're running console, runner, or rake commands
 is_console = defined?(Rails::Console)
 is_runner = caller.any? { |line| line.include?('rails/commands/runner') }
-is_rake = defined?(Rake::Task) && Rake.application.top_level_tasks.any?
+is_rake = $PROGRAM_NAME.include?('rake')
 
 should_run = case Rails.env.to_sym
 when :production
-  # Run unless we're in console, runner, or rake
+  # Run for production unless we're in console, runner, or rake
   !is_console && !is_runner && !is_rake
 when :development
   # In dev, only run for server
@@ -18,8 +18,7 @@ end
 
 puts "🔧 Content management initializer: #{should_run ? 'ENABLED' : 'DISABLED'}"
 puts "   Console: #{is_console}, Runner: #{is_runner}, Rake: #{is_rake}"
-puts "   Rails.env: #{Rails.env}, Puma: #{defined?(Puma)}"
-
+puts "   PROGRAM_NAME: #{$PROGRAM_NAME}"
 
 if should_run
   Rails.application.config.after_initialize do
