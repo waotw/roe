@@ -12,12 +12,12 @@ class ContentWatcher
     EXTENSION_PATTERN = /\.(#{ALLOWED_EXTENSIONS.join('|')})$/i
 
   def self.start
-    listener = Listen.to(*WATCH_PATHS) do |modified, added, removed|
+    listener = Listen.to(*WATCH_PATHS, ignore: /\/variants\//) do |modified, added, removed|
       handle_changes(modified, added, removed)
     end
 
     listener.start
-    puts "👀 Watching #{WATCH_PATHS.join(', ')} for changes..."
+    puts "👀 Watching #{WATCH_PATHS.join(', ')} for changes (ignoring variants)..."
 
     listener
   end
