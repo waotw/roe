@@ -123,7 +123,7 @@
           <% if media.media_type == 'images' %>
             <div class="relative">
               <% if ImageVariantGenerator.available? && media.variants_ready? %>
-                <%= image_tag image_variant_path(media.file_path, :thumb), alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
+                <%= image_tag image_variant_path(media.file_path, :small), alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
               <% else %>
                 <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
               <% end %>
