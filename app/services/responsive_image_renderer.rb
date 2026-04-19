@@ -108,10 +108,12 @@ class ResponsiveImageRenderer
 
   def build_fallback_srcset
     variants = VARIANT_WIDTHS.map do |variant_name, width|
-      variant_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
-      next unless variant_exists?(variant_path)
+      filesystem_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
+      next unless variant_exists?(filesystem_path)
 
-      "#{ERB::Util.html_escape(variant_path)} #{width}w"
+      # Convert filesystem path to web path for srcset
+      web_path = filesystem_path.sub(Rails.root.join("site").to_s, "")
+      "#{ERB::Util.html_escape(web_path)} #{width}w"
     end.compact
 
     # Add original as largest
@@ -120,16 +122,26 @@ class ResponsiveImageRenderer
     variants.join(', ')
   end
 
+
   def webp_variant_path(variant_name)
     return nil unless ImageVariantGenerator::GENERATE_WEBP
 
-    variant_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
-    variant_path.sub(File.extname(variant_path), '.webp')
+    filesystem_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
+    webp_filesystem = filesystem_path.sub(File.extname(filesystem_path), '.webp')
+
+    # Convert to web path
+    webp_filesystem.sub(Rails.root.join("site").to_s, "")
   end
 
   def variant_exists?(path)
-    full_path = Rails.root.join("site", path.to_s.sub(%r{^/}, ""))
-    File.exist?(full_path)
+    # If it's already a filesystem path, use it directly
+    if path.start_with?(Rails.root.to_s)
+      File.exist?(path)
+    else
+      # Convert web path to filesystem path
+      full_path = Rails.root.join("site", path.to_s.sub(%r{^/}, ""))
+      File.exist?(full_path)
+    end
   end
 
   def image_file?
