@@ -15,10 +15,16 @@ module ImageVariantHelper
       return source_path
     end
 
-    variant_path = ImageVariantGenerator.variant_path_for(source_path.to_s, variant_name)
+    # Get filesystem path
+    filesystem_path = ImageVariantGenerator.variant_path_for(source_path.to_s, variant_name)
 
-    # Fall back to original if variant doesn't exist yet
-    File.exist?(Rails.root.join("site", variant_path.to_s.sub(%r{^/}, ""))) ? variant_path : source_path
+    # Check if it exists
+    if File.exist?(filesystem_path)
+      # Convert to web path for image_tag
+      filesystem_path.sub(Rails.root.join("site").to_s, "")
+    else
+      source_path
+    end
   end
 
   # Returns a picture tag with WebP + JPEG fallback
