@@ -33,7 +33,7 @@ class ResponsiveImageRenderer
     alt_text = ERB::Util.html_escape(options[:alt] || '')
     css_class = ERB::Util.html_escape(options[:class] || '')
     loading = ERB::Util.html_escape(options[:loading] || 'lazy')
-    sizes = ERB::Util.html_escape(options[:sizes] || '100vw')
+    sizes = ERB::Util.html_escape(options[:sizes] || '(min-width: 1200px) 1200px, 100vw')
 
     # Build additional attributes
     extra_attrs = build_extra_attributes
@@ -59,7 +59,7 @@ class ResponsiveImageRenderer
     html << "<img src=\"#{ERB::Util.html_escape(source_path)}\" "
     html << "alt=\"#{alt_text}\" "
     html << "class=\"#{css_class}\" " if css_class.present?
-    html << "loading=\"#{loading}\" "
+    html << "loading=\"#{loading}\" decoding=\"async\" "
     html << extra_attrs if extra_attrs.present?
     html << ">"
 
