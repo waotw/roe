@@ -17,8 +17,6 @@ class Medium < ApplicationRecord
     }
   # Add this scope
   scope :originals_only, -> { where.not("file_path LIKE ?", "%/variants/%") }
-  scope :with_pending_variants, -> { where(variants_status: [ "pending", "processing" ]) }
-  scope :with_complete_variants, -> { where(variants_status: "complete") }
 
   def image?
     media_type == "images"
@@ -46,7 +44,7 @@ class Medium < ApplicationRecord
     return unless image?
     return unless ImageVariantGenerator.available?
 
-    GenerateImageVariantsJob.perform_later(file_path, id)
+    GenerateImageVariantsJob.perform_later(file_path, nil)  # Pass nil for medium_id
   end
 
   def self.remove_by_file_path(file_path)

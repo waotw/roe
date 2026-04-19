@@ -3,25 +3,13 @@
 </div>
 
 <!-- System Status Notice -->
-<% pending_images = Medium.images.with_pending_variants.count %>
 <% if !ImageVariantGenerator.available? %>
   <div class="mb-5 p-3 border border-amber-300 bg-amber-50 rounded">
     <div class="flex items-start gap-2">
       <span class="text-amber-600">⚠️</span>
       <div>
         <p class="text-sm text-amber-800 font-medium">Image optimization disabled</p>
-        <p class="text-xs text-amber-700 mt-1">libvips is not installed on your Mac. Install in <code class="bg-amber-200 px-1 rounded-xs">Terminal</code> with <code class="bg-amber-200 px-1 rounded-xs">brew install vips</code> and the system will automatically create image variants locally.</p>
-        <p class="text-xs text-amber-700 mt-1">This only applies to your local machine. When you deploy your site to a webhost, image optimization will work automatically.</p>
-      </div>
-    </div>
-  </div>
-<% elsif pending_images > 0 %>
-  <div class="mb-5 p-3 border border-blue-300 bg-blue-50 rounded">
-    <div class="flex items-start gap-2">
-      <span class="text-blue-600">🖼️</span>
-      <div>
-        <p class="text-sm text-blue-800 font-medium">Processing <%= pending_images %> <%= 'image'.pluralize(pending_images) %></p>
-        <p class="text-xs text-blue-700 mt-1">Image variants are being generated in the background. This page will update automatically.</p>
+        <p class="text-xs text-amber-700 mt-1">libvips is not installed. Images will be served at full size until variants are generated in production.</p>
       </div>
     </div>
   </div>
