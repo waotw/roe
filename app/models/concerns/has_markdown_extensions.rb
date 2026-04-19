@@ -277,8 +277,22 @@ module HasMarkdownExtensions
   def process_galleries(markdown, preview: false)
     result = markdown.gsub(/```gallery\r?\n(.*?)```/m) do
       gallery_content = $1
-      html = render_gallery(gallery_content, preview: preview)
 
+      # Parse gallery content into image data
+      images = gallery_content.split("\n").map do |line|
+        next if line.strip.empty?
+
+        # Match: ![alt](src) or ![alt](src) (*caption*)
+        if line.strip =~ /^!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*([^*]*)\*\))?$/
+          {
+            alt: $1,
+            src: $2,
+            caption: $3
+          }
+        end
+      end.compact
+
+      html = render_gallery(images, preview: preview)
       html
     end
     result
