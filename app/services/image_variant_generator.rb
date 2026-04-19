@@ -107,14 +107,14 @@ class ImageVariantGenerator
       }
     end
 
+    def variants_exist?(source_path)
+      VARIANTS.keys.all? { |name| variant_exists?(source_path, name) }
+    end
+
     private
 
     def image_file?(path)
       IMAGE_EXTENSIONS.include?(File.extname(path).downcase)
-    end
-
-    def variants_exist?(source_path)
-      VARIANTS.keys.all? { |name| variant_exists?(source_path, name) }
     end
 
     def force_regenerate?(source_path)
