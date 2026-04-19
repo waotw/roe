@@ -11,6 +11,7 @@ console_command = '/rails/bin/rails console'
 
 [env]
   PORT = '8080'
+  SOLID_QUEUE_IN_PUMA = 'true'
 
 [processes]
   app = './bin/rails server'
