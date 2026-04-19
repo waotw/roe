@@ -41,10 +41,12 @@ class ResponsiveImageRenderer
     # Use String concatenation with + instead of << to avoid frozen string issues
     html = +"<picture>"
 
-    # WebP source (if available)
-    webp_srcset = build_webp_srcset
-    if webp_srcset.present?
-      html << "<source srcset=\"#{webp_srcset}\" type=\"image/webp\" sizes=\"#{sizes}\">"
+    # WebP source (if available and enabled)
+    if ImageVariantGenerator::GENERATE_WEBP
+      webp_srcset = build_webp_srcset
+      if webp_srcset.present?
+        html << "<source srcset=\"#{webp_srcset}\" type=\"image/webp\" sizes=\"#{sizes}\">"
+      end
     end
 
     # Fallback JPEG/PNG source
