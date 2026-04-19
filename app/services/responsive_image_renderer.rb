@@ -38,7 +38,8 @@ class ResponsiveImageRenderer
     # Build additional attributes
     extra_attrs = build_extra_attributes
 
-    html = "<picture>"
+    # Use String concatenation with + instead of << to avoid frozen string issues
+    html = +"<picture>"
 
     # WebP source (if available)
     webp_srcset = build_webp_srcset
@@ -70,7 +71,8 @@ class ResponsiveImageRenderer
     loading = ERB::Util.html_escape(options[:loading] || 'lazy')
     extra_attrs = build_extra_attributes
 
-    html = "<img src=\"#{ERB::Util.html_escape(source_path)}\" "
+    # Use + to make string mutable
+    html = +"<img src=\"#{ERB::Util.html_escape(source_path)}\" "
     html << "alt=\"#{alt_text}\" "
     html << "class=\"#{css_class}\" " if css_class.present?
     html << "loading=\"#{loading}\" "
