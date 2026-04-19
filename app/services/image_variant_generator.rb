@@ -71,7 +71,10 @@ class ImageVariantGenerator
       dir = File.dirname(source_path)
       base = File.basename(source_path, ".*")
       ext = File.extname(source_path)
-      File.join(dir, "variants", "#{base}-#{variant_name}#{ext}")
+      filesystem_path = File.join(dir, "variants", "#{base}-#{variant_name}#{ext}")
+
+      # Convert back to web path
+      filesystem_path.sub(Rails.root.join("site").to_s, "")
     end
 
     def queue_missing_variants
