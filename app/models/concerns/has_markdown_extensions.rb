@@ -312,11 +312,11 @@ module HasMarkdownExtensions
         caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
 
         output << "    <figure>"
-        output << "      #{ResponsiveImageRenderer.render(img[:src], alt: img[:alt], class: 'gallery-image')}"
+        output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" class=\"gallery-image\">"
         output << "      <figcaption>#{caption_html}</figcaption>"
         output << "    </figure>"
       else
-        output << "    #{ResponsiveImageRenderer.render(img[:src], alt: img[:alt], class: 'gallery-image')}"
+        output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" class=\"gallery-image\">"
       end
     end
 
@@ -605,7 +605,7 @@ module HasMarkdownExtensions
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(item)}">)
-      output << "        #{ResponsiveImageRenderer.render(image_url, alt: item.title || 'Product', class: image_class, loading: 'lazy')}"
+      output << %Q(        <img src="#{image_url}" alt="#{item.title || 'Product'}" class="#{image_class}" loading="lazy">)
       output << %Q(      </a>)
       output << %Q(    </div>)
 
@@ -998,7 +998,7 @@ module HasMarkdownExtensions
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
           </div>
-          #{image.present? ? ResponsiveImageRenderer.render(image, alt: title, class: 'card-image') : ''}
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
           <div class="card-content">
             #{body_html}
             <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
@@ -1009,7 +1009,7 @@ module HasMarkdownExtensions
       # Small style: image, title, metadata, link
       <<~HTML
         <div class="card post-link-#{style}">
-          #{image.present? ? ResponsiveImageRenderer.render(image, alt: title, class: 'card-image') : ''}
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
           <div class="card-content">
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
@@ -1031,7 +1031,7 @@ module HasMarkdownExtensions
 
     # Build the content
     content = []
-    content << ResponsiveImageRenderer.render(image, alt: '', class: 'aside-image') if image.present?
+    content << "<img src=\"#{image}\" alt=\"\" class=\"aside-image\">" if image.present?
 
     # Wrap text and link in a container for mobile layout
     text_content = []
