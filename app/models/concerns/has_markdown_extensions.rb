@@ -107,7 +107,7 @@ module HasMarkdownExtensions
                     ''
       end
 
-      # Skip if this is already inside a picture tag or if it's not a supported image
+      # Skip if it's not a supported image
       next $~.to_s unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
 
       # Render responsive image
@@ -277,50 +277,68 @@ module HasMarkdownExtensions
   def process_galleries(markdown, preview: false)
     result = markdown.gsub(/```gallery\r?\n(.*?)```/m) do
       gallery_content = $1
+      html = render_gallery(gallery_content, preview: preview)
 
-      # Parse gallery content into image data
-      images = gallery_content.split("\n").map do |line|
-        next if line.strip.empty?
-
-        # Match: ![alt](src) or ![alt](src) (*caption*)
-        if line.strip =~ /^!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*([^*]*)\*\))?$/
-          {
-            alt: $1,
-            src: $2,
-            caption: $3
-          }
-        end
-      end.compact
-
-      html = render_gallery(images, preview: preview)
       html
     end
     result
   end
 
-  def render_gallery(images, preview: false)
-    return '' if images.empty?
+  def render_gallery(content, preview: false)
+    # Split by blank lines to get rows
+    rows = content.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
 
-    output = []
-    output << "<div class=\"gallery\">"
-
-    images.each do |img|
-      if img[:caption].present?
-        # Process caption as inline markdown
-        caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
-        # Remove wrapping <p> tags that Kramdown adds
-        caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
-
-        output << "    <figure>"
-        output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" class=\"gallery-image\">"
-        output << "      <figcaption>#{caption_html}</figcaption>"
-        output << "    </figure>"
-      else
-        output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" class=\"gallery-image\">"
-      end
+    if rows.empty?
+      return preview ? '<!-- Empty gallery -->' : ''
     end
 
-    output << "</div>"
+    output = [ '' ]
+    output << '{::nomarkdown}'
+    output << '<div class="gallery">'
+
+    rows.each do |row_content|
+      images = []
+
+      row_content.scan(/!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*(.*?)\*\))?/) do
+        alt_text = $1
+        src = $2
+        caption = $3&.strip
+
+        images << {
+          alt: alt_text,
+          src: src,
+          caption: caption
+        }
+      end
+
+      next if images.empty?
+
+      col_count = [ images.length, 3 ].min
+
+      output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
+
+      images.each do |img|
+        if img[:caption].present?
+          # Process caption as inline markdown
+          caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
+          # Remove wrapping <p> tags that Kramdown adds
+          caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
+
+          output << "    <figure>"
+          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+          output << "      <figcaption>#{caption_html}</figcaption>"
+          output << "    </figure>"
+        else
+          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+        end
+      end
+
+      output << "  </div>"
+    end
+
+    output << '</div>'
+    output << '{:/nomarkdown}'
+    output << ''
     output.join("\n")
   end
 
