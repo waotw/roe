@@ -54,8 +54,11 @@ class Admin::MediumController < Admin::BaseController
     # Queue variant generation with error handling
     if medium.image? && ImageVariantGenerator.available?
       begin
-        GenerateImageVariantsJob.perform_later(relative_path, medium.id)
-        notice_message = "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
+        notice_message = if medium.image? && ImageVariantGenerator.available?
+                           "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
+        else
+                           "#{media_type.singularize.capitalize} uploaded"
+        end
       rescue => e
         Rails.logger.error "[MediumController] Failed to queue variants: #{e.message}"
         notice_message = "#{media_type.singularize.capitalize} uploaded (variant generation failed to queue)"

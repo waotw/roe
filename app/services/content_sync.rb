@@ -99,8 +99,9 @@ class ContentSync
   end
 
   def sync_media
-    # Sync all media types (images, audio, video)
+    # Sync all media types (images, audio, video) - EXCLUDE variants folder
     media_files = Dir.glob("site/media/**/*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}")
+                     .reject { |path| path.include?("/variants/") }
 
     puts "\n🎬 Found #{media_files.count} media files"
 
@@ -131,7 +132,7 @@ class ContentSync
 
           # Queue variant generation for images
           if medium.image? && ImageVariantGenerator.available?
-            GenerateImageVariantsJob.perform_later(web_path, medium.id)
+            GenerateImageVariantsJob.perform_later(web_path, nil)  # Pass nil for medium_id
             image_count += 1
           end
         end
