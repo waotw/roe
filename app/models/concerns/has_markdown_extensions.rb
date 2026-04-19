@@ -87,31 +87,35 @@ module HasMarkdownExtensions
   end
 
   def process_responsive_images(html)
-    # Replace standard <img> tags with responsive picture elements
     html.gsub(/<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/i) do
+      match_str = $~.to_s
       pre_attrs = $1
       src = $2
       post_attrs = $3
 
-      # Extract alt text if present
+      # Check for data-sizes attribute
+      sizes = if match_str =~ /data-sizes=["']([^"']+)["']/
+                $1
+      else
+                '(min-width: 1200px) 1200px, 100vw'  # Default for non-gallery images
+      end
+
+      # Extract other attributes...
       alt = if pre_attrs =~ /alt=["']([^"']+)["']/i || post_attrs =~ /alt=["']([^"']+)["']/i
               $1
       else
               ''
       end
 
-      # Extract class if present
       css_class = if pre_attrs =~ /class=["']([^"']+)["']/i || post_attrs =~ /class=["']([^"']+)["']/i
                     $1
       else
                     ''
       end
 
-      # Skip if it's not a supported image
-      next $~.to_s unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
+      next match_str unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
 
-      # Render responsive image
-      ResponsiveImageRenderer.render(src, alt: alt, class: css_class)
+      ResponsiveImageRenderer.render(src, alt: alt, class: css_class, sizes: sizes)
     end
   end
 
@@ -315,21 +319,27 @@ module HasMarkdownExtensions
 
       col_count = [ images.length, 3 ].min
 
+      # Set sizes based on column count
+      sizes = case col_count
+      when 1 then '(min-width: 1200px) 1200px, 100vw'  # Featured/full width
+      when 2 then '(min-width: 1024px) 50vw, 100vw'     # 2 columns
+      else '(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw'  # 3 columns
+      end
+
       output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
 
       images.each do |img|
         if img[:caption].present?
-          # Process caption as inline markdown
           caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
-          # Remove wrapping <p> tags that Kramdown adds
           caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
 
           output << "    <figure>"
-          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+          # Pass sizes as data attribute
+          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" data-sizes=\"#{sizes}\">"
           output << "      <figcaption>#{caption_html}</figcaption>"
           output << "    </figure>"
         else
-          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
+          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" data-sizes=\"#{sizes}\">"
         end
       end
 
