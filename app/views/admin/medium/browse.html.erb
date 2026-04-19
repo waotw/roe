@@ -134,7 +134,12 @@
           <!-- Image/Icon -->
           <% if media.media_type == 'images' %>
             <div class="relative">
-              <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
+              <% if ImageVariantGenerator.available? && media.variants_ready? %>
+                <%= image_tag image_variant_path(media.file_path, :thumb), alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
+              <% else %>
+                <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
+              <% end %>
+
               <% if ImageVariantGenerator.available? %>
                 <% variant_stats = media.variant_stats %>
                 <% if variant_stats && !variant_stats[:ready] %>

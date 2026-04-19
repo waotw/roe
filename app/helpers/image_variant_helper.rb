@@ -47,7 +47,10 @@ module ImageVariantHelper
   # Check if a medium has all variants ready
   def variants_ready?(medium)
     return false unless medium.is_a?(Medium)
-    medium.variants_ready?
+    return false unless medium.image?
+
+    source_path = Rails.root.join("site", medium.file_path.sub(%r{^/}, "")).to_s
+    ImageVariantGenerator.variants_exist?(source_path)
   end
 
   private

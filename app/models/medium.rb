@@ -26,8 +26,12 @@ class Medium < ApplicationRecord
 
   def variants_ready?
     return false unless image?
-    variants_status == "complete"
+
+    # Check filesystem instead of DB
+    source_path = Rails.root.join("site", file_path.sub(%r{^/}, "")).to_s
+    ImageVariantGenerator.variants_exist?(source_path)
   end
+
 
   def variant_path(variant_name)
     return nil unless image?

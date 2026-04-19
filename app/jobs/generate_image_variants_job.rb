@@ -10,11 +10,8 @@ class GenerateImageVariantsJob < ApplicationJob
     return unless File.exist?(normalized_path)
     return unless image_file?(normalized_path)
 
-    # Mark as processing
-    mark_processing(medium_id) if medium_id
-
-    # Generate variants (this also marks complete internally)
-    ImageVariantGenerator.generate_variants(normalized_path, medium_id: medium_id)
+    # Generate variants (no DB updates needed)
+    ImageVariantGenerator.generate_variants(normalized_path, medium_id: nil)
   end
 
   private
@@ -31,9 +28,5 @@ class GenerateImageVariantsJob < ApplicationJob
 
   def image_file?(path)
     %w[.jpg .jpeg .png .gif .webp].include?(File.extname(path).downcase)
-  end
-
-  def mark_processing(medium_id)
-    Medium.find_by(id: medium_id)&.update(variants_status: "processing")
   end
 end

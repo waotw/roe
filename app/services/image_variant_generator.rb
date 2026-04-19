@@ -41,16 +41,7 @@ class ImageVariantGenerator
       source_path = normalize_path(source_path)
       return false unless File.exist?(source_path)
 
-      # Check if another job is already processing this
-      if medium_id
-        medium = Medium.find_by(id: medium_id)
-        if medium&.variants_status == "processing"
-          Rails.logger.debug "[ImageVariants] Already processing #{source_path}, skipping"
-          return true
-        end
-      end
-
-      # Skip if all variants exist and are up-to-date
+      # Skip if all variants exist and are up-to-date (filesystem check only)
       return true if variants_exist?(source_path) && !force_regenerate?(source_path)
 
       Rails.logger.info "[ImageVariants] Processing #{source_path}"
@@ -62,9 +53,6 @@ class ImageVariantGenerator
       VARIANTS.each do |name, operations|
         generate_variant(source_path, name, operations)
       end
-
-      # Mark medium as complete if ID provided
-      mark_complete(medium_id) if medium_id
 
       Rails.logger.info "[ImageVariants] ✓ Complete: #{File.basename(source_path)}"
       true

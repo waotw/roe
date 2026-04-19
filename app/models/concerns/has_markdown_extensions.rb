@@ -80,7 +80,39 @@ module HasMarkdownExtensions
     # Merge floated pullquotes
     html = merge_floated_pullquotes(html)
 
+    # Process images to make them responsive
+    html = process_responsive_images(html)
+
     html
+  end
+
+  def process_responsive_images(html)
+    # Replace standard <img> tags with responsive picture elements
+    html.gsub(/<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/i) do
+      pre_attrs = $1
+      src = $2
+      post_attrs = $3
+
+      # Extract alt text if present
+      alt = if pre_attrs =~ /alt=["']([^"']+)["']/i || post_attrs =~ /alt=["']([^"']+)["']/i
+              $1
+      else
+              ''
+      end
+
+      # Extract class if present
+      css_class = if pre_attrs =~ /class=["']([^"']+)["']/i || post_attrs =~ /class=["']([^"']+)["']/i
+                    $1
+      else
+                    ''
+      end
+
+      # Skip if this is already inside a picture tag or if it's not a supported image
+      next $~.to_s unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
+
+      # Render responsive image
+      ResponsiveImageRenderer.render(src, alt: alt, class: css_class)
+    end
   end
 
   private
@@ -252,61 +284,29 @@ module HasMarkdownExtensions
     result
   end
 
-  def render_gallery(content, preview: false)
-    # Split by blank lines to get rows
-    rows = content.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
+  def render_gallery(images, preview: false)
+    return '' if images.empty?
 
-    if rows.empty?
-      return preview ? '<!-- Empty gallery -->' : ''
+    output = []
+    output << "<div class=\"gallery\">"
+
+    images.each do |img|
+      if img[:caption].present?
+        # Process caption as inline markdown
+        caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
+        # Remove wrapping <p> tags that Kramdown adds
+        caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
+
+        output << "    <figure>"
+        output << "      #{ResponsiveImageRenderer.render(img[:src], alt: img[:alt], class: 'gallery-image')}"
+        output << "      <figcaption>#{caption_html}</figcaption>"
+        output << "    </figure>"
+      else
+        output << "    #{ResponsiveImageRenderer.render(img[:src], alt: img[:alt], class: 'gallery-image')}"
+      end
     end
 
-    output = [ '' ]
-    output << '{::nomarkdown}'
-    output << '<div class="gallery">'
-
-    rows.each do |row_content|
-      images = []
-
-      row_content.scan(/!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*(.*?)\*\))?/) do
-        alt_text = $1
-        src = $2
-        caption = $3&.strip
-
-        images << {
-          alt: alt_text,
-          src: src,
-          caption: caption
-        }
-      end
-
-      next if images.empty?
-
-      col_count = [ images.length, 3 ].min
-
-      output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
-
-      images.each do |img|
-        if img[:caption].present?
-          # Process caption as inline markdown
-          caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
-          # Remove wrapping <p> tags that Kramdown adds
-          caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
-
-          output << "    <figure>"
-          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
-          output << "      <figcaption>#{caption_html}</figcaption>"
-          output << "    </figure>"
-        else
-          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\">"
-        end
-      end
-
-      output << "  </div>"
-    end
-
-    output << '</div>'
-    output << '{:/nomarkdown}'
-    output << ''
+    output << "</div>"
     output.join("\n")
   end
 
@@ -591,7 +591,7 @@ module HasMarkdownExtensions
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(item)}">)
-      output << %Q(        <img src="#{image_url}" alt="#{item.title || 'Product'}" class="#{image_class}" loading="lazy">)
+      output << "        #{ResponsiveImageRenderer.render(image_url, alt: item.title || 'Product', class: image_class, loading: 'lazy')}"
       output << %Q(      </a>)
       output << %Q(    </div>)
 
@@ -984,7 +984,7 @@ module HasMarkdownExtensions
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
           </div>
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+          #{image.present? ? ResponsiveImageRenderer.render(image, alt: title, class: 'card-image') : ''}
           <div class="card-content">
             #{body_html}
             <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
@@ -995,7 +995,7 @@ module HasMarkdownExtensions
       # Small style: image, title, metadata, link
       <<~HTML
         <div class="card post-link-#{style}">
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+          #{image.present? ? ResponsiveImageRenderer.render(image, alt: title, class: 'card-image') : ''}
           <div class="card-content">
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
@@ -1017,7 +1017,7 @@ module HasMarkdownExtensions
 
     # Build the content
     content = []
-    content << "<img src=\"#{image}\" alt=\"\" class=\"aside-image\">" if image.present?
+    content << ResponsiveImageRenderer.render(image, alt: '', class: 'aside-image') if image.present?
 
     # Wrap text and link in a container for mobile layout
     text_content = []
