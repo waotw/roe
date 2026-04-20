@@ -1026,7 +1026,7 @@ module HasMarkdownExtensions
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
           </div>
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 400px, 100vw\">" : ''}
           <div class="card-content">
             #{body_html}
             <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
@@ -1037,7 +1037,7 @@ module HasMarkdownExtensions
       # Small style: image, title, metadata, link
       <<~HTML
         <div class="card post-link-#{style}">
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\">" : ''}
+        #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 300px, 100vw\">" : ''}
           <div class="card-content">
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
