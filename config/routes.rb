@@ -1,4 +1,9 @@
 Rails.application.routes.draw do
+  # Block database file access
+  constraints(->(req) { req.path =~ /^\/db\// }) do
+    match '*path', to: proc { [ 404, {}, [ 'Not Found' ] ] }, via: :all
+  end
+
   get "up" => "rails/health#show", as: :rails_health_check
 
   # Authentication (specific routes first)
