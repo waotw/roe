@@ -1009,10 +1009,12 @@ module HasMarkdownExtensions
 
     # For large style: show subtitle if available, fallback to excerpt, otherwise nothing
     body_html = ''
-    if style == 'large'
+    if style == 'large' || style == 'medium'
       body_text = subtitle.present? ? subtitle : excerpt
       if body_text.present?
-        truncated = body_text.length > 200 ? body_text[0..197] + '...' : body_text
+        # Medium gets shorter excerpt than large
+        max_length = style == 'large' ? 200 : 120
+        truncated = body_text.length > max_length ? body_text[0..max_length-3] + '...' : body_text
         body_html = "<p class=\"card-body\">#{truncated}</p>"
       end
     end
@@ -1026,18 +1028,31 @@ module HasMarkdownExtensions
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
           </div>
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 400px, 100vw\">" : ''}
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 600px, 100vw\">" : ''}
           <div class="card-content">
             #{body_html}
             <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
           </div>
         </div>
       HTML
-    else
-      # Small style: image, title, metadata, link
+    elsif style == 'medium'
+      # Medium style: image, title, metadata, excerpt, link (smaller than large)
       <<~HTML
         <div class="card post-link-#{style}">
-        #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 300px, 100vw\">" : ''}
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 400px, 100vw\">" : ''}
+          <div class="card-content">
+            <h4 class="card-title-#{style}">#{title}</h4>
+            #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
+            #{body_html}
+            <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+          </div>
+        </div>
+      HTML
+    else
+      # Small style: image, title, metadata, link (no excerpt)
+      <<~HTML
+        <div class="card post-link-#{style}">
+          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 300px, 100vw\">" : ''}
           <div class="card-content">
             <h4 class="card-title-#{style}">#{title}</h4>
             #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
