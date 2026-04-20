@@ -72,7 +72,7 @@ RUN groupadd --system --gid 1000 rails && \
 USER root
 
 # Deployment options
-ENV DATABASE_URL="sqlite3:///data/db/production.sqlite3"
+ENV DATABASE_URL="sqlite3:///data/site/db/production/production.sqlite3"
 
 # Entrypoint prepares the database.
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
