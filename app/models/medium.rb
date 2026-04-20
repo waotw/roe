@@ -4,7 +4,7 @@ class Medium < ApplicationRecord
   belongs_to :import, optional: true
 
   before_save :normalize_media_type
-  after_create :queue_variant_generation, if: :image?
+  # after_create :queue_variant_generation, if: :image?
 
   # Scope helpers for filtering
   scope :images, -> { where(media_type: "images") }

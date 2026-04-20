@@ -51,17 +51,18 @@ class Admin::MediumController < Admin::BaseController
       uploaded_at: Time.current
     )
 
-    # Queue variant generation with error handling
+    # After creating medium
     if medium.image? && ImageVariantGenerator.available?
-      begin
-        notice_message = if medium.image? && ImageVariantGenerator.available?
-                           "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
-        else
-                           "#{media_type.singularize.capitalize} uploaded"
-        end
-      rescue => e
-        Rails.logger.error "[MediumController] Failed to queue variants: #{e.message}"
-        notice_message = "#{media_type.singularize.capitalize} uploaded (variant generation failed to queue)"
+      # Count recent uploads in last 5 minutes
+      recent_uploads = Medium.where('created_at > ?', 5.minutes.ago).count
+
+      if recent_uploads <= 5
+        # Small batch - process immediately
+        GenerateImageVariantsJob.perform_later(relative_path, nil)
+        notice_message = "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
+      else
+        # Large batch - will generate on-demand
+        notice_message = "#{media_type.singularize.capitalize} uploaded (variants will generate on first view)"
       end
     else
       notice_message = "#{media_type.singularize.capitalize} uploaded"

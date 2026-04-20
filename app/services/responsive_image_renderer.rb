@@ -23,11 +23,36 @@ class ResponsiveImageRenderer
     return simple_img_tag unless ImageVariantGenerator.available?
     return simple_img_tag unless image_file?
 
-    # Build picture element with WebP and fallback
-    build_picture_tag
+    # Check if variants exist
+    source_full_path = Rails.root.join("site", source_path.sub(%r{^/}, "")).to_s
+
+    if ImageVariantGenerator.variants_exist?(source_full_path)
+      build_picture_tag
+    else
+      # Queue generation for first view, show original for now
+      queue_variant_generation(source_path) unless already_queued?(source_path)
+      simple_img_tag
+    end
   end
 
   private
+
+  def queue_variant_generation(path)
+    GenerateImageVariantsJob.perform_later(path, nil)
+  rescue => e
+    Rails.logger.warn "[ResponsiveImageRenderer] Could not queue: #{e.message}"
+  end
+
+  def already_queued?(path)
+    # Simple check to avoid re-queuing
+    SolidQueue::Job.exists?(
+      class_name: 'GenerateImageVariantsJob',
+      finished_at: nil,
+      arguments: path
+    )
+  rescue
+    false  # If check fails, allow queuing
+  end
 
   def build_picture_tag
     alt_text = ERB::Util.html_escape(options[:alt] || '')
