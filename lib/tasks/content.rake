@@ -11,27 +11,25 @@ namespace :site do
     exit 1
   end
 
-  # desc "Sync site folder with production (bidirectional)"
-  # task :sync do
-  #   machine = machine_id
-  #   puts "🔄 Syncing site with #{app_name} (#{machine})..."
+  # Database Protection: rsync exclude patterns
+  # NEVER push local production DB copies to production
+  # NEVER pull production DB into development folder
+  PUSH_EXCLUDES = [
+    '--exclude=db/production/',           # Never overwrite production DBs
+    '--exclude=db/development/.gitkeep'   # Don't delete development .gitkeep
+  ].freeze
 
-  #   # Pull from production (files newer on remote)
-  #   puts "\n📥 Pulling changes from production..."
-  #   system("rsync -rltzPi -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
+  PULL_EXCLUDES = [
+    '--exclude=db/development/',          # Never overwrite development DBs
+    '--exclude=db/production/.gitkeep'    # Don't delete production .gitkeep
+  ].freeze
 
-  #   # Push to production (files newer locally)
-  #   puts "\n📤 Pushing local changes..."
-  #   system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
-
-  #   puts "\n✅ Sync complete!"
-  # end
-
-  desc "Push site folder to production"
+  desc "Push site folder to production (protects production databases)"
   task :push do
     machine = machine_id
     puts "📤 Pushing site to #{app_name} (#{machine})..."
-    puts "⚠️  This will OVERWRITE all content on production!"
+    puts "⚠️  This will OVERWRITE content on production!"
+    puts "ℹ️  Database protection: site/db/production/ will NOT be overwritten"
     print "Type 'yes' to confirm: "
 
     confirmation = STDIN.gets.chomp
@@ -40,8 +38,52 @@ namespace :site do
       exit 0
     end
 
-    system("rsync -rltzPi -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
+    # Build rsync command with excludes to protect production DB
+    rsync_cmd = "rsync -rltzPi #{PUSH_EXCLUDES.join(' ')} -e ./bin/fly-rsync ./site/ #{machine}:/data/site/"
+    system(rsync_cmd)
     puts "✅ Push complete!"
+  end
+
+  desc "Pull production database to local site/db/production/"
+  task :pull_db do
+    machine = machine_id
+    puts "📥 Pulling production databases..."
+
+    FileUtils.mkdir_p("./site/db/production")
+    system("rsync -avP -e ./bin/fly-rsync #{machine}:/data/site/db/production/ ./site/db/production/")
+
+    # Show what we got
+    db_files = Dir.glob("./site/db/production/*.sqlite3")
+    if db_files.any?
+      puts "✅ Production databases pulled:"
+      db_files.each { |f| puts "   - #{File.basename(f)}" }
+    else
+      puts "⚠️  No database files found in production"
+    end
+  end
+
+  desc "Push development database to production (DANGEROUS - use with caution)"
+  task :push_db do
+    machine = machine_id
+    puts "⚠️  WARNING: This will OVERWRITE production databases!"
+    puts "This should only be used for initial setup or intentional data replacement."
+    puts ""
+    print "Type 'YES I UNDERSTAND' to confirm: "
+
+    confirmation = STDIN.gets.chomp
+    unless confirmation == 'YES I UNDERSTAND'
+      puts "❌ Aborted"
+      exit 0
+    end
+
+    unless Dir.exist?("./site/db/development")
+      puts "❌ No development database found at site/db/development/"
+      exit 1
+    end
+
+    puts "📤 Pushing development databases to production..."
+    system("rsync -avP --delete -e ./bin/fly-rsync ./site/db/development/ #{machine}:/data/site/db/production/")
+    puts "✅ Database push complete!"
   end
 
   desc "Backup production site with incremental hard-link snapshots (keeps 15)"
@@ -71,7 +113,7 @@ namespace :site do
     # Create backup directory
     FileUtils.mkdir_p(backup_dir)
 
-    # Execute rsync
+    # Execute rsync - backs up EVERYTHING including both DB folders
     rsync_cmd += " -e ./bin/fly-rsync #{machine}:/data/site/ #{backup_dir}/"
     system(rsync_cmd)
 
@@ -104,7 +146,7 @@ namespace :site do
   end
 
   desc "Push specific folders to production (e.g., rake site:push_folders[posts,theme])"
-  task :push_folders, [:folders] do |t, args|
+  task :push_folders, [ :folders ] do |t, args|
     unless args[:folders]
       puts "❌ Usage: rake site:push_folders[posts,theme]"
       exit 1
@@ -112,6 +154,14 @@ namespace :site do
 
     machine = machine_id
     folders = args[:folders].split(',')
+
+    # Safety check: prevent database folders from being pushed
+    db_folders = folders.select { |f| f.strip.match?(/^db(\/|$)/) }
+    if db_folders.any?
+      puts "❌ Cannot push database folders using this command: #{db_folders.join(', ')}"
+      puts "ℹ️  Use 'rake site:push_db' if you need to push development databases to production"
+      exit 1
+    end
 
     puts "📤 Pushing #{folders.join(', ')} to #{app_name} (#{machine})..."
     puts "⚠️  This will OVERWRITE these folders on production!"
@@ -140,21 +190,23 @@ namespace :site do
     puts "\n✅ Push complete!"
   end
 
-  # NEW: List what would change (dry-run)
-  desc "Preview changes between local and production"
+  desc "Preview changes between local and production (dry-run)"
   task :preview_changes do
     machine = machine_id
     puts "📋 Previewing changes (dry-run)..."
+    puts "ℹ️  Database folders are protected and won't be synced incorrectly"
+
     puts "\n--- Files that would be pulled FROM production ---"
-    system("rsync -rltzPin --dry-run -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
+    puts "(Excludes: development databases)"
+    system("rsync -rltzPin --dry-run #{PULL_EXCLUDES.join(' ')} -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
+
     puts "\n--- Files that would be pushed TO production ---"
-    system("rsync -rltzPin --dry-run -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
+    puts "(Excludes: production databases)"
+    system("rsync -rltzPin --dry-run #{PUSH_EXCLUDES.join(' ')} -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
   end
 
-  # Add this to lib/tasks/content.rake
-
-  desc "Restore production from backup (interactive or direct: rake site:rollback_site[latest])"
-  task :rollback, [:backup_name] do |t, args|
+  desc "Restore production from backup (interactive or direct: rake site:rollback[latest])"
+  task :rollback, [ :backup_name ] do |t, args|
     backup_name = args[:backup_name]
 
     # --- Direct Mode (with argument) ---
@@ -179,6 +231,7 @@ namespace :site do
       end
 
       puts "\n⚠️  This will OVERWRITE production with: #{backup_name}"
+      puts "This includes content AND production databases from the backup."
       print "Type 'yes' to confirm: "
       unless STDIN.gets.chomp == 'yes'
         puts "❌ Rollback cancelled"
@@ -228,6 +281,7 @@ namespace :site do
     timestamp = File.basename(backup_path)
 
     puts "\n⚠️  This will OVERWRITE production with: #{timestamp}"
+    puts "This includes content AND production databases from the backup."
     print "Type 'yes' to confirm: "
 
     unless STDIN.gets.chomp == 'yes'
@@ -239,5 +293,39 @@ namespace :site do
     puts "\n⏮️  Restoring #{timestamp} to production..."
     system("rsync -avP --delete -e ./bin/fly-rsync #{backup_path}/ #{machine}:/data/site/")
     puts "✅ Rollback complete!"
+  end
+
+  desc "Show database locations and status"
+  task :db_status do
+    puts "📊 Database Status\n\n"
+
+    puts "Development (site/db/development/):"
+    dev_dbs = Dir.glob("./site/db/development/*.sqlite3")
+    if dev_dbs.any?
+      dev_dbs.each do |db|
+        size = File.size(db) / 1024.0 / 1024.0
+        mtime = File.mtime(db).strftime("%Y-%m-%d %H:%M")
+        puts "  ✓ #{File.basename(db)} (#{size.round(2)} MB, modified: #{mtime})"
+      end
+    else
+      puts "  ⚠️  No databases found"
+    end
+
+    puts "\nProduction Copy (site/db/production/):"
+    prod_dbs = Dir.glob("./site/db/production/*.sqlite3")
+    if prod_dbs.any?
+      prod_dbs.each do |db|
+        size = File.size(db) / 1024.0 / 1024.0
+        mtime = File.mtime(db).strftime("%Y-%m-%d %H:%M")
+        puts "  ✓ #{File.basename(db)} (#{size.round(2)} MB, modified: #{mtime})"
+      end
+    else
+      puts "  ⚠️  No databases found (run 'rake site:pull_db' to download)"
+    end
+
+    puts "\n💡 Tips:"
+    puts "  - Run 'rake site:pull_db' to sync production databases locally"
+    puts "  - Development databases are pushed to production during deploys"
+    puts "  - Use 'rake site:push_db' (CAREFULLY) to overwrite production databases"
   end
 end

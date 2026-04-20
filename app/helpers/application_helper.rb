@@ -34,6 +34,10 @@ module ApplicationHelper
     File.exist?(Rails.root.join('site/system/features/members.yml'))
   end
 
+  def payments_enabled?
+    members_enabled? && SiteConfig.feature('members', 'payments.enabled') == true
+  end
+
   def store_enabled?
     File.exist?(Rails.root.join('site', 'system', 'features', 'store.yml'))
   end
