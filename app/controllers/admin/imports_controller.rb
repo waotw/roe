@@ -451,11 +451,13 @@ class Admin::ImportsController < Admin::BaseController
   end
 
   def reconnect_media
-    results = []
+    verified = []
+    reopened = []
     missing_media = @import.stats["missing_media"] || []
 
+    # Check ALL entries, including already resolved ones (to re-verify)
     missing_media.each_with_index do |entry, index|
-      next if entry["resolved"]
+      # Skip explicitly skipped items
       next if entry["skipped"]
 
       item = entry["items"].first
@@ -487,38 +489,49 @@ class Admin::ImportsController < Admin::BaseController
         item["expected_path"] = expected_path
       end
 
-      # Check if Medium record already exists
-      if Medium.exists?(file_path: expected_path)
-        entry["resolved"] = true
-        entry["medium_exists"] = true
-        entry["local_path"] = expected_path
-        results << "#{slug}: Verified connection"
-      else
-        # Check if file exists on disk but no Medium record
-        disk_path = Rails.root.join("site", expected_path.sub(%r{^/}, ""))
-        if File.exist?(disk_path)
-          # Create Medium record
+      disk_path = Rails.root.join("site", expected_path.sub(%r{^/}, ""))
+
+      # Check if file exists on disk
+      if File.exist?(disk_path)
+        # Ensure Medium record exists
+        unless Medium.exists?(file_path: expected_path)
           Medium.create!(
             file_path: expected_path,
             source_url: item["url"] || item["mux_id"] || "manual",
             import: @import,
             uploaded_at: File.mtime(disk_path)
           )
-
-          entry["resolved"] = true
-          entry["medium_exists"] = true
-          entry["local_path"] = expected_path
-          results << "#{slug}: Created connection for #{File.basename(disk_path)}"
         end
+
+        # Mark as resolved
+        entry["resolved"] = true
+        entry["medium_exists"] = true
+        entry["local_path"] = expected_path
+        verified << slug
+      else
+        # File doesn't exist - re-open this item for resolution
+        was_resolved = entry["resolved"]
+        entry["resolved"] = false
+        entry["medium_exists"] = false
+        entry["downloaded"] = false
+        entry.delete("local_path")
+
+        # Only count as "reopened" if it was previously marked as resolved
+        reopened << slug if was_resolved
       end
     end
 
     @import.save!
 
-    if results.any?
-      redirect_to resolve_missing_media_admin_import_path(@import), notice: "Verified #{results.count} media connections: #{results.join(', ')}"
+    messages = []
+    messages << "Verified #{verified.count} media connections" if verified.any?
+    messages << "Re-opened #{reopened.count} missing media items" if reopened.any?
+
+    if messages.any?
+      redirect_to resolve_missing_media_admin_import_path(@import), notice: messages.join(". ")
     else
-      redirect_to resolve_missing_media_admin_import_path(@import), alert: "No media files found. Make sure files are downloaded to the expected locations."
+      # All skipped or no missing_media entries at all
+      redirect_to resolve_missing_media_admin_import_path(@import), notice: "No media to verify (all items are skipped or none exist)"
     end
   end
 

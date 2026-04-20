@@ -157,6 +157,14 @@ module SubstackImporter
 
       result = download_file(url, dest)
       if result
+        # Convert HEIC to JPEG if needed (only if vips is available)
+        result = convert_heic_if_needed(result, dest)
+
+        # Update file_path if conversion changed the extension
+        if result != dest
+          file_path = "/media/images/#{File.basename(result)}"
+        end
+
         @url_mappings[url] = result
         # Create medium record and associate with this import (for rollback tracking)
         Medium.create!(
@@ -166,6 +174,55 @@ module SubstackImporter
           uploaded_at: Time.current
         )
         file_path
+      end
+    end
+
+    def convert_heic_if_needed(downloaded_path, original_dest)
+      ext = File.extname(downloaded_path).downcase
+
+      # Check if it's a HEIC file
+      return downloaded_path unless [ ".heic", ".heif" ].include?(ext)
+
+      # Check if vips is available before attempting conversion
+      unless vips_available?
+        Rails.logger.warn "  HEIC file detected but vips not available, skipping conversion: #{File.basename(downloaded_path)}" if @verbose
+        return downloaded_path
+      end
+
+      Rails.logger.info "  Converting HEIC to JPEG: #{File.basename(downloaded_path)}" if @verbose
+
+      begin
+        require "image_processing/vips"
+
+        # Create JPEG version with same base name
+        jpeg_path = downloaded_path.sub(/\.heic$/i, ".jpg").sub(/\.heif$/i, ".jpg")
+
+        # Convert using vips
+        ImageProcessing::Vips
+          .source(downloaded_path)
+          .convert("jpg")
+          .saver(quality: 90)
+          .call(destination: jpeg_path)
+
+        # Delete the original HEIC file
+        File.delete(downloaded_path)
+
+        Rails.logger.info "  Converted to: #{File.basename(jpeg_path)}" if @verbose
+        jpeg_path
+      rescue => e
+        Rails.logger.error "  HEIC conversion failed: #{e.message}" if @verbose
+        # Return original path if conversion fails
+        downloaded_path
+      end
+    end
+
+    def vips_available?
+      @vips_available ||= begin
+        require "ruby-vips"
+        Vips.version_string
+        true
+      rescue LoadError, NameError
+        false
       end
     end
 
