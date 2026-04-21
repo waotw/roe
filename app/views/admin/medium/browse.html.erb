@@ -13,18 +13,166 @@
       </div>
     </div>
   </div>
+<% elsif Rails.env.production? %>
+    <!-- Production: On-demand only -->
+    <div class="mb-5 p-3 border border-blue-300 bg-blue-50 rounded">
+      <div class="flex items-start gap-2">
+        <span class="text-blue-600">ℹ️</span>
+        <div>
+          <p class="text-sm text-blue-800 font-medium">On-demand image optimization</p>
+          <p class="text-xs text-blue-700 mt-1">
+            Image variants are generated automatically when first requested. No background processing.
+          </p>
+          <p class="text-xs text-blue-600 mt-1">
+            Process variants locally and deploy them for best performance.
+          </p>
+        </div>
+      </div>
+    </div>
+<% else %>
+  <% status = variant_generation_status %>
+
+  <% if Rails.env.development? && status[:failed_jobs].any? %>
+    <!-- Show failed jobs in development -->
+    <div class="mb-5 p-3 border border-red-300 bg-red-50 rounded">
+      <div class="flex items-start gap-2">
+        <span class="text-red-600">💥</span>
+        <div class="flex-1">
+          <p class="text-sm text-red-800 font-medium">
+            <%= status[:failed_jobs].count %> <%= 'job'.pluralize(status[:failed_jobs].count) %> failed
+          </p>
+          <% status[:failed_jobs].each do |failure| %>
+            <div class="mt-2 p-2 bg-red-100 rounded text-xs font-mono">
+              <p class="text-red-900 font-bold"><%= failure[:error_class] %>: <%= failure[:error_message] %></p>
+              <% if failure[:backtrace] %>
+                <details class="mt-1">
+                  <summary class="text-red-700 cursor-pointer hover:text-red-900">Show backtrace</summary>
+                  <pre class="mt-1 text-red-700 text-[10px] overflow-x-auto"><%= failure[:backtrace].join("\n") %></pre>
+                </details>
+              <% end %>
+            </div>
+          <% end %>
+          <div class="mt-2">
+            <%= button_to "Clear Failed Jobs",
+                          clear_failed_jobs_admin_medium_index_path,
+                          method: :post,
+                          class: "text-xs px-2 py-1 border border-red-600 bg-red-100 hover:bg-red-200 rounded",
+                          data: { turbo: false } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <% if status[:active] %>
+    <% if status[:worker_actually_dead] %>
+      <!-- Worker is dead! -->
+      <div class="mb-5 p-3 border border-red-300 bg-red-50 rounded">
+        <div class="flex items-start gap-2">
+          <span class="text-red-600">💀</span>
+          <div class="flex-1">
+            <p class="text-sm text-red-800 font-medium">Queue worker not running!</p>
+            <p class="text-xs text-red-700 mt-1">
+              <%= status[:pending_jobs] %> jobs waiting but worker is dead
+            </p>
+            <p class="text-xs text-red-600 mt-1">
+              Restart bin/dev to process jobs
+            </p>
+          </div>
+        </div>
+      </div>
+    <% else %>
+      <!-- Jobs are running -->
+      <div class="mb-5 p-3 border border-blue-300 bg-blue-50 rounded">
+        <div class="flex items-start gap-2">
+          <span class="text-blue-600 animate-pulse">🔄</span>
+          <div class="flex-1">
+            <p class="text-sm text-blue-800 font-medium">Optimizing images...</p>
+            <p class="text-xs text-blue-700 mt-1">
+              <%= status[:pending_jobs] %> pending, <%= status[:claimed_jobs] %> processing
+            </p>
+            <p class="text-xs text-blue-600 mt-1">
+              Refresh page to see progress
+            </p>
+          </div>
+          <%= button_to "Refresh", browse_admin_medium_index_path, method: :get, class: "text-xs px-2 py-1 border border-blue-600 bg-blue-100 hover:bg-blue-200 rounded" %>
+        </div>
+      </div>
+    <% end %>
+    <% elsif status[:without_variants] > 0 %>
+      <!-- Images need variants but no jobs running -->
+      <div class="mb-5 p-3 border border-amber-300 bg-amber-50 rounded">
+        <div class="flex items-start gap-2">
+          <span class="text-amber-600">⚠️</span>
+          <div class="flex-1">
+            <p class="text-sm text-amber-800 font-medium">
+              <%= status[:without_variants] %> <%= 'image'.pluralize(status[:without_variants]) %> need optimization
+            </p>
+            <p class="text-xs text-amber-700 mt-1">
+              <%= status[:with_variants] %> of <%= status[:total_images] %> optimized
+            </p>
+            <p class="text-xs text-amber-600 mt-1">
+              Variants will be generated on-demand or click below to process now
+            </p>
+          </div>
+          <%= button_to "Generate Missing Variants",
+                        queue_missing_variants_admin_medium_index_path,
+                        method: :post,
+                        class: "text-xs px-2 py-1 border border-amber-600 bg-amber-200 hover:bg-amber-300 rounded",
+                        data: { turbo: false } %>
+        </div>
+      </div>
+    <% else %>
+      <!-- All good! -->
+      <div class="mb-5 p-3 border border-green-300 bg-green-50 rounded">
+        <div class="flex items-start gap-2">
+          <span class="text-green-600">✓</span>
+          <div class="flex-1">
+            <p class="text-sm text-green-800 font-medium">
+              <% if status[:all_optimized] %>
+                All images optimized
+              <% else %>
+                Image optimization ready
+              <% end %>
+            </p>
+            <p class="text-xs text-green-700 mt-1">
+              <%= status[:total_images] %> <%= 'image'.pluralize(status[:total_images]) %> with variants
+            </p>
+          </div>
+          <%= button_to "Scan for Missing Variants",
+                        queue_missing_variants_admin_medium_index_path,
+                        method: :post,
+                        class: "text-xs px-2 py-1 border border-green-600 bg-green-100 hover:bg-green-200 rounded",
+                        data: { turbo: false } %>
+        </div>
+      </div>
+    <% end %>
 <% end %>
 
 <!-- Upload Form -->
-<div class="mb-5 p-4 border border-gray-300 bg-gray-50">
-  <div class="flex gap-2 items-center">
-    <input type="file" id="browse-media-upload" accept="image/*,audio/*,video/*" style="display: none;" onchange="handleBrowseUpload(event)">
-    <button type="button" onclick="document.getElementById('browse-media-upload').click()" class="uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
-      Upload
-    </button>
-    <span id="upload-status" class="text-sm text-gray-600"></span>
-  </div>
-</div>
+<%= form_with url: admin_medium_index_path, method: :post, multipart: true, local: true do |f| %>
+  <%= f.file_field :files,
+      accept: 'image/*,audio/*,video/*',
+      multiple: true,
+      class: "hidden",
+      id: "file-upload-input",
+      name: "files[]",
+      data: { action: "change->upload#submit" } %>
+
+  <label for="file-upload-input" class="cursor-pointer inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">
+    Upload Media
+  </label>
+<% end %>
+
+<script>
+  document.getElementById('file-upload-input').addEventListener('change', function() {
+    console.log('Files selected:', this.files.length);
+    if (this.files.length > 0) {
+      console.log('Submitting form...');
+      this.form.submit();
+    }
+  });
+</script>
 
 <% if flash[:notice] %>
   <div class="mb-5 px-2.5 py-1 border border-gray-300 bg-green-100">

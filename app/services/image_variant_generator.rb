@@ -13,7 +13,34 @@ class ImageVariantGenerator
 
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
 
+  # Environment-aware settings
   class << self
+    def concurrency_mode
+      if Rails.env.production?
+        :single_threaded  # Safe for production SQLite
+      else
+        :parallel  # Fast for development (local machine has power)
+      end
+    end
+
+    def batch_size
+      if Rails.env.production?
+        1  # Process one at a time to avoid locks
+      else
+        10  # Process in batches locally
+      end
+    end
+
+    def process_mode
+      # In production: on-demand only (lazy)
+      # In development: eager (generate immediately)
+      if Rails.env.production?
+        :on_demand
+      else
+        :eager
+      end
+    end
+
     def available?
       @available ||= begin
         # Try to require ruby-vips (won't fail if gem is installed but lib is missing)
@@ -41,7 +68,7 @@ class ImageVariantGenerator
       source_path = normalize_path(source_path)
       return false unless File.exist?(source_path)
 
-      # Skip if all variants exist and are up-to-date (filesystem check only)
+      # Skip if all variants exist and are up-to-date
       return true if variants_exist?(source_path) && !force_regenerate?(source_path)
 
       Rails.logger.info "[ImageVariants] Processing #{source_path}"
@@ -50,6 +77,7 @@ class ImageVariantGenerator
       variants_dir = File.join(File.dirname(source_path), "variants")
       FileUtils.mkdir_p(variants_dir)
 
+      # Always sequential - simple and safe
       VARIANTS.each do |name, operations|
         generate_variant(source_path, name, operations)
       end
@@ -59,6 +87,21 @@ class ImageVariantGenerator
     rescue => e
       Rails.logger.error "[ImageVariants] Failed #{source_path}: #{e.message}"
       false
+    end
+
+    def generate_variants_sequential(source_path)
+      VARIANTS.each do |name, operations|
+        generate_variant(source_path, name, operations)
+      end
+    end
+
+    def generate_variants_parallel(source_path)
+      threads = VARIANTS.map do |name, operations|
+        Thread.new do
+          generate_variant(source_path, name, operations)
+        end
+      end
+      threads.each(&:join)
     end
 
     def variant_exists?(source_path, variant_name)
@@ -86,7 +129,7 @@ class ImageVariantGenerator
         web_path = relative_path.start_with?("/") ? relative_path : "/#{relative_path}"
 
         unless variants_exist?(path)
-          GenerateImageVariantsJob.perform_later(web_path)
+          GenerateImageVariantsJob.perform_later(web_path, nil)
           queued_count += 1
         end
       end
@@ -108,14 +151,34 @@ class ImageVariantGenerator
     end
 
     def variants_exist?(source_path)
+      source_path = normalize_path(source_path)
       VARIANTS.keys.all? { |name| variant_exists?(source_path, name) }
     end
 
-    private
+    def normalize_path(path)
+      # Handle both web paths (/media/images/...) and absolute paths
+      path = path.to_s
+
+      # If already an absolute path to /rails/site, use it
+      if path.start_with?("/rails/site/")
+        path
+      # If it's a web path starting with /media
+      elsif path.start_with?("/media/")
+        Rails.root.join("site", path.sub(%r{^/}, "")).to_s
+      # If it starts with Rails.root but not /rails/site
+      elsif path.start_with?(Rails.root.to_s) && !path.start_with?("/rails/site/")
+        path
+      # Otherwise assume it's relative
+      else
+        Rails.root.join("site", path).to_s
+      end
+    end
 
     def image_file?(path)
       IMAGE_EXTENSIONS.include?(File.extname(path).downcase)
     end
+
+    private
 
     def force_regenerate?(source_path)
       # Check if variants are older than source file
@@ -157,25 +220,6 @@ class ImageVariantGenerator
       end
     rescue => e
       Rails.logger.error "[ImageVariants] Failed to generate #{variant_name} for #{source_path}: #{e.message}"
-    end
-
-    def normalize_path(path)
-      # Handle both web paths (/media/images/...) and absolute paths
-      path = path.to_s
-
-      # If already an absolute path to /rails/site, use it
-      if path.start_with?("/rails/site/")
-        path
-      # If it's a web path starting with /media
-      elsif path.start_with?("/media/")
-        Rails.root.join("site", path.sub(%r{^/}, "")).to_s
-      # If it starts with Rails.root but not /rails/site
-      elsif path.start_with?(Rails.root.to_s) && !path.start_with?("/rails/site/")
-        path
-      # Otherwise assume it's relative
-      else
-        Rails.root.join("site", path).to_s
-      end
     end
 
     def mark_complete(medium_id)

@@ -49,7 +49,7 @@ namespace :images do
     image_paths.each do |path|
       relative_path = path.sub(Rails.root.join("site").to_s, "")
       web_path = relative_path.start_with?("/") ? relative_path : "/#{relative_path}"
-      GenerateImageVariantsJob.perform_later(web_path)
+      GenerateImageVariantsJob.perform_later(web_path, nil)
     end
 
     puts "✓ Queued #{image_paths.count} images for regeneration"
