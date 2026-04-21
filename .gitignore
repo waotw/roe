@@ -33,6 +33,10 @@
 !/tmp/storage/
 !/tmp/storage/.keep
 
+/site/db/*.sqlite3
+/site/db/*.sqlite3-*
+!/site/db/.keep
+
 /public/assets
 
 # Ignore key files for decrypting credentials and more.

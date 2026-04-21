@@ -1,0 +1,161 @@
+#!/usr/bin/env ruby
+
+require 'csv'
+require 'fileutils'
+
+# Configuration
+IMPORT_DIR = File.expand_path('~/Downloads/P4MPjfCCR1q-9K81hwOokA')
+OUTPUT_DIR = File.expand_path('~/Downloads/ee-test-export')
+NUM_SUBSCRIBERS = 100
+NUM_POSTS = 20
+
+# Create output directory structure
+FileUtils.mkdir_p(OUTPUT_DIR)
+FileUtils.mkdir_p("#{OUTPUT_DIR}/posts")
+
+puts "Processing Substack export..."
+puts "Source: #{IMPORT_DIR}"
+puts "Output: #{OUTPUT_DIR}"
+
+# 1. Find the email_list file (it has the site name in it)
+email_list_file = Dir.glob("#{IMPORT_DIR}/email_list.*.csv").first
+unless email_list_file
+  puts "❌ Error: Could not find email_list.*.csv"
+  exit 1
+end
+
+email_list_filename = File.basename(email_list_file)
+puts "\n1. Processing #{email_list_filename}..."
+
+# Read and sample random subscribers
+email_list = CSV.read(email_list_file, headers: true)
+total_subscribers = email_list.count
+kept_emails = email_list.entries.sample(NUM_SUBSCRIBERS)
+kept_email_addresses = kept_emails.map { |row| row['email'] }.compact.to_set
+
+# Write sampled email list
+CSV.open("#{OUTPUT_DIR}/#{email_list_filename}", 'w') do |csv|
+  csv << email_list.headers
+  kept_emails.each { |row| csv << row }
+end
+puts "  Kept #{kept_email_addresses.count} of #{total_subscribers} subscribers (random sample)"
+
+# 2. Read posts.csv and sample random posts
+puts "\n2. Processing posts.csv..."
+posts_csv = CSV.read("#{IMPORT_DIR}/posts.csv", headers: true)
+total_posts = posts_csv.count
+kept_posts = posts_csv.entries.sample(NUM_POSTS)
+
+# Extract post IDs (the number part before the dot)
+kept_post_ids = kept_posts.map { |row| row['post_id'].split('.').first }.compact
+
+puts "  Selected #{kept_post_ids.count} random posts from #{total_posts}"
+
+# Write filtered posts.csv
+CSV.open("#{OUTPUT_DIR}/posts.csv", 'w') do |csv|
+  csv << posts_csv.headers
+  kept_posts.each { |row| csv << row }
+end
+
+# 3. Copy HTML files for kept posts
+puts "\n3. Copying HTML files..."
+copied_count = 0
+kept_post_ids.each do |post_id|
+  # Find HTML files that start with this post_id
+  html_files = Dir.glob("#{IMPORT_DIR}/posts/#{post_id}.*.html")
+  html_files.each do |html_file|
+    FileUtils.cp(html_file, "#{OUTPUT_DIR}/posts/#{File.basename(html_file)}")
+    copied_count += 1
+  end
+end
+puts "  Copied #{copied_count} HTML files"
+
+# 4. Process delivery CSVs - filter by kept emails AND kept posts
+puts "\n4. Processing delivery CSVs..."
+delivery_count = 0
+delivery_rows_kept = 0
+delivery_rows_total = 0
+
+kept_post_ids.each do |post_id|
+  # Find the delivery file
+  delivery_file = Dir.glob("#{IMPORT_DIR}/posts/#{post_id}.deliver*.csv").first
+  next unless delivery_file
+
+  deliveries = CSV.read(delivery_file, headers: true)
+  delivery_rows_total += deliveries.count
+
+  filtered = deliveries.select do |row|
+    kept_email_addresses.include?(row['email'])
+  end
+
+  if filtered.any?
+    output_filename = File.basename(delivery_file)
+    CSV.open("#{OUTPUT_DIR}/posts/#{output_filename}", 'w') do |csv|
+      csv << deliveries.headers
+      filtered.each { |row| csv << row }
+    end
+    delivery_count += 1
+    delivery_rows_kept += filtered.count
+  end
+end
+puts "  Processed #{delivery_count} delivery CSVs"
+puts "  Kept #{delivery_rows_kept} of #{delivery_rows_total} delivery rows"
+
+# 5. Process opens CSVs - filter by kept emails AND kept posts
+puts "\n5. Processing opens CSVs..."
+opens_count = 0
+opens_rows_kept = 0
+opens_rows_total = 0
+
+kept_post_ids.each do |post_id|
+  opens_file = Dir.glob("#{IMPORT_DIR}/posts/#{post_id}.opens*.csv").first
+  next unless opens_file
+
+  opens = CSV.read(opens_file, headers: true)
+  opens_rows_total += opens.count
+
+  filtered = opens.select do |row|
+    kept_email_addresses.include?(row['email'])
+  end
+
+  if filtered.any?
+    output_filename = File.basename(opens_file)
+    CSV.open("#{OUTPUT_DIR}/posts/#{output_filename}", 'w') do |csv|
+      csv << opens.headers
+      filtered.each { |row| csv << row }
+    end
+    opens_count += 1
+    opens_rows_kept += filtered.count
+  end
+end
+puts "  Processed #{opens_count} opens CSVs"
+puts "  Kept #{opens_rows_kept} of #{opens_rows_total} opens rows"
+
+# 6. Compress the output directory
+puts "\n6. Creating zip file..."
+require 'zip'
+
+zip_filename = "#{OUTPUT_DIR}.zip"
+File.delete(zip_filename) if File.exist?(zip_filename)
+
+Zip::File.open(zip_filename, create: true) do |zipfile|
+  Dir.glob("#{OUTPUT_DIR}/**/*").each do |file|
+    next if File.directory?(file)
+
+    # Get the path relative to the parent of OUTPUT_DIR
+    relative_path = file.sub("#{File.dirname(OUTPUT_DIR)}/", '')
+    zipfile.add(relative_path, file)
+  end
+end
+
+file_size = (File.size(zip_filename) / 1024.0 / 1024.0).round(2)
+puts "  Created: #{zip_filename} (#{file_size} MB)"
+
+puts "\n✅ Done! Trimmed export ready at: #{zip_filename}"
+puts "\nSummary:"
+puts "  - #{kept_email_addresses.count} subscribers (random)"
+puts "  - #{kept_posts.count} posts (random)"
+puts "  - #{copied_count} HTML files"
+puts "  - #{delivery_count} delivery CSVs (#{delivery_rows_kept} rows)"
+puts "  - #{opens_count} opens CSVs (#{opens_rows_kept} rows)"
+puts "\n📦 Import this file in your Substack importer!"
