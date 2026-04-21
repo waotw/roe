@@ -4,7 +4,8 @@ class Medium < ApplicationRecord
   belongs_to :import, optional: true
 
   before_save :normalize_media_type
-  # after_create :queue_variant_generation, if: :image?
+  before_destroy :delete_variants, if: :image?
+  after_create :queue_variant_generation, if: -> { image? && !Rails.env.production? }
 
   # Scope helpers for filtering
   scope :images, -> { where(media_type: "images") }
@@ -53,6 +54,38 @@ class Medium < ApplicationRecord
   end
 
   private
+
+  def delete_variants
+    return unless image?
+
+    source_path = Rails.root.join("site", file_path.sub(%r{^/}, ""))
+    variants_dir = File.join(File.dirname(source_path), "variants")
+
+    return unless Dir.exist?(variants_dir)
+
+    # Get exact base name and extension
+    base_name = File.basename(source_path, ".*")
+    ext = File.extname(source_path)
+
+    # Delete only exact variant matches: basename-{variant}{ext}
+    ImageVariantGenerator::VARIANTS.keys.each do |variant_name|
+      variant_file = File.join(variants_dir, "#{base_name}-#{variant_name}#{ext}")
+
+      if File.exist?(variant_file)
+        File.delete(variant_file)
+        Rails.logger.info "[Medium] Deleted variant: #{variant_file}"
+      end
+
+      # Also check for .webp variant if it exists
+      webp_file = File.join(variants_dir, "#{base_name}-#{variant_name}.webp")
+      if File.exist?(webp_file)
+        File.delete(webp_file)
+        Rails.logger.info "[Medium] Deleted webp variant: #{webp_file}"
+      end
+    end
+  rescue => e
+    Rails.logger.error "[Medium] Failed to delete variants: #{e.message}"
+  end
 
   def normalize_media_type
     # If media_type is blank, extract from file_path

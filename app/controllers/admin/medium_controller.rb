@@ -12,71 +12,132 @@ class Admin::MediumController < Admin::BaseController
   end
 
   def create
-    uploaded_file = params[:file]
+    files = params[:files]
 
-    # Determine media type from file extension
-    extension = File.extname(uploaded_file.original_filename).delete_prefix('.')
-    media_type = determine_media_type(extension)
-
-    folder_path = Rails.root.join("site/media/#{media_type}")
-    FileUtils.mkdir_p(folder_path)
-
-    # Extract extension FIRST, before sanitizing
-    extension_with_dot = File.extname(uploaded_file.original_filename)
-    base_name = File.basename(uploaded_file.original_filename, extension_with_dot)
-
-    # Sanitize only the base name (without extension)
-    sanitized_base = sanitize_media_filename(base_name)
-    filename = "#{sanitized_base}#{extension_with_dot}"
-
-    # Check for duplicates
-    counter = 1
-    while Medium.exists?(file_path: "/media/#{media_type}/#{filename}")
-      filename = "#{sanitized_base}-#{counter}#{extension_with_dot}"
-      counter += 1
+    # Handle both single file and multiple files
+    uploaded_files = if files.is_a?(Array)
+      files.reject(&:blank?)  # Add this to filter out empty strings
+    elsif files.present?
+      [ files ]
+    elsif params[:file].present?
+      [ params[:file] ]
+    else
+      []
     end
 
-    file_path = folder_path.join(filename)
-
-    # Save file
-    File.open(file_path, 'wb') do |file|
-      file.write(uploaded_file.read)
+    if uploaded_files.empty?
+      redirect_to browse_admin_medium_index_path, alert: "No files selected"
+      return
     end
 
-    # Create database record
-    relative_path = "/media/#{media_type}/#{filename}"
-    medium = Medium.create!(
-      file_path: relative_path,
-      media_type: media_type,  # Store normalized type (images/audio/video), not extension
-      uploaded_at: Time.current
-    )
+    # If more than one file, go to bulk upload page
+    if uploaded_files.length > 1
+      limit = Rails.env.production? ? 20 : 50
+      if uploaded_files.length > limit
+        redirect_to browse_admin_medium_index_path, alert: "Maximum #{limit} files allowed"
+        return
+      end
 
-    # After creating medium
-    if medium.image? && ImageVariantGenerator.available?
-      # Count recent uploads in last 5 minutes
-      recent_uploads = Medium.where('created_at > ?', 5.minutes.ago).count
+      # Create batch and save files to temp directory
+      batch_id = SecureRandom.uuid
+      temp_dir = Rails.root.join("tmp", "uploads", batch_id)
+      FileUtils.mkdir_p(temp_dir)
 
-      if recent_uploads <= 5
-        # Small batch - process immediately
-        GenerateImageVariantsJob.perform_later(relative_path, nil)
+      # Save uploaded files temporarily and track their info
+      temp_files = uploaded_files.map do |file|
+        temp_path = temp_dir.join(file.original_filename)
+        File.open(temp_path, 'wb') { |f| f.write(file.read) }
+
+        {
+          temp_path: temp_path.to_s,
+          original_filename: file.original_filename,
+          size: file.size
+        }
+      end
+
+      # Store file data in session for the progress page
+      session[:upload_batch] = {
+        id: batch_id,
+        files: temp_files.map { |f| { filename: f[:original_filename], size: f[:size] } },
+        total: uploaded_files.length,
+        media_type: determine_media_type_from_files(uploaded_files)
+      }
+
+      # Queue the uploads with temp file paths
+      BulkUploadJob.perform_later(batch_id, temp_files)
+
+      redirect_to upload_progress_admin_medium_index_path(batch_id: batch_id)
+      return
+    end
+
+    # Single file - use existing logic
+    uploaded_file = uploaded_files.first
+
+    begin
+      medium = process_single_upload(uploaded_file)
+      media_type = medium.media_type
+
+      # Generate variants if needed
+      if medium.image? && ImageVariantGenerator.available?
+        GenerateImageVariantsJob.perform_later(medium.file_path, nil)
         notice_message = "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
       else
-        # Large batch - will generate on-demand
-        notice_message = "#{media_type.singularize.capitalize} uploaded (variants will generate on first view)"
+        notice_message = "#{media_type.singularize.capitalize} uploaded"
       end
-    else
-      notice_message = "#{media_type.singularize.capitalize} uploaded"
+
+      respond_to do |format|
+        format.json { render json: { success: true, path: medium.file_path } }
+        format.html { redirect_to browse_admin_medium_index_path(type: media_type), notice: notice_message }
+      end
+    rescue => e
+      respond_to do |format|
+        format.json { render json: { success: false, error: e.message }, status: :unprocessable_entity }
+        format.html { redirect_to browse_admin_medium_index_path, alert: "Upload failed: #{e.message}" }
+      end
+    end
+  end
+
+  def upload_progress
+    @batch_id = params[:batch_id]
+    @batch = session[:upload_batch]
+
+    Rails.logger.info "=== UPLOAD PROGRESS DEBUG ==="
+    Rails.logger.info "Params batch_id: #{@batch_id.inspect}"
+    Rails.logger.info "Session upload_batch: #{@batch.inspect}"
+    Rails.logger.info "Session keys: #{session.keys.inspect}"
+    Rails.logger.info "Match? #{@batch && @batch[:id] == @batch_id}"
+
+    unless @batch && @batch['id'] == @batch_id
+      redirect_to browse_admin_medium_index_path, alert: "Upload session not found"
+      nil
+    end
+  end
+
+  def clear_failed_jobs
+    if Rails.env.development?
+      SolidQueue::FailedExecution
+        .joins("INNER JOIN solid_queue_jobs ON solid_queue_jobs.id = solid_queue_failed_executions.job_id")
+        .where("solid_queue_jobs.class_name = ?", 'GenerateImageVariantsJob')
+        .destroy_all
     end
 
-    respond_to do |format|
-      format.json { render json: { success: true, path: relative_path } }
-      format.html { redirect_to browse_admin_medium_index_path(type: media_type), notice: notice_message }
+    redirect_to browse_admin_medium_index_path, notice: "Cleared failed jobs"
+  end
+
+  def queue_missing_variants
+    queued = 0
+
+    Medium.images.originals_only.find_each do |medium|
+      path = Rails.root.join("site", medium.file_path.sub(%r{^/}, ""))
+
+      next unless File.exist?(path)
+      next if ImageVariantGenerator.variants_exist?(path)
+
+      GenerateImageVariantsJob.perform_later(medium.file_path, nil)
+      queued += 1
     end
-  rescue => e
-    respond_to do |format|
-      format.json { render json: { success: false, error: e.message }, status: :unprocessable_entity }
-      format.html { redirect_to browse_admin_medium_index_path, alert: "Upload failed: #{e.message}" }
-    end
+
+    redirect_to browse_admin_medium_index_path, notice: "Queued #{queued} #{'image'.pluralize(queued)} for optimization"
   end
 
   def destroy
@@ -153,6 +214,49 @@ class Admin::MediumController < Admin::BaseController
   end
 
   private
+
+  def process_single_upload(uploaded_file)
+    # Your existing upload logic, extracted to a method
+    extension = File.extname(uploaded_file.original_filename).delete_prefix('.')
+    media_type = determine_media_type(extension)
+
+    folder_path = Rails.root.join("site/media/#{media_type}")
+    FileUtils.mkdir_p(folder_path)
+
+    extension_with_dot = File.extname(uploaded_file.original_filename)
+    base_name = File.basename(uploaded_file.original_filename, extension_with_dot)
+
+    sanitized_base = sanitize_media_filename(base_name)
+    filename = "#{sanitized_base}#{extension_with_dot}"
+
+    # Check for duplicates
+    counter = 1
+    while Medium.exists?(file_path: "/media/#{media_type}/#{filename}")
+      filename = "#{sanitized_base}-#{counter}#{extension_with_dot}"
+      counter += 1
+    end
+
+    file_path = folder_path.join(filename)
+
+    # Save file
+    File.open(file_path, 'wb') do |file|
+      file.write(uploaded_file.read)
+    end
+
+    # Create database record
+    relative_path = "/media/#{media_type}/#{filename}"
+    Medium.create!(
+      file_path: relative_path,
+      media_type: media_type,
+      uploaded_at: Time.current
+    )
+  end
+
+  def determine_media_type_from_files(files)
+    # Use the first file's extension to determine type
+    first_ext = File.extname(files.first.original_filename).delete_prefix('.')
+    determine_media_type(first_ext)
+  end
 
   def determine_media_type(extension)
     ext = extension.downcase

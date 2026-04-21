@@ -22,6 +22,9 @@ module Roe
       api_token: Rails.application.credentials.postmark_api_token
     }
 
+    # Only allow explicit database specification for migrations
+    config.active_record.dump_schema_after_migration = false
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

@@ -1,0 +1,39 @@
+<% content_for :title, "Uploading Media" %>
+
+<div class="max-w-2xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold">Uploading <%= @batch['files'].length %> Files</h1>
+    <p class="text-sm text-gray-600 mt-1">Please wait while files are uploaded and processed...</p>
+  </div>
+
+  <div id="upload-progress-<%= @batch_id %>" class="space-y-3">
+    <% @batch['files'].each_with_index do |file_info, index| %>
+      <div id="file-<%= index %>" class="p-4 border rounded bg-white">
+        <div class="flex items-center justify-between">
+          <div class="flex-1">
+            <p class="font-medium text-sm"><%= file_info['filename'] %></p>
+            <p class="text-xs text-gray-500"><%= number_to_human_size(file_info['size']) %></p>
+          </div>
+          <div id="file-<%= index %>-status" class="text-2xl">
+            ⏳
+          </div>
+        </div>
+        <div id="file-<%= index %>-message" class="text-xs text-gray-600 mt-2">
+          Waiting...
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <div id="completion-actions" class="mt-6">
+    <%= link_to "← Back to Media Library", browse_admin_medium_index_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+  </div>
+</div>
+
+<%= turbo_stream_from "upload_batch_#{@batch_id}" %>
+
+<script>
+  addEventListener("turbo:before-stream-render", ((event) => {
+    console.log("Turbo stream received:", event.target, event.detail);
+  }));
+</script>

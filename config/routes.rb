@@ -56,6 +56,9 @@ Rails.application.routes.draw do
       collection do
         get :browse
         get :duration
+        post :clear_failed_jobs
+        post :queue_missing_variants
+        get 'upload_progress/:batch_id', action: :upload_progress, as: :upload_progress
       end
       member do
         patch :rename
