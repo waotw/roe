@@ -53,6 +53,7 @@ Rails.application.routes.draw do
         get :duration
         post :clear_failed_jobs
         post :queue_missing_variants
+        post :bulk_destroy
         get 'upload_progress/:batch_id', action: :upload_progress, as: :upload_progress
       end
       member do

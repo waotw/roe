@@ -147,10 +147,44 @@ class Admin::MediumController < Admin::BaseController
     # Delete file from filesystem
     File.delete(full_path) if File.exist?(full_path)
 
-    # Delete database record
+    # Delete database record (variants deleted via before_destroy callback)
     media.destroy
 
     redirect_to browse_admin_medium_index_path(type: params[:type]), notice: "File deleted"
+  end
+
+  def bulk_destroy
+    media_ids = params[:media_ids] || []
+
+    if media_ids.empty?
+      redirect_to browse_admin_medium_index_path, alert: "No files selected"
+      return
+    end
+
+    deleted_count = 0
+    errors = []
+
+    media_ids.each do |id|
+      media = Medium.find_by(id: id)
+      next unless media
+
+      begin
+        full_path = Rails.root.join("site#{media.file_path}")
+        File.delete(full_path) if File.exist?(full_path)
+        media.destroy
+        deleted_count += 1
+      rescue => e
+        errors << "Failed to delete #{File.basename(media.file_path)}: #{e.message}"
+      end
+    end
+
+    if errors.any?
+      redirect_to browse_admin_medium_index_path,
+                  alert: "Deleted #{deleted_count} files. Errors: #{errors.join(', ')}"
+    else
+      redirect_to browse_admin_medium_index_path,
+                  notice: "Deleted #{deleted_count} #{'file'.pluralize(deleted_count)}"
+    end
   end
 
   def rename
