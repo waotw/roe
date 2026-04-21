@@ -1,0 +1,116 @@
+<div class="flex flex-col h-full"
+     data-controller="media-bulk-select media-picker"
+     data-media-picker-media-type-value="<%= @media_type %>">
+
+  <!-- Header -->
+  <div class="flex items-center justify-left px-4 py-3 border-b border-gray-300 flex-shrink-0">
+    <h2 class="mr-3 text-sm font-mono font-bold uppercase"><%= @media_type.capitalize %></h2>
+    <div class="flex items-center gap-3">
+
+      <!-- Spinner (hidden by default) -->
+      <span data-media-picker-target="spinner" class="hidden text-xs text-gray-500 font-mono animate-pulse">Uploading...</span>
+
+      <!-- Upload button -->
+      <label class="cursor-pointer inline-flex items-center uppercase text-xs px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">
+        Upload
+        <input type="file"
+               accept="<%= @media_type == 'images' ? 'image/*' : @media_type == 'audio' ? 'audio/*' : 'video/*' %>"
+               multiple
+               class="hidden"
+               data-media-picker-target="uploadInput"
+               data-action="change->media-picker#handleUpload">
+      </label>
+
+      <!-- Search -->
+      <input type="search"
+             data-media-picker-target="search"
+             data-action="input->media-picker#handleSearch search->media-picker#handleSearch"
+             placeholder="Search..."
+             autocomplete="off"
+             class="block rounded-xs border border-gray-500 focus:bg-blue-50 focus:ring-blue-300 text-xs font-mono mr-8 px-3 py-1 bg-white w-48">
+    </div>
+  </div>
+
+  <!-- Bulk Action Toolbar (shown when items selected) -->
+  <div data-media-bulk-select-target="toolbar"
+       class="px-4 py-2 border-b border-blue-200 bg-blue-50 shrink-0"
+       style="display: none;">
+    <div class="flex items-center justify-between">
+      <div class="text-xs font-medium text-blue-800 font-mono">
+        <span data-media-bulk-select-target="selectedCount">0</span> selected
+      </div>
+      <div class="flex gap-2">
+        <button type="button"
+                data-action="click->media-picker#closeModal"
+                class="text-xs ml-2 px-3 py-1 border border-gray-600 bg-gray-300 hover:bg-gray-100 rounded-xs font-mono uppercase">
+          Cancel
+        </button>
+        <button type="button"
+                data-action="click->media-bulk-select#clearSelection"
+                class="text-xs px-3 py-1 border border-gray-600 bg-white hover:bg-gray-100 rounded-xs font-mono uppercase">
+          Clear
+        </button>
+        <button type="button"
+                data-action="click->media-bulk-select#submitInsert"
+                class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">
+          Insert Selected
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Media Grid -->
+  <div class="flex-1 overflow-y-auto p-4">
+    <% if @media.any? %>
+      <div class="grid grid-cols-4 gap-3" data-media-picker-target="grid">
+        <% @media.each do |media| %>
+          <div class="border border-gray-300 p-1.5 hover:bg-gray-50 relative cursor-pointer transition-all"
+               data-media-picker-target="item"
+               data-filename="<%= File.basename(media.file_path).downcase %>"
+               data-action="click->media-bulk-select#toggleItem">
+
+            <!-- Checkmark overlay (visible when selected) -->
+            <div class="check-overlay absolute top-1.5 left-1.5 w-5 h-5 bg-blue-600 text-white text-xs flex items-center justify-center rounded-sm z-10 pointer-events-none" style="display: none;">✓</div>
+
+            <!-- Hidden checkbox used by bulk select controller -->
+            <input type="checkbox"
+                   data-media-bulk-select-target="checkbox"
+                   data-media-id="<%= media.id %>"
+                   data-file-path="<%= media.file_path %>"
+                   data-filename="<%= File.basename(media.file_path, '.*') %>"
+                   class="hidden">
+
+            <!-- Thumbnail -->
+            <% if media.media_type == 'images' %>
+              <% if ImageVariantGenerator.available? && media.variants_ready? %>
+                <%= image_tag image_variant_path(media.file_path, :small),
+                              alt: File.basename(media.file_path),
+                              class: "w-full h-24 object-cover mb-1",
+                              loading: "lazy" %>
+              <% else %>
+                <%= image_tag media.file_path,
+                              alt: File.basename(media.file_path),
+                              class: "w-full h-24 object-cover mb-1",
+                              loading: "lazy" %>
+              <% end %>
+            <% elsif media.media_type == 'audio' %>
+              <div class="w-full h-24 bg-gray-200 mb-1 flex items-center justify-center">
+                <span class="text-3xl">🎵</span>
+              </div>
+            <% elsif media.media_type == 'video' %>
+              <div class="w-full h-24 bg-gray-200 mb-1 flex items-center justify-center">
+                <span class="text-3xl">🎬</span>
+              </div>
+            <% end %>
+
+            <!-- Filename -->
+            <p class="text-xs font-mono text-gray-600 truncate"><%= File.basename(media.file_path) %></p>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p data-media-picker-target="emptyMessage" class="text-sm text-gray-500 font-mono mt-4">No <%= @media_type %> uploaded yet. Use the Upload button above.</p>
+    <% end %>
+  </div>
+
+</div>

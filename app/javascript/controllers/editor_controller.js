@@ -116,7 +116,9 @@ export default class extends Controller {
     "form",
     "metadata",
     "cardMenu",
-    "mediaUpload",
+    "mediaMenuDropdown",
+    "mediaPickerModal",
+    "mediaPickerContent",
     "tocPanel",
     "tocContent",
     "tocArrow",
@@ -192,6 +194,20 @@ export default class extends Controller {
     // Bind beforeunload handler
     this.beforeUnloadHandler = this.handleBeforeUnload.bind(this);
     window.addEventListener("beforeunload", this.beforeUnloadHandler);
+
+    // Listen for media picker insert events
+    this.mediaPickerInsertHandler = this.handleMediaPickerInsert.bind(this);
+    this.element.addEventListener(
+      "media-picker:insert",
+      this.mediaPickerInsertHandler,
+    );
+
+    // Listen for media picker close events (e.g. Cancel button)
+    this.mediaPickerCloseHandler = this.closeMediaPicker.bind(this);
+    this.element.addEventListener(
+      "media-picker:close",
+      this.mediaPickerCloseHandler,
+    );
 
     // Check for saved trigger and broadcast refresh
     const savedTrigger = document.querySelector('[data-trigger="refresh"]');
@@ -395,6 +411,22 @@ export default class extends Controller {
 
     document.removeEventListener("click", this.cardMenuClickHandler);
     document.removeEventListener("keydown", this.cardMenuKeyHandler);
+
+    // Remove media picker insert handler
+    if (this.mediaPickerInsertHandler) {
+      this.element.removeEventListener(
+        "media-picker:insert",
+        this.mediaPickerInsertHandler,
+      );
+    }
+
+    // Remove media picker close handler
+    if (this.mediaPickerCloseHandler) {
+      this.element.removeEventListener(
+        "media-picker:close",
+        this.mediaPickerCloseHandler,
+      );
+    }
   }
 
   handleTurboBeforeVisit(event) {
@@ -1492,49 +1524,117 @@ export default class extends Controller {
 
   // ========== MEDIA ACTIONS ==========
 
-  triggerMediaUpload(event) {
+  toggleMediaMenu(event) {
     event.preventDefault();
-    this.mediaUploadTarget.click();
-  }
+    event.stopPropagation();
+    const dropdown = this.mediaMenuDropdownTarget;
+    const isHidden = dropdown.classList.contains("hidden");
 
-  handleMediaUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    // Close card menu if open
+    if (this.hasCardMenuTarget) {
+      this.cardMenuTarget.classList.add("hidden");
+    }
 
-    const savedPosition = this.textareaTarget.selectionStart;
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const token = document.querySelector('meta[name="csrf-token"]').content;
-
-    fetch("/admin/medium", {
-      method: "POST",
-      headers: {
-        "X-CSRF-Token": token,
-      },
-      body: formData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.success) {
-          this.insertMedia(data.path, file.name, savedPosition);
-        } else {
-          alert("Upload failed: " + data.error);
+    if (isHidden) {
+      dropdown.classList.remove("hidden");
+      // Save cursor position now, before focus moves away
+      this.savedMediaPosition = this.textareaTarget.selectionStart;
+      // Close on outside click
+      this._closeMediaMenuHandler = (e) => {
+        if (
+          !dropdown.contains(e.target) &&
+          !e.target.closest('[data-action*="toggleMediaMenu"]')
+        ) {
+          dropdown.classList.add("hidden");
+          document.removeEventListener("click", this._closeMediaMenuHandler);
         }
-      })
-      .catch((error) => {
-        alert("Upload error: " + error);
-      });
-
-    event.target.value = "";
+      };
+      setTimeout(
+        () => document.addEventListener("click", this._closeMediaMenuHandler),
+        0,
+      );
+    } else {
+      dropdown.classList.add("hidden");
+    }
   }
 
-  insertMedia(path, filename, position) {
-    const markdown = `![${filename}](${path})`;
+  openMediaPicker(event) {
+    event.preventDefault();
+    const mediaType = event.currentTarget.dataset.mediaType || "images";
+
+    // Close dropdown
+    if (this.hasMediaMenuDropdownTarget) {
+      this.mediaMenuDropdownTarget.classList.add("hidden");
+    }
+
+    // Save cursor position (use savedMediaPosition if set by toggleMediaMenu)
+    if (this.savedMediaPosition == null) {
+      this.savedMediaPosition = this.textareaTarget.selectionStart;
+    }
+
+    // Show modal
+    this.mediaPickerModalTarget.style.display = "flex";
+    document.body.style.overflow = "hidden";
+
+    // Load picker content via fetch
+    this.mediaPickerContentTarget.innerHTML =
+      '<div class="flex items-center justify-center h-full text-gray-400 font-mono text-sm">Loading...</div>';
+
+    fetch(`/admin/medium/picker?media_type=${mediaType}`, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    })
+      .then((r) => r.text())
+      .then((html) => {
+        this.mediaPickerContentTarget.innerHTML = html;
+      })
+      .catch(() => {
+        this.mediaPickerContentTarget.innerHTML =
+          '<p class="p-4 text-red-600 font-mono text-sm">Failed to load media.</p>';
+      });
+  }
+
+  closeMediaPicker(event) {
+    // Prevent any form submission that might be triggered
+    if (event && event.preventDefault) event.preventDefault();
+    this.mediaPickerModalTarget.style.display = "none";
+    document.body.style.overflow = "";
+    this.savedMediaPosition = null;
+  }
+
+  closeMediaPickerOnBackdrop(event) {
+    // Only close if clicking the backdrop itself (not the modal content)
+    if (event.target === this.mediaPickerModalTarget) {
+      event.preventDefault();
+      this.closeMediaPicker();
+    }
+  }
+
+  stopModalClose(event) {
+    event.stopPropagation();
+  }
+
+  handleMediaPickerInsert(event) {
+    const { mediaItems } = event.detail;
+    if (!mediaItems || mediaItems.length === 0) return;
+
+    const position =
+      this.savedMediaPosition ?? this.textareaTarget.selectionStart;
+
+    // Build markdown for all selected items, one per line
+    const markdown = mediaItems
+      .map((item) => `![${item.filename}](${item.path})`)
+      .join("\n");
+
+    // Close modal first, then insert - this ensures the textarea is
+    // the active element so execCommand lands in the right place and
+    // the browser's undo stack is intact
+    this.closeMediaPicker();
 
     this.textareaTarget.focus({ preventScroll: true });
     this.textareaTarget.setSelectionRange(position, position);
 
+    // execCommand is deprecated but still the only reliable cross-browser
+    // way to insert text that supports native undo (Cmd+Z)
     document.execCommand("insertText", false, markdown);
 
     const lineHeight = parseInt(

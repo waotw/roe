@@ -55,6 +55,7 @@ Rails.application.routes.draw do
     resources :medium, only: [ :index, :create, :destroy ] do
       collection do
         get :browse
+        get :picker
         get :duration
         post :clear_failed_jobs
         post :queue_missing_variants

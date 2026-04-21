@@ -1,4 +1,12 @@
 class Admin::MediumController < Admin::BaseController
+  def picker
+    @media_type = params[:media_type] || "images"
+    @media = Medium.originals_only
+                   .where(media_type: @media_type)
+                   .order(created_at: :desc)
+    render layout: false
+  end
+
   def browse
     # Load only original media files (exclude variants)
     @media = Medium.originals_only
@@ -86,7 +94,7 @@ class Admin::MediumController < Admin::BaseController
       end
 
       respond_to do |format|
-        format.json { render json: { success: true, path: medium.file_path } }
+        format.json { render json: { success: true, path: medium.file_path, filename: File.basename(medium.file_path, ".*") } }
         format.html { redirect_to browse_admin_medium_index_path(type: media_type), notice: notice_message }
       end
     rescue => e
