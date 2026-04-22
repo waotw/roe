@@ -30,8 +30,14 @@ module SubstackImporter
       Rails.logger.info "[SubstackImporter] Found #{delivery_files.count} delivery CSV files"
 
       if delivery_files.empty?
-        @import.mark_failed!("No delivery CSV files found (*.delivers.csv)")
-        return false
+        Rails.logger.info "[SubstackImporter] No delivery CSV files found, skipping deliveries import"
+        @import.update!(
+          status: :completed,
+          stats: @import.stats.merge({ deliveries_skipped_reason: "No delivery files found in export" }),
+          completed_at: Time.current
+        )
+        @import.complete_phase!(4)
+        return true
       end
 
       # Process each delivery file

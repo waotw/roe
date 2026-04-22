@@ -15,4 +15,27 @@ module Admin::ImportsHelper
       "bg-gray-100 text-gray-800"
     end
   end
+
+  def import_has_missing_media?(import)
+    missing = import.stats["missing_media"]
+    missing.present? && missing.any? { |m| !m["resolved"] && !m["skipped"] }
+  end
+
+  def import_status_label(import)
+    if import.status_completed? && import.completed_phases.last == 4
+      import_has_missing_media?(import) ? "Complete (missing media)" : "Import Complete"
+    elsif import.status_completed?
+      "Phase #{import.completed_phases.last} Complete"
+    else
+      import.status.humanize
+    end
+  end
+
+  def import_status_badge_class(import)
+    if import.status_completed? && import_has_missing_media?(import)
+      "bg-amber-100 text-amber-800"
+    else
+      status_badge_class(import.status)
+    end
+  end
 end

@@ -133,7 +133,12 @@ module SubstackImporter
       frontmatter = Frontmatter.new(site_root: site_root)
 
       # Setup converter
-      converter = Converter.new(verbose: Rails.env.development?)
+      converter = Converter.new(
+        verbose: Rails.env.development?,
+        insert_paywalls: @import.options["insert_paywalls"] == "1",
+        paywall_text: @import.options["paywall_text"].presence,
+        paywall_button_text: @import.options["paywall_button_text"].presence
+      )
 
       # Process each post
       processed_count = 0
@@ -154,6 +159,19 @@ module SubstackImporter
 
       # Complete phase 2
       @import.complete_phase!(2)
+
+      # If no email list exists in the export, auto-complete phases 3 and 4
+      # so the user doesn't have to step through them manually
+      unless email_list_exists?
+        Rails.logger.info "[SubstackImporter] No email list found, auto-completing phases 3 and 4"
+        skipped_stats = {
+          members_skipped_reason: "No email list found in export — member and delivery import skipped",
+          deliveries_skipped_reason: "No email list found in export — member and delivery import skipped"
+        }
+        @import.update!(stats: @import.stats.merge(skipped_stats))
+        @import.complete_phase!(3)
+        @import.complete_phase!(4)
+      end
 
       true
     rescue => e
@@ -292,6 +310,13 @@ module SubstackImporter
 
       # Posts go directly in /site/posts/ (no date subdirectories)
       File.join(base_path, "#{post.slug}.md")
+    end
+
+    def email_list_exists?
+      extract_path = @import.extract_path
+      return false unless extract_path.present? && Dir.exist?(extract_path)
+
+      Dir.glob(File.join(extract_path, "email_list*.csv")).any?
     end
 
     def find_csv_file(extract_path)

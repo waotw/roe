@@ -10,12 +10,8 @@
       <div>
         <span class="text-sm text-gray-500">Status</span>
         <div class="flex items-center mt-1">
-          <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold <%= status_badge_class(@import.status) %>">
-            <% if @import.status_completed? %>
-              <%= @import.completed_phases.last == 4 ? "Import Complete" : "Phase #{@import.completed_phases.last} Complete" %>
-            <% else %>
-              <%= @import.status.humanize %>
-            <% end %>
+          <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold <%= import_status_badge_class(@import) %>">
+            <%= import_status_label(@import) %>
           </span>
         </div>
       </div>
@@ -147,7 +143,12 @@
       </div>
     <% end %>
     <%# Member Import Stats %>
-    <% if @import.stats["members_imported"].to_i > 0 || @import.stats["members_updated"].to_i > 0 || @import.stats["members_discarded"].to_i > 0 %>
+    <% if @import.stats["members_skipped_reason"].present? %>
+      <div class="mt-6 p-4 border-t border-amber-600 bg-amber-100">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Member Import</h3>
+        <p class="text-sm text-gray-500 italic"><%= @import.stats["members_skipped_reason"] %></p>
+      </div>
+    <% elsif @import.stats["members_imported"].to_i > 0 || @import.stats["members_updated"].to_i > 0 || @import.stats["members_discarded"].to_i > 0 %>
       <div class="mt-6 pt-6 border-t border-gray-200">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Member Import Results</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -187,6 +188,13 @@
         <% end %>
       </div>
     <% end %>
+    <%# Deliveries skipped reason %>
+    <% if @import.stats["deliveries_skipped_reason"].present? %>
+      <div class="mt-6 p-4 border-t border-amber-600 bg-amber-100">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Delivery Import</h3>
+        <p class="text-sm text-gray-500 italic"><%= @import.stats["deliveries_skipped_reason"] %></p>
+      </div>
+    <% end %>
     <% if @import.stats["errors"].present? && @import.stats["errors"].any? %>
       <div class="mt-4">
         <h3 class="text-sm font-medium text-red-700 mb-2">Errors (<%= @import.stats["errors"].count %>)</h3>
@@ -223,9 +231,15 @@
       <%= link_to "Continue to Deliveries Import →", phase_4_admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     <% end %>
     <% if @import.phase_completed?(4) %>
-      <span class="inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-green-800 bg-green-200 font-mono rounded-xs text-green-800">
-        ✓ Import Complete
-      </span>
+      <% if import_has_missing_media?(@import) %>
+        <span class="inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-100 font-mono rounded-xs text-amber-800">
+          ✓ Complete (missing media)
+        </span>
+      <% else %>
+        <span class="inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-green-800 bg-green-200 font-mono rounded-xs text-green-800">
+          ✓ Import Complete
+        </span>
+      <% end %>
     <% end %>
   </div>
 </div>

@@ -25,6 +25,17 @@
       </div>
     </div>
   </div>
+  <% unless @has_email_list %>
+    <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-lg">
+      <div class="flex items-start gap-2">
+        <span class="text-amber-600">⚠️</span>
+        <div>
+          <p class="text-sm font-medium text-amber-800">No email list found in export</p>
+          <p class="text-xs text-amber-700 mt-1">No <code>email_list.csv</code> was found in your Substack export. The member import will be skipped automatically. You can still continue to proceed to the next step.</p>
+        </div>
+      </div>
+    </div>
+  <% end %>
   <div class="bg-white rounded-lg shadow p-6">
     <h2 class="text-lg font-medium mb-4">Phase 3: Configure Member Import</h2>
     <%= form_with model: [:admin, @import], url: phase_3_run_admin_import_path(@import), method: :post, local: true do |f| %>

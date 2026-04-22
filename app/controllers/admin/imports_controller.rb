@@ -88,7 +88,11 @@ class Admin::ImportsController < Admin::BaseController
 
   # Phase 3: Members Import
   def phase_3
-    # Show configuration form
+    # Check if email list CSV exists in the extract
+    extract_path = @import.extract_path
+    @has_email_list = extract_path.present? &&
+                      Dir.exist?(extract_path) &&
+                      Dir.glob(File.join(extract_path, "email_list*.csv")).any?
   end
 
   def phase_3_run

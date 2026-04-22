@@ -34,8 +34,14 @@ module SubstackImporter
 
       csv_path = find_csv_file
       unless csv_path
-        Rails.logger.error "[SubstackImporter] CSV not found, aborting"
-        return false
+        Rails.logger.info "[SubstackImporter] No email list found, skipping members import"
+        @import.update!(
+          status: :completed,
+          stats: @import.stats.merge({ members_skipped_reason: "No email list found in export" }),
+          completed_at: Time.current
+        )
+        @import.complete_phase!(3)
+        return true
       end
 
       members = parse_csv(csv_path)
@@ -137,8 +143,7 @@ module SubstackImporter
         all_csvs = Dir.glob(File.join(extract_path, "*.csv"))
         Rails.logger.info "[SubstackImporter] All CSV files in directory: #{all_csvs.inspect}"
 
-        @errors << "No email_list CSV found in export"
-        @import.mark_failed!("No email_list CSV found. Available files: #{all_csvs.join(', ')}")
+        Rails.logger.info "[SubstackImporter] No email list CSV found, will skip members import"
         nil
       end
     end

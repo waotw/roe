@@ -23,8 +23,8 @@
                 <%= link_to "Import ##{import.id}", admin_import_path(import), class: "text-blue-600 hover:text-blue-900" %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold <%= status_badge_class(import.status) %>">
-                  <%= import.status.humanize %>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold <%= import_status_badge_class(import) %>">
+                  <%= import_status_label(import) %>
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

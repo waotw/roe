@@ -56,7 +56,31 @@
         </div>
         <p class="mt-1 text-sm text-gray-500 ml-6">By default, only published posts are imported</p>
       </div>
-      <div class="bg-blue-50 rounded-lg p-4 mb-6">
+      <div class="mb-6">
+        <div class="flex items-center">
+          <%= check_box_tag "import[options][insert_paywalls]", "1", @import.options["insert_paywalls"], id: "insert_paywalls_toggle", class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %>
+          <%= label_tag "import[options][insert_paywalls]", "Insert paywalls for paid posts", class: "ml-2 block text-sm text-gray-900" %>
+        </div>
+        <p class="mt-1 text-sm text-gray-500 ml-6">Replaces Substack's paywall marker with Roe's paywall syntax</p>
+
+        <div id="paywall_options" class="mt-4 ml-6 space-y-3 <%= @import.options["insert_paywalls"] ? '' : 'hidden' %>">
+          <div>
+            <%= label_tag "import[options][paywall_text]", "Paywall message", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= text_field_tag "import[options][paywall_text]", @import.options["paywall_text"], placeholder: "Upgrade to continue reading.", class: "block w-full border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" %>
+          </div>
+          <div>
+            <%= label_tag "import[options][paywall_button_text]", "Button text", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= text_field_tag "import[options][paywall_button_text]", @import.options["paywall_button_text"], placeholder: "Become a paid member", class: "block w-full border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" %>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        document.getElementById('insert_paywalls_toggle').addEventListener('change', function() {
+          document.getElementById('paywall_options').classList.toggle('hidden', !this.checked);
+        });
+      </script>
+      <div class="bg-blue-50 rounded-md p-4 mb-6">
         <h3 class="text-sm font-medium text-blue-900 mb-2">What will happen:</h3>
         <ul class="text-sm text-blue-800 list-disc list-inside space-y-1">
           <li>Posts will be converted from HTML to Markdown</li>

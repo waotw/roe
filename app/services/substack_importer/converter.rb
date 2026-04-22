@@ -2,10 +2,13 @@
 
 module SubstackImporter
   class Converter
-    def initialize(verbose: false)
+    def initialize(verbose: false, insert_paywalls: true, paywall_text: nil, paywall_button_text: nil)
       @verbose = verbose
       @images = []
       @footnotes = {}
+      @insert_paywalls = insert_paywalls
+      @paywall_text = paywall_text || "Upgrade to continue reading."
+      @paywall_button_text = paywall_button_text || "Become a paid member"
     end
 
     def convert(html)
@@ -212,7 +215,7 @@ module SubstackImporter
 
       # Paywall
       if class_list.include?("paywall-jump")
-        return "<!--members-only-->\n\n"
+        return @insert_paywalls ? paywall_block : "<!--substack members-only-->\n\n"
       end
 
       # Tweet embeds (stub)
@@ -571,6 +574,17 @@ module SubstackImporter
       JSON.parse(json_string)
     rescue JSON::ParserError
       nil
+    end
+
+    def paywall_block
+      <<~PAYWALL
+        ```form
+        for: paid_content
+        text: #{@paywall_text}
+        button-text: #{@paywall_button_text}
+        ```
+
+      PAYWALL
     end
 
     def cleanup(text)
