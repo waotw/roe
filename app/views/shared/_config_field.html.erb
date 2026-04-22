@@ -33,7 +33,7 @@
 
     <% elsif field_type == :select %>
       <select name="config_fields[<%= field_name %>]"
-              class="w-full font-mono text-sm p-2 border border-gray-300"
+              class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
               data-config-field="<%= field_name %>"
               <%= 'disabled' if field_depends_on %>
               <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>>

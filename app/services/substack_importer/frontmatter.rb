@@ -64,11 +64,14 @@ module SubstackImporter
     end
 
     def map_audience(audience)
-      case audience.to_s
-      when "paid", "premium" then "paid"
+      Rails.logger.info "[Frontmatter] map_audience called with: #{audience.inspect}"
+      result = case audience.to_s
+      when "paid", "premium", "only_paid" then "paid"
       when "public", "free" then "everyone"
       else "everyone"
       end
+      Rails.logger.info "[Frontmatter] map_audience result: #{result.inspect}"
+      result
     end
 
     def format_date(date_str)
