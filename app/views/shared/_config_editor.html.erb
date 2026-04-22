@@ -337,8 +337,10 @@
               <!-- Defaults Section -->
               <% if defaults.any? %>
                 <div class="mb-8">
-                  <% unless @config_type == 'members' %>
-                      <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Defaults</h3>
+                  <% if @config_type == 'podcast' %>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Podcast</h3>
+                  <% elsif @config_type != 'members' %>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">Defaults</h3>
                   <% end %>
 
                   <div class="space-y-6">
@@ -346,7 +348,17 @@
                       <% if value.is_a?(Hash) %>
                         <!-- Nested section (like post-link, aside, pullquote) -->
                         <div class="config-subsection pl-4 border-l-2 border-gray-300">
-                          <h4 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h4>
+                          <% if @config_type == 'podcast' %>
+                            <!-- Podcast key display + feed URL info -->
+                            <div class="config-field-row mb-4 flex items-center justify-between">
+                              <div>
+                                <span class="text-base font-semibold text-gray-800 font-mono"><%= key %></span>
+                                <p class="text-xs text-gray-500 mt-0.5">Feed: <code>/podcast/<%= key %>.xml</code> &mdash; to rename, use <strong>EDIT YAML</strong></p>
+                              </div>
+                            </div>
+                          <% else %>
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h4>
+                          <% end %>
 
                           <div class="space-y-3">
                             <% value.each do |subkey, subvalue| %>

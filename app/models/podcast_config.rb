@@ -21,7 +21,7 @@ class PodcastConfig
   # Get all podcast configs (raw)
   def self.all_podcasts
     @all_podcasts ||= begin
-      site_config = SiteConfig.current('defaults/podcast')
+      site_config = SiteConfig.current('features/podcast')
       site_config&.config || {}
     end
   end
@@ -29,7 +29,7 @@ class PodcastConfig
   # Clear cache
   def self.reload!
     @all_podcasts = nil
-    SiteConfig.reload!('defaults/podcast')
+    SiteConfig.reload!('features/podcast')
   end
 
   # Get list of podcast keys for dropdown

@@ -1,49 +1,60 @@
+<% if @podcast_episodes.present?
+     current_index = @podcast_episodes.index { |e| e.url_name == post.url_name }
+     # Episodes are newest-first, so "next" is older (higher index), "prev" is newer (lower index)
+     prev_episode = current_index && current_index > 0 ? @podcast_episodes[current_index - 1] : nil
+     next_episode = current_index && current_index < @podcast_episodes.length - 1 ? @podcast_episodes[current_index + 1] : nil
+   end %>
 <div class="podcast-episode">
+
   <% if post.metadata['image'].present? %>
-    <div class="episode-artwork">
-      <%= image_tag post.metadata['image'], alt: post.title, loading: "lazy" %>
+    <div class="podcast-episode__image">
+      <%= image_tag post.metadata['image'], alt: post.title, loading: "lazy", class: "podcast-episode__cover" %>
     </div>
   <% end %>
 
-  <div class="episode-meta">
-    <% if post.metadata['season'].present? || post.metadata['episode_number'].present? %>
-      <p class="episode-info">
-        <% if post.metadata['season'].present? %>
-          <span class="season">Season <%= post.metadata['season'] %></span>
-        <% end %>
-        <% if post.metadata['episode_number'].present? %>
-          <span class="episode">Episode <%= post.metadata['episode_number'] %></span>
-        <% end %>
-        <% if post.metadata['duration'].present? %>
-          <span class="duration"><%= format_duration(post.metadata['duration']) %></span>
-        <% end %>
-      </p>
-    <% end %>
-  </div>
-
-  <div class="media-player audio-player">
-    <audio controls preload="metadata">
-      <source src="<%= post.audio %>" type="audio/mpeg">
-      <source src="<%= post.audio %>" type="audio/mp4">
-      <source src="<%= post.audio %>" type="audio/ogg">
-      <% if post.metadata['captions'].present? %>
-        <track kind="captions" src="<%= post.metadata['captions'] %>" srclang="en" label="English">
-      <% end %>
-      Your browser doesn't support audio playback.
-    </audio>
-  </div>
+  <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
 
   <div class="show-notes">
     <%= render_post_content(post) %>
   </div>
 
-  <% if post.metadata['podcast'].present? %>
+  <% if @podcast_config.present? || post.metadata['podcast'].present? %>
     <div class="podcast-subscribe">
-      <p>Subscribe:</p>
-      <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="subscribe-link rss" target="_blank">
-        RSS Feed
-      </a>
-      <!-- Add more subscribe links here later: Apple Podcasts, Spotify, etc. -->
+      <% if post.metadata['podcast'].present? %>
+        <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="subscribe-link subscribe-link--rss" target="_blank">
+          RSS Feed
+        </a>
+      <% end %>
     </div>
   <% end %>
+
+  <% if @podcast_episodes.present? && @podcast_episodes.length > 1 %>
+    <div class="podcast-episode__list">
+      <h2 class="podcast-episode__list-heading">All Episodes</h2>
+      <ol class="podcast-episode__episodes">
+        <% @podcast_episodes.each do |episode| %>
+          <li class="podcast-episode__episodes-item <%= 'is-current' if episode.url_name == post.url_name %>">
+            <a href="<%= post_path(episode.url_name) %>" class="podcast-episode__episodes-link">
+              <div class="podcast-episode__episodes-meta">
+                <% if episode.metadata['season'].present? || episode.metadata['episode_number'].present? %>
+                  <span class="podcast-episode__episodes-number">
+                    <% if episode.metadata['season'].present? %>S<%= episode.metadata['season'] %><% end %>
+                    <% if episode.metadata['episode_number'].present? %>E<%= episode.metadata['episode_number'] %><% end %>
+                  </span>
+                <% end %>
+                <% if episode.metadata['duration'].present? %>
+                  <span class="podcast-episode__episodes-duration"><%= format_duration(episode.metadata['duration']) %></span>
+                <% end %>
+                <% if episode.date.present? %>
+                  <span class="podcast-episode__episodes-date"><%= episode.date.strftime("%-d %B %Y") rescue episode.date.to_s %></span>
+                <% end %>
+              </div>
+              <span class="podcast-episode__episodes-title"><%= episode.title %></span>
+            </a>
+          </li>
+        <% end %>
+      </ol>
+    </div>
+  <% end %>
+
 </div>
