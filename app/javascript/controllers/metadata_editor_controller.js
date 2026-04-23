@@ -894,17 +894,14 @@ export default class extends Controller {
           : "false";
     }
 
-    // Auto-populate author if not already set (podcast config overrides site config)
+    // Do NOT auto-fill author from podcast config — leave it blank so the
+    // podcast.yml author is used as a fallback at render time. Only clear
+    // it if it was previously auto-filled with the site default author.
     const authorField = this.element.querySelector(
       '[data-metadata-field="author"]',
     );
-    if (
-      authorField &&
-      (!authorField.value ||
-        authorField.value === "" ||
-        authorField.value === this.defaultAuthorValue)
-    ) {
-      authorField.value = podcastConfig.author || this.defaultAuthorValue;
+    if (authorField && authorField.value === this.defaultAuthorValue) {
+      authorField.value = "";
     }
 
     this._notifyMetadataChange();

@@ -19,6 +19,9 @@ class SiteController < ApplicationController
     return unless helpers.members_enabled?
     return unless item.metadata['audience'] == 'paid'
 
+    # Admins can see all paid content
+    return if authenticated?
+
     # Paid members get full access
     return if current_member&.paid? && current_member&.active?
 
@@ -27,7 +30,7 @@ class SiteController < ApplicationController
 
     if has_paywall_form
       # Let the page load - content will be truncated at the form
-      return
+      nil
     else
       # No form = redirect to upgrade page
       upgrade_page = Page.find_by("file_path LIKE ?", "%upgrade.md")

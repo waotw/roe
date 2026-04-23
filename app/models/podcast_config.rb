@@ -19,16 +19,15 @@ class PodcastConfig
   end
 
   # Get all podcast configs (raw)
+  # No class-level memoization — rely on SiteConfig's own cache which
+  # gets busted when the file changes via content sync
   def self.all_podcasts
-    @all_podcasts ||= begin
-      site_config = SiteConfig.current('features/podcast')
-      site_config&.config || {}
-    end
+    site_config = SiteConfig.current('features/podcast')
+    site_config&.config || {}
   end
 
   # Clear cache
   def self.reload!
-    @all_podcasts = nil
     SiteConfig.reload!('features/podcast')
   end
 

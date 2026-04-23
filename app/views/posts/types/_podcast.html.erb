@@ -6,13 +6,14 @@
    end %>
 <div class="podcast-episode">
 
-  <% if post.metadata['image'].present? %>
-    <div class="podcast-episode__image">
+  <div class="podcast-episode__hero">
+    <% if post.metadata['image'].present? %>
       <%= image_tag post.metadata['image'], alt: post.title, loading: "lazy", class: "podcast-episode__cover" %>
+    <% end %>
+    <div class="podcast-episode__player-overlay">
+      <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
     </div>
-  <% end %>
-
-  <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
+  </div>
 
   <div class="show-notes">
     <%= render_post_content(post) %>
@@ -21,9 +22,22 @@
   <% if @podcast_config.present? || post.metadata['podcast'].present? %>
     <div class="podcast-subscribe">
       <% if post.metadata['podcast'].present? %>
-        <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="subscribe-link subscribe-link--rss" target="_blank">
-          RSS Feed
-        </a>
+        <%# Show public feed unless podcast is paid-only (admins always see it) %>
+        <% if authenticated? || @podcast_config&.dig('audience') != 'paid' %>
+          <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="subscribe-link subscribe-link--rss" target="_blank">
+            RSS Feed
+          </a>
+        <% end %>
+        <%# Show private feed to paid members and admins %>
+        <% if authenticated? %>
+          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml" class="subscribe-link subscribe-link--rss subscribe-link--private" target="_blank">
+            Private RSS Feed (Paid)
+          </a>
+        <% elsif current_member&.paid? && current_member&.active? %>
+          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml?token=<%= current_member.access_token %>" class="subscribe-link subscribe-link--rss subscribe-link--private" target="_blank">
+            Private RSS Feed (Paid)
+          </a>
+        <% end %>
       <% end %>
     </div>
   <% end %>

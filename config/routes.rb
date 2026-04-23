@@ -244,6 +244,7 @@ Rails.application.routes.draw do
   get "feed.xml", to: "feeds#rss", defaults: { format: "xml" }
   get "feed.atom", to: "feeds#atom", defaults: { format: "xml" }, as: :feed_atom
   get "/podcast/:podcast_key.xml", to: "feeds#podcast", as: :podcast_feed
+  get "/podcast/:podcast_key/private.xml", to: "feeds#private_podcast", as: :private_podcast_feed
 
   # Theme CSS
   get "theme/:filename.css", to: "system/themes#show", defaults: { format: "css" }

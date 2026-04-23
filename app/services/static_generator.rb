@@ -94,7 +94,7 @@ class StaticGenerator
 
     if changes[:changed_configs][:podcast]
       puts "  🔄 Reloading podcast config..."
-      SiteConfig.reload!('defaults/podcast')
+      SiteConfig.reload!('features/podcast')
       PodcastConfig.reload!
     end
 
@@ -144,7 +144,7 @@ class StaticGenerator
 
   def prepare_output_directory
     puts "📁 Preparing output directory..."
-    [@output_dir].each do |dir|
+    [ @output_dir ].each do |dir|
       FileUtils.mkdir_p(dir) unless dir.exist?
     end
   end
@@ -273,7 +273,6 @@ class StaticGenerator
   end
 
   def config_file_changed?(config_type)
-
     last = @manifest.dig('configs', config_type)
     config = SiteConfig.find_by("file_path LIKE ?", "%#{config_type}.yml")
 
@@ -303,7 +302,7 @@ class StaticGenerator
     layout_dir = Rails.root.join('site', 'layout')
     return nil unless layout_dir.exist?
 
-    Dir.glob(layout_dir.join('*.md')).map { |f| [f, File.mtime(f).to_i] }.to_h
+    Dir.glob(layout_dir.join('*.md')).map { |f| [ f, File.mtime(f).to_i ] }.to_h
   end
 
   def asset_checksums
@@ -318,16 +317,16 @@ class StaticGenerator
   def dir_checksum(path)
     return nil unless path.exist?
     files = Dir.glob(path.join('**', '*')).select { |f| File.file?(f) }
-    files.map { |f| [f, File.mtime(f).to_i] }.to_h
+    files.map { |f| [ f, File.mtime(f).to_i ] }.to_h
   end
 
   def build_content_manifest(model)
     items = model.pluck(:id, :updated_at, Arel.sql("json_extract(metadata, '$.url_name')"))
     items.map do |id, updated_at, url_name|
-      [id.to_s, {
+      [ id.to_s, {
         updated_at: updated_at.iso8601(6),
         html_file: html_filename_for_type(model.name, url_name)
-      }]
+      } ]
     end.to_h
   end
 
@@ -484,7 +483,7 @@ class StaticGenerator
   def extract_collection_configs
     configs = []
 
-    [Post, Page].each do |model|
+    [ Post, Page ].each do |model|
       model.not_draft.each do |item|
         item.content.scan(/```collection\r?\n(.*?)```/m) do
           config = parse_collection_config($1)
@@ -601,7 +600,7 @@ class StaticGenerator
     when 'filename'
       items.to_a.sort_by do |item|
         filename = File.basename(item.file_path, '.md')
-        filename =~ /^(\d+)/ ? [$1.to_i, filename] : [Float::INFINITY, filename]
+        filename =~ /^(\d+)/ ? [ $1.to_i, filename ] : [ Float::INFINITY, filename ]
       end
     when 'title'
       items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
@@ -828,7 +827,7 @@ class StaticGenerator
     )
   rescue ActionController::UrlGenerationError => e
     # Extract context from error
-    context_info = ["Template: #{template}"]
+    context_info = [ "Template: #{template}" ]
 
     # Identify which content item is being rendered
     if assigns[:post]

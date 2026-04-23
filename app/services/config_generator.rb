@@ -29,7 +29,7 @@ class ConfigGenerator
       my-podcast:
         title: "My Podcast"
         description: "A podcast about things"
-        author: "Your Name"
+        author: ""
         email: "you@example.com"
         category: "Technology"
         subcategory: ""

@@ -1,11 +1,13 @@
 class FeedGenerator
-  attr_reader :posts, :format, :site_config, :podcast_config
+  attr_reader :posts, :format, :site_config, :podcast_config, :include_paid, :show_paid_teasers
 
-  def initialize(posts:, format: :rss, site_config: {}, podcast_config: nil)
+  def initialize(posts:, format: :rss, site_config: {}, podcast_config: nil, include_paid: false, show_paid_teasers: false)
     @posts = posts
     @format = format.to_sym
     @site_config = default_site_config.merge(site_config)
-    @podcast_config = podcast_config  # ← Add this line
+    @podcast_config = podcast_config
+    @include_paid = include_paid
+    @show_paid_teasers = show_paid_teasers
   end
 
   def generate
@@ -84,6 +86,16 @@ class FeedGenerator
     feed.to_s
   end
 
+  def filtered_episodes
+    posts.select do |post|
+      if post.audience == 'paid'
+        include_paid
+      else
+        true
+      end
+    end
+  end
+
   def generate_podcast_rss
     require 'nokogiri'
 
@@ -91,7 +103,6 @@ class FeedGenerator
       xml.rss('version' => '2.0',
               'xmlns:itunes' => 'http://www.itunes.com/dtds/podcast-1.0.dtd',
               'xmlns:content' => 'http://purl.org/rss/1.0/modules/content/') do
-
         xml.channel do
           # Standard RSS elements
           xml.title podcast_config['title']
@@ -128,14 +139,20 @@ class FeedGenerator
           add_itunes_categories_xml(xml, podcast_config)
 
           # Episodes
-          posts.each do |post|
+          filtered_episodes.each do |post|
+            is_paid = post.audience == 'paid'
+
             xml.item do
               xml.title post.title
               xml.link "#{site_config[:url]}/posts/#{post.url_name}"
 
-              # Full content as HTML for description
+              # For paid episodes in public feed (teasers): show excerpt only, no audio
               xml.description do
-                xml.cdata episode_content_html(post)
+                if is_paid && show_paid_teasers
+                  xml.cdata "<p><em>This episode is for paid subscribers only.</em></p>#{episode_summary(post)}"
+                else
+                  xml.cdata episode_content_html(post)
+                end
               end
 
               xml.pubDate post.date.to_time.rfc822 if post.date
@@ -143,8 +160,8 @@ class FeedGenerator
               # Immutable GUID
               xml.guid(post.metadata['guid'], isPermaLink: 'false')
 
-              # Audio enclosure
-              if post.metadata['audio'].present?
+              # Audio enclosure — omit for paid episodes in public feed
+              if post.metadata['audio'].present? && (!is_paid || include_paid)
                 audio_url = audio_full_url(post.metadata['audio'])
                 audio_path = audio_file_path(post.metadata['audio'])
 

@@ -92,7 +92,7 @@ class MemberMailer
       })
 
       # Send to BOTH old and new email for security
-      [old_email, member.email].each do |email|
+      [ old_email, member.email ].each do |email|
         send_email(
           to: email,
           to_name: member.name || email,
@@ -161,24 +161,33 @@ class MemberMailer
       Rails.logger.info "🔍 Attempting to send email to #{to}"
       Rails.logger.info "📧 Subject: #{subject}"
 
-      # CHANGE THIS LINE:
-      result = PostmarkService.send_transactional_email(
-        to_email: to,
-        to_name: to_name,
-        subject: subject,
-        html_content: html_content,
-        tag: 'member-email'
-      )
+      postmark_config = PostmarkConfig.current
+      postmark_configured = PostmarkConfig.exists? && PostmarkConfig.current.connected?
 
-      Rails.logger.info "📬 Result: #{result.inspect}"
+      if postmark_configured
+        result = PostmarkService.send_transactional_email(
+          to_email: to,
+          to_name: to_name,
+          subject: subject,
+          html_content: html_content,
+          tag: 'member-email'
+        )
 
-      if result[:success]
-        Rails.logger.info "✉️  Sent '#{subject}' to #{to} (Message ID: #{result[:message_id]})"
+        Rails.logger.info "📬 Result: #{result.inspect}"
+
+        if result[:success]
+          Rails.logger.info "✉️  Sent '#{subject}' to #{to} (Message ID: #{result[:message_id]})"
+        else
+          Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
+        end
+
+        result
       else
-        Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
+        # Postmark not configured — fall back to Rails ActionMailer (letter_opener in dev)
+        Rails.logger.info "📬 Postmark not configured, falling back to ActionMailer"
+        FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
+        { success: true, fallback: true }
       end
-
-      result
     end
 
     def site_url

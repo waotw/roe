@@ -1,6 +1,22 @@
 <header class="post-header">
-  <h1 class="page-title"><%= post.title %></h1>
-
+  <div class="post-header__title__rss">
+    <h1 class="page-title"><%= post.title %></h1>
+    <div>
+      <%# Feed links %>
+      <% if post.post_type == 'podcast' && post.metadata['podcast'].present? %>
+        <% if authenticated? || @podcast_config&.dig('audience') != 'paid' %>
+          <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="post-meta__feed-link" target="_blank" title="RSS Feed">RSS</a>
+        <% end %>
+        <% if authenticated? %>
+          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml" class="post-meta__feed-link post-meta__feed-link--private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+        <% elsif current_member&.paid? && current_member&.active? %>
+          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml?token=<%= current_member.access_token %>" class="post-meta__feed-link post-meta__feed-link--private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+        <% end %>
+      <% elsif post.post_type == 'newsletter' || post.post_type == 'article' %>
+        <a href="/feed.xml" class="post-meta__feed-link" target="_blank" title="RSS Feed">RSS</a>
+      <% end %>
+    </div>
+  </div>
   <% if post.subtitle %>
     <p class="page-subtitle"><%= post.subtitle %></p>
   <% end %>
@@ -11,8 +27,9 @@
         <%= post.date.strftime("%B %d, %Y") %>
       </time>
     <% end %>
-    <% if post.author %>
-      <span>• <%= post.author %></span>
+    <% display_author = post.author.presence || @podcast_config&.dig('author') %>
+    <% if display_author %>
+      <span>• <%= display_author %></span>
     <% end %>
   </div>
 </header>
