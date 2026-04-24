@@ -326,7 +326,13 @@
                         data-metadata-field="<%= field_name %>">
                 <option value="">-- select --</option>
                 <% config[:options].each do |option| %>
-                  <option value="<%= option %>" <% if value == option %>selected<% end %>><%= option %></option>
+                  <%# Coerce both sides to string so boolean YAML values like
+                      `explicit: true` correctly pre-select their option (the
+                      <option value> attribute is always a string). Without
+                      this, `true == "true"` is false and the select renders
+                      with no selection, which used to let handlePodcastChange
+                      overwrite the user's per-episode choice on every load. %>
+                  <option value="<%= option %>" <% if value.to_s == option.to_s %>selected<% end %>><%= option %></option>
                   <% end %>
                 </select>
               <% when :textarea %>

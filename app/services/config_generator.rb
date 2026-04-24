@@ -22,6 +22,16 @@ class ConfigGenerator
   end
 
   def generate_podcast_defaults
+    # Pull sensible defaults from the existing site config so a brand-new
+    # podcast.yml inherits the author, contact email, and site URL the
+    # user has already set on the site as a whole. SiteConfig.site_url
+    # normalizes (adds https:// when missing); the raw `url` key in
+    # site.yml is what the user typed.
+    site_url     = (SiteConfig.get('url').presence && SiteConfig.site_url) || 'https://yoursite.com'
+    author       = SiteConfig.get('author').presence       || ''
+    author_email = SiteConfig.get('author_email').presence || 'you@example.com'
+    copyright_holder = author.presence || 'Your Name'
+
     content = <<~YAML
       # Podcast Configuration
       # Define one or more podcast feeds for your site
@@ -29,16 +39,16 @@ class ConfigGenerator
       my-podcast:
         title: "My Podcast"
         description: "A podcast about things"
-        author: ""
-        email: "you@example.com"
+        author: "#{author}"
+        email: "#{author_email}"
         category: "Technology"
         subcategory: ""
         language: "en"
-        copyright: "2026 Your Name"
+        copyright: "#{Date.today.year} #{copyright_holder}"
         explicit: false
         type: "episodic"
         artwork: ""
-        link: "https://yoursite.com"
+        link: "#{site_url}"
     YAML
 
     File.write(FEATURES_PATH.join('podcast.yml'), content)

@@ -254,8 +254,24 @@ class Admin::ConfigsController < ApplicationController
     @config_type = 'podcast'
     @config_content = File.read(podcast_config_path)
     @config_hash = YAML.load(@config_content) || {}
+
+    # Auto-surface the `audience` field on every podcast block when paid
+    # memberships are configured, so admins always see/manage it (matches
+    # how posts and pages auto-surface their site-gated fields). Empty
+    # values save as `audience: ""` and the publish modal prompts before
+    # anything goes live.
+    if helpers.payments_enabled?
+      @config_hash.each do |key, podcast|
+        next unless podcast.is_a?(Hash)
+        podcast['audience'] ||= '' unless podcast.key?('audience')
+      end
+    end
+
     @field_options = build_field_options_for_podcast
     @field_help = build_field_help_for_podcast
+    # Source of truth for which podcast fields are required (used by the
+    # admin form to render the red asterisk next to the label).
+    @field_required = PodcastConfig::REQUIRED_FIELDS
     render :edit
   end
 
@@ -494,7 +510,10 @@ class Admin::ConfigsController < ApplicationController
       # Note: subcategory/subcategory_2 are arrays, handled by JS
       'language' => ['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh', 'ko', 'ru'],
       'explicit' => ['false', 'true'],
-      'episode_type' => ['full', 'trailer', 'bonus']
+      'episode_type' => ['full', 'trailer', 'bonus'],
+      # Per-podcast audience gate. Renders as a select when the field is
+      # present (auto-surfaced above when payments are enabled).
+      'audience' => ['everyone', 'paid']
     }
 
     # Build prefixed versions separately

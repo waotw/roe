@@ -1,9 +1,15 @@
 <%
-  # Parse existing YAML into hash
-  begin
-    config_hash = YAML.safe_load(config_content, permitted_classes: [Date, Time, Symbol]) || {}
-  rescue
-    config_hash = {}
+  # Prefer the config_hash the controller passed in (it may have been
+  # mutated server-side — e.g. edit_podcast auto-seeds audience: '' when
+  # payments are enabled). Fall back to parsing config_content only when
+  # no hash was provided.
+  config_hash = local_assigns[:config_hash]
+  if config_hash.nil?
+    begin
+      config_hash = YAML.safe_load(config_content, permitted_classes: [Date, Time, Symbol]) || {}
+    rescue
+      config_hash = {}
+    end
   end
 
   # Flatten nested structures for easier form handling
@@ -349,12 +355,24 @@
                         <!-- Nested section (like post-link, aside, pullquote) -->
                         <div class="config-subsection pl-4 border-l-2 border-gray-300">
                           <% if @config_type == 'podcast' %>
-                            <!-- Podcast key display + feed URL info -->
-                            <div class="config-field-row mb-4 flex items-center justify-between">
-                              <div>
-                                <span class="text-base font-semibold text-gray-800 font-mono"><%= key %></span>
-                                <p class="text-xs text-gray-500 mt-0.5">Feed: <code>/podcast/<%= key %>.xml</code> &mdash; to rename, use <strong>EDIT YAML</strong></p>
-                              </div>
+                            <!-- Podcast key — editable. The data-podcast-key
+                                 attribute holds the original; formToYaml
+                                 renames the top-level YAML key on save when
+                                 the input value differs. -->
+                            <div class="config-field-row mb-4">
+                              <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Podcast key<span class="text-red-600 ml-0.5">*</span>
+                                <%= render 'shared/help_tooltip',
+                                           title: 'Podcast key',
+                                           text: ('DO NOT RENAME IF PODCAST IS PUBLISHED. Used in the feed URL (<code>/podcast/&lt;key&gt;.xml</code>) and in episode post metadata as <code>podcast:</code> which connects a podcast post to this podcast. ' \
+                                                  'Renaming will <strong>break</strong> the connection in any existing podcast posts that reference this podcast — and break the exisitng feed. Any subscribers using the old feed will lose access.').html_safe %>
+                              </label>
+                              <input type="text"
+                                     data-podcast-key="<%= key %>"
+                                     value="<%= key %>"
+                                     class="w-full font-mono text-sm p-2 border border-gray-300"
+                                     placeholder="e.g., the-briefcase">
+                              <p class="text-xs text-gray-500 mt-0.5">Feed: <code>/podcast/<span data-podcast-feed-key="<%= key %>"><%= key %></span>.xml</code></p>
                             </div>
                           <% else %>
                             <h4 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h4>
@@ -369,10 +387,11 @@
 
                               <% nested_field_key = "#{key}.#{subkey}" %>
                               <% help_key = @field_help&.key?(nested_field_key) ? nested_field_key : (@field_help&.key?(subkey) ? subkey : nil) %>
+                              <% field_required = @field_required&.include?(subkey) || @field_required&.include?(nested_field_key) %>
 
                               <div class="config-field-row">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                                  <%= subkey.humanize %>
+                                  <%= subkey.humanize %><% if field_required %><span class="text-red-600 ml-0.5">*</span><% end %>
                                   <% if help_key %>
                                     <%= render 'shared/help_tooltip',
                                                text: @field_help[help_key][:text],
@@ -821,6 +840,20 @@
   }
   });
 
+  // Live-update the "Feed: /podcast/<key>.xml" hint as the user edits
+  // a podcast key input. Sanitizes the value the same way formToYaml
+  // will on save, so what they see is what they'll get.
+  document.querySelectorAll('[data-podcast-key]').forEach(input => {
+    const oldKey = input.dataset.podcastKey;
+    const feedSpan = document.querySelector(`[data-podcast-feed-key="${oldKey}"]`);
+    if (!feedSpan) return;
+    input.addEventListener('input', () => {
+      const sanitized = sanitizePodcastKey(input.value);
+      feedSpan.textContent = sanitized || oldKey;
+      window.hasUnsavedChanges = true;
+    });
+  });
+
   window.configEditorSetupComplete = true;
   console.log('setupComplete set to true');
   }
@@ -972,7 +1005,34 @@
       }
     });
 
+    // Podcast-key renames: if the user edited the key input for any
+    // podcast block, rebuild `fields` with the new key in place of the
+    // original. Done after the field/subcategory loops so any data
+    // attached under the old key gets carried over.
+    document.querySelectorAll('[data-podcast-key]').forEach(input => {
+      const oldKey = input.dataset.podcastKey;
+      const newKey = sanitizePodcastKey(input.value);
+      if (newKey && newKey !== oldKey && fields[oldKey] !== undefined) {
+        // Rebuild to preserve order (Object.fromEntries with map keeps
+        // insertion order — important so the file diff stays stable).
+        const renamed = {};
+        Object.entries(fields).forEach(([k, v]) => {
+          renamed[k === oldKey ? newKey : k] = v;
+        });
+        // Replace fields contents in place.
+        Object.keys(fields).forEach(k => delete fields[k]);
+        Object.assign(fields, renamed);
+      }
+    });
+
     return simpleYamlStringify(fields, 0);
+  }
+
+  function sanitizePodcastKey(value) {
+    return (value || '').toString().trim().toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 
   function simpleYamlStringify(obj, indent) {

@@ -453,16 +453,30 @@ class Post < ApplicationRecord
     gaps
   end
 
+  # For podcast posts: returns the configured `podcast:` value when it
+  # doesn't match any podcast key currently in podcast.yml (e.g. the user
+  # renamed a podcast and old episode references are now orphaned).
+  # Returns nil when the reference is valid or not applicable.
+  def invalid_podcast_reference
+    return nil unless post_type == 'podcast'
+    value = metadata['podcast'].to_s.strip
+    return nil if value.empty?
+    return nil if PodcastConfig.podcast_keys.include?(value)
+    value
+  end
+
   # A published post "needs attention" if it's missing required fields for its
   # type, has media references pointing at files that don't exist on disk,
-  # or is missing site-gated fields (audience / published_to) that the
-  # publish modal would have prompted for.
+  # is missing site-gated fields (audience / published_to) that the
+  # publish modal would have prompted for, or references a podcast key
+  # that no longer exists in podcast.yml (orphaned reference).
   # Used to surface warnings in the admin UI without blocking save.
   def needs_attention?
     return false unless published?
     missing_type_required_fields.any? ||
       missing_media_refs.any? ||
-      missing_site_gated_fields.any?
+      missing_site_gated_fields.any? ||
+      !invalid_podcast_reference.nil?
   end
 
   def type

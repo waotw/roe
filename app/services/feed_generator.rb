@@ -89,7 +89,12 @@ class FeedGenerator
   def filtered_episodes
     posts.select do |post|
       if post.audience == 'paid'
-        include_paid
+        # Include paid episodes when:
+        #   - include_paid: rendering the private/full feed
+        #   - show_paid_teasers: public feed where the site has opted to
+        #     advertise paid episodes (title + excerpt + "subscribers only"
+        #     blurb, no audio enclosure — handled in the item loop below)
+        include_paid || show_paid_teasers
       else
         true
       end

@@ -119,6 +119,9 @@
                         post.missing_type_required_fields.each { |f| reasons << "missing #{f[:name]}" unless f[:name].to_s == 'guid' }
                         post.missing_site_gated_fields.each { |name| reasons << "missing #{name}" }
                         post.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
+                        if (orphan = post.invalid_podcast_reference)
+                          reasons << "podcast reference invalid: #{orphan}"
+                        end
                       %>
                       <span class="inline-block text-base text-amber-600 font-semibold font-sans"
                             title="<%= reasons.join(', ') %>">

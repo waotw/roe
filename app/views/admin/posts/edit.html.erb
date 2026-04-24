@@ -50,6 +50,12 @@
         <% @post.missing_media_refs.each do |ref| %>
           <li>File not found: <code><%= ref[:path] %></code> (<%= ref[:field] %>)</li>
         <% end %>
+        <% if (orphan = @post.invalid_podcast_reference) %>
+          <li>
+            Podcast <code><%= orphan %></code> doesn't exist in <code>podcast.yml</code>.
+            Pick a valid podcast in the metadata editor.
+          </li>
+        <% end %>
       </ul>
       <p class="text-xs text-amber-600 mt-2 italic">Save your changes to refresh this list.</p>
     </div>
