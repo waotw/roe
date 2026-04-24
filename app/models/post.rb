@@ -380,6 +380,91 @@ class Post < ApplicationRecord
     metadata["post_type"] || "article"  # Default to article if not specified
   end
 
+  def self.required_fields_for_type(post_type)
+    type_config = POST_TYPES[post_type.to_s.to_sym]
+    return [] unless type_config
+    (type_config[:metadata_fields] || []).select { |f| f[:required] }
+  end
+
+  # Returns the subset of POST_TYPES required fields that are blank on this post.
+  # Each entry is the original field hash from POST_TYPES (name/type/label/hint/options).
+  def missing_type_required_fields
+    self.class.required_fields_for_type(post_type).reject do |field|
+      metadata[field[:name].to_s].to_s.strip.present?
+    end
+  end
+
+  # Metadata fields that point at files under site/media/…
+  MEDIA_FIELDS = %w[audio video image captions].freeze
+
+  # Resolves a /media/... style path to an absolute filesystem path under site/.
+  # Returns nil for blank or non-/media paths (we only validate local refs).
+  def self.resolve_media_path(path)
+    str = path.to_s.strip
+    return nil if str.empty?
+    return nil unless str.start_with?('/media/')
+    Rails.root.join('site', str.delete_prefix('/')).to_s
+  end
+
+  # Per-request Set of every /media/... path that resolves to a real file.
+  # Used by media_refs so admin views asking needs_attention? on many posts
+  # pay for one directory glob, not one File.exist? per ref.
+  def self.media_file_set
+    Current.media_file_set ||= begin
+      base = Rails.root.join('site/media')
+      files = Dir.glob(base.join('**/*'))
+                 .select { |f| File.file?(f) }
+                 .map { |f| "/media/" + Pathname.new(f).relative_path_from(base).to_s }
+      Set.new(files)
+    end
+  end
+
+  # Returns [{ field:, path:, exists: }] for every media field this post sets.
+  def media_refs
+    MEDIA_FIELDS.filter_map do |field|
+      path = metadata[field].to_s.strip
+      next if path.empty?
+
+      # Paths that don't start with /media/ aren't checkable — treat as present.
+      exists = if path.start_with?('/media/')
+                 self.class.media_file_set.include?(path)
+               else
+                 true
+               end
+      { field: field, path: path, exists: exists }
+    end
+  end
+
+  def missing_media_refs
+    media_refs.reject { |ref| ref[:exists] }
+  end
+
+  # Returns names of site-gated metadata fields that are blank but should
+  # be set on a published post. Mirrors the publish modal's prompts so
+  # the admin warning catches file-edit-bypass cases.
+  def missing_site_gated_fields
+    gaps = []
+    if SiteFeature.payments_enabled? && metadata['audience'].to_s.strip.blank?
+      gaps << 'audience'
+    end
+    if SiteFeature.newsletters_enabled? && metadata['published_to'].to_s.strip.blank?
+      gaps << 'published_to'
+    end
+    gaps
+  end
+
+  # A published post "needs attention" if it's missing required fields for its
+  # type, has media references pointing at files that don't exist on disk,
+  # or is missing site-gated fields (audience / published_to) that the
+  # publish modal would have prompted for.
+  # Used to surface warnings in the admin UI without blocking save.
+  def needs_attention?
+    return false unless published?
+    missing_type_required_fields.any? ||
+      missing_media_refs.any? ||
+      missing_site_gated_fields.any?
+  end
+
   def type
     metadata["type"] || "article"
   end

@@ -113,6 +113,18 @@
                     ].compact.join(' ').downcase %>">
                   <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
                     <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4" %>
+                    <% if post.needs_attention? %>
+                      <%
+                        reasons = []
+                        post.missing_type_required_fields.each { |f| reasons << "missing #{f[:name]}" unless f[:name].to_s == 'guid' }
+                        post.missing_site_gated_fields.each { |name| reasons << "missing #{name}" }
+                        post.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
+                      %>
+                      <span class="inline-block text-base text-amber-600 font-semibold font-sans"
+                            title="<%= reasons.join(', ') %>">
+                        ⚠
+                      </span>
+                    <% end %>
                   </td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                     <%= render 'shared/inline_rename', resource: post, resource_type: 'post' %>

@@ -1,4 +1,6 @@
 class Admin::PagesController < Admin::BaseController
+  layout 'editor', only: [ :edit ]
+
   def index
     all_pages = Page.order(:created_at)
 
@@ -75,6 +77,24 @@ class Admin::PagesController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # Handle tags (defensive — pages don't surface tags in the editor
+      # by default, but a user could add the field via the Add Field menu
+      # or in RAW YAML).
+      if metadata['tags'].is_a?(String)
+        if metadata['tags'].strip.empty? || metadata['tags'] == '[]'
+          metadata['tags'] = []
+        else
+          metadata['tags'] = metadata['tags'].split(',').map(&:strip).reject(&:empty?)
+        end
+      elsif metadata['tags'].nil?
+        metadata['tags'] = []
+      end
+
+      # Re-serialize via Page.format_metadata_yaml so pages produce the
+      # same predictable file format as posts and products (always-quoted
+      # strings, flow-style arrays). Inherited from HasMetadata.
+      yaml_content = Page.format_metadata_yaml(metadata)
+
     rescue => e
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
@@ -83,14 +103,16 @@ class Admin::PagesController < Admin::BaseController
       return
     end
 
-    # Use the original YAML string (preserves formatting from JavaScript)
-    yaml_content = metadata_yaml.strip
+    # Capture pre-save state to detect a publishing transition for flash text.
+    was_published = @page.published?
+
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@page.file_path, full_content)
 
     ContentSync.sync_file(@page.file_path)
+    @page.reload
 
-    flash[:notice] = "Page saved"
+    flash[:notice] = (!was_published && @page.published?) ? "Page published" : "Page saved"
 
     redirect_to edit_admin_page_path(@page)
   end
@@ -125,11 +147,26 @@ class Admin::PagesController < Admin::BaseController
     redirect_to admin_pages_path
   end
 
-  def publish
+  def publish_modal
     @page = Page.find(params[:id])
-    update_page_status(@page, 'published')
-    flash[:notice] = "Page published"
-    redirect_to edit_admin_page_path(@page)
+
+    # Swap in submitted form-state metadata so the modal reflects what's
+    # *about to be saved* (e.g. just-changed audience), not the file.
+    if params[:metadata].present?
+      begin
+        submitted = YAML.safe_load(params[:metadata], permitted_classes: [ Date, Time, Symbol ])
+        @page.metadata = submitted if submitted.is_a?(Hash) && submitted.any?
+      rescue => e
+        Rails.logger.warn "publish_modal: ignoring unparseable submitted metadata (#{e.message})"
+      end
+    end
+
+    @missing_requirements = build_publish_requirements(@page)
+    @resource_label = 'Page'
+    @show_postmark_warning = false  # pages don't go to newsletter
+    @paired_duration_for = nil       # no audio/video pairing for pages
+
+    render partial: 'admin/posts/publish_modal', layout: false
   end
 
   def unpublish
@@ -214,6 +251,42 @@ class Admin::PagesController < Admin::BaseController
   # end
 
   private
+
+  # Pages have a much smaller publish gate than posts: just audience
+  # (when payments are configured) and any media files that don't
+  # resolve. No published_to (pages don't go to newsletter), no
+  # post-type-specific required fields.
+  def build_publish_requirements(page)
+    requirements = []
+
+    if helpers.requires_audience_on_publish?
+      requirements << {
+        name: 'audience',
+        type: :radio,
+        label: 'Audience',
+        hint: 'Who should be able to see this page?',
+        options: [
+          [ 'everyone', 'Everyone', 'Public content visible to all visitors' ],
+          [ 'paid', 'Paid Members Only', 'Only accessible to paid members' ]
+        ],
+        default: 'everyone',
+        current: page.metadata['audience']
+      }
+    end
+
+    page.missing_media_refs.each do |ref|
+      requirements << {
+        name: ref[:field],
+        type: :text,
+        label: ref[:field].humanize,
+        hint: "File not found on disk — fix the path or upload the file.",
+        current: ref[:path],
+        missing_file: true
+      }
+    end
+
+    requirements
+  end
 
   def member_page?(page)
     # Check if the parent directory is 'members'

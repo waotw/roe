@@ -25,6 +25,17 @@
               <% if local_assigns[:show_member_badge] %>
                 <span class="inline-flex bg-blue-100 px-2 text-xs font-mono leading-5 text-blue-800">Member</span>
               <% end %>
+              <% if page.needs_attention? %>
+                <%
+                  reasons = []
+                  page.missing_site_gated_fields.each { |name| reasons << "missing #{name}" }
+                  page.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
+                %>
+                <span class="inline-block text-base text-amber-600 font-semibold font-sans"
+                      title="<%= reasons.join(', ') %>">
+                  ⚠
+                </span>
+              <% end %>
             </td>
             <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
               <%= render 'shared/inline_rename',

@@ -65,6 +65,43 @@ class Page < ApplicationRecord
     File.basename(file_path, '.md') if file_path.present?
   end
 
+  # Metadata fields that point at files under site/media/...
+  MEDIA_FIELDS = %w[image].freeze
+
+  # Returns names of site-gated metadata fields that are blank but should
+  # be set on a published page. Pages support paid audience but never
+  # newsletter delivery, so we only check audience here.
+  def missing_site_gated_fields
+    return [] unless SiteFeature.payments_enabled?
+    metadata['audience'].to_s.strip.blank? ? [ 'audience' ] : []
+  end
+
+  def media_refs
+    MEDIA_FIELDS.filter_map do |field|
+      path = metadata[field].to_s.strip
+      next if path.empty?
+
+      exists = if path.start_with?('/media/')
+                 Post.media_file_set.include?(path)
+               else
+                 true
+               end
+      { field: field, path: path, exists: exists }
+    end
+  end
+
+  def missing_media_refs
+    media_refs.reject { |ref| ref[:exists] }
+  end
+
+  # A published page "needs attention" if its audience field is blank
+  # (when paid memberships are enabled) or its image references a file
+  # that doesn't exist on disk.
+  def needs_attention?
+    return false unless published?
+    missing_site_gated_fields.any? || missing_media_refs.any?
+  end
+
   private
 
   # def to_html

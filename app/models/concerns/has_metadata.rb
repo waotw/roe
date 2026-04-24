@@ -67,41 +67,37 @@ module HasMetadata
       yaml_lines = []
 
       metadata.each do |key, value|
-        formatted_value = case value
-        when Numeric
-          value.to_s
-        when TrueClass, FalseClass
-          value.to_s
-        when NilClass
-          '""'
-        when String
-          if value.empty?
-            '""'
-          elsif value.match?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)
-            "\"#{value}\""
-          else
-            "\"#{value.gsub('"', '\"')}\""
-          end
-        else
-          "\"#{value}\""
-        end
-
-        yaml_lines << "#{key}: #{formatted_value}"
+        yaml_lines << "#{key}: #{format_yaml_scalar(value)}"
       end
 
       # Add GUID at the end (if present)
       if guid_value.present?
-        formatted_guid = case guid_value
-        when String
-          guid_value.empty? ? '""' : "\"#{guid_value.gsub('"', '\"')}\""
-        else
-          "\"#{guid_value}\""
-        end
-
-        yaml_lines << "guid: #{formatted_guid}"
+        yaml_lines << "guid: #{format_yaml_scalar(guid_value)}"
       end
 
       yaml_lines.join("\n")
+    end
+
+    def format_yaml_scalar(value)
+      case value
+      when Numeric, TrueClass, FalseClass
+        value.to_s
+      when NilClass
+        '""'
+      when Array
+        return "[]" if value.empty?
+        "[#{value.map { |item| format_yaml_scalar(item) }.join(', ')}]"
+      when String
+        if value.empty?
+          '""'
+        elsif value.match?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)
+          "\"#{value}\""
+        else
+          "\"#{value.gsub('"', '\"')}\""
+        end
+      else
+        "\"#{value}\""
+      end
     end
   end
 

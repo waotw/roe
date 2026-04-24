@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Roe CMS - Admin</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <!--<%= stylesheet_link_tag "theme", "data-turbo-track": "reload" %>-->
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <script>
+      // Editor State Manager - preserves cursor and scroll across navigation
+      const EditorState = {
+        save(textareaId) {
+          const textarea = document.getElementById(textareaId);
+          if (!textarea) return;
+
+          const state = {
+            cursorPosition: textarea.selectionStart,
+            scrollPosition: textarea.scrollTop,
+            url: window.location.pathname
+          };
+
+          sessionStorage.setItem(`editorState:${window.location.pathname}`, JSON.stringify(state));
+        },
+
+        restore(textareaId) {
+          const stateKey = `editorState:${window.location.pathname}`;
+          const savedState = sessionStorage.getItem(stateKey);
+
+          if (!savedState) return;
+
+          const state = JSON.parse(savedState);
+          const textarea = document.getElementById(textareaId);
+
+          if (!textarea) return;
+
+          setTimeout(() => {
+            // Set cursor position FIRST (before focus)
+            textarea.setSelectionRange(state.cursorPosition, state.cursorPosition);
+
+            // Then restore scroll position
+            textarea.scrollTop = state.scrollPosition;
+
+            // Focus last, with preventScroll option
+            textarea.focus({ preventScroll: true });
+
+            sessionStorage.removeItem(stateKey);
+          }, 200);
+        },
+
+        init(textareaId) {
+          const textarea = document.getElementById(textareaId);
+          if (!textarea) return;
+
+          this.restore(textareaId);
+
+          window.addEventListener('beforeunload', () => {
+            this.save(textareaId);
+          });
+
+          const form = textarea.closest('form');
+          if (form) {
+            form.addEventListener('submit', () => {
+              this.save(textareaId);
+            });
+          }
+        }
+      };
+    </script>
+    <%= javascript_importmap_tags %>
+  </head>
+  <body class="bg-gray-100 min-w-185.5">
+    <% if warning = duplicate_sku_warning %>
+      <div class="admin-warning-bar bg-red-100 border-l-4 border-red-500 text-red-700 p-4 font-mono text-xs">
+        <p class="">⚠️ Store Issue: <%= warning[:message] %> <%= link_to "View and fix →", warning[:path], class: "underline" %>
+        </p>
+      </div>
+    <% end %>
+    <% if flash.any? %>
+      <% flash.each do |type, message| %>
+        <% next unless ['notice', 'alert', 'error', 'success', 'warning'].include?(type.to_s) %>
+        <div data-flash-message class="flash-floating <%= type %>">
+          <%= message %>
+        </div>
+      <% end %>
+    <% end %>
+      <!-- Page Content -->
+      <main class="max-w-7xl mx-auto py-6 px-8">
+        <%= yield %>
+      </main>
+    </body>
+  </html>

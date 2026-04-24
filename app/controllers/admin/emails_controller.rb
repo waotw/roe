@@ -1,36 +1,38 @@
 class Admin::EmailsController < Admin::BaseController
+  layout 'editor', only: [ :edit ]
+
   TEMPLATES = {
     'magic_link' => {
       name: 'Send Sign In Link',
-      variables: ['@member_name', '@member_email', '@magic_link', '@site_name']
+      variables: [ '@member_name', '@member_email', '@magic_link', '@site_name' ]
     },
     'welcome' => {
       name: 'Welcome New Member',
-      variables: ['@member_name', '@member_email', '@site_name']
+      variables: [ '@member_name', '@member_email', '@site_name' ]
     },
     'upgrade_success' => {
       name: 'Confirm Paid Upgrade',
-      variables: ['@member_name', '@member_email', '@password', '@site_name', '@account_url']
+      variables: [ '@member_name', '@member_email', '@password', '@site_name', '@account_url' ]
     },
     'email_changed' => {
       name: 'Confirm Email Change',
-      variables: ['@member_name', '@new_email', '@old_email', '@site_name']
+      variables: [ '@member_name', '@new_email', '@old_email', '@site_name' ]
     },
     'membership_cancelled' => {
       name: 'Membership Cancelled',
-      variables: ['@member_name', '@member_email', '@site_name']
+      variables: [ '@member_name', '@member_email', '@site_name' ]
     },
     'email_confirmation' => {
       name: 'Confirm Email Address',
-      variables: ['@member_name', '@confirmation_link', '@site_name']
+      variables: [ '@member_name', '@confirmation_link', '@site_name' ]
     },
     'payment_failed' => {
       name: 'Payment Failed',
-      variables: ['@member_name', '@member_email', '@update_payment_url', '@site_name']
+      variables: [ '@member_name', '@member_email', '@update_payment_url', '@site_name' ]
     },
     'account_deletion' => {
       name: 'Account Deleted',
-      variables: ['@member_name', '@member_email', '@site_name']
+      variables: [ '@member_name', '@member_email', '@site_name' ]
     }
   }.freeze
 

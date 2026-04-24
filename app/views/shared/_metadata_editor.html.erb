@@ -17,6 +17,12 @@
 
   # Define known fields for posts
   known_fields_config = if resource_type == 'post'
+    # Determine the current post_type so we can surface per-type required flags.
+    current_post_type = (metadata_hash['post_type'].presence || 'article').to_s
+    type_required_names = Post.required_fields_for_type(current_post_type)
+                              .map { |f| f[:name].to_s }
+    required_for_type = ->(name) { type_required_names.include?(name.to_s) }
+
     {
       # Core fields
       'title' => { type: :text, label: 'title', required: true },
@@ -27,14 +33,14 @@
       'author' => { type: :text, label: 'author', default_from_config: true },
       'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
-      'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png' },
+      'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png', required: required_for_type.call('image') },
       'excerpt' => { type: :textarea, label: 'excerpt' },
       'audience' => {
         type: :select,
         label: 'audience',
         options: ['everyone', 'paid'],
         hint: 'Who should see/receive this post?',
-        required: members_enabled?
+        required: payments_enabled?
       },
       'published_to' => {
         type: :select,
@@ -44,14 +50,15 @@
         required: newsletters_enabled?
       },
 
-      # Media fields
-      'audio' => { type: :text, label: 'audio', hint: "Example: /media/audio/audio-file.mp3" },
-      'video' => { type: :text, label: 'video', hint: "Example: /media/video/video-file.mp4" },
+      # Media fields — required flag comes from Post::POST_TYPES for the current type
+      'audio' => { type: :text, label: 'audio', hint: "Example: /media/audio/audio-file.mp3", required: required_for_type.call('audio') },
+      'video' => { type: :text, label: 'video', hint: "Example: /media/video/video-file.mp4", required: required_for_type.call('video') },
       'duration' => {
         type: :text,
         label: 'duration',
         hint: 'Auto-calculated from media file',
-        readonly: true
+        readonly: true,
+        required: required_for_type.call('duration')
       },
       'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' },
 
@@ -60,7 +67,7 @@
         type: :select,
         label: 'podcast',
         options: PodcastConfig.podcast_keys,
-        required: true,
+        required: required_for_type.call('podcast'),
         hint: 'Which podcast feed?'
       },
       'guid' => { type: :text, label: 'guid', hint: 'Auto-generated UUID (do not edit)' },
@@ -100,7 +107,15 @@
       'title' => { type: :text, label: 'title', required: true },
       'subtitle' => { type: :text, label: 'subtitle' },
       'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
+      'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
+      'audience' => {
+        type: :select,
+        label: 'audience',
+        options: ['everyone', 'paid'],
+        hint: 'Who should see this page?',
+        required: payments_enabled?
+      },
       'image' => { type: :text, label: 'image' },
       'excerpt' => { type: :textarea, label: 'excerpt' }
     }
@@ -113,10 +128,38 @@
   is_new = (!defined?(item) || !item.persisted?) || flash[:new_post]
   metadata_hidden = is_new ? '' : 'hidden'
 
+  # Auto-surface site-gated fields so the writer always sees them
+  # (whether or not the file has set them yet). If left blank, they save
+  # as `""` like any other empty field — the publish modal prompts
+  # before the post goes live.
+  #   - audience: posts and pages, when paid memberships are configured
+  #   - published_to: posts only (pages don't go out as newsletters),
+  #     when newsletters are enabled
+  if resource_type == 'post' || resource_type == 'page'
+    metadata_hash['audience'] = '' if payments_enabled? && !metadata_hash.key?('audience')
+  end
+  if resource_type == 'post'
+    metadata_hash['published_to'] = '' if newsletters_enabled? && !metadata_hash.key?('published_to')
+  end
+
   # Separate what's in the file vs what's available
   existing_fields = metadata_hash.keys
   available_known_fields = known_fields_config.keys - existing_fields
   custom_fields = metadata_hash.reject { |k, v| known_fields_config.key?(k) }
+
+  # Fields that reference media files on disk. Used to attach the
+  # media-field Stimulus controller so the editor can warn when a path
+  # doesn't resolve to a real file under site/media/.
+  media_field_kinds = { 'audio' => 'audio', 'video' => 'video', 'image' => 'image', 'captions' => 'file' }
+
+  # For the initial render, pre-compute which media paths are already broken
+  # so the warning shows on page load (matches the fonts pattern in
+  # _config_font_roles.html.erb / system_assets_controller). Blur re-checks
+  # via AJAX pick up any fixes the user makes without a reload.
+  initial_missing_media = {}
+  if resource_type == 'post' && defined?(item) && item.respond_to?(:missing_media_refs)
+    item.missing_media_refs.each { |ref| initial_missing_media[ref[:field]] = true }
+  end
 %>
 <div id="metadata-container"
      data-controller="metadata-editor"
@@ -144,10 +187,30 @@
       RAW
     </button>
   </div>
+
   <!-- Form View -->
   <div data-metadata-editor-target="content" class="<%= metadata_hidden %>">
     <div data-metadata-editor-target="formView" class="space-y-2">
       <div data-metadata-editor-target="fieldsContainer" class="space-y-2">
+      <% if item&.persisted? && item.respond_to?(:url_name) && item.url_name.present? %>
+        <div class="mb-3 p-2 bg-blue-50 border border-blue-200 text-sm font-mono mb-4">
+          <div>
+            <span class="text-blue-800 font-semibold">url_name:</span>
+            <code class="text-xs ml-2"><%= item.url_name %></code>
+          </div>
+          <% if resource_type == 'product' && item.url_name.present? %>
+            <div class="">
+              <span class="text-blue-800 font-semibold">public url:</span>
+              <code class="text-xs ml-2"><%= @product.public_url %></code>
+            </div>
+          <% end %>
+          <% if resource_type == 'post' && defined?(@post) && @post %>
+            <div id="newsletter-status-<%= @post.id %>">
+              <%= render 'newsletter_status' %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
         <%# Render known fields in config order first %>
         <% known_fields_config.each do |field_name, config| %>
           <% next unless metadata_hash.key?(field_name) %>
@@ -205,6 +268,25 @@
                             data: { turbo_frame: "sku-generator-modal" },
                             class: "text-xs text-blue-600 hover:text-blue-800 underline mt-0.5 inline-block" %>
                       <% end %>
+                    </div>
+                  <% elsif media_field_kinds.key?(field_name) %>
+                    <!-- Media text input with file-existence warning -->
+                    <div class="flex-1 flex flex-col gap-1"
+                         data-controller="media-field"
+                         data-media-field-kind-value="<%= media_field_kinds[field_name] %>">
+                      <input type="text"
+                              id="metadata-field-<%= field_name %>"
+                              name="metadata_fields[<%= field_name %>]"
+                              value="<%= ERB::Util.html_escape(display_value) %>"
+                              class="w-full font-mono text-xs px-2 py-1 border border-gray-300 <%= 'border-red-400' if initial_missing_media[field_name] %>"
+                              data-metadata-field="<%= field_name %>"
+                              data-media-field-target="input"
+                              data-action="input->media-field#checkDebounced blur->media-field#check change->media-field#check"
+                              <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <p class="text-xs text-red-600 <%= 'hidden' unless initial_missing_media[field_name] %>"
+                         data-media-field-target="warning">
+                        ⚠ File not found under <code>site/media/</code>.
+                      </p>
                     </div>
                   <% else %>
                   <!-- Regular text input -->

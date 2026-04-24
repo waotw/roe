@@ -4,12 +4,22 @@ module HasAudience
   AUDIENCES = %w[everyone paid only_paid].freeze
 
   included do
-    # Validation for metadata-based audience
-    validate :audience_must_be_valid
+    # NOTE: no audience validation. Roe is file-first — the user can edit
+    # YAML directly with anything, and the publish modal gates audience
+    # to a known value before content actually goes live. A model-level
+    # validation here would silently block ContentSync/ContentWatcher
+    # from updating the DB when a file is saved with an empty or unknown
+    # audience, which makes the admin UI lie about what's on disk.
 
-    # Scopes
+    # Scopes — treat NULL and empty string the same as 'everyone' so a
+    # blank audience field doesn't accidentally hide a post from the
+    # public listings.
     scope :public_content, -> {
-      where("json_extract(metadata, '$.audience') IS NULL OR json_extract(metadata, '$.audience') = 'everyone'")
+      where(<<~SQL.squish)
+        json_extract(metadata, '$.audience') IS NULL
+          OR json_extract(metadata, '$.audience') = ''
+          OR json_extract(metadata, '$.audience') = 'everyone'
+      SQL
     }
     scope :premium_content, -> {
       where("json_extract(metadata, '$.audience') = 'paid'")
@@ -23,9 +33,12 @@ module HasAudience
     }
   end
 
-  # Read audience from metadata
+  # Read audience from metadata. Empty / nil reads as 'everyone' so the
+  # rest of the app treats blank-audience posts as publicly accessible
+  # (matching the default behavior when the field is omitted entirely).
   def audience
-    metadata['audience'] || 'everyone'
+    value = metadata['audience'].to_s.strip
+    value.empty? ? 'everyone' : value
   end
 
   # Write audience to metadata
@@ -49,12 +62,5 @@ module HasAudience
 
   def newsletter_audience
     premium? ? 'paid' : 'everyone'
-  end
-
-  private
-
-  def audience_must_be_valid
-    return if audience.in?(AUDIENCES)
-    errors.add(:audience, "must be one of: #{AUDIENCES.join(', ')}")
   end
 end

@@ -255,6 +255,26 @@ class Admin::MediumController < Admin::BaseController
     end
   end
 
+  # Used by the metadata editor and publish modal to warn when a media
+  # path in a post's metadata doesn't resolve to a real file on disk.
+  # Only validates /media/* paths (external URLs are treated as present).
+  def exists
+    media_path = params[:path].to_s.strip
+
+    if media_path.empty?
+      render json: { exists: true, checked: false }
+      return
+    end
+
+    unless media_path.start_with?('/media/')
+      render json: { exists: true, checked: false }
+      return
+    end
+
+    file_path = Rails.root.join('site', media_path.delete_prefix('/')).to_s
+    render json: { exists: File.exist?(file_path), checked: true, path: media_path }
+  end
+
   private
 
   def process_single_upload(uploaded_file)

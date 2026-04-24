@@ -32,6 +32,17 @@
                   <tr>
                     <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
                       <%= link_to product.title || "Untitled", edit_admin_product_path(product), class: "text-blue-600 hover:text-blue-900" %>
+                      <% if product.needs_attention? %>
+                        <%
+                          reasons = []
+                          product.missing_required_fields.each { |name| reasons << "missing #{name}" }
+                          product.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
+                        %>
+                        <span class="inline-block text-base text-amber-600 font-semibold font-sans"
+                              title="<%= reasons.join(', ') %>">
+                          ⚠
+                        </span>
+                      <% end %>
                     </td>
                     <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                       $<%= sprintf('%.2f', product.price) %>

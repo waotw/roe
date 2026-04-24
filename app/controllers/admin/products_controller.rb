@@ -1,5 +1,7 @@
 class Admin::ProductsController < Admin::BaseController
-  before_action :set_product, only: [:edit, :update, :show, :destroy]
+  layout 'editor', only: [ :edit ]
+
+  before_action :set_product, only: [ :edit, :update, :show, :destroy ]
 
   def index
     @products = Product.by_newest
@@ -72,7 +74,7 @@ class Admin::ProductsController < Admin::BaseController
     metadata_yaml = params[:metadata_final].presence || params[:metadata]
 
     begin
-      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [Date, Time, Symbol])
+      metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ])
 
       unless metadata.is_a?(Hash)
         raise "Metadata must be key-value pairs"
@@ -89,7 +91,7 @@ class Admin::ProductsController < Admin::BaseController
         metadata['tags'] = []
       end
 
-      yaml_content = metadata.to_yaml.sub(/\A---\n/, '')
+      yaml_content = Product.format_metadata_yaml(metadata)
 
     rescue => e
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
@@ -99,12 +101,16 @@ class Admin::ProductsController < Admin::BaseController
       return
     end
 
+    # Capture pre-save state to detect a publishing transition for flash text.
+    was_published = @product.status == 'published'
+
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     File.write(Rails.root.join(@product.file_path), full_content)
 
     ContentSync.sync_file(Rails.root.join(@product.file_path))
+    @product.reload
 
-    flash[:notice] = "Product saved"
+    flash[:notice] = (!was_published && @product.status == 'published') ? "Product published" : "Product saved"
     redirect_to edit_admin_product_path(@product)
   end
 
@@ -168,7 +174,7 @@ class Admin::ProductsController < Admin::BaseController
       content = params[:content]
 
       begin
-        metadata = YAML.safe_load(metadata_yaml, permitted_classes: [Date, Time, Symbol]) || {}
+        metadata = YAML.safe_load(metadata_yaml, permitted_classes: [ Date, Time, Symbol ]) || {}
       rescue
         metadata = {}
       end
@@ -190,43 +196,25 @@ class Admin::ProductsController < Admin::BaseController
 
   def publish_modal
     @product = Product.find(params[:id])
-    @missing_sku = @product.sku.blank?
-    render partial: 'publish_modal', layout: false
-  end
 
-  def confirm_publish
-    @product = Product.find(params[:id])
-
-    # If SKU was provided in the form, update it
-    if params[:sku].present?
-      @product.metadata['sku'] = params[:sku]
+    # Swap in submitted form-state metadata so the modal reflects what's
+    # *about to be saved* — same pattern as posts/pages.
+    if params[:metadata].present?
+      begin
+        submitted = YAML.safe_load(params[:metadata], permitted_classes: [ Date, Time, Symbol ])
+        @product.metadata = submitted if submitted.is_a?(Hash) && submitted.any?
+      rescue => e
+        Rails.logger.warn "publish_modal: ignoring unparseable submitted metadata (#{e.message})"
+      end
     end
 
-    # Check if SKU is present (either from before or just added)
-    if @product.sku.blank?
-      flash[:error] = 'SKU is required to publish'
-      redirect_to edit_admin_product_path(@product)
-      return
-    end
+    @missing_requirements = build_publish_requirements(@product)
+    @resource_label = 'Product'
+    @show_postmark_warning = false  # products don't go to newsletter
+    @paired_duration_for = nil       # no audio/video pairing for products
+    @sku_generator_path = sku_generator_admin_product_path(@product)
 
-    # Check SKU uniqueness (server-side validation)
-    if Product.where("metadata->>'sku' = ? AND id != ?", @product.sku, @product.id).exists?
-      flash[:error] = "SKU '#{@product.sku}' is already in use by another product"
-      redirect_to edit_admin_product_path(@product)
-      return
-    end
-
-    @product.metadata['status'] = 'published'
-    save_product_to_file(@product)
-
-    flash[:notice] = 'Product published successfully'
-    redirect_to edit_admin_product_path(@product)
-  end
-
-  def publish
-    # This is now just a redirect to unpublish (for the button)
-    # The actual publishing happens via the modal
-    redirect_to edit_admin_product_path(params[:id])
+    render partial: 'admin/posts/publish_modal', layout: false
   end
 
   def unpublish
@@ -266,14 +254,55 @@ class Admin::ProductsController < Admin::BaseController
 
   private
 
+  # Builds the sections shown in the publish modal — same shape as the
+  # posts version. Products gate on their REQUIRED_FIELDS plus any
+  # broken media path.
+  def build_publish_requirements(product)
+    hints = {
+      'title'    => 'Product title',
+      'category' => begin
+        cats = ProductCategory.all rescue []
+        cats.any? ? "e.g., #{cats.first(3).join(', ')}" : 'e.g., book, ebook, poster'
+      end,
+      'price'    => 'Price in dollars (e.g., 29.99)',
+      'sku'      => 'Stock Keeping Unit (e.g., BOOK-001-TITLE)',
+      'image'    => 'Path to product image: /media/images/file.jpg'
+    }
+
+    requirements = product.missing_required_fields.map do |name|
+      {
+        name: name,
+        type: :text,
+        label: name.humanize,
+        hint: hints[name],
+        current: product.metadata[name]
+      }
+    end
+
+    # Add broken-media-path entries for fields that already have a value
+    # set (so they wouldn't be in missing_required_fields).
+    already_listed = requirements.map { |r| r[:name] }
+    product.missing_media_refs.each do |ref|
+      next if already_listed.include?(ref[:field])
+      requirements << {
+        name: ref[:field],
+        type: :text,
+        label: ref[:field].humanize,
+        hint: 'File not found on disk — fix the path or upload the file.',
+        current: ref[:path],
+        missing_file: true
+      }
+    end
+
+    requirements
+  end
+
   def save_product_to_file(product)
     yaml_content = product.metadata.to_yaml.sub(/\A---\n/, '')
     full_content = "---\n#{yaml_content}\n---\n#{product.content}"
     File.write(Rails.root.join(product.file_path), full_content)
     ContentSync.sync_file(Rails.root.join(product.file_path))
   end
-
-  private
 
   def set_product
     @product = Product.find(params[:id])

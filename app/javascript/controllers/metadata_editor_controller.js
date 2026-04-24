@@ -61,6 +61,8 @@ export default class extends Controller {
     this.setupPostTypeListener();
     this.setupPodcastListener();
     this.setupMediaDurationListeners();
+    this.setupStatusListener();
+    this.setupPublishModalListeners();
 
     this.fieldsContainerTarget.addEventListener("click", (e) => {
       if (e.target.closest('[data-action*="removeMetadataField"]')) {
@@ -80,6 +82,13 @@ export default class extends Controller {
 
     if (this.formHandler) {
       this.formHandler.removeEventListener("submit", this.boundSubmitHandler);
+    }
+
+    if (this.boundPublishCancel) {
+      document.removeEventListener("publish-modal:cancelled", this.boundPublishCancel);
+    }
+    if (this.boundPublishConfirm) {
+      document.removeEventListener("publish-modal:confirmed", this.boundPublishConfirm);
     }
   }
 
@@ -107,6 +116,30 @@ export default class extends Controller {
       this.boundSubmitHandler = this.handleSubmit.bind(this);
       form.addEventListener("submit", this.boundSubmitHandler);
     }
+
+    // Prevent Enter inside metadata text inputs / selects from submitting
+    // the form. Users expect Save to happen only via Cmd/Ctrl+S or the
+    // Save button, not from hitting Enter while editing a metadata field.
+    // Textareas are unaffected (newline is meaningful there).
+    this.boundMetadataKeydown = this.handleMetadataKeydown.bind(this);
+    this.element.addEventListener("keydown", this.boundMetadataKeydown);
+  }
+
+  handleMetadataKeydown(event) {
+    if (event.key !== "Enter") return;
+
+    const target = event.target;
+    if (!target) return;
+
+    const tag = target.tagName;
+    if (tag === "TEXTAREA") return;
+    if (tag === "BUTTON") return;
+
+    // Only intercept inputs inside the metadata editor (not the content
+    // textarea or any other inputs elsewhere on the page).
+    if (!this.element.contains(target)) return;
+
+    event.preventDefault();
   }
 
   handleSubmit(e) {
@@ -163,6 +196,7 @@ export default class extends Controller {
 
     this.attachChangeListeners();
     this.setupPostTypeListener();
+    this.setupStatusListener();
     this._notifyMetadataChange();
   }
 
@@ -243,6 +277,10 @@ export default class extends Controller {
 
     if (fieldName === "post_type") {
       this.setupPostTypeListener();
+    }
+
+    if (fieldName === "status") {
+      this.setupStatusListener();
     }
 
     // Add listeners for audio/video fields
@@ -1062,6 +1100,74 @@ export default class extends Controller {
 
     // Check on initial load if duration should be visible
     this.updateDurationFieldVisibility();
+  }
+
+  // ========== STATUS / PUBLISH HANDLING ==========
+
+  // When the user changes the status select to 'published' from 'draft'
+  // or 'unlisted', open the publish modal instead of letting the change
+  // sit in the form. The modal's confirm path will save & publish in
+  // one round trip. Cancel reverts the select back.
+  setupStatusListener() {
+    const statusField = this.element.querySelector(
+      '[data-metadata-field="status"]',
+    );
+    if (!statusField) return;
+
+    this._previousStatus = statusField.value || "draft";
+
+    if (this.statusChangeHandler) {
+      statusField.removeEventListener("change", this.statusChangeHandler);
+    }
+    this.statusChangeHandler = this.handleStatusChange.bind(this);
+    statusField.addEventListener("change", this.statusChangeHandler);
+  }
+
+  handleStatusChange(event) {
+    const newValue = event.target.value;
+    const oldValue = this._previousStatus;
+
+    const isPublishingTransition =
+      newValue === "published" &&
+      (oldValue === "draft" || oldValue === "unlisted");
+
+    if (isPublishingTransition) {
+      this._pendingStatusRevert = {
+        element: event.target,
+        previousValue: oldValue,
+      };
+      // Hand off to editor controller, which owns the modal.
+      document.dispatchEvent(
+        new CustomEvent("metadata-editor:publish-requested", { bubbles: true }),
+      );
+    }
+
+    // Track latest value so subsequent changes compare correctly.
+    this._previousStatus = newValue;
+  }
+
+  setupPublishModalListeners() {
+    this.boundPublishCancel = this.handlePublishModalCancelled.bind(this);
+    this.boundPublishConfirm = this.handlePublishModalConfirmed.bind(this);
+    document.addEventListener("publish-modal:cancelled", this.boundPublishCancel);
+    document.addEventListener("publish-modal:confirmed", this.boundPublishConfirm);
+  }
+
+  handlePublishModalCancelled() {
+    if (!this._pendingStatusRevert) return;
+
+    const { element, previousValue } = this._pendingStatusRevert;
+    element.value = previousValue;
+    this._previousStatus = previousValue;
+    this._pendingStatusRevert = null;
+  }
+
+  handlePublishModalConfirmed() {
+    // The publish actually went through — no revert needed. Update our
+    // tracked previous value so a follow-up status change compares
+    // against 'published'.
+    this._previousStatus = "published";
+    this._pendingStatusRevert = null;
   }
 
   handleMediaFieldChange(event) {

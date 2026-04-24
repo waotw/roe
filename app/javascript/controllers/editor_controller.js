@@ -209,6 +209,15 @@ export default class extends Controller {
       this.mediaPickerCloseHandler,
     );
 
+    // Listen for status-change-triggered publish requests from the
+    // metadata editor. Opens the publish modal — the actual save runs
+    // through completePublish() once the user confirms.
+    this.publishRequestHandler = () => this.showPublishModal();
+    document.addEventListener(
+      "metadata-editor:publish-requested",
+      this.publishRequestHandler,
+    );
+
     // Check for saved trigger and broadcast refresh
     const savedTrigger = document.querySelector('[data-trigger="refresh"]');
     if (savedTrigger) {
@@ -378,6 +387,12 @@ export default class extends Controller {
 
     // Clean up event listeners
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
+    if (this.publishRequestHandler) {
+      document.removeEventListener(
+        "metadata-editor:publish-requested",
+        this.publishRequestHandler,
+      );
+    }
 
     // Close broadcast channel
     if (this.previewChannel) {
@@ -491,9 +506,12 @@ export default class extends Controller {
       '[data-action*="confirmUnpublish"]',
     );
 
-    // Determine current button state
+    // Determine current button state.
+    // Publish button is shown when the post isn't fully published yet —
+    // that includes both 'draft' and 'unlisted'. Unpublish only makes
+    // sense once the post is actually 'published'.
     const currentlyShowingPublish = publishButton !== null;
-    const shouldShowPublish = newStatus === "draft";
+    const shouldShowPublish = newStatus !== "published";
 
     // Only update if state changed
     if (currentlyShowingPublish === shouldShowPublish) return;
@@ -509,33 +527,20 @@ export default class extends Controller {
       unpublishButton?.closest("form")?.action.match(/\/posts\/(\d+)\//)?.[1];
     if (!postId) return;
 
-    // Get requirements from existing button (if publish button exists)
-    const requiresAudience =
-      publishButton?.dataset.editorRequiresAudience || "false";
-    const requiresPublishedTo =
-      publishButton?.dataset.editorRequiresPublishedTo || "false";
-
     // Build new button HTML
     const authToken =
       document.querySelector('meta[name="csrf-token"]')?.content || "";
 
     if (shouldShowPublish) {
-      // Show Publish button
+      // Show Publish button — opens the publish modal; the actual save
+      // happens via the main form when the user confirms.
       buttonContainer.innerHTML = `
-        <form action="/admin/posts/${postId}/publish"
-              method="post"
-              data-turbo="false"
-              data-action="submit->editor#confirmPublish"
-              data-editor-requires-audience="${requiresAudience}"
-              data-editor-requires-published-to="${requiresPublishedTo}"
-              data-editor-post-id="${postId}">
-          <input type="hidden" name="_method" value="patch">
-          <input type="hidden" name="authenticity_token" value="${authToken}">
-          <button type="submit"
-                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
-            Publish
-          </button>
-        </form>
+        <button type="button"
+                data-action="click->editor#confirmPublish"
+                data-editor-post-id="${postId}"
+                class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+          Publish
+        </button>
       `;
     } else {
       // Show Unpublish button
@@ -1876,77 +1881,201 @@ export default class extends Controller {
 
   // ========== PUBLISH/UNPUBLISH CONFIRMATIONS ==========
 
-  showPublishModal(
-    requiresAudience,
-    requiresPublishedTo,
-    currentAudience,
-    currentPublishedTo,
-  ) {
-    // Get post ID from form data
-    const postId = event.target.dataset.editorPostId;
-
-    if (!postId) {
-      console.error("Post ID not found");
+  showPublishModal(postId) {
+    const id = postId || this.resourceIdValue;
+    if (!id) {
+      console.error("Resource ID not found");
       return;
     }
 
-    // Build query params
-    const params = new URLSearchParams({
-      requires_audience: requiresAudience,
-      requires_published_to: requiresPublishedTo,
-      current_audience: currentAudience || "",
-      current_published_to: currentPublishedTo || "",
-    });
+    // Build the URL from the resource type so pages hit
+    // /admin/pages/:id/publish_modal and posts hit
+    // /admin/posts/:id/publish_modal.
+    const resourceType = this.resourceTypeValue || "post";
+    const resourcePath = `${resourceType}s`; // post -> posts, page -> pages
 
-    // Load modal via Turbo Frame
-    const modalUrl = `/admin/posts/${postId}/publish_modal?${params}`;
-
-    // Create modal container if it doesn't exist
-    let modalContainer = document.getElementById("publish-modal-container");
-    if (!modalContainer) {
-      modalContainer = document.createElement("turbo-frame");
-      modalContainer.id = "publish-modal-container";
-      document.body.appendChild(modalContainer);
+    // Capture the metadata-editor's current state so the modal can build
+    // requirements from what's *about to be saved*, not the last-synced
+    // file. This catches things like a just-changed post_type or a brand
+    // new podcast post that has audio/duration fields the file doesn't
+    // know about yet.
+    const metadataEditorEl = this.element.querySelector(
+      '[data-controller~="metadata-editor"]',
+    );
+    const metadataEditorCtrl = metadataEditorEl
+      ? this.application.getControllerForElementAndIdentifier(
+          metadataEditorEl,
+          "metadata-editor",
+        )
+      : null;
+    let currentMetadata = "";
+    if (metadataEditorCtrl) {
+      if (
+        metadataEditorCtrl.isYamlView &&
+        metadataEditorCtrl.hasYamlTextareaTarget
+      ) {
+        currentMetadata = metadataEditorCtrl.yamlTextareaTarget.value;
+      } else {
+        currentMetadata = metadataEditorCtrl.formToYaml();
+      }
     }
 
-    // Load the modal
-    modalContainer.src = modalUrl;
+    // Live inside the editor element so the modal's data-action="click->
+    // editor#completePublish" / cancelPublish actions actually dispatch
+    // on this controller (Stimulus only matches inside scope).
+    let modalContainer = document.getElementById("publish-modal-container");
+    if (!modalContainer) {
+      modalContainer = document.createElement("div");
+      modalContainer.id = "publish-modal-container";
+      this.element.appendChild(modalContainer);
+    } else if (!this.element.contains(modalContainer)) {
+      this.element.appendChild(modalContainer);
+    }
+
+    const csrfToken =
+      document.querySelector('meta[name="csrf-token"]')?.content || "";
+    const formData = new FormData();
+    formData.append("metadata", currentMetadata);
+
+    fetch(`/admin/${resourcePath}/${id}/publish_modal`, {
+      method: "POST",
+      headers: { "X-CSRF-Token": csrfToken, Accept: "text/html" },
+      body: formData,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
+      .then((html) => {
+        modalContainer.innerHTML = html;
+      })
+      .catch((err) => {
+        console.error("Failed to load publish modal:", err);
+        modalContainer.innerHTML = "";
+      });
   }
 
+  // Triggered by the Publish button OR by the metadata-editor when the
+  // user changes the status select to 'published'. Opens the modal — the
+  // actual save happens in completePublish() once the user confirms.
   confirmPublish(event) {
-    event.preventDefault();
+    if (event && event.preventDefault) event.preventDefault();
 
-    const form = event.target;
-
-    // Always show modal - set saving state first
     this.isSaving = true;
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
 
-    // Get current metadata values from the editor
+    const postId =
+      event?.currentTarget?.dataset?.editorPostId ||
+      event?.target?.dataset?.editorPostId ||
+      this.resourceIdValue;
+
+    this.showPublishModal(postId);
+  }
+
+  // Modal "Save & Publish" button. Pulls the modal's collected values
+  // into the main metadata editor, sets status to 'published', then
+  // submits the regular Save form so content + metadata + status all
+  // persist in a single round trip.
+  completePublish(event) {
+    if (event && event.preventDefault) event.preventDefault();
+
+    const modal = document.getElementById("publish-modal-container");
     const metadataEditor = document.querySelector(
-      '[data-controller="metadata-editor"]',
+      '[data-controller~="metadata-editor"]',
     );
-    const audienceField = metadataEditor?.querySelector(
-      '[data-metadata-field="audience"]',
+    if (!metadataEditor) {
+      console.error("metadata-editor element not found");
+      return;
+    }
+
+    // Collect field values from the modal.
+    const values = {};
+    if (modal) {
+      modal.querySelectorAll('input[type="radio"]:checked').forEach((input) => {
+        const name = this._extractMetadataFieldName(input.name);
+        if (name) values[name] = input.value;
+      });
+      modal
+        .querySelectorAll(
+          'input[type="text"][name^="metadata_fields"], select[name^="metadata_fields"]',
+        )
+        .forEach((input) => {
+          const name = this._extractMetadataFieldName(input.name);
+          const trimmed = input.value.trim();
+          if (name && trimmed) values[name] = trimmed;
+        });
+    }
+
+    // Apply each value to the main metadata editor. If a corresponding
+    // [data-metadata-field] input already exists, update it. Otherwise
+    // append a hidden input so formToYaml picks it up on submit.
+    const fieldsContainer = metadataEditor.querySelector(
+      '[data-metadata-editor-target="fieldsContainer"]',
     );
-    const publishedToField = metadataEditor?.querySelector(
-      '[data-metadata-field="published_to"]',
+    Object.entries(values).forEach(([fieldName, value]) => {
+      let field = metadataEditor.querySelector(
+        `[data-metadata-field="${fieldName}"]`,
+      );
+      if (field) {
+        field.value = value;
+      } else if (fieldsContainer) {
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.dataset.metadataField = fieldName;
+        hidden.name = `metadata_fields[${fieldName}]`;
+        hidden.value = value;
+        fieldsContainer.appendChild(hidden);
+      }
+    });
+
+    // Force status to 'published' (matters when the trigger was the
+    // Publish button rather than a status-select change).
+    const statusField = metadataEditor.querySelector(
+      '[data-metadata-field="status"]',
+    );
+    if (statusField) statusField.value = "published";
+
+    // Notify metadata-editor that the publish was confirmed (so it
+    // doesn't try to revert the status select on cancel cleanup).
+    document.dispatchEvent(
+      new CustomEvent("publish-modal:confirmed", { bubbles: true }),
     );
 
-    const currentAudience = audienceField?.value || "";
-    const currentPublishedTo = publishedToField?.value || "";
+    // Close modal and submit the main Save form.
+    if (modal) modal.innerHTML = "";
 
-    // Check which fields are enabled
-    const requiresAudience = form.dataset.editorRequiresAudience === "true";
-    const requiresPublishedTo =
-      form.dataset.editorRequiresPublishedTo === "true";
+    const form = document.getElementById(`${this.resourceTypeValue}-form`);
+    if (form) {
+      form.requestSubmit();
+    } else {
+      console.error("Main editor form not found");
+    }
+  }
 
-    this.showPublishModal(
-      requiresAudience,
-      requiresPublishedTo,
-      currentAudience,
-      currentPublishedTo,
+  cancelPublish(event) {
+    // Note: deliberately NOT calling preventDefault here. The Cancel
+    // button is type="button" so it has no default action to suppress,
+    // and the "Generate SKU" link inside the modal also fires this so
+    // the publish modal closes — but we want Turbo to follow that link
+    // and load the SKU generator into its own frame.
+
+    // Tell metadata-editor so it can revert the status select if this
+    // was triggered by a status-change.
+    document.dispatchEvent(
+      new CustomEvent("publish-modal:cancelled", { bubbles: true }),
     );
+
+    const modal = document.getElementById("publish-modal-container");
+    if (modal) modal.innerHTML = "";
+
+    // Restore the unsaved-changes warning since we're not actually saving.
+    this.isSaving = false;
+    window.addEventListener("beforeunload", this.beforeUnloadHandler);
+  }
+
+  _extractMetadataFieldName(rawName) {
+    const match = (rawName || "").match(/^metadata_fields\[(.+)\]$/);
+    return match ? match[1] : null;
   }
 
   confirmUnpublish(event) {

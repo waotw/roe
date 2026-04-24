@@ -1,103 +1,145 @@
-<turbo-frame id="publish-modal-container">
-  <div class="fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50">
+<%
+  media_field_kinds = { 'audio' => 'audio', 'video' => 'video', 'image' => 'image', 'captions' => 'file' }
+  resource_label = local_assigns[:resource_label] || @resource_label || 'Post'
+  show_postmark_warning = local_assigns.fetch(:show_postmark_warning) { @show_postmark_warning }
+%>
+  <div class="fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50"
+       data-publish-modal>
     <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl mx-auto">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Publish Post</h2>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Publish <%= resource_label %></h2>
 
       <p class="text-gray-700 mb-6">
-        <% if @requires_audience || @requires_published_to %>
-
-          Confirm your publication settings:
-
+        <% if @missing_requirements.any? %>
+          Before publishing, fill in the fields below.
         <% else %>
-
-          Are you ready to publish this post? It will be live on your site.
-
+          Are you ready to publish this <%= resource_label.downcase %>? Your current edits will be saved.
         <% end %>
       </p>
 
-      <%= form_with url: confirm_publish_admin_post_path(@post),
-                    method: :post,
-                    class: "space-y-6",
-                    data: { turbo_frame: "_top" } do |f| %>
+      <% if show_postmark_warning %>
+        <div class="bg-yellow-50 border border-yellow-400 px-3 py-2 mb-6 text-sm">
+          <strong class="text-yellow-800">⚠ Postmark isn't configured.</strong>
+          <span class="text-yellow-800">
+            You can still publish, but if Distribution is set to <em>Newsletter</em> or <em>Site &amp; Newsletter</em>, no email will actually go out until you
+            <%= link_to "configure Postmark", edit_admin_postmark_config_path, class: "underline hover:text-yellow-900" %>.
+          </span>
+        </div>
+      <% end %>
 
-        <% if @requires_audience %>
-          <div class="bg-gray-50 border border-gray-300 p-6">
-            <h3 class="font-semibold text-gray-900 mb-3">Audience</h3>
-            <p class="text-sm text-gray-700 mb-4">Who should be able to see this post?</p>
+      <%# No form wrapper — Confirm injects these values into the main editor %>
+      <%# form and submits that, so the post's content + metadata save in one  %>
+      <%# go (along with status: published).                                    %>
+      <div class="space-y-6">
+        <% @missing_requirements.each do |req| %>
+          <%
+            kind = media_field_kinds[req[:name].to_s]
+            is_media = kind.present?
+            has_paired_duration = is_media && @paired_duration_for == req[:name]
+          %>
+          <div class="bg-gray-50 border border-gray-300 p-6"
+               <% if is_media %>
+                 data-controller="media-field"
+                 data-media-field-kind-value="<%= kind %>"
+               <% end %>>
+            <h3 class="font-semibold text-gray-900 mb-3">
+              <%= req[:label] %>
+              <span class="text-red-600"><sup>*</sup></span>
+            </h3>
+            <% if req[:hint] %>
+              <p class="text-sm <%= req[:missing_file] ? 'text-red-600' : 'text-gray-700' %> mb-4">
+                <%= req[:hint] %>
+              </p>
+            <% end %>
 
-            <div class="space-y-3">
-              <label class="flex items-start gap-3 cursor-pointer">
-                <%= f.radio_button :audience, 'everyone',
-                    checked: @current_audience.blank? || @current_audience == 'everyone',
-                    class: "mt-1" %>
-                <div>
-                  <div class="font-medium text-gray-900">Everyone</div>
-                  <div class="text-sm text-gray-600">Public content visible to all visitors</div>
-                </div>
-              </label>
+            <% case req[:type].to_sym %>
+            <% when :radio %>
+              <div class="space-y-3">
+                <% req[:options].each do |value, label, description| %>
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="radio"
+                           name="metadata_fields[<%= req[:name] %>]"
+                           value="<%= value %>"
+                           <%= 'checked' if req[:current] == value || (req[:current].blank? && req[:default] == value) %>
+                           class="mt-1">
+                    <div>
+                      <div class="font-medium text-gray-900"><%= label %></div>
+                      <% if description %>
+                        <div class="text-sm text-gray-600"><%= description %></div>
+                      <% end %>
+                    </div>
+                  </label>
+                <% end %>
+              </div>
 
-              <label class="flex items-start gap-3 cursor-pointer">
-                <%= f.radio_button :audience, 'paid',
-                    checked: @current_audience == 'paid',
-                    class: "mt-1" %>
-                <div>
-                  <div class="font-medium text-gray-900">Paid Members Only</div>
-                  <div class="text-sm text-gray-600">Only accessible to paid members</div>
-                </div>
-              </label>
-            </div>
+            <% when :select %>
+              <select name="metadata_fields[<%= req[:name] %>]"
+                      class="w-full font-mono text-sm p-2 border border-gray-300">
+                <option value="">-- select --</option>
+                <% Array(req[:options]).each do |option| %>
+                  <option value="<%= option %>" <%= 'selected' if req[:current] == option %>>
+                    <%= option %>
+                  </option>
+                <% end %>
+              </select>
+
+            <% else # :text and media types %>
+              <input type="text"
+                     name="metadata_fields[<%= req[:name] %>]"
+                     value="<%= req[:current] %>"
+                     class="w-full font-mono text-sm p-2 border border-gray-300"
+                     <% if is_media %>
+                       data-media-field-target="input"
+                       data-action="input->media-field#checkDebounced blur->media-field#check change->media-field#check"
+                     <% end %>
+                     <% if req[:hint] && !req[:missing_file] %>placeholder="<%= req[:hint] %>"<% end %>>
+
+              <% if is_media %>
+                <p class="text-xs text-red-600 mt-2 <%= req[:missing_file] ? '' : 'hidden' %>"
+                   data-media-field-target="warning">
+                  ⚠ This file doesn't exist under <code>site/media/</code>.
+                </p>
+              <% end %>
+
+              <% if req[:name] == 'sku' && @sku_generator_path %>
+                <%# Closes the publish modal first (cancelPublish) and then
+                    Turbo loads the generator into its sku-generator-modal frame. %>
+                <a href="<%= @sku_generator_path %>"
+                   data-turbo-frame="sku-generator-modal"
+                   data-action="click->editor#cancelPublish"
+                   class="text-xs text-blue-600 hover:text-blue-800 underline mt-2 inline-block">
+                  Generate SKU →
+                </a>
+              <% end %>
+            <% end %>
+
+            <% if has_paired_duration && @paired_duration %>
+              <div class="mt-4">
+                <label class="block text-xs font-medium text-gray-700 mb-1">
+                  Duration<span class="text-red-600"><sup>*</sup></span>
+                </label>
+                <input type="text"
+                       name="metadata_fields[duration]"
+                       value="<%= @paired_duration[:current] %>"
+                       placeholder="Auto-filled from file (HH:MM:SS)"
+                       class="w-full font-mono text-sm p-2 border border-gray-300"
+                       data-media-field-target="duration">
+              </div>
+            <% end %>
           </div>
         <% end %>
 
-        <% if @requires_published_to %>
-          <div class="bg-gray-50 border border-gray-300 p-6">
-            <h3 class="font-semibold text-gray-900 mb-3">Distribution</h3>
-            <p class="text-sm text-gray-700 mb-4">Where should this post be published?</p>
-
-            <div class="space-y-3">
-              <label class="flex items-start gap-3 cursor-pointer">
-                <%= f.radio_button :published_to, 'both',
-                    checked: @current_published_to.blank? || @current_published_to == 'both',
-                    class: "mt-1" %>
-                <div>
-                  <div class="font-medium text-gray-900">Site & Newsletter</div>
-                  <div class="text-sm text-gray-600">Publish to site and send as newsletter</div>
-                </div>
-              </label>
-
-              <label class="flex items-start gap-3 cursor-pointer">
-                <%= f.radio_button :published_to, 'site',
-                    checked: @current_published_to == 'site',
-                    class: "mt-1" %>
-                <div>
-                  <div class="font-medium text-gray-900">Site Only</div>
-                  <div class="text-sm text-gray-600">Publish to site, don't send newsletter</div>
-                </div>
-              </label>
-
-              <label class="flex items-start gap-3 cursor-pointer">
-                <%= f.radio_button :published_to, 'newsletter',
-                    checked: @current_published_to == 'newsletter',
-                    class: "mt-1" %>
-                <div>
-                  <div class="font-medium text-gray-900">Newsletter Only</div>
-                  <div class="text-sm text-gray-600">Send as newsletter, don't publish to site</div>
-                </div>
-              </label>
-            </div>
-          </div>
-        <% end %>
-
-        <div class="flex items-center gap-3">
-          <%= f.submit "Publish",
-              class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+        <div class="flex items-center gap-3 pt-2">
           <button type="button"
-                  onclick="document.getElementById('publish-modal-container').innerHTML = ''"
+                  data-action="click->editor#completePublish"
+                  class="uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer">
+            Save & Publish
+          </button>
+          <button type="button"
+                  data-action="click->editor#cancelPublish"
                   class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs">
             Cancel
           </button>
         </div>
-      <% end %>
+      </div>
     </div>
   </div>
-</turbo-frame>

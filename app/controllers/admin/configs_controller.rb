@@ -255,6 +255,7 @@ class Admin::ConfigsController < ApplicationController
     @config_content = File.read(podcast_config_path)
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_podcast
+    @field_help = build_field_help_for_podcast
     render :edit
   end
 
@@ -533,6 +534,20 @@ class Admin::ConfigsController < ApplicationController
       'payments.enabled' => ['false', 'true'],
       'newsletter.enabled' => ['false', 'true'],
       'everyone.show_paid_content' => ['true', 'false']
+    }
+  end
+
+  # Longer explanations that render as a hover tooltip next to a field's
+  # label (via shared/_help_tooltip). Keyed by top-level field name.
+  # Each entry is { text:, title?: } — text can be html_safe for simple
+  # formatting (e.g. <strong>, <br>).
+  def build_field_help_for_podcast
+    {
+      'type' => {
+        title: 'Episodic vs. Serial',
+        text: ('<strong>Episodic</strong> — episodes stand alone and can be played in any order. Apple Podcasts shows newest first. Good for interviews, news, talk shows.<br><br>' \
+               '<strong>Serial</strong> — episodes are meant to be played in order, like chapters. Apple shows oldest first. Good for narrative shows, audio dramas, limited series.').html_safe
+      }
     }
   end
 

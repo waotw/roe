@@ -6,10 +6,10 @@
 </head>
 <body class="bg-white text-black p-5" data-turbo-action="replace" data-md-editor>
 
-  <div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative ">
+  <div class="flex justify-between items-center pb-2.5 relative ">
+    <h1 class="text-xl font-bold">Edit Page: <%= @page.title %></h1>
     <div class="flex items-center gap-2">
-    <%= link_to "← Back to Pages", admin_pages_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %> |
-    <%= link_to "Media", browse_admin_medium_index_path, target: "_blank", data: { action: "click->editor#saveEditorState" }, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    <%= link_to "← Back to Pages", admin_pages_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     </div>
   </div>
 
@@ -17,7 +17,20 @@
     <div class="px-2.5 py-1 mb-5 border border-gray-300 bg-yellow-50"><%= flash[:warning] %></div>
   <% end %>
 
-  <h1 class="text-3xl font-bold mb-5">Edit Page: <%= @page.title %></h1>
+  <% if @page.needs_attention? %>
+    <div class="bg-red-50 border border-amber-400 px-3 py-2 mb-5 text-sm">
+      <strong class="text-amber-700">⚠ This page is published but has issues:</strong>
+      <ul class="list-disc ml-5 mt-1 text-amber-700">
+        <% @page.missing_site_gated_fields.each do |name| %>
+          <li>Missing required field: <code><%= name %></code></li>
+        <% end %>
+        <% @page.missing_media_refs.each do |ref| %>
+          <li>File not found: <code><%= ref[:path] %></code> (<%= ref[:field] %>)</li>
+        <% end %>
+      </ul>
+      <p class="text-xs text-amber-600 mt-2 italic">Save your changes to refresh this list.</p>
+    </div>
+  <% end %>
 
   <!-- Wrap everything in Stimulus controller -->
   <div data-controller="editor"
@@ -42,13 +55,13 @@
           Preview
         </button>
 
-        <% if @page.draft? %>
-          <%= button_to "Publish", publish_admin_page_path(@page),
-              method: :patch,
-              class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
-              form: {
-                data: { action: "submit->editor#confirmPublish" }
-              } %>
+        <% unless @page.published? %>
+          <button type="button"
+                  data-action="click->editor#confirmPublish"
+                  data-editor-post-id="<%= @page.id %>"
+                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+            Publish
+          </button>
         <% else %>
           <%= button_to "Unpublish", unpublish_admin_page_path(@page),
               method: :patch,

@@ -26,9 +26,7 @@ Rails.application.routes.draw do
         get :unlisted
       end
       member do
-        patch :publish
-        get :publish_modal
-        post :confirm_publish
+        post :publish_modal
         patch :unpublish
         post :preview
         get :preview
@@ -44,7 +42,7 @@ Rails.application.routes.draw do
 
     resources :pages, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       member do
-        patch :publish
+        post :publish_modal
         patch :unpublish
         post :preview
         get :preview
@@ -57,6 +55,7 @@ Rails.application.routes.draw do
         get :browse
         get :picker
         get :duration
+        get :exists
         post :clear_failed_jobs
         post :queue_missing_variants
         post :bulk_destroy
@@ -77,9 +76,7 @@ Rails.application.routes.draw do
         get :duplicate_skus
       end
       member do
-        get :publish_modal
-        post :confirm_publish
-        patch :publish
+        post :publish_modal
         patch :unpublish
         post :preview
         get :preview

@@ -30,36 +30,29 @@ module ApplicationHelper
     nil
   end
 
-  def members_enabled?
-    File.exist?(Rails.root.join('site/system/features/members.yml'))
-  end
-
-  def payments_enabled?
-    members_enabled? && SiteConfig.feature('members', 'payments.enabled') == true
-  end
-
-  def store_enabled?
-    File.exist?(Rails.root.join('site', 'system', 'features', 'store.yml'))
-  end
+  # Feature flag predicates — delegated to SiteFeature so models can use
+  # the same checks without pulling in the helper context.
+  def members_enabled?      = SiteFeature.members_enabled?
+  def payments_enabled?     = SiteFeature.payments_enabled?
+  def newsletters_enabled?  = SiteFeature.newsletters_enabled?
+  def postmark_configured?  = SiteFeature.postmark_configured?
+  def store_enabled?        = SiteFeature.store_enabled?
 
   def snipcart_connected?
     store_enabled? && SnipcartConfig.current&.connected?
   end
 
-  def newsletters_enabled?
-    members_enabled? && SiteConfig.feature('members', 'newsletter.enabled') == true
-  end
-
-  def postmark_configured?
-    PostmarkConfig.exists? && PostmarkConfig.current.connected?
-  end
-
+  # Audience only matters when paid memberships are actually configured —
+  # without payments, there's no "paid only" tier to gate on.
   def requires_audience_on_publish?
-    members_enabled?
+    payments_enabled?
   end
 
+  # Distribution prompt fires when newsletters are enabled. Postmark
+  # config is checked separately as a soft warning inside the modal so
+  # the user can still set published_to even if Postmark isn't ready.
   def requires_published_to_on_publish?
-    newsletters_enabled? && postmark_configured?
+    newsletters_enabled?
   end
 
   def store_currency_symbol

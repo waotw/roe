@@ -1,6 +1,11 @@
 class Current < ActiveSupport::CurrentAttributes
   attribute :session, :user, :member  # user = admin, member = public
 
+  # Per-request cache of files under site/media/. Lazily populated by
+  # Post.media_file_set so admin views that ask needs_attention? on many
+  # posts only pay for one directory glob, not one File.exist? per ref.
+  attribute :media_file_set
+
   # Admin helpers
   def admin?
     user.present?

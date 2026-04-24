@@ -5,16 +5,33 @@ class Product < ApplicationRecord
 
   # Validations
   validates :file_path, presence: true, uniqueness: true
-  validate :validate_required_metadata
+
+  # NOTE: no metadata-level validations. Roe is file-first — the file is
+  # the source of truth, and a model-level validation here would silently
+  # block ContentSync/ContentWatcher from updating the DB when a product
+  # file is saved with missing fields, which makes the admin UI lie about
+  # what's on disk. Required-field gating happens in the publish modal
+  # before content goes live, and admin warning badges surface mistakes
+  # via Product#needs_attention? after the fact.
+
+  # Required metadata fields. Mirrored in the metadata editor partial's
+  # `required: true` flags for product fields. Used by needs_attention?
+  # to flag published products that are missing critical info.
+  REQUIRED_FIELDS = %w[title category price sku image].freeze
+
+  # Metadata fields that point at files under site/media/...
+  MEDIA_FIELDS = %w[image].freeze
 
   after_save :register_category
 
-  # Scopes
-  scope :published, -> { where("metadata->>'status' = ?", 'published') }
-  scope :draft, -> { where("metadata->>'status' = ?", 'draft') }
+  # Scopes — SQLite uses json_extract, NOT the PostgreSQL `metadata->>'key'` syntax.
+  scope :published, -> { where("json_extract(metadata, '$.status') = ?", 'published') }
+  scope :draft, -> { where("json_extract(metadata, '$.status') = ?", 'draft') }
   scope :by_newest, -> { order(created_at: :desc) }
   scope :with_tag, ->(tag) {
-    where("EXISTS (SELECT 1 FROM json_array_elements_text(metadata->'tags') AS tag WHERE tag = ?)", tag)
+    # Tags are stored as a JSON array, e.g. ["featured","sale"]. We match by
+    # looking for the quoted tag substring inside the serialized array.
+    where("json_extract(metadata, '$.tags') LIKE ?", "%\"#{tag}\"%")
   }
 
   # Delegated metadata accessors
@@ -79,17 +96,17 @@ class Product < ApplicationRecord
       return nil
     end
 
-    # Validate required fields
+    # File-first: save whatever's in the file, even if title or price is
+    # missing. The admin warning system (Product#needs_attention?) flags
+    # the gaps in the UI; ContentSync should never silently skip a file.
     if parsed.front_matter['title'].blank?
       Rails.logger.warn "Product missing title: #{file_path}"
-      puts "\n  ✗ Missing title: #{File.basename(file_path)}\n"
-      return nil
+      puts "  ⚠ Missing title: #{File.basename(file_path)}"
     end
 
     if parsed.front_matter['price'].blank?
       Rails.logger.warn "Product missing price: #{file_path}"
-      puts "\n  ✗ Missing price: #{File.basename(file_path)}\n"
-      return nil
+      puts "  ⚠ Missing price: #{File.basename(file_path)}"
     end
 
     relative_path = absolute_path.sub(Rails.root.to_s + "/", "")
@@ -117,7 +134,7 @@ class Product < ApplicationRecord
 
     # Find all SKUs that start with this category
     pattern = "#{category.upcase}-%"
-    products = where("metadata->>'sku' LIKE ?", pattern)
+    products = where("json_extract(metadata, '$.sku') LIKE ?", pattern)
 
     # Extract numbers from SKUs like "BOOK-001", "BOOK-002"
     numbers = products.map do |product|
@@ -134,7 +151,7 @@ class Product < ApplicationRecord
 
   def self.sku_exists?(sku)
     return false if sku.blank?
-    where("metadata->>'sku' = ?", sku).exists?
+    where("json_extract(metadata, '$.sku') = ?", sku).exists?
   end
 
   def generate_sku_suggestion(category: nil, number: nil)
@@ -153,16 +170,53 @@ class Product < ApplicationRecord
   end
 
   def self.duplicate_skus
-    # Find all published products with SKUs
-    published_with_skus = where("metadata->>'status' = ? AND metadata->>'sku' IS NOT NULL AND metadata->>'sku' != ''", 'published')
+    # Find all published products with SKUs (SQLite syntax)
+    published_with_skus = where(<<~SQL.squish, 'published')
+      json_extract(metadata, '$.status') = ?
+        AND json_extract(metadata, '$.sku') IS NOT NULL
+        AND json_extract(metadata, '$.sku') != ''
+    SQL
 
     # Group by SKU and find duplicates
-    sku_counts = published_with_skus.group("metadata->>'sku'").count
+    sku_counts = published_with_skus.group(Arel.sql("json_extract(metadata, '$.sku')")).count
     duplicate_skus = sku_counts.select { |sku, count| count > 1 }.keys
 
     # Return products with duplicate SKUs
     published_with_skus.select { |p| duplicate_skus.include?(p.sku) }
                        .group_by(&:sku)
+  end
+
+  # Returns the names of REQUIRED_FIELDS that are blank on this product.
+  def missing_required_fields
+    REQUIRED_FIELDS.reject { |name| metadata[name].to_s.strip.present? }
+  end
+
+  # Returns [{ field:, path:, exists: }] for every media field this
+  # product sets. Mirrors Post#media_refs.
+  def media_refs
+    MEDIA_FIELDS.filter_map do |field|
+      path = metadata[field].to_s.strip
+      next if path.empty?
+
+      exists = if path.start_with?('/media/')
+                 Post.media_file_set.include?(path)
+               else
+                 true
+               end
+      { field: field, path: path, exists: exists }
+    end
+  end
+
+  def missing_media_refs
+    media_refs.reject { |ref| ref[:exists] }
+  end
+
+  # A published product "needs attention" if any required field is blank
+  # or any media path doesn't resolve to a real file on disk. Used by
+  # the admin UI to surface mistakes without blocking save.
+  def needs_attention?
+    return false unless status == 'published'
+    missing_required_fields.any? || missing_media_refs.any?
   end
 
   private
@@ -172,15 +226,5 @@ class Product < ApplicationRecord
 
     category = metadata['category'].strip.downcase
     ProductCategory.add(category)
-  end
-
-  def validate_required_metadata
-    errors.add(:metadata, "must include title") if metadata['title'].blank?
-    errors.add(:metadata, "must include price") if metadata['price'].blank?
-
-    # Only require SKU when publishing
-    if metadata['status'] == 'published' && metadata['sku'].blank?
-      errors.add(:metadata, "must include sku when publishing")
-    end
   end
 end

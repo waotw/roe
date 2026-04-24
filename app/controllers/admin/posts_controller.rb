@@ -1,4 +1,6 @@
 class Admin::PostsController < Admin::BaseController
+  layout 'editor', only: [ :edit ]
+
   def index
     @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
 
@@ -259,13 +261,28 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
+    # Capture pre-save state so we can detect a publishing transition
+    # (draft/unlisted → published) and queue any newsletter sends below.
+    was_published = @post.published?
+
     # Use the formatted YAML (includes GUID if added/restored)
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@post.file_path, full_content)
 
     ContentSync.sync_file(@post.file_path)
+    @post.reload
 
-    flash[:notice] = "Post saved"
+    # If this save published the post (transitioned from non-published)
+    # and it's marked for newsletter delivery, queue the broadcast.
+    just_published = !was_published && @post.published?
+    if just_published && should_send_newsletter?(@post)
+      QueueNewsletterBatchesJob.perform_later(@post.id)
+      flash[:notice] = "Post published. Newsletter is being sent in the background."
+    elsif just_published
+      flash[:notice] = "Post published"
+    else
+      flash[:notice] = "Post saved"
+    end
 
     redirect_to edit_admin_post_path(@post)
   end
@@ -433,56 +450,40 @@ class Admin::PostsController < Admin::BaseController
     redirect_to admin_posts_path
   end
 
-  def publish
-    @post = Post.find(params[:id])
-    update_post_status(@post, 'published')
-    flash[:notice] = "Post published"
-    redirect_to edit_admin_post_path(@post)
-  end
-
   def publish_modal
     @post = Post.find(params[:id])
-    @requires_audience = params[:requires_audience] == 'true'
-    @requires_published_to = params[:requires_published_to] == 'true'
-    @current_audience = params[:current_audience].presence
-    @current_published_to = params[:current_published_to].presence
 
-    render partial: 'publish_modal', layout: false
-  end
-
-  def confirm_publish
-    @post = Post.find(params[:id])
-
-    # Read current content
-    raw_content = File.read(@post.file_path)
-    parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
-    metadata = parsed.front_matter
-
-    # Update metadata
-    metadata['status'] = 'published'
-    metadata['audience'] = params[:audience] if params[:audience].present?
-    metadata['published_to'] = params[:published_to] if params[:published_to].present?
-
-    # Write back to file
-    yaml_content = Post.format_metadata_yaml(metadata)
-    full_content = "---\n#{yaml_content}\n---\n#{parsed.content}"
-    normalize_and_write(@post.file_path, full_content)
-
-    # Sync to DB
-    ContentSync.sync_file(@post.file_path)
-    @post.reload
-
-    # Send newsletter if published_to includes newsletter
-    if should_send_newsletter?(@post)
-      # Queue background job instead of sending immediately
-      QueueNewsletterBatchesJob.perform_later(@post.id)
-      flash[:notice] = "Post published. Newsletter is being sent in the background."
-    else
-      flash[:notice] = "Post published"
+    # If the editor sent its current form-state metadata, swap it in on
+    # the in-memory post before computing requirements. This makes the
+    # modal reflect what the user is *about to publish* (e.g. a just-
+    # changed post_type that hasn't been saved yet) rather than the
+    # last-synced file state.
+    if params[:metadata].present?
+      begin
+        submitted = YAML.safe_load(params[:metadata], permitted_classes: [ Date, Time, Symbol ])
+        @post.metadata = submitted if submitted.is_a?(Hash) && submitted.any?
+      rescue => e
+        Rails.logger.warn "publish_modal: ignoring unparseable submitted metadata (#{e.message})"
+      end
     end
 
-    # Always redirect - this ensures the modal closes and page refreshes
-    redirect_to edit_admin_post_path(@post), status: :see_other
+    @missing_requirements = build_publish_requirements(@post)
+    @resource_label = 'Post'
+    @show_postmark_warning = helpers.newsletters_enabled? && !helpers.postmark_configured?
+
+    # Pair audio/video with duration so the modal can extract duration into
+    # the matching field client-side. The paired duration is nested, so we
+    # strip it from the top-level list to avoid rendering it twice.
+    media_section = @missing_requirements.find { |r| %w[audio video].include?(r[:name]) }
+    duration_section = @missing_requirements.find { |r| r[:name] == 'duration' }
+    @paired_duration_for = nil
+    if media_section && duration_section
+      @paired_duration_for = media_section[:name]
+      @missing_requirements -= [ duration_section ]
+      @paired_duration = duration_section
+    end
+
+    render partial: 'publish_modal', layout: false
   end
 
   def unpublish
@@ -550,6 +551,83 @@ class Admin::PostsController < Admin::BaseController
   rescue => e
     Rails.logger.error "Newsletter send failed: #{e.message}"
     { success: false, error: e.message }
+  end
+
+  # Returns an array of publish-time requirements that are blank on the post.
+  # Each entry is a hash shaped for the publish modal to render:
+  #   { name:, type:, label:, hint:, options:, current: }
+  def build_publish_requirements(post)
+    requirements = []
+
+    # Site-gated: audience (always shown when paid memberships are
+    # configured, so the user confirms who the post is going to every
+    # time they publish). Without payments, audience tiers are moot.
+    if helpers.requires_audience_on_publish?
+      requirements << {
+        name: 'audience',
+        type: :radio,
+        label: 'Audience',
+        hint: 'Who should be able to see this post?',
+        options: [
+          [ 'everyone', 'Everyone', 'Public content visible to all visitors' ],
+          [ 'paid', 'Paid Members Only', 'Only accessible to paid members' ]
+        ],
+        default: 'everyone',
+        current: post.metadata['audience']
+      }
+    end
+
+    # Site-gated: published_to (always shown when newsletters + postmark are
+    # configured, so the user confirms where the post is being distributed).
+    if helpers.requires_published_to_on_publish?
+      requirements << {
+        name: 'published_to',
+        type: :radio,
+        label: 'Distribution',
+        hint: 'Where should this post be published?',
+        options: [
+          [ 'both', 'Site & Newsletter', 'Publish to site and send as newsletter' ],
+          [ 'site', 'Site Only', "Publish to site, don't send newsletter" ],
+          [ 'newsletter', 'Newsletter Only', "Send as newsletter, don't publish to site" ]
+        ],
+        default: 'both',
+        current: post.metadata['published_to']
+      }
+    end
+
+    # Type-specific requirements from POST_TYPES (blank required fields)
+    post.missing_type_required_fields.each do |field|
+      next if field[:name].to_s == 'guid'  # auto-handled
+
+      options = field[:options].respond_to?(:call) ? field[:options].call : field[:options]
+
+      requirements << {
+        name: field[:name].to_s,
+        type: field[:type] || :text,
+        label: field[:label] || field[:name].to_s.humanize,
+        hint: field[:hint],
+        options: options,
+        current: post.metadata[field[:name].to_s]
+      }
+    end
+
+    # Media files that are set in metadata but don't exist on disk. Surface
+    # them in the modal so the user can fix a typo before the post goes live.
+    already_listed = requirements.map { |r| r[:name] }
+    post.missing_media_refs.each do |ref|
+      next if already_listed.include?(ref[:field])
+
+      requirements << {
+        name: ref[:field],
+        type: :text,
+        label: ref[:field].humanize,
+        hint: "File not found on disk — fix the path or upload the file.",
+        current: ref[:path],
+        missing_file: true
+      }
+    end
+
+    requirements
   end
 
   def ensure_podcast_guid(metadata_hash, post)

@@ -367,12 +367,19 @@
                                 next if subkey == 'subcategory' || subkey == 'subcategory_2'
                               %>
 
+                              <% nested_field_key = "#{key}.#{subkey}" %>
+                              <% help_key = @field_help&.key?(nested_field_key) ? nested_field_key : (@field_help&.key?(subkey) ? subkey : nil) %>
+
                               <div class="config-field-row">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
                                   <%= subkey.humanize %>
+                                  <% if help_key %>
+                                    <%= render 'shared/help_tooltip',
+                                               text: @field_help[help_key][:text],
+                                               title: @field_help[help_key][:title] %>
+                                  <% end %>
                                 </label>
 
-                                <% nested_field_key = "#{key}.#{subkey}" %>
                                 <%
                                   # Skip subcategory fields - they're dynamically managed
                                   next if subkey == 'subcategory' || subkey == 'subcategory_2'
@@ -429,6 +436,11 @@
                         <div class="config-field-row">
                           <label class="block text-sm font-medium text-gray-700 mb-1">
                             <%= key.humanize %>
+                            <% if @field_help&.key?(key) %>
+                              <%= render 'shared/help_tooltip',
+                                         text: @field_help[key][:text],
+                                         title: @field_help[key][:title] %>
+                            <% end %>
                           </label>
 
                           <% if @field_options&.key?(key) %>
