@@ -41,8 +41,12 @@ module SubstackImporter
         fm["season"] = post.podcast_season_number if post.podcast_season_number
         fm["episode_type"] = post.podcast_episode_type.to_s if post.podcast_episode_type
 
-        # Audio: always add expected path
-        audio_path = local_media[:audio] || expected_audio_path(post)
+        # Audio: write the expected path only when audio was actually attempted
+        # (i.e., Substack reported a podcast_url). For a video-only podcast,
+        # podcast_url is empty and we skip the field entirely so it doesn't
+        # appear as a phantom "missing media" warning in admin.
+        audio_path = local_media[:audio]
+        audio_path ||= expected_audio_path(post) if post.podcast_url.present?
         fm["audio"] = audio_path if audio_path.present?
 
         if post.podcast_duration.present?

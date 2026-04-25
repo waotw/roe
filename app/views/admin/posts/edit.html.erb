@@ -61,6 +61,14 @@
     </div>
   <% end %>
 
+  <% if @post.informational_notices.any? %>
+    <div class="bg-blue-50 border border-blue-300 px-3 py-2 mb-5 text-sm text-blue-800">
+      <% @post.informational_notices.each do |note| %>
+        <p>ℹ︎ <%= note %></p>
+      <% end %>
+    </div>
+  <% end %>
+
   <!-- Wrap everything in Stimulus controller -->
   <div data-controller="editor"
        data-editor-resource-type-value="post"

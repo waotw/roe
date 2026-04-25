@@ -179,6 +179,7 @@
      data-metadata-editor-post-types-value="<%= Post::POST_TYPES.to_json %>"
      data-metadata-editor-resource-type-value="<%= resource_type %>"
      data-metadata-editor-podcast-configs-value="<%= PodcastConfig.all_podcasts.to_json %>"
+     data-metadata-editor-media-paths-value="<%= ERB::Util.html_escape(autocomplete_paths_by_kind.to_json) %>"
      <% if resource_type == 'product' %>
      data-metadata-editor-product-categories-value="<%= (ProductCategory.all rescue []).to_json %>"
      <% end %>
