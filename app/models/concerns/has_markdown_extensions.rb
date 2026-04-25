@@ -407,12 +407,17 @@ module HasMarkdownExtensions
     collection.where("json_extract(metadata, '$.category') = ?", category.strip)
   end
 
+  def apply_podcast_filter(collection, podcast_key)
+    collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip)
+  end
+
   def render_collection(config)
     heading = config[:heading]
     source = config[:source] || SiteConfig.default('collections', 'default_source') || "posts"
     order_by = config[:order] || SiteConfig.default('collections', 'default_order') || "date"
     tags = config[:tags]
     category = config[:category]
+    podcast_key = config[:podcast]
 
     # Get post_type from config or default, treating 'all' as nil (no filter)
     post_type = config[:post_type]
@@ -421,8 +426,9 @@ module HasMarkdownExtensions
     # Get base collection
     items = case source
     when 'posts'
-      collection = Post.public_posts
+      collection = Post.published.regular_posts
       collection = collection.by_type(post_type) if post_type
+      collection = apply_podcast_filter(collection, podcast_key) if podcast_key.present?
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "pages"
@@ -724,6 +730,7 @@ module HasMarkdownExtensions
     post_type = config[:post_type] unless config[:post_type] == 'all'
     order = config[:order]
     source = config[:source] || 'posts'  # ← ADD THIS
+    podcast_key = config[:podcast]
 
     # Build base URL
     base_url = if heading.present?
@@ -757,6 +764,9 @@ module HasMarkdownExtensions
 
     # Add order if non-default
     query_params << "order=#{order}" if order.present? && order != 'date'
+
+    # Add podcast key if present
+    query_params << "podcast=#{CGI.escape(podcast_key)}" if podcast_key.present?
 
     # Add exclude tags if present
     if tags.present?

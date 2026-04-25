@@ -37,6 +37,7 @@ Define reusable collection presets for navigation and indexes.
 | `source` | `posts`, `pages`, `documentation` | from collections.yml | Content source |
 | `limit` | number or `"all"` | `10` | Number of items to show |
 | `post_type` | `article`, `music`, `podcast`, `image`, `all` | `all` | Filter by post type |
+| `podcast` | podcast key (string) | — | Filter podcast episodes by show key (multi-podcast sites) |
 | `tags` | comma-separated | — | Include tags (OR logic) |
 | `exclude_tags` | comma-separated | — | Exclude tags |
 | `order` | `date`, `date-asc`, `title`, `filename` | `date` | Sort order |
@@ -115,6 +116,17 @@ exclude_tags: archived
 heading: Music
 source: posts
 post_type: music
+limit: 10
+```
+```
+
+**By podcast (multi-show sites):**
+```markdown
+```collection
+heading: My Show Episodes
+source: posts
+post_type: podcast
+podcast: my-show
 limit: 10
 ```
 ```

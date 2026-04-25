@@ -106,6 +106,13 @@ export default class extends Controller {
         this.contentTarget.classList.add("hidden");
         this.arrowTarget.textContent = "▶";
       }
+    } else {
+      // First visit in this tab — sync sessionStorage from the server-rendered
+      // visibility so the state survives the next save/redirect. Without this,
+      // a new post (rendered open via flash[:new_post]) collapses on first save
+      // because sessionStorage was never written.
+      const isHidden = this.contentTarget.classList.contains("hidden");
+      sessionStorage.setItem("metadataEditorOpen", String(!isHidden));
     }
   }
 

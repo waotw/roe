@@ -8,6 +8,7 @@ class CollectionsController < ApplicationController
     @source = params[:source] || 'posts'
     @order = params[:order] || 'date'
     @heading = params[:heading]
+    @podcast_key = params[:podcast]
 
     parse_filters
     fetch_items
@@ -66,12 +67,17 @@ class CollectionsController < ApplicationController
     when 'documentation'
       Documentation.public_documentation
     else
-      Post.public_posts
+      Post.published.regular_posts
     end
 
     # Apply post_type filter (only for posts)
     if @post_type && @source == 'posts'
       @items = @items.by_type(@post_type)
+    end
+
+    # Apply podcast filter (only for posts)
+    if @podcast_key.present? && @source == 'posts'
+      @items = @items.where("json_extract(metadata, '$.podcast') = ?", @podcast_key.strip)
     end
 
     # Apply positive tag filters (OR logic)

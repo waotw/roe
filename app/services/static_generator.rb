@@ -460,7 +460,7 @@ class StaticGenerator
   end
 
   def generate_posts_archive
-    posts = Post.public_posts.by_date
+    posts = Post.published.regular_posts.by_date
 
     generate_paginated_collection(
       items: posts,
@@ -527,12 +527,14 @@ class StaticGenerator
     heading = config[:heading]
     tags = config[:tags]
     post_type = config[:post_type] unless config[:post_type] == 'all'
+    podcast_key = config[:podcast]
 
     if heading.present?
       heading.parameterize
-    elsif post_type || tags.present?
+    elsif post_type || tags.present? || podcast_key.present?
       segments = []
       segments << "type-#{post_type.parameterize}" if post_type
+      segments << "podcast-#{podcast_key.parameterize}" if podcast_key.present?
 
       if tags.present?
         positive_tags = tags.split(',').map(&:strip).reject { |t| t.start_with?('-') }
@@ -555,11 +557,13 @@ class StaticGenerator
     tags = config[:tags]
     post_type = config[:post_type] unless config[:post_type] == 'all'
     order = config[:order] || 'date'
+    podcast_key = config[:podcast]
 
     items = case source
     when 'posts'
-      collection = Post.public_posts
+      collection = Post.published.regular_posts
       collection = collection.by_type(post_type) if post_type
+      collection = collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip) if podcast_key.present?
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when 'pages'
@@ -567,7 +571,7 @@ class StaticGenerator
     when 'documentation'
       Documentation.not_draft
     else
-      Post.public_posts
+      Post.published.regular_posts
     end
 
     # Apply paid content filter (before ordering!)

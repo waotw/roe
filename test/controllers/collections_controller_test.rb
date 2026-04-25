@@ -72,7 +72,7 @@ class CollectionsControllerTest < ActionDispatch::IntegrationTest
       create(:post, metadata: { 
         "title" => "Post #{i}", 
         "status" => "published", 
-        "date" => "2024-03-#{i+1.to_s.rjust(2, '0')}"
+        "date" => "2024-03-#{(i+1).to_s.rjust(2, '0')}"
       })
     end
     

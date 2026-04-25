@@ -11,7 +11,7 @@ document.addEventListener("turbo:load", function () {
     // Auto-dismiss after 3 seconds - just remove it
     setTimeout(function () {
       flash.remove();
-    }, 8000);
+    }, 4000);
 
     // Allow manual dismiss on click
     flash.style.cursor = "pointer";

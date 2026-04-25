@@ -152,6 +152,15 @@
   # doesn't resolve to a real file under site/media/.
   media_field_kinds = { 'audio' => 'audio', 'video' => 'video', 'image' => 'image', 'captions' => 'file' }
 
+  # Filename autocomplete options per media kind (composed alongside the
+  # media-field controller on the same input). Keys match media_field_kinds
+  # values; 'image' kind maps to media_type 'images' (plural in DB).
+  autocomplete_paths_by_kind = {
+    'audio' => Medium.originals_only.where(media_type: 'audio').pluck(:file_path).sort,
+    'video' => Medium.originals_only.where(media_type: 'video').pluck(:file_path).sort,
+    'image' => Medium.originals_only.where(media_type: 'images').pluck(:file_path).sort
+  }
+
   # For the initial render, pre-compute which media paths are already broken
   # so the warning shows on page load (matches the fonts pattern in
   # _config_font_roles.html.erb / system_assets_controller). Blur re-checks
@@ -270,19 +279,34 @@
                       <% end %>
                     </div>
                   <% elsif media_field_kinds.key?(field_name) %>
-                    <!-- Media text input with file-existence warning -->
-                    <div class="flex-1 flex flex-col gap-1"
-                         data-controller="media-field"
-                         data-media-field-kind-value="<%= media_field_kinds[field_name] %>">
+                    <%
+                      # Autocomplete is offered for kinds we have a clean
+                      # media_type mapping for (audio/video/image). The
+                      # 'captions' field uses kind='file' and is excluded.
+                      ac_paths = autocomplete_paths_by_kind[media_field_kinds[field_name]]
+                      ac_enabled = ac_paths.present?
+                    %>
+                    <!-- Media text input with file-existence warning + filename autocomplete -->
+                    <div class="flex-1 flex flex-col gap-1 <%= 'relative' if ac_enabled %>"
+                         data-controller="media-field<%= ' autocomplete' if ac_enabled %>"
+                         data-media-field-kind-value="<%= media_field_kinds[field_name] %>"
+                         <% if ac_enabled %>data-autocomplete-options-value="<%= ERB::Util.html_escape(ac_paths.to_json) %>"<% end %>>
                       <input type="text"
                               id="metadata-field-<%= field_name %>"
                               name="metadata_fields[<%= field_name %>]"
                               value="<%= ERB::Util.html_escape(display_value) %>"
+                              <% if ac_enabled %>autocomplete="off"<% end %>
                               class="w-full font-mono text-xs px-2 py-1 border border-gray-300 <%= 'border-red-400' if initial_missing_media[field_name] %>"
                               data-metadata-field="<%= field_name %>"
                               data-media-field-target="input"
-                              data-action="input->media-field#checkDebounced blur->media-field#check change->media-field#check"
+                              <% if ac_enabled %>data-autocomplete-target="input"<% end %>
+                              data-action="input->media-field#checkDebounced<% if ac_enabled %> input->autocomplete#filter keydown->autocomplete#navigate<% end %> blur->media-field#check change->media-field#check"
                               <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <% if ac_enabled %>
+                        <div data-autocomplete-target="dropdown"
+                             class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
+                        </div>
+                      <% end %>
                       <p class="text-xs text-red-600 <%= 'hidden' unless initial_missing_media[field_name] %>"
                          data-media-field-target="warning">
                         ⚠ File not found under <code>site/media/</code>.

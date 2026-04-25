@@ -80,8 +80,9 @@
     <% if flash.any? %>
       <% flash.each do |type, message| %>
         <% next unless ['notice', 'alert', 'error', 'success', 'warning'].include?(type.to_s) %>
-        <div data-flash-message class="flash-floating <%= type %>">
-          <%= message %>
+        <div data-flash-message class="flash-floating <%= type %>" title="Click to dismiss">
+          <span class="flash-message"><%= message %></span>
+          <span class="flash-close" aria-hidden="true">×</span>
         </div>
       <% end %>
     <% end %>
