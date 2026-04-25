@@ -57,6 +57,8 @@ class Post < ApplicationRecord
       metadata_fields: [
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to audio file (e.g., /media/audio/episode-1.mp3)" },
+        { name: "video", type: :text, label: "Video File",
+          hint: "Optional. Adds a video version of this episode (e.g., /media/video/episode-1.mp4). The site renders video when present; the RSS feed still uses the audio file." },
         { name: "duration", type: :text, required: true, label: "Duration",  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
         { name: "podcast", type: :select, required: true, label: "Podcast",
@@ -389,9 +391,31 @@ class Post < ApplicationRecord
   # Returns the subset of POST_TYPES required fields that are blank on this post.
   # Each entry is the original field hash from POST_TYPES (name/type/label/hint/options).
   def missing_type_required_fields
-    self.class.required_fields_for_type(post_type).reject do |field|
+    required = self.class.required_fields_for_type(post_type)
+    # Podcasts can be either-or on audio/video. When a video is set, the
+    # audio "required" flag is downgraded to a soft notice (see
+    # informational_notices) — the episode renders on the site as video
+    # and won't appear in the podcast RSS feed until audio is added.
+    if post_type == 'podcast' && metadata['video'].to_s.strip.present?
+      required = required.reject { |f| f[:name].to_s == 'audio' }
+    end
+    required.reject do |field|
       metadata[field[:name].to_s].to_s.strip.present?
     end
+  end
+
+  # Soft, non-blocking notices for the admin editor. Distinct from
+  # missing_type_required_fields and needs_attention? — these are FYIs
+  # that don't block save or publish, but give the user useful context
+  # about how the post will behave.
+  def informational_notices
+    notes = []
+    if post_type == 'podcast' &&
+       metadata['video'].to_s.strip.present? &&
+       metadata['audio'].to_s.strip.blank?
+      notes << "This episode will play on the site as video, but it won't appear in the podcast RSS feed until you add an audio file."
+    end
+    notes
   end
 
   # Metadata fields that point at files under site/media/…

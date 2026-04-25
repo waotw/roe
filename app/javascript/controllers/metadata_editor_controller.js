@@ -11,6 +11,7 @@ export default class extends Controller {
     resourceType: String,
     podcastConfigs: Object,
     productCategories: Array,
+    mediaPaths: Object,
   };
 
   static targets = [
@@ -491,6 +492,49 @@ export default class extends Controller {
                     <div data-autocomplete-target="dropdown"
                          class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">
                     </div>
+                  </div>`;
+        }
+
+        // Media fields (audio/video/image/captions): mirror the ERB
+        // partial's media-field + autocomplete wrapper so dynamically-added
+        // media fields behave identically to ones rendered on initial load.
+        const mediaFieldKinds = { audio: "audio", video: "video", image: "image", captions: "file" };
+        if (mediaFieldKinds[fieldName]) {
+          const kind = mediaFieldKinds[fieldName];
+          const paths = (this.hasMediaPathsValue && this.mediaPathsValue[kind]) || [];
+          const acEnabled = paths.length > 0;
+          const escapedPaths = JSON.stringify(paths).replace(/"/g, "&quot;");
+          const acControllers = acEnabled ? "media-field autocomplete" : "media-field";
+          const acOptionsAttr = acEnabled
+            ? `data-autocomplete-options-value="${escapedPaths}"`
+            : "";
+          const acTargetAttr = acEnabled ? 'data-autocomplete-target="input"' : "";
+          const acActionFragment = acEnabled
+            ? "input->autocomplete#filter keydown->autocomplete#navigate"
+            : "";
+          const dropdown = acEnabled
+            ? `<div data-autocomplete-target="dropdown" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto"></div>`
+            : "";
+
+          return `<div class="flex-1 flex flex-col gap-1 ${acEnabled ? "relative" : ""}"
+                       data-controller="${acControllers}"
+                       data-media-field-kind-value="${kind}"
+                       ${acOptionsAttr}>
+                    <input type="text"
+                           id="metadata-field-${fieldName}"
+                           name="metadata_fields[${fieldName}]"
+                           value="${escapedValue}"
+                           autocomplete="off"
+                           class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                           data-metadata-field="${fieldName}"
+                           data-media-field-target="input"
+                           ${acTargetAttr}
+                           data-action="input->media-field#checkDebounced ${acActionFragment} blur->media-field#check change->media-field#check"
+                           ${config.hint ? `placeholder="${config.hint}"` : ""}>
+                    ${dropdown}
+                    <p class="text-xs text-red-600 hidden" data-media-field-target="warning">
+                      ⚠ File not found under <code>site/media/</code>.
+                    </p>
                   </div>`;
         }
 
