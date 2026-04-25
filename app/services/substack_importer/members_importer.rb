@@ -231,6 +231,12 @@ module SubstackImporter
       member.metadata["substack_active_subscription"] = member_data[:active_subscription]
       member.metadata["substack_first_payment_at"] = member_data[:first_payment_at]
       member.metadata["substack_expiry"] = member_data[:expiry]
+      # Durable origin flag — survives even if the Import record is deleted
+      # and the import_id FK gets nilled. The newsletter resend filters use
+      # this as a backup so Substack-imported members are never sent a
+      # Substack-originated newsletter twice.
+      member.metadata["substack_imported"] = true
+      member.metadata["substack_imported_at"] ||= Time.current.iso8601
 
       begin
         member.save!

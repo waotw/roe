@@ -333,9 +333,11 @@ class Admin::PostsController < Admin::BaseController
                         .active
                         .where('subscribed_at > ?', last_send)
 
-    # If this is a Substack-imported post, exclude Substack-imported members
+    # If this is a Substack-imported post, exclude Substack-imported members.
+    # Belt-and-suspenders: import_id FK + durable metadata flag (the latter
+    # survives if the Import record is ever deleted).
     if @post.metadata['substack_post_id'].present?
-      new_members = new_members.where(import_id: nil)  # ← Fixed: was @new_members
+      new_members = new_members.where(import_id: nil).not_substack_imported
     end
 
     # Filter by audience if needed
@@ -370,9 +372,10 @@ class Admin::PostsController < Admin::BaseController
                         .active
                         .where.not(id: received_member_ids)
 
-    # If this is a Substack-imported post, exclude Substack-imported members
+    # If this is a Substack-imported post, exclude Substack-imported members.
+    # Belt-and-suspenders: import_id FK + durable metadata flag.
     if @post.metadata['substack_post_id'].present?
-      new_members = new_members.where(import_id: nil)  # ← Fixed: was @new_members, also moved before audience filter
+      new_members = new_members.where(import_id: nil).not_substack_imported
     end
 
     # Filter by audience if needed
@@ -410,9 +413,10 @@ class Admin::PostsController < Admin::BaseController
     # Filter by audience if needed
     @new_members = @new_members.paid_tier if @post.audience == 'paid'
 
-    # If this is a Substack-imported post, exclude Substack-imported members
+    # If this is a Substack-imported post, exclude Substack-imported members.
+    # Belt-and-suspenders: import_id FK + durable metadata flag.
     if @post.metadata['substack_post_id'].present?
-      @new_members = @new_members.where(import_id: nil)
+      @new_members = @new_members.where(import_id: nil).not_substack_imported
     end
 
     @new_members_count = @new_members.count
@@ -529,9 +533,10 @@ class Admin::PostsController < Admin::BaseController
       # Filter by audience if needed
       new_members = new_members.paid_tier if @post.audience == 'paid'
 
-      # If this is a Substack-imported post, exclude Substack-imported members
+      # If this is a Substack-imported post, exclude Substack-imported members.
+      # Belt-and-suspenders: import_id FK + durable metadata flag.
       if @post.metadata['substack_post_id'].present?
-        new_members = new_members.where(import_id: nil)
+        new_members = new_members.where(import_id: nil).not_substack_imported
       end
 
       @new_members_count = new_members.count

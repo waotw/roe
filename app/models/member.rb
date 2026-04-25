@@ -35,6 +35,14 @@ class Member < ApplicationRecord
   scope :newsletter_unsubscribed, -> { where(newsletter_status: :unsubscribed) }
   scope :newsletter_active, -> { active.newsletter_subscribed }
 
+  # Durable Substack-origin filter. Used by the resend filters in
+  # PostsController so a Substack-imported newsletter is never re-sent to
+  # members who originally received it via Substack — even if the Import
+  # record gets deleted and the import_id FK is nilled.
+  scope :not_substack_imported, -> {
+    where("json_extract(metadata, '$.substack_imported') IS NULL OR json_extract(metadata, '$.substack_imported') = 0")
+  }
+
   # Scope for newsletter recipients based on content audience
   scope :for_newsletter, ->(audience) {
     case audience

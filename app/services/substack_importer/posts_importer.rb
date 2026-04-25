@@ -182,12 +182,10 @@ module SubstackImporter
       Rails.logger.error e.backtrace.join("\n")
       @import.mark_failed!(e.message)
       false
-    ensure
-      # Cleanup extract directory
-      if @extractor
-        @extractor.cleanup
-      end
     end
+    # Note: don't clean up the extract directory here. Phases 3 (members) and
+    # 4 (deliveries) still need it. Cleanup happens via Import#cleanup_temp_files!
+    # when the import record is destroyed (see Admin::ImportsController#destroy).
 
     def rollback
       return false unless @import.can_rollback?
@@ -265,16 +263,11 @@ module SubstackImporter
       @stats[:media_downloaded] += 1 if local_media[:audio]
       @stats[:media_downloaded] += 1 if local_media[:video]
 
-      # For podcasts, extract real duration from the downloaded audio file.
-      # This replaces the unreliable `podcast_duration` value from Substack
-      # and matches what Roe's media-field controller does on user input.
-      if post.type == "podcast" && local_media[:audio].present?
-        audio_full_path = Rails.root.join("site", local_media[:audio].sub(%r{^/}, "")).to_s
-        if File.exist?(audio_full_path)
-          duration = MediaDurationExtractor.extract(audio_full_path)
-          local_media[:duration] = duration if duration.present?
-        end
-      end
+      # Duration is left blank at import time. The metadata-editor
+      # controller auto-extracts it from the audio file via the browser's
+      # HTML5 element on first page load (see autoExtractDurationIfMissing).
+      # Server-side extraction would require ffmpeg/streamio-ffmpeg which
+      # the project intentionally avoids depending on.
 
       # Track missing media
       if local_media[:missing].any?

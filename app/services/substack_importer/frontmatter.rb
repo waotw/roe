@@ -4,7 +4,9 @@ module SubstackImporter
   class Frontmatter
     def initialize(site_root:, default_published_to: nil)
       @site_root = site_root
-      @default_published_to = default_published_to
+      # Default to "site" when not set so imported posts always have a
+      # valid published_to and don't trigger missing-required warnings.
+      @default_published_to = default_published_to.presence || "site"
     end
 
     def build(post, local_media: {})
@@ -20,8 +22,7 @@ module SubstackImporter
       fm["audience"] = map_audience(post.audience)
 
       # published_to (posts only — pages are site-only by Roe convention).
-      # Skipped when the user picks "Don't assign" in the import config.
-      if post.type != "page" && @default_published_to.present? && @default_published_to != "dont_assign"
+      if post.type != "page"
         fm["published_to"] = @default_published_to
       end
 
@@ -30,10 +31,11 @@ module SubstackImporter
       image_path = local_media[:cover_image] || expected_image_path(post) || resolve_image_path(post)
       fm["image"] = image_path if image_path.present?
 
-      # Podcast-specific fields. Substack's `podcast_duration` is intentionally
-      # ignored — duration is extracted from the actual audio file in the
-      # importer (see PostsImporter#process_post) so the stored value matches
-      # the real file regardless of what Substack reported.
+      # Podcast-specific fields. Substack reports duration as a float in
+      # seconds (e.g. 2163.591) via its live JSON; we convert it to Roe's
+      # HH:MM:SS format. Source is `live_fetcher.rb` — only populated when
+      # an accurate base_url is configured so the live fetch can reach the
+      # publication.
       if post.type == "podcast"
         fm["episode_number"] = post.podcast_episode_number if post.podcast_episode_number
         fm["season"] = post.podcast_season_number if post.podcast_season_number
@@ -43,7 +45,15 @@ module SubstackImporter
         audio_path = local_media[:audio] || expected_audio_path(post)
         fm["audio"] = audio_path if audio_path.present?
 
-        fm["duration"] = local_media[:duration] if local_media[:duration].present?
+        if post.podcast_duration.present?
+          total_seconds = post.podcast_duration.to_f.to_i
+          fm["duration"] = format(
+            "%02d:%02d:%02d",
+            total_seconds / 3600,
+            (total_seconds % 3600) / 60,
+            total_seconds % 60
+          )
+        end
       end
 
       # Video-specific fields
@@ -115,7 +125,13 @@ module SubstackImporter
     def expected_image_path(post)
       return nil unless post.cover_image.present? || post.type == "newsletter" || post.type == "podcast"
 
-      # Determine extension from cover_image URL if available
+      # If a cover file already exists on disk, use its actual extension —
+      # avoids writing `.jpg` to frontmatter when the real file is `.jpeg`
+      # (or `.png`, `.webp`, etc.) due to a previous import or manual upload.
+      existing = Dir.glob(File.join(@site_root, "media", "images", "#{post.slug}-cover.*")).first
+      return "/media/images/#{File.basename(existing)}" if existing
+
+      # Otherwise determine extension from the cover_image URL if available
       ext = ".jpg"
       if post.cover_image.present?
         parsed_ext = File.extname(URI.parse(post.cover_image).path).downcase

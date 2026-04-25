@@ -21,7 +21,11 @@ class Import < ApplicationRecord
 
   has_many :posts, dependent: :nullify
   has_many :media, class_name: "Medium", dependent: :nullify
-  has_many :members, dependent: :nullify
+  # Members use :restrict_with_error so a direct destroy can't silently nil
+  # out import_id on imported members — that would defeat the resend filter
+  # in PostsController. To remove an import that created members, use the
+  # explicit `MembersImporter#rollback` action which destroys members first.
+  has_many :members, dependent: :restrict_with_error
 
   validates :source_type, presence: true
   validates :phase, numericality: { greater_than_or_equal_to: 1, less_than_or_equal_to: 4 }

@@ -88,11 +88,10 @@ class Admin::ImportsController < Admin::BaseController
 
   # Phase 3: Members Import
   def phase_3
-    # Check if email list CSV exists in the extract
-    extract_path = @import.extract_path
-    @has_email_list = extract_path.present? &&
-                      Dir.exist?(extract_path) &&
-                      Dir.glob(File.join(extract_path, "email_list*.csv")).any?
+    # Check if email list CSV exists. Prefer the extracted directory, but
+    # fall back to peeking inside the archive ZIP (the extract dir may have
+    # been cleaned up by an earlier version of the importer, or by hand).
+    @has_email_list = email_list_in_extract? || email_list_in_archive?
   end
 
   def phase_3_run
@@ -665,6 +664,25 @@ class Admin::ImportsController < Admin::BaseController
 
   def set_import
     @import = Import.find(params[:id])
+  end
+
+  def email_list_in_extract?
+    extract_path = @import.extract_path
+    extract_path.present? &&
+      Dir.exist?(extract_path) &&
+      Dir.glob(File.join(extract_path, "email_list*.csv")).any?
+  end
+
+  def email_list_in_archive?
+    archive_path = @import.archive_path
+    return false unless archive_path.present? && File.exist?(archive_path)
+
+    Zip::File.open(archive_path) do |zip|
+      zip.entries.any? { |e| File.basename(e.name).match?(/\Aemail_list.*\.csv\z/i) }
+    end
+  rescue => e
+    Rails.logger.warn "[SubstackImporter] Could not peek into archive #{archive_path}: #{e.message}"
+    false
   end
 
   def import_params

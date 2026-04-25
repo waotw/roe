@@ -39,6 +39,14 @@ class QueueNewsletterBatchesJob < ApplicationJob
       members  # Everyone gets it
     end
 
+    # Substack-imported posts: never send to Substack-imported members,
+    # even on a fresh publish. NewsletterSend records (from the deliveries
+    # importer) are the primary protection, but they only exist when the
+    # deliveries import was run. The metadata flag is the durable backup.
+    if post.metadata['substack_post_id'].present?
+      members = members.where(import_id: nil).not_substack_imported
+    end
+
     # Exclude members who already received this newsletter
     already_sent_ids = NewsletterSend.where(post: post).pluck(:member_id)
     members = members.where.not(id: already_sent_ids) if already_sent_ids.any?

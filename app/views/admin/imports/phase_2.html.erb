@@ -60,13 +60,12 @@
       <div class="mb-6">
         <h3 class="text-sm font-medium text-gray-700 mb-3">Newsletter Status</h3>
         <p class="text-sm text-gray-600 mb-3">Where should imported posts be published to? (Pages are always site-only.)</p>
-        <% selected = @import.options["default_published_to"].presence || "both" %>
+        <% selected = @import.options["default_published_to"].presence || "site" %>
         <div class="space-y-2">
           <% [
             ["site", "Site only"],
             ["newsletter", "Newsletter"],
-            ["both", "Both site and newsletter"],
-            ["dont_assign", "Don't assign — set per post manually"]
+            ["both", "Both site and newsletter"]
           ].each do |value, label| %>
             <div class="flex items-center">
               <%= radio_button_tag "import[options][default_published_to]", value, selected == value, class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" %>
@@ -75,7 +74,7 @@
           <% end %>
         </div>
         <div class="mt-3 bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-800">
-          <strong>Note:</strong> No newsletters or emails will be sent as part of this import. The <code>published_to</code> value is only used when you later publish a post from the editor.
+          <strong>Note:</strong> No newsletters or emails will be sent as part of this import. This sets the <code>published_to</code> field on each imported post; you can change it per post later in the editor.
         </div>
       </div>
       <div class="mb-6">
