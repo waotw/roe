@@ -130,7 +130,10 @@ module SubstackImporter
       )
 
       # Setup frontmatter builder
-      frontmatter = Frontmatter.new(site_root: site_root)
+      frontmatter = Frontmatter.new(
+        site_root: site_root,
+        default_published_to: @import.options["default_published_to"]
+      )
 
       # Setup converter
       converter = Converter.new(
@@ -261,6 +264,17 @@ module SubstackImporter
       @stats[:media_downloaded] += 1 if local_media[:cover_image]
       @stats[:media_downloaded] += 1 if local_media[:audio]
       @stats[:media_downloaded] += 1 if local_media[:video]
+
+      # For podcasts, extract real duration from the downloaded audio file.
+      # This replaces the unreliable `podcast_duration` value from Substack
+      # and matches what Roe's media-field controller does on user input.
+      if post.type == "podcast" && local_media[:audio].present?
+        audio_full_path = Rails.root.join("site", local_media[:audio].sub(%r{^/}, "")).to_s
+        if File.exist?(audio_full_path)
+          duration = MediaDurationExtractor.extract(audio_full_path)
+          local_media[:duration] = duration if duration.present?
+        end
+      end
 
       # Track missing media
       if local_media[:missing].any?

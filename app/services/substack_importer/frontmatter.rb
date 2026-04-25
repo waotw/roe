@@ -2,8 +2,9 @@
 
 module SubstackImporter
   class Frontmatter
-    def initialize(site_root:)
+    def initialize(site_root:, default_published_to: nil)
       @site_root = site_root
+      @default_published_to = default_published_to
     end
 
     def build(post, local_media: {})
@@ -18,21 +19,31 @@ module SubstackImporter
       fm["status"] = post.is_published ? "published" : "draft"
       fm["audience"] = map_audience(post.audience)
 
+      # published_to (posts only — pages are site-only by Roe convention).
+      # Skipped when the user picks "Don't assign" in the import config.
+      if post.type != "page" && @default_published_to.present? && @default_published_to != "dont_assign"
+        fm["published_to"] = @default_published_to
+      end
+
       # Image: always add expected path (even if file doesn't exist yet)
       # This allows missing media manager to verify/fix later
       image_path = local_media[:cover_image] || expected_image_path(post) || resolve_image_path(post)
       fm["image"] = image_path if image_path.present?
 
-      # Podcast-specific fields
+      # Podcast-specific fields. Substack's `podcast_duration` is intentionally
+      # ignored — duration is extracted from the actual audio file in the
+      # importer (see PostsImporter#process_post) so the stored value matches
+      # the real file regardless of what Substack reported.
       if post.type == "podcast"
-        fm["podcast_duration"] = post.podcast_duration if post.podcast_duration
-        fm["podcast_episode_number"] = post.podcast_episode_number if post.podcast_episode_number
-        fm["podcast_season_number"] = post.podcast_season_number if post.podcast_season_number
-        fm["podcast_episode_type"] = post.podcast_episode_type.to_s if post.podcast_episode_type
+        fm["episode_number"] = post.podcast_episode_number if post.podcast_episode_number
+        fm["season"] = post.podcast_season_number if post.podcast_season_number
+        fm["episode_type"] = post.podcast_episode_type.to_s if post.podcast_episode_type
 
         # Audio: always add expected path
         audio_path = local_media[:audio] || expected_audio_path(post)
         fm["audio"] = audio_path if audio_path.present?
+
+        fm["duration"] = local_media[:duration] if local_media[:duration].present?
       end
 
       # Video-specific fields

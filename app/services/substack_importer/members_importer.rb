@@ -182,31 +182,18 @@ module SubstackImporter
     end
 
     def filter_members(members)
-      filtered = []
-
-      members.each do |member|
-        # Import if active_subscription = TRUE OR email_disabled = FALSE
-        if member[:active_subscription] || !member[:email_disabled]
-          filtered << member
-        else
-          @stats[:members_discarded] += 1
-        end
+      # All rows with an email are imported. `active_subscription` and
+      # `email_disabled` are independent signals: tier comes from `plan`
+      # (see determine_tier), newsletter subscription comes from
+      # `email_disabled` (see process_member). A free member who turned
+      # off emails is still a member — they just read on the site.
+      members.reject { |m| m[:email].blank? }.tap do |kept|
+        @stats[:members_discarded] = members.count - kept.count
       end
-
-      filtered
     end
 
     def process_member(member_data)
-      email = member_data[:email]
-
-      Rails.logger.debug "[SubstackImporter] Raw email from CSV: '#{email}'"
-
-      if email.blank?
-        Rails.logger.warn "[SubstackImporter] Skipping blank email"
-        return
-      end
-
-      email = email.to_s.downcase.strip
+      email = member_data[:email].to_s.downcase.strip
       Rails.logger.debug "[SubstackImporter] Processing member: #{email}"
 
       # Extract name from email (everything before @)
@@ -226,7 +213,7 @@ module SubstackImporter
       member.newsletter_status = member_data[:email_disabled] ? :unsubscribed : :subscribed
 
       # Tier determination
-      tier = determine_tier(member_data[:plan])
+      tier = determine_tier(member_data)
       member.tier = tier
 
       # Timestamps
@@ -271,21 +258,38 @@ module SubstackImporter
       end
     end
 
-    def determine_tier(plan)
+    def determine_tier(member_data)
+      plan = member_data[:plan]
       return :free unless plan.present?
 
       options = @import.options || {}
 
-      case plan
-      when "lifetime"
-        options["auto_gift_lifetime"] ? :paid : :free
-      when "monthly", "quarterly", "semiannually", "yearly", "ios_app"
-        options["auto_gift_paid"] ? :paid : :free
-      when "comp", "other"
-        :free
-      else
-        :free
-      end
+      base_tier = case plan
+                  when "lifetime"
+                    options["auto_gift_lifetime"] ? :paid : :free
+                  when "monthly", "quarterly", "semiannually", "yearly", "ios_app"
+                    options["auto_gift_paid"] ? :paid : :free
+                  else  # comp, other, unknown
+                    :free
+                  end
+
+      # Only honor a paid grant if the Substack subscription is actually
+      # effective right now. Without this, a lapsed monthly subscriber
+      # (plan=monthly, active_subscription=false, expiry past) would still
+      # be imported as paid just because their plan column says "monthly".
+      return :free if base_tier == :paid && !subscription_effective?(member_data)
+
+      base_tier
+    end
+
+    def subscription_effective?(member_data)
+      return true if member_data[:active_subscription]
+
+      expiry = member_data[:expiry]
+      return false if expiry.blank?
+
+      parsed = Time.parse(expiry) rescue nil
+      parsed.present? && parsed > Time.current
     end
   end
 end
