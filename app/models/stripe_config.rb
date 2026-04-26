@@ -30,6 +30,14 @@ class StripeConfig < ApplicationRecord
     decrypt(self[:secret_key_live])
   end
 
+  def webhook_signing_secret_test
+    decrypt(self[:webhook_signing_secret_test])
+  end
+
+  def webhook_signing_secret_live
+    decrypt(self[:webhook_signing_secret_live])
+  end
+
   # Encrypted setters (encrypt when writing)
   def publishable_key_test=(value)
     self[:publishable_key_test] = encrypt(value)
@@ -47,6 +55,14 @@ class StripeConfig < ApplicationRecord
     self[:secret_key_live] = encrypt(value)
   end
 
+  def webhook_signing_secret_test=(value)
+    self[:webhook_signing_secret_test] = encrypt(value)
+  end
+
+  def webhook_signing_secret_live=(value)
+    self[:webhook_signing_secret_live] = encrypt(value)
+  end
+
   # Get the active keys based on current mode
   def current_publishable_key
     mode_test? ? publishable_key_test : publishable_key_live
@@ -54,6 +70,23 @@ class StripeConfig < ApplicationRecord
 
   def current_secret_key
     mode_test? ? secret_key_test : secret_key_live
+  end
+
+  # The webhook signing secret for the currently active mode. Used by
+  # WebhooksController to verify that incoming webhook events were
+  # actually sent by Stripe (not a forgery from someone who guessed the
+  # endpoint URL).
+  def current_webhook_signing_secret
+    mode_test? ? webhook_signing_secret_test : webhook_signing_secret_live
+  end
+
+  # Options hash to pass as the trailing argument to any Stripe SDK call,
+  # so each request uses the *currently configured* secret key. Without
+  # this we'd fall back to the global Stripe.api_key, which is set once
+  # at boot and goes stale the moment the writer switches test↔live in
+  # the admin UI.
+  def self.request_options
+    { api_key: current.current_secret_key }
   end
 
   # Check if Stripe is connected
@@ -80,7 +113,7 @@ class StripeConfig < ApplicationRecord
   def fetch_currency!
     return unless connected?
 
-    account = Stripe::Account.retrieve
+    account = Stripe::Account.retrieve({}, api_key: current_secret_key)
     update!(currency: account.default_currency)
   rescue Stripe::StripeError => e
     Rails.logger.error "Failed to fetch Stripe currency: #{e.message}"

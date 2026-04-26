@@ -146,8 +146,10 @@ class Member < ApplicationRecord
     "#{words.sample}-#{words.sample}-#{words.sample}-#{rand(10..99)}"
   end
 
-  # Upgrade to paid tier with Stripe payment
-  def upgrade_to_paid_with_stripe!(customer_id:, payment_intent_id:, password:)
+  # Upgrade to paid tier with Stripe payment. The amount snapshot is
+  # optional for back-compat — older callers (and any test stubs) may
+  # not pass it; the dashboard treats nil as "amount unknown".
+  def upgrade_to_paid_with_stripe!(customer_id:, payment_intent_id:, password:, amount_cents: nil, currency: nil)
     transaction do
       update!(
         tier: :paid,
@@ -155,7 +157,9 @@ class Member < ApplicationRecord
         password_confirmation: password,
         stripe_customer_id: customer_id,
         stripe_payment_intent_id: payment_intent_id,
-        paid_at: Time.current
+        paid_at: Time.current,
+        paid_amount_cents: amount_cents,
+        paid_currency: currency
       )
     end
   end
@@ -169,7 +173,7 @@ class Member < ApplicationRecord
   def stripe_customer
     return nil unless stripe_customer?
 
-    @stripe_customer ||= Stripe::Customer.retrieve(stripe_customer_id)
+    @stripe_customer ||= Stripe::Customer.retrieve(stripe_customer_id, StripeConfig.request_options)
   rescue Stripe::InvalidRequestError
     nil
   end

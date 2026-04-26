@@ -30,6 +30,15 @@ module Admin
         update_params[:secret_key_live] = params[:stripe_config][:secret_key_live]
       end
 
+      # Webhook signing secrets (one per mode)
+      if params[:stripe_config][:webhook_signing_secret_test].present?
+        update_params[:webhook_signing_secret_test] = params[:stripe_config][:webhook_signing_secret_test]
+      end
+
+      if params[:stripe_config][:webhook_signing_secret_live].present?
+        update_params[:webhook_signing_secret_live] = params[:stripe_config][:webhook_signing_secret_live]
+      end
+
       # Mode
       if params[:stripe_config][:mode].present?
         update_params[:mode] = params[:stripe_config][:mode]

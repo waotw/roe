@@ -70,7 +70,7 @@
     </script>
     <%= javascript_importmap_tags %>
   </head>
-  <body class="bg-gray-100 min-w-185.5">
+  <body class="bg-[#fffdf9] min-w-185.5">
     <% if warning = duplicate_sku_warning %>
       <div class="admin-warning-bar bg-red-100 border-l-4 border-red-500 text-red-700 p-4 font-mono text-xs">
         <p class="">⚠️ Store Issue: <%= warning[:message] %> <%= link_to "View and fix →", warning[:path], class: "underline" %>

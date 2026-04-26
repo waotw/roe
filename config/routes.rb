@@ -221,6 +221,11 @@ Rails.application.routes.draw do
   get "checkout/success", to: "checkout#success", as: :checkout_success
   get "checkout/cancel", to: "checkout#cancel", as: :checkout_cancel
 
+  # Public donations (one-time, anonymous-friendly support payments)
+  post "donate", to: "donations#create", as: :create_donation
+  get "donate/success", to: "donations#success", as: :donation_success
+  get "donate/cancel", to: "donations#cancel", as: :donation_cancel
+
   # Public site
   root "posts#index"
 

@@ -1183,6 +1183,8 @@ module HasMarkdownExtensions
       render_checkout_form(member_text, non_member_text)
     when 'unsubscribe'  # ADD THIS
       render_unsubscribe_form(button_text)
+    when 'donate'
+      render_donate_form(button_text)
     else
       ""
     end
@@ -1195,8 +1197,55 @@ module HasMarkdownExtensions
     {
       'signup' => 'Sign Up',
       'signin' => 'Sign In',
-      'checkout' => 'Upgrade'
+      'checkout' => 'Upgrade',
+      'donate' => 'Donate'
     }[form_type] || 'Submit'
+  end
+
+  def render_donate_form(button_text)
+    return "" unless SiteFeature.donations_enabled?
+
+    currency = (StripeConfig.current.currency.presence || "usd").upcase
+
+    # Buttons render with bare amounts; the donate-form Stimulus
+    # controller hydrates them with localized currency labels on
+    # connect. This avoids a flash of wrong-currency symbols on
+    # non-USD sites.
+    presets = SiteFeature.donation_amounts.map do |amt|
+      <<~HTML.strip
+        <button type="button"
+                class="donate-preset"
+                data-donate-form-target="preset"
+                data-action="click->donate-form#select"
+                data-amount="#{amt}">#{amt}</button>
+      HTML
+    end.join("\n      ")
+
+    <<~HTML
+      <form action="/donate"
+            method="post"
+            class="donate-form"
+            data-controller="donate-form"
+            data-donate-form-currency-value="#{currency}"
+            data-turbo="false">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+        <div class="donate-presets">
+          #{presets}
+        </div>
+        <div class="form-field">
+          <label for="donate_amount">Amount (#{currency})</label>
+          <input type="text"
+                 name="amount"
+                 id="donate_amount"
+                 data-donate-form-target="input"
+                 inputmode="decimal"
+                 placeholder="0.00"
+                 required
+                 pattern="\\d+(\\.\\d{1,3})?">
+        </div>
+        <button type="submit" class="donate-button btn-primary">#{button_text}</button>
+      </form>
+    HTML
   end
 
   def render_unsubscribe_form(button_text)

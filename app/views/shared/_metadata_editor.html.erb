@@ -40,7 +40,7 @@
         label: 'audience',
         options: ['everyone', 'paid'],
         hint: 'Who should see/receive this post?',
-        required: payments_enabled?
+        required: memberships_enabled?
       },
       'published_to' => {
         type: :select,
@@ -114,7 +114,7 @@
         label: 'audience',
         options: ['everyone', 'paid'],
         hint: 'Who should see this page?',
-        required: payments_enabled?
+        required: memberships_enabled?
       },
       'image' => { type: :text, label: 'image' },
       'excerpt' => { type: :textarea, label: 'excerpt' }
@@ -136,7 +136,7 @@
   #   - published_to: posts only (pages don't go out as newsletters),
   #     when newsletters are enabled
   if resource_type == 'post' || resource_type == 'page'
-    metadata_hash['audience'] = '' if payments_enabled? && !metadata_hash.key?('audience')
+    metadata_hash['audience'] = '' if memberships_enabled? && !metadata_hash.key?('audience')
   end
   if resource_type == 'post'
     metadata_hash['published_to'] = '' if newsletters_enabled? && !metadata_hash.key?('published_to')

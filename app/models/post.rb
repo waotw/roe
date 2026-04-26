@@ -468,7 +468,7 @@ class Post < ApplicationRecord
   # the admin warning catches file-edit-bypass cases.
   def missing_site_gated_fields
     gaps = []
-    if SiteFeature.payments_enabled? && metadata['audience'].to_s.strip.blank?
+    if SiteFeature.memberships_enabled? && metadata['audience'].to_s.strip.blank?
       gaps << 'audience'
     end
     if SiteFeature.newsletters_enabled? && metadata['published_to'].to_s.strip.blank?

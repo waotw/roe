@@ -260,7 +260,7 @@ class Admin::ConfigsController < ApplicationController
     # how posts and pages auto-surface their site-gated fields). Empty
     # values save as `audience: ""` and the publish modal prompts before
     # anything goes live.
-    if helpers.payments_enabled?
+    if helpers.memberships_enabled?
       @config_hash.each do |key, podcast|
         next unless podcast.is_a?(Hash)
         podcast['audience'] ||= '' unless podcast.key?('audience')
@@ -551,6 +551,7 @@ class Admin::ConfigsController < ApplicationController
   def build_field_options_for_members
     {
       'payments.enabled' => ['false', 'true'],
+      'payments.mode' => ['memberships', 'donations', 'both'],
       'newsletter.enabled' => ['false', 'true'],
       'everyone.show_paid_content' => ['true', 'false']
     }
@@ -576,8 +577,10 @@ class Admin::ConfigsController < ApplicationController
     currency = stripe_config.connected? ? stripe_config.default_currency.upcase : 'USD'
 
     {
-      'payments.enabled' => 'Turn on paid memberships (requires connection to your Stripe account)',
-      'payments.price' => "One-time payment amount in #{currency} (e.g., 49.00)",
+      'payments.enabled' => 'Turn on the payments system (requires connection to your Stripe account). Then choose what you want to offer in the mode field below.',
+      'payments.mode' => 'memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.',
+      'payments.price' => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
+      'payments.donation_amounts' => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
       'newsletter.enabled' => 'Enable newsletter sending via Postmark (requires Postmark account & configuration)',
       'everyone.show_paid_content' => 'Show paid content to public visitors and free members'
     }

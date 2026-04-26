@@ -30,23 +30,21 @@ module AdminHelper
 
   def build_member_links
     member_links = {}
-    pages_path = Rails.root.join('site', 'pages')
 
-    # Member page mappings
-    member_pages = {
-      'signup.md' => 'Sign Up',
-      'signin.md' => 'Sign In'
-    }
+    member_links["Sign Up"] = "/#{find_member_page('signup').url_name}" if find_member_page('signup')
+    member_links["Sign In"] = "/#{find_member_page('signin').url_name}" if find_member_page('signin')
 
-    member_pages.each do |filename, label|
-      page = Page.find_by(file_path: pages_path.join(filename).to_s)
-      member_links[label] = "/#{page.url_name}" if page
+    # Upgrade page only when memberships path is enabled and Stripe is hooked up.
+    if SiteFeature.memberships_enabled? && stripe_membership_ready?
+      upgrade = find_member_page('upgrade')
+      member_links["Upgrade to Paid"] = "/#{upgrade.url_name}" if upgrade
     end
 
-    # Add upgrade if payments enabled
-    if payments_enabled_with_stripe?
-      upgrade_page = Page.find_by(file_path: pages_path.join('upgrade.md').to_s)
-      member_links["Upgrade to Paid"] = "/#{upgrade_page.url_name}" if upgrade_page
+    # Donation page only when donations path is enabled. Donations don't
+    # need the membership price_id; just a connected Stripe account.
+    if SiteFeature.donations_enabled? && StripeConfig.current.connected?
+      donate = find_member_page('donate')
+      member_links["Support / Donate"] = "/#{donate.url_name}" if donate
     end
 
     member_links
@@ -54,10 +52,18 @@ module AdminHelper
 
   private
 
-  def payments_enabled_with_stripe?
-    payments_config = SiteConfig.current('defaults/members')&.config&.dig('payments')
-    return false unless payments_config && payments_config['enabled'] == true
+  # Member-facing pages currently live in two places — site/pages/<name>.md
+  # (legacy) and site/pages/members/<name>.md (canonical going forward).
+  # Prefer the new location, fall back to the legacy one.
+  def find_member_page(stem)
+    pages_path = Rails.root.join('site', 'pages')
+    [ pages_path.join('members', "#{stem}.md"), pages_path.join("#{stem}.md") ]
+      .map { |p| Page.find_by(file_path: p.to_s) }
+      .compact
+      .first
+  end
 
+  def stripe_membership_ready?
     stripe_config = StripeConfig.current
     stripe_config.connected? && stripe_config.price_id.present?
   end

@@ -72,7 +72,7 @@ class Page < ApplicationRecord
   # be set on a published page. Pages support paid audience but never
   # newsletter delivery, so we only check audience here.
   def missing_site_gated_fields
-    return [] unless SiteFeature.payments_enabled?
+    return [] unless SiteFeature.memberships_enabled?
     metadata['audience'].to_s.strip.blank? ? [ 'audience' ] : []
   end
 

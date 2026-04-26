@@ -1,9 +1,15 @@
 <div class="max-w-3xl mx-auto p-8 bg-white">
-  <div class="mb-6">
+  <div class="mb-6 flex justify-between items-center">
+    <div>
     <h2 class="text-xl font-semibold text-gray-900 mb-2">Stripe Configuration</h2>
     <p class="text-sm text-gray-600">
       Connect your Stripe account to accept payments for paid memberships.
     </p>
+    </div>
+    <div>
+      <%= link_to "← Back to Configs", admin_configs_path,
+                  class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+    </div>
   </div>
 
   <%= form_with model: @stripe_config, url: admin_stripe_config_path, method: :patch, class: "space-y-8" do |form| %>
@@ -54,6 +60,24 @@
                                   placeholder: "sk_test_..." %>
           <p class="text-xs text-gray-500 mt-1">Starts with sk_test_ (kept secret)</p>
         </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Webhook Signing Secret (Test)
+          </label>
+          <%= form.password_field :webhook_signing_secret_test,
+                                  value: @stripe_config.webhook_signing_secret_test,
+                                  class: "w-full font-mono text-sm p-2 border border-gray-300",
+                                  placeholder: "whsec_..." %>
+          <p class="text-xs text-gray-500 mt-1">
+            Starts with whsec_. Get this when you create a webhook endpoint in
+            <a href="https://dashboard.stripe.com/test/webhooks" target="_blank" class="text-blue-600 underline">
+              Stripe Dashboard → Developers → Webhooks
+            </a>.
+            Point the endpoint at <code><%= "#{request.base_url}/webhooks/stripe" %></code>
+            and subscribe to <code>checkout.session.completed</code>.
+          </p>
+        </div>
       </div>
     </div>
 
@@ -86,6 +110,23 @@
                                   placeholder: "sk_live_..." %>
           <p class="text-xs text-gray-500 mt-1">Starts with sk_live_ (kept secret)</p>
         </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Webhook Signing Secret (Live)
+          </label>
+          <%= form.password_field :webhook_signing_secret_live,
+                                  value: @stripe_config.webhook_signing_secret_live,
+                                  class: "w-full font-mono text-sm p-2 border border-gray-300",
+                                  placeholder: "whsec_..." %>
+          <p class="text-xs text-gray-500 mt-1">
+            Starts with whsec_. Get this from a separate Live-mode webhook endpoint at
+            <a href="https://dashboard.stripe.com/webhooks" target="_blank" class="text-blue-600 underline">
+              Stripe Dashboard → Developers → Webhooks
+            </a>.
+            Test and Live each have their own webhook endpoints and signing secrets.
+          </p>
+        </div>
       </div>
     </div>
 
@@ -115,8 +156,8 @@
       <%= form.submit "Save Configuration",
                       class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
 
-      <%= link_to "Back to Configs", admin_configs_path,
-                  class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+      <%= link_to "Cancel", admin_configs_path,
+                  class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
     </div>
   <% end %>
 

@@ -18,17 +18,20 @@ class CheckoutController < ApplicationController
 
     # Create Stripe Checkout Session
     session = Stripe::Checkout::Session.create(
-      customer_email: current_member.email,
-      mode: 'payment',
-      line_items: [{
-        price: stripe_config.price_id,
-        quantity: 1
-      }],
-      success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: checkout_cancel_url,
-      metadata: {
-        member_id: current_member.id
-      }
+      {
+        customer_email: current_member.email,
+        mode: 'payment',
+        line_items: [{
+          price: stripe_config.price_id,
+          quantity: 1
+        }],
+        success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: checkout_cancel_url,
+        metadata: {
+          member_id: current_member.id
+        }
+      },
+      StripeConfig.request_options
     )
 
     redirect_to session.url, allow_other_host: true

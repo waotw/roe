@@ -40,18 +40,21 @@ module Members
 
         begin
           checkout_session = Stripe::Checkout::Session.create(
-            customer_email: @member.email,
-            line_items: [{
-              price: stripe_config.price_id,
-              quantity: 1
-            }],
-            mode: 'payment',
-            success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url: checkout_cancel_url,
-            metadata: {
-              member_id: @member.id,
-              member_email: @member.email
-            }
+            {
+              customer_email: @member.email,
+              line_items: [{
+                price: stripe_config.price_id,
+                quantity: 1
+              }],
+              mode: 'payment',
+              success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
+              cancel_url: checkout_cancel_url,
+              metadata: {
+                member_id: @member.id,
+                member_email: @member.email
+              }
+            },
+            StripeConfig.request_options
           )
 
           redirect_to checkout_session.url, allow_other_host: true

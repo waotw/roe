@@ -1,41 +1,127 @@
-<div class="px-4 sm:px-0 font-mono">
-  <h1 class="text-3xl font-bold text-gray-900 mb-6 font-sans">Dashboard</h1>
+<div class="font-mono text-sm text-gray-800 bg-[#fffdf9] px-4 sm:px-0 max-w-4xl tabular-nums">
 
-  <!-- Stats Table -->
-  <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-gray-300 border border-gray-300">
-      <thead class="bg-gray-50">
-        <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Content Type</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Count</th>
+  <!-- Top header bar -->
+  <div class="flex justify-between items-baseline border-2 border-gray-800 px-3 py-1.5 mb-6">
+    <h1 class="text-base font-bold tracking-widest uppercase">Roe&nbsp;::&nbsp;Dashboard</h1>
+    <span class="text-xs text-gray-500"><%= Time.current.strftime("%Y-%m-%d  %H:%M") %></span>
+  </div>
+
+  <!-- ─── CONTENT ─── -->
+  <div class="relative border-2 border-gray-800 mb-8">
+    <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
+      ── Content ──
+    </div>
+
+    <table class="w-full  bg-[#fffdf9]">
+      <thead>
+        <tr class="border-b border-gray-300 text-xs uppercase tracking-wider text-gray-500">
+          <th class="px-4 pt-4 pb-2 text-left font-semibold">Type</th>
+          <th class="px-4 pt-4 pb-2 text-right font-semibold w-32">Count</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200 bg-white">
-        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-            <%= link_to "Total Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-900" %>
+      <tbody>
+        <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
+          <td class="px-4 py-1.5">
+            <%= link_to "Total Posts", admin_posts_path, class: "text-blue-700 hover:underline" %>
           </td>
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @posts_count %></td>
+          <td class="px-4 py-1.5 text-right"><%= @posts_count %></td>
         </tr>
-        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-            <%= link_to "Published Posts", admin_posts_path, class: "text-blue-600 hover:text-blue-900" %>
+        <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
+          <td class="px-4 py-1.5">
+            <%= link_to "Published Posts", admin_posts_path, class: "text-blue-700 hover:underline" %>
           </td>
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @published_posts_count %></td>
+          <td class="px-4 py-1.5 text-right"><%= @published_posts_count %></td>
         </tr>
-        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= drafts_admin_posts_path %>'">
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-            <%= link_to "Draft Posts", drafts_admin_posts_path, class: "text-blue-600 hover:text-blue-900" %>
+        <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_posts_path(type: 'article', status: 'draft', sort: 'updated-desc') %>'">
+          <td class="px-4 py-1.5">
+            <%= link_to "Draft Posts", admin_posts_path(type: 'article', status: 'draft', sort: 'updated-desc'), class: "text-blue-700 hover:underline" %>
           </td>
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @draft_posts_count %></td>
+          <td class="px-4 py-1.5 text-right"><%= @draft_posts_count %></td>
         </tr>
-        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='<%= admin_pages_path %>'">
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-            <%= link_to "Pages", admin_pages_path, class: "text-blue-600 hover:text-blue-900" %>
+        <tr class="hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_pages_path %>'">
+          <td class="px-4 py-1.5 pb-3">
+            <%= link_to "Pages", admin_pages_path, class: "text-blue-700 hover:underline" %>
           </td>
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= @pages_count %></td>
+          <td class="px-4 py-1.5 pb-3 text-right"><%= @pages_count %></td>
         </tr>
       </tbody>
     </table>
   </div>
+
+  <!-- ─── PAYMENTS ─── -->
+  <% if SiteFeature.payments_enabled? %>
+    <div class="relative border-2 border-gray-800">
+      <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
+        ── Payments ──
+      </div>
+
+      <% if @open_disputes_count.to_i > 0 %>
+        <div class="m-3 mt-4 px-3 py-2 border-2 border-amber-500 bg-amber-50 text-xs flex items-center justify-between">
+          <span class="text-amber-900">
+            ⚠ <strong><%= pluralize(@open_disputes_count, "OPEN DISPUTE") %></strong> — REVIEW IN STRIPE BEFORE DEADLINE
+          </span>
+          <a href="<%= @stripe_disputes_url %>" target="_blank" rel="noopener" class="text-amber-900 underline whitespace-nowrap">
+            [ View in Stripe → ]
+          </a>
+        </div>
+      <% end %>
+
+      <table class="w-full  bg-[#fffdf9]">
+        <thead>
+          <tr class="border-b border-gray-300 text-xs uppercase tracking-wider text-gray-500">
+            <th class="px-4 pt-4 pb-2 text-left font-semibold">Source</th>
+            <th class="px-4 pt-4 pb-2 text-right font-semibold w-20">Count</th>
+            <th class="px-4 pt-4 pb-2 text-right font-semibold w-44">Total</th>
+            <th class="px-4 pt-4 pb-2 text-right font-semibold w-40"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if SiteFeature.memberships_enabled? %>
+            <tr class="border-b border-dashed border-gray-200">
+              <td class="px-4 py-1.5">Paid memberships</td>
+              <td class="px-4 py-1.5 text-right text-gray-500"><%= @paid_members_count %></td>
+              <td class="px-4 py-1.5 text-right text-emerald-700">
+                +&nbsp;<%= number_to_currency(@membership_revenue_cents.to_i / 100.0, unit: (@membership_currency || 'usd').upcase + ' ') %>
+                <% if @membership_untracked_count.to_i > 0 %>
+                  <span class="text-xs text-gray-400 ml-1">(+<%= @membership_untracked_count %> pre-tracking)</span>
+                <% end %>
+              </td>
+              <td></td>
+            </tr>
+          <% end %>
+          <% if SiteFeature.donations_enabled? %>
+            <tr class="border-b border-dashed border-gray-200">
+              <td class="px-4 py-1.5">Donations</td>
+              <td class="px-4 py-1.5 text-right text-gray-500"><%= @donations_count %></td>
+              <td class="px-4 py-1.5 text-right text-emerald-700">
+                +&nbsp;<%= number_to_currency(@donations_total_cents.to_i / 100.0, unit: (@donations_currency || 'usd').upcase + ' ') %>
+              </td>
+              <td></td>
+            </tr>
+          <% end %>
+          <% if @refunds_count.to_i > 0 %>
+            <tr class="border-b border-dashed border-gray-200">
+              <td class="px-4 py-1.5">Refunds</td>
+              <td class="px-4 py-1.5 text-right text-gray-500"><%= @refunds_count %></td>
+              <td class="px-4 py-1.5 text-right text-rose-700">
+                −&nbsp;<%= number_to_currency(@refunds_total_cents.to_i / 100.0, unit: (@refunds_currency || 'usd').upcase + ' ') %>
+              </td>
+              <td class="px-4 py-1.5 text-right">
+                <a href="<%= @stripe_refunds_url %>" target="_blank" rel="noopener" class="text-blue-700 hover:underline text-xs whitespace-nowrap">[ View in Stripe → ]</a>
+              </td>
+            </tr>
+          <% end %>
+          <tr class="border-t-2 border-gray-800 bg-stone-600 text-[#fffdf9]">
+            <td class="px-4 py-2 font-bold uppercase tracking-wider">Total</td>
+            <td class="px-4 py-2 text-right font-bold"><%= @total_transactions_count %></td>
+            <td class="px-4 py-2 text-right font-bold">
+              <%= number_to_currency(@total_amount_cents / 100.0, unit: (@total_currency || 'usd').upcase + ' ') %>
+            </td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
 </div>

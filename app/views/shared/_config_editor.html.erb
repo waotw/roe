@@ -945,6 +945,13 @@
       return strValue;
     }
 
+    // Flow-style numeric arrays like "[5, 10, 20, 50]" — emit unquoted
+    // so YAML parses them as a real Array. Without this they'd be saved
+    // as a literal string and any consumer would have to re-parse.
+    if (/^\[\s*\d+(\.\d+)?(\s*,\s*\d+(\.\d+)?)*\s*\]$/.test(strValue.trim())) {
+      return strValue.trim();
+    }
+
     // Multi-line strings (block scalar)
     if (strValue.includes('\n')) {
       return null; // Signal to use block scalar format

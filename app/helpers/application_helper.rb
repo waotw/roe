@@ -32,20 +32,23 @@ module ApplicationHelper
 
   # Feature flag predicates — delegated to SiteFeature so models can use
   # the same checks without pulling in the helper context.
-  def members_enabled?      = SiteFeature.members_enabled?
-  def payments_enabled?     = SiteFeature.payments_enabled?
-  def newsletters_enabled?  = SiteFeature.newsletters_enabled?
-  def postmark_configured?  = SiteFeature.postmark_configured?
-  def store_enabled?        = SiteFeature.store_enabled?
+  def members_enabled?       = SiteFeature.members_enabled?
+  def payments_enabled?      = SiteFeature.payments_enabled?
+  def memberships_enabled?   = SiteFeature.memberships_enabled?
+  def donations_enabled?     = SiteFeature.donations_enabled?
+  def newsletters_enabled?   = SiteFeature.newsletters_enabled?
+  def postmark_configured?   = SiteFeature.postmark_configured?
+  def store_enabled?         = SiteFeature.store_enabled?
 
   def snipcart_connected?
     store_enabled? && SnipcartConfig.current&.connected?
   end
 
   # Audience only matters when paid memberships are actually configured —
-  # without payments, there's no "paid only" tier to gate on.
+  # without memberships, there's no "paid only" tier to gate on. (Donations
+  # don't grant any tier, so they don't make audience meaningful.)
   def requires_audience_on_publish?
-    payments_enabled?
+    memberships_enabled?
   end
 
   # Distribution prompt fires when newsletters are enabled. Postmark

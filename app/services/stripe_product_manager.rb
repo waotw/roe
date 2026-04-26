@@ -64,7 +64,7 @@ class StripeProductManager
     # If we already have a product_id, retrieve it
     if stripe_config.product_id.present?
       begin
-        return Stripe::Product.retrieve(stripe_config.product_id)
+        return Stripe::Product.retrieve(stripe_config.product_id, request_options)
       rescue Stripe::InvalidRequestError
         # Product was deleted, create a new one
         Rails.logger.warn "Stripe product not found, creating new one"
@@ -75,23 +75,33 @@ class StripeProductManager
     site_title = SiteConfig.get('title') || 'My Site'
 
     Stripe::Product.create(
-      name: "Paid Membership",
-      description: "Access to paid content on #{site_title}",
-      metadata: {
-        roe_cms: true,
-        site: site_title
-      }
+      {
+        name: "Paid Membership",
+        description: "Access to paid content on #{site_title}",
+        metadata: {
+          roe_cms: true,
+          site: site_title
+        }
+      },
+      request_options
     )
   end
 
   def create_price!(product_id, amount_cents)
     Stripe::Price.create(
-      product: product_id,
-      unit_amount: amount_cents,
-      currency: stripe_config.default_currency,
-      metadata: {
-        roe_cms: true
-      }
+      {
+        product: product_id,
+        unit_amount: amount_cents,
+        currency: stripe_config.default_currency,
+        metadata: {
+          roe_cms: true
+        }
+      },
+      request_options
     )
+  end
+
+  def request_options
+    { api_key: stripe_config.current_secret_key }
   end
 end
