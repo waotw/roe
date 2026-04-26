@@ -7,13 +7,14 @@
   /* Layout */
   --container-width: 56rem;
   --aside-content-width: 42rem;
-  --content-width: 50rem;
+  --content-width: 48rem;
+  --aside-width: 12rem;
 
   /* Typography */
   --font-scale: 1.125em;
 
   /* Font Sizes */
-  --text-xxs: 0.7rem;
+  --text-xxs: 0.75rem;
   --text-xs: 0.8rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -33,9 +34,9 @@
   --space-7: 1.75rem;
   --space-8: 2rem;
   --space-12: 3rem;
+  --space-14: 3.5rem;
   --space-16: 4rem;
   --space-gallery: 0.75rem;
-  --aside-width: 190px;
 
   /* Colors */
   --color-bg: #f6f4f0;
@@ -103,9 +104,12 @@ strong {
   font-weight: bold;
 }
 
-a,
-a:visited {
+a {
   color: var(--color-link);
+}
+
+a:visited {
+  color: inherit;
 }
 
 a:hover {
@@ -120,6 +124,12 @@ textarea {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+
+article {
+  max-width: var(--content-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ==========================================
@@ -208,12 +218,8 @@ p:has(.site-logo) {
 }
 
 .site-nav a.active,
-.site-nav a:visited.active {
+.site-nav {
   color: var(--color-nav-active);
-}
-
-.site-nav a:visited {
-  color: var(--color-text);
 }
 
 /* SITE FOOTER */
@@ -318,14 +324,18 @@ div.flash {
    MARKDOWN CONTENT
    ========================================== */
 
-.content h1 {
+.content {
+  max-width: var(--content-width);
+}
+
+h1 {
   font-size: var(--text-3xl);
   line-height: 1.25;
   font-weight: 700;
   color: var(--color-heading);
 }
 
-.content h2 {
+h2 {
   font-size: var(--text-2xl);
   line-height: 1.3;
   margin: var(--space-8) 0 var(--space-3) 0;
@@ -333,7 +343,7 @@ div.flash {
   color: var(--color-text);
 }
 
-.content h3 {
+h3 {
   font-size: var(--text-xl);
   line-height: 1.4;
   margin: var(--space-6) 0 var(--space-2) 0;
@@ -346,42 +356,38 @@ div.flash {
   line-height: 1.75;
 }
 
-.content ul,
-.content ol {
+ul,
+ol {
   margin-bottom: var(--space-3);
   padding-left: var(--space-6);
 }
 
-.content ul ul,
-.content ol ol {
+ul ul,
+ol ol {
   margin-top: var(--space-3);
 }
 
-.content li {
+li {
   margin-bottom: var(--space-2);
   line-height: var(--space-7);
 }
 
-.content a {
+a {
   color: var(--color-link);
   text-decoration: none;
 }
 
-.content a:visited {
-  color: var(--color-link-visited);
-}
-
-.content strong,
-.content b {
+strong,
+b {
   font-weight: 700;
 }
 
-.content em,
-.content i {
+em,
+i {
   font-style: italic;
 }
 
-.content blockquote {
+blockquote {
   margin: var(--space-6) 0;
   padding-left: var(--space-4);
   border-left: 3px solid var(--color-border);
@@ -389,7 +395,7 @@ div.flash {
   font-style: italic;
 }
 
-.content code {
+code {
   font-family: var(--font-mono);
   font-size: 0.9em;
   background-color: var(--color-code-bg);
@@ -398,7 +404,7 @@ div.flash {
   border-radius: 1px;
 }
 
-.content pre {
+pre {
   background-color: var(--color-code-bg);
   padding: var(--space-4);
   margin: var(--space-6) 0;
@@ -407,44 +413,44 @@ div.flash {
   white-space: pre-wrap;
 }
 
-.content pre code {
+pre code {
   background: none;
   padding: 0;
 }
 
-.content img {
+img {
   max-width: 100%;
   height: auto;
   display: block;
   margin: var(--space-6) 0;
 }
 
-.content hr {
+hr {
   border: 0;
   border-top: 1px solid var(--color-border);
   margin: var(--space-8) 0;
 }
 
-.content table {
+table {
   width: 100%;
   border-collapse: collapse;
   margin: var(--space-6) 0;
 }
 
-.content th,
-.content td {
+th,
+td {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   text-align: left;
 }
 
-.content th {
+th {
   background-color: var(--color-code-bg);
   font-weight: 600;
 }
 
 /* Footnotes */
-.content .footnotes {
+.footnotes {
   margin-top: var(--space-12);
   padding-top: var(--space-6);
   border-top: 1px solid var(--color-border);
@@ -452,17 +458,17 @@ div.flash {
   color: var(--color-muted);
 }
 
-.content .footnotes ol {
+.footnotes ol {
   padding-left: var(--space-4);
 }
 
 /* Hide default list marker */
-.content .footnotes ol {
+.footnotes ol {
   list-style-type: none;
   padding-left: 0;
 }
 
-.content .footnotes ol li {
+.footnotes ol li {
   position: relative;
   padding-left: var(--space-8);
   line-height: var(--space-6);
@@ -497,6 +503,14 @@ a.footnote-backlink-number:hover {
   line-height: 1.5;
   z-index: 1000;
   pointer-events: none;
+}
+
+.poetry {
+  font-family: inherit;
+  white-space: pre-wrap;
+  background: none;
+  padding: 0;
+  border: none;
 }
 
 /* ==========================================
@@ -549,13 +563,12 @@ p.collection-more a:hover {
 }
 
 .collection-heading {
-  font-size: var(--text-2xl);
-  margin-bottom: 0;
-  color: var(--color-heading);
 }
 
 .collection h2 {
   margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-3xl);
+  color: var(--color-heading);
 }
 
 .collection h3 {
@@ -605,6 +618,119 @@ p.collection-more a:hover {
 
 /* COMPACT */
 
+/* FULL — base layout (image-less, non-media items render the body full-width). */
+
+.collection-item.full {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Side-by-side flex layout whenever the item has a media column —
+   either a real image or a media icon (video/audio post without image).
+   Uses :has() so the modifier class isn't needed; layout activates
+   whenever .collection-item__image is present in the DOM. */
+.collection-item.full:has(.collection-item__image) {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.collection-item.full:has(
+    .collection-item__image.collection-item__image--icon-only
+  ) {
+  align-items: center;
+}
+
+.collection-item img {
+  margin: 0;
+  object-fit: cover;
+  aspect-ratio: 16/10;
+}
+
+.collection-item.full:has(.collection-item__image) .collection-item__body {
+  flex: 1;
+  min-width: 0; /* allow long titles to wrap instead of overflowing */
+}
+
+.collection-item.full .collection-item__image {
+  position: relative;
+  flex: 0 0 12rem;
+  display: block;
+}
+
+.collection-item.full .collection-item__image img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* --- Media icon overlay (play / headphones) ---
+   When there's an image, the icon overlays the center of it inside a
+   semi-translucent dark circle. When there's no image, the icon stands
+   alone in the column at a larger size with no background. */
+.collection-item__media-icon {
+  position: absolute;
+  bottom: 3%;
+  right: 3%;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.55);
+  color: var(--color-bg);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 70%;
+}
+
+.collection-item__media-icon svg {
+  width: 90%;
+  height: 90%;
+  display: block;
+}
+
+/* Icon-only variant: no image, no overlay — just the icon centered in
+   the same media column width. Larger size, muted color, no background. */
+.collection-item__image--icon-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+}
+
+.collection-item.full
+  .collection-item__image.collection-item__image--icon-only {
+  display: flex;
+}
+
+.collection-item__image--icon-only .collection-item__media-icon {
+  position: static;
+  transform: none;
+  width: 2rem;
+  height: 2rem;
+  background-color: transparent;
+  color: var(--color-muted);
+}
+
+.collection-item__image--icon-only .collection-item__media-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 600px) {
+  .collection-item.full:has(.collection-item__image) {
+    flex-direction: column-reverse;
+    gap: var(--space-3);
+  }
+
+  .collection-item.full .collection-item__image {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
 /* LINKS */
 
 .collection-item.links {
@@ -628,7 +754,7 @@ p.collection-more a:hover {
 /* Collection grids - consecutive collections */
 .collection-grid {
   display: grid;
-  gap: var(--space-16);
+  gap: var(--space-14);
   margin: var(--space-8) 0;
   justify-content: start;
 }
@@ -695,7 +821,7 @@ p.collection-more a:hover {
 }
 
 /* Base gallery image - let natural aspect ratio show */
-.content .gallery img {
+.gallery img {
   margin: 0;
   width: 100%;
   height: auto;
@@ -1048,8 +1174,29 @@ a.aside-link-inline {
   opacity: 0.8;
 }
 
-/* Tablet/Mobile (float right with text wrap) */
-@media (max-width: 1024px) {
+/* Article content container. `position: relative` anchors the aside's
+   absolute positioning at desktop sizes; harmless at smaller sizes where
+   the aside is static-positioned. */
+article .content {
+  position: relative;
+  margin-right: auto;
+}
+
+/* Desktop (≥781px): leave room on the left for the absolutely-positioned
+   aside. Wrapped in min-width so it has no effect on smaller viewports —
+   that way the @media (max-width: 780px) block below doesn't have to
+   "undo" anything; each block owns a viewport range exclusively. */
+@media (min-width: 781px) {
+  article .content:has(.card-aside) {
+    margin-left: var(--aside-width);
+    max-width: var(--aside-content-width);
+  }
+}
+
+/* Tablet/Mobile (≤780px): aside floats right inside the article and
+   text wraps around it. Content takes full width naturally because the
+   desktop offset above no longer applies. */
+@media (max-width: 780px) {
   .card-aside {
     border: 1px solid var(--color-border);
     position: static;
@@ -1070,30 +1217,25 @@ a.aside-link-inline {
   }
 
   .card-aside .aside-image {
-    width: 100%;
+    width: 90%;
     margin-top: 0;
     margin-bottom: var(--space-3);
   }
 }
 
+/* Smaller tablet (≤700px): tighten aside spacing. */
 @media (max-width: 700px) {
   .card-aside {
-    border: 1px solid var(--color-border);
-    position: static;
-    float: right;
     margin: var(--space-3) 0 0.5rem 1.2rem;
-    left: auto;
-    transform: none;
-    clear: right;
   }
 
   .card-aside .aside-image {
-    width: 100%;
+    width: 85%;
     margin-bottom: var(--space-3);
   }
 }
 
-/* Small mobile (inline block, below content) */
+/* Small mobile (≤600px): aside flows below as an inline flex block. */
 @media (max-width: 600px) {
   .card-aside {
     float: none;
@@ -1116,35 +1258,7 @@ a.aside-link-inline {
 
   .card-aside .aside-text {
     flex: 1;
-  }
-}
-
-/* Adjust article/content container to leave space for asides */
-article .content,
-.home.content {
-  position: relative;
-  margin-right: auto;
-}
-
-article .content:has(.card-aside),
-.home.content:has(.card-aside) {
-  margin-left: var(--aside-width); /* Leave space for aside cards */
-  max-width: var(--aside-content-width);
-}
-
-@media (max-width: 1024px) {
-  article .content,
-  .home.content {
-    margin-left: 0;
-    margin-right: auto;
-    padding: 0 0rem;
-    max-width: var(--container-width);
-  }
-
-  article .content:has(.card-aside),
-  .home.content:has(.card-aside) {
-    margin-left: 0;
-    max-width: var(--container-width);
+    font-size: var(--text-sm);
   }
 }
 
@@ -1773,6 +1887,173 @@ a.member-account-icon svg {
 }
 
 /* ==========================================
+   MEMBER PAGES
+   Pages under /pages/members/ — signup, signin, upgrade, donate, etc.
+   Centered, bordered, narrower than regular content for a focused feel.
+   Forms inside use the same fonts/colors as the rest of the theme.
+   ========================================== */
+
+.member-page {
+  max-width: 26rem;
+  margin: var(--space-12) auto;
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+}
+
+.member-page h1,
+.member-page h2 {
+  margin-top: 0;
+}
+
+.member-page h2 {
+}
+
+/* --- Form layout --- */
+.member-page form {
+  margin: var(--space-6) 0;
+}
+
+.member-page .form-field {
+  margin-bottom: var(--space-4);
+}
+
+.member-page .form-field label {
+  display: block;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+  color: var(--color-muted);
+}
+
+.member-page .form-field input[type="email"],
+.member-page .form-field input[type="text"],
+.member-page .form-field input[type="password"] {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.member-page .form-field input:focus {
+  outline: 2px solid var(--color-link);
+  outline-offset: -1px;
+}
+
+/* --- Buttons (signup / signin / donate / upgrade / unsubscribe) --- */
+.member-page .signup-button,
+.member-page .signin-button,
+.member-page .donate-button,
+.member-page .upgrade-button,
+.member-page .unsubscribe-button {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  margin: 0 var(--space-2) 0 0;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.checkout-form-wrapper {
+  margin-top: var(--space-6);
+}
+
+.member-page .signup-button:hover,
+.member-page .signin-button:hover,
+.member-page .donate-button:hover,
+.member-page .upgrade-button:hover,
+.member-page .unsubscribe-button:hover {
+  background-color: var(--color-bg-dim);
+}
+
+/* Primary variant — filled with the site's accent color */
+.member-page .btn-primary {
+  background-color: var(--color-link);
+  color: var(--color-bg);
+  border-color: var(--color-link);
+}
+
+.member-page .btn-primary:hover {
+  background-color: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* Outline variant — bordered, transparent fill */
+.member-page .btn-outline {
+  background-color: transparent;
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+
+.member-page .btn-outline:hover {
+  background-color: var(--color-link);
+  color: var(--color-bg);
+}
+
+/* Destructive variant — used for unsubscribe confirmation */
+.member-page .btn-destructive {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+
+.member-page .btn-destructive:hover {
+  background-color: var(--color-link);
+  color: var(--color-bg);
+}
+
+/* --- Checkout form: show only the relevant branch ---
+   The render_checkout_form helper outputs BOTH branches; the
+   pages_helper swaps `MEMBER_STATUS_PLACEHOLDER` for `is-member` or
+   `is-guest` at render time. CSS hides the inactive one. */
+
+.checkout-form-wrapper.is-guest .member-checkout,
+.checkout-form-wrapper.is-member .non-member-checkout {
+  display: none;
+}
+
+/* --- Donation preset buttons (click to fill the amount input) --- */
+.member-page .donate-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.member-page .donate-preset {
+  flex: 1 1 auto;
+  min-width: 4rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.member-page .donate-preset:hover {
+  background-color: var(--color-bg-dim);
+}
+
+.member-page .donate-preset.is-selected {
+  background-color: var(--color-link);
+  color: var(--color-bg);
+  border-color: var(--color-link);
+}
+
+.paid-lock-icon {
+  opacity: 50%;
+}
+
+/* ==========================================
    PRODUCT GRID (SINGLE COLLECTION)
    ========================================== */
 
@@ -1879,7 +2160,7 @@ a.member-account-icon svg {
 
 /* Product Grid Images */
 
-.content .grid-item-image img {
+.grid-item-image img {
   margin: var(--space-0);
   position: relative;
   overflow: hidden;
