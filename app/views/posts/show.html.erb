@@ -1,5 +1,5 @@
-<div class="content">
-  <article class="post post--<%= @post.post_type %>">
+<article class="post post--<%= @post.post_type %>">
+  <div class="content">
     <%= render 'posts/header', post: @post %>
 
     <% if lookup_context.exists?("posts/types/#{@post.post_type}", [], true) %>
@@ -10,7 +10,7 @@
     <% end %>
 
     <%= render 'posts/footer', post: @post %>
-  </article>
+  </div>
+</article>
 
-  <%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>
-</div>
+<%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>

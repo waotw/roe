@@ -64,7 +64,9 @@ class ConfigGenerator
       content = <<~YAML
         payments:
           enabled: #{payments_enabled}
+          mode: memberships
           price: "#{payment_price}"
+          donation_amounts: [5, 10, 20, 50]
         newsletter:
           enabled: #{newsletter_enabled}
         everyone:
@@ -121,34 +123,14 @@ class ConfigGenerator
   end
 
   def generate_member_pages
-    pages_path = Rails.root.join('site', 'pages')
-    FileUtils.mkdir_p(pages_path)
-
-    # Generate signup page
-    generate_signup_page(pages_path)
-
-    # Generate signin page
-    generate_signin_page(pages_path)
-
-    # Generate check email confirmation page
-    generate_check_email_page(pages_path)
-
-    # Generate upgrade page
-    generate_upgrade_page
-
-    # Generate email templates
-    generate_member_emails
-  end
-
-  def generate_member_pages
     pages_path = Rails.root.join('site', 'pages', 'members')
     FileUtils.mkdir_p(pages_path)
 
-    # Generate all member pages
     generate_signup_page(pages_path)
     generate_signin_page(pages_path)
     generate_check_email_page(pages_path)
     generate_upgrade_page(pages_path)
+    generate_donate_page(pages_path)
     generate_unsubscribe_page(pages_path)
     generate_unsubscribed_page(pages_path)
 
@@ -287,6 +269,33 @@ class ConfigGenerator
 
     File.write(pages_path.join('upgrade.md'), upgrade_content)
     puts "✓ Generated members/upgrade.md page"
+  end
+
+  def generate_donate_page(pages_path)
+    return if File.exist?(pages_path.join('donate.md'))
+
+    donate_content = <<~MARKDOWN
+      ---
+      title: Support this site
+      url_name: donate
+      status: published
+      audience: everyone
+      ---
+
+      # Support this site
+
+      If this work has been useful to you and you'd like to help keep it going, you can chip in any amount. One-time payment, no subscription, no account required.
+
+      ```form
+      for: donate
+      button-text: Continue to Stripe →
+      ```
+
+      Secure payment powered by Stripe.
+    MARKDOWN
+
+    File.write(pages_path.join('donate.md'), donate_content)
+    puts "✓ Generated members/donate.md page"
   end
 
   def generate_unsubscribe_page(pages_path)

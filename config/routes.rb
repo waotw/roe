@@ -204,6 +204,15 @@ Rails.application.routes.draw do
   delete "signout", to: "members/sessions#destroy"
   get "signin/:token", to: "members/sessions#signin_with_token", as: :token_signin
 
+  # GET aliases for the public signin/signup PAGES. The post routes above
+  # handle form submissions to /signin and /signup, but Rails' signin_path
+  # / signup_path helpers resolve to those URLs, and a guest redirected
+  # there via GET would get a 404. The actual marketing pages live at
+  # /sign-in and /sign-up (per their url_name in pages/members/). These
+  # aliases keep all existing signin_path / signup_path callers working.
+  get "signin", to: redirect("/sign-in")
+  get "signup", to: redirect("/sign-up")
+
   post "signup", to: "members/registrations#create"
   post "signup_and_checkout", to: "members/registrations#create_and_checkout"
 
@@ -227,7 +236,9 @@ Rails.application.routes.draw do
   get "donate/cancel", to: "donations#cancel", as: :donation_cancel
 
   # Public site
-  root "posts#index"
+  # Root renders home.md as a regular page through PagesController#show.
+  # Same code path as any other public page — no special-case template.
+  root to: "pages#show", defaults: { url_name: "home" }
 
   # Redirect post ID to slug (preserves anchor in browser)
   get "p/:id", to: "posts#show_by_id", constraints: { id: /\d+/ }, as: :post_by_id

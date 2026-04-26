@@ -566,14 +566,18 @@ module HasMarkdownExtensions
       render_compact(items)
     when 'links'
       render_links(items)
+    when 'full'
+      render_full(items, config)
     when 'list'
-      render_list(items)
+      render_list(items, config)
     else
-      render_list(items)
+      render_list(items, config)
     end
   end
 
-  def render_list(items)
+  def render_list(items, config = {})
+    show_author = collection_truthy?(config[:show_author])
+
     items.map do |item|
       output = []
       output << '<div class="collection-item list" markdown="1">'
@@ -593,9 +597,10 @@ module HasMarkdownExtensions
         output << ""
       end
 
-      # Date
-      if item.respond_to?(:date) && item.date
-        output << "*#{item.date.strftime('%B %d, %Y')}*"
+      # Meta row: date, optionally with " • author" appended
+      meta = collection_item_meta(item, show_author: show_author)
+      if meta.present?
+        output << "*#{meta}*"
         output << "{: .item-date}"
         output << ""
       end
@@ -605,6 +610,134 @@ module HasMarkdownExtensions
 
       output.join("\n")
     end.join("\n")
+  end
+
+  # Image-on-the-right template. Includes everything from `list`, plus
+  # excerpt and a featured image. show_author defaults to TRUE for this
+  # template (opposite of list); pass `show_author: false` to suppress.
+  # show_excerpt also defaults to true.
+  #
+  # Media column rendering:
+  # - Image present: `<img>` rendered; the CSS flex layout puts it on the right.
+  # - post_type video/podcast/audio: a play (video) or headphones (audio-only)
+  #   icon overlays the image. Without an image, the icon stands alone in the
+  #   media column with no background.
+  # - No image and not a media post: media column omitted, body flows full width.
+  def render_full(items, config = {})
+    show_author = collection_truthy?(config[:show_author], default: true)
+    show_excerpt = collection_truthy?(config[:show_excerpt], default: true)
+
+    items.map do |item|
+      image_url = item.respond_to?(:image) ? item.image : nil
+      has_image = image_url.present?
+      icon_type = collection_media_icon(item)
+      has_media_column = has_image || !icon_type.nil?
+      alt = (item.title || '').to_s.gsub('"', '&quot;')
+
+      output = []
+      output << '<div class="collection-item full">'
+      output << '  <div class="collection-item__body" markdown="1">'
+      output << ""
+
+      title_html = item.title || 'Untitled'
+      title_html += " #{paid_lock_icon}" if show_paid_indicator?(item)
+      output << "### [#{title_html}](#{item_path(item)})"
+      output << "{: .item-title}"
+      output << ""
+
+      if item.respond_to?(:subtitle) && item.subtitle.present?
+        output << "*#{item.subtitle}*"
+        output << "{: .item-subtitle}"
+        output << ""
+      end
+
+      if show_excerpt && item.respond_to?(:excerpt) && item.excerpt.present?
+        output << item.excerpt.to_s
+        output << "{: .item-excerpt}"
+        output << ""
+      end
+
+      meta = collection_item_meta(item, show_author: show_author)
+      if meta.present?
+        output << "*#{meta}*"
+        output << "{: .item-date}"
+        output << ""
+      end
+
+      output << "  </div>"
+
+      if has_media_column
+        col_classes = [ 'collection-item__image' ]
+        col_classes << 'collection-item__image--icon-only' unless has_image
+        output << %Q(  <a class="#{col_classes.join(' ')}" href="#{item_path(item)}">)
+        output << %Q(    <img src="#{image_url}" alt="#{alt}">) if has_image
+        if icon_type
+          output << %Q(    <span class="collection-item__media-icon">#{render_media_icon(icon_type)}</span>)
+        end
+        output << '  </a>'
+      end
+
+      output << '</div>'
+      output << ""
+
+      output.join("\n")
+    end.join("\n")
+  end
+
+  # Returns :play / :headphones / nil based on post type and media fields.
+  # Only audio/video/podcast posts get an icon. For podcast posts (which can
+  # carry both audio and video), video wins.
+  def collection_media_icon(item)
+    return nil unless item.respond_to?(:post_type)
+    return nil unless %w[video podcast audio].include?(item.post_type.to_s)
+
+    has_video = item.respond_to?(:video) && item.video.present?
+    return :play if has_video
+
+    has_audio = item.respond_to?(:audio) && item.audio.present?
+    return :headphones if has_audio
+
+    nil
+  end
+
+  # Inline SVG for the media icons used in collection-item full template.
+  # Inline so we don't pay a request per item; uses currentColor so CSS
+  # controls the color (white when overlaid on an image, muted otherwise).
+  def render_media_icon(type)
+    case type
+    when :play
+      %Q(<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16.1328 15.7715"><rect height="15.7715" opacity="0" width="16.1328" x="0" y="0"/>
+        <path d="M15.7715 7.88086C15.7715 12.2266 12.2363 15.7617 7.88086 15.7617C3.53516 15.7617 0 12.2266 0 7.88086C0 3.53516 3.53516 0 7.88086 0C12.2363 0 15.7715 3.53516 15.7715 7.88086ZM5.5957 5.14648L5.5957 10.625C5.5957 11.0254 6.04492 11.2207 6.43555 10.9766L10.9473 8.33008C11.2988 8.13477 11.2891 7.64648 10.9473 7.44141L6.43555 4.79492C6.08398 4.58008 5.5957 4.74609 5.5957 5.14648Z" fill="currentColor" fill-opacity="0.85"/></svg>)
+    when :headphones
+      %Q(<svg viewBox="0 0 16.1328 15.7715" fill="currentColor" aria-hidden="true"><path d="M15.7715 7.89062C15.7715 12.2363 12.2363 15.7715 7.88086 15.7715C3.53516 15.7715 0 12.2363 0 7.89062C0 3.54492 3.53516 0.00976562 7.88086 0.00976562C12.2363 0.00976562 15.7715 3.54492 15.7715 7.89062ZM3.56445 7.89062C3.56445 9.43359 3.92578 10.5273 4.54102 11.582C4.69727 11.8652 5.01953 11.9727 5.32227 11.8359C5.54688 12.0801 5.89844 12.1875 6.26953 12.0605C6.82617 11.9141 7.08984 11.4355 6.93359 10.8887L6.38672 8.93555C6.23047 8.37891 5.75195 8.10547 5.19531 8.26172C5.03906 8.31055 4.90234 8.37891 4.80469 8.4668C4.78516 8.28125 4.77539 8.0957 4.77539 7.89062C4.77539 5.82031 6.02539 4.46289 7.89062 4.46289C9.77539 4.46289 11.0254 5.83008 11.0254 7.89062C11.0254 8.0957 11.0156 8.29102 11.0059 8.48633C10.8887 8.38867 10.7617 8.31055 10.5859 8.26172C10.0488 8.10547 9.57031 8.37891 9.41406 8.93555L8.85742 10.8984C8.70117 11.4453 8.95508 11.9141 9.51172 12.0605C9.89258 12.1777 10.2344 12.0801 10.4688 11.8359C10.7715 11.9727 11.084 11.8652 11.2598 11.582C11.8848 10.4883 12.2363 9.4043 12.2363 7.89062C12.2363 5.12695 10.4883 3.25195 7.89062 3.25195C5.30273 3.25195 3.56445 5.11719 3.56445 7.89062Z"/></svg>)
+    end
+  end
+
+  # Build the "date • author" meta line for collection items. Author is
+  # only included when show_author is truthy AND the post (or site
+  # config) actually has an author to show.
+  def collection_item_meta(item, show_author: false)
+    parts = []
+
+    if item.respond_to?(:date) && item.date
+      parts << item.date.strftime('%B %d, %Y')
+    end
+
+    if show_author
+      author = item.metadata['author'].to_s.strip
+      author = SiteConfig.get('author').to_s.strip if author.blank?
+      parts << author if author.present?
+    end
+
+    parts.join(' • ')
+  end
+
+  # Collection-block options arrive as strings ("true"/"false") or as
+  # parsed booleans depending on caller. Returns the boolean intent;
+  # use `default:` to set what `nil` means.
+  def collection_truthy?(val, default: false)
+    return default if val.nil?
+    val == true || val.to_s.downcase == 'true'
   end
 
   def render_compact(items)

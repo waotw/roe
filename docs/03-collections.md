@@ -41,7 +41,9 @@ Define reusable collection presets for navigation and indexes.
 | `tags` | comma-separated | — | Include tags (OR logic) |
 | `exclude_tags` | comma-separated | — | Exclude tags |
 | `order` | `date`, `date-asc`, `title`, `filename` | `date` | Sort order |
-| `template` | `list`, `compact`, `links` | `list` | Display template |
+| `template` | `list`, `full`, `compact`, `links` | `list` | Display template |
+| `show_author` | `true`, `false` | `false` for `list`, `true` for `full` | Append " • author" to the date line |
+| `show_excerpt` | `true`, `false` | `true` (only used by `full`) | Show the post excerpt |
 | `show_more` | `true`, `false` | `false` | Show "show more" link |
 | `show_more_text` | string | "Show more →" | Custom link text |
 | `show_more_link` | string | — | Custom link URL |
@@ -64,6 +66,27 @@ Define reusable collection presets for navigation and indexes.
     </li>
   </ul>
   <a href="/posts" class="show-more">Show more →</a>
+</section>
+```
+
+**`full`** — Like `list` but with the post's image floated to the right and excerpt included. Author appended to the date by default (set `show_author: false` to hide). Set `show_excerpt: false` to hide the excerpt. Items without an image render the body full-width — no placeholder image.
+
+For posts with `post_type: video`, `podcast`, or `audio`, a media icon is added to the image area:
+- **Play triangle** if the post has a `video` field set
+- **Headphones** if the post has only `audio` set
+
+If the post has an image, the icon is overlaid centered on it (white on a translucent dark circle). If the post has no image, the icon stands alone in the media column at a larger size with no background. Posts that aren't media types and have no image render with no media column at all (body full-width).
+
+```html
+<section class="collection">
+  <div class="collection-item full">
+    <div class="collection-item__body">
+      <h3><a href="/posts/slug">Title</a></h3>
+      <p class="item-excerpt">Description excerpt...</p>
+      <p class="item-date"><em>January 15, 2024 • Author Name</em></p>
+    </div>
+    <a class="collection-item__image" href="/posts/slug"><img src="/media/images/cover.jpg" alt="Title"></a>
+  </div>
 </section>
 ```
 

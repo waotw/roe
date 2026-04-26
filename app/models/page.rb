@@ -65,6 +65,13 @@ class Page < ApplicationRecord
     File.basename(file_path, '.md') if file_path.present?
   end
 
+  # True for pages stored under site/pages/members/ — used by the public
+  # page view to add a `member-page` CSS class so theme styles can target
+  # signup / signin / upgrade / donate / etc. distinctly from regular pages.
+  def member_page?
+    file_path.to_s.include?('/site/pages/members/')
+  end
+
   # Metadata fields that point at files under site/media/...
   MEDIA_FIELDS = %w[image].freeze
 
