@@ -115,11 +115,11 @@ module SubstackImporter
         text.empty? ? "" : "#{text}\n\n"
       when "br" then "\n"
       when "strong", "b"
-        "**#{process_children(node, depth: depth)}**"
+        wrap_emphasis(process_children(node, depth: depth), "**")
       when "em", "i"
-        "*#{process_children(node, depth: depth)}*"
+        wrap_emphasis(process_children(node, depth: depth), "*")
       when "s"
-        "~~#{process_children(node, depth: depth)}~~"
+        wrap_emphasis(process_children(node, depth: depth), "~~")
       when "a"
         process_link(node, depth: depth)
       when "ul"
@@ -254,7 +254,7 @@ module SubstackImporter
       return "" unless data
 
       src = data["src"].to_s
-      alt = data["alt"].to_s
+      alt = data["alt"].to_s.strip
       caption_node = node.at_css("figcaption.image-caption")
       caption = caption_node ? caption_node.inner_text.strip : ""
 
@@ -277,7 +277,7 @@ module SubstackImporter
 
       lines = images.each_with_index.map do |img, i|
         src = img["src"].to_s
-        alt = img["alt"].to_s || data["alt"].to_s
+        alt = (img["alt"].to_s.presence || data["alt"].to_s).strip
 
         @images << { src: src, alt: alt }
 
@@ -320,9 +320,45 @@ module SubstackImporter
       pre = node.at_css("pre.text") || node.at_css("pre")
       return "" unless pre
 
-      text = pre.inner_text
+      # Walk the pre's children preserving whitespace EXACTLY (no strip,
+      # no newline collapse) while still converting inline emphasis tags
+      # to markdown. Substack lets writers bold/italicize inside poetry
+      # blocks; the regular process_node would either strip the tags
+      # (inner_text) or normalize the surrounding whitespace.
+      text = preformatted_inline(pre)
 
       "```poetry\n#{text}\n```\n\n"
+    end
+
+    # Whitespace-preserving sibling of process_node, used only inside
+    # preformatted/poetry blocks. Converts inline tags to markdown but
+    # never strips text nodes.
+    def preformatted_inline(node)
+      node.children.map do |child|
+        case child
+        when Nokogiri::XML::Text
+          child.text
+        when Nokogiri::XML::Element
+          case child.name.downcase
+          when "strong", "b"
+            wrap_emphasis(preformatted_inline(child), "**")
+          when "em", "i"
+            wrap_emphasis(preformatted_inline(child), "*")
+          when "s"
+            wrap_emphasis(preformatted_inline(child), "~~")
+          when "br"
+            "\n"
+          when "a"
+            href = child["href"].to_s
+            text = preformatted_inline(child)
+            href.empty? ? text : "[#{text}](#{href})"
+          else
+            preformatted_inline(child)
+          end
+        else
+          ""
+        end
+      end.join
     end
 
     def process_pullquote(node)
@@ -529,10 +565,10 @@ module SubstackImporter
       data = parse_data_attrs(node["data-attrs"])
       if data
         src = data["src"].to_s
-        alt = data["alt"].to_s
+        alt = data["alt"].to_s.strip
       else
         src = node["src"].to_s
-        alt = node["alt"].to_s
+        alt = node["alt"].to_s.strip
       end
 
       return "" if src.empty?
@@ -566,6 +602,22 @@ module SubstackImporter
 
     def inner_text(node)
       node.inner_text.strip
+    end
+
+    # Wrap inline emphasis content (bold/italic/strikethrough) so that any
+    # leading or trailing spaces/tabs end up *outside* the markdown
+    # delimiters. Substack often produces e.g. `<strong>foo </strong>`,
+    # which would naively become `**foo **` — and CommonMark rejects that
+    # as bold because the closing `**` is preceded by whitespace. Moving
+    # the space outside (`**foo** `) renders correctly.
+    # Restricted to spaces/tabs (not all whitespace) so multi-line content
+    # isn't reflowed across newlines.
+    def wrap_emphasis(text, marker)
+      return "" if text.nil?
+      return text if text.strip.empty?
+      leading = text[/\A[ \t]*/]
+      trailing = text[/[ \t]*\z/]
+      "#{leading}#{marker}#{text.strip}#{marker}#{trailing}"
     end
 
     def parse_data_attrs(json_string)

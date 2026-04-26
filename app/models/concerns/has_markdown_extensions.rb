@@ -27,7 +27,11 @@ module HasMarkdownExtensions
       end
 
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
-      code_blocks[token] = render_code_block(code, lang)
+      code_blocks[token] = if lang == 'poetry'
+        render_poetry_block(code)
+      else
+        render_code_block(code, lang)
+      end
       counter += 1
       token
     end
@@ -125,6 +129,28 @@ module HasMarkdownExtensions
     escaped_code = CGI.escapeHTML(code)
     lang_class = language.empty? ? '' : " class=\"language-#{CGI.escapeHTML(language)}\""
     "<pre><code#{lang_class}>#{escaped_code}</code></pre>"
+  end
+
+  # Poetry blocks preserve whitespace exactly (newlines, indentation,
+  # multiple spaces) but still allow inline emphasis and links. Markdown
+  # isn't processed inside `<pre>`, so we convert emphasis to HTML tags
+  # ourselves before wrapping. Style with CSS .poetry as desired.
+  def render_poetry_block(content)
+    text = content.sub(/\n\z/, "")        # drop the newline before the closing fence
+    text = render_poetry_inline(text)
+    "<pre class=\"poetry\">#{text}</pre>"
+  end
+
+  def render_poetry_inline(text)
+    text = CGI.escapeHTML(text)
+    # Order matters: ** before * so the bold opener isn't eaten by italic.
+    text = text.gsub(/\*\*(.+?)\*\*/) { "<strong>#{$1}</strong>" }
+    text = text.gsub(/\*(.+?)\*/) { "<em>#{$1}</em>" }
+    text = text.gsub(/~~(.+?)~~/) { "<s>#{$1}</s>" }
+    text = text.gsub(/\[([^\]]+)\]\(([^)]+)\)/) do
+      "<a href=\"#{CGI.escapeHTML($2)}\">#{$1}</a>"
+    end
+    text
   end
 
   def process_strikethrough(markdown)
