@@ -15,7 +15,7 @@
   <%= form_with model: @stripe_config, url: admin_stripe_config_path, method: :patch, class: "space-y-8" do |form| %>
 
     <!-- Connection Status -->
-    <div class="p-4 border <%= @stripe_config.connected? ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50' %>">
+    <div class="p-4 border mb-4 <%= @stripe_config.connected? ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50' %>">
       <div class="flex items-center gap-2">
         <% if @stripe_config.connected? %>
           <span class="text-green-600 font-semibold">✓ Connected</span>
@@ -27,6 +27,8 @@
         <% end %>
       </div>
     </div>
+
+    <h3 class="mb-4">Documentation & Instructions: <a href="/documentation/payments" class="text-blue-600 underline">Payments & Stripe</a></h3>
 
     <!-- Test Mode Keys -->
     <div class="config-section">
@@ -70,11 +72,11 @@
                                   class: "w-full font-mono text-sm p-2 border border-gray-300",
                                   placeholder: "whsec_..." %>
           <p class="text-xs text-gray-500 mt-1">
-            Starts with whsec_. Get this when you create a webhook endpoint in
+            Starts with <code class="bg-gray-200 px-1 rounded-xs">whsec_</code>. Get this when you create a webhook endpoint in
             <a href="https://dashboard.stripe.com/test/webhooks" target="_blank" class="text-blue-600 underline">
               Stripe Dashboard → Developers → Webhooks
             </a>.
-            Point the endpoint at <code><%= "#{request.base_url}/webhooks/stripe" %></code>
+            Point the endpoint at <code><%= request.base_url %>/webhooks/stripe</code>
             and subscribe to <code>checkout.session.completed</code>.
           </p>
         </div>
@@ -120,7 +122,7 @@
                                   class: "w-full font-mono text-sm p-2 border border-gray-300",
                                   placeholder: "whsec_..." %>
           <p class="text-xs text-gray-500 mt-1">
-            Starts with whsec_. Get this from a separate Live-mode webhook endpoint at
+            Starts with <code class="bg-gray-200 px-1 rounded-xs">whsec_</code>. Get this from a separate Live-mode webhook endpoint at
             <a href="https://dashboard.stripe.com/webhooks" target="_blank" class="text-blue-600 underline">
               Stripe Dashboard → Developers → Webhooks
             </a>.
