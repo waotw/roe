@@ -79,7 +79,7 @@ case $push_option in
     ;;
   2)
     echo ""
-    echo "Available folders: posts, pages, media, theme, system"
+    echo "Available folders: posts, pages, pages/members, media, theme, system (or any path under site/)"
     read -p "Enter folders to push (comma-separated): " folders
     rake site:push_folders[$folders]
     ;;

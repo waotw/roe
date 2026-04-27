@@ -113,18 +113,25 @@ class StripeConfig < ApplicationRecord
   def fetch_currency!
     return unless connected?
 
-    account = Stripe::Account.retrieve({}, api_key: current_secret_key)
+    # Stripe::Account.retrieve(id, opts) — id is the account ID (string)
+    # or nil for the connected account. Passing `{}` here would be coerced
+    # to a string for the URL path and raise TypeError.
+    account = Stripe::Account.retrieve(nil, api_key: current_secret_key)
     update!(currency: account.default_currency)
   rescue Stripe::StripeError => e
     Rails.logger.error "Failed to fetch Stripe currency: #{e.message}"
     nil
   end
 
-  # Get currency (fetch if not cached)
+  # Get currency (fetch if not cached). Falls back to "usd" when the
+  # cached value is blank AND the Stripe fetch returns nothing — either
+  # because the API call failed (network, rate limit, bad key) or because
+  # the connected Stripe account hasn't set a default currency yet. The
+  # fallback isn't persisted, so a subsequent request will retry the fetch.
   def default_currency
     return currency if currency.present?
     fetch_currency!
-    currency
+    currency.presence || "usd"
   end
 
   private
