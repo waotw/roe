@@ -59,3 +59,10 @@ migrate-main/
 output/
 site_backups/
 faircamp/
+
+# Graphify generated files
+/graphify-out/
+/graphify-out/*
+**/.graphify_*
+**/graph.json
+GRAPH_REPORT.md
