@@ -68,14 +68,22 @@
               <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                 <% is_active = theme[:name] == @active_theme %>
                 <% is_installed = theme[:installed] %>
+                <% is_master = theme[:master] %>
 
-                <% if is_active %>
-                  <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">ACTIVE</span>
-                <% elsif is_installed %>
-                  <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Installed</span>
-                <% else %>
-                  <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-500">Available</span>
-                <% end %>
+                <div class="flex gap-1 flex-wrap">
+                  <% if is_active %>
+                    <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">ACTIVE</span>
+                  <% end %>
+                  <% if is_installed %>
+                    <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800">Installed</span>
+                  <% end %>
+                  <% unless is_master %>
+                    <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800">Custom</span>
+                  <% end %>
+                  <% if is_master && !is_installed %>
+                    <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-500">Available</span>
+                  <% end %>
+                </div>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
                 <div class="flex gap-2 justify-end">
@@ -84,16 +92,22 @@
                               target: "_blank",
                               class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
 
-                  <% if is_active && !is_installed %>
-                    <%= button_to "Install",
-                                  activate_admin_theme_path(theme[:name]),
-                                  method: :post,
-                                  class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs" %>
-                  <% elsif !is_active %>
+                  <% if !is_active %>
                     <%= button_to "Activate",
                                   activate_admin_theme_path(theme[:name]),
                                   method: :post,
                                   class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+                  <% end %>
+
+                  <% if is_installed && !is_active %>
+                    <button type="button"
+                            data-action="delete"
+                            data-resource-id="<%= theme[:name] %>"
+                            data-resource-title="<%= theme[:name].capitalize %>"
+                            data-resource-type="theme"
+                            class="uppercase text-xs px-2 py-1 border border-gray-800 bg-red-100 hover:bg-red-200 text-red-800 font-mono rounded-xs">
+                      Uninstall
+                    </button>
                   <% end %>
                 </div>
               </td>
@@ -104,3 +118,89 @@
     </div>
   </div>
 </div>
+
+<!-- Delete Theme Modal -->
+<div id="delete-modal-theme" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Uninstall "<span id="delete-item-title-theme"></span>"?</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      This will permanently delete the theme file from <code class="bg-gray-100 px-1">site/theme/</code>.
+      This action cannot be undone.
+    </p>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Type <strong>DELETE</strong> to confirm:
+      </label>
+      <input type="text"
+             id="delete-confirmation-input-theme"
+             class="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+             placeholder="DELETE"
+             autocomplete="off">
+    </div>
+    <div class="flex gap-3 justify-end">
+      <button type="button"
+              onclick="hideThemeDeleteConfirmation()"
+              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+        Cancel
+      </button>
+      <%= button_to "Uninstall Theme",
+          admin_theme_path('THEME_NAME_PLACEHOLDER'),
+          method: :delete,
+          id: "delete-confirm-btn-theme",
+          disabled: true,
+          class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed",
+          form: {
+            id: "delete-theme-form",
+            onsubmit: "return document.getElementById('delete-confirmation-input-theme').value === 'DELETE'",
+            style: "display: inline; margin: 0;"
+          } %>
+    </div>
+  </div>
+</div>
+
+<script>
+function showThemeDeleteConfirmation(themeName, themeTitle) {
+  document.getElementById("delete-item-title-theme").textContent = themeTitle;
+  document.getElementById("delete-modal-theme").classList.remove("hidden");
+  document.getElementById("delete-confirmation-input-theme").value = "";
+  document.getElementById("delete-confirmation-input-theme").focus();
+  document.getElementById("delete-confirm-btn-theme").disabled = true;
+
+  // Update the form action to point to the correct theme
+  var form = document.getElementById("delete-theme-form");
+  form.action = "/admin/themes/" + encodeURIComponent(themeName);
+}
+
+function hideThemeDeleteConfirmation() {
+  document.getElementById("delete-modal-theme").classList.add("hidden");
+}
+
+document.addEventListener("turbo:load", function () {
+  // Handle theme uninstall button clicks
+  document.querySelectorAll('[data-action="delete"][data-resource-type="theme"]').forEach((button) => {
+    button.addEventListener("click", function () {
+      const themeName = this.dataset.resourceId;
+      const themeTitle = this.dataset.resourceTitle;
+      showThemeDeleteConfirmation(themeName, themeTitle);
+    });
+  });
+
+  // Set up the confirmation input for theme deletion
+  const deleteInput = document.getElementById("delete-confirmation-input-theme");
+  const deleteBtn = document.getElementById("delete-confirm-btn-theme");
+
+  if (deleteInput && deleteBtn) {
+    deleteInput.addEventListener("input", function () {
+      deleteBtn.disabled = this.value !== "DELETE";
+    });
+
+    deleteInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && this.value === "DELETE") {
+        deleteBtn.form.requestSubmit();
+      } else if (e.key === "Escape") {
+        hideThemeDeleteConfirmation();
+      }
+    });
+  }
+});
+</script>

@@ -108,11 +108,12 @@ Rails.application.routes.draw do
     # Snipcart Configuration
     resource :snipcart_config, only: [ :edit, :update, :destroy ]
 
-    resources :themes, only: [ :index ] do
+    resources :themes, only: [ :index, :destroy ] do
       member do
         get :edit
         patch :update
         post :activate
+        post :reset
       end
     end
 

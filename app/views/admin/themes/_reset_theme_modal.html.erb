@@ -1,0 +1,58 @@
+<div id="reset-theme-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6 shadow-xl max-w-lg w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Reset Theme</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Choose how you want to restore the original <strong><%= @theme_name %></strong> theme:
+    </p>
+
+    <%= form_with url: reset_admin_theme_path(@theme_name), method: :post, id: "reset-theme-form" do |form| %>
+      <div class="space-y-4 mb-6">
+        <!-- Option 1: Reset to original -->
+        <div class="border border-gray-200 rounded p-4 hover:bg-gray-50 cursor-pointer" data-action="click->theme-reset-modal#selectOption" data-option="overwrite">
+          <div class="flex items-start">
+            <%= form.radio_button :reset_type, 'overwrite', class: "mt-1 mr-3", data: { action: "change->theme-reset-modal#optionChanged" } %>
+            <div>
+              <label class="font-medium text-gray-900 cursor-pointer">Reset CSS to original</label>
+              <p class="text-sm text-gray-600 mt-1">
+                Overwrite current theme with the original. <strong class="text-red-600">You will lose all changes.</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option 2: Install fresh copy -->
+        <div class="border border-gray-200 rounded p-4 hover:bg-gray-50 cursor-pointer" data-action="click->theme-reset-modal#selectOption" data-option="fresh">
+          <div class="flex items-start">
+            <%= form.radio_button :reset_type, 'fresh', class: "mt-1 mr-3", data: { action: "change->theme-reset-modal#optionChanged" } %>
+            <div class="flex-1">
+              <label class="font-medium text-gray-900 cursor-pointer">Install a fresh copy</label>
+              <p class="text-sm text-gray-600 mt-1 mb-2">
+                Keep your current edits and install a fresh copy as a new theme.
+              </p>
+              <div class="mt-2">
+                <%= form.text_field :custom_name,
+                                    value: @suggested_copy_name,
+                                    placeholder: "Theme name",
+                                    class: "w-full px-3 py-2 border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                    data: { theme_reset_modal_target: "customNameInput" } %>
+                <p class="text-xs text-gray-500 mt-1">Leave blank to auto-generate a name</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 justify-end">
+        <button type="button"
+                onclick="hideResetThemeModal()"
+                class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+          Cancel
+        </button>
+        <%= form.submit "Reset Theme",
+                        class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed",
+                        data: { theme_reset_modal_target: "submitButton" },
+                        disabled: true %>
+      </div>
+    <% end %>
+  </div>
+</div>
