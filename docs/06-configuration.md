@@ -237,3 +237,8 @@ This allows the app to spin up with all configuration prepared.
 - [Architecture](./01-architecture.md) - How config fits into the system
 - [Collections](./03-collections.md) - Inline collection parameters
 - [Markdown Extensions](./04-markdown-extensions.md) - Card types
+- [Members & Authentication](./11-members-authentication.md) - Member feature configuration
+- [Payments & Stripe](./12-payments-stripe.md) - Stripe configuration
+- [Podcasts](./13-podcasts.md) - Podcast configuration
+- [Email & Newsletters](./14-email-newsletters.md) - Postmark configuration
+- [Products & Store](./16-products-store.md) - Store and Snipcart configuration

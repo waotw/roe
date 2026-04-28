@@ -34,7 +34,7 @@ Define reusable collection presets for navigation and indexes.
 | Parameter | Values | Default | Description |
 |-----------|--------|---------|-------------|
 | `heading` | string | — | Section heading text |
-| `source` | `posts`, `pages`, `documentation` | from collections.yml | Content source |
+| `source` | `posts`, `pages`, `documentation`, `products` | from collections.yml | Content source |
 | `limit` | number or `"all"` | `10` | Number of items to show |
 | `post_type` | `article`, `music`, `podcast`, `image`, `all` | `all` | Filter by post type |
 | `podcast` | podcast key (string) | — | Filter podcast episodes by show key (multi-podcast sites) |
@@ -48,6 +48,8 @@ Define reusable collection presets for navigation and indexes.
 | `show_more_text` | string | "Show more →" | Custom link text |
 | `show_more_link` | string | — | Custom link URL |
 | `exclude_id` | number | — | Exclude specific post by ID |
+| `show_paid` | `true`, `false` | `false` | Show paid content to non-members (overrides default) |
+| `audience` | `everyone`, `free`, `paid` | — | Filter by content audience level |
 
 ### Templates
 
@@ -112,6 +114,22 @@ If the post has an image, the icon is overlaid centered on it (white on a transl
 </section>
 ```
 
+**`grid`** — Card-based layout for products (default for `source: products`):
+
+```html
+<section class="collection-grid">
+  <h2>Products</h2>
+  <div class="grid">
+    <article class="product-card">
+      <img src="/media/images/product.jpg" alt="Product">
+      <h3><a href="/products/slug">Product Name</a></h3>
+      <p class="price">$29.99</p>
+      <button>Add to Cart</button>
+    </article>
+  </div>
+</section>
+```
+
 ### Examples
 
 **By tag:**
@@ -163,6 +181,81 @@ order: title
 template: links
 ```
 ```
+
+**Products grid:**
+```markdown
+```collection
+heading: Featured Products
+source: products
+tags: featured
+template: grid
+limit: 6
+```
+```
+
+**Show paid content to everyone:**
+```markdown
+```collection
+heading: Premium Articles
+source: posts
+audience: paid
+show_paid: true
+template: full
+```
+```
+
+**Free content only:**
+```markdown
+```collection
+heading: Free Articles
+source: posts
+audience: free
+limit: 10
+```
+```
+
+---
+
+## Content Gating & Audience Filtering
+
+Collections automatically respect content audience settings from the [Members & Authentication](./11-members-authentication.md) system.
+
+### Default Behavior
+
+- **Non-members**: See only `public` and `free` content
+- **Free members**: See `public` and `free` content
+- **Paid members**: See all content (`public`, `free`, `paid`)
+
+### Override with `show_paid`
+
+Use `show_paid: true` to display paid content teasers to everyone:
+
+```markdown
+```collection
+heading: Premium Content
+source: posts
+audience: paid
+show_paid: true
+template: full
+show_excerpt: true
+```
+```
+
+This is useful for:
+- Marketing pages showing preview content
+- "Upgrade to read more" prompts
+- Public archives with teasers
+
+### Filter by Audience
+
+Use the `audience` parameter to show only specific tiers:
+
+| Value | Shows |
+|-------|-------|
+| (blank) | All content (respects member auth) |
+| `everyone` | Only public posts |
+| `free` | Only free posts |
+| `paid` | Only paid posts |
 
 ---
 
@@ -236,9 +329,38 @@ When content is rendered:
 1. `HasMarkdownExtensions#to_html` processes Markdown
 2. Inline collections are detected via regex
 3. `CollectionRenderer` fetches matching records
-4. Results are filtered by tags, post_type, etc.
-5. Template applied to generate HTML
-6. Collections are wrapped in grid sections if consecutive
+4. `CollectionMembersFilter` applies audience/paid content filtering
+5. Results are filtered by tags, post_type, etc.
+6. Template applied to generate HTML
+7. `CollectionGridProcessor` wraps consecutive collections in grid sections
+
+### Collection Services
+
+**CollectionRenderer** (`app/services/collection_renderer.rb`)
+- Parses collection parameters from Markdown
+- Queries database for matching content
+- Applies filters (tags, post_type, order, limit)
+- Returns collection items ready for template rendering
+
+**CollectionMembersFilter** (`app/services/collection_members_filter.rb`)
+- Filters paid content based on member authentication
+- Respects `show_paid` parameter overrides
+- Applies site-wide `show_paid_content` setting from members config
+- Hides `audience: paid` content from non-members unless explicitly shown
+
+**CollectionGridProcessor** (`app/services/collection_grid_processor.rb`)
+- Post-processes rendered HTML
+- Detects consecutive collection sections
+- Wraps adjacent collections in grid layout containers
+- Enables 2-column, 3-column layouts automatically
+
+### Performance Considerations
+
+- Collections query the database on each render (cached per request)
+- Static generation pre-renders collections to HTML
+- Avoid `limit: all` on large content libraries
+- Use specific `tags` filters to reduce query scope
+- Collections in static sites are pre-generated (no runtime overhead)
 
 ### Consecutive Collections
 
@@ -260,8 +382,56 @@ Renders as a 2-column grid layout.
 
 ---
 
+## Troubleshooting
+
+### Collection not showing content
+
+**Check:**
+1. Content status is `published` (not `draft`)
+2. Content matches collection filters (tags, post_type, audience)
+3. For members-only content: user is authenticated with appropriate tier
+4. Content exists in database (run `bin/rails content:sync`)
+
+### Paid content showing to everyone
+
+**Check:**
+- Collection doesn't have `show_paid: true`
+- Site config `members.everyone.show_paid_content` is `false`
+- Member authentication is working
+- `CollectionMembersFilter` is being applied
+
+### Grid layout not working
+
+**Check:**
+- Collections are consecutive (no content between them)
+- Both collections render successfully
+- `CollectionGridProcessor` running (check for JavaScript errors)
+- CSS grid styles are loaded
+
+### Podcast collection empty
+
+**Check:**
+- `post_type: podcast` is set
+- `podcast:` key matches podcast config key
+- Episodes have published status
+- Podcast episodes in correct format
+
+### Products not displaying
+
+**Check:**
+- `source: products` is set
+- Products exist in `site/products/`
+- Products synced to database
+- Using `template: grid` for best display
+
+---
+
 ## Related
 
 - [Content System](./02-content-system.md) - Frontmatter and status
 - [Markdown Extensions](./04-markdown-extensions.md) - Other Markdown features
 - [Static Generation](./05-sync-generation.md) - How collections are pre-rendered
+- [Members & Authentication](./11-members-authentication.md) - Content gating and audience filtering
+- [Podcasts](./13-podcasts.md) - Podcast episode collections
+- [Products & Store](./16-products-store.md) - Product catalog and store collections
+- [Troubleshooting](./18-troubleshooting.md) - Common issues and solutions

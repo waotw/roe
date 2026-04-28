@@ -187,3 +187,6 @@ This is text with a footnote<sup id="fnref-1"><a href="#fn-1">1</a></sup>.
 - [Collections](./03-collections.md) - Grouping content by metadata
 - [Markdown Extensions](./04-markdown-extensions.md) - Cards, galleries, pullquotes
 - [Configuration](./06-configuration.md) - site.yml structure
+- [Members & Authentication](./11-members-authentication.md) - Access control and content gating
+- [Podcasts](./13-podcasts.md) - Podcast post type and audio content
+- [Media System](./17-media-system.md) - Image variants and media handling

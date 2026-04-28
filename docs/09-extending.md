@@ -311,3 +311,5 @@ After adding features:
 - [Markdown Extensions](./04-markdown-extensions.md) - Existing extensions
 - [Collections](./03-collections.md) - Collection system
 - [Sync & Generation](./05-sync-generation.md) - Static generation process
+- [Testing](./19-testing.md) - Testing your extensions
+- [Troubleshooting](./18-troubleshooting.md) - Debugging issues

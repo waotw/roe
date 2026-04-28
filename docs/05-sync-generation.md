@@ -192,3 +192,5 @@ static:
 - [Collections](./03-collections.md) - Collection rendering
 - [Markdown Extensions](./04-markdown-extensions.md) - Card and gallery processing
 - [Extending](./09-extending.md) - What to update when adding features
+- [Media System](./17-media-system.md) - Media handling during sync and generation
+- [Deployment](./20-deployment.md) - Production deployment of static sites
