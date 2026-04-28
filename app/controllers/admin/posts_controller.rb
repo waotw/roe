@@ -616,6 +616,33 @@ class Admin::PostsController < Admin::BaseController
       }
     end
 
+    # Soft prompt: when a podcast post has no `podcast:` value yet, ask
+    # which feed it should join (or explicitly pick "local-only"). The
+    # field isn't strictly required — Substack-style "local-only" episodes
+    # are a valid mode — but we want the writer to make the call once at
+    # publish time rather than silently ship an unconnected episode.
+    # Suppressed once the value is set so we don't re-prompt on every edit.
+    if post.post_type == 'podcast' && post.metadata['podcast'].to_s.strip.empty?
+      feed_keys = PodcastConfig.podcast_keys
+      if feed_keys.any?
+        feed_options = feed_keys.map do |key|
+          title = PodcastConfig.get(key)&.dig('title').to_s.strip.presence || key
+          [key, title, "Add this episode to the #{title} RSS feed"]
+        end
+        feed_options << ['', 'Local-only', "This episode appears on the site but doesn't go out in any RSS feed"]
+
+        requirements << {
+          name: 'podcast',
+          type: :radio,
+          label: 'Podcast feed',
+          hint: 'Which feed should this episode appear in?',
+          options: feed_options,
+          default: '',
+          current: post.metadata['podcast']
+        }
+      end
+    end
+
     # Media files that are set in metadata but don't exist on disk. Surface
     # them in the modal so the user can fix a typo before the post goes live.
     already_listed = requirements.map { |r| r[:name] }

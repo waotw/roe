@@ -57,6 +57,23 @@ class Admin::ImportsController < Admin::BaseController
     @import.status = :importing_posts
     @import.started_at = Time.current
     @import.error_message = nil
+
+    # Optional podcast RSS feed enrichment. Fetched synchronously here so
+    # the URL (which may contain a paywall token for private feeds) never
+    # leaves the controller process — the parsed result is stored on the
+    # Import for the background job to use, then scrubbed once the import
+    # completes (see Import#scrub_rss_data!).
+    rss_url = params.dig(:import, :rss_url).to_s.strip
+    if rss_url.present?
+      result = PodcastFeedFetcher.fetch(rss_url)
+      if result.success?
+        @import.rss_data = result.data
+        flash[:notice] = "Podcast RSS feed loaded — #{result.data[:items].size} episodes will be enriched."
+      else
+        flash[:alert] = "Could not load RSS feed: #{result.error}. Continuing without it."
+      end
+    end
+
     @import.save!
 
     # Start the import job

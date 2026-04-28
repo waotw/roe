@@ -1051,9 +1051,12 @@ export default class extends Controller {
             return "full";
           }
           if (fieldName === "podcast") {
-            // Auto-select first podcast (or only podcast if there's just one)
-            const podcastOptions = config.options || [];
-            return podcastOptions.length > 0 ? podcastOptions[0] : "";
+            // Leave blank — `podcast:` is optional. A podcast post with no
+            // value renders on the site but doesn't appear in any RSS feed
+            // (matches Substack's "local-only" podcast pattern). Auto-
+            // selecting the first option misled imports of episodes that
+            // were intentionally never in a feed into looking connected.
+            return "";
           }
           return "";
         })();

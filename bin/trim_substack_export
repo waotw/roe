@@ -2,12 +2,24 @@
 
 require 'csv'
 require 'fileutils'
+require 'optparse'
 
 # Configuration
 IMPORT_DIR = File.expand_path('~/Downloads/P4MPjfCCR1q-9K81hwOokA')
 OUTPUT_DIR = File.expand_path('~/Downloads/ee-test-export')
 NUM_SUBSCRIBERS = 100
 NUM_POSTS = 20
+
+# CLI flags
+options = { ensure_podcasts: 0 }
+OptionParser.new do |opts|
+  opts.banner = "Usage: trim_substack_export [options]"
+  opts.on("--ensure-podcasts N", Integer,
+          "Force at least N podcast posts into the sample (default: 0). " \
+          "Useful for testing the RSS-feed enrichment path.") do |n|
+    options[:ensure_podcasts] = n
+  end
+end.parse!
 
 # Create output directory structure
 FileUtils.mkdir_p(OUTPUT_DIR)
@@ -40,16 +52,30 @@ CSV.open("#{OUTPUT_DIR}/#{email_list_filename}", 'w') do |csv|
 end
 puts "  Kept #{kept_email_addresses.count} of #{total_subscribers} subscribers (random sample)"
 
-# 2. Read posts.csv and sample random posts
+# 2. Read posts.csv and sample posts
 puts "\n2. Processing posts.csv..."
 posts_csv = CSV.read("#{IMPORT_DIR}/posts.csv", headers: true)
 total_posts = posts_csv.count
-kept_posts = posts_csv.entries.sample(NUM_POSTS)
+
+ensure_podcasts = options[:ensure_podcasts]
+if ensure_podcasts > 0
+  # Force N podcast posts into the sample first, then fill the remaining
+  # slots with a random sample of any-type posts. Lets the RSS-enrichment
+  # path get exercised on every run regardless of the random seed.
+  podcast_posts = posts_csv.entries.select { |r| r['type'].to_s == 'podcast' }
+  forced = podcast_posts.sample([ ensure_podcasts, podcast_posts.size ].min)
+  remaining_slots = [ NUM_POSTS - forced.size, 0 ].max
+  random_others = (posts_csv.entries - forced).sample(remaining_slots)
+  kept_posts = forced + random_others
+  puts "  Forced #{forced.size} podcast posts (of #{podcast_posts.size} available); filled #{random_others.size} more at random"
+else
+  kept_posts = posts_csv.entries.sample(NUM_POSTS)
+end
 
 # Extract post IDs (the number part before the dot)
 kept_post_ids = kept_posts.map { |row| row['post_id'].split('.').first }.compact
 
-puts "  Selected #{kept_post_ids.count} random posts from #{total_posts}"
+puts "  Selected #{kept_post_ids.count} posts from #{total_posts}"
 
 # Write filtered posts.csv
 CSV.open("#{OUTPUT_DIR}/posts.csv", 'w') do |csv|

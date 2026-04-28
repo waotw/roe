@@ -2,11 +2,16 @@
 
 module SubstackImporter
   class Frontmatter
-    def initialize(site_root:, default_published_to: nil)
+    def initialize(site_root:, default_published_to: nil, rss_items: nil, podcast_key: nil)
       @site_root = site_root
       # Default to "site" when not set so imported posts always have a
       # valid published_to and don't trigger missing-required warnings.
       @default_published_to = default_published_to.presence || "site"
+      # Optional RSS lookup map (substack_post_id → rss item hash). When
+      # present, the importer uses RSS data as the source of truth for
+      # podcast episodes (guid, duration, image, explicit, author).
+      @rss_items = rss_items
+      @podcast_key = podcast_key
     end
 
     def build(post, local_media: {})
@@ -26,37 +31,71 @@ module SubstackImporter
         fm["published_to"] = @default_published_to
       end
 
-      # Image: always add expected path (even if file doesn't exist yet)
-      # This allows missing media manager to verify/fix later
+      # Image: prefer per-episode RSS artwork for podcasts (downloaded by
+      # media_handler); fall back to cover image / expected path / remote URL.
+      rss_item = rss_item_for(post)
       image_path = local_media[:cover_image] || expected_image_path(post) || resolve_image_path(post)
       fm["image"] = image_path if image_path.present?
 
-      # Podcast-specific fields. Substack reports duration as a float in
-      # seconds (e.g. 2163.591) via its live JSON; we convert it to Roe's
-      # HH:MM:SS format. Source is `live_fetcher.rb` — only populated when
-      # an accurate base_url is configured so the live fetch can reach the
-      # publication.
+      # Podcast-specific fields. When RSS data is available it's the source
+      # of truth (it comes straight from Substack's authoritative feed);
+      # otherwise we fall back to live_fetcher / CSV data.
       if post.type == "podcast"
+        # Only assign to a podcast feed if this episode was actually IN the
+        # RSS feed (i.e., Substack listed it as part of that show — paid
+        # "podcast" posts that weren't subscribable on Substack don't
+        # belong in Roe's RSS feed for this show either). The user can
+        # opt in manually by adding `podcast: <key>` to the post's
+        # frontmatter later.
+        fm["podcast"] = @podcast_key if @podcast_key.present? && rss_item
+
         fm["episode_number"] = post.podcast_episode_number if post.podcast_episode_number
         fm["season"] = post.podcast_season_number if post.podcast_season_number
         fm["episode_type"] = post.podcast_episode_type.to_s if post.podcast_episode_type
 
-        # Audio: write the expected path only when audio was actually attempted
-        # (i.e., Substack reported a podcast_url). For a video-only podcast,
-        # podcast_url is empty and we skip the field entirely so it doesn't
-        # appear as a phantom "missing media" warning in admin.
+        # Audio: write the expected path for every podcast post unless it's
+        # clearly video-only. "Clearly video-only" = a Mux video is set AND
+        # no audio source was reported (no podcast_url from Substack, no
+        # RSS enclosure). Substack's "local-only" podcasts (audio episodes
+        # never published to a public RSS feed) often have neither a
+        # podcast_url nor an RSS item, but the user still needs the audio
+        # path written so the admin's "missing media" resolver gives them
+        # a place to drop the file.
         audio_path = local_media[:audio]
-        audio_path ||= expected_audio_path(post) if post.podcast_url.present?
+        if audio_path.nil?
+          has_audio_source = post.podcast_url.present? || rss_item&.dig("enclosure_url").present?
+          is_video_only = post.video_mux_playback_id.present? && !has_audio_source
+          audio_path = expected_audio_path(post) unless is_video_only
+        end
         fm["audio"] = audio_path if audio_path.present?
 
-        if post.podcast_duration.present?
-          total_seconds = post.podcast_duration.to_f.to_i
+        # Duration: prefer RSS itunes:duration (clean integer seconds);
+        # fall back to live-fetched podcast_duration.
+        duration_seconds = rss_item&.dig("duration").presence&.to_i
+        duration_seconds ||= post.podcast_duration.to_f.to_i if post.podcast_duration.present?
+        if duration_seconds && duration_seconds > 0
           fm["duration"] = format(
             "%02d:%02d:%02d",
-            total_seconds / 3600,
-            (total_seconds % 3600) / 60,
-            total_seconds % 60
+            duration_seconds / 3600,
+            (duration_seconds % 3600) / 60,
+            duration_seconds % 60
           )
+        end
+
+        # GUID: from RSS only. Substack format is `substack:post:NNN` and
+        # we store it as-is so podcast subscribers' apps see the same GUID
+        # they did from Substack — no migration-day re-download spam.
+        fm["guid"] = rss_item["guid"] if rss_item && rss_item["guid"].present?
+
+        # Explicit: RSS itunes:explicit is "Yes"/"No" (sometimes
+        # "true"/"false"). Map to Roe's boolean string.
+        if rss_item && rss_item["explicit"].present?
+          fm["explicit"] = %w[yes true].include?(rss_item["explicit"].to_s.downcase) ? "true" : "false"
+        end
+
+        # Author: per-episode override from RSS itunes:author.
+        if rss_item && rss_item["author"].present?
+          fm["author"] = rss_item["author"]
         end
       end
 
@@ -155,6 +194,11 @@ module SubstackImporter
     def expected_video_path(post)
       return nil unless post.type == "video" || post.video_mux_playback_id.present?
       "/media/video/#{post.slug}.mp4"
+    end
+
+    def rss_item_for(post)
+      return nil unless @rss_items
+      @rss_items[post.id.to_s]
     end
   end
 end

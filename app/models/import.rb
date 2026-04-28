@@ -121,4 +121,22 @@ class Import < ApplicationRecord
 
     FileUtils.rm_rf(extract_path)
   end
+
+  # Build a substack_post_id → rss_item lookup hash for fast per-episode
+  # access during import. Returns nil when no RSS data was captured.
+  def rss_items_by_post_id
+    return nil unless rss_data.is_a?(Hash)
+    items = rss_data["items"] || rss_data[:items] || []
+    items.each_with_object({}) do |item, h|
+      pid = item["substack_post_id"] || item[:substack_post_id]
+      h[pid.to_s] = item if pid.present?
+    end
+  end
+
+  # Clear the rss_data column once an import is done with it. The parsed
+  # data contains token-bearing enclosure URLs (paid Substack feeds) that
+  # we don't want lingering in the DB after the import completes.
+  def scrub_rss_data!
+    update_column(:rss_data, nil) if rss_data.present?
+  end
 end

@@ -177,6 +177,7 @@ Rails.application.routes.draw do
 
     get "configs/podcast/edit", to: "configs#edit_podcast", as: "edit_podcast_config"
     patch "configs/podcast", to: "configs#update_podcast", as: "podcast_config"
+    post "configs/podcast/seed_from_rss", to: "configs#seed_podcast_from_rss", as: "seed_podcast_config_from_rss"
 
     get "configs/cards/edit", to: "configs#edit_cards", as: "edit_cards_config"
     patch "configs/cards", to: "configs#update_cards", as: "cards_config"

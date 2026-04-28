@@ -121,19 +121,32 @@ module SubstackImporter
         Rails.logger.warn "[SubstackImporter] No base_url provided, skipping live data fetch"
       end
 
+      # Build the RSS lookup map (substack_post_id → rss_item) once,
+      # passed to media_handler and frontmatter so they can prefer RSS
+      # data for podcasts when available.
+      rss_items = @import.rss_items_by_post_id
+      podcast_key = derive_podcast_key_from_rss(rss_items)
+
       # Setup media handler
       site_root = Rails.root.join("site").to_s
       media_handler = MediaHandler.new(
         site_root: site_root,
         import: @import,
-        verbose: Rails.env.development?
+        verbose: Rails.env.development?,
+        rss_items: rss_items
       )
 
       # Setup frontmatter builder
       frontmatter = Frontmatter.new(
         site_root: site_root,
-        default_published_to: @import.options["default_published_to"]
+        default_published_to: @import.options["default_published_to"],
+        rss_items: rss_items,
+        podcast_key: podcast_key
       )
+
+      # If we have RSS channel data, seed/update the podcast.yml entry so
+      # imported episodes' `podcast: <key>` field references a valid show.
+      seed_podcast_config_from_rss(podcast_key) if podcast_key
 
       # Setup converter
       converter = Converter.new(
@@ -159,6 +172,11 @@ module SubstackImporter
         stats: @import.stats.merge(@stats),
         completed_at: Time.current
       )
+
+      # Drop the RSS data now that we're done with it. The parsed feed
+      # contains token-bearing enclosure URLs we don't want lingering
+      # in the DB after the import is finished.
+      @import.scrub_rss_data!
 
       # Complete phase 2
       @import.complete_phase!(2)
@@ -346,6 +364,32 @@ module SubstackImporter
 
       # Otherwise just use the extract root (files might be flat)
       extract_path
+    end
+
+    # Derive a slug-style podcast key from the RSS channel title
+    # (e.g. "Expressive Egg Podcast" → "expressive-egg-podcast"). Used
+    # both as the key in podcast.yml and as the value of each imported
+    # episode's `podcast:` field. Returns nil if no RSS data.
+    def derive_podcast_key_from_rss(rss_items)
+      return nil unless rss_items
+      channel = @import.rss_data["channel"] || @import.rss_data[:channel] || {}
+      title = channel["title"] || channel[:title]
+      return nil if title.blank?
+      PodcastConfigSeeder.derive_key(title)
+    end
+
+    # Create or update a podcast.yml entry from the RSS channel data so
+    # imported episodes' `podcast:` references resolve. Downloads the
+    # podcast artwork to /site/system/images/<key>-artwork.<ext>.
+    def seed_podcast_config_from_rss(podcast_key)
+      channel = @import.rss_data["channel"] || @import.rss_data[:channel]
+      return unless channel
+
+      seeder = PodcastConfigSeeder.new(podcast_key, channel.transform_keys(&:to_s))
+      seeder.seed!
+      Rails.logger.info "[SubstackImporter] Seeded podcast.yml entry: #{podcast_key}"
+    rescue => e
+      Rails.logger.error "[SubstackImporter] Failed to seed podcast config for #{podcast_key}: #{e.message}"
     end
   end
 end

@@ -128,6 +128,28 @@
           </div>
         <% end %>
 
+        <%
+          # GUID confirmation box for Substack-imported podcast episodes.
+          # The GUID is what podcast clients use to dedupe episodes — once
+          # this post is published, Roe locks it. We surface it here so
+          # the user can verify (read-only) that the original Substack
+          # GUID is what'll be published.
+          imported_post = local_assigns[:item] || @post
+          show_guid_confirmation = imported_post.respond_to?(:metadata) &&
+                                   imported_post.metadata['substack_post_id'].present? &&
+                                   imported_post.metadata['guid'].present? &&
+                                   imported_post.post_type == 'podcast'
+        %>
+        <% if show_guid_confirmation %>
+          <div class="bg-blue-50 border border-blue-300 p-4 text-sm">
+            <p class="font-semibold text-blue-900 mb-1">Imported podcast GUID</p>
+            <p class="text-blue-800 text-xs mb-2">
+              Inherited from the Substack RSS feed. Locked once published so podcast subscribers' apps continue to recognize this episode.
+            </p>
+            <code class="block font-mono text-xs bg-white border border-blue-200 px-2 py-1 select-all"><%= imported_post.metadata['guid'] %></code>
+          </div>
+        <% end %>
+
         <div class="flex items-center gap-3 pt-2">
           <button type="button"
                   data-action="click->editor#completePublish"

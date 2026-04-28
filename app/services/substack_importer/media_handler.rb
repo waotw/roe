@@ -4,10 +4,11 @@ module SubstackImporter
   class MediaHandler
     attr_reader :site_root, :downloaded, :url_mappings, :existing_media
 
-    def initialize(site_root:, import: nil, verbose: false)
+    def initialize(site_root:, import: nil, verbose: false, rss_items: nil)
       @site_root = site_root
       @import = import
       @verbose = verbose
+      @rss_items = rss_items
       @downloaded = []
       @url_mappings = {} # remote_url => local_path
       @existing_media = {} # remote_url => medium record
@@ -102,9 +103,12 @@ module SubstackImporter
     end
 
     def download_cover_image(post, missing)
-      return nil if post.cover_image.nil? || post.cover_image.empty?
-
-      src = post.cover_image
+      # For podcast episodes, prefer the per-episode artwork from the RSS
+      # itunes:image (when an RSS feed was provided). Substack hosts a
+      # different image per episode in the feed, separate from the
+      # post's cover image — this gives every episode its own artwork.
+      src = rss_episode_image_for(post) || post.cover_image
+      return nil if src.nil? || src.empty?
       return nil if src.start_with?("/")
 
       begin
@@ -125,6 +129,18 @@ module SubstackImporter
         Rails.logger.error "  Invalid cover image URL: #{e.message}" if @verbose
         nil
       end
+    end
+
+    def rss_episode_image_for(post)
+      return nil unless @rss_items
+      item = @rss_items[post.id.to_s]
+      item && item["image_url"].presence
+    end
+
+    def rss_audio_url_for(post)
+      return nil unless @rss_items
+      item = @rss_items[post.id.to_s]
+      item && item["enclosure_url"].presence
     end
 
     def download_image(url, filename)
@@ -166,13 +182,11 @@ module SubstackImporter
         end
 
         @url_mappings[url] = result
-        # Create medium record and associate with this import (for rollback tracking)
-        Medium.create!(
-          file_path: file_path,
-          source_url: url,
-          import: @import,
-          uploaded_at: Time.current
-        )
+        # Upsert by file_path. Plain create! collides when a Medium row
+        # already exists at this path — happens when the user deleted the
+        # file from disk but the DB row survived, or when the URL rotated
+        # (RSS tokens change per session) so the source_url lookup missed.
+        upsert_medium!(file_path: file_path, source_url: url, uploaded_at: Time.current)
         file_path
       end
     end
@@ -227,7 +241,10 @@ module SubstackImporter
     end
 
     def download_audio(post, missing)
-      url = post.podcast_url
+      # Prefer the RSS enclosure URL (authoritative, includes paid-feed
+      # token) over the live-fetched podcast_url. Falls back when no
+      # RSS data was provided.
+      url = rss_audio_url_for(post) || post.podcast_url
       expected_path = "/media/audio/#{post.slug}.mp3"
 
       return nil if url.nil? || url.empty?
@@ -258,13 +275,7 @@ module SubstackImporter
 
       result = download_file(url, dest)
       if result
-        # Create medium record and associate with this import
-        Medium.create!(
-          file_path: file_path,
-          source_url: url,
-          import: @import,
-          uploaded_at: Time.current
-        )
+        upsert_medium!(file_path: file_path, source_url: url, uploaded_at: Time.current)
         file_path
       else
         # Track missing audio with expected path
@@ -310,13 +321,7 @@ module SubstackImporter
 
       result = download_file(url, dest)
       if result
-        # Create medium record and associate with this import
-        Medium.create!(
-          file_path: file_path,
-          source_url: url,
-          import: @import,
-          uploaded_at: Time.current
-        )
+        upsert_medium!(file_path: file_path, source_url: url, uploaded_at: Time.current)
         file_path
       else
         # Track missing video with expected path
@@ -325,9 +330,41 @@ module SubstackImporter
       end
     end
 
+    # Upsert a Medium row for a freshly-downloaded file. Replaces plain
+    # Medium.create! at the end of each download_* method so we don't trip
+    # the file_path UNIQUE constraint when:
+    #   - The file was deleted from disk but the DB row was left behind
+    #     (orphaned record from a prior import that wasn't rolled back).
+    #   - The source_url changed between imports (e.g. RSS enclosure URLs
+    #     with rotating session tokens) so the find_by(source_url:) lookup
+    #     missed an existing row that points at the same destination path.
+    #   - The ContentWatcher (Listen-based file watcher) sees the freshly
+    #     downloaded file land in site/media/ and races us to insert the
+    #     Medium row before our save! runs. find_or_initialize_by checked
+    #     before the watcher's insert, save! runs after — UNIQUE blows up.
+    # Always re-associates with the current import so rollback can clean
+    # up the freshly-downloaded file.
+    def upsert_medium!(file_path:, source_url:, uploaded_at:)
+      medium = Medium.find_or_initialize_by(file_path: file_path)
+      medium.source_url = source_url
+      medium.import = @import
+      medium.uploaded_at = uploaded_at
+      medium.save!
+      medium
+    rescue ActiveRecord::RecordNotUnique
+      # Lost the race with ContentWatcher. Re-fetch the row it inserted
+      # and stamp our import association onto it so rollback still works.
+      medium = Medium.find_by!(file_path: file_path)
+      medium.update!(source_url: source_url, import: @import, uploaded_at: uploaded_at)
+      medium
+    end
+
     def download_file(url, dest, redirect_limit: 5)
       return dest if File.exist?(dest)
-      return nil if redirect_limit <= 0
+      if redirect_limit <= 0
+        Rails.logger.error "[SubstackImporter] Too many redirects when downloading: #{url}"
+        return nil
+      end
 
       FileUtils.mkdir_p(File.dirname(dest))
 
@@ -335,37 +372,47 @@ module SubstackImporter
 
       uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme == "https"
+      http.use_ssl = (uri.scheme == "https")
       http.open_timeout = 15
-      http.read_timeout = 120
+      # Large podcasts can take a few minutes on slower connections.
+      # The previous 120s default was tripping for ~60MB+ episodes.
+      http.read_timeout = 600
 
       request = Net::HTTP::Get.new(uri)
       request["User-Agent"] = "Mozilla/5.0 (compatible; SubstackImporter/#{VERSION})"
 
-      response = http.request(request)
-
-      case response
-      when Net::HTTPSuccess
-        File.binwrite(dest, response.body)
-        @downloaded << dest
-        dest
-      when Net::HTTPRedirection
-        # Follow redirect
-        new_url = response["location"]
-        if new_url
-          # Handle relative redirects
-          new_url = URI.join(url, new_url).to_s unless new_url.start_with?("http")
-          download_file(new_url, dest, redirect_limit: redirect_limit - 1)
+      # Stream the body straight to disk so we never hold the whole file
+      # in memory — important for hour-long podcast MP3s.
+      result = nil
+      http.request(request) do |response|
+        case response
+        when Net::HTTPSuccess
+          File.open(dest, "wb") do |f|
+            response.read_body { |chunk| f.write(chunk) }
+          end
+          @downloaded << dest
+          result = dest
+        when Net::HTTPRedirection
+          new_url = response["location"]
+          if new_url.present?
+            new_url = URI.join(url, new_url).to_s unless new_url.start_with?("http")
+            result = download_file(new_url, dest, redirect_limit: redirect_limit - 1)
+          else
+            Rails.logger.error "[SubstackImporter] Redirect without location header for #{url}"
+          end
         else
-          Rails.logger.error "  Redirect without location: #{url}" if @verbose
-          nil
+          Rails.logger.error "[SubstackImporter] Download failed: HTTP #{response.code} #{response.message} for #{url}"
         end
-      else
-        Rails.logger.error "  Download failed (#{response.code}): #{url}" if @verbose
-        nil
       end
+
+      result
+    rescue Net::ReadTimeout, Net::OpenTimeout => e
+      Rails.logger.error "[SubstackImporter] Timeout downloading #{url}: #{e.message}"
+      File.delete(dest) if File.exist?(dest)  # clean up any partial file
+      nil
     rescue => e
-      Rails.logger.error "  Download error: #{e.message}" if @verbose
+      Rails.logger.error "[SubstackImporter] Download error (#{e.class}) for #{url}: #{e.message}"
+      File.delete(dest) if File.exist?(dest)
       nil
     end
   end

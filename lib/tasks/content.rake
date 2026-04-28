@@ -92,9 +92,12 @@ namespace :site do
     timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
     backup_dir = "./site_backups/#{timestamp}"
 
-    # Find most recent backup for hard-linking
+    # Find most recent NON-EMPTY backup for hard-linking. Skipping
+    # empties matters: if a prior backup ran but rsync failed silently
+    # (the bug this task was guarding against), we don't want to point
+    # --link-dest at an empty dir — it'd waste a full transfer.
     previous_backups = Dir.glob("./site_backups/20*").sort
-    previous_backup = previous_backups.last
+    previous_backup = previous_backups.reverse.find { |d| Dir.exist?(d) && !Dir.empty?(d) }
 
     # Build rsync command
     rsync_cmd = "rsync -avP"
@@ -113,9 +116,33 @@ namespace :site do
     # Create backup directory
     FileUtils.mkdir_p(backup_dir)
 
-    # Execute rsync - backs up EVERYTHING including both DB folders
+    # Execute rsync - backs up EVERYTHING including both DB folders.
+    # IMPORTANT: must check exit status. If rsync fails (e.g. fly-rsync
+    # transport breaks) the dir we just made would be empty, and the
+    # original task would still update `latest` and rotate-out real
+    # backups — that's how all 15 existing backup dirs ended up empty.
     rsync_cmd += " -e ./bin/fly-rsync #{machine}:/data/site/ #{backup_dir}/"
-    system(rsync_cmd)
+    success = system(rsync_cmd)
+    exit_status = $?.exitstatus
+
+    unless success
+      puts "\n❌ Backup failed (rsync exit status #{exit_status})."
+      puts "   Removing empty backup dir: #{timestamp}"
+      FileUtils.rm_rf(backup_dir)
+      puts "   Leaving previous backups and 'latest' symlink untouched."
+      exit 1
+    end
+
+    # Belt-and-suspenders: rsync can occasionally exit 0 with nothing
+    # transferred under broken transports. An empty dir is never a
+    # successful backup, so refuse to advance state.
+    if Dir.empty?(backup_dir)
+      puts "\n❌ Backup dir is empty after rsync — transport is broken."
+      puts "   Removing empty backup dir: #{timestamp}"
+      FileUtils.rm_rf(backup_dir)
+      puts "   Leaving previous backups and 'latest' symlink untouched."
+      exit 1
+    end
 
     # Update 'latest' symlink
     latest_link = "./site_backups/latest"

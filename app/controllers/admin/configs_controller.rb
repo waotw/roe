@@ -68,7 +68,7 @@ class Admin::ConfigsController < ApplicationController
         'active' => {
           type: :select,
           label: 'Active Theme',
-          options: ['egg', 'default'],
+          options: [ 'egg', 'default' ],
           hint: 'Select the theme for your site'
         }
       }
@@ -117,25 +117,25 @@ class Admin::ConfigsController < ApplicationController
 
   def itunes_subcategories
     {
-      'Arts' => ['Books', 'Design', 'Fashion & Beauty', 'Food', 'Performing Arts', 'Visual Arts'],
-      'Business' => ['Careers', 'Entrepreneurship', 'Investing', 'Management', 'Marketing', 'Non-Profit'],
-      'Comedy' => ['Comedy Interviews', 'Improv', 'Stand-Up'],
-      'Education' => ['Courses', 'How To', 'Language Learning', 'Self-Improvement'],
-      'Fiction' => ['Comedy Fiction', 'Drama', 'Science Fiction'],
-      'Government' => [],  # ← Add these categories with empty arrays
-      'Health & Fitness' => ['Alternative Health', 'Fitness', 'Medicine', 'Mental Health', 'Nutrition', 'Sexuality'],
+      'Arts' => [ 'Books', 'Design', 'Fashion & Beauty', 'Food', 'Performing Arts', 'Visual Arts' ],
+      'Business' => [ 'Careers', 'Entrepreneurship', 'Investing', 'Management', 'Marketing', 'Non-Profit' ],
+      'Comedy' => [ 'Comedy Interviews', 'Improv', 'Stand-Up' ],
+      'Education' => [ 'Courses', 'How To', 'Language Learning', 'Self-Improvement' ],
+      'Fiction' => [ 'Comedy Fiction', 'Drama', 'Science Fiction' ],
+      'Government' => [],  # ← No subcategories
+      'Health & Fitness' => [ 'Alternative Health', 'Fitness', 'Medicine', 'Mental Health', 'Nutrition', 'Sexuality' ],
       'History' => [],  # ← No subcategories
-      'Kids & Family' => ['Education for Kids', 'Parenting', 'Pets & Animals', 'Stories for Kids'],
-      'Leisure' => ['Animation & Manga', 'Automotive', 'Aviation', 'Crafts', 'Games', 'Hobbies', 'Home & Garden', 'Video Games'],
-      'Music' => ['Music Commentary', 'Music History', 'Music Interviews'],
-      'News' => ['Business News', 'Daily News', 'Entertainment News', 'News Commentary', 'Politics', 'Sports News', 'Tech News'],
-      'Religion & Spirituality' => ['Buddhism', 'Christianity', 'Hinduism', 'Islam', 'Judaism', 'Religion', 'Spirituality'],
-      'Science' => ['Astronomy', 'Chemistry', 'Earth Sciences', 'Life Sciences', 'Mathematics', 'Natural Sciences', 'Nature', 'Physics', 'Social Sciences'],
-      'Society & Culture' => ['Documentary', 'Personal Journals', 'Philosophy', 'Places & Travel', 'Relationships'],
-      'Sports' => ['Baseball', 'Basketball', 'Cricket', 'Fantasy Sports', 'Football', 'Golf', 'Hockey', 'Rugby', 'Running', 'Soccer', 'Swimming', 'Tennis', 'Volleyball', 'Wilderness', 'Wrestling'],
+      'Kids & Family' => [ 'Education for Kids', 'Parenting', 'Pets & Animals', 'Stories for Kids' ],
+      'Leisure' => [ 'Animation & Manga', 'Automotive', 'Aviation', 'Crafts', 'Games', 'Hobbies', 'Home & Garden', 'Video Games' ],
+      'Music' => [ 'Music Commentary', 'Music History', 'Music Interviews' ],
+      'News' => [ 'Business News', 'Daily News', 'Entertainment News', 'News Commentary', 'Politics', 'Sports News', 'Tech News' ],
+      'Religion & Spirituality' => [ 'Buddhism', 'Christianity', 'Hinduism', 'Islam', 'Judaism', 'Religion', 'Spirituality' ],
+      'Science' => [ 'Astronomy', 'Chemistry', 'Earth Sciences', 'Life Sciences', 'Mathematics', 'Natural Sciences', 'Nature', 'Physics', 'Social Sciences' ],
+      'Society & Culture' => [ 'Documentary', 'Personal Journals', 'Philosophy', 'Places & Travel', 'Relationships' ],
+      'Sports' => [ 'Baseball', 'Basketball', 'Cricket', 'Fantasy Sports', 'Football', 'Golf', 'Hockey', 'Rugby', 'Running', 'Soccer', 'Swimming', 'Tennis', 'Volleyball', 'Wilderness', 'Wrestling' ],
       'Technology' => [],  # ← No subcategories
       'True Crime' => [],  # ← No subcategories
-      'TV & Film' => ['After Shows', 'Film History', 'Film Interviews', 'Film Reviews', 'TV Reviews']  # ← Was missing
+      'TV & Film' => [ 'After Shows', 'Film History', 'Film Interviews', 'Film Reviews', 'TV Reviews' ]  # ← Was missing
     }
   end
 
@@ -205,7 +205,7 @@ class Admin::ConfigsController < ApplicationController
     @config_files = [
       {
         section: "Global",
-        files: [site_file, fonts_file]
+        files: [ site_file, fonts_file ]
       },
       {
         section: "Features",
@@ -273,6 +273,37 @@ class Admin::ConfigsController < ApplicationController
     # admin form to render the red asterisk next to the label).
     @field_required = PodcastConfig::REQUIRED_FIELDS
     render :edit
+  end
+
+  # Seed a podcast.yml entry from an RSS feed URL. The URL is fetched
+  # synchronously here so any paywall token in it stays in request scope —
+  # never persisted, never logged. Existing entries with the same key are
+  # overwritten (this action is explicitly user-initiated; if the user
+  # didn't want overwrite they wouldn't click the button).
+  def seed_podcast_from_rss
+    rss_url = params[:rss_url].to_s.strip
+
+    if rss_url.blank?
+      redirect_to admin_edit_podcast_config_path, alert: "Please paste a podcast RSS feed URL." and return
+    end
+
+    fetch = PodcastFeedFetcher.fetch(rss_url)
+    unless fetch.success?
+      redirect_to admin_edit_podcast_config_path, alert: "Could not load RSS feed: #{fetch.error}" and return
+    end
+
+    channel = fetch.data[:channel] || {}
+    title = channel[:title].to_s
+    if title.blank?
+      redirect_to admin_edit_podcast_config_path, alert: "Feed had no <title> — cannot derive a podcast key." and return
+    end
+
+    key = PodcastConfigSeeder.derive_key(title)
+    seeder = PodcastConfigSeeder.new(key, channel.transform_keys(&:to_s), mode: :overwrite)
+    result = seeder.seed!
+
+    redirect_to admin_edit_podcast_config_path,
+                notice: "Podcast '#{title}' seeded as '#{key}' (#{result})."
   end
 
   def update_podcast
@@ -492,7 +523,7 @@ class Admin::ConfigsController < ApplicationController
     all_subcategories = itunes_subcategories.values.flatten.sort
 
     base_options = {
-      'type' => ['episodic', 'serial'],
+      'type' => [ 'episodic', 'serial' ],
       'category' => [
         '', # Blank option
         'Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government',
@@ -508,12 +539,12 @@ class Admin::ConfigsController < ApplicationController
         'Sports', 'Technology', 'True Crime', 'TV & Film'
       ],
       # Note: subcategory/subcategory_2 are arrays, handled by JS
-      'language' => ['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh', 'ko', 'ru'],
-      'explicit' => ['false', 'true'],
-      'episode_type' => ['full', 'trailer', 'bonus'],
+      'language' => [ 'en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh', 'ko', 'ru' ],
+      'explicit' => [ 'false', 'true' ],
+      'episode_type' => [ 'full', 'trailer', 'bonus' ],
       # Per-podcast audience gate. Renders as a select when the field is
       # present (auto-surfaced above when payments are enabled).
-      'audience' => ['everyone', 'paid']
+      'audience' => [ 'everyone', 'paid' ]
     }
 
     # Build prefixed versions separately
@@ -550,10 +581,10 @@ class Admin::ConfigsController < ApplicationController
 
   def build_field_options_for_members
     {
-      'payments.enabled' => ['false', 'true'],
-      'payments.mode' => ['memberships', 'donations', 'both'],
-      'newsletter.enabled' => ['false', 'true'],
-      'everyone.show_paid_content' => ['true', 'false']
+      'payments.enabled' => [ 'false', 'true' ],
+      'payments.mode' => [ 'memberships', 'donations', 'both' ],
+      'newsletter.enabled' => [ 'false', 'true' ],
+      'everyone.show_paid_content' => [ 'true', 'false' ]
     }
   end
 

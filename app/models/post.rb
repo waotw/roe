@@ -61,8 +61,8 @@ class Post < ApplicationRecord
           hint: "Optional. Adds a video version of this episode (e.g., /media/video/episode-1.mp4). The site renders video when present; the RSS feed still uses the audio file." },
         { name: "duration", type: :text, required: true, label: "Duration",  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
-        { name: "podcast", type: :select, required: true, label: "Podcast",
-          hint: "Which podcast feed does this episode belong to?",
+        { name: "podcast", type: :select, label: "Podcast",
+          hint: "Which podcast feed does this episode belong to? Leave blank for a local-only episode that won't appear in any RSS feed.",
           options: -> { PodcastConfig.podcast_keys } },
         { name: "author", type: :text, label: "Author",
           hint: "Override podcast default author for this episode" },
