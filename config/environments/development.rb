@@ -16,7 +16,7 @@ Rails.application.configure do
   config.server_timing = true
 
   # Around line 8 or wherever config.hosts is mentioned
-  config.hosts << "6cd2-2600-1700-5d50-6cb0-7dad-6f7d-5123-e265.ngrok-free.app"
+  config.hosts << "bulginess-consult-esophagus.ngrok-free.dev"
 
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.

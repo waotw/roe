@@ -32,4 +32,35 @@ FactoryBot.define do
     sequence(:email_address) { |n| "test#{n}@example.com" }
     password_digest { BCrypt::Password.create("password") }
   end
+
+  factory :member do
+    sequence(:email) { |n| "member#{n}@example.com" }
+    sequence(:name) { |n| "Test Member #{n}" }
+    tier { :free }
+    status { :active }
+    newsletter_status { :subscribed }
+    
+    trait :paid do
+      tier { :paid }
+      password { "secure_password123" }
+      password_confirmation { "secure_password123" }
+      paid_at { Time.current }
+    end
+    
+    trait :cancelled do
+      status { :cancelled }
+      cancelled_at { Time.current }
+    end
+    
+    trait :unsubscribed do
+      newsletter_status { :unsubscribed }
+    end
+  end
+
+  factory :import do
+    source_type { 'substack' }
+    status { 'pending' }
+    configuration { {} }
+    stats { {} }
+  end
 end

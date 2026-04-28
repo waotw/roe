@@ -57,6 +57,8 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   gem 'letter_opener'
+
+  gem 'mocha'
 end
 
 group :development do

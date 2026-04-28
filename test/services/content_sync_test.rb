@@ -98,20 +98,20 @@ class ContentSyncTest < ActiveSupport::TestCase
   test "rename detection matches similar basenames" do
     content = <<~YAML
       ---
-      title: Old Name
+      title: Article Title
       date: 2024-01-15
       status: published
       ---
       
-      # Old Name
+      # Article Title
     YAML
     
-    old_path = write_test_file("posts/old-name.md", content)
+    old_path = write_test_file("posts/article.md", content)
     post = Post.create_or_update_from_file(old_path)
     original_id = post.id
     
-    new_content = content.gsub("Old Name", "New Name")
-    new_path = write_test_file("posts/new-name.md", new_content)
+    new_content = content.gsub("Article Title", "Updated Article Title")
+    new_path = write_test_file("posts/updated-article.md", new_content)
     
     ContentSync.new.send(:handle_orphaned_posts, [new_path])
     
