@@ -1864,6 +1864,9 @@ export default class extends Controller {
   }
 
   handleKeydown(event) {
+    // Only process shortcuts when textarea has focus
+    const isTextareaFocused = document.activeElement === this.textareaTarget;
+    
     // Cmd/Ctrl+S to save
     if ((event.metaKey || event.ctrlKey) && event.key === "s") {
       event.preventDefault();
@@ -1876,6 +1879,32 @@ export default class extends Controller {
       event.preventDefault();
       console.log("[KEYBOARD] Cmd/Ctrl+P pressed, opening preview");
       this.preview(event);
+    }
+    
+    // Formatting shortcuts - only when textarea is focused
+    if (isTextareaFocused && (event.metaKey || event.ctrlKey)) {
+      switch (event.key.toLowerCase()) {
+        case "b":
+          event.preventDefault();
+          console.log("[KEYBOARD] Cmd/Ctrl+B pressed - Bold");
+          this.insertBold(event);
+          break;
+        case "i":
+          event.preventDefault();
+          console.log("[KEYBOARD] Cmd/Ctrl+I pressed - Italic");
+          this.insertItalic(event);
+          break;
+        case "s":
+          event.preventDefault();
+          console.log("[KEYBOARD] Cmd/Ctrl+S pressed - Strikethrough");
+          this.insertStrike(event);
+          break;
+        case "k":
+          event.preventDefault();
+          console.log("[KEYBOARD] Cmd/Ctrl+K pressed - Link");
+          this.insertLink(event);
+          break;
+      }
     }
   }
 
