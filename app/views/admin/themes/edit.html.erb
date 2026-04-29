@@ -2,6 +2,10 @@
 <html>
 <head>
   <title>Edit Theme: <%= @theme_name.capitalize %></title>
+  <%= stylesheet_link_tag "codemirror/codemirror.min", "data-turbo-track": "reload" %>
+  <%= stylesheet_link_tag "codemirror/eclipse.min", "data-turbo-track": "reload" %>
+  <%= javascript_include_tag "codemirror/codemirror.min", "data-turbo-track": "reload" %>
+  <%= javascript_include_tag "codemirror/css.min", "data-turbo-track": "reload" %>
 </head>
 <body class="bg-white text-black p-5">
 
@@ -67,12 +71,12 @@
       <%= form.text_area :content,
                          value: @theme_content,
                          data: {
-                           css_editor_target: "textarea",
-                           action: "input->css-editor#trackChanges"
+                           css_editor_target: "textarea"
                          },
-                         class: "w-full font-mono text-sm p-4 border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500",
-                         style: "min-height: 70vh; tab-size: 2; overflow: hidden; resize: none;",
+                         class: "hidden",
                          spellcheck: "false" %>
+      <!-- CodeMirror editor container -->
+      <div data-css-editor-target="editorContainer" class="codemirror-wrapper"></div>
     <% end %>
 
     <div class="text-xs text-gray-500 font-mono mt-2">
