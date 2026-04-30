@@ -81,10 +81,10 @@ class ConfigGenerator
   end
 
   def self.generate_store
-    new.generate_store_defaults
+    generate_store_defaults
   end
 
-  def generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
+  def self.generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
     # Parse categories if it's a string
     categories = if product_categories.is_a?(String)
       product_categories.split(',').map(&:strip).map(&:downcase).reject(&:blank?)
@@ -92,11 +92,14 @@ class ConfigGenerator
       product_categories || []
     end
 
+    # Format categories for YAML output
+    categories_string = categories.any? ? categories.join(', ') : 'book, ebook, file'
+
     content = <<~YAML
       enabled: true
-      currency: "gbp"
-      default_domain: "19ce-2600-1700-5d50-6cb0-3472-8a05-1bf6-6464.ngrok-free.app"
-      product_categories: "book, ebook, file, paperback, pin, poster"
+      currency: "#{currency}"
+      default_domain: "#{default_domain}"
+      product_categories: "#{categories_string}"
       product_button_template: |
         ![Add Image Description](@image)
 

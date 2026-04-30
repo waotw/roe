@@ -141,19 +141,33 @@ class Admin::ConfigsController < ApplicationController
 
   def index
     # Site-level configs
-    site_file = {
-      name: "site.yml",
-      path: "global/site.yml",
-      type: "site",
-      edit_path: admin_edit_site_config_path
-    }
+    global_files = [
+      {
+        name: "site.yml",
+        path: "global/site.yml",
+        type: "site",
+        description: "Site title, URL, author info, and branding",
+        edit_path: admin_edit_site_config_path
+      },
+      {
+        name: "fonts.yml",
+        path: "global/fonts.yml",
+        type: "fonts",
+        description: "Custom font configuration",
+        edit_path: admin_edit_fonts_config_path
+      }
+    ]
 
-    fonts_file = {
-      name: "fonts.yml",
-      path: "global/fonts.yml",
-      type: "fonts",
-      edit_path: admin_edit_fonts_config_path
-    }
+    # Add development.yml if it exists
+    if File.exist?(SiteConfig::DEVELOPMENT_FILE)
+      global_files << {
+        name: "development.yml",
+        path: "global/development.yml",
+        type: "development",
+        description: "Development features and debugging (ngrok hosts, etc.)",
+        edit_path: admin_edit_development_config_path
+      }
+    end
 
     # Feature configs
     features_files = []
@@ -205,7 +219,7 @@ class Admin::ConfigsController < ApplicationController
     @config_files = [
       {
         section: "Global",
-        files: [ site_file, fonts_file ]
+        files: global_files
       },
       {
         section: "Features",
@@ -490,6 +504,86 @@ class Admin::ConfigsController < ApplicationController
     SiteConfig.reload!('features/store')
 
     flash[:notice] = "Store feature disabled successfully"
+    redirect_to admin_configs_path
+  end
+
+  def edit_development
+    development_config_path = SiteConfig::DEVELOPMENT_FILE
+
+    unless File.exist?(development_config_path)
+      flash[:alert] = "Development configuration doesn't exist."
+      redirect_to admin_configs_path and return
+    end
+
+    @config_type = 'development'
+    @config_content = File.read(development_config_path)
+    @config_hash = YAML.load(@config_content) || {}
+    @allowed_hosts = @config_hash['allowed_hosts'] || []
+    render :edit_development
+  end
+
+  def update_development
+    # Get hosts from params, filter out empty ones
+    hosts = params[:allowed_hosts]&.reject(&:blank?) || []
+    
+    # Build YAML content
+    if hosts.any?
+      yaml_content = "allowed_hosts:\n"
+      hosts.each do |host|
+        yaml_content += "  - #{host}\n"
+      end
+    else
+      yaml_content = "allowed_hosts: []\n"
+    end
+    
+    # Write to file
+    File.write(SiteConfig::DEVELOPMENT_FILE, yaml_content)
+    
+    # Sync to database
+    SiteConfig.sync_from_file('development')
+    
+    flash[:notice] = "Development configuration updated successfully"
+    redirect_to admin_configs_path
+  rescue => e
+    flash.now[:error] = "Failed to update configuration: #{e.message}"
+    @config_type = 'development'
+    @config_content = File.read(SiteConfig::DEVELOPMENT_FILE)
+    @config_hash = YAML.load(@config_content) || {}
+    @allowed_hosts = @config_hash['allowed_hosts'] || []
+    render :edit_development
+  end
+
+  def enable_development
+    unless Rails.env.development?
+      flash[:alert] = "Development features can only be enabled in development mode"
+      redirect_to admin_configs_path and return
+    end
+
+    if File.exist?(SiteConfig::DEVELOPMENT_FILE)
+      flash[:alert] = "Development configuration already exists"
+    else
+      # Create development.yml with default content
+      FileUtils.mkdir_p(SiteConfig::DEVELOPMENT_FILE.dirname)
+      File.write(SiteConfig::DEVELOPMENT_FILE, <<~YAML)
+        allowed_hosts:
+          - your-site.ngrok-free.app
+      YAML
+
+      SiteConfig.sync_from_file('development')
+      flash[:notice] = "Development features enabled! Edit development.yml to add allowed hosts."
+    end
+
+    redirect_to admin_configs_path
+  end
+
+  def delete_development
+    file_path = SiteConfig::DEVELOPMENT_FILE
+
+    File.delete(file_path) if File.exist?(file_path)
+    SiteConfig.find_by("file_path LIKE ?", "%development.yml")&.destroy
+    SiteConfig.reload!('development')
+
+    flash[:notice] = "Development configuration deleted successfully"
     redirect_to admin_configs_path
   end
 

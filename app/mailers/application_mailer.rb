@@ -1,4 +1,4 @@
 class ApplicationMailer < ActionMailer::Base
-  default from: "from@example.com"
+  default from: -> { SiteConfig.get('author_email').presence || "noreply@#{default_url_options[:host] || 'localhost'}" }
   layout "mailer"
 end

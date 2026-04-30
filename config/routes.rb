@@ -19,6 +19,7 @@ Rails.application.routes.draw do
     get "layout/footer/edit", to: "layouts#edit_footer"
     patch "layout/footer", to: "layouts#update_footer"
     get "layouts", to: "layouts#index"
+    post "layouts/generate_missing", to: "layouts#generate_missing", as: "generate_missing_admin_layouts"
 
     resources :posts, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       collection do
@@ -191,6 +192,11 @@ Rails.application.routes.draw do
 
     get "configs/store/edit", to: "configs#edit_store", as: "edit_store_config"
     patch "configs/store", to: "configs#update_store", as: "store_config"
+
+    get "configs/development/edit", to: "configs#edit_development", as: "edit_development_config"
+    patch "configs/development", to: "configs#update_development", as: "development_config"
+    post "configs/development/enable", to: "configs#enable_development", as: "enable_development_admin_configs"
+    delete "configs/development", to: "configs#delete_development", as: "delete_development_admin_configs"
 
     # Post template editor
     get "settings/post_template", to: "settings#edit_post_template"

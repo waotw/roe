@@ -31,6 +31,7 @@ class FeedGenerator
       maker.channel.link = site_config[:url]
       maker.channel.description = site_config[:description]
       maker.channel.updated = posts.first&.date&.to_time || Time.now
+      maker.channel.managingEditor = site_config[:author] if site_config[:author].present?
 
       posts.each do |post|
         maker.items.new_item do |item|
@@ -207,10 +208,10 @@ class FeedGenerator
 
   def default_site_config
     {
-      title: "My Blog",
-      description: "Blog posts and updates",
-      url: "http://localhost:3000",
-      author: "Site Author"
+      title: SiteConfig.get('title').presence || "My Site",
+      description: SiteConfig.get('description').presence || "Latest posts and updates",
+      url: SiteConfig.site_url.presence || "https://example.com",
+      author: SiteConfig.get('author_name').presence || SiteConfig.get('author_email').presence || "Site Author"
     }
   end
 

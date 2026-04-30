@@ -8,7 +8,13 @@
       </p>
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center uppercase text-sm mb-2 px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+      <% if Rails.env.development? && !File.exist?(Rails.root.join('site', 'system', 'global', 'development.yml')) %>
+        <%= button_to "Enable Dev Settings",
+                      admin_enable_development_admin_configs_path,
+                      method: :post,
+                      class: "inline-flex items-center uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+      <% end %>
     </div>
   </div>
 

@@ -6,6 +6,7 @@ class SiteConfig < ApplicationRecord
 
   SITE_FILE = SITE_PATH.join('site.yml')
   FONTS_FILE = SITE_PATH.join('fonts.yml')
+  DEVELOPMENT_FILE = SITE_PATH.join('development.yml')
 
   CACHE_KEY_PREFIX = 'site_config'
 
@@ -33,6 +34,20 @@ class SiteConfig < ApplicationRecord
     config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.fonts error: #{e.message}"
+    nil
+  end
+
+  # Get development config (advanced settings, hidden by default)
+  def self.development(key = nil)
+    return nil unless File.exist?(DEVELOPMENT_FILE)
+    config_data = YAML.load_file(DEVELOPMENT_FILE)
+
+    return config_data unless key
+
+    keys = key.to_s.split('.')
+    config_data&.dig(*keys)
+  rescue => e
+    Rails.logger.error "SiteConfig.development error: #{e.message}"
     nil
   end
 

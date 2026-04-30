@@ -15,8 +15,13 @@ Rails.application.configure do
   # Enable server timing.
   config.server_timing = true
 
-  # Around line 8 or wherever config.hosts is mentioned
-  config.hosts << "bulginess-consult-esophagus.ngrok-free.dev"
+  # Allow additional hosts from development config (e.g., ngrok for testing webhooks)
+  # These are configured in site/system/global/development.yml
+  if File.exist?(Rails.root.join('site', 'system', 'global', 'development.yml'))
+    dev_config = YAML.load_file(Rails.root.join('site', 'system', 'global', 'development.yml'))
+    allowed_hosts = dev_config&.dig('allowed_hosts') || []
+    allowed_hosts.each { |host| config.hosts << host }
+  end
 
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.

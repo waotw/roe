@@ -3,7 +3,7 @@
   <p class="mt-2 text-sm text-gray-700 font-sans">Edit header and footer that appear on all pages.</p>
 
   <div class="mt-8">
-    <table class="min-w-full divide-y divide-gray-300">
+    <table class="min-w-full divide-y divide-gray-300 border border-gray-200">
       <thead class="bg-gray-50">
         <tr>
           <th class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">File</th>
@@ -19,7 +19,14 @@
               <%= layout[:name] %>
             </td>
             <td class="py-4 pl-3 pr-4 text-right text-sm">
-              <%= link_to "Edit", layout[:path], class: "text-blue-600 hover:text-blue-900" %>
+              <% if layout[:exists] %>
+                <%= link_to "Edit", layout[:path], class: "text-blue-600 hover:text-blue-900" %>
+              <% else %>
+                <%= button_to "Create",
+                              admin_generate_missing_admin_layouts_path(file_key: layout[:file]),
+                              method: :post,
+                              class: "text-sm px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-sm" %>
+              <% end %>
             </td>
           </tr>
         <% end %>
