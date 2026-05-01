@@ -9,12 +9,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CURRENT_DIR="$(basename "$SCRIPT_DIR")"
 
 if [ "$CURRENT_DIR" = "current" ]; then
-    # Versioned structure
+    # We're inside current/ - versioned structure
     ROE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+    APP_DIR="$SCRIPT_DIR"
+    SITE_DIR="$ROE_ROOT/site"
+elif [ -d "$SCRIPT_DIR/current" ]; then
+    # We're at root and current/ exists - versioned structure
+    ROE_ROOT="$SCRIPT_DIR"
+    APP_DIR="$ROE_ROOT/current"
     SITE_DIR="$ROE_ROOT/site"
 else
-    # Standard structure
+    # Standard structure (pre-Phase 2)
     ROE_ROOT="$SCRIPT_DIR"
+    APP_DIR="$SCRIPT_DIR"
     SITE_DIR="$ROE_ROOT/site"
 fi
 
@@ -56,7 +63,8 @@ usage() {
     echo "  status    Check server status"
     echo "  update    Check for and install updates"
     echo ""
-    echo "Current directory: $SCRIPT_DIR"
+    echo "Root directory: $ROE_ROOT"
+    echo "App directory: $APP_DIR"
     echo "Site directory: $SITE_DIR"
 }
 
@@ -64,23 +72,23 @@ usage() {
 cmd_start() {
     log_info "Starting Roe CMS..."
     
-    if [ -f "$SCRIPT_DIR/tmp/pids/server.pid" ]; then
-        PID=$(cat "$SCRIPT_DIR/tmp/pids/server.pid")
+    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
+        PID=$(cat "$APP_DIR/tmp/pids/server.pid")
         if ps -p "$PID" > /dev/null 2>&1; then
             log_warning "Server is already running (PID: $PID)"
             return 0
         else
-            rm -f "$SCRIPT_DIR/tmp/pids/server.pid"
+            rm -f "$APP_DIR/tmp/pids/server.pid"
         fi
     fi
     
-    cd "$SCRIPT_DIR"
+    cd "$APP_DIR"
     
-    if [ -f "$SCRIPT_DIR/bin/thrust" ]; then
+    if [ -f "$APP_DIR/bin/thrust" ]; then
         log_info "Using Thruster..."
-        exec "$SCRIPT_DIR/bin/thrust" "$SCRIPT_DIR/bin/rails" server "$@"
+        exec "$APP_DIR/bin/thrust" "$APP_DIR/bin/rails" server "$@"
     else
-        exec "$SCRIPT_DIR/bin/rails" server "$@"
+        exec "$APP_DIR/bin/rails" server "$@"
     fi
 }
 
@@ -88,14 +96,14 @@ cmd_start() {
 cmd_stop() {
     log_info "Stopping Roe CMS..."
     
-    if [ -f "$SCRIPT_DIR/tmp/pids/server.pid" ]; then
-        PID=$(cat "$SCRIPT_DIR/tmp/pids/server.pid")
+    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
+        PID=$(cat "$APP_DIR/tmp/pids/server.pid")
         if ps -p "$PID" > /dev/null 2>&1; then
             kill "$PID"
             log_success "Server stopped (PID: $PID)"
         else
             log_warning "PID file exists but process not running"
-            rm -f "$SCRIPT_DIR/tmp/pids/server.pid"
+            rm -f "$APP_DIR/tmp/pids/server.pid"
         fi
     else
         log_warning "Server is not running"
@@ -113,8 +121,8 @@ cmd_restart() {
 # Open console
 cmd_console() {
     log_info "Opening Rails console..."
-    cd "$SCRIPT_DIR"
-    exec "$SCRIPT_DIR/bin/rails" console
+    cd "$APP_DIR"
+    exec "$APP_DIR/bin/rails" console
 }
 
 # Check status
@@ -123,12 +131,13 @@ cmd_status() {
     echo "=============="
     echo ""
     echo "Root directory: $ROE_ROOT"
+    echo "App directory: $APP_DIR"
     echo "Site directory: $SITE_DIR"
     echo "Current version: $(cat "$ROE_ROOT/VERSION" 2>/dev/null | grep 'version:' | cut -d'"' -f2 || echo 'unknown')"
     echo ""
     
-    if [ -f "$SCRIPT_DIR/tmp/pids/server.pid" ]; then
-        PID=$(cat "$SCRIPT_DIR/tmp/pids/server.pid")
+    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
+        PID=$(cat "$APP_DIR/tmp/pids/server.pid")
         if ps -p "$PID" > /dev/null 2>&1; then
             log_success "Server is running (PID: $PID)"
         else
@@ -142,8 +151,8 @@ cmd_status() {
 # Check for updates
 cmd_update() {
     log_info "Checking for updates..."
-    cd "$SCRIPT_DIR"
-    "$SCRIPT_DIR/bin/rails" runner "puts RoeUpdater::VersionChecker.check_for_updates.inspect"
+    cd "$APP_DIR"
+    "$APP_DIR/bin/rails" runner "puts RoeUpdater::VersionChecker.check_for_updates.inspect"
 }
 
 # Main command handler
