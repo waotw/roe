@@ -17,16 +17,6 @@
   </label>
 <% end %>
 
-<script>
-  document.getElementById('file-upload-input').addEventListener('change', function() {
-    console.log('Files selected:', this.files.length);
-    if (this.files.length > 0) {
-      console.log('Submitting form...');
-      this.form.submit();
-    }
-  });
-</script>
-
 <div data-controller="media-filter media-bulk-select"
      data-media-filter-total-value="<%= @media.count %>">
 

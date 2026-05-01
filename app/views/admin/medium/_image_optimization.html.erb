@@ -11,20 +11,20 @@
   </div>
 <% elsif Rails.env.production? %>
     <!-- Production: On-demand only -->
-    <div class="mb-5 p-3 border border-blue-300 bg-blue-50 rounded">
+    <!--<div class="mb-5 p-3 border border-blue-300 bg-blue-50 rounded">
       <div class="flex items-start gap-2">
         <span class="text-blue-600">ℹ️</span>
         <div>
           <p class="text-sm text-blue-800 font-medium">On-demand image optimization</p>
           <p class="text-xs text-blue-700 mt-1">
-            Image variants are generated automatically when first requested. No background processing.
+            Image variants are generated automatically when images are uploaded.
           </p>
           <p class="text-xs text-blue-600 mt-1">
             Process variants locally and deploy them for best performance.
           </p>
         </div>
       </div>
-    </div>
+    </div>-->
 <% else %>
   <% status = variant_generation_status %>
 
