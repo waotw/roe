@@ -154,7 +154,7 @@ class Admin::MediumController < Admin::BaseController
     # Check for files with counter suffixes using LIKE patterns
     existing_pattern = 0
     filename_patterns.each do |pattern|
-      existing_pattern += 1 if Medium.exists?("file_path LIKE ?", "/media/%/#{pattern}")
+      existing_pattern += 1 if Medium.where("file_path LIKE ?", "/media/%/#{pattern}").exists?
     end
     
     existing_count = [existing_exact, existing_pattern].max
