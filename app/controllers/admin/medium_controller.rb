@@ -117,9 +117,64 @@ class Admin::MediumController < Admin::BaseController
 
     unless @batch && @batch['id'] == @batch_id
       redirect_to browse_admin_medium_index_path, alert: "Upload session not found"
-      nil
+      return
+    end
+
+    # Check if uploads are already complete (fallback when Turbo Streams miss updates)
+    @upload_status = check_upload_completion_status
+  end
+
+  # Checks if the batch upload job has completed by looking at:
+  # 1. Whether the job is still in the queue
+  # 2. Whether the expected media files exist in the database
+  def check_upload_completion_status
+    filenames = @batch['files'].map { |f| f['filename'] }
+    
+    # Build list of possible paths for each file (different media types + counter suffixes)
+    possible_paths = []
+    filename_patterns = []
+    
+    filenames.each do |name|
+      base = File.basename(name, File.extname(name))
+      ext = File.extname(name)
+      # Match exact name or name with counter suffix (e.g., image.jpg or image-1.jpg)
+      filename_patterns << "#{base}%#{ext}"
+      
+      # Also add exact paths for all media types
+      possible_paths.concat([
+        "/media/images/#{name}",
+        "/media/audio/#{name}",
+        "/media/video/#{name}"
+      ])
+    end
+    
+    # Check for exact matches first
+    existing_exact = Medium.where(file_path: possible_paths).count
+    
+    # Check for files with counter suffixes using LIKE patterns
+    existing_pattern = 0
+    filename_patterns.each do |pattern|
+      existing_pattern += 1 if Medium.exists?("file_path LIKE ?", "/media/%/#{pattern}")
+    end
+    
+    existing_count = [existing_exact, existing_pattern].max
+    
+    # Check if the bulk upload job is still running
+    job_running = SolidQueue::Job.exists?(
+      class_name: 'BulkUploadJob',
+      finished_at: nil
+    )
+
+    # Determine status
+    if existing_count >= filenames.length && !job_running
+      :complete
+    elsif existing_count > 0
+      :partial
+    else
+      :pending
     end
   end
+  private :check_upload_completion_status
 
   def clear_failed_jobs
     if Rails.env.development?

@@ -1866,7 +1866,7 @@ export default class extends Controller {
   handleKeydown(event) {
     // Only process shortcuts when textarea has focus
     const isTextareaFocused = document.activeElement === this.textareaTarget;
-    
+
     // Cmd/Ctrl+S to save
     if ((event.metaKey || event.ctrlKey) && event.key === "s") {
       event.preventDefault();
@@ -1880,7 +1880,7 @@ export default class extends Controller {
       console.log("[KEYBOARD] Cmd/Ctrl+P pressed, opening preview");
       this.preview(event);
     }
-    
+
     // Formatting shortcuts - only when textarea is focused
     if (isTextareaFocused && (event.metaKey || event.ctrlKey)) {
       switch (event.key.toLowerCase()) {
@@ -1894,7 +1894,7 @@ export default class extends Controller {
           console.log("[KEYBOARD] Cmd/Ctrl+I pressed - Italic");
           this.insertItalic(event);
           break;
-        case "s":
+        case "~":
           event.preventDefault();
           console.log("[KEYBOARD] Cmd/Ctrl+S pressed - Strikethrough");
           this.insertStrike(event);

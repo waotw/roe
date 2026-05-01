@@ -9,16 +9,26 @@ export default class extends Controller {
   connect() {
     console.log("Upload progress connected for batch:", this.batchIdValue)
     
-    // Give Turbo Streams time to connect
+    // Check if already complete (server-side rendered completion state)
+    const isComplete = this.messageTargets.every(el => 
+      el.textContent.includes("Complete")
+    )
+    
+    if (isComplete) {
+      console.log("Upload already complete, no need for Turbo Stream monitoring")
+      return
+    }
+    
+    // Give Turbo Streams time to connect and receive updates
     setTimeout(() => {
       this.checkConnection()
-    }, 2000)
+    }, 3000)
   }
 
   checkConnection() {
     // Check if any statuses are still showing "Waiting..."
     const waitingCount = this.messageTargets.filter(el => 
-      el.textContent.includes("Waiting...") || el.textContent.includes("Uploading...")
+      el.textContent.includes("Waiting...")
     ).length
 
     if (waitingCount > 0 && waitingCount === this.messageTargets.length) {
