@@ -18,11 +18,14 @@ class BulkUploadJob < ApplicationJob
   def perform(batch_id, temp_files)
     sleep(2)
 
+    # Give the browser time to establish Turbo Stream connection
+    sleep(1) unless Rails.env.development?
+
     temp_files.each_with_index do |file_info, index|
       begin
         # Broadcast uploading status
         broadcast_status(batch_id, index, "⏳", "Uploading...")
-        sleep(0.5) if Rails.env.development?
+        sleep(0.3) unless Rails.env.development?
 
         # Create a simple object that mimics UploadedFile
         uploaded_file = TempUploadedFile.new(
@@ -63,15 +66,18 @@ class BulkUploadJob < ApplicationJob
 
   def broadcast_status(batch_id, file_index, icon, message)
     Turbo::StreamsChannel.broadcast_update_to(
-      "upload_batch_#{batch_id}",  # Double quotes
-      target: "file-#{file_index}-status",  # Double quotes
+      "upload_batch_#{batch_id}",
+      target: "file-#{file_index}-status",
       html: icon
     )
 
+    # Small delay to ensure broadcasts are processed separately
+    sleep(0.1) unless Rails.env.development?
+
     Turbo::StreamsChannel.broadcast_update_to(
-      "upload_batch_#{batch_id}",  # Double quotes
-      target: "file-#{file_index}-message",  # Double quotes
-      html: "<span class='text-xs text-gray-600'>#{message}</span>"  # Double quotes
+      "upload_batch_#{batch_id}",
+      target: "file-#{file_index}-message",
+      html: "<span class='text-xs text-gray-600'>#{message}</span>"
     )
   end
 

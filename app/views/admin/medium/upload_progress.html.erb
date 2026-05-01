@@ -6,7 +6,9 @@
     <p class="text-sm text-gray-600 mt-1">Please wait while files are uploaded and processed...</p>
   </div>
 
-  <div id="upload-progress-<%= @batch_id %>" class="space-y-3">
+  <div id="upload-progress-<%= @batch_id %>" class="space-y-3"
+     data-controller="upload-progress"
+     data-upload-progress-batch-id-value="<%= @batch_id %>">
     <% @batch['files'].each_with_index do |file_info, index| %>
       <div id="file-<%= index %>" class="p-4 border rounded bg-white">
         <div class="flex items-center justify-between">
@@ -14,11 +16,11 @@
             <p class="font-medium text-sm"><%= file_info['filename'] %></p>
             <p class="text-xs text-gray-500"><%= number_to_human_size(file_info['size']) %></p>
           </div>
-          <div id="file-<%= index %>-status" class="text-2xl">
+          <div id="file-<%= index %>-status" class="text-2xl" data-upload-progress-target="status">
             ⏳
           </div>
         </div>
-        <div id="file-<%= index %>-message" class="text-xs text-gray-600 mt-2">
+        <div id="file-<%= index %>-message" class="text-xs text-gray-600 mt-2" data-upload-progress-target="message">
           Waiting...
         </div>
       </div>
