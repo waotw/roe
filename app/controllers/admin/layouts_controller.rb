@@ -1,7 +1,7 @@
 class Admin::LayoutsController < Admin::BaseController
   LAYOUT_FILES = {
-    'navigation' => Rails.root.join('site/layout/navigation.md'),
-    'footer' => Rails.root.join('site/layout/footer.md')
+    'navigation' => File.join(RoeSitePaths::SITE_PATH, 'layout/navigation.md'),
+    'footer' => File.join(RoeSitePaths::SITE_PATH, 'layout/footer.md')
   }
 
   def default_layout_content(file_key)
@@ -90,7 +90,7 @@ class Admin::LayoutsController < Admin::BaseController
   private
 
   def ensure_layout_directory_exists
-    layout_dir = Rails.root.join('site/layout')
+    layout_dir = File.join(RoeSitePaths::SITE_PATH, 'layout')
     unless File.directory?(layout_dir)
       flash[:alert] = "Layout directory is missing. Please create it manually at site/layout/"
       redirect_to admin_dashboard_path

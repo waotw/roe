@@ -56,7 +56,7 @@ module Admin::MediumHelper
     images_without_variants = 0
 
     Medium.where("file_path LIKE ?", "%/media/images/%").find_each do |medium|
-      path = Rails.root.join("site", medium.file_path.sub(%r{^/}, ""))
+      path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, ""))
       next unless File.exist?(path)
 
       if ImageVariantGenerator.variants_exist?(path)

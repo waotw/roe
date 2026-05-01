@@ -1,6 +1,6 @@
 class EmailRenderer
   def self.render(template_name, variables = {})
-    template_path = Rails.root.join('site', 'emails', "#{template_name}.md")
+    template_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{template_name}.md")
 
     unless File.exist?(template_path)
       raise "Email template not found: #{template_name}"

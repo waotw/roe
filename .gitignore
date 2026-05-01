@@ -58,6 +58,7 @@ migrate-main/
 /public/
 output/
 site_backups/
+static_site/
 faircamp/
 
 # Graphify generated files

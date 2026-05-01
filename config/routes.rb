@@ -14,6 +14,11 @@ Rails.application.routes.draw do
   namespace :admin do
     root "dashboard#index"
 
+    # Updates
+    get "updates", to: "updates#index", as: "updates"
+    post "updates/check", to: "updates#check", as: "check_updates"
+    post "updates/install", to: "updates#install", as: "install_update"
+
     get "layout/navigation/edit", to: "layouts#edit_navigation"
     patch "layout/navigation", to: "layouts#update_navigation"
     get "layout/footer/edit", to: "layouts#edit_footer"

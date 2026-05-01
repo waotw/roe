@@ -53,7 +53,7 @@
 class StaticGenerator
   attr_reader :output_dir, :stats
 
-  def initialize(output_dir: Rails.root.join('public'))
+  def initialize(output_dir: RoeSitePaths::STATIC_SITE_PATH)
     @output_dir = Pathname.new(output_dir)
     @stats = {
       posts: 0,
@@ -299,7 +299,7 @@ class StaticGenerator
   end
 
   def layout_checksums
-    layout_dir = Rails.root.join('site', 'layout')
+    layout_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'layout'))
     return nil unless layout_dir.exist?
 
     Dir.glob(layout_dir.join('*.md')).map { |f| [ f, File.mtime(f).to_i ] }.to_h
@@ -307,10 +307,10 @@ class StaticGenerator
 
   def asset_checksums
     {
-      fonts: dir_checksum(Rails.root.join('site', 'system', 'assets', 'fonts')),
-      images: dir_checksum(Rails.root.join('site', 'system', 'assets', 'images')),
-      media: dir_checksum(Rails.root.join('site', 'media')),
-      theme: dir_checksum(Rails.root.join('site', 'theme'))
+      fonts: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'fonts'))),
+      images: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'images'))),
+      media: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'media'))),
+      theme: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'theme')))
     }
   end
 
@@ -749,19 +749,21 @@ class StaticGenerator
 
   def copy_assets
     puts "🎨 Copying changed assets..."
-    sync_directory(Rails.root.join('site', 'system', 'assets', 'fonts'), @output_dir.join('system', 'fonts'))
-    sync_directory(Rails.root.join('site', 'system', 'assets', 'images'), @output_dir.join('system', 'images'))
-    sync_directory(Rails.root.join('site', 'theme'), @output_dir.join('theme'))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'fonts'), @output_dir.join('system', 'fonts'))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'images'), @output_dir.join('system', 'images'))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'theme'), @output_dir.join('theme'))
     puts "  ✓ Assets synced"
   end
 
   def copy_media
     puts "🖼️  Copying changed media..."
-    sync_directory(Rails.root.join('site', 'media'), @output_dir.join('media'))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'media'), @output_dir.join('media'))
     puts "  ✓ Media synced"
   end
 
   def sync_directory(source, dest)
+    source = Pathname.new(source) unless source.is_a?(Pathname)
+    dest = Pathname.new(dest) unless dest.is_a?(Pathname)
     return unless source.exist?
 
     FileUtils.mkdir_p(dest)

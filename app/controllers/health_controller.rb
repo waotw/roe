@@ -3,9 +3,9 @@ class HealthController < ApplicationController
 
   def check
     checks = {
-      media_writable: File.writable?(Rails.root.join('site', 'media')),
-      media_exists: Dir.exist?(Rails.root.join('site', 'media')),
-      system_assets_exists: Dir.exist?(Rails.root.join('site', 'system', 'assets')),
+      media_writable: File.writable?(File.join(RoeSitePaths::SITE_PATH, 'media')),
+      media_exists: Dir.exist?(File.join(RoeSitePaths::SITE_PATH, 'media')),
+      system_assets_exists: Dir.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets')),
       db_connected: ActiveRecord::Base.connection.active?
     }
 

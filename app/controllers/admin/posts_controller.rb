@@ -138,7 +138,7 @@ class Admin::PostsController < Admin::BaseController
 
   def create
     filename = sanitize_filename(params[:filename])
-    file_path = Rails.root.join("site/posts/#{filename}.md")
+    file_path = File.join(RoeSitePaths::SITE_PATH, "posts/#{filename}.md")
 
     if File.exist?(file_path)
       flash.now[:error] = "A post with that filename already exists"
@@ -720,7 +720,7 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def load_post_template
-    template_path = Rails.root.join("site/templates/post_template.md")
+    template_path = File.join(RoeSitePaths::SITE_PATH, "templates/post_template.md")
 
     if File.exist?(template_path)
       File.read(template_path)

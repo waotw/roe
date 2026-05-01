@@ -5,7 +5,7 @@
 
 app = 'roe'
 primary_region = 'lhr'
-console_command = '/rails/bin/rails console'
+console_command = '/rails/current/bin/rails console'
 
 [build]
 

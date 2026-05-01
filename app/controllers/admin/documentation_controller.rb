@@ -17,7 +17,7 @@ class Admin::DocumentationController < Admin::BaseController
 
   def create
     file_name = params[:file_name].parameterize + '.md'
-    file_path = Rails.root.join('site', 'docs', file_name)
+    file_path = File.join(RoeSitePaths::SITE_PATH, 'docs', file_name)
 
     # Build full content
     full_content = params[:metadata] + "\n---\n\n" + params[:content]

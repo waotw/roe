@@ -7,7 +7,7 @@ module SiteFeature
   module_function
 
   def members_enabled?
-    File.exist?(Rails.root.join('site/system/features/members.yml'))
+    File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system/features/members.yml'))
   end
 
   def payments_enabled?
@@ -59,7 +59,7 @@ module SiteFeature
   end
 
   def store_enabled?
-    File.exist?(Rails.root.join('site/system/features/store.yml'))
+    File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system/features/store.yml'))
   end
 
   def postmark_configured?

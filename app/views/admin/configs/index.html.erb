@@ -6,19 +6,19 @@
     </div>
 
     <div class="flex gap-2">
-      <% unless File.exist?(Rails.root.join('site', 'system', 'features', 'members.yml')) %>
+      <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'members.yml')) %>
         <%= link_to "Enable Members",
                     new_members_setup_admin_configs_path,
                     class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs" %>
       <% end %>
 
-      <% unless File.exist?(Rails.root.join('site', 'system', 'features', 'podcast.yml')) %>
+      <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'podcast.yml')) %>
         <%= button_to "Enable Podcasts",
                       generate_podcast_admin_configs_path,
                       method: :post,
                       class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
       <% end %>
-      <% unless File.exist?(Rails.root.join('site', 'system', 'features', 'store.yml')) %>
+      <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'store.yml')) %>
         <%= link_to "Enable Store",
                     new_store_setup_admin_configs_path,
                     class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-purple-200 hover:bg-purple-300 font-mono rounded-xs" %>

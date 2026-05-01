@@ -28,7 +28,7 @@ namespace :site do
 
   desc "Generate static site to custom directory"
   task :generate_to, [ :output_dir ] => :environment do |t, args|
-    output_dir = args[:output_dir] || Rails.root.join('tmp', 'static_site')
+    output_dir = args[:output_dir] || RoeSitePaths::STATIC_SITE_PATH
 
     puts "🚀 Generating static site to: #{output_dir}"
     puts ""
@@ -67,7 +67,7 @@ namespace :site do
 
     server = WEBrick::HTTPServer.new(
       Port: 8080,
-      DocumentRoot: Rails.root.join('public'),
+      DocumentRoot: RoeSitePaths::STATIC_SITE_PATH,
       Logger: WEBrick::Log.new('/dev/null'),
       AccessLog: []
     )
@@ -76,42 +76,42 @@ namespace :site do
     server.start
   end
 
-  desc "Clean generated static files from public directory"
+  desc "Clean generated static files from static_site directory"
   task clean: :environment do
-    public_dir = Rails.root.join('public')
+    static_dir = Pathname.new(RoeSitePaths::STATIC_SITE_PATH)
 
     files_deleted = 0
 
     puts "🧹 Cleaning static site files..."
 
     # Remove individual posts
-    Dir.glob(public_dir.join('posts', '*.html')).each do |file|
+    Dir.glob(static_dir.join('posts', '*.html')).each do |file|
       File.delete(file)
       files_deleted += 1
     end
 
     # Remove post pagination
-    Dir.glob(public_dir.join('posts', 'page-*.html')).each do |file|
+    Dir.glob(static_dir.join('posts', 'page-*.html')).each do |file|
       File.delete(file)
       files_deleted += 1
     end
 
     # Remove collections directory
-    if Dir.exist?(public_dir.join('collections'))
-      collection_files = Dir.glob(public_dir.join('collections', '**', '*')).count { |f| File.file?(f) }
-      FileUtils.rm_rf(public_dir.join('collections'))
+    if Dir.exist?(static_dir.join('collections'))
+      collection_files = Dir.glob(static_dir.join('collections', '**', '*')).count { |f| File.file?(f) }
+      FileUtils.rm_rf(static_dir.join('collections'))
       files_deleted += collection_files
     end
 
     # Remove documentation pages
-    if Dir.exist?(public_dir.join('documentation'))
-      doc_files = Dir.glob(public_dir.join('documentation', '**', '*')).count { |f| File.file?(f) }
-      FileUtils.rm_rf(public_dir.join('documentation'))
+    if Dir.exist?(static_dir.join('documentation'))
+      doc_files = Dir.glob(static_dir.join('documentation', '**', '*')).count { |f| File.file?(f) }
+      FileUtils.rm_rf(static_dir.join('documentation'))
       files_deleted += doc_files
     end
 
     # Remove page files (but keep index.html)
-    Dir.glob(public_dir.join('*.html')).each do |file|
+    Dir.glob(static_dir.join('*.html')).each do |file|
       next if File.basename(file) == 'index.html'
       File.delete(file)
       files_deleted += 1
@@ -119,22 +119,22 @@ namespace :site do
 
     # Remove feeds
     [ 'feed.rss', 'feed.atom' ].each do |feed|
-      if File.exist?(public_dir.join(feed))
-        File.delete(public_dir.join(feed))
+      if File.exist?(static_dir.join(feed))
+        File.delete(static_dir.join(feed))
         files_deleted += 1
       end
     end
 
     # Remove podcast feeds
-    if Dir.exist?(public_dir.join('podcast'))
-      podcast_files = Dir.glob(public_dir.join('podcast', '*.xml')).count
-      FileUtils.rm_rf(public_dir.join('podcast'))
+    if Dir.exist?(static_dir.join('podcast'))
+      podcast_files = Dir.glob(static_dir.join('podcast', '*.xml')).count
+      FileUtils.rm_rf(static_dir.join('podcast'))
       files_deleted += podcast_files
     end
 
     # Remove manifest (forces full regeneration)
-    if File.exist?(public_dir.join('.generation_manifest.json'))
-      File.delete(public_dir.join('.generation_manifest.json'))
+    if File.exist?(static_dir.join('.generation_manifest.json'))
+      File.delete(static_dir.join('.generation_manifest.json'))
       puts "   ✓ Deleted generation manifest"
     end
 

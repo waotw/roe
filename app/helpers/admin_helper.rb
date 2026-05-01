@@ -56,7 +56,7 @@ module AdminHelper
   # (legacy) and site/pages/members/<name>.md (canonical going forward).
   # Prefer the new location, fall back to the legacy one.
   def find_member_page(stem)
-    pages_path = Rails.root.join('site', 'pages')
+    pages_path = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'pages'))
     [ pages_path.join('members', "#{stem}.md"), pages_path.join("#{stem}.md") ]
       .map { |p| Page.find_by(file_path: p.to_s) }
       .compact

@@ -145,7 +145,7 @@
              data-has-references="<%= media.posts.any? %>"
              data-filename="<%= File.basename(media.file_path).downcase %>"
              data-uploaded-at="<%= media.created_at.to_i %>"
-             data-file-size="<%= File.size?(Rails.root.join('site', media.file_path.delete_prefix('/'))) || 0 %>"
+             data-file-size="<%= File.size?(File.join(RoeSitePaths::SITE_PATH, media.file_path.delete_prefix('/'))) || 0 %>"
              data-searchable="<%= File.basename(media.file_path).downcase %>"
              data-media-id="<%= media.id %>">
 

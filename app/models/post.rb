@@ -427,7 +427,7 @@ class Post < ApplicationRecord
     str = path.to_s.strip
     return nil if str.empty?
     return nil unless str.start_with?('/media/')
-    Rails.root.join('site', str.delete_prefix('/')).to_s
+    File.join(RoeSitePaths::SITE_PATH, str.delete_prefix('/')).to_s
   end
 
   # Per-request Set of every /media/... path that resolves to a real file.
@@ -435,7 +435,7 @@ class Post < ApplicationRecord
   # pay for one directory glob, not one File.exist? per ref.
   def self.media_file_set
     Current.media_file_set ||= begin
-      base = Rails.root.join('site/media')
+      base = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'media'))
       files = Dir.glob(base.join('**/*'))
                  .select { |f| File.file?(f) }
                  .map { |f| "/media/" + Pathname.new(f).relative_path_from(base).to_s }

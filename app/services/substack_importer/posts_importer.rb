@@ -128,7 +128,7 @@ module SubstackImporter
       podcast_key = derive_podcast_key_from_rss(rss_items)
 
       # Setup media handler
-      site_root = Rails.root.join("site").to_s
+      site_root = RoeSitePaths::SITE_PATH.to_s
       media_handler = MediaHandler.new(
         site_root: site_root,
         import: @import,
@@ -218,7 +218,7 @@ module SubstackImporter
       media_deleted = @import.media.count
       @import.media.find_each do |medium|
         # Delete file from disk
-        full_path = Rails.root.join("site", medium.file_path.sub(%r{^/}, ""))
+        full_path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, ""))
         FileUtils.rm_f(full_path) if File.exist?(full_path)
         medium.destroy
       end
@@ -328,9 +328,9 @@ module SubstackImporter
 
     def build_file_path(post)
       base_path = if post.type == "page"
-        Rails.root.join("site", "pages")
+        File.join(RoeSitePaths::SITE_PATH, "pages")
       else
-        Rails.root.join("site", "posts")
+        File.join(RoeSitePaths::SITE_PATH, "posts")
       end
 
       # Posts go directly in /site/posts/ (no date subdirectories)

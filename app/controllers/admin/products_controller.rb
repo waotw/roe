@@ -15,7 +15,7 @@ class Admin::ProductsController < Admin::BaseController
     filename = sanitize_filename(params[:filename])
 
     # Ensure products directory exists
-    products_dir = Rails.root.join("site/products")
+    products_dir = File.join(RoeSitePaths::SITE_PATH, "products")
     FileUtils.mkdir_p(products_dir) unless Dir.exist?(products_dir)
 
     file_path = products_dir.join("#{filename}.md")
@@ -317,7 +317,7 @@ class Admin::ProductsController < Admin::BaseController
   end
 
   def load_product_template
-    template_path = Rails.root.join('site', 'system', 'templates', 'product_template.md')
+    template_path = File.join(RoeSitePaths::SITE_PATH, 'system', 'templates', 'product_template.md')
 
     if File.exist?(template_path)
       File.read(template_path)

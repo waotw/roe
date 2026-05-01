@@ -24,7 +24,7 @@ class ProductCategory
   end
 
   def self.update_store_config(categories)
-    store_path = Rails.root.join('site/system/features/store.yml')
+    store_path = File.join(RoeSitePaths::SITE_PATH, 'system/features/store.yml')
 
     begin
       # Load existing config or start with empty hash

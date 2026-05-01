@@ -136,7 +136,7 @@ class Admin::MediumController < Admin::BaseController
     queued = 0
 
     Medium.images.originals_only.find_each do |medium|
-      path = Rails.root.join("site", medium.file_path.sub(%r{^/}, ""))
+      path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, ""))
 
       next unless File.exist?(path)
       next if ImageVariantGenerator.variants_exist?(path)
@@ -150,7 +150,7 @@ class Admin::MediumController < Admin::BaseController
 
   def destroy
     media = Medium.find(params[:id])
-    full_path = Rails.root.join("site#{media.file_path}")
+    full_path = File.join(RoeSitePaths::SITE_PATH, media.file_path.to_s.sub(%r{^/}, ""))
 
     # Delete file from filesystem
     File.delete(full_path) if File.exist?(full_path)
@@ -177,7 +177,7 @@ class Admin::MediumController < Admin::BaseController
       next unless media
 
       begin
-        full_path = Rails.root.join("site#{media.file_path}")
+        full_path = File.join(RoeSitePaths::SITE_PATH, media.file_path.to_s.sub(%r{^/}, ""))
         File.delete(full_path) if File.exist?(full_path)
         media.destroy
         deleted_count += 1
@@ -205,7 +205,7 @@ class Admin::MediumController < Admin::BaseController
     end
 
     relative_path = @medium.file_path.delete_prefix('/')
-    old_path = Rails.root.join('site', relative_path)
+    old_path = File.join(RoeSitePaths::SITE_PATH, relative_path)
     extension = File.extname(old_path)
 
     # Keep same media type folder
@@ -239,7 +239,7 @@ class Admin::MediumController < Admin::BaseController
     end
 
     # Convert /media/audio/file.mp3 to absolute path (as STRING)
-    file_path = Rails.root.join('site', media_path.delete_prefix('/')).to_s  # ← Add .to_s
+    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix('/')).to_s  # ← Add .to_s
 
     unless File.exist?(file_path)
       render json: { error: 'File not found' }, status: :not_found
@@ -271,7 +271,7 @@ class Admin::MediumController < Admin::BaseController
       return
     end
 
-    file_path = Rails.root.join('site', media_path.delete_prefix('/')).to_s
+    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix('/')).to_s
     render json: { exists: File.exist?(file_path), checked: true, path: media_path }
   end
 
@@ -282,7 +282,7 @@ class Admin::MediumController < Admin::BaseController
     extension = File.extname(uploaded_file.original_filename).delete_prefix('.')
     media_type = determine_media_type(extension)
 
-    folder_path = Rails.root.join("site/media/#{media_type}")
+    folder_path = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "media/#{media_type}"))
     FileUtils.mkdir_p(folder_path)
 
     extension_with_dot = File.extname(uploaded_file.original_filename)

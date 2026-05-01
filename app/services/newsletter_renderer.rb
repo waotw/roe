@@ -131,7 +131,7 @@ class NewsletterRenderer
   # Get CSS from active theme
   def theme_css
     theme_name = active_theme
-    theme_css_path = Rails.root.join('site', 'themes', theme_name, "#{theme_name}.css")
+    theme_css_path = File.join(RoeSitePaths::SITE_PATH, 'themes', theme_name, "#{theme_name}.css")
 
     if File.exist?(theme_css_path)
       File.read(theme_css_path)

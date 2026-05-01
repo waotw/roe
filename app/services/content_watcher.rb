@@ -1,5 +1,12 @@
 class ContentWatcher
-  WATCH_PATHS = [ 'site/posts', 'site/pages', 'site/documentation', 'site/products', 'site/system', 'site/media' ].freeze
+  WATCH_PATHS = [
+    File.join(RoeSitePaths::SITE_PATH, 'posts'),
+    File.join(RoeSitePaths::SITE_PATH, 'pages'),
+    File.join(RoeSitePaths::SITE_PATH, 'documentation'),
+    File.join(RoeSitePaths::SITE_PATH, 'products'),
+    File.join(RoeSitePaths::SITE_PATH, 'system'),
+    File.join(RoeSitePaths::SITE_PATH, 'media')
+  ].freeze
 
     # Define what file types we process
     ALLOWED_EXTENSIONS = %w[
@@ -182,7 +189,7 @@ class ContentWatcher
 
       puts "DEBUG: Processing media file: #{absolute_file}"
 
-      web_path = absolute_file.sub(Rails.root.join('site').to_s, '')
+      web_path = absolute_file.sub(RoeSitePaths::SITE_PATH.to_s, '')
       puts "DEBUG: Web path: #{web_path}"
 
       if Medium.exists?(file_path: web_path)
@@ -270,8 +277,8 @@ class ContentWatcher
       end
     elsif absolute_old.include?('site/media')
       # Media files are stored with web paths like "/media/images/file.jpg"
-      old_web_path = absolute_old.sub(Rails.root.join('site').to_s, '')
-      new_web_path = absolute_new.sub(Rails.root.join('site').to_s, '')
+      old_web_path = absolute_old.sub(RoeSitePaths::SITE_PATH.to_s, '')
+      new_web_path = absolute_new.sub(RoeSitePaths::SITE_PATH.to_s, '')
 
       medium = Medium.find_by(file_path: old_web_path)
       if medium
@@ -299,7 +306,7 @@ class ContentWatcher
       Documentation.remove_by_file_path(absolute_file)
       puts "   Removed documentation from database"
     elsif absolute_file.include?('site/media')
-      web_path = absolute_file.sub(Rails.root.join('site').to_s, '')
+      web_path = absolute_file.sub(RoeSitePaths::SITE_PATH.to_s, '')
       Medium.remove_by_file_path(web_path)
       puts "   Removed media file from database"
     end

@@ -37,7 +37,7 @@ class Admin::EmailsController < Admin::BaseController
   }.freeze
 
   def index
-    emails_dir = Rails.root.join('site', 'emails')
+    emails_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'emails'))
 
     @emails = if Dir.exist?(emails_dir)
       Dir.glob(emails_dir.join('*.md')).map do |file_path|
@@ -60,7 +60,7 @@ class Admin::EmailsController < Admin::BaseController
 
   def edit
     @filename = params[:id]
-    @file_path = Rails.root.join('site', 'emails', "#{@filename}.md")
+    @file_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{@filename}.md")
 
     unless File.exist?(@file_path)
       flash[:error] = "Email template not found"
@@ -78,7 +78,7 @@ class Admin::EmailsController < Admin::BaseController
 
   def update
     @filename = params[:id]
-    @file_path = Rails.root.join('site', 'emails', "#{@filename}.md")
+    @file_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{@filename}.md")
 
     unless File.exist?(@file_path)
       flash[:error] = "Email template not found"
@@ -96,7 +96,7 @@ class Admin::EmailsController < Admin::BaseController
 
   def preview
     @filename = params[:id]
-    @file_path = Rails.root.join('site', 'emails', "#{@filename}.md")
+    @file_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{@filename}.md")
 
     # Use submitted content for POST, saved content for GET
     content = if request.post?

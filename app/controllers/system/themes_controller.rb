@@ -13,7 +13,7 @@ class System::ThemesController < ApplicationController
     content_type = format == 'js' ? 'application/javascript' : 'text/css'
 
     # Check user's installed themes first
-    user_file_path = Rails.root.join('site', 'theme', full_filename)
+    user_file_path = File.join(RoeSitePaths::SITE_PATH, 'theme', full_filename)
 
     # Fall back to app themes if not installed
     app_file_path = Rails.root.join('app', 'themes', full_filename)
@@ -45,9 +45,9 @@ class System::ThemesController < ApplicationController
 
   def detect_extension(filename)
     # If no extension, check what exists
-    if File.exist?(Rails.root.join('site', 'theme', "#{filename}.css"))
+    if File.exist?(File.join(RoeSitePaths::SITE_PATH, 'theme', "#{filename}.css"))
       '.css'
-    elsif File.exist?(Rails.root.join('site', 'theme', "#{filename}.js"))
+    elsif File.exist?(File.join(RoeSitePaths::SITE_PATH, 'theme', "#{filename}.js"))
       '.js'
     else
       '.css' # Default fallback

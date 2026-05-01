@@ -95,8 +95,9 @@
           <div class="shrink-0">
             <%= link_to "Roe CMS", admin_root_path, class: "text-xl font-bold text-gray-900" %>
           </div>
-          <!-- Right: Settings & Logout -->
+          <!-- Right: Settings, Updates & Logout -->
           <div class="flex items-center gap-6">
+            <%= link_to "Updates", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>

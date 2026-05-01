@@ -34,3 +34,53 @@ module Roe
     # config.eager_load_paths << Rails.root.join("extras")
   end
 end
+
+# Centralized Site Path Configuration
+# This module defines the path to the /site directory
+# When Roe is moved to a versioned directory structure (current/),
+# this will point to the parent directory's site/ folder
+module RoeSitePaths
+  # Compute ROE_ROOT at module load time
+  # In versioned setup: Rails app is in /roe/current/, site is in /roe/site/
+  # In standard setup: Rails app is in /roe/, site is in /roe/site/
+  ROE_ROOT = begin
+    # Check if site directory exists in parent (versioned structure)
+    parent_dir = File.expand_path('..', Rails.root)
+    parent_site = File.join(parent_dir, 'site')
+    
+    # Also check if current directory name suggests we're versioned
+    current_dir_name = File.basename(Rails.root)
+    
+    if current_dir_name == 'current' && File.directory?(parent_site)
+      # Versioned structure: we're in /roe/current/, site is in /roe/site/
+      parent_dir
+    else
+      # Standard structure: site is in Rails.root
+      Rails.root.to_s
+    end
+  end
+
+  # SITE_PATH is where all user content lives
+  SITE_PATH = File.join(ROE_ROOT, 'site')
+
+  # STATIC_SITE_PATH is where static site output goes (outside versioned directory)
+  STATIC_SITE_PATH = File.join(ROE_ROOT, 'static_site')
+
+  # Common subdirectories
+  SITE_SYSTEM_PATH = File.join(SITE_PATH, 'system')
+  SITE_POSTS_PATH = File.join(SITE_PATH, 'posts')
+  SITE_PAGES_PATH = File.join(SITE_PATH, 'pages')
+  SITE_DOCUMENTATION_PATH = File.join(SITE_PATH, 'documentation')
+  SITE_PRODUCTS_PATH = File.join(SITE_PATH, 'products')
+  SITE_MEDIA_PATH = File.join(SITE_PATH, 'media')
+  SITE_EMAILS_PATH = File.join(SITE_PATH, 'emails')
+  SITE_TEMPLATES_PATH = File.join(SITE_PATH, 'templates')
+  SITE_LAYOUT_PATH = File.join(SITE_PATH, 'layout')
+  SITE_THEME_PATH = File.join(SITE_PATH, 'theme')
+
+  # System subdirectories
+  SITE_DB_PATH = File.join(SITE_PATH, 'db')
+  SITE_SYSTEM_GLOBAL_PATH = File.join(SITE_SYSTEM_PATH, 'global')
+  SITE_SYSTEM_FEATURES_PATH = File.join(SITE_SYSTEM_PATH, 'features')
+  SITE_SYSTEM_DEFAULTS_PATH = File.join(SITE_SYSTEM_PATH, 'defaults')
+end

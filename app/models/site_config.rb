@@ -1,12 +1,12 @@
 class SiteConfig < ApplicationRecord
-  SYSTEM_PATH = Rails.root.join('site', 'system')
-  SITE_PATH = SYSTEM_PATH.join('global')
-  FEATURES_PATH = SYSTEM_PATH.join('features')
-  DEFAULTS_PATH = SYSTEM_PATH.join('defaults')
+  SYSTEM_PATH = File.join(RoeSitePaths::SITE_PATH, 'system')
+  SITE_PATH = File.join(SYSTEM_PATH, 'global')
+  FEATURES_PATH = Pathname.new(File.join(SYSTEM_PATH, 'features'))
+  DEFAULTS_PATH = Pathname.new(File.join(SYSTEM_PATH, 'defaults'))
 
-  SITE_FILE = SITE_PATH.join('site.yml')
-  FONTS_FILE = SITE_PATH.join('fonts.yml')
-  DEVELOPMENT_FILE = SITE_PATH.join('development.yml')
+  SITE_FILE = File.join(SITE_PATH, 'site.yml')
+  FONTS_FILE = File.join(SITE_PATH, 'fonts.yml')
+  DEVELOPMENT_FILE = File.join(SITE_PATH, 'development.yml')
 
   CACHE_KEY_PREFIX = 'site_config'
 

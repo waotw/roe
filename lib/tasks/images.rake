@@ -47,7 +47,7 @@ namespace :images do
 
     # Queue all images
     image_paths.each do |path|
-      relative_path = path.sub(Rails.root.join("site").to_s, "")
+      relative_path = path.sub(RoeSitePaths::SITE_PATH.to_s, "")
       web_path = relative_path.start_with?("/") ? relative_path : "/#{relative_path}"
       GenerateImageVariantsJob.perform_later(web_path, nil)
     end

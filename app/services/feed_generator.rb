@@ -287,7 +287,7 @@ class FeedGenerator
 
   def audio_file_path(audio_path)
     # Convert /media/audio/file.mp3 to absolute file path
-    Rails.root.join('site', audio_path.delete_prefix('/'))
+    File.join(RoeSitePaths::SITE_PATH, audio_path.delete_prefix('/'))
   end
 
   def audio_file_size(file_path)

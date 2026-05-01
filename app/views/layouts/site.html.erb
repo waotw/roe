@@ -31,7 +31,7 @@
       <%= stylesheet_link_tag "/theme/#{params[:preview_theme]}.css?v=#{Time.now.to_i}" %>
     <% else %>
       <% theme_name = SiteConfig.get('theme.active') || 'default' %>
-      <% theme_file = Rails.root.join('site', 'theme', "#{theme_name}.css") %>
+      <% theme_file = File.join(RoeSitePaths::SITE_PATH, 'theme', "#{theme_name}.css") %>
       <% cache_buster = File.exist?(theme_file) ? "?v=#{File.mtime(theme_file).to_i}" : "" %>
       <%= stylesheet_link_tag "/theme/#{theme_name}.css#{cache_buster}" %>
     <% end %>

@@ -2,9 +2,9 @@ class MediaController < ApplicationController
   skip_before_action :require_authentication
 
   def show
-    file_path = Rails.root.join("site", "media", params[:path])
+    file_path = File.join(RoeSitePaths::SITE_PATH, "media", params[:path])
     unless File.exist?(file_path)
-      file_path = Rails.root.join("site", "documentation", "media", params[:path])
+      file_path = File.join(RoeSitePaths::SITE_PATH, "documentation", "media", params[:path])
     end
 
     unless File.exist?(file_path)

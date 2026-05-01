@@ -90,13 +90,14 @@ namespace :site do
   task :backup do
     machine = machine_id
     timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
-    backup_dir = "./site_backups/#{timestamp}"
+    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups')
+    backup_dir = File.join(backup_root, timestamp)
 
     # Find most recent NON-EMPTY backup for hard-linking. Skipping
     # empties matters: if a prior backup ran but rsync failed silently
     # (the bug this task was guarding against), we don't want to point
     # --link-dest at an empty dir — it'd waste a full transfer.
-    previous_backups = Dir.glob("./site_backups/20*").sort
+    previous_backups = Dir.glob(File.join(backup_root, "20*")).sort
     previous_backup = previous_backups.reverse.find { |d| Dir.exist?(d) && !Dir.empty?(d) }
 
     # Build rsync command
@@ -106,7 +107,7 @@ namespace :site do
     if previous_backup
       # Use absolute path for --link-dest
       link_dest_path = File.expand_path(previous_backup)
-      rsync_cmd += " --link-dest=#{link_dest_path}"
+      rsync_cmd += " --link-dest='#{link_dest_path}'"
       puts "💾 Creating incremental backup: #{timestamp}"
       puts "   Linking to: #{File.basename(previous_backup)}"
     else
@@ -121,7 +122,7 @@ namespace :site do
     # transport breaks) the dir we just made would be empty, and the
     # original task would still update `latest` and rotate-out real
     # backups — that's how all 15 existing backup dirs ended up empty.
-    rsync_cmd += " -e ./bin/fly-rsync #{machine}:/data/site/ #{backup_dir}/"
+    rsync_cmd += " -e ./bin/fly-rsync #{machine}:/data/site/ '#{backup_dir}/'"
     success = system(rsync_cmd)
     exit_status = $?.exitstatus
 
@@ -145,13 +146,13 @@ namespace :site do
     end
 
     # Update 'latest' symlink
-    latest_link = "./site_backups/latest"
+    latest_link = File.join(backup_root, 'latest')
     FileUtils.rm_f(latest_link) if File.symlink?(latest_link)
     FileUtils.ln_s(timestamp, latest_link)
     puts "   Updated: site_backups/latest → #{timestamp}"
 
     # Cleanup: keep only 15 most recent backups
-    all_backups = Dir.glob("./site_backups/20*").sort
+    all_backups = Dir.glob(File.join(backup_root, "20*")).sort
     if all_backups.length > 15
       to_delete = all_backups[0...(all_backups.length - 15)]
       puts "\n🗑️  Removing #{to_delete.length} old backup(s):"
@@ -162,9 +163,9 @@ namespace :site do
     end
 
     # Show summary
-    final_count = Dir.glob("./site_backups/20*").length
+    final_count = Dir.glob(File.join(backup_root, "20*")).length
     backup_size = `du -sh #{backup_dir}`.split.first rescue "unknown"
-    total_size = `du -sh ./site_backups`.split.first rescue "unknown"
+    total_size = `du -sh #{backup_root}`.split.first rescue "unknown"
 
     puts "\n✅ Backup complete!"
     puts "📊 Backup size: #{backup_size}"
@@ -235,25 +236,27 @@ namespace :site do
   desc "Restore production from backup (interactive or direct: rake site:rollback[latest])"
   task :rollback, [ :backup_name ] do |t, args|
     backup_name = args[:backup_name]
+    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups')
 
     # --- Direct Mode (with argument) ---
     if backup_name
       # Resolve 'latest' symlink
       if backup_name == 'latest'
-        unless File.symlink?("./site_backups/latest")
+        latest_link = File.join(backup_root, 'latest')
+        unless File.symlink?(latest_link)
           puts "❌ No 'latest' symlink found"
           exit 1
         end
-        backup_name = File.readlink("./site_backups/latest")
+        backup_name = File.readlink(latest_link)
         puts "🔗 Resolved 'latest' → #{backup_name}"
       end
 
-      backup_path = "./site_backups/#{backup_name}"
+      backup_path = File.join(backup_root, backup_name)
 
       unless Dir.exist?(backup_path)
         puts "❌ Backup not found: #{backup_name}"
         puts "\nAvailable backups:"
-        Dir.glob("./site_backups/20*").sort.reverse.each { |b| puts "  - #{File.basename(b)}" }
+        Dir.glob(File.join(backup_root, "20*")).sort.reverse.each { |b| puts "  - #{File.basename(b)}" }
         exit 1
       end
 
@@ -273,7 +276,7 @@ namespace :site do
     end
 
     # --- Interactive Mode (no argument) ---
-    backups = Dir.glob("./site_backups/20*").sort.reverse
+    backups = Dir.glob(File.join(backup_root, "20*")).sort.reverse
 
     if backups.empty?
       puts "❌ No backups found in site_backups/"
@@ -286,8 +289,9 @@ namespace :site do
       size = `du -sh #{backup}`.split.first rescue "?"
 
       # Show 'latest' indicator
-      is_latest = File.symlink?("./site_backups/latest") &&
-                  File.readlink("./site_backups/latest") == timestamp
+      latest_link = File.join(backup_root, 'latest')
+      is_latest = File.symlink?(latest_link) &&
+                  File.readlink(latest_link) == timestamp
       latest_marker = is_latest ? " ← latest" : ""
 
       puts "  #{i + 1}) #{timestamp} (#{size})#{latest_marker}"

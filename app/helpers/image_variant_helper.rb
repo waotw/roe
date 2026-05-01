@@ -21,7 +21,7 @@ module ImageVariantHelper
     # Check if it exists
     if File.exist?(filesystem_path)
       # Convert to web path for image_tag
-      filesystem_path.sub(Rails.root.join("site").to_s, "")
+      filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
     else
       source_path
     end
@@ -55,7 +55,7 @@ module ImageVariantHelper
     return false unless medium.is_a?(Medium)
     return false unless medium.image?
 
-    source_path = Rails.root.join("site", medium.file_path.sub(%r{^/}, "")).to_s
+    source_path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, "")).to_s
     ImageVariantGenerator.variants_exist?(source_path)
   end
 
@@ -84,7 +84,7 @@ module ImageVariantHelper
     webp_path = variant_path.sub(File.extname(variant_path), ".webp")
 
     # Fall back to JPEG if WebP doesn't exist
-    File.exist?(Rails.root.join("site", webp_path.sub(%r{^/}, ""))) ? webp_path : variant_path
+    File.exist?(File.join(RoeSitePaths::SITE_PATH, webp_path.sub(%r{^/}, ""))) ? webp_path : variant_path
   end
 
   def image_file?(path)

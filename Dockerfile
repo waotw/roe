@@ -59,25 +59,32 @@ RUN apt-get update -qq && \
 
 # Copy built artifacts: gems, application
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
-COPY --from=build /rails /rails
+
+# Set up versioned directory structure
+# /rails/current/ - Current Roe version (Rails app)
+# /rails/site/ - User content (symlinked to /data/site for persistence)
+RUN mkdir -p /rails/current && \
+    mkdir -p /data/db /data/site && \
+    ln -s /data/site /rails/site
+
+# Copy Rails app to current/ directory
+COPY --from=build /rails /rails/current
 
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
     useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    mkdir -p /data/db /data/site && \
-    rm -rf /rails/site && \
-    ln -s /data/site /rails/site && \
-    chown -R 1000:1000 db log storage tmp /data
+    chown -R 1000:1000 /rails/current/db /rails/current/log /rails/current/storage /rails/current/tmp /data
 
 USER root
 
 # Deployment options
-ENV DATABASE_URL="sqlite3:///data/site/db/production/production.sqlite3"
+ENV DATABASE_URL="sqlite3:///data/site/db/production.sqlite3"
 
 # Entrypoint prepares the database.
-ENTRYPOINT ["/rails/bin/docker-entrypoint"]
+ENTRYPOINT ["/rails/current/bin/docker-entrypoint"]
 
 # Start server via Thruster by default, this can be overwritten at runtime
 EXPOSE 8080
 VOLUME /data
+WORKDIR /rails/current
 CMD ["./bin/thrust", "./bin/rails", "server"]

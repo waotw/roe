@@ -1,5 +1,5 @@
 class Admin::SettingsController < Admin::BaseController
-  TEMPLATE_PATH = Rails.root.join("site/templates/post_template.md")
+  TEMPLATE_PATH = File.join(RoeSitePaths::SITE_PATH, "templates/post_template.md")
 
   def edit_post_template
     @template_content = if File.exist?(TEMPLATE_PATH)

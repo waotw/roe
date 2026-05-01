@@ -147,7 +147,7 @@ File: `app/services/content_sync.rb`
 
 ```ruby
 def sync_articles
-  directory = Rails.root.join('site', 'articles')
+  directory = File.join(RoeSitePaths::SITE_PATH, 'articles')
   return unless directory.exist?
   
   current_files = []

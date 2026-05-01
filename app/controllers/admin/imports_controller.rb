@@ -257,7 +257,7 @@ class Admin::ImportsController < Admin::BaseController
       filename = File.basename(file_path)
     end
 
-    dest_path = Rails.root.join("site", "media", dest_dir, filename)
+    dest_path = File.join(RoeSitePaths::SITE_PATH, "media", dest_dir, filename)
     file_path = item["expected_path"]
 
     begin
@@ -423,7 +423,7 @@ class Admin::ImportsController < Admin::BaseController
     end
 
     # Check if file exists
-    media_dir = Rails.root.join("site", "media", dest_dir)
+    media_dir = File.join(RoeSitePaths::SITE_PATH, "media", dest_dir)
     existing_files = Dir.glob(File.join(media_dir, pattern))
 
     if existing_files.any?
@@ -509,7 +509,7 @@ class Admin::ImportsController < Admin::BaseController
         item["expected_path"] = expected_path
       end
 
-      disk_path = Rails.root.join("site", expected_path.sub(%r{^/}, ""))
+      disk_path = File.join(RoeSitePaths::SITE_PATH, expected_path.sub(%r{^/}, ""))
 
       # Check if file exists on disk
       if File.exist?(disk_path)
@@ -610,7 +610,7 @@ class Admin::ImportsController < Admin::BaseController
     live_fetcher.fetch_posts(fetcher_posts)
 
     # Now attempt to download media with the updated URLs
-    site_root = Rails.root.join("site").to_s
+    site_root = RoeSitePaths::SITE_PATH.to_s
     media_handler = SubstackImporter::MediaHandler.new(
       site_root: site_root,
       import: @import,
@@ -631,7 +631,7 @@ class Admin::ImportsController < Admin::BaseController
       next unless post_record
 
       # Update the post's frontmatter with new media paths
-      file_path = Rails.root.join("site", "posts", "#{fetcher_post.slug}.md")
+      file_path = File.join(RoeSitePaths::SITE_PATH, "posts", "#{fetcher_post.slug}.md")
       next unless File.exist?(file_path)
 
       # Read current file

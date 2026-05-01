@@ -4,6 +4,19 @@ set -e
 echo "🚀 Roe CMS Deployment"
 echo "===================="
 
+# Detect directory structure
+# In versioned setup: we're in /roe/current/, site is in /roe/site/
+# In standard setup: site is in ./site/
+if [ "$(basename "$(pwd)")" = "current" ] && [ -d "../site" ]; then
+    # Versioned structure
+    SITE_DIR="../site"
+    echo "📁 Detected versioned structure (current/)"
+else
+    # Standard structure
+    SITE_DIR="./site"
+    echo "📁 Detected standard structure"
+fi
+
 # Check requirements
 if ! command -v fly &> /dev/null; then
     echo "❌ Fly CLI not found. Install: https://fly.io/docs/hands-on/install-flyctl/"
@@ -20,9 +33,9 @@ echo ""
 echo "🎨 Step 1: Syncing local theme to app/themes..."
 echo "===================="
 
-if [ -d "site/theme" ]; then
-    rsync -av --delete site/theme/ app/themes/
-    echo "✅ Theme synced from site/theme → app/themes"
+if [ -d "$SITE_DIR/theme" ]; then
+    rsync -av --delete "$SITE_DIR/theme/" app/themes/
+    echo "✅ Theme synced from $SITE_DIR/theme → app/themes"
 
   # Check if there are uncommitted theme changes
   if ! git diff --quiet app/themes/; then
@@ -41,7 +54,7 @@ if [ -d "site/theme" ]; then
       fi
   fi
 else
-    echo "⚠️  No site/theme folder found"
+    echo "⚠️  No $SITE_DIR/theme folder found"
 fi
 
 # 2. Backup production
@@ -119,4 +132,9 @@ fi
 echo ""
 echo "✅ Deployment complete!"
 echo "🌐 Visit: https://${APP_URL}"
-echo "📂 Backup: site_backups/$(ls -t site_backups | head -1)"
+# Show backup location based on directory structure
+if [ "$(basename "$(pwd)")" = "current" ]; then
+    echo "📂 Backup: ../site_backups/$(ls -t ../site_backups 2>/dev/null | head -1)"
+else
+    echo "📂 Backup: site_backups/$(ls -t site_backups 2>/dev/null | head -1)"
+fi

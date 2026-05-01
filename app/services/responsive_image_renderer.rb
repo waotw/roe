@@ -24,7 +24,7 @@ class ResponsiveImageRenderer
     return simple_img_tag unless image_file?
 
     # Check if variants exist
-    source_full_path = Rails.root.join("site", source_path.sub(%r{^/}, "")).to_s
+    source_full_path = File.join(RoeSitePaths::SITE_PATH, source_path.sub(%r{^/}, "")).to_s
 
     if ImageVariantGenerator.variants_exist?(source_full_path)
       build_picture_tag
@@ -126,7 +126,7 @@ class ResponsiveImageRenderer
 
     # Add original as largest if it exists as WebP
     original_webp = source_path.sub(File.extname(source_path), '.webp')
-    if File.exist?(Rails.root.join("site", original_webp.sub(%r{^/}, "")))
+    if File.exist?(File.join(RoeSitePaths::SITE_PATH, original_webp.sub(%r{^/}, "")))
       variants << "#{ERB::Util.html_escape(original_webp)} 2000w"
     end
 
@@ -139,7 +139,7 @@ class ResponsiveImageRenderer
       next unless variant_exists?(filesystem_path)
 
       # Convert filesystem path to web path for srcset
-      web_path = filesystem_path.sub(Rails.root.join("site").to_s, "")
+      web_path = filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
       "#{ERB::Util.html_escape(web_path)} #{width}w"
     end.compact
 
@@ -157,7 +157,7 @@ class ResponsiveImageRenderer
     webp_filesystem = filesystem_path.sub(File.extname(filesystem_path), '.webp')
 
     # Convert to web path
-    webp_filesystem.sub(Rails.root.join("site").to_s, "")
+    webp_filesystem.sub(RoeSitePaths::SITE_PATH.to_s, "")
   end
 
   def variant_exists?(path)
@@ -166,7 +166,7 @@ class ResponsiveImageRenderer
       File.exist?(path)
     else
       # Convert web path to filesystem path
-      full_path = Rails.root.join("site", path.to_s.sub(%r{^/}, ""))
+      full_path = File.join(RoeSitePaths::SITE_PATH, path.to_s.sub(%r{^/}, ""))
       File.exist?(full_path)
     end
   end

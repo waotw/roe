@@ -120,12 +120,12 @@ class ImageVariantGenerator
     def queue_missing_variants
       return 0 unless available?
 
-      image_paths = Dir.glob(Rails.root.join("site/media/images/**/*.{jpg,jpeg,png,gif,webp}"))
+      image_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media/images/**/*.{jpg,jpeg,png,gif,webp}"))
                        .reject { |p| p.include?("/variants/") }
 
       queued_count = 0
       image_paths.each do |path|
-        relative_path = path.sub(Rails.root.join("site").to_s, "")
+        relative_path = path.sub(RoeSitePaths::SITE_PATH.to_s, "")
         web_path = relative_path.start_with?("/") ? relative_path : "/#{relative_path}"
 
         unless variants_exist?(path)
@@ -141,7 +141,7 @@ class ImageVariantGenerator
     def stats_for(medium)
       return nil unless medium&.image?
 
-      source_path = Rails.root.join("site", medium.file_path.sub(%r{^/}, "")).to_s
+      source_path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, "")).to_s
       {
         total: VARIANTS.count,
         generated: VARIANTS.count { |name, _| variant_exists?(source_path, name) },
@@ -164,13 +164,13 @@ class ImageVariantGenerator
         path
       # If it's a web path starting with /media
       elsif path.start_with?("/media/")
-        Rails.root.join("site", path.sub(%r{^/}, "")).to_s
+        File.join(RoeSitePaths::SITE_PATH, path.sub(%r{^/}, "")).to_s
       # If it starts with Rails.root but not /rails/site
       elsif path.start_with?(Rails.root.to_s) && !path.start_with?("/rails/site/")
         path
       # Otherwise assume it's relative
       else
-        Rails.root.join("site", path).to_s
+        File.join(RoeSitePaths::SITE_PATH, path).to_s
       end
     end
 

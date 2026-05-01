@@ -12,8 +12,8 @@ require "open-uri"
 #   "Seed from RSS feed" button where the user is explicitly asking
 #   for the podcast.yml entry to be (re)generated.
 class PodcastConfigSeeder
-  PODCAST_YML = Rails.root.join("site/system/features/podcast.yml").freeze
-  ARTWORK_DIR = Rails.root.join("site/system/images").freeze
+  PODCAST_YML = File.join(RoeSitePaths::SITE_PATH, "system/features/podcast.yml").freeze
+  ARTWORK_DIR = File.join(RoeSitePaths::SITE_PATH, "system/images").freeze
 
   # Single source of truth for podcast-key derivation. Both the Substack
   # importer (deriving the `podcast:` field for episodes) and the admin

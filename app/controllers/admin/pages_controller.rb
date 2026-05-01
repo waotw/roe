@@ -19,7 +19,7 @@ class Admin::PagesController < Admin::BaseController
 
   def create
     filename = sanitize_filename(params[:filename])
-    file_path = Rails.root.join("site/pages/#{filename}.md")
+    file_path = File.join(RoeSitePaths::SITE_PATH, "pages/#{filename}.md")
 
     if File.exist?(file_path)
       flash.now[:error] = "A page with that filename already exists"
@@ -303,7 +303,7 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def load_page_template
-    template_path = Rails.root.join("site/templates/page_template.md")
+    template_path = File.join(RoeSitePaths::SITE_PATH, "templates/page_template.md")
 
     if File.exist?(template_path)
       File.read(template_path)

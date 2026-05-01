@@ -2,7 +2,7 @@ class Admin::ThemesController < ApplicationController
   layout 'application'
 
   THEMES_DIR = Rails.root.join('app/themes')
-  USER_THEME_DIR = Rails.root.join('site/theme')
+  USER_THEME_DIR = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'theme'))
 
   def index
     @available_themes = list_available_themes

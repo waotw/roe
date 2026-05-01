@@ -1,5 +1,5 @@
 class PageGenerator
-  PAGES_PATH = Rails.root.join('site/pages')
+  PAGES_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'pages'))
 
   def self.generate_defaults
     FileUtils.mkdir_p(PAGES_PATH)

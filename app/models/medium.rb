@@ -27,7 +27,7 @@ class Medium < ApplicationRecord
     return false unless image?
 
     # Check filesystem instead of DB
-    source_path = Rails.root.join("site", file_path.sub(%r{^/}, "")).to_s
+    source_path = File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, "")).to_s
     ImageVariantGenerator.variants_exist?(source_path)
   end
 
@@ -58,7 +58,7 @@ class Medium < ApplicationRecord
   def delete_variants
     return unless image?
 
-    source_path = Rails.root.join("site", file_path.sub(%r{^/}, ""))
+    source_path = File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, ""))
     variants_dir = File.join(File.dirname(source_path), "variants")
 
     return unless Dir.exist?(variants_dir)
