@@ -1,8 +1,9 @@
-<div class="px-4 sm:px-0">
+<% content_for :editor_js, false %>
+<div class="px-4 sm:px-0" data-controller="updates">
   <div class="mb-8">
     <h1 class="text-3xl font-bold text-gray-900">Updates</h1>
     <p class="mt-2 text-sm text-gray-700">
-      Check for updates to Roe CMS and view release notes.
+      Check for updates to Roe CMS and manage installation.
     </p>
   </div>
 
@@ -26,33 +27,63 @@
           Roe CMS <%= @current_version %>
         </p>
       </div>
-      <%= button_to "Check for Updates", 
-                    admin_check_updates_path, 
-                    method: :post,
-                    class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      <div class="flex items-center gap-3">
+        <%= button_to "Check for Updates",
+                      admin_check_updates_path,
+                      method: :post,
+                      class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+
+        <% if @update_info && @update_info[:update_available] %>
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+          </span>
+        <% end %>
+      </div>
     </div>
   </div>
 
-  <% if @update_info %>
+  <% if @in_progress %>
+    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
+      <h2 class="text-lg font-semibold text-amber-900 mb-2">Update in Progress</h2>
+      <p class="text-amber-800 mb-4">
+        An update is currently being applied to your site.
+        Please do not close this window.
+      </p>
+
+      <div class="mb-4">
+        <div class="w-full bg-amber-200 rounded-full h-2.5">
+          <div class="bg-amber-600 h-2.5 rounded-full" style="width: <%= @last_update&.progress_percent || 0 %>%"></div>
+        </div>
+        <p class="text-sm text-amber-700 mt-2">
+          <%= @last_update&.current_step || 'Starting...' %>
+        </p>
+      </div>
+
+      <div class="bg-white rounded-sm p-4 font-mono text-xs text-gray-600 h-48 overflow-y-auto">
+        <%= simple_format(@last_update&.log || '') %>
+      </div>
+    </div>
+  <% elsif @update_info %>
     <% if @update_info[:update_available] %>
-      <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
+      <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-6">
         <div class="flex items-start gap-4">
           <div class="flex-1">
-            <h2 class="text-lg font-semibold text-amber-900 mb-2">
+            <h2 class="text-lg font-semibold text-blue-900 mb-2">
               Update Available
             </h2>
-            <p class="text-amber-800 mb-4">
-              A new version of Roe is available: 
+            <p class="text-blue-800 mb-4">
+              A new version of Roe is available:
               <span class="font-mono font-bold"><%= @update_info[:latest_version] %></span>
             </p>
-            <p class="text-sm text-amber-700 mb-2">
+            <p class="text-sm text-blue-700 mb-2">
               Released: <%= time_ago_in_words(@update_info[:published_at]) %> ago
             </p>
           </div>
         </div>
 
         <% if @update_info[:release_notes].present? %>
-          <div class="mt-4 p-4 bg-white border border-amber-200 rounded-sm">
+          <div class="mt-4 p-4 bg-white border border-blue-200 rounded-sm">
             <h3 class="text-sm font-semibold text-gray-900 mb-2">Release Notes</h3>
             <div class="prose prose-sm max-w-none text-gray-700">
               <%= simple_format(@update_info[:release_notes]) %>
@@ -60,25 +91,24 @@
           </div>
         <% end %>
 
-        <div class="mt-6 pt-4 border-t border-amber-200">
-          <h3 class="text-sm font-semibold text-amber-900 mb-2">Installation Instructions</h3>
-          <div class="bg-gray-900 rounded-sm p-4 font-mono text-sm text-gray-100 overflow-x-auto">
-            <p class="text-gray-400 mb-2"># Run these commands in your terminal:</p>
-            <p>cd /path/to/roe</p>
-            <p>git pull origin main</p>
-            <p>bundle install</p>
-            <p>bin/rails db:migrate</p>
-            <p>bin/rails assets:precompile</p>
-            <p class="text-gray-400 mt-2"># Then restart your server</p>
-          </div>
-          <p class="text-xs text-amber-700 mt-2">
-            Note: Make sure to backup your site/ directory before updating.
-          </p>
+        <div class="mt-6 pt-4 border-t border-blue-200">
+          <h3 class="text-sm font-semibold text-blue-900 mb-2">Before Updating</h3>
+          <ul class="text-sm text-blue-700 list-disc list-inside space-y-1">
+            <li>A backup of your site will be created automatically</li>
+            <li>Your site will be unavailable for approximately 30 seconds</li>
+            <li>Static site generation will be paused during the update</li>
+          </ul>
         </div>
 
-        <div class="mt-4">
-          <%= link_to "View on Sourcehut", 
-                      @update_info[:release_url], 
+        <div class="mt-6 flex items-center gap-3">
+          <%= button_to "Update Now",
+                        admin_start_update_path(version: @update_info[:latest_version]),
+                        method: :post,
+                        data: { confirm: "This will update Roe to v#{@update_info[:latest_version]}. Your site will be briefly unavailable. Continue?" },
+                        class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs" %>
+
+          <%= link_to "View on Sourcehut",
+                      @update_info[:release_url],
                       target: "_blank",
                       class: "text-sm text-blue-600 hover:text-blue-900 underline" %>
         </div>
@@ -88,9 +118,6 @@
         <h2 class="text-lg font-semibold text-green-900">You're Up to Date</h2>
         <p class="text-green-800 mt-2">
           You're running the latest version of Roe CMS (<%= @current_version %>).
-        </p>
-        <p class="text-sm text-green-700 mt-1">
-          Last checked: <%= time_ago_in_words(Time.now) %> ago
         </p>
       </div>
     <% end %>
@@ -102,13 +129,27 @@
     </div>
   <% end %>
 
+  <% if @last_update && @last_update.status == 'failed' %>
+    <div class="mt-6 bg-red-50 border border-red-200 rounded-sm p-6">
+      <h3 class="text-sm font-semibold text-red-900 mb-2">Last Update Failed</h3>
+      <p class="text-sm text-red-700 mb-4">
+        <%= @last_update.error_message %>
+      </p>
+      <%= button_to "Attempt Rollback",
+                    admin_rollback_update_path,
+                    method: :post,
+                    data: { confirm: "This will restore the previous version. Continue?" },
+                    class: "inline-flex items-center px-4 py-2 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono text-xs rounded-xs" %>
+    </div>
+  <% end %>
+
   <div class="mt-8 pt-6 border-t border-gray-200">
     <h3 class="text-sm font-semibold text-gray-900 mb-2">About Updates</h3>
     <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
-      <li>Always backup your site/ directory before updating</li>
-      <li>Updates may include new features, bug fixes, and security patches</li>
+      <li>Updates include new features, bug fixes, and security patches</li>
       <li>Your content in the site/ folder is preserved during updates</li>
-      <li>Configuration files in site/system/ are not overwritten</li>
+      <li>Configuration files are not overwritten</li>
+      <li>If an update fails, the system will automatically roll back</li>
     </ul>
   </div>
 </div>

@@ -17,7 +17,9 @@ Rails.application.routes.draw do
     # Updates
     get "updates", to: "updates#index", as: "updates"
     post "updates/check", to: "updates#check", as: "check_updates"
-    post "updates/install", to: "updates#install", as: "install_update"
+    post "updates/start", to: "updates#start", as: "start_update"
+    post "updates/rollback", to: "updates#rollback", as: "rollback_update"
+    get "updates/status", to: "updates#status", as: "update_status"
 
     get "layout/navigation/edit", to: "layouts#edit_navigation"
     patch "layout/navigation", to: "layouts#update_navigation"

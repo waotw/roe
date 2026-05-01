@@ -1,0 +1,77 @@
+module RoeUpdater
+  class MigrationTester
+    class MigrationError < StandardError; end
+
+    TEST_SITE_PATH = File.join(RoeSitePaths::ROE_ROOT, 'staging', 'test_site')
+
+    class << self
+      def test_migrations(status_record)
+        status_record.update!(
+          current_step: "Testing migrations...",
+          log: (status_record.log || "") + "→ Testing migrations on copy...\n"
+        )
+
+        copy_site_to_test
+        
+        staging_app_path = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+        
+        env_vars = {
+          'RAILS_ENV' => 'production',
+          'ROE_SITE_PATH' => TEST_SITE_PATH
+        }
+        
+        bundle_cmd = "cd '#{staging_app_path}' && bundle install --quiet 2>&1"
+        output = nil
+        
+        Bundler.with_original_env do
+          output = `#{bundle_cmd}`
+        end
+        
+        unless $?.success?
+          cleanup_test_site
+          raise MigrationError, "Bundle install failed: #{output}"
+        end
+
+        migrate_cmd = "cd '#{staging_app_path}' && RAILS_ENV=production ROE_SITE_PATH='#{TEST_SITE_PATH}' bundle exec rails db:migrate 2>&1"
+        output = nil
+        
+        Bundler.with_original_env do
+          output = `#{migrate_cmd}`
+        end
+        
+        unless $?.success?
+          cleanup_test_site
+          raise MigrationError, "Migration test failed: #{output}"
+        end
+
+        cleanup_test_site
+
+        status_record.update!(
+          log: (status_record.log || "") + "✓ Migration test passed\n"
+        )
+
+        true
+      rescue => e
+        cleanup_test_site
+        raise MigrationError, "Migration testing failed: #{e.message}"
+      end
+
+      private
+
+      def copy_site_to_test
+        cleanup_test_site
+        
+        rsync_cmd = "rsync -av --delete '#{RoeSitePaths::SITE_PATH}/' '#{TEST_SITE_PATH}/' 2>&1"
+        output = `#{rsync_cmd}`
+        
+        unless $?.success?
+          raise MigrationError, "Failed to copy site for testing: #{output}"
+        end
+      end
+
+      def cleanup_test_site
+        FileUtils.rm_rf(TEST_SITE_PATH) if File.exist?(TEST_SITE_PATH)
+      end
+    end
+  end
+end
