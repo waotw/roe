@@ -9,13 +9,20 @@
       multiple: true,
       class: "hidden",
       id: "file-upload-input",
-      name: "files[]",
-      data: { action: "change->upload#submit" } %>
+      name: "files[]" %>
 
   <label for="file-upload-input" class="cursor-pointer inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">
     Upload Media
   </label>
 <% end %>
+
+<script>
+  document.getElementById('file-upload-input').addEventListener('change', function() {
+    if (this.files.length > 0) {
+      this.form.submit();
+    }
+  });
+</script>
 
 <div data-controller="media-filter media-bulk-select"
      data-media-filter-total-value="<%= @media.count %>">
