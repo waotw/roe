@@ -36,7 +36,7 @@ class BulkUploadJob < ApplicationJob
         # Queue variant generation if it's an image
         if medium.image? && ImageVariantGenerator.available?
           broadcast_status(batch_id, index, "🔄", "Optimizing...")
-          GenerateImageVariantsJob.perform_now(medium.file_path, nil)
+          GenerateImageVariantsJob.perform_later(medium.file_path, medium.id)
         end
 
         # Broadcast success
