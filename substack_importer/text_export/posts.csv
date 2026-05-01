@@ -1,6 +1,0 @@
-post_id,post_date,is_published,email_sent_at,inbox_sent_at,type,audience,title,subtitle,podcast_url
-192242642.post-linked-article,2026-03-26T19:29:16.857Z,true,,,newsletter,everyone,Post linked article,This article was post linked,
-192201431.this-is-a-custom-page-on-substack,2026-03-26T12:45:20.783Z,true,,,page,everyone,This is a custom page on Substack,,
-192101002.title-video-podcast-one,2026-03-25T14:34:28.945Z,true,,,podcast,everyone,Title Video Podcast One,Subtitle Video Podcast One,
-192100469.title-podcast-one,2026-03-25T14:32:57.238Z,true,2026-03-25T14:32:57.340Z,2026-03-25T14:32:57.340Z,podcast,everyone,Title Podcast One,Subtitle Podcast One,
-192087624.an-article-that-uses-all-the-tools,2026-03-25T12:54:09.026Z,true,,,newsletter,everyone,An article that uses all the tools,And has a great subtitle,

@@ -68,3 +68,9 @@ graphify-out/
 **/.graphify_*
 **/graph.json
 GRAPH_REPORT.md
+
+# Roe versioned structure
+/current/
+/staging/
+/static_site/
+/site_backups/
