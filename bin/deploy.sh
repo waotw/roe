@@ -6,14 +6,9 @@ echo "===================="
 
 # Detect directory structure
 # In versioned setup: we're in /roe/current/, site is in /roe/site/
-# In standard setup: site is in ./site/
-if [ "$(basename "$(pwd)")" = "current" ] && [ -d "../site" ]; then
-    # Versioned structure
-    SITE_DIR="../site"
+if [ "$(basename "$(pwd)")" = "current" ]; then
     echo "📁 Detected versioned structure (current/)"
 else
-    # Standard structure
-    SITE_DIR="./site"
     echo "📁 Detected standard structure"
 fi
 
@@ -28,41 +23,12 @@ if ! fly auth whoami &> /dev/null; then
     exit 1
 fi
 
-# 1. Sync local theme changes to app/themes (for version control)
+# 1. Backup production
 echo ""
-echo "🎨 Step 1: Syncing local theme to app/themes..."
-echo "===================="
-
-if [ -d "$SITE_DIR/theme" ]; then
-    rsync -av --delete "$SITE_DIR/theme/" app/themes/
-    echo "✅ Theme synced from $SITE_DIR/theme → app/themes"
-
-  # Check if there are uncommitted theme changes
-  if ! git diff --quiet app/themes/; then
-      echo ""
-      echo "⚠️  Theme changes detected in app/themes/"
-      echo ""
-      read -p "Review and commit theme changes now? (y/n) " -r
-      if [[ $REPLY =~ ^[Yy]$ ]]; then
-          echo ""
-          git add app/themes/
-          echo "Theme changes staged for commit."
-          echo ""
-          read -p "Commit message: " commit_msg
-          git commit -m "${commit_msg:-Update theme CSS}"
-          echo "✅ Theme changes committed"
-      fi
-  fi
-else
-    echo "⚠️  No $SITE_DIR/theme folder found"
-fi
-
-# 2. Backup production
-echo ""
-echo "💾 Step 2: Backing up production..."
+echo "💾 Step 1: Backing up production..."
 rake site:backup
 
-# 3. Preview what will be pushed to production
+# 2. Preview what will be pushed to production
 echo ""
 read -p "Preview what would sync to production? (y/n) " -r
 echo
@@ -70,7 +36,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     rake site:preview_changes
 fi
 
-# 4. Choose push strategy
+# 3. Choose push strategy
 echo ""
 echo "Content sync options:"
 echo "  1) Push everything (overwrite all production content)"
@@ -105,7 +71,7 @@ case $push_option in
     ;;
 esac
 
-# 5. Confirm deploy
+# 4. Confirm deploy
 echo ""
 read -p "🚢 Deploy application code to Fly.io? (y/n) " -r
 echo
@@ -114,12 +80,12 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# 6. Deploy
+# 5. Deploy
 echo ""
 echo "🚢 Deploying to Fly.io..."
 fly deploy --local-only
 
-# 7. Health check
+# 6. Health check
 echo ""
 echo "🏥 Health check..."
 APP_URL=$(fly status --json | jq -r '.Hostname')

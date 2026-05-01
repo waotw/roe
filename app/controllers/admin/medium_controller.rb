@@ -133,6 +133,13 @@ class Admin::MediumController < Admin::BaseController
   end
 
   def queue_missing_variants
+    # Only queue missing variants in development
+    # Production generates variants on upload
+    unless Rails.env.development?
+      redirect_to browse_admin_medium_index_path, notice: "Variant queueing only available in development"
+      return
+    end
+
     queued = 0
 
     Medium.images.originals_only.find_each do |medium|

@@ -14,7 +14,6 @@ class GenerateImageVariantsJob < ApplicationJob
   end
 
   def perform(file_path, medium_id)
-    return if Rails.env.production?
 
     Rails.logger.info "[ImageVariants] Job started: #{file_path}"
 

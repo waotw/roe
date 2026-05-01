@@ -159,14 +159,14 @@ class ImageVariantGenerator
       # Handle both web paths (/media/images/...) and absolute paths
       path = path.to_s
 
-      # If already an absolute path to /rails/site, use it
-      if path.start_with?("/rails/site/")
+      # If already an absolute path to site directory, use it
+      if path.start_with?(RoeSitePaths::SITE_PATH.to_s)
         path
       # If it's a web path starting with /media
       elsif path.start_with?("/media/")
         File.join(RoeSitePaths::SITE_PATH, path.sub(%r{^/}, "")).to_s
-      # If it starts with Rails.root but not /rails/site
-      elsif path.start_with?(Rails.root.to_s) && !path.start_with?("/rails/site/")
+      # If it starts with Rails.root
+      elsif path.start_with?(Rails.root.to_s)
         path
       # Otherwise assume it's relative
       else

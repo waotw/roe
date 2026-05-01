@@ -14,7 +14,7 @@ class ContentSync
   end
 
   def sync_posts
-    relative_paths = Dir.glob("site/posts/**/*.md")
+    relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_POSTS_PATH, "**", "*.md"))
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     puts "\n📚 Found #{markdown_files.count} markdown files in site/posts"
@@ -68,7 +68,7 @@ class ContentSync
   end
 
   def sync_pages
-    relative_paths = Dir.glob("site/pages/**/*.md")
+    relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_PAGES_PATH, "**", "*.md"))
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     return if markdown_files.empty?
@@ -100,7 +100,7 @@ class ContentSync
 
   def sync_media
     # Sync all media types (images, audio, video) - EXCLUDE variants folder
-    media_files = Dir.glob("site/media/**/*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}")
+    media_files = Dir.glob(File.join(RoeSitePaths::SITE_MEDIA_PATH, "**", "*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}"))
                      .reject { |path| path.include?("/variants/") }
 
     puts "\n🎬 Found #{media_files.count} media files"
@@ -115,7 +115,7 @@ class ContentSync
     image_count = 0
 
     media_files.each do |file_path|
-      web_path = file_path.sub('site', '')
+      web_path = file_path.sub(RoeSitePaths::SITE_PATH.to_s, '')
 
       begin
         unless Medium.exists?(file_path: web_path)
@@ -130,8 +130,8 @@ class ContentSync
           puts "  ✓ Added: #{File.basename(file_path)}"
           success_count += 1
 
-          # Queue variant generation for images
-          if medium.image? && ImageVariantGenerator.available?
+          # Queue variant generation for images (development only - production generates on upload)
+          if medium.image? && ImageVariantGenerator.available? && Rails.env.development?
             GenerateImageVariantsJob.perform_later(web_path, nil)  # Pass nil for medium_id
             image_count += 1
           end
@@ -155,7 +155,7 @@ class ContentSync
   end
 
   def sync_documentation
-    relative_paths = Dir.glob("site/documentation/**/*.md")
+    relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "**", "*.md"))
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     return if markdown_files.empty?
@@ -186,7 +186,7 @@ class ContentSync
   end
 
   def sync_products
-    relative_paths = Dir.glob("site/products/**/*.md")
+    relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_PRODUCTS_PATH, "**", "*.md"))
     markdown_files = relative_paths.map { |path| File.expand_path(path) }
 
     puts "\n🛍️  Found #{markdown_files.count} markdown files in site/products"
@@ -201,7 +201,7 @@ class ContentSync
 
     markdown_files.each do |file_path|
       begin
-        relative_path = file_path.sub(Rails.root.to_s + "/", "")
+        relative_path = file_path.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
         content = File.read(file_path)
 
         # Parse frontmatter
@@ -245,7 +245,7 @@ class ContentSync
   end
 
   def handle_orphaned_products(markdown_files)
-    relative_paths = markdown_files.map { |path| path.sub(Rails.root.to_s + "/", "") }
+    relative_paths = markdown_files.map { |path| path.sub(RoeSitePaths::SITE_PATH.to_s + "/", "") }
     orphaned_products = Product.where.not(file_path: relative_paths)
 
     if orphaned_products.any?
@@ -344,7 +344,7 @@ class ContentSync
 
   def handle_orphaned_media(current_files)
     # Convert to web paths for comparison
-    current_web_paths = current_files.map { |f| f.sub('site', '') }
+    current_web_paths = current_files.map { |f| f.sub(RoeSitePaths::SITE_PATH.to_s, '') }
 
     orphans = Medium.where.not(file_path: current_web_paths)
 
