@@ -1,3 +1,5 @@
+require 'shellwords'
+
 namespace :site do
   def app_name
     ENV['FLY_APP_NAME'] || 'roe'
@@ -212,7 +214,7 @@ namespace :site do
       end
 
       puts "\n  → Syncing #{folder}/"
-      system("rsync -rltzPi --delete -e ./bin/fly-rsync #{local_path} #{remote_path}")
+      system("rsync -rltzPi --delete -e ./bin/fly-rsync #{Shellwords.escape(local_path)} #{Shellwords.escape(remote_path)}")
     end
 
     puts "\n✅ Push complete!"
@@ -226,11 +228,11 @@ namespace :site do
 
     puts "\n--- Files that would be pulled FROM production ---"
     puts "(Excludes: development databases)"
-    system("rsync -rltzPin --dry-run #{PULL_EXCLUDES.join(' ')} -e ./bin/fly-rsync #{machine}:/data/site/ ./site/")
+    system("rsync -rltzPin --dry-run #{PULL_EXCLUDES.join(' ')} -e ./bin/fly-rsync #{machine}:/data/site/ #{Shellwords.escape('./site/')}")
 
     puts "\n--- Files that would be pushed TO production ---"
     puts "(Excludes: production databases)"
-    system("rsync -rltzPin --dry-run #{PUSH_EXCLUDES.join(' ')} -e ./bin/fly-rsync ./site/ #{machine}:/data/site/")
+    system("rsync -rltzPin --dry-run #{PUSH_EXCLUDES.join(' ')} -e ./bin/fly-rsync #{Shellwords.escape('./site/')} #{machine}:/data/site/")
   end
 
   desc "Restore production from backup (interactive or direct: rake site:rollback[latest])"
@@ -270,7 +272,8 @@ namespace :site do
 
       machine = machine_id
       puts "\n⏮️  Restoring #{backup_name} to production..."
-      system("rsync -avP --delete -e ./bin/fly-rsync #{backup_path}/ #{machine}:/data/site/")
+      escaped_path = Shellwords.escape("#{backup_path}/")
+      system("rsync -avP --delete -e ./bin/fly-rsync #{escaped_path} #{machine}:/data/site/")
       puts "✅ Rollback complete!"
       exit 0
     end
@@ -322,7 +325,7 @@ namespace :site do
 
     machine = machine_id
     puts "\n⏮️  Restoring #{timestamp} to production..."
-    system("rsync -avP --delete -e ./bin/fly-rsync #{backup_path}/ #{machine}:/data/site/")
+    system("rsync -avP --delete -e ./bin/fly-rsync #{Shellwords.escape("#{backup_path}/")} #{machine}:/data/site/")
     puts "✅ Rollback complete!"
   end
 
