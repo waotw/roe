@@ -115,7 +115,9 @@ class ContentSync
     image_count = 0
 
     media_files.each do |file_path|
-      web_path = file_path.sub(RoeSitePaths::SITE_PATH.to_s, '')
+      # Handle symlinks - resolve to real path before substitution
+      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+      web_path = File.realpath(file_path).sub(real_site_path, '')
 
       begin
         unless Medium.exists?(file_path: web_path)
@@ -199,9 +201,10 @@ class ContentSync
     error_count = 0
     error_files = []
 
+    real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
     markdown_files.each do |file_path|
       begin
-        relative_path = file_path.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
+        relative_path = File.realpath(file_path).sub(real_site_path + "/", "")
         content = File.read(file_path)
 
         # Parse frontmatter
@@ -245,7 +248,8 @@ class ContentSync
   end
 
   def handle_orphaned_products(markdown_files)
-    relative_paths = markdown_files.map { |path| path.sub(RoeSitePaths::SITE_PATH.to_s + "/", "") }
+    real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+    relative_paths = markdown_files.map { |path| File.realpath(path).sub(real_site_path + "/", "") }
     orphaned_products = Product.where.not(file_path: relative_paths)
 
     if orphaned_products.any?
@@ -344,7 +348,9 @@ class ContentSync
 
   def handle_orphaned_media(current_files)
     # Convert to web paths for comparison
-    current_web_paths = current_files.map { |f| f.sub(RoeSitePaths::SITE_PATH.to_s, '') }
+    # Handle symlinks - resolve to real path before substitution
+    real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, '') }
 
     orphans = Medium.where.not(file_path: current_web_paths)
 

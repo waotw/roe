@@ -189,7 +189,11 @@ class ContentWatcher
 
       puts "DEBUG: Processing media file: #{absolute_file}"
 
-      web_path = absolute_file.sub(RoeSitePaths::SITE_PATH.to_s, '')
+      # Handle symlinks - resolve to real path before substitution
+      # In production, /rails/site is a symlink to /data/site
+      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+      real_file_path = File.realpath(absolute_file)
+      web_path = real_file_path.sub(real_site_path, '')
       puts "DEBUG: Web path: #{web_path}"
 
       if Medium.exists?(file_path: web_path)
@@ -277,8 +281,10 @@ class ContentWatcher
       end
     elsif absolute_old.include?('site/media')
       # Media files are stored with web paths like "/media/images/file.jpg"
-      old_web_path = absolute_old.sub(RoeSitePaths::SITE_PATH.to_s, '')
-      new_web_path = absolute_new.sub(RoeSitePaths::SITE_PATH.to_s, '')
+      # Handle symlinks - resolve to real path before substitution
+      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+      old_web_path = File.realpath(absolute_old).sub(real_site_path, '')
+      new_web_path = File.realpath(absolute_new).sub(real_site_path, '')
 
       medium = Medium.find_by(file_path: old_web_path)
       if medium
@@ -306,7 +312,9 @@ class ContentWatcher
       Documentation.remove_by_file_path(absolute_file)
       puts "   Removed documentation from database"
     elsif absolute_file.include?('site/media')
-      web_path = absolute_file.sub(RoeSitePaths::SITE_PATH.to_s, '')
+      # Handle symlinks - resolve to real path before substitution
+      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+      web_path = File.realpath(absolute_file).sub(real_site_path, '')
       Medium.remove_by_file_path(web_path)
       puts "   Removed media file from database"
     end
