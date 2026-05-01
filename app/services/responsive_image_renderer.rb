@@ -44,12 +44,12 @@ class ResponsiveImageRenderer
   end
 
   def already_queued?(path)
-    # Simple check to avoid re-queuing
-    SolidQueue::Job.exists?(
-      class_name: 'GenerateImageVariantsJob',
-      finished_at: nil,
-      arguments: path
-    )
+    # Check if a job for this path already exists in the queue
+    # Arguments are stored as serialized JSON in SQLite
+    SolidQueue::Job
+      .where(class_name: 'GenerateImageVariantsJob')
+      .where(finished_at: nil)
+      .exists?(["arguments LIKE ?", "%#{path}%"])
   rescue
     false  # If check fails, allow queuing
   end

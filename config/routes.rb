@@ -71,6 +71,7 @@ Rails.application.routes.draw do
       end
       member do
         patch :rename
+        post :regenerate_variants
       end
     end
 

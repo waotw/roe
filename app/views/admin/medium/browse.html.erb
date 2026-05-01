@@ -171,6 +171,12 @@
                     <div class="absolute top-1 right-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded">
                       ⏳ <%= variant_stats[:generated] %>/<%= variant_stats[:total] %>
                     </div>
+                    <%= button_to "⚡",
+                                  regenerate_variants_admin_medium_path(media),
+                                  method: :post,
+                                  class: "absolute top-1 left-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded hover:bg-blue-600",
+                                  title: "Generate variants",
+                                  data: { turbo: false } %>
                   <% elsif variant_stats && variant_stats[:ready] %>
                     <div class="absolute top-1 right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded" title="Variants ready: <%= ImageVariantGenerator::VARIANTS.keys.join(', ') %>">
                       ✓

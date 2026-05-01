@@ -155,6 +155,27 @@ class Admin::MediumController < Admin::BaseController
     redirect_to browse_admin_medium_index_path, notice: "Queued #{queued} #{'image'.pluralize(queued)} for optimization"
   end
 
+  def regenerate_variants
+    medium = Medium.find(params[:id])
+    
+    unless medium.image?
+      redirect_to browse_admin_medium_index_path, alert: "Only images can have variants generated"
+      return
+    end
+    
+    path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, ""))
+    
+    unless File.exist?(path)
+      redirect_to browse_admin_medium_index_path, alert: "Image file not found on disk"
+      return
+    end
+
+    # Queue variant generation
+    GenerateImageVariantsJob.perform_later(medium.file_path, medium.id)
+    
+    redirect_to browse_admin_medium_index_path, notice: "Queued variant generation for #{File.basename(medium.file_path)}"
+  end
+
   def destroy
     media = Medium.find(params[:id])
     full_path = File.join(RoeSitePaths::SITE_PATH, media.file_path.to_s.sub(%r{^/}, ""))
