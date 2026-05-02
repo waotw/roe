@@ -1,16 +1,24 @@
 module RoeUpdater
   class UpdateOrchestrator
     STEPS = [
-      { name: 'validating', percent: 5, description: 'Validating update prerequisites' },
-      { name: 'backing_up_db', percent: 15, description: 'Creating database backup' },
-      { name: 'backing_up_site', percent: 25, description: 'Creating full site backup' },
-      { name: 'downloading', percent: 40, description: 'Downloading new version' },
-      { name: 'testing', percent: 55, description: 'Testing migrations' },
-      { name: 'migrating', percent: 70, description: 'Running production migrations' },
-      { name: 'switching', percent: 85, description: 'Switching to new version' },
-      { name: 'restarting', percent: 95, description: 'Restarting server' },
-      { name: 'completed', percent: 100, description: 'Update complete' }
+      { name: 'validating',         percent: 5,   description: 'Validating update prerequisites' },
+      { name: 'backing_up_db',      percent: 15,  description: 'Creating database backup' },
+      { name: 'backing_up_site',    percent: 25,  description: 'Creating full site backup' },
+      { name: 'downloading',        percent: 40,  description: 'Downloading new version' },
+      { name: 'testing',            percent: 55,  description: 'Testing migrations' },
+      { name: 'migrating',          percent: 70,  description: 'Running production migrations' },
+      { name: 'switching',          percent: 85,  description: 'Switching to new version' },
+      { name: 'syncing_root_files', percent: 88,  description: 'Syncing root-level files' },
+      { name: 'writing_version',    percent: 90,  description: 'Updating VERSION file' },
+      { name: 'restarting',         percent: 95,  description: 'Restarting server' },
+      { name: 'completed',          percent: 100, description: 'Update complete' }
     ].freeze
+
+    # Files whose source-of-truth lives in current/ but need to appear
+    # at ROE_ROOT/ for users (and for the launcher script). These get
+    # copied out after every successful switch so updates pick up new
+    # versions of the launcher / docs without manual intervention.
+    ROOT_SYNC_FILES = %w[roe.sh README.md AGENTS.md].freeze
 
     class << self
       def start_update(to_version, status_record)
@@ -24,6 +32,8 @@ module RoeUpdater
         execute_step(:testing) { MigrationTester.test_migrations(@status) }
         execute_step(:migrating) { run_production_migrations }
         execute_step(:switching) { SwitchManager.switch_versions(@status) }
+        execute_step(:syncing_root_files) { sync_root_files }
+        execute_step(:writing_version) { write_root_version_file }
         execute_step(:restarting) { restart_server }
 
         complete_update
@@ -57,43 +67,104 @@ module RoeUpdater
           raise "Git is not available. Please install Git to perform updates."
         end
 
-        if File.exist?(File.join(RoeSitePaths::ROE_ROOT, 'staging'))
-          raise "Staging directory already exists. Please clean up manually or wait for current update to complete."
+        # An empty `staging/` ships with the install — only fail when it
+        # actually has content, which would mean either an in-progress
+        # update or a previous update that crashed without cleanup.
+        staging = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+        if Dir.exist?(staging) && !Dir.empty?(staging)
+          raise "Staging directory has unexpected content (#{Dir.children(staging).size} items). " \
+                "Either an update is in progress, or a previous run crashed — clean up #{staging} manually."
         end
       end
 
       def run_production_migrations
         log("Running production migrations...")
-        
-        current_app = File.join(RoeSitePaths::ROE_ROOT, 'current')
-        
-        env_vars = {
-          'RAILS_ENV' => 'production'
-        }
-        
-        migrate_cmd = "cd '#{current_app}' && RAILS_ENV=production bundle exec rails db:migrate 2>&1"
+
+        # Run from staging/, not current/. At this point the new code +
+        # new migration files are still in staging/ — the switch hasn't
+        # happened yet. Running from current/ would silently no-op
+        # (no new migration files visible) and the new app would boot
+        # against an unmigrated schema after the switch.
+        staging_app = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+
+        migrate_cmd = "cd '#{staging_app}' && RAILS_ENV=production bundle exec rails db:migrate 2>&1"
         output = nil
-        
+
         Bundler.with_original_env do
           output = `#{migrate_cmd}`
         end
-        
+
         unless $?.success?
           raise "Production migration failed: #{output}"
         end
-        
+
         log("Production migrations completed")
+      end
+
+      # Copy root-level companion files (launcher script + top-level
+      # docs) from the freshly-switched current/ up to ROE_ROOT/. These
+      # files are versioned with Roe but need to be visible at the
+      # project root — the launcher because users invoke `./roe.sh`
+      # from there, the docs so `cat README.md` works without diving
+      # into current/. Missing source files are skipped with a warning
+      # so an older Roe distribution that doesn't ship one of these
+      # doesn't break the update.
+      def sync_root_files
+        ROOT_SYNC_FILES.each do |filename|
+          source = File.join(RoeSitePaths::ROE_ROOT, 'current', filename)
+          dest   = File.join(RoeSitePaths::ROE_ROOT, filename)
+
+          unless File.exist?(source)
+            log("⊘ #{filename} not present in current/, skipping")
+            next
+          end
+
+          FileUtils.cp(source, dest)
+          log("✓ Synced #{filename} → ROE_ROOT")
+        end
+      end
+
+      # Refresh ROE_ROOT/VERSION so the launcher and VersionChecker
+      # report the new version after the swap. We write authoritatively
+      # from the orchestrator (which knows @version) rather than copying
+      # from current/VERSION — that way a Roe distribution doesn't need
+      # to ship a separate root-level VERSION; the file gets created/
+      # rewritten on every successful update.
+      def write_root_version_file
+        version_path = File.join(RoeSitePaths::ROE_ROOT, 'VERSION')
+
+        existing = File.exist?(version_path) ? (YAML.load_file(version_path) || {}) : {}
+        updated = existing.merge(
+          'version'      => @version,
+          'release_date' => Date.today.iso8601
+        )
+
+        File.write(version_path, updated.to_yaml)
+        log("Wrote VERSION file: #{@version}")
       end
 
       def restart_server
         log("Initiating server restart...")
-        
+
+        # Outside production we don't kill the server — there's no
+        # process supervisor to bring it back up, so exiting would just
+        # leave a dead Puma. Tell the user to restart by hand.
+        unless Rails.env.production?
+          log("⚠️  Manual restart required to load the new version: run `./roe.sh restart`")
+          return
+        end
+
+        # In production we trust a supervisor (systemd / kamal / fly
+        # machine config) to relaunch us. Schedule the exit a few
+        # seconds out so the orchestrator's complete_update call (and
+        # this status update) is durably persisted before we die.
         Thread.new do
-          sleep 2
+          sleep 5
+          Rails.logger.info "[RoeUpdater] Exiting for supervised restart"
           exit!(0)
         end
-        
-        log("Server restart scheduled")
+
+        log("Server restart scheduled in 5 seconds (supervisor will relaunch)")
       end
 
       def complete_update

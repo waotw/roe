@@ -60,8 +60,12 @@ module RoeSitePaths
     end
   end
 
-  # SITE_PATH is where all user content lives
-  SITE_PATH = File.join(ROE_ROOT, 'site')
+  # SITE_PATH is where all user content lives. Defaults to <ROE_ROOT>/site,
+  # overridable via the ROE_SITE_PATH env var. The override exists so the
+  # update system's MigrationTester can boot a Rails subprocess pointed
+  # at a copy of the production site (under staging/test_site/) and run
+  # `db:migrate` against the copy without ever touching the real DB.
+  SITE_PATH = ENV['ROE_SITE_PATH'].presence || File.join(ROE_ROOT, 'site')
 
   # STATIC_SITE_PATH is where static site output goes (outside versioned directory)
   STATIC_SITE_PATH = File.join(ROE_ROOT, 'static_site')

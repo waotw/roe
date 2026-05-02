@@ -7,18 +7,31 @@ module RoeUpdater
         backup_dir = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'update_tmp')
         FileUtils.mkdir_p(backup_dir)
 
-        databases = Dir.glob(File.join(RoeSitePaths::SITE_PATH, 'db/*.sqlite3'))
-        
+        # Pick up production DBs from any conventional layout — flat
+        # site/db/*.sqlite3 (older convention) or
+        # site/db/{development,production}/*.sqlite3 (current).
+        databases = Dir.glob(File.join(RoeSitePaths::SITE_PATH, 'db/**/*.sqlite3'))
+                       .reject { |p| p =~ /-(?:shm|wal)$/ }
+
         databases.each do |db|
           backup_path = File.join(backup_dir, File.basename(db))
-          FileUtils.cp(db, backup_path)
-          
-          unless File.exist?(backup_path) && File.size(backup_path) == File.size(db)
+
+          # Use SQLite's online backup API instead of cp. Roe runs SQLite
+          # in WAL mode, where recent writes can sit in foo.sqlite3-wal
+          # before being checkpointed to the main file — a plain `cp`
+          # would silently miss those writes. `.backup` issues a
+          # consistent snapshot regardless of journal state.
+          output = `sqlite3 '#{db}' ".backup '#{backup_path}'" 2>&1`
+          unless $?.success?
+            raise BackupError, "SQLite .backup failed for #{File.basename(db)}: #{output}"
+          end
+
+          unless File.exist?(backup_path) && File.size(backup_path) > 0
             raise BackupError, "Backup verification failed for #{File.basename(db)}"
           end
         end
 
-        status_record.update!(log: (status_record.log || "") + "✓ Database backup created\n")
+        status_record.update!(log: (status_record.log || "") + "✓ Database backup created (#{databases.size} files)\n")
         backup_dir
       rescue => e
         raise BackupError, "Database backup failed: #{e.message}"
@@ -46,13 +59,29 @@ module RoeUpdater
 
       def restore_databases
         backup_dir = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'update_tmp')
-        
+
         Dir.glob(File.join(backup_dir, '*.sqlite3')).each do |backup|
           db_name = File.basename(backup)
-          db_path = File.join(RoeSitePaths::SITE_PATH, 'db', db_name)
-          FileUtils.cp(backup, db_path)
+          # The .backup files are written flat into update_tmp/, but the
+          # originals live nested under db/{development,production}/.
+          # Find the matching original by basename so we restore to the
+          # right subdir regardless of which environment's DB we're
+          # rolling back.
+          original = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "db/**/#{db_name}")).first
+
+          unless original
+            Rails.logger.warn "[RoeUpdater] No original found for #{db_name}, skipping restore"
+            next
+          end
+
+          # `sqlite3 dest .restore source` is the inverse of .backup —
+          # safely overwrites the destination DB even with WAL traffic.
+          output = `sqlite3 '#{original}' ".restore '#{backup}'" 2>&1`
+          unless $?.success?
+            raise BackupError, "SQLite .restore failed for #{db_name}: #{output}"
+          end
         end
-        
+
         FileUtils.rm_rf(backup_dir)
       rescue => e
         Rails.logger.error "Database restore failed: #{e.message}"

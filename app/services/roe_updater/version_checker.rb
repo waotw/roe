@@ -51,7 +51,16 @@ module RoeUpdater
       end
 
       def fetch_latest_version
-        return mock_release if Rails.env.development? || Rails.env.test?
+        # Mock the latest-release lookup when:
+        #   - running tests (so we never hit the network), or
+        #   - the developer explicitly opts in via ROE_MOCK_UPDATE=1
+        # The previous "always mock in dev" behavior meant every dev
+        # session showed a misleading "Update to 0.2.0 available" banner;
+        # opting in keeps the dev experience honest while still letting
+        # you exercise the update UI when you want to.
+        return mock_release if Rails.env.test?
+        return mock_release if ENV['ROE_MOCK_UPDATE'].present?
+
         fetch_via_git_tags || fetch_via_sourcehut_api
       rescue => e
         Rails.logger.error "Failed to fetch latest version: #{e.message}"

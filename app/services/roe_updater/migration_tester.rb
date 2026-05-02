@@ -12,14 +12,14 @@ module RoeUpdater
         )
 
         copy_site_to_test
-        
+
         staging_app_path = File.join(RoeSitePaths::ROE_ROOT, 'staging')
-        
-        env_vars = {
-          'RAILS_ENV' => 'production',
-          'ROE_SITE_PATH' => TEST_SITE_PATH
-        }
-        
+
+        # ROE_SITE_PATH is honored by RoeSitePaths in current/config/
+        # application.rb — the staging Rails subprocess will boot with
+        # SITE_PATH (and therefore SITE_DB_PATH, used in database.yml)
+        # pointing at the copied test_site, so migrations run against
+        # the COPY rather than the real production DB.
         bundle_cmd = "cd '#{staging_app_path}' && bundle install --quiet 2>&1"
         output = nil
         
