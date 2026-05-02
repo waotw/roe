@@ -65,12 +65,15 @@ class EmailRenderer
   end
 
   def self.email_styles
-    # Try to load from active theme, fallback to defaults
-    theme_name = SiteConfig.get('theme.active') || 'default'
-    theme_path = Rails.root.join('themes', theme_name)
+    # Roe's theme system stores the active theme's files flat under
+    # /site/theme/ (egg.css, checkout.js, optional email.yml). The
+    # earlier `Rails.root.join('themes', theme_name)` form pointed at a
+    # path that never existed under either the current/ or versioned
+    # layout, so this always silently fell through to defaults.
+    email_yml = File.join(RoeSitePaths::SITE_PATH, 'theme', 'email.yml')
 
-    if File.exist?(theme_path.join('email.yml'))
-      YAML.load_file(theme_path.join('email.yml')).symbolize_keys
+    if File.exist?(email_yml)
+      YAML.load_file(email_yml).symbolize_keys
     else
       default_email_styles
     end

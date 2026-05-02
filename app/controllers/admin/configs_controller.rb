@@ -525,7 +525,7 @@ class Admin::ConfigsController < ApplicationController
   def update_development
     # Get hosts from params, filter out empty ones
     hosts = params[:allowed_hosts]&.reject(&:blank?) || []
-    
+
     # Build YAML content
     if hosts.any?
       yaml_content = "allowed_hosts:\n"
@@ -535,13 +535,13 @@ class Admin::ConfigsController < ApplicationController
     else
       yaml_content = "allowed_hosts: []\n"
     end
-    
+
     # Write to file
     File.write(SiteConfig::DEVELOPMENT_FILE, yaml_content)
-    
+
     # Sync to database
     SiteConfig.sync_from_file('development')
-    
+
     flash[:notice] = "Development configuration updated successfully"
     redirect_to admin_configs_path
   rescue => e
@@ -677,7 +677,7 @@ class Admin::ConfigsController < ApplicationController
     {
       'payments.enabled' => [ 'false', 'true' ],
       'payments.mode' => [ 'memberships', 'donations', 'both' ],
-      'newsletter.enabled' => [ 'false', 'true' ],
+      'newsletter & email.enabled' => [ 'false', 'true' ],
       'everyone.show_paid_content' => [ 'true', 'false' ]
     }
   end
@@ -706,7 +706,7 @@ class Admin::ConfigsController < ApplicationController
       'payments.mode' => 'memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.',
       'payments.price' => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       'payments.donation_amounts' => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
-      'newsletter.enabled' => 'Enable newsletter sending via Postmark (requires Postmark account & configuration)',
+      'newsletter & email.enabled' => 'Enable newsletter & email sending via Postmark (requires Postmark account & configuration)',
       'everyone.show_paid_content' => 'Show paid content to public visitors and free members'
     }
   end

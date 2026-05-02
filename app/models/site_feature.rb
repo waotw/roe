@@ -55,7 +55,7 @@ module SiteFeature
   end
 
   def newsletters_enabled?
-    members_enabled? && SiteConfig.feature('members', 'newsletter.enabled') == true
+    members_enabled? && SiteConfig.feature('members', "newsletter & email.enabled") == true
   end
 
   def store_enabled?
