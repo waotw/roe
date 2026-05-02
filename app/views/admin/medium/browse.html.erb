@@ -68,7 +68,7 @@
        class="mb-4 p-3 border border-blue-300 bg-blue-50 rounded-xs"
        style="display: none;">
     <div class="flex items-center justify-between">
-      <div class="text-sm font-medium text-blue-800">
+      <div class="text-xs font-mono text-blue-800">
         <span data-media-bulk-select-target="selectedCount">0</span> selected
       </div>
       <div class="flex gap-2">
@@ -174,7 +174,7 @@
                     <%= button_to "⚡",
                                   regenerate_variants_admin_medium_path(media),
                                   method: :post,
-                                  class: "absolute top-1 left-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded hover:bg-blue-600",
+                                  class: "absolute top-6 right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded hover:bg-blue-600",
                                   title: "Generate variants",
                                   data: { turbo: false } %>
                   <% elsif variant_stats && variant_stats[:ready] %>
