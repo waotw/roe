@@ -32,7 +32,15 @@ module RoeUpdater
           raise MigrationError, "Bundle install failed: #{output}"
         end
 
-        migrate_cmd = "cd '#{staging_app_path}' && RAILS_ENV=production ROE_SITE_PATH='#{TEST_SITE_PATH}' bundle exec rails db:migrate 2>&1"
+        # Use the parent's Rails.env, not a hardcoded "production". When
+        # the orchestrator is running in real production, that's prod —
+        # giving a realistic dry-run. When it's running in dev (e.g.,
+        # while testing the update flow itself), we use dev — which is
+        # the only env that has working credentials in a dev install.
+        # Hardcoding production made dev tests fail with "Missing
+        # secret_key_base" before migrations ever ran.
+        rails_env = Rails.env
+        migrate_cmd = "cd '#{staging_app_path}' && RAILS_ENV=#{rails_env} ROE_SITE_PATH='#{TEST_SITE_PATH}' bundle exec rails db:migrate 2>&1"
         output = nil
         
         Bundler.with_original_env do

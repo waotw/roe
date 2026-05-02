@@ -87,7 +87,13 @@ module RoeUpdater
         # against an unmigrated schema after the switch.
         staging_app = File.join(RoeSitePaths::ROE_ROOT, 'staging')
 
-        migrate_cmd = "cd '#{staging_app}' && RAILS_ENV=production bundle exec rails db:migrate 2>&1"
+        # Inherit the parent's Rails.env. In real production updates
+        # this is `production` (and credentials are available); in dev
+        # tests this is `development` (and we don't need prod creds).
+        # Hardcoding production fails in dev with "Missing
+        # secret_key_base" because the parent doesn't have a master.key.
+        rails_env = Rails.env
+        migrate_cmd = "cd '#{staging_app}' && RAILS_ENV=#{rails_env} bundle exec rails db:migrate 2>&1"
         output = nil
 
         Bundler.with_original_env do
@@ -183,18 +189,22 @@ module RoeUpdater
       def handle_failure(error)
         log("Update failed: #{error.message}")
         log("Initiating automatic rollback...")
-        
+
         begin
           BackupManager.restore_databases
           SwitchManager.rollback
           BackupManager.cleanup_update_backups
-          
+          # Wipe the staging clone too — otherwise the next update
+          # attempt will fail validate_prerequisites' "non-empty
+          # staging/" check and the user has to clean it up by hand.
+          Downloader.cleanup_staging
+
           @status.update!(
             status: 'rolled_back',
             error_message: error.message,
             current_step: "Rolled back to previous version"
           )
-          
+
           log("Rollback completed")
         rescue => rollback_error
           log("CRITICAL: Rollback failed: #{rollback_error.message}")

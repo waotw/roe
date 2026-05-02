@@ -19,7 +19,13 @@ development:
     database: <%= File.join(RoeSitePaths::SITE_DB_PATH, "development", "development.sqlite3") %>
   cable:
     <<: *default
+    # Cable shares the primary file in dev — Solid Cable's schema is
+    # already declared in db/schema.rb (solid_cable_messages). The
+    # explicit migrations_paths points at an empty directory so the
+    # cable connection doesn't re-scan db/migrate and double-list every
+    # pending migration in `bin/rails db:migrate:status`.
     database: <%= File.join(RoeSitePaths::SITE_DB_PATH, "development", "development.sqlite3") %>
+    migrations_paths: db/cable_migrate
   cache:
     <<: *default
     database: <%= File.join(RoeSitePaths::SITE_DB_PATH, "development", "cache.sqlite3") %>
