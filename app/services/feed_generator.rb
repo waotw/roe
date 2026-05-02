@@ -130,9 +130,12 @@ class FeedGenerator
             xml['itunes'].email podcast_config['email']
           end
 
-          # iTunes artwork
+          # iTunes artwork — channel-level cover. The /system/images/* path
+          # podcast.yml uses falls outside the variant pipeline so this
+          # tends to fall through to the original; episode-level art below
+          # gets the xl-variant treatment.
           if podcast_config['artwork'].present?
-            artwork_url = image_full_url(podcast_config['artwork'])
+            artwork_url = image_full_url(podcast_config['artwork'], variant: :xl)
             xml['itunes'].image(href: artwork_url)
             xml.image do
               xml.url artwork_url
@@ -191,9 +194,10 @@ class FeedGenerator
               xml['itunes'].season post.metadata['season'] if post.metadata['season'].present?
               xml['itunes'].episodeType post.metadata['episode_type'] || 'full'
 
-              # Episode artwork (optional override)
+              # Episode artwork (optional override). xl variant — Apple
+              # wants podcast art at >=1400px square; xl is 1800px max.
               if post.metadata['image'].present?
-                xml['itunes'].image(href: image_full_url(post.metadata['image']))
+                xml['itunes'].image(href: image_full_url(post.metadata['image'], variant: :xl))
               end
             end
           end
@@ -280,9 +284,25 @@ class FeedGenerator
     "#{site_config[:url]}/#{clean_path}"
   end
 
-  def image_full_url(image_path)
-    clean_path = image_path.start_with?('/') ? image_path[1..-1] : image_path
+  # Build an absolute URL for an image. Pass `variant:` to point at a
+  # generated variant (xl is right for podcast feed art — Apple wants
+  # square cover at >=1400px and our xl is 1800px). When the variant
+  # doesn't exist (e.g. /system/images/* podcast cover art that lives
+  # outside the variant pipeline) we fall back to the original path.
+  def image_full_url(image_path, variant: nil)
+    resolved = variant ? resolve_variant_web_path(image_path, variant) : image_path
+    clean_path = resolved.start_with?('/') ? resolved[1..-1] : resolved
     "#{site_config[:url]}/#{clean_path}"
+  end
+
+  def resolve_variant_web_path(image_path, variant_name)
+    return image_path unless ImageVariantGenerator.available?
+    return image_path unless ImageVariantGenerator::VARIANTS.key?(variant_name.to_sym)
+
+    filesystem_path = ImageVariantGenerator.variant_path_for(image_path, variant_name)
+    return image_path unless File.exist?(filesystem_path)
+
+    filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
   end
 
   def audio_file_path(audio_path)

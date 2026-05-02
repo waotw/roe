@@ -151,7 +151,7 @@
                 </div>
 
                 <%# Check if any fonts are installed %>
-                <% fonts_installed = Dir.glob(Rails.root.join('site/system/assets/fonts/*')).any? %>
+                <% fonts_installed = Dir.glob(File.join(RoeSitePaths::SITE_PATH, 'system/assets/fonts/*')).any? %>
                 <% if !fonts_installed %>
                   <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xs">
                     <p class="text-sm text-amber-800">

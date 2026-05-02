@@ -45,11 +45,13 @@ namespace :images do
     # Reset all media records
     Medium.where(media_type: "images").update_all(variants_status: "pending", variants_generated_at: nil)
 
-    # Queue all images
+    # Queue all images, bypassing the dedup cache — user-initiated
+    # force-regenerate must not be swallowed by a stale "queued" flag
+    # from a prior crashed run.
     image_paths.each do |path|
       relative_path = path.sub(RoeSitePaths::SITE_PATH.to_s, "")
       web_path = relative_path.start_with?("/") ? relative_path : "/#{relative_path}"
-      GenerateImageVariantsJob.perform_later(web_path, nil)
+      ImageVariantGenerator.queue!(web_path, force: true)
     end
 
     puts "✓ Queued #{image_paths.count} images for regeneration"

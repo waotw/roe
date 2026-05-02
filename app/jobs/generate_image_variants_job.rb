@@ -14,7 +14,6 @@ class GenerateImageVariantsJob < ApplicationJob
   end
 
   def perform(file_path, medium_id)
-
     Rails.logger.info "[ImageVariants] Job started: #{file_path}"
 
     normalized_path = ImageVariantGenerator.normalize_path(file_path)
@@ -49,5 +48,10 @@ class GenerateImageVariantsJob < ApplicationJob
       puts "=" * 80 + "\n"
     end
     raise
+  ensure
+    # Clear the dedup flag so a follow-up render can re-queue if the
+    # variants still aren't there (e.g. job crashed before generating).
+    # Safe to run unconditionally — no-op when nothing was queued.
+    ImageVariantGenerator.dequeue(file_path)
   end
 end

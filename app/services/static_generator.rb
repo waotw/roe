@@ -755,13 +755,24 @@ class StaticGenerator
     puts "  ✓ Assets synced"
   end
 
+  # Pattern for image originals at the top of media/images/ (NOT inside
+  # the variants/ subdir). These are the source-of-truth files that the
+  # site no longer references — every served `<img>`/`<picture>` points
+  # at a variant under media/images/variants/. Copying originals to
+  # static_site/ would just bloat the build.
+  IMAGE_ORIGINAL_PATTERN = %r{\Aimages/[^/]+\.(?:jpg|jpeg|png|gif|webp|heic|heif)\z}i.freeze
+
   def copy_media
     puts "🖼️  Copying changed media..."
-    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'media'), @output_dir.join('media'))
+    sync_directory(
+      File.join(RoeSitePaths::SITE_PATH, 'media'),
+      @output_dir.join('media'),
+      skip_if: ->(rel) { rel =~ IMAGE_ORIGINAL_PATTERN }
+    )
     puts "  ✓ Media synced"
   end
 
-  def sync_directory(source, dest)
+  def sync_directory(source, dest, skip_if: nil)
     source = Pathname.new(source) unless source.is_a?(Pathname)
     dest = Pathname.new(dest) unless dest.is_a?(Pathname)
     return unless source.exist?
@@ -774,7 +785,16 @@ class StaticGenerator
       next unless File.file?(source_file)
 
       relative_path = Pathname.new(source_file).relative_path_from(source)
-      source_files << relative_path.to_s
+      relative_str = relative_path.to_s
+
+      # Caller-supplied skip predicate (e.g. don't copy image originals).
+      # Skipped files are also kept out of source_files so the orphan
+      # cleanup pass below doesn't delete an already-skipped destination
+      # — but we still want to clear any stale copy of one that was
+      # synced before the predicate existed.
+      next if skip_if&.call(relative_str)
+
+      source_files << relative_str
       dest_file = dest.join(relative_path)
 
       if !dest_file.exist? || File.mtime(source_file) > File.mtime(dest_file)

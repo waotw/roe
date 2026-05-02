@@ -109,7 +109,13 @@ class Product < ApplicationRecord
       puts "  ⚠ Missing price: #{File.basename(file_path)}"
     end
 
-    relative_path = absolute_path.sub(Rails.root.to_s + "/", "")
+    # Strip SITE_PATH (not Rails.root) to derive the relative key under
+    # the versioned layout — content lives at <root>/site/, while
+    # Rails.root is <root>/current/. Using Rails.root here previously
+    # left absolute paths intact, which made find_or_initialize_by miss
+    # the existing relative-path row and silently create duplicate
+    # Product records on every save through the admin.
+    relative_path = absolute_path.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
 
     product = Product.find_or_initialize_by(file_path: relative_path)
     product.content = parsed.content

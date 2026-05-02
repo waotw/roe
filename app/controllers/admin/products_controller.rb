@@ -55,7 +55,7 @@ class Admin::ProductsController < Admin::BaseController
 
   def edit
     @product = Product.find(params[:id])
-    raw_content = File.read(Rails.root.join(@product.file_path))
+    raw_content = File.read(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
 
     begin
       parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
@@ -96,7 +96,7 @@ class Admin::ProductsController < Admin::BaseController
     rescue => e
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
-      File.write(Rails.root.join(@product.file_path), full_content)
+      File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
       redirect_to edit_admin_product_path(@product)
       return
     end
@@ -105,9 +105,9 @@ class Admin::ProductsController < Admin::BaseController
     was_published = @product.status == 'published'
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
-    File.write(Rails.root.join(@product.file_path), full_content)
+    File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
 
-    ContentSync.sync_file(Rails.root.join(@product.file_path))
+    ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     @product.reload
 
     flash[:notice] = (!was_published && @product.status == 'published') ? "Product published" : "Product saved"
@@ -156,7 +156,7 @@ class Admin::ProductsController < Admin::BaseController
 
   def destroy
     @product = Product.find(params[:id])
-    file_path = Rails.root.join(@product.file_path)
+    file_path = File.join(RoeSitePaths::SITE_PATH, @product.file_path)
 
     File.delete(file_path) if File.exist?(file_path)
     @product.destroy
@@ -300,8 +300,8 @@ class Admin::ProductsController < Admin::BaseController
   def save_product_to_file(product)
     yaml_content = product.metadata.to_yaml.sub(/\A---\n/, '')
     full_content = "---\n#{yaml_content}\n---\n#{product.content}"
-    File.write(Rails.root.join(product.file_path), full_content)
-    ContentSync.sync_file(Rails.root.join(product.file_path))
+    File.write(File.join(RoeSitePaths::SITE_PATH, product.file_path), full_content)
+    ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, product.file_path))
   end
 
   def set_product

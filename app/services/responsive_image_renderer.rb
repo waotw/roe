@@ -1,11 +1,23 @@
 # frozen_string_literal: true
 
 class ResponsiveImageRenderer
+  # Widths used to build srcset descriptors. `thumb` is intentionally
+  # excluded — it's a square crop, not a width-scaled variant. Order
+  # matters: smallest first so the browser walks ascending widths.
   VARIANT_WIDTHS = {
-    small: 400,
+    small:  400,
     medium: 800,
-    large: 1200
+    large:  1200,
+    xl:     1800
   }.freeze
+
+  # The variant whose web path becomes the `<img>` `src` inside the
+  # picture tag. Browsers fall back to `src` only when none of the
+  # `<source>` srcsets match, which on modern browsers means basically
+  # never — but it's also what JS reads via `img.src`, what scrapers
+  # see, and what gets used when CSS does `background-image` etc. So
+  # it has to point at a real served-friendly variant, not the original.
+  DEFAULT_IMG_VARIANT = :medium
 
   attr_reader :source_path, :options
 
@@ -29,30 +41,15 @@ class ResponsiveImageRenderer
     if ImageVariantGenerator.variants_exist?(source_full_path)
       build_picture_tag
     else
-      # Queue generation for first view, show original for now
-      queue_variant_generation(source_path) unless already_queued?(source_path)
+      # Queue generation for first view, show original for now. queue! is
+      # idempotent — Rails.cache flag dedups subsequent renders of this
+      # path until the job clears it (or the TTL expires).
+      ImageVariantGenerator.queue!(source_path)
       simple_img_tag
     end
   end
 
   private
-
-  def queue_variant_generation(path)
-    GenerateImageVariantsJob.perform_later(path, nil)
-  rescue => e
-    Rails.logger.warn "[ResponsiveImageRenderer] Could not queue: #{e.message}"
-  end
-
-  def already_queued?(path)
-    # Check if a job for this path already exists in the queue
-    # Arguments are stored as serialized JSON in SQLite
-    SolidQueue::Job
-      .where(class_name: 'GenerateImageVariantsJob')
-      .where(finished_at: nil)
-      .exists?(["arguments LIKE ?", "%#{path}%"])
-  rescue
-    false  # If check fails, allow queuing
-  end
 
   def build_picture_tag
     alt_text = ERB::Util.html_escape(options[:alt] || '')
@@ -80,8 +77,14 @@ class ResponsiveImageRenderer
       html << "<source srcset=\"#{fallback_srcset}\" sizes=\"#{sizes}\">"
     end
 
-    # Fallback img tag
-    html << "<img src=\"#{ERB::Util.html_escape(source_path)}\" "
+    # Fallback img tag — points at the medium variant rather than the
+    # source. Reaching this `<img>` means no `<source>` srcset matched
+    # (rare on modern browsers), but it's also what JS, scrapers, and
+    # CSS background-image consumers see. Per "never serve originals",
+    # the original is an on-disk archive only; the picture tag's variant
+    # menu is the entire serving menu.
+    fallback_src = variant_web_path(DEFAULT_IMG_VARIANT) || source_path
+    html << "<img src=\"#{ERB::Util.html_escape(fallback_src)}\" "
     html << "alt=\"#{alt_text}\" "
     html << "class=\"#{css_class}\" " if css_class.present?
     html << "loading=\"#{loading}\" decoding=\"async\" "
@@ -116,6 +119,14 @@ class ResponsiveImageRenderer
     extra.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ')
   end
 
+  # Both srcset builders intentionally OMIT the original. The originals-
+  # never-served policy means the variant menu is the entire serving
+  # menu; the original lives on disk as the source-of-truth archive
+  # for re-derivation only. simple_img_tag remains the fail-safe for
+  # the cases when variants aren't ready yet (queued first-render) or
+  # libvips is unavailable — there, falling back to the original is
+  # better than serving nothing.
+
   def build_webp_srcset
     variants = VARIANT_WIDTHS.map do |variant_name, width|
       webp_path = webp_variant_path(variant_name)
@@ -124,40 +135,32 @@ class ResponsiveImageRenderer
       "#{ERB::Util.html_escape(webp_path)} #{width}w"
     end.compact
 
-    # Add original as largest if it exists as WebP
-    original_webp = source_path.sub(File.extname(source_path), '.webp')
-    if File.exist?(File.join(RoeSitePaths::SITE_PATH, original_webp.sub(%r{^/}, "")))
-      variants << "#{ERB::Util.html_escape(original_webp)} 2000w"
-    end
-
     variants.any? ? variants.join(', ') : nil
   end
 
   def build_fallback_srcset
     variants = VARIANT_WIDTHS.map do |variant_name, width|
-      filesystem_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
-      next unless variant_exists?(filesystem_path)
+      web_path = variant_web_path(variant_name)
+      next unless web_path && variant_exists?(web_path)
 
-      # Convert filesystem path to web path for srcset
-      web_path = filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
       "#{ERB::Util.html_escape(web_path)} #{width}w"
     end.compact
 
-    # Add original as largest
-    variants << "#{ERB::Util.html_escape(source_path)} 2000w"
-
-    variants.join(', ')
+    variants.any? ? variants.join(', ') : nil
   end
 
+  # Web path for a native-format variant of the source.
+  # Returns nil when the variant generator can't produce one (no source).
+  def variant_web_path(variant_name)
+    filesystem_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
+    filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
+  end
 
   def webp_variant_path(variant_name)
     return nil unless ImageVariantGenerator::GENERATE_WEBP
 
-    filesystem_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
-    webp_filesystem = filesystem_path.sub(File.extname(filesystem_path), '.webp')
-
-    # Convert to web path
-    webp_filesystem.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    web_path = variant_web_path(variant_name)
+    web_path.sub(File.extname(web_path), ".webp")
   end
 
   def variant_exists?(path)

@@ -9,7 +9,7 @@
   <% has_cover = post.metadata['image'].present? %>
   <div class="podcast-episode__hero <%= 'podcast-episode__hero--no-cover' unless has_cover %>">
     <% if has_cover %>
-      <%= image_tag post.metadata['image'], alt: post.title, loading: "lazy", class: "podcast-episode__cover" %>
+      <%= raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title, class: "podcast-episode__cover") %>
     <% end %>
     <div class="podcast-episode__player-overlay">
       <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>

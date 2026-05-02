@@ -2,14 +2,20 @@
 
 class ImageVariantGenerator
   VARIANTS = {
-    thumb: { resize_to_fill: [ 150, 150 ] },
-    small: { resize_to_limit: [ 400, 400 ] },
-    medium: { resize_to_limit: [ 800, 800 ] },
-    large: { resize_to_limit: [ 1200, 1200 ] }
+    thumb:  { resize_to_fill:  [ 150, 150 ] },     # admin grid, square OG
+    small:  { resize_to_limit: [ 400, 400 ] },     # cards, sidebars
+    medium: { resize_to_limit: [ 800, 800 ] },     # body content default
+    large:  { resize_to_limit: [ 1200, 1200 ] },   # full-width content
+    xl:     { resize_to_limit: [ 1800, 1800 ] }    # hero / full-bleed / OG image
   }.freeze
 
   WEBP_QUALITY = 85  # Quality for WebP conversion
-  GENERATE_WEBP = false  # Set to true when helpers support WebP
+  # Generate `.webp` siblings alongside each native-format variant. The
+  # ResponsiveImageRenderer emits a `<source type="image/webp">` first
+  # in the picture tag so capable browsers (universal modern support)
+  # pick the smaller WebP file; older browsers fall through to the
+  # native-format source.
+  GENERATE_WEBP = true
 
   # Source extensions we'll generate variants for. HEIC/HEIF are included
   # so they're treated consistently with Medium#image? — variant_path_for
@@ -20,24 +26,13 @@ class ImageVariantGenerator
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .heic .heif].freeze
   HEIC_EXTENSIONS = %w[.heic .heif].freeze
 
-  # Environment-aware settings
+  # How long the "this path is queued" Rails.cache flag lives if the job
+  # never gets to its ensure block to clear it (crash, OOM, worker kill).
+  # Long enough to actually deduplicate a busy render burst, short enough
+  # that a stuck flag self-recovers.
+  QUEUE_DEDUP_TTL = 1.hour
+
   class << self
-    def concurrency_mode
-      if Rails.env.production?
-        :single_threaded  # Safe for production SQLite
-      else
-        :parallel  # Fast for development (local machine has power)
-      end
-    end
-
-    def batch_size
-      if Rails.env.production?
-        1  # Process one at a time to avoid locks
-      else
-        10  # Process in batches locally
-      end
-    end
-
     def process_mode
       # In production: on-demand only (lazy)
       # In development: eager (generate immediately)
@@ -75,46 +70,50 @@ class ImageVariantGenerator
       source_path = normalize_path(source_path)
       return false unless File.exist?(source_path)
 
-      # Skip if all variants exist and are up-to-date
-      return true if variants_exist?(source_path) && !force_regenerate?(source_path)
-
       Rails.logger.info "[ImageVariants] Processing #{source_path}"
 
       # Ensure variants directory exists
       variants_dir = File.join(File.dirname(source_path), "variants")
       FileUtils.mkdir_p(variants_dir)
 
-      # Always sequential - simple and safe
+      # Sequential. Per-variant mtime check inside generate_variant skips
+      # work when a variant is already up-to-date relative to the source,
+      # so we don't need an outer "everything fresh?" short-circuit —
+      # always running mark_complete_for at the end self-heals the DB
+      # status column for files whose variants exist but were never
+      # stamped (older imports, manual file drops).
       VARIANTS.each do |name, operations|
         generate_variant(source_path, name, operations)
       end
 
-      Rails.logger.info "[ImageVariants] ✓ Complete: #{File.basename(source_path)}"
-      mark_complete_for(source_path)
-      true
+      # Only stamp the row "complete" if every native variant (and WebP
+      # sibling, when GENERATE_WEBP is on) actually exists on disk. The
+      # per-variant rescue inside generate_variant swallows individual
+      # failures so the loop keeps going — without this verify step we'd
+      # falsely mark partially-generated images as complete and the next
+      # backfill_status sweep would have to silently undo the lie.
+      if variants_exist?(source_path)
+        Rails.logger.info "[ImageVariants] ✓ Complete: #{File.basename(source_path)}"
+        mark_complete_for(source_path)
+        true
+      else
+        Rails.logger.warn "[ImageVariants] ⚠ Partial: some variants missing for #{File.basename(source_path)} — leaving status pending"
+        false
+      end
     rescue => e
       Rails.logger.error "[ImageVariants] Failed #{source_path}: #{e.message}"
       false
     end
 
-    def generate_variants_sequential(source_path)
-      VARIANTS.each do |name, operations|
-        generate_variant(source_path, name, operations)
-      end
-    end
-
-    def generate_variants_parallel(source_path)
-      threads = VARIANTS.map do |name, operations|
-        Thread.new do
-          generate_variant(source_path, name, operations)
-        end
-      end
-      threads.each(&:join)
-    end
-
     def variant_exists?(source_path, variant_name)
       path = variant_path_for(source_path, variant_name)
       File.exist?(path)
+    end
+
+    def webp_variant_exists?(source_path, variant_name)
+      path = variant_path_for(source_path, variant_name)
+      webp_path = path.sub(File.extname(path), ".webp")
+      File.exist?(webp_path)
     end
 
     def variant_path_for(source_path, variant_name)
@@ -128,24 +127,58 @@ class ImageVariantGenerator
       File.join(dir, "variants", "#{base}-#{variant_name}#{ext}")
     end
 
+    # Idempotent enqueue: skips if a job for this web path was queued
+    # within the dedup window. The cache flag is cleared by the job's
+    # ensure block (see #dequeue) so subsequent retries can re-queue
+    # naturally; the TTL is a safety net for jobs that crash before
+    # reaching the ensure. Returns true if a job was enqueued, false if
+    # deduped.
+    #
+    # Pass `force: true` to bypass the dedup check — used by user-
+    # initiated rake/admin actions where "queue this now" must not be
+    # silently swallowed by a stale cache flag from a prior crashed run.
+    def queue!(web_path, force: false)
+      return false unless available?
+      cache_key = queue_cache_key(web_path)
+      return false if !force && Rails.cache.exist?(cache_key)
+
+      Rails.cache.write(cache_key, true, expires_in: QUEUE_DEDUP_TTL)
+      GenerateImageVariantsJob.perform_later(web_path, nil)
+      true
+    end
+
+    # Cleared by the job (success or failure) so the next renderer hit
+    # for a still-missing variant can re-queue without waiting for the
+    # TTL to expire.
+    def dequeue(web_path)
+      Rails.cache.delete(queue_cache_key(web_path))
+    end
+
+    def queue_cache_key(web_path)
+      "variants_queued:#{web_path}"
+    end
+
     def queue_missing_variants
       return 0 unless available?
 
-      image_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media/images/**/*.{jpg,jpeg,png,gif,webp}"))
+      image_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media/images/**/*.{jpg,jpeg,png,gif,webp,heic,heif}"))
                        .reject { |p| p.include?("/variants/") }
 
       queued_count = 0
       image_paths.each do |path|
+        next if variants_exist?(path)
+
         relative_path = path.sub(RoeSitePaths::SITE_PATH.to_s, "")
         web_path = relative_path.start_with?("/") ? relative_path : "/#{relative_path}"
 
-        unless variants_exist?(path)
-          GenerateImageVariantsJob.perform_later(web_path, nil)
-          queued_count += 1
-        end
+        # force: true so a stale "queued" cache flag from a previously
+        # crashed/killed job run doesn't silently swallow this re-queue.
+        # User-initiated batch operation — "queue everything missing"
+        # has to actually queue everything missing.
+        queued_count += 1 if queue!(web_path, force: true)
       end
 
-      Rails.logger.info "[ContentSync] Queued #{queued_count} images for variant generation"
+      Rails.logger.info "[ImageVariants] Queued #{queued_count} images for variant generation"
       queued_count
     end
 
@@ -161,9 +194,18 @@ class ImageVariantGenerator
       }
     end
 
+    # "All variants present" = every native-format variant exists, AND
+    # (when WebP is enabled) every WebP sibling exists too. This is the
+    # gate the on-demand job and the renderer both consult, so flipping
+    # GENERATE_WEBP on automatically routes every image through the
+    # queue once until WebP siblings are filled in. After backfill, this
+    # stays cheap (8 stat calls vs 4).
     def variants_exist?(source_path)
       source_path = normalize_path(source_path)
-      VARIANTS.keys.all? { |name| variant_exists?(source_path, name) }
+      VARIANTS.keys.all? do |name|
+        variant_exists?(source_path, name) &&
+          (!GENERATE_WEBP || webp_variant_exists?(source_path, name))
+      end
     end
 
     def normalize_path(path)
@@ -191,43 +233,31 @@ class ImageVariantGenerator
 
     private
 
-    def force_regenerate?(source_path)
-      # Check if variants are older than source file
-      source_mtime = File.mtime(source_path)
-      VARIANTS.keys.any? do |name|
-        path = variant_path_for(source_path, name)
-        !File.exist?(path) || File.mtime(path) < source_mtime
-      end
-    end
-
     def generate_variant(source_path, variant_name, operations)
       variant_path = variant_path_for(source_path, variant_name)
+      source_mtime = File.mtime(source_path)
 
-      # Skip if variant exists and is newer than source
-      if File.exist?(variant_path) && File.mtime(variant_path) >= File.mtime(source_path)
-        Rails.logger.debug "[ImageVariants] Skipping #{variant_name} (up to date)"
-        return
+      # Generate the native-format variant if missing or stale.
+      unless File.exist?(variant_path) && File.mtime(variant_path) >= source_mtime
+        require "image_processing/vips"
+        pipeline = ImageProcessing::Vips.source(source_path)
+        operations.each { |op, args| pipeline = pipeline.public_send(op, *args) }
+        pipeline.call(destination: variant_path)
       end
 
-      # Require here instead of at top of file
-      require "image_processing/vips"
-
-      pipeline = ImageProcessing::Vips.source(source_path)
-      operations.each do |operation, args|
-        pipeline = pipeline.public_send(operation, *args)
-      end
-
-      # Generate main variant
-      pipeline.call(destination: variant_path)
-
-      # Generate WebP variant only if enabled
+      # Generate the WebP sibling if enabled, missing, or stale. Checked
+      # independently so a re-run picks up missing WebPs without
+      # regenerating the native variant — that's the on-disk backfill
+      # path for installations that had GENERATE_WEBP off when their
+      # variants were originally created.
       if GENERATE_WEBP
         webp_path = variant_path.sub(File.extname(variant_path), ".webp")
-        ImageProcessing::Vips.source(source_path)
-                            .public_send(operations.keys.first, *operations.values.first)
-                            .convert("webp")
-                            .saver(quality: WEBP_QUALITY)
-                            .call(destination: webp_path)
+        unless File.exist?(webp_path) && File.mtime(webp_path) >= source_mtime
+          require "image_processing/vips"
+          pipeline = ImageProcessing::Vips.source(source_path)
+          operations.each { |op, args| pipeline = pipeline.public_send(op, *args) }
+          pipeline.convert("webp").saver(quality: WEBP_QUALITY).call(destination: webp_path)
+        end
       end
     rescue => e
       Rails.logger.error "[ImageVariants] Failed to generate #{variant_name} for #{source_path}: #{e.message}"

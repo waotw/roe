@@ -119,6 +119,14 @@ module HasMarkdownExtensions
 
       next match_str unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
 
+      # Skip imgs whose src already points into the variants directory.
+      # render_product_grid / render_full emit `<picture><img src=/media/
+      # images/variants/foo-medium.jpeg></picture>` themselves; without
+      # this guard the regex sweep below would re-pipe that variant src
+      # back into ResponsiveImageRenderer and emit variants-of-variants
+      # (`/variants/variants/foo-medium-medium.jpeg`).
+      next match_str if src.include?("/media/images/variants/")
+
       ResponsiveImageRenderer.render(src, alt: alt, class: css_class, sizes: sizes)
     end
   end
@@ -670,7 +678,7 @@ module HasMarkdownExtensions
         col_classes = [ 'collection-item__image' ]
         col_classes << 'collection-item__image--icon-only' unless has_image
         output << %Q(  <a class="#{col_classes.join(' ')}" href="#{item_path(item)}">)
-        output << %Q(    <img src="#{image_url}" alt="#{alt}">) if has_image
+        output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}" if has_image
         if icon_type
           output << %Q(    <span class="collection-item__media-icon">#{render_media_icon(icon_type)}</span>)
         end
@@ -798,7 +806,7 @@ module HasMarkdownExtensions
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(item)}">)
-      output << %Q(        <img src="#{image_url}" alt="#{item.title || 'Product'}" class="#{image_class}" loading="lazy">)
+      output << "        #{ResponsiveImageRenderer.render(image_url, alt: (item.title || 'Product'), class: image_class)}"
       output << %Q(      </a>)
       output << %Q(    </div>)
 

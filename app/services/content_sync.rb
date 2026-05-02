@@ -132,10 +132,13 @@ class ContentSync
           puts "  ✓ Added: #{File.basename(file_path)}"
           success_count += 1
 
-          # Queue variant generation for images (development only - production generates on upload)
-          if medium.image? && ImageVariantGenerator.available? && Rails.env.development?
-            GenerateImageVariantsJob.perform_later(web_path, nil)  # Pass nil for medium_id
-            image_count += 1
+          # Queue variant generation for images (development only - production generates on upload).
+          # The Medium#after_create callback will have already attempted to queue;
+          # queue! is idempotent so a second call is a no-op cache hit. We keep
+          # this explicit call as a belt-and-suspenders for cases where the
+          # callback's conditions change.
+          if medium.image? && Rails.env.development?
+            image_count += 1 if ImageVariantGenerator.queue!(web_path)
           end
         end
       rescue => e

@@ -32,13 +32,17 @@
     </audio>
     <%# Top row: artwork + title + now playing chapter %>
     <div class="audio-player__header">
+      <%# Player artwork is a small UI thumbnail — `small` variant is enough.
+          image_variant_path falls through to the source path when the variant
+          doesn't exist (e.g. /system/images/* podcast cover art that lives
+          outside the variant pipeline) so this stays safe for both. %>
       <% if podcast_artwork.present? %>
-        <img src="<%= podcast_artwork %>"
+        <img src="<%= image_variant_path(podcast_artwork, :small) %>"
              alt="<%= podcast_config['title'] %>"
              class="audio-player__artwork"
              data-audio-player-target="artwork">
       <% elsif post.metadata['image'].present? %>
-        <img src="<%= post.metadata['image'] %>"
+        <img src="<%= image_variant_path(post.metadata['image'], :small) %>"
              alt="<%= post.title %>"
              class="audio-player__artwork"
              data-audio-player-target="artwork">

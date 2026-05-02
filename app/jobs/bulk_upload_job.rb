@@ -37,9 +37,8 @@ class BulkUploadJob < ApplicationJob
         medium = Admin::MediumController.new.send(:process_single_upload, uploaded_file)
 
         # Queue variant generation if it's an image
-        if medium.image? && ImageVariantGenerator.available?
+        if medium.image? && ImageVariantGenerator.queue!(medium.file_path)
           broadcast_status(batch_id, index, "🔄", "Optimizing...")
-          GenerateImageVariantsJob.perform_later(medium.file_path, medium.id)
         end
 
         # Broadcast success

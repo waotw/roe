@@ -86,8 +86,7 @@ class Admin::MediumController < Admin::BaseController
       media_type = medium.media_type
 
       # Generate variants if needed
-      if medium.image? && ImageVariantGenerator.available?
-        GenerateImageVariantsJob.perform_later(medium.file_path, nil)
+      if medium.image? && ImageVariantGenerator.queue!(medium.file_path)
         notice_message = "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
       else
         notice_message = "#{media_type.singularize.capitalize} uploaded"
@@ -203,8 +202,7 @@ class Admin::MediumController < Admin::BaseController
       next unless File.exist?(path)
       next if ImageVariantGenerator.variants_exist?(path)
 
-      GenerateImageVariantsJob.perform_later(medium.file_path, nil)
-      queued += 1
+      queued += 1 if ImageVariantGenerator.queue!(medium.file_path)
     end
 
     redirect_to browse_admin_medium_index_path, notice: "Queued #{queued} #{'image'.pluralize(queued)} for optimization"
@@ -225,9 +223,10 @@ class Admin::MediumController < Admin::BaseController
       return
     end
 
-    # Queue variant generation
-    GenerateImageVariantsJob.perform_later(medium.file_path, medium.id)
-    
+    # Explicit user-initiated regenerate — bypass dedup so we definitely
+    # enqueue fresh, even if a prior job's flag is still warm in the cache.
+    ImageVariantGenerator.queue!(medium.file_path, force: true)
+
     redirect_to browse_admin_medium_index_path, notice: "Queued variant generation for #{File.basename(medium.file_path)}"
   end
 

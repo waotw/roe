@@ -33,10 +33,20 @@ class Medium < ApplicationRecord
 
   def variants_ready?
     return false unless image?
+    # Fast path: trust the column when it says complete. mark_complete_for
+    # only stamps "complete" after a post-loop variants_exist? check, so
+    # a true here is a real "all on-disk variants present" signal.
+    return true if variants_status == "complete"
 
-    # Check filesystem instead of DB
+    # Slow path / self-heal: column might not have been backfilled yet
+    # (rows that predate the wired-up status). Confirm against the
+    # filesystem and stamp the column on the way out so subsequent calls
+    # take the fast path.
     source_path = File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, "")).to_s
-    ImageVariantGenerator.variants_exist?(source_path)
+    return false unless ImageVariantGenerator.variants_exist?(source_path)
+
+    update_columns(variants_status: "complete", variants_generated_at: Time.current) if persisted?
+    true
   end
 
 
@@ -51,9 +61,8 @@ class Medium < ApplicationRecord
 
   def queue_variant_generation
     return unless image?
-    return unless ImageVariantGenerator.available?
 
-    GenerateImageVariantsJob.perform_later(file_path, nil)  # Pass nil for medium_id
+    ImageVariantGenerator.queue!(file_path)
   end
 
   def self.remove_by_file_path(file_path)
