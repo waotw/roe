@@ -19,6 +19,14 @@ class Medium < ApplicationRecord
   # Add this scope
   scope :originals_only, -> { where.not("file_path LIKE ?", "%/variants/%") }
 
+  # Variant status scopes — back the indexed `variants_status` column.
+  # Stamped by ImageVariantGenerator.mark_complete_for after a successful
+  # generation run; row stays at the "pending" default until then. The
+  # pending scope treats NULL the same as "pending" since older rows
+  # predate the column default.
+  scope :with_complete_variants, -> { where(variants_status: "complete") }
+  scope :with_pending_variants, -> { where("variants_status IS NULL OR variants_status != ?", "complete") }
+
   def image?
     media_type == "images"
   end
@@ -63,13 +71,11 @@ class Medium < ApplicationRecord
 
     return unless Dir.exist?(variants_dir)
 
-    # Get exact base name and extension
-    base_name = File.basename(source_path, ".*")
-    ext = File.extname(source_path)
-
-    # Delete only exact variant matches: basename-{variant}{ext}
+    # Delegate variant-path construction to ImageVariantGenerator so
+    # naming stays in one place — this matters for HEIC/HEIF sources
+    # where variants are emitted as .jpg, not .heic.
     ImageVariantGenerator::VARIANTS.keys.each do |variant_name|
-      variant_file = File.join(variants_dir, "#{base_name}-#{variant_name}#{ext}")
+      variant_file = ImageVariantGenerator.variant_path_for(source_path, variant_name)
 
       if File.exist?(variant_file)
         File.delete(variant_file)
@@ -77,7 +83,7 @@ class Medium < ApplicationRecord
       end
 
       # Also check for .webp variant if it exists
-      webp_file = File.join(variants_dir, "#{base_name}-#{variant_name}.webp")
+      webp_file = variant_file.sub(File.extname(variant_file), ".webp")
       if File.exist?(webp_file)
         File.delete(webp_file)
         Rails.logger.info "[Medium] Deleted webp variant: #{webp_file}"

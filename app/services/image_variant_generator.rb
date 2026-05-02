@@ -11,7 +11,14 @@ class ImageVariantGenerator
   WEBP_QUALITY = 85  # Quality for WebP conversion
   GENERATE_WEBP = false  # Set to true when helpers support WebP
 
-  IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
+  # Source extensions we'll generate variants for. HEIC/HEIF are included
+  # so they're treated consistently with Medium#image? — variant_path_for
+  # remaps their variants to .jpg below since browsers can't display HEIC.
+  # (The original HEIC file remains; the substack importer converts at
+  # download time, but manual uploads land as-is. Source-side conversion
+  # for non-import flows is a follow-up.)
+  IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .heic .heif].freeze
+  HEIC_EXTENSIONS = %w[.heic .heif].freeze
 
   # Environment-aware settings
   class << self
@@ -83,6 +90,7 @@ class ImageVariantGenerator
       end
 
       Rails.logger.info "[ImageVariants] ✓ Complete: #{File.basename(source_path)}"
+      mark_complete_for(source_path)
       true
     rescue => e
       Rails.logger.error "[ImageVariants] Failed #{source_path}: #{e.message}"
@@ -114,6 +122,9 @@ class ImageVariantGenerator
       dir = File.dirname(source_path)
       base = File.basename(source_path, ".*")
       ext = File.extname(source_path)
+      # HEIC/HEIF aren't browser-displayable; emit JPG variants so the
+      # picture/srcset pipeline produces something the browser can render.
+      ext = ".jpg" if HEIC_EXTENSIONS.include?(ext.downcase)
       File.join(dir, "variants", "#{base}-#{variant_name}#{ext}")
     end
 
@@ -222,11 +233,19 @@ class ImageVariantGenerator
       Rails.logger.error "[ImageVariants] Failed to generate #{variant_name} for #{source_path}: #{e.message}"
     end
 
-    def mark_complete(medium_id)
-      Medium.find_by(id: medium_id)&.update(
+    # Stamp the matching Medium row as complete so `with_complete_variants`
+    # / `with_pending_variants` scopes (and any future O(1) callers) can
+    # avoid re-statting the filesystem. Looks up by web path derived from
+    # the filesystem source. No-ops when no matching Medium exists yet
+    # (e.g. variants generated for a file that ContentSync hasn't seen).
+    def mark_complete_for(source_path)
+      web_path = source_path.to_s.sub(RoeSitePaths::SITE_PATH.to_s, "")
+      Medium.where(file_path: web_path).update_all(
         variants_status: "complete",
         variants_generated_at: Time.current
       )
+    rescue => e
+      Rails.logger.warn "[ImageVariants] Could not stamp variants_status for #{source_path}: #{e.class}: #{e.message}"
     end
   end
 end

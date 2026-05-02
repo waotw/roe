@@ -161,14 +161,14 @@ class ResponsiveImageRenderer
   end
 
   def variant_exists?(path)
-    # If it's already a filesystem path, use it directly
-    if path.start_with?(Rails.root.to_s)
-      File.exist?(path)
-    else
-      # Convert web path to filesystem path
-      full_path = File.join(RoeSitePaths::SITE_PATH, path.to_s.sub(%r{^/}, ""))
-      File.exist?(full_path)
-    end
+    # Delegate path resolution to ImageVariantGenerator.normalize_path so
+    # this stays correct under the versioned `current/` layout — site
+    # files live under RoeSitePaths::SITE_PATH (/roe/site), not under
+    # Rails.root (/roe/current). The previous start_with?(Rails.root)
+    # check missed every filesystem path coming back from
+    # `variant_path_for`, so build_fallback_srcset treated all variants
+    # as missing and the picture tag silently degraded to the original.
+    File.exist?(ImageVariantGenerator.normalize_path(path))
   end
 
   def image_file?

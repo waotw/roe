@@ -21,7 +21,7 @@ namespace :images do
       exit 1
     end
 
-    image_paths = Dir.glob(Rails.root.join("site/media/images/**/*.{jpg,jpeg,png,gif,webp}"))
+    image_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media/images/**/*.{jpg,jpeg,png,gif,webp,heic,heif}"))
                      .reject { |p| p.include?("/variants/") }
 
     puts "🖼️  Found #{image_paths.count} images"
@@ -35,7 +35,7 @@ namespace :images do
     end
 
     # Clear existing variants first
-    variants_dir = Rails.root.join("site/media/images/variants")
+    variants_dir = File.join(RoeSitePaths::SITE_PATH, "media/images/variants")
     if Dir.exist?(variants_dir)
       puts "🧹 Clearing existing variants..."
       FileUtils.rm_rf(variants_dir)
@@ -87,21 +87,29 @@ namespace :images do
 
   desc "Clean up orphaned variant files"
   task cleanup: :environment do
-    variants_dir = Rails.root.join("site/media/images/variants")
-    return unless Dir.exist?(variants_dir)
+    variants_dir = File.join(RoeSitePaths::SITE_PATH, "media/images/variants")
+    next unless Dir.exist?(variants_dir)
 
-    variant_files = Dir.glob(variants_dir.join("*"))
-    originals_dir = Rails.root.join("site/media/images")
+    variant_files = Dir.glob(File.join(variants_dir, "*"))
+    originals_dir = File.join(RoeSitePaths::SITE_PATH, "media/images")
 
     removed = 0
     variant_files.each do |variant_file|
-      # Extract original filename from variant filename
       basename = File.basename(variant_file)
-      # Remove variant suffix (e.g., "-medium", "-thumb") to find original
-      original_name = basename.sub(/-(thumb|small|medium|large)\.(jpg|jpeg|png|gif|webp)$/, '.\\2')
-      original_path = originals_dir.join(original_name)
+      # Strip the variant suffix to recover the source's base name. We
+      # look up the original by base name across every supported source
+      # extension because HEIC sources produce .jpg variants — comparing
+      # the variant's extension to the original's would falsely flag
+      # those as orphans.
+      base_match = basename.match(/\A(.+)-(?:thumb|small|medium|large)\.[^.]+\z/)
+      next unless base_match
 
-      unless File.exist?(original_path)
+      base_name = base_match[1]
+      original_exists = ImageVariantGenerator::IMAGE_EXTENSIONS.any? do |ext|
+        File.exist?(File.join(originals_dir, "#{base_name}#{ext}"))
+      end
+
+      unless original_exists
         File.delete(variant_file)
         removed += 1
         puts "🗑️  Removed orphaned variant: #{basename}"
@@ -109,5 +117,27 @@ namespace :images do
     end
 
     puts "\n✓ Removed #{removed} orphaned variant files"
+  end
+
+  desc "Backfill variants_status from filesystem (run once after enabling DB-backed status)"
+  task backfill_status: :environment do
+    fixed = 0
+    Medium.images.find_each do |medium|
+      source_path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, "")).to_s
+      complete = File.exist?(source_path) && ImageVariantGenerator.variants_exist?(source_path)
+      target_status = complete ? "complete" : "pending"
+      target_generated_at = complete ? File.mtime(source_path) : nil
+
+      next if medium.variants_status == target_status &&
+              medium.variants_generated_at.to_i == target_generated_at.to_i
+
+      medium.update_columns(
+        variants_status: target_status,
+        variants_generated_at: target_generated_at
+      )
+      fixed += 1
+    end
+
+    puts "✓ Backfilled #{fixed} Medium record(s) from filesystem state"
   end
 end
