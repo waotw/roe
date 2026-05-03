@@ -3,9 +3,8 @@ module RoeUpdater
     STEPS = [
       { name: 'validating',         percent: 5,   description: 'Validating update prerequisites' },
       { name: 'backing_up_db',      percent: 15,  description: 'Creating database backup' },
-      { name: 'backing_up_site',    percent: 25,  description: 'Creating full site backup' },
-      { name: 'downloading',        percent: 40,  description: 'Downloading new version' },
-      { name: 'testing',            percent: 55,  description: 'Testing migrations' },
+      { name: 'downloading',        percent: 30,  description: 'Downloading new version' },
+      { name: 'testing',            percent: 50,  description: 'Testing migrations' },
       { name: 'migrating',          percent: 70,  description: 'Running production migrations' },
       { name: 'switching',          percent: 85,  description: 'Switching to new version' },
       { name: 'syncing_root_files', percent: 87,  description: 'Syncing root-level files' },
@@ -28,7 +27,6 @@ module RoeUpdater
 
         execute_step(:validating) { validate_prerequisites }
         execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
-        execute_step(:backing_up_site) { BackupManager.backup_full_site(@status) }
         execute_step(:downloading) { Downloader.download_version(@version, @status) }
         execute_step(:testing) { MigrationTester.test_migrations(@status) }
         execute_step(:migrating) { run_production_migrations }
@@ -223,9 +221,11 @@ module RoeUpdater
         log("Initiating automatic rollback...")
 
         begin
-          BackupManager.restore_databases
+          # Pass @status so restore_databases finds the timestamp from
+          # THIS update's backup (stamped during backup_databases),
+          # rather than guessing at the most recent one on disk.
+          BackupManager.restore_databases(@status)
           SwitchManager.rollback
-          BackupManager.cleanup_update_backups
           # Wipe the staging clone too — otherwise the next update
           # attempt will fail validate_prerequisites' "non-empty
           # staging/" check and the user has to clean it up by hand.

@@ -10,7 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_21_151338) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
+  create_table "disputes", force: :cascade do |t|
+    t.integer "amount_cents"
+    t.datetime "created_at", null: false
+    t.string "currency"
+    t.integer "status", default: 0, null: false
+    t.string "stripe_charge_id"
+    t.string "stripe_dispute_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_disputes_on_status"
+    t.index ["stripe_dispute_id"], name: "index_disputes_on_stripe_dispute_id", unique: true
+  end
+
   create_table "documentation", force: :cascade do |t|
     t.text "content"
     t.datetime "created_at", null: false
@@ -18,6 +30,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_151338) do
     t.json "metadata", default: {}
     t.datetime "updated_at", null: false
     t.index ["file_path"], name: "index_documentation_on_file_path", unique: true
+  end
+
+  create_table "donations", force: :cascade do |t|
+    t.integer "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.string "currency", null: false
+    t.string "email", null: false
+    t.integer "member_id"
+    t.integer "refunded_amount_cents"
+    t.datetime "refunded_at"
+    t.string "refunded_currency"
+    t.string "stripe_payment_intent_id"
+    t.string "stripe_session_id"
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_donations_on_created_at"
+    t.index ["email"], name: "index_donations_on_email"
+    t.index ["member_id"], name: "index_donations_on_member_id"
+    t.index ["stripe_session_id"], name: "index_donations_on_stripe_session_id", unique: true
   end
 
   create_table "imports", force: :cascade do |t|
@@ -29,6 +59,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_151338) do
     t.text "error_message"
     t.json "original_data", default: {}
     t.integer "phase", default: 1, null: false
+    t.json "rss_data"
     t.string "source_type", default: "substack", null: false
     t.datetime "started_at"
     t.json "stats", default: {}
@@ -76,9 +107,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_151338) do
     t.json "metadata", default: {}
     t.string "name"
     t.integer "newsletter_status", default: 0, null: false
+    t.integer "paid_amount_cents"
     t.datetime "paid_at"
+    t.string "paid_currency"
     t.string "password_digest"
     t.string "pending_email"
+    t.integer "refunded_amount_cents"
+    t.datetime "refunded_at"
+    t.string "refunded_currency"
     t.integer "status", default: 0, null: false
     t.string "stripe_customer_id"
     t.string "stripe_payment_intent_id"
@@ -192,6 +228,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_151338) do
     t.text "secret_key_live"
     t.text "secret_key_test"
     t.datetime "updated_at", null: false
+    t.string "webhook_signing_secret_live"
+    t.string "webhook_signing_secret_test"
+  end
+
+  create_table "update_statuses", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.string "current_step"
+    t.text "error_message"
+    t.string "from_version"
+    t.text "log"
+    t.integer "progress_percent", default: 0
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.string "to_version"
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_update_statuses_on_created_at"
+    t.index ["status"], name: "index_update_statuses_on_status"
   end
 
   create_table "users", force: :cascade do |t|
@@ -202,6 +256,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_151338) do
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
+  add_foreign_key "donations", "members"
   add_foreign_key "media", "imports"
   add_foreign_key "media_references", "media"
   add_foreign_key "media_references", "posts"
