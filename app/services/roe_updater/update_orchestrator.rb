@@ -8,8 +8,9 @@ module RoeUpdater
       { name: 'testing',            percent: 55,  description: 'Testing migrations' },
       { name: 'migrating',          percent: 70,  description: 'Running production migrations' },
       { name: 'switching',          percent: 85,  description: 'Switching to new version' },
-      { name: 'syncing_root_files', percent: 88,  description: 'Syncing root-level files' },
-      { name: 'writing_version',    percent: 90,  description: 'Updating VERSION file' },
+      { name: 'syncing_root_files', percent: 87,  description: 'Syncing root-level files' },
+      { name: 'writing_version',    percent: 89,  description: 'Updating VERSION file' },
+      { name: 'building_assets',    percent: 92,  description: 'Building assets' },
       { name: 'restarting',         percent: 95,  description: 'Restarting server' },
       { name: 'completed',          percent: 100, description: 'Update complete' }
     ].freeze
@@ -34,6 +35,7 @@ module RoeUpdater
         execute_step(:switching) { SwitchManager.switch_versions(@status) }
         execute_step(:syncing_root_files) { sync_root_files }
         execute_step(:writing_version) { write_root_version_file }
+        execute_step(:building_assets) { build_assets }
         execute_step(:restarting) { restart_server }
 
         complete_update
@@ -67,9 +69,12 @@ module RoeUpdater
           raise "Git is not available. Please install Git to perform updates."
         end
 
-        # An empty `staging/` ships with the install — only fail when it
-        # actually has content, which would mean either an in-progress
-        # update or a previous update that crashed without cleanup.
+        # staging/ is transient — created by Downloader, consumed by
+        # SwitchManager's rename. It should be absent (or at worst
+        # empty) when a new update starts. Non-empty content here
+        # means either an update is in progress or a previous run
+        # crashed without cleanup; either way we don't want to clobber
+        # whatever's there.
         staging = File.join(RoeSitePaths::ROE_ROOT, 'staging')
         if Dir.exist?(staging) && !Dir.empty?(staging)
           raise "Staging directory has unexpected content (#{Dir.children(staging).size} items). " \
@@ -147,6 +152,33 @@ module RoeUpdater
 
         File.write(version_path, updated.to_yaml)
         log("Wrote VERSION file: #{@version}")
+      end
+
+      # Compile build-time assets (Tailwind CSS, anything else
+      # `assets:precompile` invokes via prependable rake hooks). The
+      # build outputs (e.g. app/assets/builds/tailwind.css) are
+      # gitignored as derived artifacts, so a fresh clone has the
+      # source files but not the compiled CSS — Propshaft 500s on the
+      # next request without this step. assets:precompile is the most
+      # general entry point: tailwindcss-rails hooks `tailwindcss:build`
+      # into it automatically, and it's a no-op for asset types that
+      # aren't configured.
+      def build_assets
+        current_app = File.join(RoeSitePaths::ROE_ROOT, 'current')
+        rails_env = Rails.env
+
+        cmd = "cd '#{current_app}' && RAILS_ENV=#{rails_env} bundle exec rails assets:precompile 2>&1"
+        output = nil
+
+        Bundler.with_original_env do
+          output = `#{cmd}`
+        end
+
+        unless $?.success?
+          raise "Asset compilation failed: #{output}"
+        end
+
+        log("Assets compiled")
       end
 
       def restart_server

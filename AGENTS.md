@@ -26,7 +26,7 @@ Roe uses a **versioned directory structure** to support seamless updates:
     media/
     db/
     ...
-  staging/                        # New version during updates
+  staging/                        # Transient — only present mid-update
   static_site/                    # Generated static site output
   site_backups/                   # Automatic backups
   roe.sh                          # Server management script
