@@ -36,13 +36,16 @@ module Api
       # ledger to whatever's on disk now. Returns the resulting
       # fingerprint so the caller can sanity-check.
       def refresh_ledger
+        Rails.logger.info "[Api::SiteSync::ExchangeController] refresh_ledger called from peer"
         ::SiteSync::Ledger.write_current!
         ::SiteSync::Checker.clear_cache
         Rails.cache.delete("site_sync:current_fingerprint")
-        render json: {
-          ok:          true,
-          fingerprint: ::SiteSync::Ledger.fingerprint_for(::RoeSitePaths::SITE_PATH)
-        }
+        fp = ::SiteSync::Ledger.fingerprint_for(::RoeSitePaths::SITE_PATH)
+        Rails.logger.info "[Api::SiteSync::ExchangeController] refresh_ledger wrote ledger; current fingerprint=#{fp}"
+        render json: { ok: true, fingerprint: fp }
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] refresh_ledger FAILED: #{e.class} #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+        render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
       private

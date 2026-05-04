@@ -118,9 +118,13 @@ module SiteSync
       # job already updates the local ledger, and the peer's /site
       # didn't change.
       def refresh_peer_ledger!
-        return false unless can_call_peer?
+        unless can_call_peer?
+          Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger skipped — can_call_peer? is false (peer_url present? #{peer_url.present?}, token present? #{token.present?}, env: #{Rails.env})"
+          return false
+        end
 
         uri = URI.parse(File.join(peer_url, '/api/site_sync/refresh_ledger'))
+        Rails.logger.info "[SiteSync::Exchange] refresh_peer_ledger → POST #{uri}"
 
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl      = (uri.scheme == 'https')
@@ -137,13 +141,14 @@ module SiteSync
         response = http.request(request)
 
         unless response.is_a?(Net::HTTPSuccess)
-          Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger got #{response.code}: #{response.body}"
+          Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger FAILED: HTTP #{response.code} from #{uri} — body: #{response.body}"
           return false
         end
 
+        Rails.logger.info "[SiteSync::Exchange] refresh_peer_ledger OK — peer reports fingerprint #{(JSON.parse(response.body) rescue {})['fingerprint']}"
         true
       rescue => e
-        Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger failed: #{e.class} #{e.message}"
+        Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger ERROR: #{e.class} #{e.message}"
         false
       end
 
