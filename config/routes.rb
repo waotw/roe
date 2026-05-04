@@ -6,6 +6,16 @@ Rails.application.routes.draw do
 
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Machine-to-machine API (token-authed, no admin session). Lives
+  # outside the /admin namespace because it's our own Rails app
+  # talking to itself across environments — no logged-in user, just
+  # a bearer token.
+  namespace :api do
+    namespace :site_sync do
+      post "exchange", to: "exchange#create"
+    end
+  end
+
   # Authentication (specific routes first)
   resource :session, only: [ :new, :create, :destroy ]
   resources :passwords, param: :token
@@ -26,6 +36,8 @@ Rails.application.routes.draw do
     post "site_sync/mark_synced", to: "site_sync#mark_synced", as: "mark_site_synced"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
+    patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
+    post "site_sync/config/regenerate_token", to: "site_sync#regenerate_token", as: "regenerate_site_sync_token"
 
     get "layout/navigation/edit", to: "layouts#edit_navigation"
     patch "layout/navigation", to: "layouts#update_navigation"

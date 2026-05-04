@@ -13,3 +13,13 @@ production:
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
+
+# Dev-side cross-env exchange — pings prod for its state hourly so
+# the local banner reflects the live site even between active admin
+# sessions. The job no-ops if peer_url isn't configured, so it's
+# safe to leave scheduled even in fresh installs.
+development:
+  site_sync_exchange:
+    class: SiteSyncExchangeJob
+    queue: default
+    schedule: every hour

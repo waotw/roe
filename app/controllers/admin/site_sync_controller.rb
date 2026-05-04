@@ -19,6 +19,20 @@ class Admin::SiteSyncController < Admin::BaseController
       Rails.cache.delete(LAST_RESTORE_CACHE_KEY)
       @last_restore = nil
     end
+
+    # Peer state for the cross-env section. refresh_if_stale will
+    # enqueue a background ping if the cached value is older than
+    # the threshold; the current request just gets whatever's
+    # already cached, so the page doesn't block on the HTTP call.
+    @peer_state            = SiteSync::Exchange.refresh_if_stale
+    @peer_drift            = SiteSync::Exchange.peer_has_drift?
+    @peer_call_configured  = SiteSync::Exchange.can_call_peer?
+    @peer_url              = SiteSync::Exchange.peer_url
+
+    # Live config for the form (token + peer_url). first_or_create!
+    # auto-generates a token on first access, so the form always has
+    # something to show.
+    @sync_config = SyncConfig.current
   end
 
   def mark_synced
@@ -37,6 +51,31 @@ class Admin::SiteSyncController < Admin::BaseController
     flash[:notice] = "Backup created: #{File.basename(path)}"
   rescue SiteSync::BackupManager::BackupError => e
     flash[:alert] = e.message
+  ensure
+    redirect_to admin_site_sync_path
+  end
+
+  # Update peer URL + token from the form. Token is optional —
+  # if blank, leaves the existing one untouched (so the user can
+  # save a peer_url change without re-typing the token).
+  def update_config
+    config = SyncConfig.current
+    config.peer_url = params[:peer_url].to_s.strip.presence
+    config.token = params[:token] if params[:token].present?
+    config.save!
+
+    flash[:notice] = "Sync configuration saved."
+  rescue => e
+    flash[:alert] = "Couldn't save sync config: #{e.message}"
+  ensure
+    redirect_to admin_site_sync_path
+  end
+
+  def regenerate_token
+    SyncConfig.current.regenerate_token!
+    flash[:notice] = "New token generated. Set the same token on the other side."
+  rescue => e
+    flash[:alert] = "Couldn't regenerate token: #{e.message}"
   ensure
     redirect_to admin_site_sync_path
   end
