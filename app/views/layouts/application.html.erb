@@ -77,6 +77,12 @@
         </p>
       </div>
     <% end %>
+    <%# Site-sync drift banner. Lives in the layout so it surfaces on every
+        admin page once the ledger sees changes since the last recorded
+        sync. Cached for ~30s — see SiteSync::Checker. %>
+    <% if authenticated? %>
+      <%= render "shared/site_sync_banner" %>
+    <% end %>
     <% if flash.any? %>
       <% flash.each do |type, message| %>
         <%# Skip internal flags, only show user-facing messages %>
@@ -97,6 +103,7 @@
           </div>
           <!-- Right: Settings, Updates & Logout -->
           <div class="flex items-center gap-6">
+            <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Updates", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>

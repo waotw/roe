@@ -1,0 +1,219 @@
+<% content_for :editor_js, false %>
+<div class="px-4 sm:px-0">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Site Sync</h1>
+    <p class="mt-2 text-sm text-gray-700">
+      Track changes to your <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder and manage backups.
+    </p>
+  </div>
+
+  <%# ─── Post-restore confirmation panel ─────────────────────────── %>
+  <%# Sticks around for an hour after a restore so the user has clear
+      evidence the operation worked. Older restores fall out (no
+      reason to surface them — they're history, not current state). %>
+  <% if @last_restore && @last_restore[:restored_at] && @last_restore[:restored_at] > 1.hour.ago %>
+    <div class="bg-green-50 border border-green-200 rounded-sm p-6 mb-6">
+      <h3 class="text-sm font-semibold text-green-900 mb-2">
+        Restore Completed
+      </h3>
+      <p class="text-sm text-green-800">
+        Restored <code class="text-xs bg-white px-1 rounded font-mono"><%= @last_restore[:name] %></code>
+        <%= time_ago_in_words(@last_restore[:restored_at]) %> ago.
+        <strong><%= @last_restore[:file_count] %></strong> files written to <code class="text-xs bg-white px-1 rounded">/site</code>.
+      </p>
+      <p class="text-xs text-green-700 mt-2">
+        If this was unintentional, you can restore to the most recent backup in the list below. This will bring your site back to exactly as it was before it was restored.
+      </p>
+    </div>
+  <% end %>
+
+  <%# ─── Drift state ──────────────────────────────────────────────── %>
+  <% case @status[:state] %>
+  <% when :clean %>
+    <div class="bg-green-50 border border-green-200 rounded-sm p-6 mb-6">
+      <h2 class="text-lg font-semibold text-green-900">No Unsynced Changes</h2>
+      <p class="text-green-800 mt-2">
+        Your <code class="text-xs bg-white px-1 rounded">/site</code> hasn't changed since the last sync.
+      </p>
+      <%# When cross-env verification lands this can confidently say
+          "your local /site matches the public /site as of <time>" —
+          today we can only confirm there have been no local edits
+          since the last backup/restore/mark-as-synced operation. %>
+      <% if @status[:recorded_at] %>
+        <p class="text-xs text-green-700 mt-2 font-mono">
+          Last sync: <%= @status[:recorded_at] %>
+        </p>
+      <% end %>
+    </div>
+
+  <% when :error %>
+    <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
+      <h2 class="text-lg font-semibold text-red-900 mb-2">Sync Check Failed</h2>
+      <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @status[:error] %></pre>
+    </div>
+
+  <% else %>
+    <%# :local_drift %>
+    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
+      <% counts = @status[:local] %>
+      <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
+      <p class="text-amber-800 mb-3">
+        You've made these changes since your last sync:
+      </p>
+      <ul class="list-disc ml-6 mb-4 text-sm text-amber-800 space-y-1">
+        <% if counts[:modified].any? %>
+          <li><strong><%= counts[:modified].size %></strong> file<%= 's' if counts[:modified].size != 1 %> modified</li>
+        <% end %>
+        <% if counts[:added].any? %>
+          <li><strong><%= counts[:added].size %></strong> file<%= 's' if counts[:added].size != 1 %> added</li>
+        <% end %>
+        <% if counts[:deleted].any? %>
+          <li><strong><%= counts[:deleted].size %></strong> file<%= 's' if counts[:deleted].size != 1 %> deleted</li>
+        <% end %>
+      </ul>
+      <% if @status[:recorded_at] %>
+        <p class="text-xs text-amber-700 mb-4 font-mono">
+          Last sync: <%= @status[:recorded_at] %>
+        </p>
+      <% end %>
+
+      <%# Per-file paths, collapsed by default. Useful when the
+          counts above leave the user wondering "which files?" %>
+      <% [ [ "Modified", counts[:modified] ], [ "Added", counts[:added] ], [ "Deleted", counts[:deleted] ] ].each do |label, list| %>
+        <% next if list.empty? %>
+        <details class="mb-3">
+          <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
+            Show <%= label.downcase %> paths
+          </summary>
+          <ul class="mt-2 ml-4 text-xs font-mono text-amber-800 space-y-1 max-h-64 overflow-y-auto">
+            <% list.each do |path| %>
+              <li><%= path %></li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+
+      <div class="mt-6 pt-4 border-t border-amber-200">
+        <%# Placeholder for the upcoming "Sync to live site" action.
+            When cross-env sync lands, replace this section with the
+            real button (push local /site → public via fly-rsync) and
+            drop the manual-marker fallback. %>
+        <p class="text-sm text-amber-800 mb-3">
+          A "Sync to live site" button will appear here once cross-env sync is wired up.
+          For now: rsync these changes from your terminal, then click below to mark them as synced.
+        </p>
+        <%= button_to "Mark as synced",
+                      admin_mark_site_synced_path,
+                      method: :post,
+                      data: { confirm: "Mark the current /site state as the new sync baseline? Only do this if you've already synced this state to the other environment." },
+                      class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ─── Local backups ───────────────────────────────────────────── %>
+  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+    <div class="flex items-center justify-between mb-4 gap-4">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Local Backups</h2>
+        <p class="text-sm text-gray-600 mb-2">
+          Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/local/</code>
+          <ul class="list-disc ml-6">
+            <li>Each backup is a complete, browsable copy of the <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder</li>
+            <li>Files unchanged between backups share disk space</li>
+            <li>Last <%= SiteSync::BackupManager::BACKUP_RETENTION %> are kept.</li>
+          </ul>
+        </p>
+      </div>
+      <%= button_to "Create backup",
+                    admin_create_site_backup_path,
+                    method: :post,
+                    data: { turbo_submits_with: "⏳ Creating new backup. Please hold…" },
+                    class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+    </div>
+
+    <% if @local_backups.empty? %>
+      <p class="text-sm text-gray-500 italic">No local backups yet.</p>
+    <% else %>
+      <ol class="divide-y divide-gray-200 list-decimal">
+        <% @local_backups.each do |backup| %>
+          <li class="py-3 flex items-center justify-between">
+            <div>
+              <div class="font-mono text-sm <%= backup[:active] ? 'text-green-900 font-semibold' : 'text-gray-900' %>">
+                <%= backup[:name] %>
+                <% if backup[:active] %>
+                  <span class="ml-2 text-xs font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">matches current /site</span>
+                <% end %>
+              </div>
+              <div class="text-xs text-gray-500">
+                <%= time_ago_in_words(backup[:created_at]) %> ago
+                <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
+              </div>
+            </div>
+            <% if backup[:active] %>
+              <span class="inline-flex items-center px-3 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
+                    title="Backup matches current /site — nothing to restore.">
+                Restore
+              </span>
+            <% else %>
+              <%= button_to "Restore",
+                            admin_restore_site_backup_path(name: backup[:name]),
+                            method: :post,
+                            data: {
+                              confirm: "Restore /site from #{backup[:name]}? Your current /site contents will be snapshotted first as a safety net.",
+                              turbo_submits_with: "⏳ Restoring from backup. Please hold…"
+                            },
+                            class: "inline-flex items-center px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+            <% end %>
+          </li>
+        <% end %>
+      </ol>
+    <% end %>
+  </div>
+
+  <%# ─── Production backups ──────────────────────────────────────── %>
+  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+    <div>
+      <h2 class="text-lg font-semibold text-gray-900">Public/Live Site Backups</h2>
+      <p class="text-sm text-gray-600 mb-2">
+        Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/production/</code>, these are created when you sync your local site with the hosted site.
+      </p>
+      <p class="text-xs text-gray-500 mb-4">
+        To restore a production backup, run <code class="text-xs bg-gray-100 px-1 rounded">rake site:rollback[&lt;name&gt;]</code> from your terminal.
+        An admin-UI restore button for production is coming with the cross-env sync work.
+      </p>
+    </div>
+
+    <% if @production_backups.empty? %>
+      <p class="text-sm text-gray-500 italic">No production backups yet. Run <code class="text-xs bg-gray-100 px-1 rounded">rake site:backup</code> to create one.</p>
+    <% else %>
+      <ul class="divide-y divide-gray-200">
+        <% @production_backups.each do |backup| %>
+          <li class="py-3 flex items-center justify-between">
+            <div>
+              <div class="font-mono text-sm text-gray-900"><%= backup[:name] %></div>
+              <div class="text-xs text-gray-500">
+                <%= time_ago_in_words(backup[:created_at]) %> ago
+                <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
+              </div>
+            </div>
+            <code class="text-xs text-gray-500 font-mono">
+              rake site:rollback[<%= backup[:name] %>]
+            </code>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+
+  <%# ─── About ────────────────────────────────────────────────────── %>
+  <div class="mt-8 pt-6 border-t border-gray-200">
+    <h3 class="text-sm font-semibold text-gray-900 mb-2">About Site Sync</h3>
+    <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+      <li>Tracks every file under <code class="text-xs">/site</code> via size + mtime (matches what rsync uses)</li>
+      <li>Excludes <code class="text-xs">db/</code> (separate backup system), <code class="text-xs">.git/</code>, and macOS noise</li>
+      <li>Local backups are rsync mirrors with <code class="text-xs">--link-dest</code> hardlinks — multiple snapshots dedupe unchanged files</li>
+      <li>Each restore auto-creates a fresh backup of the pre-restore state — to undo, restore that one</li>
+    </ul>
+  </div>
+</div>

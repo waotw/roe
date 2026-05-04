@@ -21,6 +21,12 @@ Rails.application.routes.draw do
     post "updates/rollback", to: "updates#rollback", as: "rollback_update"
     get "updates/status", to: "updates#status", as: "update_status"
 
+    # Site Sync
+    get "site_sync", to: "site_sync#index", as: "site_sync"
+    post "site_sync/mark_synced", to: "site_sync#mark_synced", as: "mark_site_synced"
+    post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
+    post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
+
     get "layout/navigation/edit", to: "layouts#edit_navigation"
     patch "layout/navigation", to: "layouts#update_navigation"
     get "layout/footer/edit", to: "layouts#edit_footer"

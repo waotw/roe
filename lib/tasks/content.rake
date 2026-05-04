@@ -92,7 +92,12 @@ namespace :site do
   task :backup do
     machine = machine_id
     timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
-    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups')
+    # Production-side backups live under site_backups/production/ so the
+    # local-side admin UI can have its own site_backups/local/ subdir
+    # without the two getting tangled. Both follow the same hard-linked
+    # snapshot format.
+    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+    FileUtils.mkdir_p(backup_root)
     backup_dir = File.join(backup_root, timestamp)
 
     # Find most recent NON-EMPTY backup for hard-linking. Skipping
@@ -151,7 +156,7 @@ namespace :site do
     latest_link = File.join(backup_root, 'latest')
     FileUtils.rm_f(latest_link) if File.symlink?(latest_link)
     FileUtils.ln_s(timestamp, latest_link)
-    puts "   Updated: site_backups/latest → #{timestamp}"
+    puts "   Updated: site_backups/production/latest → #{timestamp}"
 
     # Cleanup: keep only 15 most recent backups
     all_backups = Dir.glob(File.join(backup_root, "20*")).sort
@@ -238,7 +243,8 @@ namespace :site do
   desc "Restore production from backup (interactive or direct: rake site:rollback[latest])"
   task :rollback, [ :backup_name ] do |t, args|
     backup_name = args[:backup_name]
-    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups')
+    # Production backups live in site_backups/production/ — see site:backup.
+    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
 
     # --- Direct Mode (with argument) ---
     if backup_name

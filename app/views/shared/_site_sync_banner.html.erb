@@ -1,0 +1,14 @@
+<%# Drift banner shown across all admin pages. Hidden when /site is in
+    sync (the common case) so it doesn't clutter the UI. %>
+<% sync_status = SiteSync::Checker.status_cached rescue nil %>
+<% if sync_status && sync_status[:state] == :local_drift %>
+  <% counts = sync_status[:local] %>
+  <% total  = counts[:modified].size + counts[:added].size + counts[:deleted].size %>
+  <div class="admin-warning-bar bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 font-mono text-xs">
+    <p>
+      🔄 You've made <%= pluralize(total, "unsynced change") %> to /site
+      (<%= counts[:modified].size %> modified, <%= counts[:added].size %> added, <%= counts[:deleted].size %> deleted).
+      <%= link_to "View details →", admin_site_sync_path, class: "underline" %>
+    </p>
+  </div>
+<% end %>
