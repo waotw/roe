@@ -12,7 +12,8 @@ Rails.application.routes.draw do
   # a bearer token.
   namespace :api do
     namespace :site_sync do
-      post "exchange", to: "exchange#create"
+      post "exchange",       to: "exchange#create"
+      post "refresh_ledger", to: "exchange#refresh_ledger"
     end
   end
 
@@ -38,6 +39,10 @@ Rails.application.routes.draw do
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
     patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
     post "site_sync/config/regenerate_token", to: "site_sync#regenerate_token", as: "regenerate_site_sync_token"
+    post "site_sync/refresh_exchange", to: "site_sync#refresh_exchange", as: "refresh_site_sync_exchange"
+    post "site_sync/push_to_live",     to: "site_sync#push_to_live",    as: "push_site_to_live"
+    post "site_sync/pull_from_live",   to: "site_sync#pull_from_live",  as: "pull_site_from_live"
+    post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"
 
     get "layout/navigation/edit", to: "layouts#edit_navigation"
     patch "layout/navigation", to: "layouts#update_navigation"

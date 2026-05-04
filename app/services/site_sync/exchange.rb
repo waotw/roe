@@ -87,6 +87,46 @@ module SiteSync
         nil
       end
 
+      # Tell the peer to walk its own /site and rewrite its ledger
+      # to match. Called after a push so the peer's drift detection
+      # doesn't claim "everything changed" from the rsync touching
+      # mtimes on every transferred file. Returns true on success,
+      # false on any failure (best-effort — failures are logged but
+      # don't fail the calling job).
+      #
+      # This is push-only — pull doesn't need it because the local
+      # job already updates the local ledger, and the peer's /site
+      # didn't change.
+      def refresh_peer_ledger!
+        return false unless can_call_peer?
+
+        uri = URI.parse(File.join(peer_url, '/api/site_sync/refresh_ledger'))
+
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl      = (uri.scheme == 'https')
+        # Walking /site can take a few seconds on a 2GB tree; give
+        # it more headroom than a regular exchange call.
+        http.read_timeout = 30
+        http.open_timeout = HTTP_TIMEOUT_SECONDS
+
+        request = Net::HTTP::Post.new(uri.request_uri)
+        request['Content-Type']  = 'application/json'
+        request['Authorization'] = "Bearer #{token}"
+        request.body             = '{}'
+
+        response = http.request(request)
+
+        unless response.is_a?(Net::HTTPSuccess)
+          Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger got #{response.code}: #{response.body}"
+          return false
+        end
+
+        true
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger failed: #{e.class} #{e.message}"
+        false
+      end
+
       # Cached peer state from the most recent exchange (inbound or
       # outbound). Returns nil if we've never spoken to the peer or
       # the cache entry has expired.

@@ -33,6 +33,10 @@ class Admin::SiteSyncController < Admin::BaseController
     # auto-generates a token on first access, so the form always has
     # something to show.
     @sync_config = SyncConfig.current
+
+    # In-progress / recently-completed transfer status for the
+    # push/pull buttons. nil when nothing has happened recently.
+    @transfer_status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
   end
 
   def mark_synced
@@ -80,6 +84,88 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # Push local /site to live via fly-rsync, in the background. The
+  # type-to-confirm gate is required because the underlying rsync
+  # uses --delete: any file present on live but missing locally will
+  # be removed. Live is snapshotted first so the operation is
+  # reversible from the production-backup list.
+  def push_to_live
+    if transfer_in_progress?
+      flash[:alert] = "Another sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "Push requires a peer URL set on this side (dev only)."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless params[:confirm].to_s.strip == "LIVE"
+      flash[:alert] = "Push aborted — the confirmation didn't match \"LIVE\"."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    seed_running_status(:push)
+    SiteSyncTransferJob.perform_later(:push)
+    flash[:notice] = "Pushing to live in the background. This usually takes a few minutes — refresh the page to check progress."
+    redirect_to admin_site_sync_path
+  end
+
+  # Pull live's /site over local. Local is snapshotted first
+  # (regular site_backups/local/ entry) so the pull is reversible
+  # from the local backup list — no typed confirmation needed
+  # since we can always restore.
+  def pull_from_live
+    if transfer_in_progress?
+      flash[:alert] = "Another sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "Pull requires a peer URL set on this side (dev only)."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    seed_running_status(:pull)
+    SiteSyncTransferJob.perform_later(:pull)
+    flash[:notice] = "Pulling from live in the background. Refresh the page to check progress."
+    redirect_to admin_site_sync_path
+  end
+
+  # Clear a completed/failed status notice from the UI without
+  # waiting for the cache TTL.
+  def dismiss_transfer_status
+    Rails.cache.delete(SiteSyncTransferJob::STATUS_CACHE_KEY)
+    redirect_to admin_site_sync_path
+  end
+
+  # Force a synchronous exchange call. Useful for testing — without
+  # this you'd have to wait for the hourly job (or 60s on-render
+  # debounce) to see fresh peer state. Synchronous so the user gets
+  # an immediate result, with a brief HTTP timeout to keep the
+  # request from hanging if the peer is unreachable.
+  def refresh_exchange
+    if !SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "This side doesn't initiate exchanges (no peer URL configured)."
+    else
+      result = SiteSync::Exchange.call_peer
+      if result
+        flash[:notice] = "Exchange complete — peer state refreshed."
+      else
+        flash[:alert] = "Exchange failed. Check Rails logs for details (likely token mismatch, wrong peer URL, or peer unreachable)."
+      end
+    end
+  rescue => e
+    flash[:alert] = "Exchange error: #{e.message}"
+  ensure
+    redirect_to admin_site_sync_path
+  end
+
   def restore_backup
     result = SiteSync::BackupManager.restore(params[:name])
     SiteSync::Checker.clear_cache
@@ -102,5 +188,22 @@ class Admin::SiteSyncController < Admin::BaseController
     flash[:alert] = e.message
   ensure
     redirect_to admin_site_sync_path
+  end
+
+  private
+
+  def transfer_in_progress?
+    Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)&.dig(:state) == :running
+  end
+
+  # Write the running status synchronously before enqueueing so
+  # the UI shows "running" on the immediate redirect, even if the
+  # Solid Queue worker hasn't picked the job up yet.
+  def seed_running_status(kind)
+    Rails.cache.write(
+      SiteSyncTransferJob::STATUS_CACHE_KEY,
+      { state: :running, kind: kind, started_at: Time.current },
+      expires_in: SiteSyncTransferJob::STATUS_TTL
+    )
   end
 end

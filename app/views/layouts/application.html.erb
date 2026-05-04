@@ -97,9 +97,23 @@
     <nav class="bg-white border-b border-gray-200 min-w-185.5">
       <div class="px-8">
         <div class="flex justify-between items-center h-16">
-          <!-- Left: Roe CMS Title -->
-          <div class="shrink-0">
+          <!-- Left: Roe CMS Title + env badge so dev and prod are visually distinct -->
+          <div class="shrink-0 flex items-center gap-2">
             <%= link_to "Roe CMS", admin_root_path, class: "text-xl font-bold text-gray-900" %>
+            <% env_classes = case Rails.env
+               when "production"  then "bg-green-100 text-green-800 border-green-300"
+               when "development" then "bg-amber-100 text-amber-800 border-amber-300"
+               when "test"        then "bg-red-100 text-red-800 border-red-300"
+               else                    "bg-gray-100 text-gray-700 border-gray-300"
+               end %>
+            <% env_label = case Rails.env
+               when "production"  then "live"
+               when "development" then "local"
+               else                    Rails.env
+               end %>
+            <span class="text-xs px-2 py-0.5 rounded uppercase font-mono border <%= env_classes %>" title="Rails.env: <%= Rails.env %>">
+              <%= env_label %>
+            </span>
           </div>
           <!-- Right: Settings, Updates & Logout -->
           <div class="flex items-center gap-6">

@@ -23,6 +23,28 @@ module Api
         render json: { error: "invalid json: #{e.message}" }, status: :bad_request
       end
 
+      # POST /api/site_sync/refresh_ledger
+      #
+      # Called by the peer right after it pushes content to us, so
+      # our ledger reflects the new /site state instead of the pre-
+      # push one. Without this, our drift detection would scream
+      # "everything changed!" right after a successful push (because
+      # rsync updated mtimes on every transferred file but our
+      # ledger still has the old mtimes).
+      #
+      # No body needed — we just walk our own /site and write the
+      # ledger to whatever's on disk now. Returns the resulting
+      # fingerprint so the caller can sanity-check.
+      def refresh_ledger
+        ::SiteSync::Ledger.write_current!
+        ::SiteSync::Checker.clear_cache
+        Rails.cache.delete("site_sync:current_fingerprint")
+        render json: {
+          ok:          true,
+          fingerprint: ::SiteSync::Ledger.fingerprint_for(::RoeSitePaths::SITE_PATH)
+        }
+      end
+
       private
 
       # Constant-time comparison so an attacker can't time their

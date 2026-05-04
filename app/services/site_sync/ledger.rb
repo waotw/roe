@@ -92,7 +92,17 @@ module SiteSync
         relative = path.sub(/\A#{Regexp.escape(prefix)}/, '')
         next if excluded?(relative)
 
-        stat = File.stat(path)
+        # File can vanish between Dir.glob enumerating it and us
+        # stat'ing it — common with rsync's atomic write (write to
+        # .tmp, rename) or image-variant temp files like
+        # `.foo.jpeg.aB3xZq`. Skip these gracefully rather than
+        # crashing the whole drift check.
+        begin
+          stat = File.stat(path)
+        rescue Errno::ENOENT
+          next
+        end
+
         manifest[relative] = {
           'size'  => stat.size,
           'mtime' => stat.mtime.to_i
