@@ -56,15 +56,18 @@ class SiteSyncTransferJob < ApplicationJob
     SiteSync::Checker.clear_cache
     Rails.cache.delete("site_sync:current_fingerprint")
 
-    # For push: also tell the peer to refresh its ledger. Without
-    # this, the peer's drift detection thinks "everything changed"
-    # because rsync touched mtimes on every transferred file but
-    # the peer's ledger still has the pre-push mtimes. Pull doesn't
-    # need this — peer's /site didn't change.
-    if @kind == :push
-      update_step(:notifying_peer)
-      SiteSync::Exchange.refresh_peer_ledger!
-    end
+    # Tell the peer to refresh its ledger too — for both push and
+    # pull. The motivations differ slightly:
+    #   - Push: peer's /site changed (we wrote to it). Without a
+    #     refresh, peer's drift would scream "everything changed!"
+    #     because rsync touched mtimes on every transferred file
+    #     but peer's ledger still has the pre-push mtimes.
+    #   - Pull: peer's /site didn't change, but our pull means we've
+    #     adopted peer's current state as the truth. Resetting
+    #     peer's baseline makes its drift signal clear too — both
+    #     sides agree they're in sync now.
+    update_step(:notifying_peer)
+    SiteSync::Exchange.refresh_peer_ledger!
 
     write_status(
       state:        :completed,

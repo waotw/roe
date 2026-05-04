@@ -47,9 +47,7 @@
             <% end %>
             <p class="text-sm text-blue-800">
               Started <%= time_ago_in_words(@transfer_status[:started_at]) %> ago.
-              Refresh this page to check for progress. Pushing through fly ssh console
-              has high per-file overhead, so a 2GB site can take 10–20 minutes total
-              even when very little actually changed.
+              Refresh this page to check for progress.
             </p>
           </div>
           <%# Force-clear the status — useful if the worker died or

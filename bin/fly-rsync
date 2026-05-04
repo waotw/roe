@@ -2,9 +2,20 @@
 #!/bin/bash
 # Pass this to rsync as the -e option to use fly ssh.
 # Usage: rsync -e ./bin/fly-rsync <local> <MACHINE_ID>:<remote>
+#
+# Connects as the `rails` user (uid 1000) so files transferred via
+# rsync end up owned by the same user the Rails app runs as. Without
+# `--user rails`, fly ssh defaults to root and the rails app (running
+# as the rails user via gosu in docker-entrypoint) can't write to the
+# files afterwards — admin-side edits raise Errno::EACCES.
+#
+# TODO(kamal): when we move to Kamal, configure the equivalent in
+# `config/deploy.yml` — Kamal's ssh.user should also be `rails` (or
+# whatever non-root user the container runs the app as) so the same
+# ownership-from-the-start property holds.
 
 set -euo pipefail
 MACHINE="$1"
 shift
 CMD=$(printf " %q" "$@")
-fly ssh console --quiet --machine "$MACHINE" -C "$CMD"
+fly ssh console --quiet --user rails --machine "$MACHINE" -C "$CMD"

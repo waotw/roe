@@ -87,4 +87,19 @@ module RoeSitePaths
   SITE_SYSTEM_GLOBAL_PATH = File.join(SITE_SYSTEM_PATH, 'global')
   SITE_SYSTEM_FEATURES_PATH = File.join(SITE_SYSTEM_PATH, 'features')
   SITE_SYSTEM_DEFAULTS_PATH = File.join(SITE_SYSTEM_PATH, 'defaults')
+
+  # Resolve a /site path to its canonical form, following symlinks.
+  # On production the Dockerfile sets up `/rails/site` as a symlink to
+  # `/data/site` (the persistent volume); without normalization, the
+  # admin controllers store the symlink path while the file watcher
+  # (Listen) reports the realpath, and content lookups silently
+  # mismatch — creating duplicate Post/Page records on every change.
+  #
+  # Falls back to expand_path when the file doesn't exist (typical
+  # for delete handlers, where realpath would raise ENOENT).
+  def self.normalize(path)
+    File.realpath(path)
+  rescue Errno::ENOENT
+    File.expand_path(path)
+  end
 end

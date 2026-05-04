@@ -15,7 +15,11 @@ class ContentSync
 
   def sync_posts
     relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_POSTS_PATH, "**", "*.md"))
-    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+    # RoeSitePaths.normalize resolves symlinks (notably /rails/site →
+    # /data/site on prod) so the file_path values we hand to model
+    # lookups match what the models stored on previous syncs. Without
+    # this, every sync after a file change would create a duplicate.
+    markdown_files = relative_paths.map { |path| RoeSitePaths.normalize(path) }
 
     puts "\n📚 Found #{markdown_files.count} markdown files in site/posts"
 
@@ -69,7 +73,11 @@ class ContentSync
 
   def sync_pages
     relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_PAGES_PATH, "**", "*.md"))
-    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+    # RoeSitePaths.normalize resolves symlinks (notably /rails/site →
+    # /data/site on prod) so the file_path values we hand to model
+    # lookups match what the models stored on previous syncs. Without
+    # this, every sync after a file change would create a duplicate.
+    markdown_files = relative_paths.map { |path| RoeSitePaths.normalize(path) }
 
     return if markdown_files.empty?
 
@@ -161,7 +169,11 @@ class ContentSync
 
   def sync_documentation
     relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "**", "*.md"))
-    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+    # RoeSitePaths.normalize resolves symlinks (notably /rails/site →
+    # /data/site on prod) so the file_path values we hand to model
+    # lookups match what the models stored on previous syncs. Without
+    # this, every sync after a file change would create a duplicate.
+    markdown_files = relative_paths.map { |path| RoeSitePaths.normalize(path) }
 
     return if markdown_files.empty?
 
@@ -192,7 +204,11 @@ class ContentSync
 
   def sync_products
     relative_paths = Dir.glob(File.join(RoeSitePaths::SITE_PRODUCTS_PATH, "**", "*.md"))
-    markdown_files = relative_paths.map { |path| File.expand_path(path) }
+    # RoeSitePaths.normalize resolves symlinks (notably /rails/site →
+    # /data/site on prod) so the file_path values we hand to model
+    # lookups match what the models stored on previous syncs. Without
+    # this, every sync after a file change would create a duplicate.
+    markdown_files = relative_paths.map { |path| RoeSitePaths.normalize(path) }
 
     puts "\n🛍️  Found #{markdown_files.count} markdown files in site/products"
 

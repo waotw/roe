@@ -85,7 +85,14 @@ class Product < ApplicationRecord
   end
 
   def self.create_or_update_from_file(file_path)
-    absolute_path = File.expand_path(file_path)
+    # Resolve symlinks (notably /rails/site → /data/site on prod) for
+    # both the file and SITE_PATH so the strip below produces the
+    # canonical relative key. Without this, file_path and SITE_PATH
+    # use different forms and the sub doesn't match — leaving an
+    # absolute path stored where a relative key was expected, which
+    # then misses on subsequent lookups and creates duplicates.
+    absolute_path  = RoeSitePaths.normalize(file_path)
+    real_site_path = RoeSitePaths.normalize(RoeSitePaths::SITE_PATH.to_s)
 
     begin
       parsed = FrontMatterParser::Parser.parse_file(file_path)
@@ -109,13 +116,7 @@ class Product < ApplicationRecord
       puts "  ⚠ Missing price: #{File.basename(file_path)}"
     end
 
-    # Strip SITE_PATH (not Rails.root) to derive the relative key under
-    # the versioned layout — content lives at <root>/site/, while
-    # Rails.root is <root>/current/. Using Rails.root here previously
-    # left absolute paths intact, which made find_or_initialize_by miss
-    # the existing relative-path row and silently create duplicate
-    # Product records on every save through the admin.
-    relative_path = absolute_path.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
+    relative_path = absolute_path.sub(real_site_path + "/", "")
 
     product = Product.find_or_initialize_by(file_path: relative_path)
     product.content = parsed.content

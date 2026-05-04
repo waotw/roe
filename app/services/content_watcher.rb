@@ -127,7 +127,12 @@ class ContentWatcher
   end
 
   def self.process_file(file)
-    absolute_file = File.expand_path(file)
+    # Normalize through realpath so models receive the same path
+    # form they store (resolves the /rails/site → /data/site symlink
+    # on prod). The media branch below ALSO does this normalization
+    # explicitly via File.realpath; this top-level call covers
+    # posts/pages/documentation/products.
+    absolute_file = RoeSitePaths.normalize(file)
 
     # Handle global configs (site.yml, fonts.yml)
     if absolute_file.include?('site/system/global/')
@@ -255,8 +260,10 @@ class ContentWatcher
   end
 
   def self.handle_rename(old_path, new_path)
-    absolute_old = File.expand_path(old_path)
-    absolute_new = File.expand_path(new_path)
+    # Old path no longer exists (normalize falls back to expand_path).
+    # New path exists, so it'll resolve through realpath cleanly.
+    absolute_old = RoeSitePaths.normalize(old_path)
+    absolute_new = RoeSitePaths.normalize(new_path)
 
     if absolute_old.include?('site/posts')
       post = Post.find_by(file_path: absolute_old)
@@ -297,7 +304,9 @@ class ContentWatcher
   end
 
   def self.remove_file(file)
-    absolute_file = File.expand_path(file)
+    # File is gone — normalize falls back to expand_path internally
+    # since realpath would raise ENOENT on a missing file.
+    absolute_file = RoeSitePaths.normalize(file)
 
     # Handle config files first
     if absolute_file.include?('site/system')

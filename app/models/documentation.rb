@@ -7,7 +7,10 @@ class Documentation < ApplicationRecord
   include HasInlineFootnotes
 
   def self.create_or_update_from_file(file_path)
-    absolute_path = File.expand_path(file_path)
+    # Resolve symlinks (notably /rails/site → /data/site on prod) so
+    # this lookup matches records created via other paths into this
+    # model. See RoeSitePaths.normalize for the why.
+    absolute_path = RoeSitePaths.normalize(file_path)
 
     # Parse with error handling
     begin
@@ -55,7 +58,7 @@ class Documentation < ApplicationRecord
   end
 
   def self.remove_by_file_path(file_path)
-    absolute_path = File.expand_path(file_path)
+    absolute_path = RoeSitePaths.normalize(file_path)
     find_by(file_path: absolute_path)&.destroy
   end
 
