@@ -30,19 +30,39 @@ module SiteSync
     REFRESH_STALE_AFTER   = 60.seconds       # threshold for opportunistic refresh
     HTTP_TIMEOUT_SECONDS  = 5
 
+    # Cap for the per-category drift file list we ship in the
+    # exchange payload. A pathological case (e.g. a fresh push that
+    # touched every file) could otherwise produce a multi-MB JSON
+    # body. The full counts are still sent; only the path arrays
+    # get truncated.
+    DRIFT_LIST_CAP        = 500
+
     class << self
       # State payload describing THIS environment, used both as the
       # body of outbound exchange calls and as the response to
       # inbound ones. `version` is just a timestamp, included so the
-      # peer can tell when this snapshot was taken.
+      # peer can tell when this snapshot was taken. `drift` is the
+      # file-level diff against this side's last-recorded baseline,
+      # so the peer's UI can show which files changed instead of
+      # just a count.
       def local_state
-        recorded = SiteSync::Ledger.recorded
-        {
-          fingerprint:          SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH),
+        current_files = SiteSync::Ledger.current
+        recorded      = SiteSync::Ledger.recorded
+        recorded_files = recorded&.dig('files') || {}
+
+        state = {
+          fingerprint:          SiteSync::Ledger.fingerprint_of(current_files),
           recorded_fingerprint: recorded&.dig('fingerprint'),
           env:                  Rails.env.to_s,
           version:              Time.now.utc.iso8601
         }
+
+        if recorded
+          diff = SiteSync::Ledger.diff(current_files, recorded_files)
+          state[:drift] = build_drift_payload(diff)
+        end
+
+        state
       end
 
       # Inbound: peer just sent us their state. Cache it and return
@@ -209,9 +229,47 @@ module SiteSync
           recorded_fingerprint: payload['recorded_fingerprint'] || payload[:recorded_fingerprint],
           env:                  payload['env']                  || payload[:env],
           version:              payload['version']              || payload[:version],
+          drift:                normalize_drift(payload['drift'] || payload[:drift]),
           received_at:          Time.current
         }
         Rails.cache.write(PEER_STATE_CACHE_KEY, normalized, expires_in: PEER_STATE_TTL)
+      end
+
+      # Outbound shape: capped path lists per category, plus full
+      # counts so the receiving side can show "showing 500 of 6772."
+      def build_drift_payload(diff)
+        {
+          counts: {
+            modified: diff[:modified].size,
+            added:    diff[:added].size,
+            deleted:  diff[:deleted].size
+          },
+          modified:  diff[:modified].first(DRIFT_LIST_CAP),
+          added:     diff[:added].first(DRIFT_LIST_CAP),
+          deleted:   diff[:deleted].first(DRIFT_LIST_CAP),
+          truncated: diff[:modified].size > DRIFT_LIST_CAP ||
+                     diff[:added].size > DRIFT_LIST_CAP ||
+                     diff[:deleted].size > DRIFT_LIST_CAP
+        }
+      end
+
+      # Inbound shape: tolerant of missing fields (peer might be
+      # running older code without drift info) and of either string
+      # or symbol keys.
+      def normalize_drift(drift)
+        return nil unless drift
+        counts = drift['counts'] || drift[:counts] || {}
+        {
+          counts: {
+            modified: counts['modified'] || counts[:modified] || (drift['modified'] || drift[:modified] || []).size,
+            added:    counts['added']    || counts[:added]    || (drift['added']    || drift[:added]    || []).size,
+            deleted:  counts['deleted']  || counts[:deleted]  || (drift['deleted']  || drift[:deleted]  || []).size
+          },
+          modified:  drift['modified']  || drift[:modified]  || [],
+          added:     drift['added']     || drift[:added]     || [],
+          deleted:   drift['deleted']   || drift[:deleted]   || [],
+          truncated: drift['truncated'] || drift[:truncated] || false
+        }
       end
     end
   end
