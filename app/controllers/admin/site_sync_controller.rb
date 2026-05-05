@@ -144,6 +144,34 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # Re-run a previously-failed transfer. Uses the kind from the
+  # last status payload (push or pull). The new job will compute
+  # a fresh diff — if some files made it through last time, that
+  # diff will be smaller and the retry only does the remaining
+  # work. If the previous failure was actually bookkeeping-only
+  # (content matches), the new diff is empty and the job no-ops.
+  def retry_transfer
+    last = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+    kind = last && last[:kind]
+
+    unless [ :push, :pull ].include?(kind)
+      flash[:alert] = "Can't retry — no recent transfer status to retry from."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    if transfer_in_progress?
+      flash[:alert] = "Another sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    seed_running_status(kind)
+    SiteSyncTransferJob.perform_later(kind)
+    flash[:notice] = "Retrying #{kind} in the background. The job will only re-do what's still pending."
+    redirect_to admin_site_sync_path
+  end
+
   # Force a synchronous exchange call. Useful for testing — without
   # this you'd have to wait for the hourly job (or 60s on-render
   # debounce) to see fresh peer state. Synchronous so the user gets

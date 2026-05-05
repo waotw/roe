@@ -70,6 +70,12 @@ module SiteSync
       # response. Single round trip carries info both ways.
       def handle_inbound(payload)
         save_peer_state(payload)
+        # If their fingerprint matches ours, both sides actually
+        # have the same content — even if our ledger says otherwise.
+        # Refresh our ledger to reflect reality. This is what makes
+        # the system self-correct after a `notifying_peer` failure
+        # or any other case where bookkeeping drifted from truth.
+        self_heal_ledger_if_in_sync_with(payload)
         local_state
       end
 
@@ -101,6 +107,10 @@ module SiteSync
 
         parsed = JSON.parse(response.body)
         save_peer_state(parsed)
+        # Symmetric self-heal on dev's side: if peer's fingerprint
+        # matches ours, our ledger should reflect that we're in
+        # sync (in case our local ledger update failed earlier).
+        self_heal_ledger_if_in_sync_with(parsed)
         parsed
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] peer call failed: #{e.class} #{e.message}"
@@ -126,30 +136,71 @@ module SiteSync
         uri = URI.parse(File.join(peer_url, '/api/site_sync/refresh_ledger'))
         Rails.logger.info "[SiteSync::Exchange] refresh_peer_ledger → POST #{uri}"
 
+        # 1 attempt + 2 retries on transient failures (network blip,
+        # 502/503 from the peer, etc.). Auth/4xx failures aren't
+        # retried — they won't fix themselves. Retries use brief
+        # exponential backoff (1s, then 2s) so we don't compound a
+        # struggling peer.
+        with_retries(label: 'refresh_peer_ledger', max_retries: 2) do
+          response = post_to_peer(uri, '{}')
+          if response.nil?
+            raise "no response (network error)"
+          elsif response.is_a?(Net::HTTPSuccess)
+            Rails.logger.info "[SiteSync::Exchange] refresh_peer_ledger OK — peer reports fingerprint #{(JSON.parse(response.body) rescue {})['fingerprint']}"
+            return true
+          elsif response.code.to_i.between?(500, 599)
+            # Server error — transient enough to retry
+            raise "HTTP #{response.code}: #{response.body}"
+          else
+            # 4xx (auth, bad request, etc.) — don't retry, return failure
+            Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger FAILED: HTTP #{response.code} from #{uri} — body: #{response.body}"
+            return false
+          end
+        end
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger ERROR after retries: #{e.class} #{e.message}"
+        false
+      end
+
+      # Tiny HTTP helper — separated out so the retry loop above can
+      # treat network errors and HTTP responses uniformly.
+      def post_to_peer(uri, body)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl      = (uri.scheme == 'https')
-        # Walking /site can take a few seconds on a 2GB tree; give
-        # it more headroom than a regular exchange call.
         http.read_timeout = 30
         http.open_timeout = HTTP_TIMEOUT_SECONDS
 
         request = Net::HTTP::Post.new(uri.request_uri)
         request['Content-Type']  = 'application/json'
         request['Authorization'] = "Bearer #{token}"
-        request.body             = '{}'
+        request.body             = body
 
-        response = http.request(request)
-
-        unless response.is_a?(Net::HTTPSuccess)
-          Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger FAILED: HTTP #{response.code} from #{uri} — body: #{response.body}"
-          return false
-        end
-
-        Rails.logger.info "[SiteSync::Exchange] refresh_peer_ledger OK — peer reports fingerprint #{(JSON.parse(response.body) rescue {})['fingerprint']}"
-        true
+        http.request(request)
       rescue => e
-        Rails.logger.warn "[SiteSync::Exchange] refresh_peer_ledger ERROR: #{e.class} #{e.message}"
-        false
+        Rails.logger.warn "[SiteSync::Exchange] HTTP error to #{uri}: #{e.class} #{e.message}"
+        nil
+      end
+
+      # Generic retry-with-backoff. Yields once + up to `max_retries`
+      # additional times on failure. Backoff sleeps 1s, 2s, 4s, ...
+      # (linear-ish growth). Used for network-y operations that
+      # commonly hit transient errors; logs each attempt so we can
+      # trace what happened.
+      def with_retries(label:, max_retries: 2)
+        attempts = 0
+        begin
+          attempts += 1
+          yield
+        rescue => e
+          if attempts <= max_retries
+            backoff = attempts # 1, 2, ...
+            Rails.logger.warn "[SiteSync::Exchange] #{label}: attempt #{attempts} failed (#{e.message}); retrying in #{backoff}s"
+            sleep backoff
+            retry
+          else
+            raise
+          end
+        end
       end
 
       # Cached peer state from the most recent exchange (inbound or
@@ -224,6 +275,34 @@ module SiteSync
       end
 
       private
+
+      # If the peer reports the same fingerprint we have right now,
+      # both sides have identical content — full stop. Make sure our
+      # ledger reflects that. This is the safety net for cases where
+      # a sync's content transfer succeeded but the bookkeeping
+      # afterwards (notifying_peer, write_current!, etc.) failed.
+      # The exchange itself heals the ledger, so the user doesn't
+      # see lingering "drift" on a side that's actually in sync.
+      #
+      # Skips when fingerprints differ (real drift exists — don't
+      # paper over it) or when our ledger already records this state.
+      def self_heal_ledger_if_in_sync_with(payload)
+        peer_fp = payload['fingerprint'] || payload[:fingerprint]
+        return if peer_fp.blank?
+
+        current_fp = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH)
+        return unless current_fp == peer_fp
+
+        recorded = SiteSync::Ledger.recorded
+        return if recorded && recorded['fingerprint'] == current_fp
+
+        Rails.logger.info "[SiteSync::Exchange] self-heal: peer fingerprint matches ours, refreshing local ledger"
+        SiteSync::Ledger.write_current!
+        SiteSync::Checker.clear_cache
+        Rails.cache.delete("site_sync:current_fingerprint")
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] self-heal failed: #{e.class} #{e.message}"
+      end
 
       # Symbolize keys defensively — JSON.parse returns string keys,
       # but `local_state` builds a symbol-keyed hash, so callers

@@ -53,7 +53,7 @@
           <%# Force-clear the status — useful if the worker died or
               rsync hung. Only clears the UI flag; doesn't actually
               kill any subprocess that might still be running. %>
-          <%= button_to "Force clear",
+          <%= button_to "Dismiss",
                         admin_dismiss_site_transfer_status_path,
                         method: :post,
                         data: { confirm: "Clear the running-status flag? Only do this if you've confirmed the job isn't actually running (check Rails logs for SiteSync::FlyRsync activity). This won't kill any subprocess that might still be working." },
@@ -76,25 +76,180 @@
         </div>
       <% end %>
     <% when :failed %>
-      <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
-        <div class="flex items-start justify-between gap-4 mb-3">
-          <div>
-            <h3 class="text-sm font-semibold text-red-900 mb-1">❌ <%= kind_label %> failed</h3>
-            <p class="text-sm text-red-700">
-              Failed <%= time_ago_in_words(@transfer_status[:completed_at] || @transfer_status[:started_at]) %> ago.
-              Live and local should be unchanged from the pre-transfer state — the destination's safety backup is in the backup list below.
-            </p>
+      <%# Reassessment compares the current local + peer fingerprints
+          to determine whether the transfer's *content* actually went
+          through despite the failure (which would mean only the
+          bookkeeping step failed). Different copy + actions for each
+          case. %>
+      <% reassessment = @transfer_status[:reassessment] %>
+      <% step_label = SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] %>
+
+      <% if reassessment && reassessment[:in_sync] %>
+        <%# Bookkeeping-only failure — content is actually synced. %>
+        <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
+          <div class="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠️ <%= kind_label %> hit a bookkeeping issue</h3>
+              <p class="text-sm text-amber-800 mb-1">
+                Both sides report the same content fingerprint, so the actual
+                file transfer succeeded. The error happened in a follow-up step
+                (likely <code class="text-xs"><%= step_label %></code>).
+              </p>
+              <p class="text-xs text-amber-700">
+                The drift indicators will self-heal on the next exchange (within ~60s).
+                You can dismiss this safely.
+              </p>
+            </div>
+            <%= button_to "Dismiss",
+                          admin_dismiss_site_transfer_status_path,
+                          method: :post,
+                          class: "inline-flex items-center px-3 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
           </div>
-          <%= button_to "Dismiss",
-                        admin_dismiss_site_transfer_status_path,
-                        method: :post,
-                        class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+          <% if @transfer_status[:error].present? %>
+            <details class="mt-2">
+              <summary class="text-xs text-amber-700 cursor-pointer hover:text-amber-900">Show error details</summary>
+              <pre class="mt-2 p-3 bg-white border border-amber-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
+            </details>
+          <% end %>
         </div>
-        <% if @transfer_status[:error].present? %>
-          <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
-        <% end %>
-      </div>
+
+      <% else %>
+        <%# Real partial failure — content is NOT in sync (or we
+            couldn't verify). %>
+        <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
+          <div class="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <h3 class="text-sm font-semibold text-red-900 mb-1">❌ <%= kind_label %> didn't complete</h3>
+              <p class="text-sm text-red-700 mb-1">
+                Failed <%= time_ago_in_words(@transfer_status[:completed_at] || @transfer_status[:started_at]) %> ago
+                during <code class="text-xs"><%= step_label %></code>.
+              </p>
+              <% if reassessment && reassessment[:local_fingerprint] && reassessment[:peer_fingerprint] %>
+                <p class="text-sm text-red-700">
+                  Local and live are out of sync. Files are atomic-per-file
+                  (no corruption), but a partial set transferred. Click Retry
+                  to re-run — only the still-pending files will be re-sent.
+                </p>
+              <% else %>
+                <p class="text-sm text-red-700">
+                  Couldn't reach the peer to verify state. The destination
+                  may be in a partial state. Click Retry once the underlying
+                  issue is resolved — only the still-pending files will be
+                  re-sent.
+                </p>
+              <% end %>
+            </div>
+            <div class="flex flex-col gap-2 items-end">
+              <%= button_to "Retry",
+                            admin_retry_site_transfer_path,
+                            method: :post,
+                            data: { turbo_submits_with: "⏳ Retrying…" },
+                            class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-200 hover:bg-red-300 text-red-900 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+              <%= button_to "Dismiss",
+                            admin_dismiss_site_transfer_status_path,
+                            method: :post,
+                            class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+            </div>
+          </div>
+          <% if @transfer_status[:error].present? %>
+            <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
+          <% end %>
+        </div>
+      <% end %>
     <% end %>
+  <% end %>
+
+  <%# ─── Drift state ──────────────────────────────────────────────── %>
+  <%# :clean renders nothing — no point shouting "no changes" when
+      nothing's wrong. Errors and drift get their own panels. %>
+  <% case @status[:state] %>
+  <% when :error %>
+    <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
+      <h2 class="text-lg font-semibold text-red-900 mb-2">Sync Status Checked Failed</h2>
+      <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @status[:error] %></pre>
+    </div>
+
+  <% when :local_drift %>
+    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
+      <% counts = @status[:local] %>
+      <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
+      <p class="text-amber-800 mb-3">
+        You've made these changes since your last sync:
+      </p>
+      <ul class="list-disc ml-6 mb-4 text-sm text-amber-800 space-y-1">
+        <% if counts[:modified].any? %>
+          <li><strong><%= counts[:modified].size %></strong> file<%= 's' if counts[:modified].size != 1 %> modified</li>
+        <% end %>
+        <% if counts[:added].any? %>
+          <li><strong><%= counts[:added].size %></strong> file<%= 's' if counts[:added].size != 1 %> added</li>
+        <% end %>
+        <% if counts[:deleted].any? %>
+          <li><strong><%= counts[:deleted].size %></strong> file<%= 's' if counts[:deleted].size != 1 %> deleted</li>
+        <% end %>
+      </ul>
+      <% if @status[:recorded_at] %>
+        <p class="text-xs text-amber-700 mb-4 font-mono">
+          Last sync: <%= @status[:recorded_at] %>
+        </p>
+      <% end %>
+
+      <%# Single collapsible "Show changes" containing all three
+          groups. Easier to scan than three separate disclosures. %>
+      <details class="mb-4">
+        <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
+          Show changes
+        </summary>
+        <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+          <% [ [ "Modified", counts[:modified] ], [ "Added", counts[:added] ], [ "Deleted", counts[:deleted] ] ].each do |label, list| %>
+            <% next if list.empty? %>
+            <div>
+              <h4 class="text-xs font-semibold text-amber-900 mb-1">
+                <%= label %> (<%= list.size %>)
+              </h4>
+              <ul class="text-xs font-mono text-amber-800 space-y-1">
+                <% list.each do |path| %>
+                  <li><%= path %></li>
+                <% end %>
+              </ul>
+            </div>
+          <% end %>
+        </div>
+      </details>
+
+      <% if SiteSync::Exchange.can_call_peer? %>
+        <div class="mt-6 pt-4 border-t border-amber-200">
+          <h3 class="text-sm font-semibold text-amber-900 mb-2">Push these changes to live</h3>
+          <p class="text-sm text-amber-800 mb-3">
+            Note: after sync, the live site will reflect the changes mentioned above. Live site is backed up before sync.
+          </p>
+          <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
+            <div class="flex gap-2">
+              <%= form.text_field :confirm,
+                                  placeholder: "Type LIVE to confirm",
+                                  autocomplete: "off",
+                                  class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
+              <%= form.submit "Push to live now",
+                              data: { turbo_submits_with: "⏳ Starting push…" },
+                              class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# Manual fallback for "I already synced from terminal" — kept
+          alongside the real Push button so user has an escape hatch
+          if rsync from CLI is preferred. Will go away in Phase 4
+          when local-drift display becomes the offline-only fallback. %>
+      <div class="mt-4 text-xs text-amber-700">
+        Already synced manually?
+        <%= button_to "Mark current state as synced",
+                      admin_mark_site_synced_path,
+                      method: :post,
+                      form: { style: "display: inline;" },
+                      data: { confirm: "Mark the current /site state as the new sync baseline? Only do this if you've already synced this state to the other environment." },
+                      class: "inline underline bg-transparent border-0 p-0 text-xs text-amber-700 hover:text-amber-900 cursor-pointer" %>
+      </div>
+    </div>
   <% end %>
 
   <%# ─── Cross-environment sync status ───────────────────────────── %>
@@ -293,102 +448,6 @@
       </p>
     </div>
   </div>
-
-  <%# ─── Drift state ──────────────────────────────────────────────── %>
-  <%# :clean renders nothing — no point shouting "no changes" when
-      nothing's wrong. Errors and drift get their own panels. %>
-  <% case @status[:state] %>
-  <% when :error %>
-    <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
-      <h2 class="text-lg font-semibold text-red-900 mb-2">Sync Status Checked Failed</h2>
-      <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @status[:error] %></pre>
-    </div>
-
-  <% when :local_drift %>
-    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
-      <% counts = @status[:local] %>
-      <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
-      <p class="text-amber-800 mb-3">
-        You've made these changes since your last sync:
-      </p>
-      <ul class="list-disc ml-6 mb-4 text-sm text-amber-800 space-y-1">
-        <% if counts[:modified].any? %>
-          <li><strong><%= counts[:modified].size %></strong> file<%= 's' if counts[:modified].size != 1 %> modified</li>
-        <% end %>
-        <% if counts[:added].any? %>
-          <li><strong><%= counts[:added].size %></strong> file<%= 's' if counts[:added].size != 1 %> added</li>
-        <% end %>
-        <% if counts[:deleted].any? %>
-          <li><strong><%= counts[:deleted].size %></strong> file<%= 's' if counts[:deleted].size != 1 %> deleted</li>
-        <% end %>
-      </ul>
-      <% if @status[:recorded_at] %>
-        <p class="text-xs text-amber-700 mb-4 font-mono">
-          Last sync: <%= @status[:recorded_at] %>
-        </p>
-      <% end %>
-
-      <%# Single collapsible "Show changes" containing all three
-          groups. Easier to scan than three separate disclosures. %>
-      <details class="mb-4">
-        <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
-          Show changes
-        </summary>
-        <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-          <% [ [ "Modified", counts[:modified] ], [ "Added", counts[:added] ], [ "Deleted", counts[:deleted] ] ].each do |label, list| %>
-            <% next if list.empty? %>
-            <div>
-              <h4 class="text-xs font-semibold text-amber-900 mb-1">
-                <%= label %> (<%= list.size %>)
-              </h4>
-              <ul class="text-xs font-mono text-amber-800 space-y-1">
-                <% list.each do |path| %>
-                  <li><%= path %></li>
-                <% end %>
-              </ul>
-            </div>
-          <% end %>
-        </div>
-      </details>
-
-      <% if SiteSync::Exchange.can_call_peer? %>
-        <div class="mt-6 pt-4 border-t border-amber-200">
-          <h3 class="text-sm font-semibold text-amber-900 mb-2">Push these changes to live</h3>
-          <p class="text-sm text-amber-800 mb-3">
-            This overwrites Live with your Local content. Files on Live not present
-            locally <strong>will be deleted</strong>. Live site is backed up first to
-            <code class="text-xs bg-white px-1 rounded">site_backups/production/</code>
-            so the push is reversible.
-          </p>
-          <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
-            <div class="flex gap-2">
-              <%= form.text_field :confirm,
-                                  placeholder: "Type LIVE to confirm",
-                                  autocomplete: "off",
-                                  class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
-              <%= form.submit "Push to live now",
-                              data: { turbo_submits_with: "⏳ Starting push…" },
-                              class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
-
-      <%# Manual fallback for "I already synced from terminal" — kept
-          alongside the real Push button so user has an escape hatch
-          if rsync from CLI is preferred. Will go away in Phase 4
-          when local-drift display becomes the offline-only fallback. %>
-      <div class="mt-4 text-xs text-amber-700">
-        Already synced manually?
-        <%= button_to "Mark current state as synced",
-                      admin_mark_site_synced_path,
-                      method: :post,
-                      form: { style: "display: inline;" },
-                      data: { confirm: "Mark the current /site state as the new sync baseline? Only do this if you've already synced this state to the other environment." },
-                      class: "inline underline bg-transparent border-0 p-0 text-xs text-amber-700 hover:text-amber-900 cursor-pointer" %>
-      </div>
-    </div>
-  <% end %>
 
   <%# ─── Local backups ───────────────────────────────────────────── %>
   <%# Hidden in production. Local backups live on whichever machine

@@ -269,9 +269,11 @@ module SiteSync
         flags = "-rltzPi"
         flags += " --delete" if delete
         cmd = build_cmd(source: source, dest: dest, flags: flags, excludes: excludes)
-        output, success = run(cmd)
-        raise FlyRsyncError, "rsync failed:\n#{output}" unless success
-        output
+        with_retries(label: "rsync") do
+          output, success = run(cmd)
+          raise FlyRsyncError, "rsync failed:\n#{output}" unless success
+          return output
+        end
       end
 
       # rsync invocation that transfers ONLY the listed files (paths
@@ -295,11 +297,35 @@ module SiteSync
             excludes: excludes
           )
 
-          output, success = run(cmd)
-          raise FlyRsyncError, "selective rsync failed:\n#{output}" unless success
-          output
+          with_retries(label: "rsync_files_from") do
+            output, success = run(cmd)
+            raise FlyRsyncError, "selective rsync failed:\n#{output}" unless success
+            return output
+          end
         ensure
           File.unlink(list.path) if list && File.exist?(list.path)
+        end
+      end
+
+      # Generic retry-with-backoff. Yields once + up to `max_retries`
+      # additional times on failure. Used to absorb transient fly ssh
+      # console hiccups (broken pipes, momentary network blips). rsync
+      # itself is idempotent on retry — files already transferred will
+      # be skipped via mtime+size comparison.
+      def with_retries(label:, max_retries: 2)
+        attempts = 0
+        begin
+          attempts += 1
+          yield
+        rescue FlyRsyncError => e
+          if attempts <= max_retries
+            backoff = attempts # 1s, 2s
+            Rails.logger.warn "[SiteSync::FlyRsync] #{label}: attempt #{attempts} failed (#{e.message.lines.first&.chomp}); retrying in #{backoff}s"
+            sleep backoff
+            retry
+          else
+            raise
+          end
         end
       end
 
