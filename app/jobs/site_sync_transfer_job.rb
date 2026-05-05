@@ -158,20 +158,26 @@ class SiteSyncTransferJob < ApplicationJob
     end
   end
 
-  # Quick post-failure check: do both sides actually agree on
-  # content, despite the failure? If yes, the transfer effectively
-  # succeeded — only bookkeeping failed (notifying_peer, write_current!,
-  # etc.). If no, there's real pending work.
+  # Post-failure check: figure out what actually happened. Returns
+  # a hash the UI can render with two layers of detail:
   #
-  # Returns a small hash the UI can render. Best-effort: if the peer
-  # ping fails or we can't compute fingerprints, returns nil and the
-  # UI falls back to a generic "failed" message.
+  #   - `in_sync`: aggregate fingerprint comparison. True means
+  #     content matches on both sides regardless of the failure
+  #     (bookkeeping-only failure — self-heals on next exchange).
+  #
+  #   - `pending_*` lists: per-file detail. For each file in the
+  #     original diff, did it make it to the peer? Requires per-file
+  #     state from the peer — only available when we can call out.
+  #
+  # Best-effort: if the peer ping fails or we can't compute, returns
+  # what we have (or nil if even that fails) and the UI falls back to
+  # a generic "failed" message.
   def reassess_after_failure
     local_fp = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH)
     peer_fp = nil
 
-    # Get fresh peer state if we can call out (dev only). On prod
-    # we can only use the cached peer state, which may be stale.
+    # Get fresh peer state if we can call out (dev only). On prod we
+    # can only use the cached peer state, which may be stale.
     if SiteSync::Exchange.can_call_peer?
       peer_payload = SiteSync::Exchange.call_peer
       peer_fp = peer_payload && (peer_payload['fingerprint'] || peer_payload[:fingerprint])
@@ -180,11 +186,105 @@ class SiteSyncTransferJob < ApplicationJob
       peer_fp = cached && cached[:fingerprint]
     end
 
-    {
+    base = {
       local_fingerprint: local_fp,
       peer_fingerprint:  peer_fp,
       in_sync:           local_fp.present? && peer_fp.present? && local_fp == peer_fp
     }
+
+    # If aggregate fingerprints already agree, no need for per-file
+    # detail — everything's actually in sync.
+    return base if base[:in_sync]
+
+    # Otherwise, drill down: for each file in the original diff, ask
+    # the peer "what state is this file in?" and compare to our
+    # expected state. This tells the user exactly which files still
+    # need to make it through.
+    detail = per_file_pending(@kind)
+    base.merge(detail || {})
+  end
+
+  # Per-file analysis of which files in the original diff are still
+  # pending (didn't make it through). Walks the original diff, calls
+  # the peer's /api/site_sync/file_states endpoint with those paths,
+  # and compares each peer entry to what we expected.
+  #
+  # Returns nil when we can't reach the peer or have no original diff.
+  def per_file_pending(kind)
+    return nil unless @original_diff
+    return nil unless SiteSync::Exchange.can_call_peer?
+
+    modified = Array(@original_diff[:modified])
+    added    = Array(@original_diff[:added])
+    deleted  = Array(@original_diff[:deleted])
+    all_paths = (modified + added + deleted).uniq
+    return nil if all_paths.empty?
+
+    peer_states = SiteSync::Exchange.fetch_peer_file_states(all_paths)
+    return nil if peer_states.empty?
+
+    pending_modified = []
+    pending_added    = []
+    pending_deleted  = []
+
+    case kind
+    when :push
+      # Push: we expect peer to have local's version of mod+add files,
+      # and to NOT have deleted files. Anything else is pending.
+      modified.each do |path|
+        pending_modified << path unless states_match?(local_file_state(path), peer_states[path])
+      end
+      added.each do |path|
+        pending_added << path unless states_match?(local_file_state(path), peer_states[path])
+      end
+      deleted.each do |path|
+        pending_deleted << path if peer_states[path]
+      end
+    when :pull
+      # Pull: we expect local to have peer's version of mod+add files,
+      # and local to NOT have deleted files. Compare local to what
+      # peer reports — pending = local doesn't match peer's state.
+      modified.each do |path|
+        pending_modified << path unless states_match?(local_file_state(path), peer_states[path])
+      end
+      added.each do |path|
+        pending_added << path unless states_match?(local_file_state(path), peer_states[path])
+      end
+      deleted.each do |path|
+        pending_deleted << path if local_file_state(path)
+      end
+    end
+
+    intended_count = modified.size + added.size + deleted.size
+    pending_count  = pending_modified.size + pending_added.size + pending_deleted.size
+
+    {
+      intended_count:    intended_count,
+      pending_count:     pending_count,
+      done_count:        intended_count - pending_count,
+      pending_modified:  pending_modified,
+      pending_added:     pending_added,
+      pending_deleted:   pending_deleted
+    }
+  rescue => e
+    Rails.logger.warn "[SiteSyncTransferJob] per_file_pending failed: #{e.class} #{e.message}"
+    nil
+  end
+
+  def local_file_state(path)
+    full = File.join(RoeSitePaths::SITE_PATH, path)
+    return nil unless File.exist?(full)
+    stat = File.stat(full)
+    { 'size' => stat.size, 'mtime' => stat.mtime.to_i }
+  rescue
+    nil
+  end
+
+  # Two file states match when both sides have the file with the same
+  # size + mtime (rsync's default change-detection signature).
+  def states_match?(a, b)
+    return false unless a && b
+    a['size'] == b['size'] && a['mtime'] == b['mtime']
   end
 
   # Diffs are symbol-keyed in memory but solid_cache serializes them

@@ -82,6 +82,26 @@ class ContentWatcher
     else
       puts "\nℹ️  Static generation disabled (enable in Site Config)"
     end
+
+    # Tell SiteSync something in /site changed — this side's
+    # drift caches are now stale, and the peer's view of us is
+    # also stale. Bust the local caches so the admin banner
+    # reflects the new state on the next render, and schedule a
+    # peer ping so the other side learns within seconds (instead
+    # of waiting up to an hour for the recurring exchange).
+    notify_site_sync if (modified + added + removed).any?
+  end
+
+  def self.notify_site_sync
+    Rails.cache.delete("site_sync:current_fingerprint")
+    SiteSync::Checker.clear_cache
+
+    # perform_later doesn't block the watcher thread; the job runs
+    # in the Solid Queue worker and updates peer_state in the
+    # cache when it returns.
+    SiteSyncExchangeJob.perform_later if SiteSync::Exchange.can_call_peer?
+  rescue => e
+    Rails.logger.warn "[ContentWatcher] notify_site_sync failed: #{e.class} #{e.message}"
   end
 
 

@@ -96,7 +96,7 @@
                 (likely <code class="text-xs"><%= step_label %></code>).
               </p>
               <p class="text-xs text-amber-700">
-                The drift indicators will self-heal on the next exchange (within ~60s).
+                The sync status will resolve (within ~60s).
                 You can dismiss this safely.
               </p>
             </div>
@@ -124,16 +124,26 @@
                 Failed <%= time_ago_in_words(@transfer_status[:completed_at] || @transfer_status[:started_at]) %> ago
                 during <code class="text-xs"><%= step_label %></code>.
               </p>
-              <% if reassessment && reassessment[:local_fingerprint] && reassessment[:peer_fingerprint] %>
+              <% if reassessment && reassessment[:intended_count] %>
+                <%# Per-file detail available — show concrete numbers. %>
                 <p class="text-sm text-red-700">
-                  Local and live are out of sync. Files are atomic-per-file
-                  (no corruption), but a partial set transferred. Click Retry
+                  <strong><%= reassessment[:done_count] %></strong> of
+                  <strong><%= reassessment[:intended_count] %></strong>
+                  files synced.
+                  <strong><%= reassessment[:pending_count] %></strong>
+                  still pending. Click Retry to finish — only the
+                  pending files will be re-sent.
+                </p>
+              <% elsif reassessment && reassessment[:local_fingerprint] && reassessment[:peer_fingerprint] %>
+                <%# Aggregate fingerprint check only — no per-file detail. %>
+                <p class="text-sm text-red-700">
+                  Local and live are out of sync. Click Retry
                   to re-run — only the still-pending files will be re-sent.
                 </p>
               <% else %>
+                <%# No reassessment data at all. %>
                 <p class="text-sm text-red-700">
-                  Couldn't reach the peer to verify state. The destination
-                  may be in a partial state. Click Retry once the underlying
+                  Couldn't reach the live site to verify sync status. Click Retry once the underlying
                   issue is resolved — only the still-pending files will be
                   re-sent.
                 </p>
@@ -151,8 +161,38 @@
                             class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
             </div>
           </div>
+
+          <%# Per-file pending list (collapsible). Only renders when
+              the reassessment got per-file detail back from the peer. %>
+          <% if reassessment && reassessment[:pending_count].to_i > 0 %>
+            <details class="mt-3">
+              <summary class="text-sm font-semibold text-red-900 cursor-pointer hover:text-red-700">
+                Show pending files
+              </summary>
+              <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+                <% [
+                  [ "Modified", reassessment[:pending_modified] ],
+                  [ "Added",    reassessment[:pending_added] ],
+                  [ "Deleted",  reassessment[:pending_deleted] ]
+                ].each do |label, list| %>
+                  <% next if list.blank? %>
+                  <div>
+                    <h4 class="text-xs font-semibold text-red-900 mb-1">
+                      <%= label %> (<%= list.size %>)
+                    </h4>
+                    <ul class="text-xs font-mono text-red-800 space-y-1">
+                      <% list.each do |path| %>
+                        <li><%= path %></li>
+                      <% end %>
+                    </ul>
+                  </div>
+                <% end %>
+              </div>
+            </details>
+          <% end %>
+
           <% if @transfer_status[:error].present? %>
-            <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
+            <pre class="mt-3 p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
           <% end %>
         </div>
       <% end %>
@@ -170,6 +210,10 @@
     </div>
 
   <% when :local_drift %>
+    <%# Shown only when peer is unreachable (offline-fallback mode).
+        When peer is reachable, the same info is folded into the
+        cross-env panel below — no need to display it twice. %>
+    <% unless @peer_reachable %>
     <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
       <% counts = @status[:local] %>
       <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
@@ -238,8 +282,7 @@
 
       <%# Manual fallback for "I already synced from terminal" — kept
           alongside the real Push button so user has an escape hatch
-          if rsync from CLI is preferred. Will go away in Phase 4
-          when local-drift display becomes the offline-only fallback. %>
+          if rsync from CLI is preferred. %>
       <div class="mt-4 text-xs text-amber-700">
         Already synced manually?
         <%= button_to "Mark current state as synced",
@@ -250,6 +293,7 @@
                       class: "inline underline bg-transparent border-0 p-0 text-xs text-amber-700 hover:text-amber-900 cursor-pointer" %>
       </div>
     </div>
+    <% end %>
   <% end %>
 
   <%# ─── Cross-environment sync status ───────────────────────────── %>
@@ -350,6 +394,81 @@
           ✓ <%= SiteSync::Exchange.peer_label %> reports no unsynced changes.
         </p>
       <% end %>
+
+      <%# Local-side drift, folded into the cross-env panel when the
+          peer is reachable. The standalone local-drift panel above
+          this one is hidden in that case (avoids showing the same
+          info twice). When peer is unreachable, the standalone panel
+          shows instead — this section just doesn't render. %>
+      <% if @peer_reachable && @status[:state] == :local_drift %>
+        <% local_counts = @status[:local] %>
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mt-3">
+          <p class="text-sm text-amber-800 mb-3">
+            ⬆️ You have unsynced local changes — push them to live before they accumulate.
+          </p>
+          <ul class="list-disc ml-6 mb-3 text-sm text-amber-800 space-y-1">
+            <% if local_counts[:modified].any? %>
+              <li><strong><%= local_counts[:modified].size %></strong> file<%= 's' if local_counts[:modified].size != 1 %> modified</li>
+            <% end %>
+            <% if local_counts[:added].any? %>
+              <li><strong><%= local_counts[:added].size %></strong> file<%= 's' if local_counts[:added].size != 1 %> added</li>
+            <% end %>
+            <% if local_counts[:deleted].any? %>
+              <li><strong><%= local_counts[:deleted].size %></strong> file<%= 's' if local_counts[:deleted].size != 1 %> deleted</li>
+            <% end %>
+          </ul>
+
+          <details class="mb-3">
+            <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
+              Show changes
+            </summary>
+            <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+              <% [ [ "Modified", local_counts[:modified] ], [ "Added", local_counts[:added] ], [ "Deleted", local_counts[:deleted] ] ].each do |label, list| %>
+                <% next if list.empty? %>
+                <div>
+                  <h4 class="text-xs font-semibold text-amber-900 mb-1">
+                    <%= label %> (<%= list.size %>)
+                  </h4>
+                  <ul class="text-xs font-mono text-amber-800 space-y-1">
+                    <% list.each do |path| %>
+                      <li><%= path %></li>
+                    <% end %>
+                  </ul>
+                </div>
+              <% end %>
+            </div>
+          </details>
+
+          <% if @peer_call_configured %>
+            <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
+              <div class="flex gap-2">
+                <%= form.text_field :confirm,
+                                    placeholder: "Type LIVE to confirm",
+                                    autocomplete: "off",
+                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
+                <%= form.submit "Push to live now",
+                                data: { turbo_submits_with: "⏳ Starting push…" },
+                                class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+              </div>
+            <% end %>
+          <% else %>
+            <p class="text-xs text-amber-700">
+              Push from this side isn't configured. Visit your <strong>local</strong> admin to push.
+            </p>
+          <% end %>
+
+          <div class="mt-3 text-xs text-amber-700">
+            Already synced manually?
+            <%= button_to "Mark current state as synced",
+                          admin_mark_site_synced_path,
+                          method: :post,
+                          form: { style: "display: inline;" },
+                          data: { confirm: "Mark the current /site state as the new sync baseline?" },
+                          class: "inline underline bg-transparent border-0 p-0 text-xs text-amber-700 hover:text-amber-900 cursor-pointer" %>
+          </div>
+        </div>
+      <% end %>
+
       <details class="mt-3">
         <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
           Show debug info

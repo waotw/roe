@@ -28,6 +28,8 @@ module SiteSync
     PEER_STATE_CACHE_KEY  = "site_sync:peer_state".freeze
     PEER_STATE_TTL        = 1.day            # stop trusting peer state after this
     REFRESH_STALE_AFTER   = 60.seconds       # threshold for opportunistic refresh
+    PEER_REACHABLE_WINDOW = 2.hours          # peer counts as "reachable" if we
+                                             # heard from them within this window
     HTTP_TIMEOUT_SECONDS  = 5
 
     # Cap for the per-category drift file list we ship in the
@@ -162,6 +164,28 @@ module SiteSync
         false
       end
 
+      # Ask the peer for per-file state (size + mtime) of a specific
+      # set of paths. Returns a hash of `{ "path" => {size, mtime} or nil }`.
+      # Used by post-failure reassessment to figure out which specific
+      # files made it through a partial sync.
+      #
+      # Returns {} on any failure (network, auth, etc.) — caller falls
+      # back to coarser fingerprint comparison.
+      def fetch_peer_file_states(paths)
+        return {} unless can_call_peer?
+        paths = Array(paths).reject(&:blank?).uniq
+        return {} if paths.empty?
+
+        uri = URI.parse(File.join(peer_url, '/api/site_sync/file_states'))
+        response = post_to_peer(uri, { paths: paths }.to_json)
+        return {} unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)['files'] || {}
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] fetch_peer_file_states failed: #{e.class} #{e.message}"
+        {}
+      end
+
       # Tiny HTTP helper — separated out so the retry loop above can
       # treat network errors and HTTP responses uniformly.
       def post_to_peer(uri, body)
@@ -249,6 +273,16 @@ module SiteSync
       # panel; nil if no contact yet.
       def last_contact_at
         peer_state&.dig(:received_at)
+      end
+
+      # True if the cross-env exchange can be considered the source
+      # of truth right now — i.e., we've heard from the peer recently
+      # enough that its drift signal is meaningful. The admin UI uses
+      # this to hide the local-drift fallback when the cross-env
+      # panel is doing its job, and to show it when offline.
+      def peer_reachable?
+        contact = last_contact_at
+        contact.present? && contact > PEER_REACHABLE_WINDOW.ago
       end
 
       def can_call_peer?

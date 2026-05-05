@@ -48,6 +48,41 @@ module Api
         render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # POST /api/site_sync/file_states
+      #
+      # Body:    { paths: [ "posts/foo.md", "media/img.jpg", ... ] }
+      # Returns: { files: { "posts/foo.md": {size, mtime}, "media/img.jpg": null, ... } }
+      #
+      # nil for a path means "file doesn't exist on this side." Caller
+      # uses this to compare per-file state across sides — typically
+      # for post-failure reassessment to figure out which specific
+      # files made it through and which didn't.
+      def file_states
+        payload = JSON.parse(request.body.read)
+        paths = Array(payload['paths']).first(2000) # cap to keep payload sane
+
+        result = paths.each_with_object({}) do |path, h|
+          # Defensive: refuse paths that try to escape /site
+          if path.to_s.include?('..') || path.to_s.start_with?('/')
+            h[path] = nil
+            next
+          end
+
+          full = File.join(::RoeSitePaths::SITE_PATH, path)
+          h[path] = if File.exist?(full)
+            stat = File.stat(full)
+            { 'size' => stat.size, 'mtime' => stat.mtime.to_i }
+          end
+        end
+
+        render json: { files: result }
+      rescue JSON::ParserError => e
+        render json: { error: "invalid json: #{e.message}" }, status: :bad_request
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] file_states FAILED: #{e.class} #{e.message}"
+        render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
       private
 
       # Constant-time comparison so an attacker can't time their
