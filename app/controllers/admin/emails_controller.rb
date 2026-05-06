@@ -1,4 +1,6 @@
 class Admin::EmailsController < Admin::BaseController
+  before_action :require_production_features
+
   layout 'editor', only: [ :edit ]
 
   TEMPLATES = {

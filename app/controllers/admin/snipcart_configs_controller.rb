@@ -1,4 +1,6 @@
 class Admin::SnipcartConfigsController < Admin::BaseController
+  before_action :require_production_features
+
   def edit
     @snipcart_config = SnipcartConfig.current
   end

@@ -1,4 +1,6 @@
 class Admin::PostmarkConfigsController < Admin::BaseController
+  before_action :require_production_features
+
   def edit
     @postmark_config = PostmarkConfig.current
     @stats = PostmarkService.get_stats if @postmark_config.connected?

@@ -2,6 +2,8 @@ module Admin
   class StripeConfigsController < ApplicationController
     layout 'application'
 
+    before_action :require_production_features
+
     def edit
       @stripe_config = StripeConfig.current
     end
