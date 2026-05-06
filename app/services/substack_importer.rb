@@ -6,8 +6,6 @@ require "zip"
 module SubstackImporter
   VERSION = "0.1.0"
 
-  before_action :require_development_features
-
   Post = Struct.new(
     :id, :slug, :title, :subtitle, :date, :type, :audience,
     :is_published, :email_sent_at, :inbox_sent_at, :podcast_url,

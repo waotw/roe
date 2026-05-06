@@ -1,5 +1,5 @@
 module Admin
-  class StripeConfigsController < ApplicationController
+  class StripeConfigsController < Admin::BaseController
     layout 'application'
 
     before_action :require_production_features
