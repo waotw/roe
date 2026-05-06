@@ -29,6 +29,7 @@ class Admin::SiteSyncController < Admin::BaseController
     @peer_call_configured  = SiteSync::Exchange.can_call_peer?
     @peer_url              = SiteSync::Exchange.peer_url
     @peer_reachable        = SiteSync::Exchange.peer_reachable?
+    @deploy_target_label   = SiteSync.deploy_target_label
 
     # Live config for the form (token + peer_url). first_or_create!
     # auto-generates a token on first access, so the form always has

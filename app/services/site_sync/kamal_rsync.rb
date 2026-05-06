@@ -1,0 +1,393 @@
+require 'shellwords'
+require 'tempfile'
+require 'yaml'
+
+module SiteSync
+  # Kamal-specific transport for site sync. Mirrors the public
+  # interface of SiteSync::FlyRsync (push/pull/backup_live with
+  # selective + full modes) but uses plain SSH instead of fly's
+  # `fly ssh console` wrapper.
+  #
+  # Reads server, ssh user, and the /site volume mapping from
+  # config/deploy.yml so the sync stays in sync with the actual
+  # Kamal deploy configuration — no parallel config to maintain.
+  #
+  # Kamal users need a volume mapping for /data/site in
+  # config/deploy.yml so the SSH-side rsync target matches what
+  # Roe's container expects. Example:
+  #
+  #   volumes:
+  #     - "/var/lib/roe/site:/data/site"
+  #
+  # If that mapping is missing, KamalRsync raises a clear error
+  # explaining what to add.
+  #
+  # NOTE: parallel structure to SiteSync::FlyRsync — same shape,
+  # same flags, same exclude lists, different transport. They're
+  # kept duplicated rather than abstracted into a base class
+  # while we're still feeling out the differences in real-world
+  # use. Once both are in production for a while and the patterns
+  # are stable, extract a shared base.
+  class KamalRsync
+    class KamalRsyncError < StandardError; end
+
+    # Container path Roe's Dockerfile mounts the site volume at.
+    # The HOST path is derived from config/deploy.yml's volume
+    # mapping at runtime.
+    REMOTE_SITE_CONTAINER_PATH = '/data/site'.freeze
+
+    COMMON_EXCLUDES = [
+      '--exclude=.sync-state.json',
+      '--exclude=.git',
+      '--exclude=.sync-backups',
+      '--exclude=.DS_Store'
+    ].freeze
+
+    PUSH_EXCLUDES = (COMMON_EXCLUDES + [
+      '--exclude=db/production/',
+      '--exclude=db/development/.gitkeep'
+    ]).freeze
+
+    PULL_EXCLUDES = (COMMON_EXCLUDES + [
+      '--exclude=db/development/',
+      '--exclude=db/production/.gitkeep'
+    ]).freeze
+
+    BACKUP_EXCLUDES = (COMMON_EXCLUDES + [
+      '--exclude=db/'
+    ]).freeze
+
+    REMOTE_DELETE_BATCH = 50
+
+    class << self
+      def push_local_to_live!(diff: nil)
+        diff ? push_selective(diff) : push_full
+      end
+
+      def pull_live_to_local!(diff: nil)
+        diff ? pull_selective(diff) : pull_full
+      end
+
+      def backup_live_to_local!(files: nil)
+        files ? backup_selective(files) : backup_full
+      end
+
+      private
+
+      # ─── Push ─────────────────────────────────────────────────────
+
+      def push_selective(diff)
+        modified = Array(diff[:modified])
+        added    = Array(diff[:added])
+        deleted  = Array(diff[:deleted])
+
+        files_to_send = modified + added
+        if files_to_send.any?
+          rsync_files_from(
+            source:   "#{RoeSitePaths::SITE_PATH}/",
+            dest:     "#{ssh_destination}:#{remote_site_path}",
+            files:    files_to_send,
+            excludes: PUSH_EXCLUDES
+          )
+        end
+
+        remove_remote_files(deleted) if deleted.any?
+      end
+
+      def push_full
+        rsync(
+          source:   "#{RoeSitePaths::SITE_PATH}/",
+          dest:     "#{ssh_destination}:#{remote_site_path}",
+          excludes: PUSH_EXCLUDES,
+          delete:   true
+        )
+      end
+
+      # ─── Pull ─────────────────────────────────────────────────────
+
+      def pull_selective(diff)
+        modified = Array(diff[:modified])
+        added    = Array(diff[:added])
+        deleted  = Array(diff[:deleted])
+
+        files_to_fetch = modified + added
+        if files_to_fetch.any?
+          rsync_files_from(
+            source:   "#{ssh_destination}:#{remote_site_path}",
+            dest:     "#{RoeSitePaths::SITE_PATH}/",
+            files:    files_to_fetch,
+            excludes: PULL_EXCLUDES
+          )
+        end
+
+        remove_local_files(deleted) if deleted.any?
+      end
+
+      def pull_full
+        rsync(
+          source:   "#{ssh_destination}:#{remote_site_path}",
+          dest:     "#{RoeSitePaths::SITE_PATH}/",
+          excludes: PULL_EXCLUDES,
+          delete:   true
+        )
+      end
+
+      # ─── Backup ───────────────────────────────────────────────────
+
+      def backup_selective(files)
+        files = Array(files).uniq
+        if files.empty?
+          Rails.logger.info "[SiteSync::KamalRsync] selective backup: no files in diff, skipping"
+          return nil
+        end
+
+        backup_dir, backup_root, timestamp = new_backup_dir
+        FileUtils.mkdir_p(backup_dir)
+
+        rsync_files_from(
+          source:      "#{ssh_destination}:#{remote_site_path}",
+          dest:        "#{backup_dir}/",
+          files:       files,
+          excludes:    BACKUP_EXCLUDES,
+          extra_flags: "--ignore-missing-args"
+        )
+
+        if Dir.empty?(backup_dir)
+          Rails.logger.warn "[SiteSync::KamalRsync] selective backup empty for #{files.size} files"
+        end
+
+        update_latest_symlink(backup_root, timestamp)
+        backup_dir
+      end
+
+      def backup_full
+        backup_dir, backup_root, timestamp = new_backup_dir
+
+        previous   = previous_backup(backup_root)
+        link_dest  = previous ? "--link-dest=#{Shellwords.escape(File.expand_path(previous))}" : ""
+
+        FileUtils.mkdir_p(backup_dir)
+
+        cmd = build_cmd(
+          source:   "#{ssh_destination}:#{remote_site_path}",
+          dest:     "#{backup_dir}/",
+          # Drop -H — /site has no internal hardlinks, and -H makes
+          # rsync build a hardlink graph across the whole tree even
+          # when there's nothing to track.
+          flags:    "-rltzPi #{link_dest}",
+          excludes: BACKUP_EXCLUDES
+        )
+
+        output, success = run(cmd)
+
+        unless success
+          FileUtils.rm_rf(backup_dir)
+          raise KamalRsyncError, "Live backup failed:\n#{output}"
+        end
+
+        if Dir.empty?(backup_dir)
+          FileUtils.rm_rf(backup_dir)
+          raise KamalRsyncError, "Live backup is empty after rsync — transport likely broken."
+        end
+
+        update_latest_symlink(backup_root, timestamp)
+        backup_dir
+      end
+
+      # ─── Kamal config readers ─────────────────────────────────────
+
+      def kamal_config
+        @kamal_config ||= begin
+          path = Rails.root.join('config', 'deploy.yml')
+          unless File.exist?(path)
+            raise KamalRsyncError, "config/deploy.yml not found — Kamal deploy isn't configured."
+          end
+          YAML.load_file(path)
+        end
+      end
+
+      def host
+        @host ||= begin
+          servers = kamal_config['servers']
+          host_value = case servers
+                       when Hash
+                         # Kamal supports roles. Use the 'web' role
+                         # first (most common), falling back to first
+                         # role defined.
+                         role = servers['web'] || servers.values.first
+                         Array(role).first
+                       when Array
+                         servers.first
+                       end
+
+          unless host_value && host_value.to_s != '192.168.0.1'
+            raise KamalRsyncError, "config/deploy.yml has no real server configured " \
+                                   "(found #{host_value.inspect}). Set servers.web to your actual host."
+          end
+          host_value
+        end
+      end
+
+      def ssh_user
+        kamal_config.dig('ssh', 'user') || 'root'
+      end
+
+      def ssh_destination
+        @ssh_destination ||= "#{ssh_user}@#{host}"
+      end
+
+      # The HOST path of the /data/site volume — that's where rsync
+      # writes since we operate on the host filesystem (the container
+      # sees the same content via bind mount).
+      def remote_site_path
+        @remote_site_path ||= begin
+          volumes = Array(kamal_config['volumes'])
+          site_volume = volumes.find { |v| v.to_s.split(':').last.to_s.start_with?(REMOTE_SITE_CONTAINER_PATH) }
+
+          unless site_volume
+            raise KamalRsyncError, <<~MSG
+              config/deploy.yml has no volume mapping for #{REMOTE_SITE_CONTAINER_PATH}.
+              Add a volume entry under 'volumes:' like:
+                volumes:
+                  - "/var/lib/roe/site:#{REMOTE_SITE_CONTAINER_PATH}"
+              so site sync knows where on the host filesystem to rsync to.
+            MSG
+          end
+
+          host_path = site_volume.split(':').first
+          host_path.end_with?('/') ? host_path : "#{host_path}/"
+        end
+      end
+
+      # ─── rsync invocation ────────────────────────────────────────
+
+      def rsync(source:, dest:, excludes:, delete:)
+        flags = "-rltzPi"
+        flags += " --delete" if delete
+        cmd = build_cmd(source: source, dest: dest, flags: flags, excludes: excludes)
+        with_retries(label: "rsync") do
+          output, success = run(cmd)
+          raise KamalRsyncError, "rsync failed:\n#{output}" unless success
+          return output
+        end
+      end
+
+      def rsync_files_from(source:, dest:, files:, excludes: [], extra_flags: "")
+        files = Array(files).uniq
+        return if files.empty?
+
+        list = Tempfile.create([ 'site-sync-files', '.txt' ])
+        begin
+          list.write(files.join("\n"))
+          list.close
+
+          flags = "-rltzPi --files-from=#{Shellwords.escape(list.path)} #{extra_flags}".strip
+          cmd = build_cmd(
+            source:   source,
+            dest:     dest,
+            flags:    flags,
+            excludes: excludes
+          )
+
+          with_retries(label: "rsync_files_from") do
+            output, success = run(cmd)
+            raise KamalRsyncError, "selective rsync failed:\n#{output}" unless success
+            return output
+          end
+        ensure
+          File.unlink(list.path) if list && File.exist?(list.path)
+        end
+      end
+
+      # Plain ssh as transport — no fly-rsync wrapper. Simpler than
+      # FlyRsync's build_cmd because we don't need to cd into Rails.root
+      # to use a relative path for -e (the path-with-spaces issue is
+      # specific to fly's wrapper).
+      def build_cmd(source:, dest:, flags:, excludes:)
+        excludes_str = excludes.join(' ')
+        "rsync #{flags} #{excludes_str} -e ssh " \
+          "#{Shellwords.escape(source)} #{Shellwords.escape(dest)} 2>&1"
+      end
+
+      def with_retries(label:, max_retries: 2)
+        attempts = 0
+        begin
+          attempts += 1
+          yield
+        rescue KamalRsyncError => e
+          if attempts <= max_retries
+            backoff = attempts # 1s, 2s
+            Rails.logger.warn "[SiteSync::KamalRsync] #{label}: attempt #{attempts} failed (#{e.message.lines.first&.chomp}); retrying in #{backoff}s"
+            sleep backoff
+            retry
+          else
+            raise
+          end
+        end
+      end
+
+      def run(cmd)
+        Rails.logger.info "[SiteSync::KamalRsync] #{cmd}"
+        output = `#{cmd}`
+        [ output, $?.success? ]
+      end
+
+      # ─── Remote/local file deletion ──────────────────────────────
+
+      def remove_remote_files(paths)
+        return if paths.empty?
+
+        paths.each_slice(REMOTE_DELETE_BATCH) do |chunk|
+          remote_paths = chunk.map { |p| File.join(remote_site_path, p) }
+          rm_arg = remote_paths.map { |p| Shellwords.escape(p) }.join(' ')
+          # Plain ssh — much simpler than fly's machine-id lookup.
+          remote_cmd = "rm -f #{rm_arg}"
+          cmd = "ssh #{Shellwords.escape(ssh_destination)} #{Shellwords.escape(remote_cmd)} 2>&1"
+
+          output, success = run(cmd)
+          raise KamalRsyncError, "remote delete failed:\n#{output}" unless success
+        end
+      end
+
+      def remove_local_files(paths)
+        return if paths.empty?
+
+        site_root = File.expand_path(RoeSitePaths::SITE_PATH)
+        paths.each do |p|
+          # Defense in depth: refuse paths that try to escape /site.
+          next if p.to_s.include?('..') || p.to_s.start_with?('/')
+
+          full = File.expand_path(File.join(RoeSitePaths::SITE_PATH, p))
+          next unless full.start_with?(site_root + '/')
+
+          File.delete(full) if File.exist?(full)
+        rescue => e
+          Rails.logger.warn "[SiteSync::KamalRsync] Could not delete #{p}: #{e.message}"
+        end
+      end
+
+      # ─── Backup helpers ──────────────────────────────────────────
+
+      def new_backup_dir
+        timestamp   = Time.now.strftime("%Y-%m-%d-%H%M%S")
+        backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+        FileUtils.mkdir_p(backup_root)
+        backup_dir  = File.join(backup_root, timestamp)
+        [ backup_dir, backup_root, timestamp ]
+      end
+
+      def previous_backup(backup_root)
+        snapshots = Dir.glob(File.join(backup_root, "20*"))
+                       .select { |d| File.directory?(d) && !File.symlink?(d) }
+        snapshots.reject! { |d| Dir.empty?(d) rescue true }
+        snapshots.sort.last
+      end
+
+      def update_latest_symlink(backup_root, timestamp)
+        latest = File.join(backup_root, 'latest')
+        FileUtils.rm_f(latest) if File.symlink?(latest) || File.exist?(latest)
+        FileUtils.ln_s(timestamp, latest)
+      end
+    end
+  end
+end

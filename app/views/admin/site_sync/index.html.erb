@@ -56,7 +56,7 @@
           <%= button_to "Dismiss",
                         admin_dismiss_site_transfer_status_path,
                         method: :post,
-                        data: { confirm: "Clear the running-status flag? Only do this if you've confirmed the job isn't actually running (check Rails logs for SiteSync::FlyRsync activity). This won't kill any subprocess that might still be working." },
+                        data: { confirm: "Clear the running-status flag? Only do this if you've confirmed the job isn't actually running (check Rails logs for SiteSync activity). This won't kill any subprocess that might still be working." },
                         class: "inline-flex items-center px-3 py-1 border border-blue-700 bg-blue-100 hover:bg-blue-200 text-blue-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
         </div>
       </div>
@@ -499,7 +499,18 @@
 
     <%# ─── Settings form ─────────────────────────────────────────── %>
     <div class="mt-6 pt-6 border-t border-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900 mb-3">Settings</h3>
+      <div class="flex items-center justify-between mb-3 gap-4">
+        <h3 class="text-sm font-semibold text-gray-900">Settings</h3>
+        <%# Auto-detected deploy target. SiteSync.transport routes
+            push/pull/backup through the matching FlyRsync or
+            KamalRsync service. %>
+        <span class="text-xs text-gray-500">
+          Deploy target:
+          <code class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded font-mono">
+            <%= @deploy_target_label %>
+          </code>
+        </span>
+      </div>
 
       <%= form_with url: admin_update_site_sync_config_path, method: :patch, local: true, class: "space-y-4" do |form| %>
         <%# Token — must match between dev and prod. Auto-generated

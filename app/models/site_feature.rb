@@ -65,4 +65,33 @@ module SiteFeature
   def postmark_configured?
     PostmarkConfig.exists? && PostmarkConfig.current.connected?
   end
+
+  # Framework-dev override: lets the Roe maintainer work on production-only
+  # features (members, store, integrations) from a development environment,
+  # and on dev-only features (Substack importer) from production. End users
+  # never set this — it's gated behind a non-obvious env var name and
+  # specific value so casual inspection of `Rails.env` checks won't reveal
+  # the seam.
+  #
+  # Why: the dev/prod feature split intentionally hides production-only
+  # surfaces in dev (and vice versa) so site owners aren't tempted to
+  # configure things in the wrong place. The maintainer still needs to
+  # build and test those surfaces, hence this escape hatch.
+  def framework_dev_mode?
+    ENV['ROE_DEV_OVERRIDE'] == 'on'
+  end
+
+  # Show production-only features (members, store, integrations) when:
+  #   - we're actually in production, OR
+  #   - the framework-dev override is on (maintainer working in dev)
+  def show_production_features?
+    Rails.env.production? || framework_dev_mode?
+  end
+
+  # Show development-only features (Substack importer, Tools menu) when:
+  #   - we're actually in development, OR
+  #   - the framework-dev override is on (maintainer testing on prod)
+  def show_development_features?
+    Rails.env.development? || framework_dev_mode?
+  end
 end

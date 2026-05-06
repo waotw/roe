@@ -120,17 +120,17 @@ class SiteSyncTransferJob < ApplicationJob
       # delete on prod, then push only the changed files.
       files_to_back_up = diff[:modified] + diff[:deleted]
       update_step(:backing_up_live)
-      SiteSync::FlyRsync.backup_live_to_local!(files: files_to_back_up)
+      SiteSync.transport.backup_live_to_local!(files: files_to_back_up)
 
       update_step(:pushing_to_live)
-      SiteSync::FlyRsync.push_local_to_live!(diff: diff)
+      SiteSync.transport.push_local_to_live!(diff: diff)
     else
       # Fallback: full-tree backup + push.
       update_step(:backing_up_live_full)
-      SiteSync::FlyRsync.backup_live_to_local!
+      SiteSync.transport.backup_live_to_local!
 
       update_step(:pushing_to_live_full)
-      SiteSync::FlyRsync.push_local_to_live!
+      SiteSync.transport.push_local_to_live!
     end
   end
 
@@ -151,10 +151,10 @@ class SiteSyncTransferJob < ApplicationJob
 
     if diff
       update_step(:pulling_from_live)
-      SiteSync::FlyRsync.pull_live_to_local!(diff: diff)
+      SiteSync.transport.pull_live_to_local!(diff: diff)
     else
       update_step(:pulling_from_live_full)
-      SiteSync::FlyRsync.pull_live_to_local!
+      SiteSync.transport.pull_live_to_local!
     end
   end
 

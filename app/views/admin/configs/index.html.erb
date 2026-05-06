@@ -1,22 +1,18 @@
 <div class="px-4 sm:px-0">
   <div class="">
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">Configuration Files</h1>
-      <p class="mt-2 mb-4 text-sm text-gray-700">Edit YAML configuration files for your site.</p>
+      <h1 class="text-3xl font-bold text-gray-900">Configuration</h1>
+      <p class="mt-2 mb-4 text-sm text-gray-700">Edit configuration files for your site.</p>
     </div>
+
+    <h2 class="text-2xl font-bold text-gray-900">Integrations</h2>
+    <p class="mt-2 mb-4 text-sm text-gray-700">These features can be enabled/configured once the site is live/hosted.</p>
 
     <div class="flex gap-2">
       <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'members.yml')) %>
         <%= link_to "Enable Members",
                     new_members_setup_admin_configs_path,
                     class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs" %>
-      <% end %>
-
-      <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'podcast.yml')) %>
-        <%= button_to "Enable Podcasts",
-                      generate_podcast_admin_configs_path,
-                      method: :post,
-                      class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
       <% end %>
       <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'store.yml')) %>
         <%= link_to "Enable Store",
@@ -25,6 +21,16 @@
       <% end %>
     </div>
   </div>
+
+  <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'podcast.yml')) %>
+    <div class="mt-4">
+      <h3 class="mb-2 text-xl font-bold text-gray-900">Features</h3>
+      <%= button_to "Enable Podcasts",
+                    generate_podcast_admin_configs_path,
+                    method: :post,
+                    class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    </div>
+  <% end %>
 
   <div class="mt-8 space-y-8">
     <% @config_files.each do |section| %>

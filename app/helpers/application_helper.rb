@@ -32,13 +32,16 @@ module ApplicationHelper
 
   # Feature flag predicates — delegated to SiteFeature so models can use
   # the same checks without pulling in the helper context.
-  def members_enabled?       = SiteFeature.members_enabled?
-  def payments_enabled?      = SiteFeature.payments_enabled?
-  def memberships_enabled?   = SiteFeature.memberships_enabled?
-  def donations_enabled?     = SiteFeature.donations_enabled?
-  def newsletters_enabled?   = SiteFeature.newsletters_enabled?
-  def postmark_configured?   = SiteFeature.postmark_configured?
-  def store_enabled?         = SiteFeature.store_enabled?
+  def members_enabled?            = SiteFeature.members_enabled?
+  def payments_enabled?           = SiteFeature.payments_enabled?
+  def memberships_enabled?        = SiteFeature.memberships_enabled?
+  def donations_enabled?          = SiteFeature.donations_enabled?
+  def newsletters_enabled?        = SiteFeature.newsletters_enabled?
+  def postmark_configured?        = SiteFeature.postmark_configured?
+  def store_enabled?              = SiteFeature.store_enabled?
+  def framework_dev_mode?         = SiteFeature.framework_dev_mode?
+  def show_production_features?   = SiteFeature.show_production_features?
+  def show_development_features?  = SiteFeature.show_development_features?
 
   def snipcart_connected?
     store_enabled? && SnipcartConfig.current&.connected?
