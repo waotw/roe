@@ -12,9 +12,11 @@ Rails.application.routes.draw do
   # a bearer token.
   namespace :api do
     namespace :site_sync do
-      post "exchange",       to: "exchange#create"
-      post "refresh_ledger", to: "exchange#refresh_ledger"
-      post "file_states",    to: "exchange#file_states"
+      post "exchange",                  to: "exchange#create"
+      post "refresh_ledger",            to: "exchange#refresh_ledger"
+      post "file_states",               to: "exchange#file_states"
+      post "publish_members",           to: "imports#publish_members"
+      post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"
     end
   end
 
@@ -185,6 +187,9 @@ Rails.application.routes.draw do
         post :skip_missing_media
         post :reconnect_media
         post :retry_live_fetch
+        post :publish_to_live
+        post :dismiss_publish_status
+        post :refresh_peer_exchange
       end
     end
 

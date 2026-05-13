@@ -45,6 +45,13 @@
       </div>
     <% end %>
   </div>
+
+  <%# Publish-to-live appears once all import phases are done. Hidden while
+      importing — the user can still rollback / fix missing media first. %>
+  <% if @import.phase_completed?(4) %>
+    <%= render "publish_panel", import: @import %>
+  <% end %>
+
   <!-- Stats -->
   <% if @import.stats.present? && (
     @import.stats["posts_created"].to_i > 0 ||
@@ -243,6 +250,7 @@
     <% end %>
   </div>
 </div>
+
 <%# Delivery Stats %>
 <% if @import.stats["deliveries_created"].to_i > 0 || @import.stats["posts_with_deliveries"].to_i > 0 %>
   <div class="mt-6 bg-white shadow p-6">
@@ -364,10 +372,13 @@
   </div>
 <% end %>
 </div>
-<%# Auto-refresh for in-progress imports %>
-<% if @import.status_importing_posts? || @import.status_importing_media? || @import.status_importing_members? || @import.status_importing_deliveries? %>
+<%# Auto-refresh for in-progress imports or publishes %>
+<%
+  publish_running = Rails.cache.read(ImportPublishJob.status_cache_key(@import.id))&.dig(:state) == :running
+%>
+<% if @import.status_importing_posts? || @import.status_importing_media? || @import.status_importing_members? || @import.status_importing_deliveries? || publish_running %>
   <script>
-    // Auto-refresh every 3 seconds while import is in progress
+    // Auto-refresh every 3 seconds while import or publish is in progress
     setTimeout(function() {
       window.location.reload();
     }, 3000);

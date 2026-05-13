@@ -54,7 +54,13 @@ module SiteSync
 
         state = {
           fingerprint:          SiteSync::Ledger.fingerprint_of(current_files),
-          recorded_fingerprint: recorded&.dig('fingerprint'),
+          # Recompute recorded_fingerprint from the recorded manifest
+          # rather than reading the stored value. Ledgers written
+          # before fingerprint_of was made canonical (sorted) have
+          # stale fingerprints baked in; recomputing here means old
+          # ledgers self-heal on first exchange without anyone needing
+          # to click "Mark Synced." Always-fresh, always-canonical.
+          recorded_fingerprint: recorded ? SiteSync::Ledger.fingerprint_of(recorded_files) : nil,
           env:                  Rails.env.to_s,
           version:              Time.now.utc.iso8601
         }
@@ -184,6 +190,43 @@ module SiteSync
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] fetch_peer_file_states failed: #{e.class} #{e.message}"
         {}
+      end
+
+      # Send a batch of imported members to the peer for publish. The
+      # peer skips any member whose email already exists. Returns the
+      # parsed response hash on success ({inserted, skipped, errors})
+      # or nil on any failure (auth, network, peer error). Caller
+      # should treat nil as "this batch didn't make it" and surface
+      # the error rather than silently moving on.
+      def publish_members(batch)
+        return nil unless can_call_peer?
+
+        uri = URI.parse(File.join(peer_url, '/api/site_sync/publish_members'))
+        response = post_to_peer(uri, { members: batch }.to_json)
+        return nil unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] publish_members failed: #{e.class} #{e.message}"
+        nil
+      end
+
+      # Same shape as publish_members, but for newsletter_sends. The peer
+      # resolves post_id via metadata (substack_post_id → url_name) and
+      # member_id via email; per-record outcomes are returned in the
+      # response so the job can show "247 inserted, 12 had no matching
+      # post on live (probably need to re-run site sync)."
+      def publish_newsletter_sends(batch)
+        return nil unless can_call_peer?
+
+        uri = URI.parse(File.join(peer_url, '/api/site_sync/publish_newsletter_sends'))
+        response = post_to_peer(uri, { sends: batch }.to_json)
+        return nil unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] publish_newsletter_sends failed: #{e.class} #{e.message}"
+        nil
       end
 
       # Tiny HTTP helper — separated out so the retry loop above can

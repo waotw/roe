@@ -55,11 +55,21 @@ module SiteSync
         { modified: modified.sort, added: added.sort, deleted: deleted.sort }
       end
 
-      # Stable hash over a manifest. Used to mark backups "currently
-      # active" by comparing their saved fingerprint to /site's
-      # current one.
+      # Stable, *canonical* hash over a manifest. Keys are sorted before
+      # JSON-encoding so two filesystems holding the same content
+      # produce the same hash — Dir.glob returns entries in
+      # filesystem-dependent order (macOS APFS vs Linux ext4 inside a
+      # container will differ), and an unsorted Hash#to_json embeds
+      # that order. Without this sort, identical /site trees on dev
+      # and live could fingerprint differently and the cross-env
+      # exchange would falsely report drift.
+      #
+      # Sort applies to the top-level path map; the inner {size, mtime}
+      # hashes always have a fixed key order (built that way in
+      # current_manifest) so they don't need separate canonicalization.
       def fingerprint_of(manifest)
-        Digest::SHA256.hexdigest(manifest.to_json)
+        sorted = manifest.sort.to_h
+        Digest::SHA256.hexdigest(sorted.to_json)
       end
 
       # Convenience: compute the fingerprint of an arbitrary directory

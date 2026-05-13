@@ -1,6 +1,6 @@
 class Admin::ImportsController < Admin::BaseController
   before_action :require_development_features
-  before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch ]
+  before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch, :publish_to_live, :dismiss_publish_status, :refresh_peer_exchange ]
 
   def index
     @imports = Import.order(created_at: :desc)
@@ -676,6 +676,82 @@ class Admin::ImportsController < Admin::BaseController
       redirect_to resolve_missing_media_admin_import_path(@import),
         alert: "Live fetch complete, but could not resolve any items. URLs may still be unavailable."
     end
+  end
+
+  # Ship imported Members + NewsletterSends to the live site. Posts/
+  # pages/media must already be in sync (file-based site sync handles
+  # those) because deliveries reference posts by their natural key —
+  # if a post isn't on live yet, its deliveries can't be linked.
+  #
+  # All preconditions are checked here so the user gets a clear flash
+  # message; the actual work runs in ImportPublishJob.
+  def publish_to_live
+    unless @import.phase_completed?(4)
+      redirect_to admin_import_path(@import),
+                  alert: "Finish all import phases (posts, members, deliveries) before publishing to live."
+      return
+    end
+
+    unless SiteSync::Exchange.can_call_peer?
+      redirect_to admin_import_path(@import),
+                  alert: "No live site configured. See /documentation/deployment to set up your peer URL."
+      return
+    end
+
+    local_fp = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH)
+    peer_fp  = SiteSync::Exchange.peer_state&.dig(:fingerprint)
+
+    unless local_fp.present? && peer_fp.present? && local_fp == peer_fp
+      redirect_to admin_import_path(@import),
+                  alert: "Sync posts and media to live first — deliveries reference posts that must already exist on live."
+      return
+    end
+
+    status = Rails.cache.read(ImportPublishJob.status_cache_key(@import.id))
+    if status && status[:state] == :running
+      redirect_to admin_import_path(@import),
+                  alert: "Already publishing this import. Wait for it to finish."
+      return
+    end
+
+    # Seed the running status synchronously so the page shows
+    # "running" on the immediate redirect, even if Solid Queue hasn't
+    # picked the job up yet.
+    Rails.cache.write(
+      ImportPublishJob.status_cache_key(@import.id),
+      { state: :running, step: :starting, started_at: Time.current },
+      expires_in: ImportPublishJob::STATUS_TTL
+    )
+
+    ImportPublishJob.perform_later(@import.id)
+    redirect_to admin_import_path(@import),
+                notice: "Publishing this import to live in the background. Refresh to see progress."
+  end
+
+  # Clear the cached publish status (completed or failed). Doesn't kill
+  # the job — only used to dismiss the status panel from the UI.
+  def dismiss_publish_status
+    Rails.cache.delete(ImportPublishJob.status_cache_key(@import.id))
+    redirect_to admin_import_path(@import)
+  end
+
+  # Synchronously refresh peer state and redirect back. Used by the
+  # publish panel when the cached peer_state is stale — e.g. user just
+  # finished a site-sync push and the post-push exchange hasn't been
+  # observed yet. Mirrors Admin::SiteSyncController#refresh_exchange
+  # but lands the user back on the imports page instead of /site_sync.
+  def refresh_peer_exchange
+    if !SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "This side doesn't initiate exchanges (no peer URL configured)."
+    elsif SiteSync::Exchange.call_peer
+      flash[:notice] = "Peer state refreshed."
+    else
+      flash[:alert] = "Exchange failed — check Rails logs (likely token mismatch, wrong peer URL, or peer unreachable)."
+    end
+  rescue => e
+    flash[:alert] = "Exchange error: #{e.message}"
+  ensure
+    redirect_to admin_import_path(@import)
   end
 
   private

@@ -78,9 +78,15 @@ class SiteSyncTransferJob < ApplicationJob
     )
 
     # Tell the peer about our new state right away — without this,
-    # the banner on the other side stays stale until the next
-    # hourly exchange run.
-    SiteSyncExchangeJob.perform_later if SiteSync::Exchange.can_call_peer?
+    # both sides have stale state until the next hourly exchange:
+    # the peer's banner doesn't know we just pushed, and OUR peer_state
+    # cache still has the peer's pre-push fingerprint. Sync (not async)
+    # so admin UIs that read peer_state right after a push (like the
+    # imports publish panel) see accurate state on the next render
+    # without waiting for a queued job. call_peer is best-effort
+    # internally — returns nil on failure rather than raising — so
+    # this won't flip the just-completed push to "failed."
+    SiteSync::Exchange.call_peer if SiteSync::Exchange.can_call_peer?
   rescue => e
     Rails.logger.error "[SiteSyncTransferJob #{kind}] #{e.class}: #{e.message}"
 
