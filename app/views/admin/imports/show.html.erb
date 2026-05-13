@@ -157,7 +157,16 @@
       </div>
     <% elsif @import.stats["members_imported"].to_i > 0 || @import.stats["members_updated"].to_i > 0 || @import.stats["members_discarded"].to_i > 0 %>
       <div class="mt-6 pt-6 border-t border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Member Import Results</h3>
+        <div class="flex items-center justify-between mb-4 gap-4">
+          <h3 class="text-lg font-medium text-gray-900">Member Import Results</h3>
+          <%# Members admin is production-only — but for verifying an
+              import's output, this read-only view is dev-only. %>
+          <% if Member.where(import: @import).any? %>
+            <%= link_to "View imported members →",
+                        members_admin_import_path(@import),
+                        class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+          <% end %>
+        </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <% if @import.stats["members_imported"].to_i > 0 %>
             <div class="bg-green-50 p-4">

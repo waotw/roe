@@ -37,7 +37,6 @@ Rails.application.routes.draw do
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
-    post "site_sync/mark_synced", to: "site_sync#mark_synced", as: "mark_site_synced"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
     patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
@@ -190,6 +189,7 @@ Rails.application.routes.draw do
         post :publish_to_live
         post :dismiss_publish_status
         post :refresh_peer_exchange
+        get :members
       end
     end
 

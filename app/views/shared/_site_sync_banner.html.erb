@@ -1,17 +1,54 @@
-<%# Cross-env drift banner. Shows when the OTHER environment has
-    unsynced changes — dev sees prod's state, prod sees dev's. The
-    state is fetched via SiteSync::Exchange (hourly background job
-    + opportunistic refresh on stale cache). Silent when we have
-    no peer info, when peer is clean, or when peer's last checkin
-    is older than the cache TTL. %>
-<%
-  peer_state = (SiteSync::Exchange.refresh_if_stale rescue nil)
+<%#
+  Cross-environment sync banner. Shows on the LOCAL (development) side
+  only — production is a read-mostly environment whose admin shouldn't
+  be nagged about sync state on every page render. The Site Sync page
+  on prod still surfaces the same info for anyone who wants to check.
+
+  Authority: cross-side fingerprint comparison. We don't trust local-
+  ledger drift as a sync signal because the ledger can get rewritten
+  by paths that didn't actually transfer content (historical bug).
+
+  Three states:
+    - in sync         → hidden
+    - out of sync     → "local differs from live, sync to align"
+    - peer unreachable → "live unreachable, content can't be verified"
 %>
-<% if peer_state && SiteSync::Exchange.peer_has_drift? %>
-  <div class="admin-warning-bar bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 font-mono text-xs">
-    <p>
-      🔄 <%= SiteSync::Exchange.peer_label %> has unsynced changes — sync them before editing.
-      <%= link_to "View →", admin_site_sync_path, class: "underline" %>
-    </p>
-  </div>
+<% if Rails.env.development? %>
+  <%
+    # refresh_if_stale enqueues an async ping when the cache is older
+    # than 60s; the current request still uses whatever's in cache.
+    peer_state = (SiteSync::Exchange.refresh_if_stale rescue nil)
+    peer_reachable = SiteSync::Exchange.peer_reachable?
+    local_fp = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil
+    peer_fp  = peer_state&.dig(:fingerprint)
+    in_sync  = peer_fp.present? && local_fp.present? && local_fp == peer_fp
+  %>
+
+  <% if !SiteSync::Exchange.can_call_peer? %>
+    <%# No peer URL or token configured — nothing to compare to. Silent. %>
+
+  <% elsif in_sync %>
+    <%# Happy path — nothing to surface. %>
+
+  <% elsif !peer_reachable %>
+    <div class="admin-warning-bar bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 font-mono text-xs">
+      <p>
+        🔌 Live site is unreachable. Local content can't be verified as in sync —
+        there appear to be unsynced changes. Restore the connection to live and sync.
+        <% unless request.path == admin_site_sync_path %>
+          <%= link_to "Open Site Sync →", admin_site_sync_path, class: "underline" %>
+        <% end %>
+      </p>
+    </div>
+
+  <% else %>
+    <div class="admin-warning-bar bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 font-mono text-xs">
+      <p>
+        🔄 Local content differs from live. Sync to align both sides.
+        <% unless request.path == admin_site_sync_path %>
+          <%= link_to "Open Site Sync →", admin_site_sync_path, class: "underline" %>
+        <% end %>
+      </p>
+    </div>
+  <% end %>
 <% end %>

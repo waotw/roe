@@ -43,13 +43,28 @@ class ImportPublishJob < ApplicationJob
     publish_members!
     publish_sends!
 
+    completed_at = Time.current
     write_status(
       state:        :completed,
       started_at:   @started_at,
-      completed_at: Time.current,
+      completed_at: completed_at,
       counts:       @counts,
       errors:       @errors.first(50)
     )
+
+    # Persist the outcome on the Import record itself so the publish
+    # panel can display "published on X" indefinitely — the cache
+    # entry above is transient (1-day TTL) and a stale cache miss
+    # shouldn't make the panel re-suggest a publish that already
+    # happened. Stringify everything since stats is serialized to JSON.
+    @import.stats = (@import.stats || {}).merge(
+      "published_to_live" => {
+        "at"     => completed_at.iso8601,
+        "counts" => @counts.transform_keys(&:to_s),
+        "errors" => @errors.first(50)
+      }
+    )
+    @import.save!
   rescue => e
     Rails.logger.error "[ImportPublishJob #{import_id}] #{e.class}: #{e.message}"
     write_status(

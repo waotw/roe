@@ -31,6 +31,14 @@ class Admin::SiteSyncController < Admin::BaseController
     @peer_reachable        = SiteSync::Exchange.peer_reachable?
     @deploy_target_label   = SiteSync.deploy_target_label
 
+    # Cross-side fingerprint comparison — the authoritative "are dev
+    # and live actually in sync" signal. Local-only drift (@status,
+    # @peer_drift) tells us each side's filesystem-vs-own-ledger
+    # state; this tells us whether the two filesystems agree.
+    local_fp        = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil
+    peer_fp         = @peer_state&.dig(:fingerprint)
+    @in_sync_with_peer = local_fp.present? && peer_fp.present? && local_fp == peer_fp
+
     # Live config for the form (token + peer_url). first_or_create!
     # auto-generates a token on first access, so the form always has
     # something to show.
@@ -39,16 +47,6 @@ class Admin::SiteSyncController < Admin::BaseController
     # In-progress / recently-completed transfer status for the
     # push/pull buttons. nil when nothing has happened recently.
     @transfer_status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
-  end
-
-  def mark_synced
-    SiteSync::Ledger.write_current!
-    SiteSync::Checker.clear_cache
-    flash[:notice] = "Sync baseline updated. /site is now the recorded state."
-  rescue => e
-    flash[:alert] = "Failed to update baseline: #{e.message}"
-  ensure
-    redirect_to admin_site_sync_path
   end
 
   def create_backup

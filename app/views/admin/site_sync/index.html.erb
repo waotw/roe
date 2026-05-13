@@ -280,18 +280,6 @@
         </div>
       <% end %>
 
-      <%# Manual fallback for "I already synced from terminal" — kept
-          alongside the real Push button so user has an escape hatch
-          if rsync from CLI is preferred. %>
-      <div class="mt-4 text-xs text-amber-700">
-        Already synced manually?
-        <%= button_to "Mark current state as synced",
-                      admin_mark_site_synced_path,
-                      method: :post,
-                      form: { style: "display: inline;" },
-                      data: { confirm: "Mark the current /site state as the new sync baseline? Only do this if you've already synced this state to the other environment." },
-                      class: "inline underline bg-transparent border-0 p-0 text-xs text-amber-700 hover:text-amber-900 cursor-pointer" %>
-      </div>
     </div>
     <% end %>
   <% end %>
@@ -389,10 +377,48 @@
             </p>
           <% end %>
         </div>
-      <% else %>
+      <% elsif @in_sync_with_peer %>
         <p class="text-sm text-green-800">
-          ✓ <%= SiteSync::Exchange.peer_label %> reports no unsynced changes.
+          ✓ Local content matches <%= SiteSync::Exchange.peer_label %>.
         </p>
+      <% elsif @status[:state] == :clean %>
+        <%# Both sides clean against their own ledgers but content
+            doesn't actually match. The diff that selective push uses
+            comes from local-vs-ledger, so it'll be empty — push will
+            need to go full-tree. This branch surfaces a push button
+            anyway so the user has a recovery path. %>
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mt-3">
+          <p class="text-sm text-amber-800 mb-3">
+            ⚠️ Content differs from <%= SiteSync::Exchange.peer_label %>, but neither side reports local drift.
+            The ledgers on the two sides have diverged — push (or pull) will realign them.
+          </p>
+
+          <% if @peer_call_configured %>
+            <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
+              <div class="flex gap-2">
+                <%= form.text_field :confirm,
+                                    placeholder: "Type LIVE to confirm",
+                                    autocomplete: "off",
+                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
+                <%= form.submit "Push to live now",
+                                data: { turbo_submits_with: "⏳ Starting push…" },
+                                class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+              </div>
+            <% end %>
+            <%= button_to "Pull from live",
+                          admin_pull_site_from_live_path,
+                          method: :post,
+                          data: {
+                            confirm: "Pull live's content over your local /site? Your current local /site will be backed up first.",
+                            turbo_submits_with: "⏳ Starting pull…"
+                          },
+                          class: "mt-2 inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+          <% else %>
+            <p class="text-xs text-amber-700">
+              Push from this side isn't configured. Visit your <strong>local</strong> admin Site Sync page.
+            </p>
+          <% end %>
+        </div>
       <% end %>
 
       <%# Local-side drift, folded into the cross-env panel when the
@@ -456,16 +482,6 @@
               Push from this side isn't configured. Visit your <strong>local</strong> admin to push.
             </p>
           <% end %>
-
-          <div class="mt-3 text-xs text-amber-700">
-            Already synced manually?
-            <%= button_to "Mark current state as synced",
-                          admin_mark_site_synced_path,
-                          method: :post,
-                          form: { style: "display: inline;" },
-                          data: { confirm: "Mark the current /site state as the new sync baseline?" },
-                          class: "inline underline bg-transparent border-0 p-0 text-xs text-amber-700 hover:text-amber-900 cursor-pointer" %>
-          </div>
         </div>
       <% end %>
 

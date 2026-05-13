@@ -90,11 +90,12 @@ module SiteSync
         update_latest_symlink(timestamp)
         prune!
 
-        # Establish (or refresh) the sync baseline silently — taking a
-        # backup means the user implicitly endorses /site as the
-        # current known-good state. Saves them from having to also
-        # click a separate "Mark as synced" button afterwards.
-        refresh_sync_baseline
+        # Intentionally NOT writing the sync ledger here. Creating a
+        # backup is about "I have a restorable snapshot of this state"
+        # — it says nothing about whether that state has been synced to
+        # the peer. Conflating the two used to claim drift was resolved
+        # by taking a backup, which broke cross-env in-sync detection
+        # (banner read "no drift" while peer was on different content).
 
         backup_dir
       end
@@ -166,12 +167,14 @@ module SiteSync
           raise BackupError, "rsync failed during restore: #{output}. Pre-restore snapshot is at #{safety_path}"
         end
 
-        # Refresh the sync baseline to match the just-restored state.
-        # Previously we deleted the ledger here, which made the
-        # "Set baseline to current state" button reappear after every
-        # restore — confusing for the user since they hadn't done
-        # anything to invalidate it.
-        refresh_sync_baseline
+        # Intentionally NOT writing the sync ledger here. Restoring
+        # from a local snapshot doesn't change anything on the peer —
+        # so claiming sync is no longer accurate. The cross-env
+        # exchange will report drift correctly on its own; if the
+        # restored state happens to match the peer, self-heal will
+        # rewrite the ledger automatically.
+        Rails.cache.delete("site_sync:current_fingerprint")
+        SiteSync::Checker.clear_cache
 
         {
           safety_path:  safety_path,
@@ -191,19 +194,6 @@ module SiteSync
       end
 
       private
-
-      # Write the current /site state as the sync baseline. Called
-      # after backup/restore so the drift indicator reflects "you've
-      # made changes since the last operation," not "you've never
-      # established a baseline." Failures are logged, not raised —
-      # ledger writing is bookkeeping, not a critical path.
-      def refresh_sync_baseline
-        SiteSync::Ledger.write_current!
-        SiteSync::Checker.clear_cache
-        Rails.cache.delete("site_sync:current_fingerprint")
-      rescue => e
-        Rails.logger.error "[SiteSync::BackupManager] failed to refresh ledger: #{e.message}"
-      end
 
       def ensure_site_present!
         return if Dir.exist?(RoeSitePaths::SITE_PATH)

@@ -1,6 +1,6 @@
 class Admin::ImportsController < Admin::BaseController
   before_action :require_development_features
-  before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch, :publish_to_live, :dismiss_publish_status, :refresh_peer_exchange ]
+  before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch, :publish_to_live, :dismiss_publish_status, :refresh_peer_exchange, :members ]
 
   def index
     @imports = Import.order(created_at: :desc)
@@ -733,6 +733,19 @@ class Admin::ImportsController < Admin::BaseController
   def dismiss_publish_status
     Rails.cache.delete(ImportPublishJob.status_cache_key(@import.id))
     redirect_to admin_import_path(@import)
+  end
+
+  # Read-only members list scoped to this import. The Members admin
+  # section proper is gated as production-only — but for an import,
+  # the user needs to see what was created so they can verify the
+  # results before (or after) publishing to live. Eager-loads
+  # newsletter_sends count for the verification table.
+  def members
+    @members = Member.where(import: @import)
+                     .left_joins(:newsletter_sends)
+                     .select("members.*, COUNT(newsletter_sends.id) AS sends_count")
+                     .group("members.id")
+                     .order(subscribed_at: :desc)
   end
 
   # Synchronously refresh peer state and redirect back. Used by the
