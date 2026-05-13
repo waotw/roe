@@ -664,6 +664,10 @@
   <% end %>
 
   <%# ─── Production backups ──────────────────────────────────────── %>
+  <%# Hidden on production itself — the list only shows snapshots of
+      live, which live doesn't need to see in its own admin. Live's
+      Site Sync page is for token/peer config only. %>
+  <% unless Rails.env.production? %>
   <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
     <div>
       <h2 class="text-lg font-semibold text-gray-900">Public/Live Site Backups</h2>
@@ -697,15 +701,19 @@
       </ul>
     <% end %>
   </div>
+  <% end %>
 
   <%# ─── About ────────────────────────────────────────────────────── %>
+  <%# Hidden on production — the page on live is for configuration only. %>
+  <% unless Rails.env.production? %>
   <div class="mt-8 pt-6 border-t border-gray-200">
     <h3 class="text-sm font-semibold text-gray-900 mb-2">About Site Sync</h3>
     <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
       <li>Tracks every file under <code class="text-xs">/site</code></li>
       <li>Excludes <code class="text-xs">db/</code> (separate backup system)</li>
-      <li>Local backups are rsync mirrors with <code class="text-xs">--link-dest</code> hardlinks — multiple snapshots dedupe unchanged files</li>
-      <li>Each restore auto-creates a fresh backup of the pre-restore state — to undo, restore that one</li>
+      <li>The local backups use a tool called rsync to create exact copies of your files. For new backups, the system only saves the files that actually changed. For any file that stayed the same, it creates a 'shortcut' (link) to the previous version instead of copying it again. This gives you multiple points in time you can restore from, but saves a massive amount of storage space.</li>
+      <li>Restoring from a backup can be undone by simply restoring from the most recent backup.</li>
     </ul>
   </div>
+  <% end %>
 </div>
