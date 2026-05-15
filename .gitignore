@@ -74,3 +74,6 @@ GRAPH_REPORT.md
 /staging/
 /static_site/
 /site_backups/
+
+# Secrets:
+.kamal/secrets

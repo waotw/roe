@@ -45,7 +45,21 @@ COPY . .
 # Precompile bootsnap code for faster boot times
 RUN bundle exec bootsnap precompile app/ lib/
 
-# Precompiling assets for production without requiring secret RAILS_MASTER_KEY
+# Force cache invalidation for the asset-build steps below. Earlier
+# broken builds poisoned the registry-side build cache (kamal uses
+# --cache-from registry by default), causing every subsequent
+# `kamal deploy` to reuse a cached precompile layer that never
+# included tailwind in the manifest. Bumping this comment forces
+# the next build to rebuild from this layer onward.
+ARG ASSET_BUILD_REV=2026-05-15
+RUN echo "asset build rev: ${ASSET_BUILD_REV}"
+
+# Build Tailwind CSS, then precompile assets. Two separate RUN steps
+# rather than one combined `tailwindcss:build assets:precompile` so
+# they execute as independent processes — eliminates any chance of
+# precompile reading a stale file list before tailwindcss:build's
+# output lands. Each step's exit code is checked independently.
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails tailwindcss:build
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
 
@@ -88,3 +102,5 @@ EXPOSE 8080
 VOLUME /data
 WORKDIR /rails/current
 CMD ["./bin/thrust", "./bin/rails", "server"]
+# rebuild 1778798348
+# bust 1778801469

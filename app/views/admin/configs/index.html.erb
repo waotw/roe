@@ -5,36 +5,38 @@
       <p class="mt-2 mb-4 text-sm text-gray-700">Edit configuration files for your site.</p>
     </div>
 
-    <h2 class="text-2xl font-bold text-gray-900">Integrations</h2>
-    <p class="mt-2 mb-4 text-sm text-gray-700">
-      <% if show_production_features? %>
-        Members is a membership system with newsletters (Postmark) and payments (Stripe). Store is an ecommerce integration with Snipcart.
-      <% else %>
-        These features can be enabled/configured once the site is live/hosted.
-      <% end %>
-    </p>
+    <% if integrations_to_enable? %>
+      <h2 class="text-2xl font-bold text-gray-900">Integrations</h2>
+      <p class="mt-2 mb-4 text-sm text-gray-700">
+        <% if show_production_features? %>
+          Members is a membership system with newsletters (Postmark) and payments (Stripe). Store is an ecommerce integration with Snipcart.
+        <% else %>
+          These features can be enabled/configured once the site is live/hosted.
+        <% end %>
+      </p>
 
-    <div class="flex gap-2">
-      <% disabled       = !show_production_features? %>
-      <% disabled_class = disabled ? "opacity-50 pointer-events-none cursor-not-allowed" : "" %>
-      <% base_class     = "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 font-mono rounded-xs" %>
+      <div class="flex gap-2">
+        <% disabled       = !show_production_features? %>
+        <% disabled_class = disabled ? "opacity-50 pointer-events-none cursor-not-allowed" : "" %>
+        <% base_class     = "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 font-mono rounded-xs" %>
 
-      <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'members.yml')) %>
-        <%= link_to "Enable Members",
-                    new_members_setup_admin_configs_path,
-                    class: "#{base_class} bg-green-200 hover:bg-green-300 #{disabled_class}",
-                    aria: (disabled ? { disabled: "true" } : {}),
-                    title: (disabled ? "Members can only be enabled in production" : nil) %>
-      <% end %>
+        <% unless members_enabled? %>
+          <%= link_to "Enable Members",
+                      new_members_setup_admin_configs_path,
+                      class: "#{base_class} bg-green-200 hover:bg-green-300 #{disabled_class}",
+                      aria: (disabled ? { disabled: "true" } : {}),
+                      title: (disabled ? "Members can only be enabled in production" : nil) %>
+        <% end %>
 
-      <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'store.yml')) %>
-        <%= link_to "Enable Store",
-                    new_store_setup_admin_configs_path,
-                    class: "#{base_class} bg-purple-200 hover:bg-purple-300 #{disabled_class}",
-                    aria: (disabled ? { disabled: "true" } : {}),
-                    title: (disabled ? "Store can only be enabled in production" : nil) %>
-      <% end %>
-    </div>
+        <% unless store_enabled? %>
+          <%= link_to "Enable Store",
+                      new_store_setup_admin_configs_path,
+                      class: "#{base_class} bg-purple-200 hover:bg-purple-300 #{disabled_class}",
+                      aria: (disabled ? { disabled: "true" } : {}),
+                      title: (disabled ? "Store can only be enabled in production" : nil) %>
+        <% end %>
+      </div>
+    <% end %>
   </div>
 
   <% unless File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'features', 'podcast.yml')) %>

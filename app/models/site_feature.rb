@@ -62,6 +62,15 @@ module SiteFeature
     File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system/features/store.yml'))
   end
 
+  # True when at least one integration (Members, Store) hasn't been
+  # enabled yet. Used by the configs index to hide the entire
+  # "Integrations" section once everything's set up — no point
+  # showing a section whose only purpose was the enable buttons.
+  # Podcasts are a separate "Features" group and not counted here.
+  def integrations_to_enable?
+    !members_enabled? || !store_enabled?
+  end
+
   def postmark_configured?
     PostmarkConfig.exists? && PostmarkConfig.current.connected?
   end

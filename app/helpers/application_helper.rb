@@ -39,6 +39,7 @@ module ApplicationHelper
   def newsletters_enabled?        = SiteFeature.newsletters_enabled?
   def postmark_configured?        = SiteFeature.postmark_configured?
   def store_enabled?              = SiteFeature.store_enabled?
+  def integrations_to_enable?     = SiteFeature.integrations_to_enable?
   def framework_dev_mode?         = SiteFeature.framework_dev_mode?
   def show_production_features?   = SiteFeature.show_production_features?
   def show_development_features?  = SiteFeature.show_development_features?
