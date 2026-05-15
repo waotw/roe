@@ -10,7 +10,7 @@ module HasMarkdownExtensions
     processed_content = content.gsub(/````+(\w*)\s*\r?\n(.*?)````+/m) do
       lang = $1.empty? ? 'text' : $1
       code = $2
-      token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
+      token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
       code_blocks[token] = render_code_block(code, lang)
       counter += 1
       token
@@ -26,7 +26,7 @@ module HasMarkdownExtensions
         next $~.to_s
       end
 
-      token = "CODE_BLOCK_PLACEHOLDER_#{counter}"
+      token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
       code_blocks[token] = if lang == 'poetry'
         render_poetry_block(code)
       else
@@ -36,14 +36,10 @@ module HasMarkdownExtensions
       token
     end
 
-    # Protect || split markers
-    pullquote_splits = {}
-    processed_content = processed_content.gsub(/\|\|/) do
-      token = "PULLQUOTE_SPLIT_#{counter}"
-      pullquote_splits[token] = '||'
-      counter += 1
-      token
-    end
+    # Protect || split markers from Kramdown's table parsing. Every
+    # marker restores to the same value, so a single shared placeholder
+    # is enough — no per-occurrence indexing needed.
+    processed_content = processed_content.gsub('||', 'PULLQUOTE_SPLIT_END')
 
     # Process galleries, collections, cards, etc.
     processed_content = process_auto_galleries(processed_content)
@@ -71,9 +67,7 @@ module HasMarkdownExtensions
     end
 
     # Restore pullquote splits
-    pullquote_splits.each do |token, original|
-      html.gsub!(token, original)
-    end
+    html.gsub!('PULLQUOTE_SPLIT_END', '||')
 
     # Add footnote backlinks
     html = add_footnote_backlinks(html)
