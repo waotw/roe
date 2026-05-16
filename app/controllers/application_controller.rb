@@ -20,6 +20,12 @@ class ApplicationController < ActionController::Base
   end
 
   def render_not_found
-    render file: "#{Rails.root}/public/404.html", status: :not_found, layout: false
+    static_404 = Rails.root.join("public", "404.html")
+    if File.exist?(static_404)
+      render file: static_404.to_s, status: :not_found, layout: false
+    else
+      render html: "<h1 style='font-family:sans-serif;padding:2rem'>404 &mdash; Page not found</h1>".html_safe,
+             status: :not_found, layout: false
+    end
   end
 end

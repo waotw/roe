@@ -7,6 +7,7 @@ class SiteConfig < ApplicationRecord
   SITE_FILE = File.join(SITE_PATH, 'site.yml')
   FONTS_FILE = File.join(SITE_PATH, 'fonts.yml')
   DEVELOPMENT_FILE = File.join(SITE_PATH, 'development.yml')
+  DEPLOY_FILE = File.join(SITE_PATH, 'deploy.yml')
 
   CACHE_KEY_PREFIX = 'site_config'
 
@@ -119,6 +120,7 @@ class SiteConfig < ApplicationRecord
     # Sync site configs
     sync_from_file('site') if File.exist?(SITE_FILE)
     sync_from_file('fonts') if File.exist?(FONTS_FILE)
+    sync_from_file('deploy') if File.exist?(DEPLOY_FILE)
 
     # Sync all defaults
     Dir.glob(DEFAULTS_PATH.join('*.yml')).each do |file|
@@ -145,6 +147,8 @@ class SiteConfig < ApplicationRecord
       SITE_FILE
     when 'fonts'
       FONTS_FILE
+    when 'deploy'
+      DEPLOY_FILE
     when /^features\//
       filename = type.split('/').last
       FEATURES_PATH.join("#{filename}.yml")

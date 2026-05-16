@@ -667,7 +667,7 @@ export default class extends Controller {
     doneButton.type = "button";
     doneButton.id = "footnote-done-button";
     doneButton.className =
-      "fixed bottom-8 right-10 z-50 uppercase text-base px-1.5 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs";
+      "fixed bottom-8 right-12 z-50 uppercase text-base px-1.5 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs";
     doneButton.innerHTML = "✓ Done with Footnote";
     doneButton.dataset.returnPosition = returnPosition;
 

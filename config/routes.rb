@@ -28,12 +28,16 @@ Rails.application.routes.draw do
   namespace :admin do
     root "dashboard#index"
 
-    # Updates
-    get "updates", to: "updates#index", as: "updates"
-    post "updates/check", to: "updates#check", as: "check_updates"
-    post "updates/start", to: "updates#start", as: "start_update"
-    post "updates/rollback", to: "updates#rollback", as: "rollback_update"
-    get "updates/status", to: "updates#status", as: "update_status"
+    # Updates & Deploy
+    get  "updates",                   to: "updates#index",          as: "updates"
+    post "updates/check",             to: "updates#check",          as: "check_updates"
+    post "updates/start",             to: "updates#start",          as: "start_update"
+    post "updates/rollback",          to: "updates#rollback",       as: "rollback_update"
+    get  "updates/status",            to: "updates#status",         as: "update_status"
+    post "updates/deploy",            to: "updates#start_deploy",   as: "start_deploy"
+    get  "updates/deploy/status",     to: "updates#deploy_status",  as: "deploy_status"
+    post "updates/deploy/dismiss",    to: "updates#dismiss_deploy", as: "dismiss_deploy"
+    get  "updates/git_status",        to: "updates#git_status",     as: "git_status"
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
@@ -230,6 +234,10 @@ Rails.application.routes.draw do
 
     get "configs/store/edit", to: "configs#edit_store", as: "edit_store_config"
     patch "configs/store", to: "configs#update_store", as: "store_config"
+
+    get  "configs/deploy/edit",           to: "configs#edit_deploy",            as: "edit_deploy_config"
+    patch "configs/deploy",                to: "configs#update_deploy",           as: "deploy_config"
+    post  "configs/deploy/clear_password", to: "configs#clear_deploy_password",   as: "clear_deploy_password"
 
     get "configs/development/edit", to: "configs#edit_development", as: "edit_development_config"
     patch "configs/development", to: "configs#update_development", as: "development_config"

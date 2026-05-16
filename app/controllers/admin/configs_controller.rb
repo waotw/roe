@@ -158,6 +158,17 @@ class Admin::ConfigsController < ApplicationController
       }
     ]
 
+    # Always show deploy.yml (ships with Roe)
+    if File.exist?(SiteConfig::DEPLOY_FILE)
+      global_files << {
+        name: "deploy.yml",
+        path: "global/deploy.yml",
+        type: "deploy",
+        description: "Deployment target (Kamal/Fly), server address, registry, and volume paths",
+        edit_path: admin_edit_deploy_config_path
+      }
+    end
+
     # Add development.yml if it exists
     if File.exist?(SiteConfig::DEVELOPMENT_FILE)
       global_files << {
@@ -505,6 +516,89 @@ class Admin::ConfigsController < ApplicationController
 
     flash[:notice] = "Store feature disabled successfully"
     redirect_to admin_configs_path
+  end
+
+  def clear_deploy_password
+    DeploySecrets.delete_all
+    flash[:notice] = "Registry password cleared."
+    redirect_to admin_edit_deploy_config_path
+  end
+
+  def edit_deploy
+    @config_hash         = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    @deploy_secrets      = DeploySecrets.current
+    @master_key_present  = DeployConfigGenerator.master_key_present?
+    @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
+    @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
+    render :edit_deploy
+  end
+
+  def update_deploy
+    dp = params[:deploy_config] || {}
+
+    config = {
+      'target'   => dp[:target].to_s.presence || 'kamal',
+      'app_name' => dp[:app_name].to_s.strip,
+      'ssl'      => dp[:ssl] == '1',
+      'kamal'    => {
+        'servers'           => (dp.dig(:kamal, :servers) || []).reject(&:blank?),
+        'registry_username' => dp.dig(:kamal, :registry_username).to_s.strip,
+        'image_name'        => dp.dig(:kamal, :image_name).to_s.strip
+      },
+      'fly'      => {
+        'region'    => dp.dig(:fly, :region).to_s.strip,
+        'vm_memory' => dp.dig(:fly, :vm_memory).to_s.strip
+      }
+    }
+
+    FileUtils.mkdir_p(File.dirname(SiteConfig::DEPLOY_FILE))
+    File.write(SiteConfig::DEPLOY_FILE, config.to_yaml)
+    SiteConfig.sync_from_file('deploy')
+
+    # Save registry password if a new one was provided (blank = keep existing).
+    deploy_secrets   = DeploySecrets.current
+    new_password     = params.dig(:deploy_secrets, :registry_password).presence
+    if new_password
+      deploy_secrets.registry_password = new_password
+      deploy_secrets.save!
+    end
+
+    # Generate platform config files, then .kamal/secrets when ready.
+    generated = []
+    alerts    = []
+
+    begin
+      generated += DeployConfigGenerator.generate!.map { |r| r[:file] }
+    rescue DeployConfigGenerator::GenerationError => e
+      Rails.logger.error "DeployConfigGenerator.generate! failed: #{e.message}"
+      alerts << e.message
+    end
+
+    if config['target'] == 'kamal' &&
+       deploy_secrets.registry_password.present? &&
+       DeployConfigGenerator.master_key_present?
+      begin
+        DeployConfigGenerator.generate_secrets!
+        generated << '.kamal/secrets'
+      rescue DeployConfigGenerator::GenerationError => e
+        Rails.logger.error "DeployConfigGenerator.generate_secrets! failed: #{e.message}"
+        alerts << e.message
+      end
+    end
+
+    flash[:notice] = "Deploy configuration saved#{generated.any? ? ". Generated: #{generated.join(', ')}" : ""}."
+    flash[:alert]  = alerts.join(' ') if alerts.any?
+
+    redirect_to admin_edit_deploy_config_path
+  rescue => e
+    Rails.logger.error "Failed to update deploy config: #{e.message}"
+    flash.now[:error] = "Failed to update deploy configuration: #{e.message}"
+    @config_hash         = config || {}
+    @deploy_secrets      = DeploySecrets.current
+    @master_key_present  = DeployConfigGenerator.master_key_present?
+    @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
+    @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
+    render :edit_deploy, status: :unprocessable_entity
   end
 
   def edit_development

@@ -1,10 +1,31 @@
 <% content_for :editor_js, false %>
 <div class="px-4 sm:px-0" data-controller="updates">
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900">Updates</h1>
+    <h1 class="text-3xl font-bold text-gray-900">Updates &amp; Deploy</h1>
     <p class="mt-2 text-sm text-gray-700">
-      Check for updates to Roe CMS and manage installation.
+      Check for updates to Roe CMS and deploy the current build to your live server.
     </p>
+  </div>
+
+  <div class="mt-8 mb-8 pt-6 border-t px-4 border-gray-200 flex gap-2">
+    <div class="flex-1">
+      <h3 class="text-sm font-semibold text-gray-900 mb-2">About Updates</h3>
+      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-4">
+        <li>Updates include new features, bug fixes, and security patches</li>
+        <li>Your content in the <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/</code> folder is preserved during updates</li>
+        <li>Configuration files are not overwritten</li>
+        <li>If an update fails, the system will automatically roll back</li>
+      </ul>
+    </div>
+    <div class="flex-1">
+      <h3 class="text-sm font-semibold text-gray-900 mb-2">About Deploy</h3>
+      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-4">
+        <li>Deploys only apply to Roe's codebase, not your site content</li>
+        <li>Your content in the <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/</code> folder is always preserved &mdash; it lives on a separate persistent volume</li>
+        <li><b>Kamal:</b> if the build fails, your server is untouched. If the container fails to start, run <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">kamal rollback</code> from the terminal to restore the previous image</li>
+        <li><b>Fly:</b> Fly starts the new instance before stopping the old one &mdash; if health checks fail, traffic stays on the previous version automatically</li>
+      </ul>
+    </div>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
@@ -181,13 +202,187 @@
     </div>
   <% end %>
 
-  <div class="mt-8 pt-6 border-t border-gray-200">
-    <h3 class="text-sm font-semibold text-gray-900 mb-2">About Updates</h3>
-    <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
-      <li>Updates include new features, bug fixes, and security patches</li>
-      <li>Your content in the site/ folder is preserved during updates</li>
-      <li>Configuration files are not overwritten</li>
-      <li>If an update fails, the system will automatically roll back</li>
-    </ul>
-  </div>
+  <%# ══════════════════════════════════════════════════════════════════════
+      Deploy section
+  ══════════════════════════════════════════════════════════════════════ %>
+
+  <div class="mt-12 pt-8 border-t-2 border-gray-300">
+    <h2 class="mt-6 text-2xl font-bold text-gray-900 mb-6">Deploy to Live Server</h2>
+
+    <%
+      deploy_target       = @deploy_config['target'].presence || 'kamal'
+      deploy_target_label = deploy_target == 'kamal' ? 'Kamal' : 'Fly.io'
+      deploy_state        = @deploy_status&.dig(:state)
+
+      # Human-readable server/app descriptor for the card header
+      deploy_server_desc = if deploy_target == 'kamal'
+        servers = Array(@deploy_config.dig('kamal', 'servers')).reject(&:blank?)
+        servers.first.presence || '(no server configured)'
+      else
+        @deploy_config['app_name'].presence || '(no app name)'
+      end
+
+      last_deployed_at = @deploy_status&.dig(:completed_at) if deploy_state == :completed
+    %>
+
+    <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+
+      <%# Card header — always visible %>
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-flex items-center font-mono text-xs px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs">
+              <%= deploy_target_label %>
+            </span>
+            <span class="text-sm text-gray-600 font-mono"><%= deploy_server_desc %></span>
+          </div>
+          <% if last_deployed_at %>
+            <p class="text-xs text-gray-400">Last deployed <%= time_ago_in_words(last_deployed_at) %> ago</p>
+          <% elsif deploy_state == :running %>
+            <p class="text-xs text-amber-600">Deploy in progress…</p>
+          <% else %>
+            <p class="text-xs text-gray-400">Not yet deployed from this machine</p>
+          <% end %>
+        </div>
+        <%= link_to "Edit deploy config",
+                    admin_edit_deploy_config_path,
+                    class: "text-xs text-gray-400 hover:text-gray-700 underline" %>
+      </div>
+
+      <%# ── Running state — Stimulus polls deployLog target ── %>
+      <% if deploy_state == :running %>
+        <div class="bg-amber-50 border border-amber-200 rounded-sm p-4"
+             data-updates-target="deployInProgressPanel">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <h3 class="text-sm font-semibold text-amber-900">Deploy in progress</h3>
+            <% if @deploy_status[:started_at] %>
+              <span class="text-xs text-amber-700 ml-auto">
+                Started <%= time_ago_in_words(@deploy_status[:started_at]) %> ago
+              </span>
+            <% end %>
+          </div>
+          <p class="text-xs text-amber-800 mb-3">Please don’t close this window. The page updates automatically.</p>
+          <div class="bg-white border border-amber-200 rounded-sm p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
+               data-updates-target="deployLog">
+            <%= simple_format(@deploy_status[:log].presence || '') %>
+          </div>
+        </div>
+
+      <%# ── Completed state ── %>
+      <% elsif deploy_state == :completed %>
+        <div class="bg-green-50 border border-green-200 rounded-sm p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-green-900">Deploy completed successfully</h3>
+              <% if @deploy_status[:completed_at] %>
+                <p class="text-xs text-green-700 mt-0.5">
+                  Finished <%= time_ago_in_words(@deploy_status[:completed_at]) %> ago
+                  <% if @deploy_status[:version_tag].present? && deploy_target == 'kamal' %>
+                    &middot; version tag <span class="font-mono"><%= @deploy_status[:version_tag] %></span>
+                  <% end %>
+                </p>
+              <% end %>
+            </div>
+            <%= button_to "Dismiss",
+                          admin_dismiss_deploy_path,
+                          method: :post,
+                          class: "text-xs font-mono px-3 py-1.5 border border-green-600 bg-green-100 hover:bg-green-200 text-green-800 rounded-xs" %>
+          </div>
+          <% if @deploy_status[:log].present? %>
+            <details class="mt-3">
+              <summary class="text-xs text-green-700 cursor-pointer hover:text-green-900">Show deploy log</summary>
+              <div class="mt-2 bg-white border border-green-200 rounded-sm p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
+                <%= simple_format(@deploy_status[:log]) %>
+              </div>
+            </details>
+          <% end %>
+        </div>
+
+      <%# ── Failed state ── %>
+      <% elsif deploy_state == :failed %>
+        <div class="bg-red-50 border border-red-200 rounded-sm p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
+            <div class="flex gap-2">
+              <%= button_to "Retry",
+                            admin_start_deploy_path,
+                            method: :post,
+                            class: "text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
+              <%= button_to "Dismiss",
+                            admin_dismiss_deploy_path,
+                            method: :post,
+                            class: "text-xs font-mono px-3 py-1.5 border border-red-400 bg-red-100 hover:bg-red-200 text-red-800 rounded-xs" %>
+            </div>
+          </div>
+          <% if @deploy_status[:error].present? %>
+            <p class="text-xs text-red-700 mb-3"><%= @deploy_status[:error] %></p>
+          <% end %>
+          <% if @deploy_status[:log].present? %>
+            <div class="bg-white border border-red-200 rounded-sm p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
+              <%= simple_format(@deploy_status[:log]) %>
+            </div>
+          <% end %>
+        </div>
+
+      <%# ── Not ready — prerequisites unmet ── %>
+      <% elsif @deploy_issues.any? %>
+        <div class="bg-amber-50 border border-amber-200 rounded-sm p-4">
+          <h3 class="text-sm font-semibold text-amber-900 mb-2">Not ready to deploy</h3>
+          <ul class="text-sm text-amber-800 list-disc list-inside space-y-1 mb-3">
+            <% @deploy_issues.each do |issue| %>
+              <li><%= issue %></li>
+            <% end %>
+          </ul>
+          <%= link_to "Edit deploy config →",
+                      admin_edit_deploy_config_path,
+                      class: "text-xs font-mono underline text-amber-800 hover:text-amber-900" %>
+        </div>
+
+      <%# ── Ready — show deploy button ── %>
+      <% else %>
+        <% confirm_msg = if deploy_target == 'kamal'
+             "Build and push a Docker image to #{deploy_server_desc}, then restart the container. " \
+             "The site will be briefly unavailable. Continue?"
+           else
+             "Deploy to Fly.io (app: #{@deploy_config['app_name']}). Continue?"
+           end %>
+        <div>
+          <% if deploy_target == 'kamal' && !@kamal_cli_available %>
+            <p class="text-sm text-amber-700 mb-3">
+              Kamal CLI is not available on this machine. Run
+              <code class="font-mono text-xs bg-amber-50 px-0.5">bundle install</code>
+              in <code class="font-mono text-xs bg-amber-50 px-0.5">current/</code> first.
+            </p>
+          <% elsif deploy_target == 'fly' && !@fly_cli_available %>
+            <p class="text-sm text-amber-700 mb-3">
+              The Fly CLI is not installed.
+              <%= link_to "See install instructions →", admin_edit_deploy_config_path, class: "underline" %>
+            </p>
+          <% else %>
+            <button type="button"
+                    data-action="click->updates#checkBeforeDeploy"
+                    data-deploy-url="<%= admin_start_deploy_path %>"
+                    data-confirm-msg="<%= confirm_msg %>"
+                    class="inline-flex items-center px-2 py-1.5 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono text-sm rounded-xs">
+              Deploy
+            </button>
+            <p class="mt-2 text-xs text-gray-500">
+              Deploys the current build on disk.
+              <% if deploy_target == 'kamal' %>
+                Kamal builds on the remote server — expect 5–10 minutes.
+              <% else %>
+                Fly builds in the cloud — typically 2–5 minutes.
+              <% end %>
+            </p>
+          <% end %>
+        </div>
+      <% end %>
+
+    </div><%# /deploy card %>
+  </div><%# /deploy section %>
+
 </div>

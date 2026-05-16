@@ -25,6 +25,12 @@ module Roe
     # Only allow explicit database specification for migrations
     config.active_record.dump_schema_after_migration = false
 
+    # Silence the "Unpermitted parameters" warning for authenticity_token
+    # and commit — these are standard Rails form params (CSRF token and
+    # submit button label) that never need to be in permit() and would
+    # otherwise appear in the log on every form submission.
+    config.action_controller.action_on_unpermitted_parameters = false
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
@@ -47,10 +53,10 @@ module RoeSitePaths
     # Check if site directory exists in parent (versioned structure)
     parent_dir = File.expand_path('..', Rails.root)
     parent_site = File.join(parent_dir, 'site')
-    
+
     # Also check if current directory name suggests we're versioned
     current_dir_name = File.basename(Rails.root)
-    
+
     if current_dir_name == 'current' && File.directory?(parent_site)
       # Versioned structure: we're in /roe/current/, site is in /roe/site/
       parent_dir

@@ -1,0 +1,448 @@
+<% content_for :editor_js, false %>
+<div class="px-4 sm:px-0">
+  <div class="sm:flex sm:items-center mb-6">
+    <div class="sm:flex-auto">
+      <h1 class="text-3xl font-bold text-gray-900">Deploy Configuration</h1>
+      <p class="mt-2 text-sm text-gray-700">
+        Configure your deployment target, server, and credentials.
+        Secrets are stored encrypted and written to the appropriate files automatically.
+      </p>
+      <div class="mt-3 flex gap-2 flex-wrap">
+        <span class="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 bg-gray-100 border border-gray-300 rounded-xs text-gray-600">
+          generates → <strong>config/deploy.yml</strong>
+        </span>
+        <span class="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 bg-gray-100 border border-gray-300 rounded-xs text-gray-600">
+          generates → <strong>fly.toml</strong>
+        </span>
+        <span id="kamal-secrets-badge"
+              class="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 bg-gray-100 border border-gray-300 rounded-xs text-gray-600
+                     <%= 'hidden' if (@config_hash['target'].presence || 'kamal') != 'kamal' %>">
+          generates → <strong>.kamal/secrets</strong>
+        </span>
+      </div>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+      <%= link_to "← Back to Settings", admin_configs_path,
+            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+    </div>
+  </div>
+
+  <% if flash[:error] %>
+    <div class="mb-4 bg-red-50 border border-red-200 p-4">
+      <p class="text-sm text-red-800"><%= flash[:error] %></p>
+    </div>
+  <% end %>
+
+  <%# ── CLI requirement banners ─────────────────────────────────────────
+      Shown when the chosen target's CLI is not found in PATH.
+      Both banners share the same show/hide toggle as their
+      respective settings section so they track the target radio. %>
+
+  <% unless @fly_cli_available %>
+    <div id="fly-cli-warning"
+         class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (target = @config_hash['target'].presence || 'kamal') != 'fly' %>">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">Fly CLI not installed</h3>
+      <p class="text-sm text-amber-800 mb-3">
+        The <code class="font-mono text-xs bg-amber-100 px-0.5">fly</code> command-line tool is
+        required to build and deploy to Fly.io. Install it, then reload this page.
+      </p>
+      <div class="space-y-2 font-mono text-xs bg-white border border-amber-200 p-3">
+        <p class="text-amber-700 font-sans text-xs font-semibold mb-1">macOS (Homebrew — recommended)</p>
+        <p class="select-all">brew install flyctl</p>
+        <p class="text-amber-700 font-sans text-xs font-semibold mt-2 mb-1">macOS / Linux (official installer)</p>
+        <p class="select-all">curl -L https://fly.io/install.sh | sh</p>
+        <p class="text-amber-700 font-sans text-xs font-semibold mt-2 mb-1">Then authenticate</p>
+        <p class="select-all">fly auth login</p>
+      </div>
+      <p class="mt-2 text-xs text-amber-700">
+        Full docs: <a href="https://fly.io/docs/flyctl/install/" target="_blank" class="underline">fly.io/docs/flyctl/install</a>
+      </p>
+    </div>
+  <% end %>
+
+  <% unless @kamal_cli_available %>
+    <div id="kamal-cli-warning"
+         class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (@config_hash['target'].presence || 'kamal') != 'kamal' %>">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">Kamal CLI not available</h3>
+      <p class="text-sm text-amber-800 mb-3">
+        <code class="font-mono text-xs bg-amber-100 px-0.5">bundle exec kamal</code> could not be found.
+        Kamal is included in Roe's Gemfile — running <code class="font-mono text-xs bg-amber-100 px-0.5">bundle install</code>
+        from the <code class="font-mono text-xs bg-amber-100 px-0.5">current/</code> directory should resolve this.
+      </p>
+      <div class="font-mono text-xs bg-white border border-amber-200 p-3 space-y-1">
+        <p class="select-all">cd current/</p>
+        <p class="select-all">bundle install</p>
+      </div>
+    </div>
+  <% end %>
+
+  <%
+    target            = @config_hash['target'].presence || 'kamal'
+    kamal             = @config_hash['kamal'] || {}
+    fly               = @config_hash['fly'] || {}
+    servers           = kamal['servers'].presence || ['']
+  %>
+
+  <%= form_with url: admin_deploy_config_path, method: :patch, local: true, class: "space-y-6" do |f| %>
+
+    <%# ── Credentials card ─────────────────────────────────────────────────── %>
+    <div class="bg-white border border-gray-200">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Credentials</h3>
+        <p class="text-sm text-gray-500 mt-1">
+          Required to build and push your Docker image. Stored encrypted — never written to version control.
+        </p>
+      </div>
+      <div class="px-6 py-4 space-y-5">
+
+        <%# Master key — auto-detected, no input needed %>
+        <div>
+          <p class="text-sm font-bold text-gray-700 mb-1">Rails master key</p>
+          <% if @master_key_present %>
+            <div class="flex items-center gap-1.5 text-sm text-green-700">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              <span>Found at <code class="font-mono text-xs bg-green-50 px-0.5">config/master.key</code> — used automatically.</span>
+            </div>
+          <% else %>
+            <div class="flex items-start gap-1.5 text-sm text-red-700">
+              <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              <span>
+                Not found at <code class="font-mono text-xs bg-red-50 px-0.5">config/master.key</code>.
+                This file is required for deployment. Copy it from your Rails credentials setup or
+                generate new credentials with <code class="font-mono text-xs bg-red-50 px-0.5">bin/rails credentials:edit</code>.
+              </span>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Registry password — Kamal only %>
+        <div id="kamal-registry-section" class="<%= 'hidden' if target != 'kamal' %> mt-3">
+          <label class="block text-sm font-bold text-gray-700 mb-1" for="deploy_registry_password">
+            Registry password
+            <span class="font-normal text-gray-400">(Docker Hub access token)</span>
+          </label>
+          <% if @deploy_secrets.registry_password_set? %>
+            <%# Masked display — shown by default when a password is already saved %>
+            <div id="password-saved-display" class="flex items-center gap-3">
+              <span class="font-mono text-lg tracking-widest text-gray-500 select-none">
+                &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
+              </span>
+              <button type="button" id="change-password-btn"
+                class="uppercase text-xs font-mono px-2 py-1 border border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xs">
+                Change
+              </button>
+              <%= link_to "Remove",
+                    admin_clear_deploy_password_path,
+                    class: "uppercase text-xs font-mono px-2 py-1 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs",
+                    data: { turbo_method: :post, turbo_confirm: "Remove the saved registry password?" } %>
+            </div>
+            <%# Actual input — hidden until Change is clicked %>
+            <div id="password-edit-display" class="hidden">
+              <%= password_field_tag "deploy_secrets[registry_password]",
+                    nil,
+                    id: "deploy_registry_password",
+                    class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                    placeholder: "Paste new Docker Hub access token",
+                    autocomplete: "new-password" %>
+              <button type="button" id="cancel-password-btn"
+                class="mt-2 uppercase text-xs px-2 py-1.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
+                Cancel
+              </button>
+            </div>
+          <% else %>
+            <%= password_field_tag "deploy_secrets[registry_password]",
+                  nil,
+                  id: "deploy_registry_password",
+                  class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                  placeholder: "Paste Docker Hub access token",
+                  autocomplete: "new-password" %>
+          <% end %>
+          <p class="mt-1 text-xs text-gray-500">
+            Create a token at Docker Hub → Account Settings → Security → New Access Token.
+            Grant it <strong>Read &amp; Write</strong> access.
+          </p>
+        </div>
+
+        <%# Fly credentials note — Fly only %>
+        <div id="fly-secrets-note" class="<%= 'hidden' if target != 'fly' %>">
+          <p class="text-sm font-medium text-gray-700 mb-2">Fly.io credentials</p>
+          <p class="text-sm text-gray-600 mb-3">
+            Fly secrets are managed on the platform, not in local files.
+            Run these once from your terminal:
+          </p>
+          <div class="bg-gray-50 border border-gray-200 rounded-xs p-3 space-y-1.5 font-mono text-xs">
+            <p class="select-all">fly secrets set RAILS_MASTER_KEY=$(cat config/master.key)</p>
+            <p class="select-all">fly auth login</p>
+          </div>
+          <p class="mt-2 text-xs text-gray-500">Fly stores these securely on the platform — no local secrets file needed.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <%# ── Target ─────────────────────────────────────────────────────── %>
+    <div class="bg-white border border-gray-200">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Deployment Target</h3>
+        <p class="text-sm text-gray-500 mt-1">
+          Choose whether to deploy with Kamal (any VPS/bare metal) or Fly.io.
+          The target controls which section below is used when running deploys.
+        </p>
+      </div>
+      <div class="px-6 py-4 flex gap-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <%= radio_button_tag "deploy_config[target]", "kamal", target == "kamal",
+                id: "target_kamal",
+                class: "target-radio",
+                data: { target: "kamal" } %>
+          <span class="text-sm font-medium text-gray-900 font-mono">kamal</span>
+          <span class="text-xs text-gray-500">— any VPS, DigitalOcean, Hetzner, etc.</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <%= radio_button_tag "deploy_config[target]", "fly", target == "fly",
+                id: "target_fly",
+                class: "target-radio",
+                data: { target: "fly" } %>
+          <span class="text-sm font-medium text-gray-900 font-mono">fly</span>
+          <span class="text-xs text-gray-500">— Fly.io managed platform</span>
+        </label>
+      </div>
+    </div>
+
+    <%# ── Common fields ──────────────────────────────────────────────── %>
+    <div class="bg-white border border-gray-200">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Common Settings</h3>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="deploy_app_name">
+            App name
+          </label>
+          <%= text_field_tag "deploy_config[app_name]", @config_hash['app_name'],
+                id: "deploy_app_name",
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                placeholder: "roe" %>
+          <p class="mt-1 text-xs text-gray-500">Used as the Kamal app name and Fly app name. Lowercase, with hyphens, no spaces.</p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <%= check_box_tag "deploy_config[ssl]", "1", @config_hash['ssl'] != false,
+                id: "deploy_ssl",
+                class: "h-4 w-4 mt-0.5 border-gray-300 rounded" %>
+          <div>
+            <label for="deploy_ssl" class="text-sm font-medium text-gray-700 cursor-pointer">Enable SSL / HTTPS</label>
+            <p class="mt-0.5 text-xs text-gray-500">
+              Safe to leave enabled. Your first Kamal deploy works over HTTP via your server’s IP
+              regardless — HTTPS only activates once you point a custom domain at the server.
+              For Fly.io, this forces HTTPS on all requests.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%# ── Kamal section ──────────────────────────────────────────────── %>
+    <div id="kamal-section" class="bg-white border border-gray-200 <%= 'hidden' if target != 'kamal' %>">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Kamal Settings</h3>
+        <p class="text-sm text-gray-500 mt-1">
+          Configuration for
+          <a href="https://kamal-deploy.org" target="_blank" class="underline">Kamal</a>
+          deploys. The registry password / Docker Hub token belongs in
+          <code class="font-mono text-xs bg-gray-100 px-0.5">.kamal/secrets</code>,
+          not here.
+        </p>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+
+        <%# Servers array %>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Servers</label>
+          <p class="text-xs text-gray-500 mb-2">IP address(es) or hostnames of your target server(s). One per line.</p>
+          <div id="kamal-servers-container" class="space-y-2">
+            <% (servers.reject(&:blank?).presence || ['']).each do |server| %>
+              <%= text_field_tag "deploy_config[kamal][servers][]", server,
+                    class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                    placeholder: "192.168.1.1 or example.com" %>
+            <% end %>
+          </div>
+          <button type="button" id="add-server-btn"
+            class="mt-2 inline-flex items-center gap-1 font-mono text-xs px-2 py-1.5 border border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xs">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add server
+          </button>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="kamal_registry_username">
+            Registry username
+          </label>
+          <%= text_field_tag "deploy_config[kamal][registry_username]", kamal['registry_username'],
+                id: "kamal_registry_username",
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                placeholder: "your-docker-hub-username",
+                autocomplete: "off" %>
+          <p class="mt-1 text-xs text-gray-500">
+            Your Docker Hub (or other registry) username.
+            The password / access token goes in
+            <code class="font-mono text-xs bg-gray-100 px-0.5">.kamal/secrets</code>
+            as <code class="font-mono text-xs bg-gray-100 px-0.5">KAMAL_REGISTRY_PASSWORD</code>.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="kamal_image_name">
+            Repository name
+          </label>
+          <%= text_field_tag "deploy_config[kamal][image_name]", kamal['image_name'],
+                id: "kamal_image_name",
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                placeholder: @config_hash['app_name'].presence || 'roe' %>
+          <p class="mt-1 text-xs text-gray-500">
+            The Docker image repository name. Defaults to your app name if left blank.
+            Your image will be pushed as
+            <code class="font-mono bg-gray-100 px-0.5">
+              <%= kamal['registry_username'].presence || 'username' %>/<%= kamal['image_name'].presence || @config_hash['app_name'].presence || 'roe' %>
+            </code>.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <%# ── Fly section ─────────────────────────────────────────────────── %>
+    <div id="fly-section" class="bg-white border border-gray-200 <%= 'hidden' if target != 'fly' %>">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Fly.io Settings</h3>
+        <p class="text-sm text-gray-500 mt-1">
+          Configuration for
+          <a href="https://fly.io" target="_blank" class="underline">Fly.io</a>
+          deploys. Set your API token with
+          <code class="font-mono text-xs bg-gray-100 px-0.5">fly auth login</code>
+          or the <code class="font-mono text-xs bg-gray-100 px-0.5">FLY_API_TOKEN</code> env var.
+        </p>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="fly_region">
+            Region
+          </label>
+          <%= text_field_tag "deploy_config[fly][region]", fly['region'],
+                id: "fly_region",
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                placeholder: "iad" %>
+          <p class="mt-1 text-xs text-gray-500">
+            Fly region code, e.g. <code class="font-mono text-xs bg-gray-100 px-0.5">iad</code> (US East),
+            <code class="font-mono text-xs bg-gray-100 px-0.5">lhr</code> (London),
+            <code class="font-mono text-xs bg-gray-100 px-0.5">syd</code> (Sydney).
+            Run <code class="font-mono text-xs bg-gray-100 px-0.5">fly platform regions</code> for the full list.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="fly_vm_memory">
+            VM memory
+          </label>
+          <%= text_field_tag "deploy_config[fly][vm_memory]", fly['vm_memory'],
+                id: "fly_vm_memory",
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                placeholder: "1gb" %>
+          <p class="mt-1 text-xs text-gray-500">Default <code class="font-mono text-xs bg-gray-100 px-0.5">1gb</code> is right for most sites. Increase if you see out-of-memory errors (e.g. <code class="font-mono text-xs bg-gray-100 px-0.5">2gb</code>).</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="h-12"></div>
+
+    <%# ── Actions ─────────────────────────────────────────────────────── %>
+    <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 right-12 bg-white">
+        <div class="flex items-center gap-2">
+          <%= f.submit "Save Configuration",
+                class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+          <%= link_to "Cancel", admin_configs_path,
+                class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+        </div>
+        <!--<p class="text-xs text-gray-500">
+          Saving rewrites <code class="font-mono bg-gray-100 px-0.5">config/deploy.yml</code> and
+          <code class="font-mono bg-gray-100 px-0.5">fly.toml</code> in the
+          <code class="font-mono bg-gray-100 px-0.5">current/</code> directory.
+        </p>-->
+      </div>
+
+  <% end %>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+
+    // ── Target toggle ────────────────────────────────────────────
+    const kamalSection        = document.getElementById('kamal-section');
+    const flySection          = document.getElementById('fly-section');
+    const flyCliWarning       = document.getElementById('fly-cli-warning');
+    const kamalCliWarning     = document.getElementById('kamal-cli-warning');
+    const kamalRegistrySection = document.getElementById('kamal-registry-section');
+    const flySecretsNote      = document.getElementById('fly-secrets-note');
+    const kamalSecretsBadge   = document.getElementById('kamal-secrets-badge');
+
+    document.querySelectorAll('.target-radio').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        const isKamal = this.value === 'kamal';
+        kamalSection.classList.toggle('hidden', !isKamal);
+        flySection.classList.toggle('hidden', isKamal);
+        if (flyCliWarning)        flyCliWarning.classList.toggle('hidden', isKamal);
+        if (kamalCliWarning)      kamalCliWarning.classList.toggle('hidden', !isKamal);
+        if (kamalRegistrySection) kamalRegistrySection.classList.toggle('hidden', !isKamal);
+        if (flySecretsNote)       flySecretsNote.classList.toggle('hidden', isKamal);
+        if (kamalSecretsBadge)    kamalSecretsBadge.classList.toggle('hidden', !isKamal);
+      });
+    });
+
+    // ── Registry password Change / Cancel toggle ────────────────────
+    const changePasswordBtn  = document.getElementById('change-password-btn');
+    const cancelPasswordBtn  = document.getElementById('cancel-password-btn');
+    const passwordSavedDisplay = document.getElementById('password-saved-display');
+    const passwordEditDisplay  = document.getElementById('password-edit-display');
+
+    if (changePasswordBtn) {
+      changePasswordBtn.addEventListener('click', function () {
+        passwordSavedDisplay.classList.add('hidden');
+        passwordEditDisplay.classList.remove('hidden');
+        passwordEditDisplay.querySelector('input').focus();
+      });
+    }
+
+    if (cancelPasswordBtn) {
+      cancelPasswordBtn.addEventListener('click', function () {
+        passwordEditDisplay.classList.add('hidden');
+        passwordEditDisplay.querySelector('input').value = '';
+        passwordSavedDisplay.classList.remove('hidden');
+      });
+    }
+
+    // ── Add server button ────────────────────────────────────────────
+    const addServerBtn     = document.getElementById('add-server-btn');
+    const serversContainer = document.getElementById('kamal-servers-container');
+
+    if (addServerBtn) {
+      addServerBtn.addEventListener('click', function () {
+        const input       = document.createElement('input');
+        input.type        = 'text';
+        input.name        = 'deploy_config[kamal][servers][]';
+        input.className   = 'w-full font-mono text-sm p-2 border border-gray-300 rounded-xs mt-2';
+        input.placeholder = '192.168.1.1 or example.com';
+        serversContainer.appendChild(input);
+        input.focus();
+      });
+    }
+
+  });
+</script>

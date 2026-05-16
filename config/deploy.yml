@@ -1,82 +1,51 @@
 # Kamal deployment config for Roe.
+# Generated from site/system/global/deploy.yml — edit via Admin → Configuration → deploy.yml.
 #
-# Sensitive values live in .kamal/secrets (gitignored). Roe-specific
-# convention: the volume mapping for /data/site is what
-# SiteSync::KamalRsync writes to — keep that path stable.
+# Sensitive values live in .kamal/secrets (gitignored). The volume mapping
+# for /data/site is used by SiteSync::KamalRsync — keep that path stable.
 
-# Service name (Kamal uses this for container naming and labels).
 service: roe
-
-# Container image. Format: <registry-username>/<image-name>
 image: benjaminwelch/roe
 
-# Servers that run the app. Add more for multi-server deploys.
 servers:
   web:
     - 165.245.170.200
 
-# SSL/proxy disabled for first deploy — accessed via IP only over HTTP.
-# To enable later: point a domain's A record at the server, uncomment
-# the block below, and run `kamal proxy reboot`.
+# To enable SSL with a custom domain:
+# 1. Point your domain's A record at the server
+# 2. Uncomment the proxy block below and set your domain
+# 3. Run: kamal proxy reboot
 #
 # proxy:
 #   ssl: true
-#   host: roe.example.com
+#   host: your-domain.com
 
-# Docker Hub registry. Password is read from .kamal/secrets via the
-# KAMAL_REGISTRY_PASSWORD env reference below.
 registry:
   server: docker.io
   username: benjaminwelch
   password:
     - KAMAL_REGISTRY_PASSWORD
 
-# Environment variables injected into the container.
 env:
   secret:
     - RAILS_MASTER_KEY
   clear:
-    # Run Solid Queue inside Puma so we don't need a separate jobs
-    # container on a single-server setup. Split into a job server
-    # when traffic + queue depth justify it.
     SOLID_QUEUE_IN_PUMA: true
 
-# Persistent storage volumes mapped from host → container
-#   roe_storage:/rails/storage  — Active Storage uploads, build artifacts
-#   /var/lib/roe/site:/data/site — Roe's /site folder; required path for
-#                                  SiteSync::KamalRsync to know where to
-#                                  rsync files into.
 volumes:
   - "roe_storage:/rails/storage"
   - "/var/lib/roe/site:/data/site"
 
-# Bridge fingerprinted assets across versions so in-flight requests
-# don't 404 during a deploy. Points at the in-container assets path —
-# Roe's Dockerfile copies the app into /rails/current/ (not /rails/),
-# so this needs the /current/ segment.
 asset_path: /rails/current/public/assets
 
-# Build natively on the droplet itself instead of cross-compiling
-# from Apple Silicon → amd64. Cross-arch builds via qemu/Rosetta
-# have been silently corrupting Tailwind output and producing stale
-# cached layers. SSHing into the droplet to build means amd64
-# binaries on amd64 hardware, no emulation in the loop, no Mac-side
-# cache to poison. Tradeoff: builds use droplet RAM (~500-800MB
-# peak); swap handles the spike on the 1GB box, builds take 5-10 min.
 builder:
   arch: amd64
   remote: ssh://root@165.245.170.200
 
-# Single-container deploys. SQLite uses file locking, so two containers
-# can't share the database file safely — Kamal's default zero-downtime
-# strategy (start new, then stop old) causes SQLite lock conflicts and
-# health check failures. limit: 1 means stop old before start new, with
-# a few seconds of downtime per deploy. Right tradeoff for SQLite.
 boot:
   limit: 1
   wait: 0
 
-# Aliases — shortcuts triggered with `kamal <name>`.
 aliases:
   console: app exec --interactive --reuse "bin/rails console"
   shell: app exec --interactive --reuse "bash"

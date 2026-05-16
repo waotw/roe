@@ -548,11 +548,11 @@
     <!-- Hidden field to store final config YAML -->
     <%= form.hidden_field :content, id: "config-final", value: "" %>
 
-    <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 right-10 bg-white">
+    <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 right-12 bg-white">
       <%= form.submit "Save Configuration",
                       class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
       <%= link_to "Cancel", admin_configs_path,
-                  class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+                  class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs leading-none" %>
     </div>
   <% end %>
 </div>
