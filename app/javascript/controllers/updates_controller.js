@@ -175,7 +175,7 @@ export default class extends Controller {
     const modal = document.createElement("div");
     modal.id = "deploy-git-modal";
     modal.className = "fixed inset-0 flex items-center justify-center z-50";
-    modal.style.backgroundColor = "rgba(180,83,9,0.35)";
+    modal.style.backgroundColor = "rgba(0,17,52,0.35)";
 
     if (data.clean || data.git_unavailable) {
       // ── Clean state ──────────────────────────────────────────────────────────────
