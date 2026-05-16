@@ -346,9 +346,9 @@
       <% else %>
         <% confirm_msg = if deploy_target == 'kamal'
              "Build and push a Docker image to #{deploy_server_desc}, then restart the container. " \
-             "The site will be briefly unavailable. Continue?"
+             "The site will be briefly unavailable."
            else
-             "Deploy to Fly.io (app: #{@deploy_config['app_name']}). Continue?"
+             "Deploy to Fly.io (app: #{@deploy_config['app_name']})."
            end %>
         <div>
           <% if deploy_target == 'kamal' && !@kamal_cli_available %>

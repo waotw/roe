@@ -127,7 +127,7 @@ export default class extends Controller {
   async checkBeforeDeploy(event) {
     const btn = event.currentTarget;
     const deployUrl = btn.dataset.deployUrl;
-    const confirmMsg = btn.dataset.confirmMsg;
+    const deployInfo = btn.dataset.confirmMsg;
 
     let data;
     try {
@@ -139,18 +139,13 @@ export default class extends Controller {
         data = { clean: true };
       } else {
         data = await res.json();
-        console.log("[updates] git_status:", data);
       }
     } catch (e) {
       console.warn("[updates] git_status fetch error:", e.message);
       data = { clean: true };
     }
 
-    if (data.clean || data.git_unavailable) {
-      if (confirm(confirmMsg)) this.submitDeploy(deployUrl);
-    } else {
-      this.showGitModal(data, deployUrl, confirmMsg);
-    }
+    this.showDeployModal(data, deployUrl, deployInfo);
   }
 
   // Programmatically POSTs to the deploy URL (avoids needing a nested form).
@@ -169,93 +164,113 @@ export default class extends Controller {
     form.submit();
   }
 
-  // Builds and injects the git-status modal into the page.
-  showGitModal(data, deployUrl, confirmMsg) {
+  // Single modal for both clean and dirty states.
+  // Clean: shows deploy description + Deploy button.
+  // Dirty: shows changed file list + auto-commit or manual-commit options.
+  // Refresh re-renders the modal in place — no browser confirm() anywhere.
+  showDeployModal(data, deployUrl, deployInfo) {
     const existing = document.getElementById("deploy-git-modal");
     if (existing) existing.remove();
-
-    const plural = data.count === 1 ? "file has" : "files have";
-    const overflow =
-      data.count > 10
-        ? `<li class="text-xs text-gray-400 italic">…and ${data.count - 10} more</li>`
-        : "";
-    const fileItems = data.changed
-      .map(
-        (f) =>
-          `<li class="font-mono text-xs text-gray-700">${this.escapeHtml(f)}</li>`,
-      )
-      .join("");
 
     const modal = document.createElement("div");
     modal.id = "deploy-git-modal";
     modal.className = "fixed inset-0 flex items-center justify-center z-50";
     modal.style.backgroundColor = "rgba(180,83,9,0.35)";
-    modal.innerHTML = `
-      <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
-        <h2 class="text-2xl font-bold text-gray-900 mb-3">Uncommitted Changes</h2>
-        <p class="text-gray-700 mb-4">
-          ${data.count} ${plural} uncommitted changes that won't be included in
-          the deploy unless committed first.
-        </p>
-        <ul class="bg-gray-50 border border-gray-200 p-3 mb-6 space-y-1 max-h-40 overflow-y-auto">
-          ${fileItems}${overflow}
-        </ul>
-        <div class="space-y-3">
-          <button id="git-auto-commit-btn"
-            class="w-full uppercase text-sm px-4 py-2.5 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs">
-            Auto-commit and deploy
-          </button>
-          <div class="flex items-center gap-3">
-            <button id="git-refresh-btn"
-              class="flex-none uppercase text-sm px-4 py-2 border border-gray-400 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs">
-              Refresh
+
+    if (data.clean || data.git_unavailable) {
+      // ── Clean state ──────────────────────────────────────────────────────────────
+      modal.innerHTML = `
+        <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
+          <h2 class="text-2xl font-bold text-gray-900 mb-3">Deploy to Live Server</h2>
+          <p class="text-gray-700 mb-6">${this.escapeHtml(deployInfo)}</p>
+          <div class="flex gap-3">
+            <button id="modal-deploy-btn"
+              class="uppercase text-sm px-4 py-2.5 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs">
+              Deploy
             </button>
-            <span class="text-xs text-gray-500">I've committed manually — check again</span>
+            <button id="modal-cancel-btn"
+              class="uppercase text-sm px-4 py-2.5 border border-gray-400 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono rounded-xs">
+              Cancel
+            </button>
           </div>
-          <button id="git-cancel-btn"
-            class="w-full text-center text-sm text-gray-400 hover:text-gray-700 py-1">
-            Cancel
-          </button>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      // ── Dirty state ──────────────────────────────────────────────────────────────
+      const plural = data.count === 1 ? "file has" : "files have";
+      const overflow =
+        data.count > 10
+          ? `<li class="text-xs text-gray-400 italic">…and ${data.count - 10} more</li>`
+          : "";
+      const fileItems = data.changed
+        .map(
+          (f) =>
+            `<li class="font-mono text-xs text-gray-700">${this.escapeHtml(f)}</li>`,
+        )
+        .join("");
+
+      modal.innerHTML = `
+        <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
+          <h2 class="text-2xl font-bold text-gray-900 mb-3">Uncommitted Changes</h2>
+          <p class="text-gray-700 mb-4">
+            ${data.count} ${plural} uncommitted changes that won’t be
+            included in the deploy unless committed first.
+          </p>
+          <ul class="bg-gray-50 border border-gray-200 p-3 mb-6 space-y-1 max-h-40 overflow-y-auto">
+            ${fileItems}${overflow}
+          </ul>
+          <div class="space-y-3">
+            <button id="modal-deploy-btn"
+              class="w-full uppercase text-sm px-4 py-2.5 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs">
+              Auto-commit and deploy
+            </button>
+            <div class="flex items-center gap-3">
+              <button id="git-refresh-btn"
+                class="flex-none uppercase text-sm px-4 py-2 border border-gray-400 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs">
+                Refresh
+              </button>
+              <span class="text-xs text-gray-500">I’ve committed manually — check again</span>
+            </div>
+            <button id="modal-cancel-btn"
+              class="w-full text-center text-sm text-gray-400 hover:text-gray-700 py-1">
+              Cancel
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     document.body.appendChild(modal);
 
-    // Auto-commit and deploy — job handles the git commit
+    // Deploy / auto-commit-and-deploy
     document
-      .getElementById("git-auto-commit-btn")
-      .addEventListener("click", () => {
+      .getElementById("modal-deploy-btn")
+      ?.addEventListener("click", () => {
         modal.remove();
         this.submitDeploy(deployUrl);
       });
 
-    // Refresh — re-check git status
+    // Refresh — re-renders modal in place, no browser confirm
     document
       .getElementById("git-refresh-btn")
-      .addEventListener("click", async () => {
+      ?.addEventListener("click", async () => {
         let fresh;
         try {
           const res = await fetch("/admin/updates/git_status", {
             headers: { Accept: "application/json" },
           });
-          fresh = await res.json();
+          fresh = res.ok ? await res.json() : { clean: true };
         } catch (e) {
           fresh = { clean: true };
         }
         modal.remove();
-        if (fresh.clean) {
-          if (confirm(confirmMsg)) this.submitDeploy(deployUrl);
-        } else {
-          this.showGitModal(fresh, deployUrl, confirmMsg);
-        }
+        this.showDeployModal(fresh, deployUrl, deployInfo);
       });
 
-    // Cancel
-    document.getElementById("git-cancel-btn").addEventListener("click", () => {
-      modal.remove();
-    });
-
-    // Click outside to dismiss
+    // Cancel / click outside
+    document
+      .getElementById("modal-cancel-btn")
+      ?.addEventListener("click", () => modal.remove());
     modal.addEventListener("click", (e) => {
       if (e.target === modal) modal.remove();
     });
