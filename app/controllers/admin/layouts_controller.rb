@@ -1,7 +1,8 @@
 class Admin::LayoutsController < Admin::BaseController
   LAYOUT_FILES = {
     'navigation' => File.join(RoeSitePaths::SITE_PATH, 'layout/navigation.md'),
-    'footer' => File.join(RoeSitePaths::SITE_PATH, 'layout/footer.md')
+    'footer' => File.join(RoeSitePaths::SITE_PATH, 'layout/footer.md'),
+    'sidebar' => File.join(RoeSitePaths::SITE_PATH, 'layout/sidebar.md')
   }
 
   def default_layout_content(file_key)
@@ -26,18 +27,34 @@ class Admin::LayoutsController < Admin::BaseController
         Built with [Roe](https://getroe.com) • © #{author_name} #{year}
 
       MD
+    when 'sidebar'
+      <<~MD
+        ---
+        position: left
+        ---
+
+        ## Sidebar
+
+        This content appears in the sidebar.
+
+        - [Link 1](#)
+        - [Link 2](#)
+        - [Link 3](#)
+
+      MD
     else
       "<!-- #{file_key.capitalize} content - edit as needed -->\n\n"
     end
   end
 
   before_action :ensure_layout_directory_exists
-  before_action :ensure_layout_file_exists, only: [:edit_navigation, :edit_footer]
+  before_action :ensure_layout_file_exists, only: [:edit_navigation, :edit_footer, :edit_sidebar]
 
   def index
     @layouts = [
       { name: 'Navigation', file: 'navigation', path: admin_layout_navigation_edit_path, exists: File.exist?(LAYOUT_FILES['navigation']) },
-      { name: 'Footer', file: 'footer', path: admin_layout_footer_edit_path, exists: File.exist?(LAYOUT_FILES['footer']) }
+      { name: 'Footer', file: 'footer', path: admin_layout_footer_edit_path, exists: File.exist?(LAYOUT_FILES['footer']) },
+      { name: 'Sidebar', file: 'sidebar', path: admin_layout_sidebar_edit_path, exists: File.exist?(LAYOUT_FILES['sidebar']) }
     ]
   end
 
@@ -55,6 +72,13 @@ class Admin::LayoutsController < Admin::BaseController
     render :edit
   end
 
+  def edit_sidebar
+    @layout_name = 'Sidebar'
+    @file_key = 'sidebar'
+    @content = File.read(LAYOUT_FILES['sidebar'])
+    render :edit
+  end
+
   def update_navigation
     File.write(LAYOUT_FILES['navigation'], params[:content].gsub(/\r\n/, "\n"))
     flash[:notice] = "Navigation updated"
@@ -67,6 +91,13 @@ class Admin::LayoutsController < Admin::BaseController
     flash[:notice] = "Footer updated"
     flash[:trigger_refresh] = true
     redirect_to admin_layout_footer_edit_path
+  end
+
+  def update_sidebar
+    File.write(LAYOUT_FILES['sidebar'], params[:content].gsub(/\r\n/, "\n"))
+    flash[:notice] = "Sidebar updated"
+    flash[:trigger_refresh] = true
+    redirect_to admin_layout_sidebar_edit_path
   end
 
   def generate_missing
@@ -98,7 +129,14 @@ class Admin::LayoutsController < Admin::BaseController
   end
 
   def ensure_layout_file_exists
-    file_key = action_name == 'edit_navigation' ? 'navigation' : 'footer'
+    file_key = case action_name
+    when 'edit_navigation' then 'navigation'
+    when 'edit_footer' then 'footer'
+    when 'edit_sidebar' then 'sidebar'
+    else
+      action_name.to_s.gsub('edit_', '').gsub('update_', '')
+    end
+
     file_path = LAYOUT_FILES[file_key]
 
     unless File.exist?(file_path)

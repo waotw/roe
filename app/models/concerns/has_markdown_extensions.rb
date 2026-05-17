@@ -482,21 +482,26 @@ module HasMarkdownExtensions
     # Apply ordering based on order parameter
     items = apply_collection_order(items, order_by)
 
-    # Apply limit
+    # Apply offset and limit
+    offset_value = config[:offset].to_i
     limit_value = config[:limit]
     default_limit = SiteConfig.default('collections', 'default_limit') || 10
     show_more = config[:show_more] == 'true' || config[:show_more] == true
 
+    # Convert to array if needed
+    items_array = items.is_a?(Array) ? items : items.to_a
+    total_count = items_array.count
+
+    # Apply offset (skip first N items)
+    items_array = items_array[offset_value..-1] || [] if offset_value > 0
+
     if limit_value.to_s.downcase == 'all'
-      display_items = items.is_a?(Array) ? items : items.to_a
-      total_count = display_items.count
+      display_items = items_array
     elsif limit_value
       limit_int = limit_value.to_i
-      total_count = items.is_a?(Array) ? items.count : items.count
-      display_items = items.is_a?(Array) ? items.take(limit_int) : items.limit(limit_int).to_a
+      display_items = items_array.take(limit_int)
     else
-      total_count = items.is_a?(Array) ? items.count : items.count
-      display_items = items.is_a?(Array) ? items.take(default_limit) : items.limit(default_limit).to_a
+      display_items = items_array.take(default_limit)
     end
 
     # Render based on template, default to 'grid' for products, otherwise use configured default
@@ -587,7 +592,7 @@ module HasMarkdownExtensions
 
       # Title (linked) with optional lock icon
       title_html = item.title || 'Untitled'
-      title_html += " #{paid_lock_icon}" if show_paid_indicator?(item)
+      title_html += "<span>&nbsp;</span>#{paid_lock_icon}" if show_paid_indicator?(item)
       output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
@@ -642,7 +647,7 @@ module HasMarkdownExtensions
       output << ""
 
       title_html = item.title || 'Untitled'
-      title_html += " #{paid_lock_icon}" if show_paid_indicator?(item)
+      title_html += "<span>&nbsp;</span>#{paid_lock_icon}" if show_paid_indicator?(item)
       output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
@@ -745,7 +750,7 @@ module HasMarkdownExtensions
   def render_compact(items)
     items.map do |item|
       date_str = item.respond_to?(:date) && item.date ? " • #{item.date.strftime('%b %d, %Y')}" : ""
-      lock_icon = show_paid_indicator?(item) ? " #{paid_lock_icon}" : ""
+      lock_icon = show_paid_indicator?(item) ? "<span>&nbsp;</span>#{paid_lock_icon}" : ""
       "- [#{item.title || 'Untitled'}#{lock_icon}](#{item_path(item)})#{date_str}"
     end.join("\n")
   end
@@ -758,7 +763,7 @@ module HasMarkdownExtensions
 
       # Title (linked) with optional lock icon
       title_html = item.title || 'Untitled'
-      title_html += " #{paid_lock_icon}" if show_paid_indicator?(item)
+      title_html += "<span>&nbsp;</span>#{paid_lock_icon}" if show_paid_indicator?(item)
       output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
@@ -952,7 +957,7 @@ module HasMarkdownExtensions
   end
 
   def paid_lock_icon
-    '<svg class="paid-lock-icon" viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M7.88 15.76c4.36 0 7.89-3.53 7.89-7.88 0-4.36-3.53-7.88-7.89-7.88C3.54 0 0 3.52 0 7.88c0 4.35 3.54 7.88 7.88 7.88zm0-1.48c-3.54 0-6.39-2.86-6.39-6.4 0-3.54 2.85-6.4 6.39-6.4 3.54 0 6.4 2.86 6.4 6.4 0 3.54-2.86 6.4-6.4 6.4z"/><path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/></svg>'
+    '<svg class="paid-lock-icon" viewBox="0 0 16 16" fill="currentColor" width="18" height="18"><path d="M7.88 15.76c4.36 0 7.89-3.53 7.89-7.88 0-4.36-3.53-7.88-7.89-7.88C3.54 0 0 3.52 0 7.88c0 4.35 3.54 7.88 7.88 7.88zm0-1.48c-3.54 0-6.39-2.86-6.39-6.4 0-3.54 2.85-6.4 6.39-6.4 3.54 0 6.4 2.86 6.4 6.4 0 3.54-2.86 6.4-6.4 6.4z"/><path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/></svg>'
   end
 
   ## CARDS

@@ -23,6 +23,87 @@ module LayoutHelper
     ''
   end
 
+  # Check if sidebar should be shown for current content
+  def show_sidebar?
+    return false unless File.exist?(sidebar_file_path)
+
+    # Check post/page metadata for override
+    content = @post || @page || @doc
+    if content.respond_to?(:metadata)
+      # If show_sidebar is explicitly false, hide it
+      return false if content.metadata['show_sidebar'] == false
+    end
+
+    true
+  end
+
+  # Get sidebar position from frontmatter (default: left)
+  def sidebar_position
+    return @sidebar_position if defined?(@sidebar_position)
+
+    @sidebar_position = parse_sidebar_frontmatter['position'] || 'left'
+  end
+
+  # Render sidebar with proper positioning class
+  def render_sidebar
+    return '' unless show_sidebar?
+
+    file_path = sidebar_file_path
+    content = File.read(file_path)
+
+    # Parse out frontmatter if present
+    body_content = extract_body_from_content(content)
+
+    # Escape inline pipes
+    body_content = escape_inline_pipes_for_layout(body_content)
+
+    html = Kramdown::Document.new(body_content).to_html
+    html.html_safe
+  rescue => e
+    Rails.logger.error "Error rendering sidebar: #{e.message}"
+    ''
+  end
+
+  private
+
+  def sidebar_file_path
+    File.join(RoeSitePaths::SITE_PATH, 'layout', 'sidebar.md')
+  end
+
+  def parse_sidebar_frontmatter
+    return {} unless File.exist?(sidebar_file_path)
+
+    content = File.read(sidebar_file_path)
+    parse_frontmatter(content)
+  rescue => e
+    Rails.logger.error "Error parsing sidebar frontmatter: #{e.message}"
+    {}
+  end
+
+  def parse_frontmatter(content)
+    frontmatter = {}
+
+    # Check for YAML frontmatter (--- at start)
+    if content =~ /\A---\s*\n(.*?)^---\s*\n?/m
+      yaml_content = $1
+      frontmatter = YAML.safe_load(yaml_content) || {}
+    end
+
+    frontmatter
+  rescue => e
+    Rails.logger.error "Error parsing frontmatter: #{e.message}"
+    {}
+  end
+
+  def extract_body_from_content(content)
+    # Remove YAML frontmatter if present
+    if content =~ /\A---\s*\n.*?^---\s*\n?/m
+      content.sub(/\A---\s*\n.*?^---\s*\n?/m, '')
+    else
+      content
+    end
+  end
+
   def logo_classes
     logo_url = SiteConfig.get('logo')
     logo_style = SiteConfig.get('logo_style')

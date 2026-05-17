@@ -47,10 +47,15 @@
     <%= javascript_importmap_tags %>
     <meta name="turbo-visit-control" content="restore">
   </head>
-  <body>
+  <body class="<%= 'has-sidebar' if show_sidebar? %> sidebar-<%= sidebar_position %>">
     <header class="site-nav <%= logo_classes %>">
       <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
+    <% if show_sidebar? %>
+      <aside class="site-sidebar sidebar-<%= sidebar_position %>">
+        <%= render_sidebar %>
+      </aside>
+    <% end %>
     <main data-controller="footnote-tooltip">
       <% flash.each do |type, message| %>
         <div class="flash flash-<%= type %>">

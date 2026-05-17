@@ -588,6 +588,9 @@ class ConfigGenerator
       mono:
         family: "Inconsolata"
         source: "google"
+      accent:
+        family: ""
+        source: ""
     YAML
 
     File.write(File.join(SITE_PATH, 'fonts.yml'), content)

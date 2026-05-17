@@ -110,6 +110,12 @@ class Admin::ConfigsController < ApplicationController
           description: "Used for code blocks and preformatted text",
           required_variants: [ 'family', 'regular' ],
           common_variants: [ 'bold', 'italic', 'bold_italic' ]
+        },
+        accent: {
+          label: "Accent Font",
+          description: "Optional font for special elements like collection titles, pullquotes, or emphasis",
+          required_variants: [ 'family', 'regular' ],
+          common_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium' ]
         }
       }
     }
