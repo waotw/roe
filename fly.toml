@@ -14,7 +14,7 @@ console_command = '/rails/current/bin/rails console'
   SOLID_QUEUE_IN_PUMA = 'true'
 
 [processes]
-  app = './bin/rails server'
+  app = './bin/thrust ./bin/rails server'
 
 [[mounts]]
   source = 'data'

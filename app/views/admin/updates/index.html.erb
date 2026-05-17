@@ -215,11 +215,12 @@
       deploy_state        = @deploy_status&.dig(:state)
 
       # Human-readable server/app descriptor for the card header
+      default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
       deploy_server_desc = if deploy_target == 'kamal'
         servers = Array(@deploy_config.dig('kamal', 'servers')).reject(&:blank?)
         servers.first.presence || '(no server configured)'
       else
-        @deploy_config['app_name'].presence || '(no app name)'
+        @deploy_config['app_name'].presence || default_app_name
       end
 
       last_deployed_at = @deploy_status&.dig(:completed_at) if deploy_state == :completed

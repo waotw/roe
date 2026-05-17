@@ -137,7 +137,8 @@ class DeployConfigGenerator
   end
 
   def kamal_content(config)
-    app_name     = config['app_name'].presence || 'roe'
+    default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
+    app_name     = config['app_name'].presence || default_app_name
     reg_username = config.dig('kamal', 'registry_username').to_s.strip
     image_name   = config.dig('kamal', 'image_name').presence || app_name
     servers      = Array(config.dig('kamal', 'servers')).map(&:to_s).reject(&:blank?)
@@ -229,7 +230,8 @@ class DeployConfigGenerator
   end
 
   def fly_content(config)
-    app_name  = config['app_name'].presence || 'roe'
+    default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
+    app_name  = config['app_name'].presence || default_app_name
     region    = config.dig('fly', 'region').to_s.strip.presence || 'iad'
     vm_memory = config.dig('fly', 'vm_memory').presence || '1gb'
     ssl       = config['ssl'] != false
@@ -254,7 +256,7 @@ class DeployConfigGenerator
         SOLID_QUEUE_IN_PUMA = 'true'
 
       [processes]
-        app = './bin/rails server'
+        app = './bin/thrust ./bin/rails server'
 
       [[mounts]]
         source = '#{FLY_VOLUME_SOURCE}'

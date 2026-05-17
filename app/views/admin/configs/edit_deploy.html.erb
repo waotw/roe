@@ -219,6 +219,9 @@
         <h3 class="text-lg font-medium text-gray-900">Common Settings</h3>
       </div>
       <div class="px-6 py-4 space-y-4">
+        <%
+          default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
+        %>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1" for="deploy_app_name">
             App name
@@ -226,8 +229,8 @@
           <%= text_field_tag "deploy_config[app_name]", @config_hash['app_name'],
                 id: "deploy_app_name",
                 class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
-                placeholder: "roe" %>
-          <p class="mt-1 text-xs text-gray-500">Used as the Kamal app name and Fly app name. Lowercase, with hyphens, no spaces.</p>
+                placeholder: default_app_name %>
+          <p class="mt-1 text-xs text-gray-500">Defaults to the folder name (<%= default_app_name %>) if left blank. Used as the Kamal app name and Fly app name. Lowercase, no spaces, use hyphens (e.g., my-site).</p>
         </div>
 
         <div class="flex items-start gap-3">
