@@ -19,6 +19,7 @@ class ConfigGenerator
     generate_fonts_config unless File.exist?(File.join(SITE_PATH, 'fonts.yml'))
     generate_cards_defaults unless File.exist?(File.join(DEFAULTS_PATH, 'cards.yml'))
     generate_collections_defaults unless File.exist?(File.join(DEFAULTS_PATH, 'collections.yml'))
+    generate_welcome_post
   end
 
   def generate_podcast_defaults
@@ -638,5 +639,54 @@ class ConfigGenerator
 
     File.write(File.join(DEFAULTS_PATH, 'collections.yml'), content)
     puts "✓ Generated defaults/collections.yml"
+  end
+
+  def generate_welcome_post
+    posts_path = File.join(RoeSitePaths::SITE_PATH, 'posts')
+    welcome_file = File.join(posts_path, 'welcome.md')
+
+    return if File.exist?(welcome_file)
+    return if Dir.exist?(posts_path) && Dir.glob(File.join(posts_path, '*.md')).any?
+
+    FileUtils.mkdir_p(posts_path)
+
+    content = <<~MARKDOWN
+      ---
+      title: Welcome to Roe
+      description: Your file-backed CMS is ready to go
+      date: #{Date.today}
+      status: published
+      type: article
+      ---
+
+      # Welcome to Roe! 🚀
+
+      Your new site is up and running. Roe is a file-backed CMS that keeps your content in plain Markdown files — easy to edit, version control, and deploy anywhere.
+
+      ## Quick Start
+
+      1. **Configure your site**: Visit the [admin panel](/admin) to set your site title, URL, and other settings
+      2. **Create content**: Add posts to the `site/posts/` folder as Markdown files
+      3. **Customize the theme**: Edit files in `site/layout/` and `site/theme/`
+      4. **Deploy**: Use the Updates & Deploy page to push your site live
+
+      ## Content Structure
+
+      - **Posts** → `site/posts/*.md` — Blog posts, articles, podcasts
+      - **Pages** → `site/pages/*.md` — Static pages like About, Contact
+      - **Media** → `site/media/` — Images, audio, video files
+      - **Config** → `site/system/` — Site settings and feature flags
+
+      ## Need Help?
+
+      - Check the documentation in `current/docs/`
+      - Visit the Admin panel for content management
+      - Look at this post's source: `site/posts/welcome.md`
+
+      Happy publishing! ✍️
+    MARKDOWN
+
+    File.write(welcome_file, content)
+    puts "✓ Generated welcome post at posts/welcome.md"
   end
 end

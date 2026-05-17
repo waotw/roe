@@ -23,7 +23,18 @@ module SiteSync
   end
 
   def self.deploy_target
+    # 1. Explicit env var override
     return ENV['ROE_DEPLOY_TARGET'].to_sym if ENV['ROE_DEPLOY_TARGET'].present?
+
+    # 2. Check deploy.yml target setting (most reliable - user-configured)
+    if File.exist?(SiteConfig::DEPLOY_FILE)
+      config = YAML.load_file(SiteConfig::DEPLOY_FILE) rescue {}
+      target = config['target'].to_s.downcase
+      return :kamal if target == 'kamal'
+      return :fly if target == 'fly'
+    end
+
+    # 3. Fall back to file detection for legacy/auto-detection
     return :kamal if File.exist?(Rails.root.join('.kamal', 'secrets'))
     return :fly   if File.exist?(Rails.root.join('fly.toml'))
     nil

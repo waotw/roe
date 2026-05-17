@@ -25,12 +25,14 @@ module SiteSync
   # Rails.env so an accidentally-set value doesn't make prod try to
   # phone home to itself.
   class Exchange
-    PEER_STATE_CACHE_KEY  = "site_sync:peer_state".freeze
-    PEER_STATE_TTL        = 1.day            # stop trusting peer state after this
-    REFRESH_STALE_AFTER   = 60.seconds       # threshold for opportunistic refresh
-    PEER_REACHABLE_WINDOW = 2.hours          # peer counts as "reachable" if we
-                                             # heard from them within this window
-    HTTP_TIMEOUT_SECONDS  = 5
+    PEER_STATE_CACHE_KEY     = "site_sync:peer_state".freeze
+    PEER_STATE_TTL           = 1.day            # stop trusting peer state after this
+    LAST_EXCHANGE_CACHE_KEY  = "site_sync:last_exchange".freeze
+    LAST_EXCHANGE_TTL        = 1.day
+    REFRESH_STALE_AFTER      = 60.seconds       # threshold for opportunistic refresh
+    PEER_REACHABLE_WINDOW    = 2.hours          # peer counts as "reachable" if we
+                                                # heard from them within this window
+    HTTP_TIMEOUT_SECONDS     = 5
 
     # Cap for the per-category drift file list we ship in the
     # exchange payload. A pathological case (e.g. a fresh push that
@@ -110,11 +112,20 @@ module SiteSync
 
         unless response.is_a?(Net::HTTPSuccess)
           Rails.logger.warn "[SiteSync::Exchange] peer responded #{response.code}: #{response.body}"
+          # Track the specific error type
+          error_type = case response.code.to_i
+                       when 401 then :auth_error
+                       when 404 then :not_found
+                       when 500..599 then :server_error
+                       else :request_error
+                       end
+          save_exchange_result(success: false, error_type: error_type, http_code: response.code)
           return nil
         end
 
         parsed = JSON.parse(response.body)
         save_peer_state(parsed)
+        save_exchange_result(success: true)
         # Symmetric self-heal on dev's side: if peer's fingerprint
         # matches ours, our ledger should reflect that we're in
         # sync (in case our local ledger update failed earlier).
@@ -122,7 +133,33 @@ module SiteSync
         parsed
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] peer call failed: #{e.class} #{e.message}"
+        save_exchange_result(success: false, error_type: :network_error, error_message: e.message)
         nil
+      end
+
+      # Track the result of the last exchange attempt for UI feedback
+      def save_exchange_result(success:, error_type: nil, http_code: nil, error_message: nil)
+        Rails.cache.write(
+          LAST_EXCHANGE_CACHE_KEY,
+          {
+            success: success,
+            error_type: error_type,
+            http_code: http_code,
+            error_message: error_message,
+            attempted_at: Time.current
+          },
+          expires_in: LAST_EXCHANGE_TTL
+        )
+      end
+
+      # Get the last exchange attempt result
+      def last_exchange_result
+        Rails.cache.read(LAST_EXCHANGE_CACHE_KEY)
+      end
+
+      # Clear the last exchange result (e.g., after config changes)
+      def clear_exchange_result
+        Rails.cache.delete(LAST_EXCHANGE_CACHE_KEY)
       end
 
       # Tell the peer to walk its own /site and rewrite its ledger
@@ -338,7 +375,9 @@ module SiteSync
         # phone something. (The form hides the field on prod, but
         # this is defense in depth.)
         return nil unless Rails.env.development?
-        SyncConfig.current.peer_url.presence
+
+        # Use explicitly set peer_url, or fall back to Site URL from settings
+        SyncConfig.current.peer_url.presence || ::SiteConfig.site_url
       rescue ActiveRecord::StatementInvalid
         # Table doesn't exist yet (migration pending). Treat as
         # unconfigured rather than crash the admin layout.

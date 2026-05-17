@@ -187,6 +187,9 @@ class Admin::UpdatesController < Admin::BaseController
     issues = []
     target = config['target'].presence || 'kamal'
 
+    # Site URL is required for all deploy targets
+    issues << "site URL is not set — configure it in Admin → Site Settings" if SiteConfig.site_url.blank?
+
     case target
     when 'kamal'
       servers = Array(config.dig('kamal', 'servers')).map(&:to_s).reject(&:blank?)

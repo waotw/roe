@@ -39,7 +39,7 @@ FileUtils.chdir APP_ROOT do
     puts "\nStarting development server..."
     STDOUT.flush # flush the output before exec(2) so that it displays
     exec "bin/dev"
+  else
+    puts "Run 'bin/dev' to start the server."
   end
-
-  puts "Run 'bin/dev' to start the server."
 end

@@ -7,6 +7,20 @@
     </p>
   </div>
 
+  <%# ─── About ────────────────────────────────────────────────────── %>
+  <%# Hidden on production — the page on live is for configuration only. %>
+  <% unless Rails.env.production? %>
+  <div class="mt-8 py-6 border-t border-gray-200">
+    <h3 class="text-sm font-semibold text-gray-900 mb-2">About Site Sync</h3>
+    <ul class="text-sm text-gray-600 space-y-1 list-disc ml-5">
+      <li>Tracks & syncs every file in your <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">/site</code> folder</li>
+      <li>Excludes databases in <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">db/</code> folder (separate backup system)</li>
+      <li>The local backups use a tool called <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">rsync</code> to create exact copies of your files. For new backups, the system only saves the files that actually changed. For any file that stayed the same, it creates a 'shortcut' (link) to the previous version instead of copying it again. This gives you multiple points in time you can restore from, but saves a massive amount of storage space.</li>
+      <li>If you restore from a backup and wish to <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">UNDO</code>, simply restore from the most recent Local Backup below.</li>
+    </ul>
+  </div>
+  <% end %>
+
   <%# ─── Post-restore confirmation panel ─────────────────────────── %>
   <%# Sticks around for an hour after a restore so the user has clear
       evidence the operation worked. Older restores fall out (no
@@ -296,13 +310,110 @@
           waiting on the hourly job or the 60s on-render debounce.
           Only meaningful on the side that initiates (dev). %>
       <% if @peer_call_configured %>
-        <%= button_to "Refresh now",
+        <%= button_to "Refresh Connection",
                       admin_refresh_site_sync_exchange_path,
                       method: :post,
                       data: { turbo_submits_with: "⏳ Refreshing…" },
-                      class: "inline-flex items-center px-3 py-1.5 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+                      class: "uppercase inline-flex items-center px-3 py-1.5 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
       <% end %>
     </div>
+
+    <%# ─── Connection status alerts ─────────────────────────────────── %>
+    <% if @last_exchange_result && !@last_exchange_result[:success] %>
+      <% error_type = @last_exchange_result[:error_type] %>
+      <% attempted_at = @last_exchange_result[:attempted_at] %>
+
+        <% if error_type == :auth_error %>
+        <%# Token mismatch - most critical error %>
+        <div class="p-4 bg-red-50 border border-red-200 rounded-sm mb-4">
+          <h3 class="text-sm font-semibold text-red-900 mb-2">
+            ⚠️ Token Mismatch — Cannot Connect to Live Site
+          </h3>
+          <p class="text-sm text-red-800 mb-3">
+            The shared token doesn't match between environments. Site Sync cannot authenticate with the live site.
+          </p>
+          <p class="text-sm text-red-800 mb-4">
+            <strong>To fix this:</strong> Copy the Shared token from below and add it to the production environment.
+            <% if Rails.env.development? && @peer_url.present? %>
+              <a href="<%= @peer_url %>/admin/site_sync"
+                 target="_blank"
+                 class="underline font-semibold">
+                Open production Site Sync →
+              </a>
+            <% end %>
+          </p>
+          <% if attempted_at %>
+            <p class="text-xs text-red-600">
+              Last attempt: <%= time_ago_in_words(attempted_at) %> ago
+            </p>
+          <% end %>
+        </div>
+
+      <% elsif error_type == :not_found %>
+        <%# 404 - endpoint doesn't exist %>
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-4">
+          <h3 class="text-sm font-semibold text-amber-900 mb-2">
+            ⚠️ Site Sync Endpoint Not Found
+          </h3>
+          <p class="text-sm text-amber-800 mb-3">
+            The peer URL might be incorrect, or the production site doesn't have Site Sync enabled.
+          </p>
+          <p class="text-sm text-amber-800">
+            <strong>Check:</strong> Is the Peer URL correct? Does the production site have the latest Roe version?
+          </p>
+        </div>
+
+      <% elsif error_type == :network_error %>
+        <%# Network issues %>
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-4">
+          <h3 class="text-sm font-semibold text-amber-900 mb-2">
+            ⚠️ Cannot Reach Live Site
+          </h3>
+          <p class="text-sm text-amber-800 mb-3">
+            Network error when trying to connect. The live site might be down or unreachable.
+          </p>
+          <% if @last_exchange_result[:error_message] %>
+            <p class="text-xs text-amber-600 font-mono">
+              <%= @last_exchange_result[:error_message] %>
+            </p>
+          <% end %>
+        </div>
+
+      <% else %>
+        <%# Generic error %>
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-4">
+          <h3 class="text-sm font-semibold text-amber-900 mb-2">
+            ⚠️ Connection Issue
+          </h3>
+          <p class="text-sm text-amber-800 mb-3">
+            Unable to sync with live site.
+            <% if @last_exchange_result[:http_code] %>
+              (HTTP <%= @last_exchange_result[:http_code] %>)
+            <% end %>
+          </p>
+          <p class="text-xs text-amber-600">
+            Try clicking "Refresh now" to retry the connection.
+          </p>
+        </div>
+      <% end %>
+    <% end %>
+
+    <%# ─── Production-specific: Show if never received contact ────── %>
+    <% if Rails.env.production? && !@peer_state %>
+      <div class="p-4 bg-blue-50 border border-blue-200 rounded-sm mb-4">
+        <h3 class="text-sm font-semibold text-blue-900 mb-2">
+          ⏳ Waiting for Local Environment
+        </h3>
+        <p class="text-sm text-blue-800 mb-3">
+          Production receives sync requests but doesn't initiate them.
+          No connection from your local environment yet.
+        </p>
+        <p class="text-sm text-blue-800">
+          <strong>To connect:</strong> Go to your local Site Sync page, set the Peer URL to this production site,
+          ensure both environments have the same Shared token, then click "Refresh now".
+        </p>
+      </div>
+    <% end %>
 
     <% if @peer_state %>
       <p class="text-sm text-gray-700 mb-2">
@@ -528,70 +639,85 @@
         </span>
       </div>
 
-      <%= form_with url: admin_update_site_sync_config_path, method: :patch, local: true, class: "space-y-4" do |form| %>
-        <%# Token — must match between dev and prod. Auto-generated
-            on first access (so the field is never empty), but the
-            user can paste a different value to match the other side. %>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            Shared token
-          </label>
-          <%= form.text_field :token,
-                              value: @sync_config.token,
-                              onclick: "this.select();",
-                              class: "w-full px-3 py-2 border border-gray-300 rounded-sm font-mono text-xs text-gray-800" %>
+      <%# Token display — must be outside the settings form since token actions are separate forms %>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Shared token
+        </label>
+        <% if @sync_config.token.present? %>
+          <div class="flex gap-2">
+            <input type="text"
+                   value="<%= @sync_config.token %>"
+                   readonly
+                   id="sync-token-field"
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-sm font-mono text-xs text-gray-800 bg-gray-50"
+                   onclick="this.select();">
+            <button type="button"
+                    onclick="const f=document.getElementById('sync-token-field');f.select();navigator.clipboard.writeText(f.value);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000);"
+                    class="uppercase inline-flex items-center px-3 py-2 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer">
+              Copy
+            </button>
+          </div>
           <p class="text-xs text-gray-500 mt-1">
-            Click to select. The same value must be set on both sides — copy from
-            here to the other environment's Site Sync settings, or use Regenerate
-            (below) to make a new one.
+            Click Copy to copy to clipboard. The same value must be set on both sides.
+            <%= "Paste this into the other environment's Site Sync settings." if Rails.env.development? %>
           </p>
-        </div>
+        <% else %>
+          <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm">
+            <p class="text-sm text-amber-800 mb-3">
+              ⚠️ No token has been generated yet. Site Sync requires a shared token to authenticate exchanges between environments.
+            </p>
+            <%= button_to "Generate token",
+                          admin_regenerate_site_sync_token_path,
+                          method: :post,
+                          class: "inline-flex items-center px-4 py-2 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono text-sm rounded-xs cursor-pointer" %>
+          </div>
+        <% end %>
+      </div>
 
-        <%# Peer URL — only meaningful on dev. Hidden on prod with
-            a brief note (rather than disabled-but-shown, which
-            invites the question "why is this disabled?"). %>
+      <%= form_with url: admin_update_site_sync_config_path, method: :patch, local: true, class: "space-y-4" do |form| %>
+        <%# Peer URL — only meaningful on dev. Defaults to Site URL from settings. %>
         <% if Rails.env.development? %>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Peer URL <span class="text-xs font-normal text-gray-500">— your live site, e.g. https://yourblog.com</span>
+            <label class="block text-sm font-medium text-gray-700 mb-1 mt-4">
+              Site URL <span class="text-xs font-normal text-gray-500">— your live/production site</span>
             </label>
             <%= form.text_field :peer_url,
                                 value: @sync_config.peer_url,
-                                placeholder: "https://yourblog.com",
+                                placeholder: @site_url,
                                 class: "w-full px-3 py-2 border border-gray-300 rounded-sm font-mono text-xs text-gray-800" %>
             <p class="text-xs text-gray-500 mt-1">
-              Where this side sends its state. Only used on dev — production receives, never initiates.
+              Defaults to your Site URL
+              (<code class="text-xs bg-gray-100 px-1"><%= @site_url %></code>) if left blank.
             </p>
           </div>
         <% else %>
           <p class="text-xs text-gray-500">
-            Peer URL isn't set on production — this side only receives exchanges, never initiates them.
+            This production site receives sync requests at
+            <code class="text-xs bg-gray-100 px-1"><%= @site_url %></code>.
+            It never initiates connections.
           </p>
         <% end %>
 
         <div class="pt-2">
           <%= form.submit "Save settings",
-                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer" %>
+                          class: "uppercase inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer" %>
         </div>
       <% end %>
 
-      <%# Regenerate is its own form — keeping it nested inside the
-          settings form_with would produce nested <form> tags, which
-          browsers silently break (and which previously caused Save
-          to do nothing). %>
-      <div class="mt-3 flex items-center gap-3">
-        <%= button_to "Regenerate token",
-                      admin_regenerate_site_sync_token_path,
-                      method: :post,
-                      data: { confirm: "Generate a new random token? You'll need to copy it to the other side, or exchanges will start failing." },
-                      class: "inline-flex items-center px-3 py-1.5 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer" %>
-        <span class="text-xs text-gray-500">Replaces the current token with a fresh random one.</span>
-      </div>
-
-      <p class="text-xs text-gray-500 mt-4">
-        💡 Once Kamal/Fly deploy automation is wired up, the token will sync to
-        production on deploy and you won't need to copy it manually.
-      </p>
+      <%# Regenerate is its own form — must be outside the settings form %>
+      <% if @sync_config.token.present? %>
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <div class="">
+            <button type="button"
+                    onclick="showRegenerateTokenModal()"
+                    class="uppercase inline-flex items-center px-3 py-1.5 border border-amber-600 bg-amber-200 hover:bg-amber-400 text-amber-900 font-mono text-xs rounded-xs cursor-pointer">
+              Regenerate token
+            </button>
+            <p class="text-xs text-gray-500 mt-1.5">Replaces the current token with a fresh random one. If you update the token here, you'll need to add it to the live website as well.</p>
+          </div>
+        </div>
+      <% end %>
     </div>
   </div>
 
@@ -620,7 +746,7 @@
                     admin_create_site_backup_path,
                     method: :post,
                     data: { turbo_submits_with: "⏳ Creating new backup. Please hold…" },
-                    class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+                    class: "uppercase inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
     </div>
 
     <% if @local_backups.empty? %>
@@ -654,7 +780,7 @@
                               confirm: "Restore /site from #{backup[:name]}? Your current /site contents will be snapshotted first as a safety net.",
                               turbo_submits_with: "⏳ Restoring from backup. Please hold…"
                             },
-                            class: "inline-flex items-center px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+                            class: "uppercase inline-flex items-center px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
             <% end %>
           </li>
         <% end %>
@@ -702,18 +828,62 @@
     <% end %>
   </div>
   <% end %>
-
-  <%# ─── About ────────────────────────────────────────────────────── %>
-  <%# Hidden on production — the page on live is for configuration only. %>
-  <% unless Rails.env.production? %>
-  <div class="mt-8 pt-6 border-t border-gray-200">
-    <h3 class="text-sm font-semibold text-gray-900 mb-2">About Site Sync</h3>
-    <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
-      <li>Tracks every file under <code class="text-xs">/site</code></li>
-      <li>Excludes <code class="text-xs">db/</code> (separate backup system)</li>
-      <li>The local backups use a tool called rsync to create exact copies of your files. For new backups, the system only saves the files that actually changed. For any file that stayed the same, it creates a 'shortcut' (link) to the previous version instead of copying it again. This gives you multiple points in time you can restore from, but saves a massive amount of storage space.</li>
-      <li>Restoring from a backup can be undone by simply restoring from the most recent backup.</li>
-    </ul>
-  </div>
-  <% end %>
 </div>
+
+<%# ─── Regenerate Token Modal ──────────────────────────────────────── %>
+<div id="regenerate-token-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden" style="background-color: rgba(0,17,52,0.35);">
+  <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
+    <h2 class="text-2xl font-bold text-amber-900 mb-3">⚠️ Regenerate Token?</h2>
+    <p class="text-gray-700 mb-4">
+      This will <strong>delete the current token</strong> and generate a new one.
+    </p>
+    <div class="bg-red-50 border border-red-200 p-4 mb-6">
+      <p class="text-sm text-amber-800 font-semibold mb-2">You should:</p>
+      <ol class="text-sm text-red-amber list-decimal list-inside space-y-1">
+        <li>Copy the new token</li>
+        <li>Paste it into your live site in: Admin → Site Sync</li>
+      </ol>
+    </div>
+    <p class="text-sm text-gray-600 mb-6">
+      <strong>Warning:</strong> Site Sync will stop working until the local token matches the live/public token.
+    </p>
+    <div class="flex gap-3">
+      <%= button_to "Yes, Regenerate Token",
+                    admin_regenerate_site_sync_token_path,
+                    method: :post,
+                    id: "modal-regenerate-confirm",
+                    class: "uppercase text-sm px-4 py-2.5 border border-amber-800 bg-amber-600 hover:bg-amber-700 text-white font-mono rounded-xs" %>
+      <button type="button"
+              onclick="hideRegenerateTokenModal()"
+              class="uppercase text-sm px-4 py-2.5 border border-gray-400 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono rounded-xs">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showRegenerateTokenModal() {
+    const modal = document.getElementById('regenerate-token-modal');
+    modal.classList.remove('hidden');
+  }
+
+  function hideRegenerateTokenModal() {
+    const modal = document.getElementById('regenerate-token-modal');
+    modal.classList.add('hidden');
+  }
+
+  // Close modal when clicking outside
+  document.getElementById('regenerate-token-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      hideRegenerateTokenModal();
+    }
+  });
+
+  // Close modal on Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      hideRegenerateTokenModal();
+    }
+  });
+</script>

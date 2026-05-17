@@ -30,6 +30,7 @@ class Admin::SiteSyncController < Admin::BaseController
     @peer_url              = SiteSync::Exchange.peer_url
     @peer_reachable        = SiteSync::Exchange.peer_reachable?
     @deploy_target_label   = SiteSync.deploy_target_label
+    @last_exchange_result  = SiteSync::Exchange.last_exchange_result
 
     # Cross-side fingerprint comparison — the authoritative "are dev
     # and live actually in sync" signal. Local-only drift (@status,
@@ -43,6 +44,9 @@ class Admin::SiteSyncController < Admin::BaseController
     # auto-generates a token on first access, so the form always has
     # something to show.
     @sync_config = SyncConfig.current
+
+    # Site URL from settings - used as default for Peer URL
+    @site_url = SiteConfig.site_url
 
     # In-progress / recently-completed transfer status for the
     # push/pull buttons. nil when nothing has happened recently.
@@ -67,6 +71,9 @@ class Admin::SiteSyncController < Admin::BaseController
     config.peer_url = params[:peer_url].to_s.strip.presence
     config.token = params[:token] if params[:token].present?
     config.save!
+
+    # Clear any cached exchange errors since config changed
+    SiteSync::Exchange.clear_exchange_result
 
     flash[:notice] = "Sync configuration saved."
   rescue => e
