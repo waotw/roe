@@ -4,7 +4,7 @@
 # See https://fly.io/docs/reference/configuration/ for reference.
 
 app = 'roe'
-primary_region = 'iad'
+primary_region = 'lhr'
 console_command = '/rails/current/bin/rails console'
 
 [build]

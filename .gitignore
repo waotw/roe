@@ -62,7 +62,6 @@ static_site/
 faircamp/
 
 # Graphify generated files
-
 graphify-out/
 /graphify-out/*
 **/.graphify_*
@@ -77,3 +76,6 @@ GRAPH_REPORT.md
 
 # Secrets:
 .kamal/secrets
+
+# tmp files
+fly-2026-05-17.toml
