@@ -11,6 +11,13 @@ class Admin::UpdatesController < Admin::BaseController
     @deploy_issues       = deploy_prerequisites(@deploy_config)
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
+
+    # Deploy display helpers
+    @default_app_name    = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
+    @deploy_target       = @deploy_config['target'].presence || 'kamal'
+    @deploy_target_label = @deploy_target == 'kamal' ? 'Kamal' : 'Fly.io'
+    @deploy_server_desc  = deploy_server_description(@deploy_config, @deploy_target, @default_app_name)
+    @deploy_confirm_msg  = deploy_confirmation_message(@deploy_target, @deploy_server_desc, @deploy_config, @default_app_name)
   end
 
   def check
@@ -151,6 +158,27 @@ class Admin::UpdatesController < Admin::BaseController
 
   def license_valid?
     true
+  end
+
+  # Human-readable server/app descriptor for the card header
+  def deploy_server_description(config, target, default_app_name)
+    if target == 'kamal'
+      servers = Array(config.dig('kamal', 'servers')).reject(&:blank?)
+      servers.first.presence || '(no server configured)'
+    else
+      config['app_name'].presence || default_app_name
+    end
+  end
+
+  # Confirmation message shown before deploy
+  def deploy_confirmation_message(target, server_desc, config, default_app_name)
+    if target == 'kamal'
+      "Build and push a Docker image to #{server_desc}, then restart the container. " \
+      "The site will be briefly unavailable."
+    else
+      app_name = config['app_name'].presence || default_app_name
+      "Deploy to Fly.io (app: #{app_name})."
+    end
   end
 
   # Returns an array of human-readable strings describing unmet

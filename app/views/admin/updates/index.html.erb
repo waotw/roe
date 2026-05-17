@@ -210,19 +210,7 @@
     <h2 class="mt-6 text-2xl font-bold text-gray-900 mb-6">Deploy to Live Server</h2>
 
     <%
-      deploy_target       = @deploy_config['target'].presence || 'kamal'
-      deploy_target_label = deploy_target == 'kamal' ? 'Kamal' : 'Fly.io'
       deploy_state        = @deploy_status&.dig(:state)
-
-      # Human-readable server/app descriptor for the card header
-      default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
-      deploy_server_desc = if deploy_target == 'kamal'
-        servers = Array(@deploy_config.dig('kamal', 'servers')).reject(&:blank?)
-        servers.first.presence || '(no server configured)'
-      else
-        @deploy_config['app_name'].presence || default_app_name
-      end
-
       last_deployed_at = @deploy_status&.dig(:completed_at) if deploy_state == :completed
     %>
 
@@ -233,9 +221,9 @@
         <div>
           <div class="flex items-center gap-2 mb-1">
             <span class="inline-flex items-center font-mono text-xs px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs">
-              <%= deploy_target_label %>
+              <%= @deploy_target_label %>
             </span>
-            <span class="text-sm text-gray-600 font-mono"><%= deploy_server_desc %></span>
+            <span class="text-sm text-gray-600 font-mono"><%= @deploy_server_desc %></span>
           </div>
           <% if last_deployed_at %>
             <p class="text-xs text-gray-400">Last deployed <%= time_ago_in_words(last_deployed_at) %> ago</p>
@@ -282,7 +270,7 @@
               <% if @deploy_status[:completed_at] %>
                 <p class="text-xs text-green-700 mt-0.5">
                   Finished <%= time_ago_in_words(@deploy_status[:completed_at]) %> ago
-                  <% if @deploy_status[:version_tag].present? && deploy_target == 'kamal' %>
+                  <% if @deploy_status[:version_tag].present? && @deploy_target == 'kamal' %>
                     &middot; version tag <span class="font-mono"><%= @deploy_status[:version_tag] %></span>
                   <% end %>
                 </p>
@@ -345,20 +333,14 @@
 
       <%# ── Ready — show deploy button ── %>
       <% else %>
-        <% confirm_msg = if deploy_target == 'kamal'
-             "Build and push a Docker image to #{deploy_server_desc}, then restart the container. " \
-             "The site will be briefly unavailable."
-           else
-             "Deploy to Fly.io (app: #{@deploy_config['app_name']})."
-           end %>
         <div>
-          <% if deploy_target == 'kamal' && !@kamal_cli_available %>
+          <% if @deploy_target == 'kamal' && !@kamal_cli_available %>
             <p class="text-sm text-amber-700 mb-3">
               Kamal CLI is not available on this machine. Run
               <code class="font-mono text-xs bg-amber-50 px-0.5">bundle install</code>
               in <code class="font-mono text-xs bg-amber-50 px-0.5">current/</code> first.
             </p>
-          <% elsif deploy_target == 'fly' && !@fly_cli_available %>
+          <% elsif @deploy_target == 'fly' && !@fly_cli_available %>
             <p class="text-sm text-amber-700 mb-3">
               The Fly CLI is not installed.
               <%= link_to "See install instructions →", admin_edit_deploy_config_path, class: "underline" %>
@@ -367,13 +349,13 @@
             <button type="button"
                     data-action="click->updates#checkBeforeDeploy"
                     data-deploy-url="<%= admin_start_deploy_path %>"
-                    data-confirm-msg="<%= confirm_msg %>"
+                    data-confirm-msg="<%= @deploy_confirm_msg %>"
                     class="inline-flex items-center px-2 py-1.5 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono text-sm rounded-xs">
               Deploy
             </button>
             <p class="mt-2 text-xs text-gray-500">
               Deploys the current build on disk.
-              <% if deploy_target == 'kamal' %>
+              <% if @deploy_target == 'kamal' %>
                 Kamal builds on the remote server — expect 5–10 minutes.
               <% else %>
                 Fly builds in the cloud — typically 2–5 minutes.
