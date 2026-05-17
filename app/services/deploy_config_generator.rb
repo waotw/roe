@@ -256,7 +256,7 @@ class DeployConfigGenerator
         SOLID_QUEUE_IN_PUMA = 'true'
 
       [processes]
-        app = './bin/thrust ./bin/rails server'
+        app = '/rails/current/bin/rails server -b 0.0.0.0 -p 8080'
 
       [[mounts]]
         source = '#{FLY_VOLUME_SOURCE}'
@@ -272,8 +272,8 @@ class DeployConfigGenerator
 
         [[http_service.checks]]
           interval = '10s'
-          timeout = '2s'
-          grace_period = '5s'
+          timeout = '5s'
+          grace_period = '30s'
           method = 'GET'
           path = '/up'
           protocol = 'http'
