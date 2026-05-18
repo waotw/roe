@@ -204,15 +204,16 @@
   <% end %>
 
   <%# ══════════════════════════════════════════════════════════════════════
-      Deploy section
+      Deploy section — only show in development/staging
   ══════════════════════════════════════════════════════════════════════ %>
 
+  <% unless Rails.env.production? %>
   <div class="mt-12 pt-2 border-t-2 border-gray-300">
     <h2 class="mt-6 text-2xl font-bold text-gray-900 mb-6">Deploy to Live Server</h2>
 
     <%
-      deploy_state        = @deploy_status&.dig(:state)
-      last_deployed_at = @deploy_status&.dig(:completed_at) if deploy_state == :completed
+      deploy_state     = @deploy_status&.dig(:state)
+      last_deployed_at = @deploy_status&.dig(:completed_at)
     %>
 
     <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
@@ -368,5 +369,6 @@
 
     </div><%# /deploy card %>
   </div><%# /deploy section %>
+  <% end %>
 
 </div>
