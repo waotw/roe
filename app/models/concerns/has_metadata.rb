@@ -102,9 +102,10 @@ module HasMetadata
   end
 
   def raw_frontmatter
-    return '' unless File.exist?(file_path)
+    full_path = File.join(RoeSitePaths::SITE_PATH, file_path)
+    return '' unless File.exist?(full_path)
 
-    content = File.read(file_path)
+    content = File.read(full_path)
 
     # Extract everything between the --- delimiters
     if content =~ /\A---\s*\n(.*?)\n---\s*\n/m

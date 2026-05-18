@@ -39,8 +39,33 @@ class Product < ApplicationRecord
     metadata['title']
   end
 
+  def group
+    metadata['group']
+  end
+
+  def variant
+    metadata['variant']
+  end
+
+  def primary?
+    metadata['primary'] == true || metadata['primary'] == 'true'
+  end
+
   def url_name
-    metadata['url_name'] || title&.parameterize
+    # If url_name is explicitly set, use it exactly
+    explicit = metadata['url_name']
+    return explicit if explicit.present?
+    
+    # Auto-generate from title
+    base = title&.parameterize
+    return nil if base.blank?
+    
+    # Only append variant if: there's a group AND variant AND no explicit url_name
+    if group.present? && variant.present?
+      "#{base}-#{variant.parameterize}"
+    else
+      base
+    end
   end
 
   def status
