@@ -61,27 +61,62 @@ module RoeUpdater
         return mock_release if Rails.env.test?
         return mock_release if ENV['ROE_MOCK_UPDATE'].present?
 
-        fetch_via_git_tags || fetch_via_sourcehut_api
+        Rails.logger.info "[VersionChecker] Starting update check from #{GIT_REMOTE_URL}"
+        
+        # Try git tags first
+        Rails.logger.info "[VersionChecker] Attempting git tags fetch..."
+        git_result = fetch_via_git_tags
+        if git_result
+          Rails.logger.info "[VersionChecker] Git tags fetch succeeded: #{git_result[:version]}"
+          return git_result
+        end
+        
+        # Fall back to Sourcehut API
+        Rails.logger.info "[VersionChecker] Git tags fetch returned nil, trying Sourcehut API..."
+        api_result = fetch_via_sourcehut_api
+        if api_result
+          Rails.logger.info "[VersionChecker] Sourcehut API fetch succeeded: #{api_result[:version]}"
+          return api_result
+        end
+        
+        Rails.logger.error "[VersionChecker] All fetch methods failed"
+        nil
       rescue => e
-        Rails.logger.error "Failed to fetch latest version: #{e.message}"
+        Rails.logger.error "[VersionChecker] Failed to fetch latest version: #{e.class} - #{e.message}"
+        Rails.logger.error e.backtrace.first(5).join("\n")
         nil
       end
 
       def fetch_via_git_tags
-        return nil unless git_available?
+        unless git_available?
+          Rails.logger.info "[VersionChecker] Git not available on this system"
+          return nil
+        end
 
+        Rails.logger.info "[VersionChecker] Running: git ls-remote --tags #{GIT_REMOTE_URL}"
         tags_output = `git ls-remote --tags #{GIT_REMOTE_URL} 2>/dev/null`
-        return nil if tags_output.empty?
+        Rails.logger.info "[VersionChecker] Git output length: #{tags_output.length} chars"
+        
+        if tags_output.empty?
+          Rails.logger.info "[VersionChecker] Git output was empty"
+          return nil
+        end
 
         tags = tags_output.lines.map do |line|
           match = line.match(/refs\/tags\/(v?(.+))/)
           match[2] if match
         end.compact
 
+        Rails.logger.info "[VersionChecker] Found #{tags.length} tags, #{tags.select { |t| t.match(/^\d+\.\d+(\.\d+)?$/) }.length} version tags"
+        
         version_tags = tags.select { |t| t.match(/^\d+\.\d+(\.\d+)?$/) }
-        return nil if version_tags.empty?
+        if version_tags.empty?
+          Rails.logger.info "[VersionChecker] No valid version tags found"
+          return nil
+        end
 
         latest_tag = version_tags.sort { |a, b| compare_versions(a, b) }.last
+        Rails.logger.info "[VersionChecker] Latest tag: #{latest_tag}"
 
         {
           version: latest_tag,
@@ -90,29 +125,43 @@ module RoeUpdater
           published_at: Time.now.iso8601
         }
       rescue => e
-        Rails.logger.error "Git tags fetch failed: #{e.message}"
+        Rails.logger.error "[VersionChecker] Git tags fetch failed: #{e.class} - #{e.message}"
         nil
       end
 
       def fetch_via_sourcehut_api
         uri = URI("https://git.sr.ht/api/~benjaminwelch/repos/roe/log")
+        Rails.logger.info "[VersionChecker] Making API request to: #{uri}"
+        
         response = Net::HTTP.get_response(uri)
-        return nil unless response.is_a?(Net::HTTPSuccess)
+        Rails.logger.info "[VersionChecker] API response code: #{response.code}"
+        
+        unless response.is_a?(Net::HTTPSuccess)
+          Rails.logger.info "[VersionChecker] API request failed: #{response.code} #{response.message}"
+          return nil
+        end
         
         data = JSON.parse(response.body)
         commits = data['results'] || []
-        return nil if commits.empty?
+        Rails.logger.info "[VersionChecker] Found #{commits.length} commits in response"
+        
+        if commits.empty?
+          Rails.logger.info "[VersionChecker] No commits found in API response"
+          return nil
+        end
 
         latest_commit = commits.first
+        version = extract_version_from_commit(latest_commit)
+        Rails.logger.info "[VersionChecker] Extracted version: #{version}"
         
         {
-          version: extract_version_from_commit(latest_commit),
+          version: version,
           url: "https://git.sr.ht/#{SOURCEHUT_REPO}",
           notes: "Latest commit: #{latest_commit['message']&.lines&.first}",
           published_at: latest_commit['timestamp']
         }
       rescue => e
-        Rails.logger.error "Sourcehut API fetch failed: #{e.message}"
+        Rails.logger.error "[VersionChecker] Sourcehut API fetch failed: #{e.class} - #{e.message}"
         nil
       end
 
