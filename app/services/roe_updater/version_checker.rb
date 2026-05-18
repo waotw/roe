@@ -130,38 +130,99 @@ module RoeUpdater
       end
 
       def fetch_via_sourcehut_api
-        uri = URI("https://git.sr.ht/api/~benjaminwelch/repos/roe/log")
-        Rails.logger.info "[VersionChecker] Making API request to: #{uri}"
+        # Try the GraphQL API endpoint first (more reliable)
+        uri = URI("https://git.sr.ht/query")
+        Rails.logger.info "[VersionChecker] Making GraphQL API request to: #{uri}"
+        
+        # GraphQL query for repository refs/tags
+        query = {
+          query: <<~GRAPHQL
+            query {
+              repository(owner: "~benjaminwelch", name: "roe") {
+                refs(type: TAGS, count: 10) {
+                  results {
+                    name
+                  }
+                }
+              }
+            }
+          GRAPHQL
+        }
+        
+        req = Net::HTTP::Post.new(uri)
+        req['Content-Type'] = 'application/json'
+        req.body = query.to_json
+        
+        response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+          http.request(req)
+        end
+        
+        Rails.logger.info "[VersionChecker] GraphQL API response code: #{response.code}"
+        
+        if response.is_a?(Net::HTTPSuccess)
+          data = JSON.parse(response.body)
+          
+          if data['errors']
+            Rails.logger.info "[VersionChecker] GraphQL errors: #{data['errors']}"
+            return nil
+          end
+          
+          tags = data.dig('data', 'repository', 'refs', 'results') || []
+          Rails.logger.info "[VersionChecker] Found #{tags.length} tags via GraphQL"
+          
+          version_tags = tags.map { |t| t['name'] }.select { |t| t.match(/^v?\d+\.\d+(\.\d+)?$/) }
+          
+          if version_tags.any?
+            latest_tag = version_tags.sort { |a, b| compare_versions(a.gsub(/^v/, ''), b.gsub(/^v/, '')) }.last
+            Rails.logger.info "[VersionChecker] Latest version from GraphQL: #{latest_tag}"
+            
+            return {
+              version: latest_tag.gsub(/^v/, ''),
+              url: "https://git.sr.ht/#{SOURCEHUT_REPO}/refs/#{latest_tag}",
+              notes: "View the changelog and commit history on Sourcehut.",
+              published_at: Time.now.iso8601
+            }
+          end
+        end
+        
+        Rails.logger.info "[VersionChecker] GraphQL API failed or no tags found, trying REST endpoint..."
+        
+        # Fallback to REST API - try the refs endpoint instead
+        uri = URI("https://git.sr.ht/api/~benjaminwelch/repos/roe/refs")
+        Rails.logger.info "[VersionChecker] Making REST API request to: #{uri}"
         
         response = Net::HTTP.get_response(uri)
-        Rails.logger.info "[VersionChecker] API response code: #{response.code}"
+        Rails.logger.info "[VersionChecker] REST API response code: #{response.code}"
         
         unless response.is_a?(Net::HTTPSuccess)
-          Rails.logger.info "[VersionChecker] API request failed: #{response.code} #{response.message}"
+          Rails.logger.info "[VersionChecker] REST API request failed: #{response.code} #{response.message}"
           return nil
         end
         
         data = JSON.parse(response.body)
-        commits = data['results'] || []
-        Rails.logger.info "[VersionChecker] Found #{commits.length} commits in response"
+        Rails.logger.info "[VersionChecker] REST API response keys: #{data.keys.inspect}"
         
-        if commits.empty?
-          Rails.logger.info "[VersionChecker] No commits found in API response"
-          return nil
+        # Try to extract version from tags in the refs response
+        refs = data['results'] || []
+        tags = refs.select { |r| r['name']&.match(/^v?\d+\.\d+(\.\d+)?$/) }
+        
+        if tags.any?
+          latest_tag = tags.sort { |a, b| compare_versions(a['name'].gsub(/^v/, ''), b['name'].gsub(/^v/, '')) }.last
+          Rails.logger.info "[VersionChecker] Latest version from REST API: #{latest_tag['name']}"
+          
+          return {
+            version: latest_tag['name'].gsub(/^v/, ''),
+            url: "https://git.sr.ht/#{SOURCEHUT_REPO}/refs/#{latest_tag['name']}",
+            notes: "View the changelog and commit history on Sourcehut.",
+            published_at: latest_tag['created'] || Time.now.iso8601
+          }
         end
-
-        latest_commit = commits.first
-        version = extract_version_from_commit(latest_commit)
-        Rails.logger.info "[VersionChecker] Extracted version: #{version}"
         
-        {
-          version: version,
-          url: "https://git.sr.ht/#{SOURCEHUT_REPO}",
-          notes: "Latest commit: #{latest_commit['message']&.lines&.first}",
-          published_at: latest_commit['timestamp']
-        }
+        Rails.logger.info "[VersionChecker] No version tags found in API responses"
+        nil
       rescue => e
         Rails.logger.error "[VersionChecker] Sourcehut API fetch failed: #{e.class} - #{e.message}"
+        Rails.logger.error e.backtrace.first(3).join("\n")
         nil
       end
 
