@@ -10,7 +10,7 @@ module AssetsHelper
 
     # Generate @font-face rules for each font role (only if fonts are configured)
     if fonts_config
-      %w[heading body mono].each do |role|
+      %w[heading body mono accent].each do |role|
         next unless fonts_config[role]
 
         font_data = fonts_config[role]
@@ -34,6 +34,7 @@ module AssetsHelper
     css << "  --font-heading: #{font_stack('heading', fonts_config)};"
     css << "  --font-body: #{font_stack('body', fonts_config)};"
     css << "  --font-mono: #{font_stack('mono', fonts_config)};"
+    css << "  --font-accent: #{font_stack('accent', fonts_config)};"
     css << asset_variables
     css << "}"
 
@@ -160,6 +161,7 @@ module AssetsHelper
     when 'heading' then 'Georgia, serif'
     when 'body' then 'system-ui, -apple-system, sans-serif'
     when 'mono' then 'Monaco, Consolas, monospace'
+    when 'accent' then 'Georgia, serif'
     end
   end
 end
