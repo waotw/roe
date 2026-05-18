@@ -74,6 +74,25 @@ module Api
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # GET /api/site_sync/manifest
+      #
+      # Returns the full file manifest for the site directory.
+      # Used for accurate cross-site comparison during sync operations.
+      # Returns: { files: { "path/to/file": {size, mtime}, ... }, fingerprint: "..." }
+      def manifest
+        current = ::SiteSync::Ledger.current
+        fingerprint = ::SiteSync::Ledger.fingerprint_of(current)
+
+        render json: {
+          files: current,
+          fingerprint: fingerprint,
+          file_count: current.count
+        }
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] manifest FAILED: #{e.class} #{e.message}"
+        render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
     end
   end
 end

@@ -229,6 +229,30 @@ module SiteSync
         {}
       end
 
+      # Fetch the complete file manifest from the peer. Returns a hash
+      # of `{ "path" => {size, mtime}, ... }` suitable for diffing against
+      # the local manifest. Used for accurate cross-site comparison.
+      #
+      # Returns nil on failure (network, auth, etc.) — caller should
+      # fall back to recorded ledger comparison.
+      def fetch_peer_manifest
+        return nil unless can_call_peer?
+
+        uri = URI.parse(File.join(peer_url, '/api/site_sync/manifest'))
+        response = get_from_peer(uri)
+        return nil unless response.is_a?(Net::HTTPSuccess)
+
+        data = JSON.parse(response.body)
+        {
+          'files' => data['files'] || {},
+          'fingerprint' => data['fingerprint'],
+          'file_count' => data['file_count']
+        }
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] fetch_peer_manifest failed: #{e.class} #{e.message}"
+        nil
+      end
+
       # Send a batch of imported members to the peer for publish. The
       # peer skips any member whose email already exists. Returns the
       # parsed response hash on success ({inserted, skipped, errors})
@@ -282,6 +306,22 @@ module SiteSync
         http.request(request)
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] HTTP error to #{uri}: #{e.class} #{e.message}"
+        nil
+      end
+
+      # HTTP GET helper for fetching data from peer (used by manifest fetch).
+      def get_from_peer(uri)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl      = (uri.scheme == 'https')
+        http.read_timeout = 30
+        http.open_timeout = HTTP_TIMEOUT_SECONDS
+
+        request = Net::HTTP::Get.new(uri.request_uri)
+        request['Authorization'] = "Bearer #{token}"
+
+        http.request(request)
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] HTTP GET error to #{uri}: #{e.class} #{e.message}"
         nil
       end
 

@@ -15,6 +15,7 @@ Rails.application.routes.draw do
       post "exchange",                  to: "exchange#create"
       post "refresh_ledger",            to: "exchange#refresh_ledger"
       post "file_states",               to: "exchange#file_states"
+      get "manifest",                   to: "exchange#manifest"
       post "publish_members",           to: "imports#publish_members"
       post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"
     end

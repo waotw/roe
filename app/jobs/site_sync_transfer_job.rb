@@ -113,7 +113,7 @@ class SiteSyncTransferJob < ApplicationJob
 
   def perform_push
     update_step(:computing_diff)
-    diff = local_diff
+    diff = cross_site_diff
     @original_diff = diff  # preserve for failure reassessment
 
     if diff && diff_empty?(diff)
@@ -317,6 +317,22 @@ class SiteSyncTransferJob < ApplicationJob
     SiteSync::Ledger.diff(current, recorded["files"] || {})
   end
 
+  # Cross-site diff: compares local filesystem directly to peer's
+  # current filesystem. This is the most accurate way to determine
+  # what actually needs to be synced, bypassing recorded ledger
+  # discrepancies. Falls back to local_diff if peer manifest unavailable.
+  def cross_site_diff
+    # Try to fetch peer manifest for accurate comparison
+    peer_manifest = SiteSync::Exchange.fetch_peer_manifest
+    return local_diff unless peer_manifest
+
+    current = SiteSync::Ledger.current
+    SiteSync::Ledger.diff(current, peer_manifest['files'])
+  rescue => e
+    Rails.logger.warn "[SiteSyncTransferJob] cross_site_diff failed: #{e.class} #{e.message}, falling back to local_diff"
+    local_diff
+  end
+
   # Peer's drift, as reported via the most recent exchange. Returns
   # nil when:
   #   - we've never spoken to the peer (no cached state)
@@ -324,6 +340,19 @@ class SiteSyncTransferJob < ApplicationJob
   #   - peer's drift was truncated (we don't have the full list, so
   #     selective sync would miss files — fall back to full pull)
   def peer_diff
+    # First try to get accurate diff from peer manifest
+    peer_manifest = SiteSync::Exchange.fetch_peer_manifest
+    if peer_manifest
+      current = SiteSync::Ledger.current
+      diff = SiteSync::Ledger.diff(peer_manifest['files'], current)
+      return {
+        modified: diff[:modified],
+        added: diff[:added],
+        deleted: diff[:deleted]
+      }
+    end
+
+    # Fallback to cached drift info
     state = SiteSync::Exchange.peer_state
     drift = state && state[:drift]
     return nil unless drift
@@ -334,6 +363,9 @@ class SiteSyncTransferJob < ApplicationJob
       added:    Array(drift[:added]),
       deleted:  Array(drift[:deleted])
     }
+  rescue => e
+    Rails.logger.warn "[SiteSyncTransferJob] peer_diff failed: #{e.class} #{e.message}"
+    nil
   end
 
   def diff_empty?(diff)
