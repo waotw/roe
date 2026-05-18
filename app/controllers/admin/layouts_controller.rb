@@ -31,6 +31,7 @@ class Admin::LayoutsController < Admin::BaseController
       <<~MD
         ---
         position: left
+        scope: all
         ---
 
         ## Sidebar

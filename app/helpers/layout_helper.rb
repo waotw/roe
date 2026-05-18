@@ -34,7 +34,24 @@ module LayoutHelper
       return false if content.metadata['show_sidebar'] == false
     end
 
-    true
+    # Check sidebar scope from frontmatter
+    scope = sidebar_scope
+    return true if scope.include?('all')
+
+    # Determine current content type
+    current_type = if @post
+      'posts'
+    elsif @page
+      'pages'
+    elsif @doc
+      'documentation'
+    elsif @product
+      'products'
+    else
+      'unknown'
+    end
+
+    scope.include?(current_type)
   end
 
   # Get sidebar position from frontmatter (default: left)
@@ -42,6 +59,26 @@ module LayoutHelper
     return @sidebar_position if defined?(@sidebar_position)
 
     @sidebar_position = parse_sidebar_frontmatter['position'] || 'left'
+  end
+
+  # Get sidebar scope from frontmatter (default: ['all'])
+  # Supports: 'all', 'pages', 'posts', 'products', 'documentation'
+  # Can be a single value or array: 'pages, posts' or ['pages', 'posts']
+  def sidebar_scope
+    return @sidebar_scope if defined?(@sidebar_scope)
+
+    scope_value = parse_sidebar_frontmatter['scope'] || 'all'
+
+    # Handle both string and array inputs
+    @sidebar_scope = case scope_value
+    when String
+      # Split by comma and clean up whitespace
+      scope_value.split(',').map(&:strip)
+    when Array
+      scope_value
+    else
+      ['all']
+    end
   end
 
   # Render sidebar with proper positioning class

@@ -86,7 +86,8 @@
       'explicit' => { type: :select, label: 'explicit', options: ['false', 'true'], hint: 'Explicit content?' },
       'episode_number' => { type: :text, label: 'episode_number', hint: 'Episode number' },
       'season' => { type: :text, label: 'season', hint: 'Season number' },
-      'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' }
+      'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' },
+      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this post?' }
     }
   elsif resource_type == 'product'
     {
@@ -112,7 +113,8 @@
       'sku' => { type: :text, label: 'sku', required: true, hint: 'Product SKU (required for publishing)' },
       'image' => { type: :text, label: 'image', required: true, hint: 'Product image: /media/images/product.jpg' },
       'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
-      'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' }
+      'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' },
+      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' }
     }
   else # pages
     {
@@ -129,7 +131,8 @@
         required: memberships_enabled?
       },
       'image' => { type: :text, label: 'image' },
-      'excerpt' => { type: :textarea, label: 'excerpt' }
+      'excerpt' => { type: :textarea, label: 'excerpt' },
+      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this page?' }
     }
   end
 
