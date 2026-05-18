@@ -20,6 +20,7 @@ class PerformDeployJob < ApplicationJob
 
   STATUS_CACHE_KEY = 'deploy:status'.freeze
   STATUS_TTL       = 24.hours
+  LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, 'system', 'global', '.last_deploy.yml')
 
   def perform(target:, version_tag:)
     # Kamal builds from git-tracked files only, so uncommitted changes are
@@ -110,14 +111,17 @@ class PerformDeployJob < ApplicationJob
     end
 
     if success
+      completed_time = Time.current
       write_status(
         state:        :completed,
         target:       target,
         version_tag:  version_tag,
         log:          log,
-        completed_at: Time.current,
+        completed_at: completed_time,
         error:        nil
       )
+      # Persist last deploy timestamp so it survives cache dismissal
+      File.write(LAST_DEPLOY_FILE, { completed_at: completed_time.iso8601, target: target }.to_yaml)
       Rails.logger.info "[PerformDeployJob] #{target} deploy completed successfully"
     else
       write_status(
