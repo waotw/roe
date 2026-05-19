@@ -28,9 +28,15 @@ class PerformDeployJob < ApplicationJob
     # building so the deployed image always reflects the current state on disk.
     auto_commit if target == 'kamal'
 
+    # Copy VERSION from root to current/ so Docker can access it during build
+    prepare_version_file
+
     cmd = build_command(target, version_tag)
     Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag})"
     run_with_streaming(cmd, target: target, version_tag: version_tag)
+  ensure
+    # Clean up temporary VERSION file
+    cleanup_version_file
   end
 
   private
@@ -58,6 +64,24 @@ class PerformDeployJob < ApplicationJob
     end
   rescue => e
     Rails.logger.warn "[PerformDeployJob] Auto-commit failed (#{e.message}) — continuing with deploy"
+  end
+
+  def prepare_version_file
+    version_source = File.join(RoeSitePaths::ROE_ROOT, 'VERSION')
+    version_dest = File.join(Rails.root, 'VERSION')
+
+    if File.exist?(version_source)
+      FileUtils.cp(version_source, version_dest)
+      Rails.logger.info "[PerformDeployJob] Copied VERSION file for build context"
+    else
+      Rails.logger.warn "[PerformDeployJob] No VERSION file found at #{version_source}"
+    end
+  end
+
+  def cleanup_version_file
+    version_file = File.join(Rails.root, 'VERSION')
+    FileUtils.rm_f(version_file)
+    Rails.logger.info "[PerformDeployJob] Cleaned up temporary VERSION file"
   end
 
   def build_command(target, version_tag)
