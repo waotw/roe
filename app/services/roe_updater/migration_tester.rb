@@ -78,7 +78,6 @@ module RoeUpdater
           raise MigrationError, "Failed to copy site for testing: #{output}"
         end
       end
-      end
 
       def cleanup_test_site
         FileUtils.rm_rf(TEST_SITE_PATH) if File.exist?(TEST_SITE_PATH)
