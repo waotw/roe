@@ -40,7 +40,8 @@ module SiteSync
       '--exclude=.sync-state.json',
       '--exclude=.git',
       '--exclude=.sync-backups',
-      '--exclude=.DS_Store'
+      '--exclude=.DS_Store',
+      '--exclude=system/global/.last_deploy.yml'
     ].freeze
 
     PUSH_EXCLUDES = (COMMON_EXCLUDES + [
