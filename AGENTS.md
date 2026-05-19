@@ -171,7 +171,7 @@ site/                             # Content root (file-backed, persistent)
   posts/                          # Markdown posts
   pages/                          # Markdown pages
   documentation/                  # Markdown docs
-  products/                       # Store catalog
+  products/                       # Store catalog (supports grouped variants: group, variant, primary fields)
   media/                          # Images, audio, video
   emails/                         # Email templates
   templates/                      # Reusable content blocks
@@ -191,9 +191,11 @@ test/
 
 ## Major Subsystems
 
-### Update System
-Roe includes a **staged update system** that allows seamless updates without touching user content:
+### Update & Deploy
 
+Roe supports two workflows for updating production:
+
+**1. In-App Update System (for production-only installations):**
 - **VersionChecker**: Checks git.sr.ht for new releases
 - **BackupManager**: Creates DB and full site backups before updating
 - **Downloader**: Clones new versions to `staging/`
@@ -203,13 +205,35 @@ Roe includes a **staged update system** that allows seamless updates without tou
 
 **Access**: Admin → Updates
 **Process**: Check → Backup → Download → Test → Migrate → Switch → Restart
-**Rollback**: Automatic on failure, manual button available
+
+**2. Deploy to Live (for local development workflow):**
+Deploy the current codebase from local to a live server via Kamal or Fly.io.
+- **Access**: Admin → Updates & Deploy (or `./roe.sh deploy` from CLI)
+- **Targets**: Kamal (SSH-based) or Fly.io (container platform)
+- **VERSION file**: Must exist at `ROE_ROOT/VERSION` (git-tracked or manually created)
+
+**Rollback**: Automatic on update failure; manual rollback available for deploy
 
 ### Content sync
 Markdown files in `site/` are the source of truth. `ContentSync` parses front-matter and body and upserts `Post`, `Page`, `Documentation`, `Medium`, `Product`, and `*Config` rows. `ContentWatcher` (dev) re-syncs on file changes. JSON metadata is stored as a text column and queried via SQLite `json_extract`.
 
 ### Members + audiences
 `Member` records back a magic-link / token-based auth flow under `app/controllers/members/`. The `HasAudience` concern controls who can see what (public / paid / draft). Paid access is gated by Stripe subscriptions managed via `StripeProductManager` and the `checkout_controller`.
+
+### Store & Products
+Products are Markdown files in `site/products/` with front-matter defining price, SKU, category, and status. Enable the store via `site/system/features/store.yml` (creates Snipcart integration).
+
+**Product Grouping**: Products can be grouped as variants (e.g., one book with Paperback/Hardback/Ebook formats):
+- Set `group: book-id` on all variants to link them
+- Set `variant: "Paperback"` to label each format
+- Set `primary: true` on the variant to show first in collections
+- Collection grid shows variant list and price range with `groups: enabled`
+- Button renderer auto-detects siblings and renders variant selector
+
+**Configuration**:
+- Store settings in `site/system/features/store.yml`: currency, default_domain, product_categories, grouped_products
+- Product template for editor in store config
+- SKU generation via `ProductCategory` service
 
 ### Podcast feeds
 `PodcastConfig` (sourced from `site/system/features/podcast.yml`) supports multiple podcast series. `FeedGenerator` produces RSS/Atom for the main blog and per-podcast feeds, with `include_paid` / `show_paid_teasers` flags. Public feeds may show paid episodes as teasers (no enclosure); a separate `/podcast/:podcast_key/private.xml` route serves full audio to authenticated members via per-member tokens.
