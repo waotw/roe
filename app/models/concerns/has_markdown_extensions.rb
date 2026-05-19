@@ -789,66 +789,122 @@ module HasMarkdownExtensions
     # Check if description should be shown
     show_description = config[:show_description] == 'true' || config[:show_description] == true
 
+    # Check if grouping is enabled
+    groups_enabled = config[:groups] == 'enabled' || config[:groups] == true
+
     # Get aspect ratio setting (default to 'auto')
     aspect_ratio = config[:aspect_ratio] || 'auto'
     image_class = "img-#{aspect_ratio}"
 
+    # Get grouped product settings
+    grouped_config = SiteConfig.feature('store', 'grouped_products') || {}
+    grouped_button_text = grouped_config['button_text'] || 'View'
+    price_display_mode = grouped_config['price_display'] || 'range'
+
+    # Group items by their group field if groups enabled, otherwise show all
+    if groups_enabled
+      # Group items by their group field
+      grouped_items = items.group_by do |item|
+        item.respond_to?(:group) && item.group.present? ? item.group : item.id
+      end
+    else
+      # No grouping - each item is its own group
+      grouped_items = items.map { |item| [item.id, [item]] }.to_h
+    end
+
     output = []
     output << '<div class="product-grid">'
 
-    items.each do |item|
+    grouped_items.each do |group_id, group_products|
+      # Determine which product to display
+      display_product = determine_display_product(group_products)
+      next unless display_product
+
+      # Check if this is a grouped product
+      is_grouped = group_products.length > 1
+
       output << '  <div class="grid-item">'
 
       # Product image
-      image_url = item.respond_to?(:image) ? item.image : nil
+      image_url = display_product.respond_to?(:image) ? display_product.image : nil
       image_url = '/media/images/404.png' if image_url.blank?
 
       output << %Q(    <div class="grid-item-image">)
-      output << %Q(      <a href="#{item_path(item)}">)
-      output << "        #{ResponsiveImageRenderer.render(image_url, alt: (item.title || 'Product'), class: image_class)}"
+      output << %Q(      <a href="#{item_path(display_product)}">)
+      output << "        #{ResponsiveImageRenderer.render(image_url, alt: (display_product.title || 'Product'), class: image_class)}"
       output << %Q(      </a>)
       output << %Q(    </div>)
 
       # Product title (linked)
       output << %Q(    <div class="grid-item-title">)
-      output << %Q(      <a href="#{item_path(item)}">#{item.title || 'Untitled'}</a>)
+      output << %Q(      <a href="#{item_path(display_product)}">#{display_product.title || 'Untitled'}</a>)
       output << %Q(    </div>)
 
+      # Show variants if grouped
+      if is_grouped
+        variants = group_products.map { |p| p.variant || 'Standard' }.compact.join(', ')
+        output << %Q(    <div class="grid-item-variants">(#{variants})</div>)
+      end
+
       # Optional description
-      if show_description && item.respond_to?(:description) && item.description.present?
+      if show_description && display_product.respond_to?(:description) && display_product.description.present?
         # Truncate to ~100 characters
-        desc = item.description.length > 100 ? item.description[0..97] + '...' : item.description
+        desc = display_product.description.length > 100 ? display_product.description[0..97] + '...' : display_product.description
         output << %Q(    <div class="grid-item-description">#{desc}</div>)
       end
 
-      # Price and Add to Cart button
+      # Price and button
       output << '    <div class="grid-item-footer">'
 
-      if item.respond_to?(:price)
-        price_formatted = "#{currency_symbol}#{sprintf('%.2f', item.price)}"
-        output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
-      end
-
-      # Add to Cart button (if product has SKU)
-      if item.respond_to?(:sku) && item.sku.present?
-        # Get validation URL using item_path helper
-        product_url = item_path(item)
-        domain = SiteConfig.feature('store', 'default_domain')
-        validation_url = domain ? "https://#{domain}#{product_url}" : product_url
-
-        output << %Q(      <button class="snipcart-add-item grid-item-button")
-        output << %Q(              data-turbo="false")
-        output << %Q(              data-item-id="#{item.sku}")
-        output << %Q(              data-item-name="#{item.title}")
-        output << %Q(              data-item-price="#{item.price}")
-        output << %Q(              data-item-url="#{validation_url}")
-        if item.respond_to?(:description) && item.description.present?
-          output << %Q(              data-item-description="#{item.description.gsub('"', '&quot;')}")
+      if is_grouped
+        # Show price based on config setting
+        prices = group_products.map { |p| p.price.to_f }.compact
+        if prices.any?
+          formatted_price = case price_display_mode
+          when 'lowest'
+            "#{currency_symbol}#{sprintf('%.2f', prices.min)}"
+          when 'highest'
+            "#{currency_symbol}#{sprintf('%.2f', prices.max)}"
+          else # 'range' or default
+            if prices.min == prices.max
+              "#{currency_symbol}#{sprintf('%.2f', prices.min)}"
+            else
+              "#{currency_symbol}#{sprintf('%.2f', prices.min)} - #{currency_symbol}#{sprintf('%.2f', prices.max)}"
+            end
+          end
+          output << %Q(      <span class="grid-item-price">#{formatted_price}</span>)
         end
-        if item.respond_to?(:image) && item.image.present?
-          output << %Q(              data-item-image="#{item.image}")
+
+        # View button for grouped products - link to primary product
+        primary_for_link = find_primary_product(group_products) || display_product
+        output << %Q(      <a href="#{item_path(primary_for_link)}" class="grid-item-button">#{grouped_button_text}</a>)
+      else
+        # Single product - show individual price and Add to Cart
+        if display_product.respond_to?(:price)
+          price_formatted = "#{currency_symbol}#{sprintf('%.2f', display_product.price)}"
+          output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
         end
-        output << %Q(      >Add to Cart</button>)
+
+        # Add to Cart button (if product has SKU)
+        if display_product.respond_to?(:sku) && display_product.sku.present?
+          product_url = item_path(display_product)
+          domain = SiteConfig.feature('store', 'default_domain')
+          validation_url = domain ? "https://#{domain}#{product_url}" : product_url
+
+          output << %Q(      <button class="snipcart-add-item grid-item-button")
+          output << %Q(              data-turbo="false")
+          output << %Q(              data-item-id="#{display_product.sku}")
+          output << %Q(              data-item-name="#{display_product.title}")
+          output << %Q(              data-item-price="#{display_product.price}")
+          output << %Q(              data-item-url="#{validation_url}")
+          if display_product.respond_to?(:description) && display_product.description.present?
+            output << %Q(              data-item-description="#{display_product.description.gsub('"', '&quot;')}")
+          end
+          if display_product.respond_to?(:image) && display_product.image.present?
+            output << %Q(              data-item-image="#{display_product.image}")
+          end
+          output << %Q(      >Add to Cart</button>)
+        end
       end
 
       output << '    </div>' # Close grid-item-footer
@@ -857,6 +913,28 @@ module HasMarkdownExtensions
 
     output << '</div>' # Close product-grid
     output.join("\n")
+  end
+
+  # Determine which product to display from a group
+  # Priority: primary → has SKU → oldest (created first)
+  def determine_display_product(products)
+    return products.first if products.length == 1
+
+    # First, check for primary product
+    primary = find_primary_product(products)
+    return primary if primary
+
+    # Next, prefer product with SKU
+    with_sku = products.find { |p| p.respond_to?(:sku) && p.sku.present? }
+    return with_sku if with_sku
+
+    # Finally, return oldest (first created)
+    products.sort_by(&:created_at).first
+  end
+
+  # Find the primary product in a group (if one exists)
+  def find_primary_product(products)
+    products.find { |p| p.respond_to?(:primary?) && p.primary? }
   end
 
   def get_currency_symbol
@@ -1506,24 +1584,87 @@ module HasMarkdownExtensions
   # BUTTONS
 
   def process_buttons(content, preview: false)
-    content.gsub(/```button\r?\n(.*?)```/m) do
-      config_text = $1
-
+    # Pattern to match button blocks
+    button_pattern = /```button\r?\n(.*?)```/m
+    
+    # Find all button blocks with their positions
+    buttons = []
+    content.scan(button_pattern) do |match|
+      config_text = match[0]
+      start_pos = $~.begin(0)
+      end_pos = $~.end(0)
+      
       begin
         config = parse_button_config(config_text)
-
-        # Build context for button renderer
-        context = {
-          current_product: (self.is_a?(Product) ? self : nil),
-          authenticated: preview # In preview mode, treat as authenticated
+        buttons << {
+          config: config,
+          start_pos: start_pos,
+          end_pos: end_pos,
+          match: $~
         }
-
-        ProductButtonRenderer.render(config, context)
       rescue => e
-        Rails.logger.error "Button rendering error: #{e.message}"
-        preview ? "<div class=\"error\">Button error: #{e.message}</div>" : ''
+        Rails.logger.error "Button parsing error: #{e.message}"
       end
     end
+    
+    return content if buttons.empty?
+    
+    # Group consecutive buttons (no blank lines between)
+    groups = []
+    current_group = [buttons.first]
+    
+    buttons.each_cons(2) do |prev, curr|
+      # Check if there's a blank line between these buttons
+      text_between = content[prev[:end_pos]...curr[:start_pos]]
+      
+      if text_between =~ /\n\s*\n/
+        # Blank line found - start new group
+        groups << current_group
+        current_group = [curr]
+      else
+        # No blank line - same group
+        current_group << curr
+      end
+    end
+    groups << current_group
+    
+    # Render each group
+    result = content.dup
+    offset = 0
+    
+    groups.each do |group|
+      # Build context for button renderer
+      context = {
+        current_product: (self.is_a?(Product) ? self : nil),
+        authenticated: preview
+      }
+      
+      if group.length > 1
+        # Multiple consecutive buttons - render as variant list
+        skus = group.map { |b| b[:config]['sku'] }.compact
+        if skus.length > 1
+          renderer = ProductButtonRenderer.new({'skus' => skus}, context)
+          rendered = renderer.render_variant_list
+        else
+          # Fall back to individual rendering if no SKUs
+          rendered = group.map do |btn|
+            ProductButtonRenderer.render(btn[:config], context)
+          end.join("\n")
+        end
+      else
+        # Single button - render normally
+        rendered = ProductButtonRenderer.render(group.first[:config], context)
+      end
+      
+      # Replace in result
+      first_btn = group.first
+      last_btn = group.last
+      original_text = content[first_btn[:start_pos]...last_btn[:end_pos]]
+      
+      result.sub!(original_text, rendered)
+    end
+    
+    result
   end
 
   def parse_button_config(config_text)

@@ -53,7 +53,7 @@ log_error() {
 usage() {
     echo "Roe CMS - Server Management"
     echo ""
-    echo "Usage: roe.sh {start|stop|restart|console|status|update}"
+    echo "Usage: roe.sh {start|stop|restart|console|status|update|deploy}"
     echo ""
     echo "Commands:"
     echo "  start     Start the Roe server"
@@ -62,6 +62,7 @@ usage() {
     echo "  console   Open Rails console"
     echo "  status    Check server status"
     echo "  update    Check for and install updates"
+    echo "  deploy    Deploy to production (Fly or Kamal)"
     echo ""
     echo "Root directory: $ROE_ROOT"
     echo "App directory: $APP_DIR"
@@ -158,6 +159,52 @@ cmd_update() {
     "$APP_DIR/bin/rails" runner "puts RoeUpdater::VersionChecker.check_for_updates.inspect"
 }
 
+# Deploy to production
+cmd_deploy() {
+    log_info "Preparing to deploy..."
+    
+    cd "$APP_DIR"
+    
+    # Copy VERSION from root to current/ so Docker can access it
+    if [ -f "$ROE_ROOT/VERSION" ]; then
+        cp "$ROE_ROOT/VERSION" "$APP_DIR/VERSION"
+        log_info "VERSION file copied to app directory"
+    else
+        log_warning "No VERSION file found at $ROE_ROOT/VERSION"
+    fi
+    
+    # Detect deploy method
+    if [ -f "$APP_DIR/config/deploy.yml" ]; then
+        # Kamal deployment
+        log_info "Detected Kamal configuration"
+        if ! command -v kamal &> /dev/null; then
+            log_error "Kamal not found. Install: gem install kamal"
+            rm -f "$APP_DIR/VERSION"
+            exit 1
+        fi
+        log_info "Deploying with Kamal..."
+        kamal deploy
+    elif [ -f "$APP_DIR/fly.toml" ]; then
+        # Fly.io deployment
+        log_info "Detected Fly.io configuration"
+        if ! command -v fly &> /dev/null; then
+            log_error "Fly CLI not found. Install: https://fly.io/docs/hands-on/install-flyctl/"
+            rm -f "$APP_DIR/VERSION"
+            exit 1
+        fi
+        log_info "Deploying to Fly.io..."
+        fly deploy --local-only
+    else
+        log_error "No deployment configuration found (expected config/deploy.yml for Kamal or fly.toml for Fly.io)"
+        rm -f "$APP_DIR/VERSION"
+        exit 1
+    fi
+    
+    # Cleanup
+    rm -f "$APP_DIR/VERSION"
+    log_success "Deployment complete!"
+}
+
 # Main command handler
 case "${1:-}" in
     start)
@@ -179,6 +226,9 @@ case "${1:-}" in
         ;;
     update)
         cmd_update
+        ;;
+    deploy)
+        cmd_deploy
         ;;
     help|--help|-h)
         usage

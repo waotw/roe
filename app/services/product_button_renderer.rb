@@ -12,15 +12,84 @@ class ProductButtonRenderer
   end
 
   def render
-    # Auto-detect product on product pages if no SKU provided
-    product = if config['sku'].present?
-                Product.find_by("metadata->>'sku' = ?", config['sku'])
-              elsif context[:current_product]
-                context[:current_product]
-              else
-                nil
-              end
+    # Check if we have multiple SKUs (variants)
+    skus = extract_skus
 
+    if skus.length > 1
+      # Render as variant list
+      render_variant_list(skus)
+    elsif skus.length == 1
+      # Single product button
+      product = find_product(skus.first)
+      return render_single_product(product)
+    else
+      # Auto-detect product on product pages if no SKU provided
+      product = context[:current_product]
+      return render_single_product(product)
+    end
+  end
+
+  def render_variant_list(skus = nil)
+    skus ||= config['skus'] || []
+    skus = Array(skus)
+
+    return '' if skus.empty?
+
+    # Find all products
+    products = skus.map { |sku| find_product(sku) }.compact
+
+    # Filter to only published products for public users
+    unless context[:authenticated]
+      products = products.select { |p| p.status == 'published' }
+    end
+
+    return '' if products.empty?
+    return render_single_product(products.first) if products.length == 1
+
+    # Build variant list
+    text = config['text'] || 'Add to Cart'
+    style = config['style'] || 'primary'
+    currency = get_currency_symbol
+
+    items = products.map do |product|
+      variant_name = product.variant || product.title
+      price = "#{currency}#{sprintf('%.2f', product.price)}"
+      button = render_button(product, text, style, 1)
+
+      "<li class=\"product-variant-item\">" \
+      "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span>, " \
+      "<span class=\"variant-price\">#{price}</span>: " \
+      "#{button}" \
+      "</li>"
+    end
+
+    "<ul class=\"product-variant-list\">\n#{items.join("\n")}\n</ul>"
+  end
+
+  private
+
+  def extract_skus
+    skus = []
+
+    # Check for single SKU
+    skus << config['sku'] if config['sku'].present?
+
+    # Check for multiple SKUs in variants array
+    if config['variants'].is_a?(Array)
+      skus.concat(config['variants'].map { |v| v['sku'] || v }.compact)
+    elsif config['variants'].is_a?(String)
+      # Comma-separated SKUs
+      skus.concat(config['variants'].split(',').map(&:strip))
+    end
+
+    skus.uniq
+  end
+
+  def find_product(sku)
+    Product.find_by("metadata->>'sku' = ?", sku)
+  end
+
+  def render_single_product(product)
     # Handle missing product
     unless product
       return render_error if context[:authenticated]
@@ -33,6 +102,28 @@ class ProductButtonRenderer
       return ''
     end
 
+    # Check if product has variants (is part of a group)
+    if product.respond_to?(:group) && product.group.present?
+      # Find all products in this group
+      group_products = Product.where("json_extract(metadata, '$.group') = ?", product.group).to_a
+      
+      # Filter to published products for public users
+      unless context[:authenticated]
+        group_products = group_products.select { |p| p.status == 'published' }
+      end
+      
+      # If there are multiple products in the group, render as variant list
+      if group_products.length > 1
+        # Sort: primary first, then by created_at
+        sorted_products = group_products.sort_by do |p|
+          primary = p.respond_to?(:primary?) && p.primary? ? 0 : 1
+          [primary, p.created_at]
+        end
+        
+        return render_product_list(sorted_products)
+      end
+    end
+
     # Build button attributes
     text = config['text'] || 'Add to Cart'
     style = config['style'] || 'primary'
@@ -40,6 +131,40 @@ class ProductButtonRenderer
 
     # Generate Snipcart button
     render_button(product, text, style, quantity)
+  end
+
+  def render_product_list(products)
+    # Build variant list
+    text = config['text'] || 'Add to Cart'
+    style = config['style'] || 'primary'
+    currency = get_currency_symbol
+
+    items = products.map do |product|
+      variant_name = product.respond_to?(:variant) && product.variant.present? ? product.variant : product.title
+      price = "#{currency}#{sprintf('%.2f', product.price)}"
+      button = render_button(product, text, style, 1)
+
+      "<li class=\"product-variant-item\">" \
+      "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span>, " \
+      "<span class=\"variant-price\">#{price}</span>: " \
+      "#{button}" \
+      "</li>"
+    end
+
+    "<ul class=\"product-variant-list\">\n#{items.join("\n")}\n</ul>"
+  end
+
+  def get_currency_symbol
+    currency = SiteConfig.feature('store', 'currency') || 'usd'
+    case currency.downcase
+    when 'usd' then '$'
+    when 'eur' then '€'
+    when 'gbp' then '£'
+    when 'cad' then 'CA$'
+    when 'aud' then 'A$'
+    when 'jpy' then '¥'
+    else currency.upcase
+    end
   end
 
   private

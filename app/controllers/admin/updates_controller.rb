@@ -7,6 +7,7 @@ class Admin::UpdatesController < Admin::BaseController
 
     # Deploy section
     @deploy_status       = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
+    @last_deploy_time    = load_last_deploy_time
     @deploy_config       = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
     @deploy_issues       = deploy_prerequisites(@deploy_config)
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
@@ -123,7 +124,20 @@ class Admin::UpdatesController < Admin::BaseController
   end
 
   def dismiss_deploy
-    Rails.cache.delete(PerformDeployJob::STATUS_CACHE_KEY)
+    # Clear the in-progress/failed status from cache but preserve completed state
+    # The LAST_DEPLOY_FILE keeps the timestamp for display after dismissal
+    current_status = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
+    if current_status && current_status[:state] == :completed
+      # Keep completed status but mark as dismissed (no longer showing success banner)
+      Rails.cache.write(
+        PerformDeployJob::STATUS_CACHE_KEY,
+        current_status.merge(dismissed: true),
+        expires_in: PerformDeployJob::STATUS_TTL
+      )
+    else
+      # For running/failed states, just delete from cache
+      Rails.cache.delete(PerformDeployJob::STATUS_CACHE_KEY)
+    end
     redirect_to admin_updates_path
   end
 
@@ -204,5 +218,18 @@ class Admin::UpdatesController < Admin::BaseController
     end
 
     issues
+  end
+
+  def load_last_deploy_time
+    file_path = PerformDeployJob::LAST_DEPLOY_FILE
+    return nil unless File.exist?(file_path)
+
+    data = YAML.load_file(file_path)
+    return nil unless data.is_a?(Hash) && data['completed_at']
+
+    Time.parse(data['completed_at'])
+  rescue => e
+    Rails.logger.error "Error loading last deploy time: #{e.message}"
+    nil
   end
 end

@@ -114,7 +114,10 @@
       'image' => { type: :text, label: 'image', required: true, hint: 'Product image: /media/images/product.jpg' },
       'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
       'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' },
-      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' }
+      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' },
+      'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
+      'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
+      'primary' => { type: :select, label: 'primary', options: ['true', 'false'], hint: 'Show this variant in collections (default: false)' }
     }
   else # pages
     {

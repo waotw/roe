@@ -19,7 +19,8 @@ module SiteSync
     #   - .DS_Store       macOS noise that appears in every browsed dir
     #   - .sync-state.json the ledger itself; otherwise the ledger's mtime
     #                     bumps every time we write it and we'd flap drift
-    EXCLUDED_FILES = %w[.DS_Store .sync-state.json].freeze
+    #   - .last_deploy.yml tracks local deploy state, environment-specific
+    EXCLUDED_FILES = %w[.DS_Store .sync-state.json .last_deploy.yml].freeze
 
     class << self
       def current

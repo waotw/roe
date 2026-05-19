@@ -310,7 +310,7 @@
           waiting on the hourly job or the 60s on-render debounce.
           Only meaningful on the side that initiates (dev). %>
       <% if @peer_call_configured %>
-        <%= button_to "Refresh Connection",
+        <%= button_to "Refresh Sync Status",
                       admin_refresh_site_sync_exchange_path,
                       method: :post,
                       data: { turbo_submits_with: "⏳ Refreshing…" },
@@ -536,13 +536,24 @@
           peer is reachable. The standalone local-drift panel above
           this one is hidden in that case (avoids showing the same
           info twice). When peer is unreachable, the standalone panel
-          shows instead — this section just doesn't render. %>
+          shows instead — this section just doesn't render.
+          
+          NOTE: On production, "local" means the production server itself.
+          Changes here should be pulled to dev, not pushed. %>
       <% if @peer_reachable && @status[:state] == :local_drift %>
         <% local_counts = @status[:local] %>
         <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mt-3">
-          <p class="text-sm text-amber-800 mb-3">
-            ⬆️ You have unsynced local changes — push them to live before they accumulate.
-          </p>
+          <% if Rails.env.production? %>
+            <%# Production view: changes on live server need to be pulled to dev %>
+            <p class="text-sm text-amber-800 mb-3">
+              ⬆️ You have unsynced changes on this server — pull them to your local site before they accumulate.
+            </p>
+          <% else %>
+            <%# Development view: local changes need to be pushed to live %>
+            <p class="text-sm text-amber-800 mb-3">
+              ⬆️ You have unsynced local changes — push them to live before they accumulate.
+            </p>
+          <% end %>
           <ul class="list-disc ml-6 mb-3 text-sm text-amber-800 space-y-1">
             <% if local_counts[:modified].any? %>
               <li><strong><%= local_counts[:modified].size %></strong> file<%= 's' if local_counts[:modified].size != 1 %> modified</li>
@@ -576,7 +587,13 @@
             </div>
           </details>
 
-          <% if @peer_call_configured %>
+          <% if Rails.env.production? %>
+            <%# On production, direct users to their local dev environment %>
+            <p class="text-xs text-amber-700">
+              Site sync is controlled from your local development environment. 
+              Visit your <strong>local</strong> admin Site Sync page to pull these changes.
+            </p>
+          <% elsif @peer_call_configured %>
             <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
               <div class="flex gap-2">
                 <%= form.text_field :confirm,

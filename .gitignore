@@ -74,6 +74,9 @@ GRAPH_REPORT.md
 /static_site/
 /site_backups/
 
+# Temporary VERSION file copied during deploy (source is at ROE_ROOT/VERSION)
+/VERSION
+
 # Secrets:
 .kamal/secrets
 

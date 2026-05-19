@@ -115,6 +115,10 @@ class ConfigGenerator
         text: Add to Cart
         style: primary
         ```
+      # Grouped product display settings
+      grouped_products:
+        button_text: "View"
+        price_display: "range"  # Options: range, lowest, highest
       snipcart:
         load_strategy: "on-user-interaction"
         modal_style: "side"
