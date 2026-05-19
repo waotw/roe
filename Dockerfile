@@ -74,6 +74,12 @@ RUN apt-get update -qq && \
 # Copy built artifacts: gems, application
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 
+# deploy version file to production
+COPY VERSION /rails/VERSION
+
+# Copy root-level companion files for users
+COPY roe.sh README.md AGENTS.md /rails/
+
 # Set up versioned directory structure
 # /rails/current/ - Current Roe version (Rails app)
 # /rails/site/ - User content (symlinked to /data/site for persistence)

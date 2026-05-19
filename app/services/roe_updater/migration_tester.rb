@@ -69,12 +69,15 @@ module RoeUpdater
       def copy_site_to_test
         cleanup_test_site
         
-        rsync_cmd = "rsync -av --delete '#{RoeSitePaths::SITE_PATH}/' '#{TEST_SITE_PATH}/' 2>&1"
-        output = `#{rsync_cmd}`
+        # Exclude generated image variants - they can be rebuilt from originals
+        # This saves significant space during the migration test
+        rsync_cmd = "rsync -av --delete --exclude='media/images/variants/' '#{RoeSitePaths::SITE_PATH}/' '#{TEST_SITE_PATH}/' 2>&1"
+        output = `rsync_cmd`
         
         unless $?.success?
           raise MigrationError, "Failed to copy site for testing: #{output}"
         end
+      end
       end
 
       def cleanup_test_site
