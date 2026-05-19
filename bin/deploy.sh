@@ -80,10 +80,24 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# 5. Deploy
+# 5. Prepare build context
+echo ""
+echo "📋 Preparing build context..."
+# Copy VERSION from root to current/ so Docker can access it
+if [ -f "../VERSION" ]; then
+    cp ../VERSION ./VERSION
+    echo "✅ VERSION file copied"
+fi
+
+# 6. Deploy
 echo ""
 echo "🚢 Deploying to Fly.io..."
 fly deploy --local-only
+
+# 7. Cleanup
+echo ""
+echo "🧹 Cleaning up..."
+rm -f ./VERSION
 
 # 6. Health check
 echo ""
