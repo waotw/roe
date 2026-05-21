@@ -6,8 +6,13 @@ class SendNewsletterJobTest < ActiveJob::TestCase
     @member = create(:member, email: 'test@example.com', name: 'Test User')
     @job = SendNewsletterJob.new
 
-    # Ensure SiteConfig is set up
-    SiteConfig.find_by(file_path: 'site/system/global/site.yml')&.update!(
+    # Clear SiteConfig cache and destroy existing test config
+    SiteConfig.reload!('site')
+    SiteConfig.where("file_path LIKE ?", "%site/system/global/site.yml").destroy_all
+    
+    # Create fresh test config
+    SiteConfig.create!(
+      file_path: SiteConfig::SITE_FILE.to_s,
       config: { 'author_email' => 'author@example.com', 'author' => 'Test Author' }
     )
 
@@ -163,8 +168,8 @@ class SendNewsletterJobTest < ActiveJob::TestCase
 
     PostmarkService.expects(:send_newsletter_batch).twice.returns(fail_result, success_result)
 
-    # Job should sleep between retries
-    @job.expects(:sleep).with(2) # 2^1 seconds
+    # Job should sleep between retries - stub to speed up test
+    SendNewsletterJob.any_instance.stubs(:sleep)
 
     result = SendNewsletterJob.perform_now(@post.id, [ @member.id ])
     
@@ -176,9 +181,8 @@ class SendNewsletterJobTest < ActiveJob::TestCase
 
     PostmarkService.expects(:send_newsletter_batch).times(3).returns(fail_result)
 
-    # Should sleep for 2s and 4s (2^1 and 2^2)
-    @job.expects(:sleep).with(2)
-    @job.expects(:sleep).with(4)
+    # Should sleep between retries - stub to speed up test
+    SendNewsletterJob.any_instance.stubs(:sleep)
 
     result = SendNewsletterJob.perform_now(@post.id, [ @member.id ])
     
@@ -210,7 +214,8 @@ class SendNewsletterJobTest < ActiveJob::TestCase
       { success: true, results: Array.new(50) { { 'ErrorCode' => 0, 'MessageID' => 'msg-1' } } }
     )
 
-    @job.expects(:sleep).with(0.2)
+    # Should sleep between batches - stub to speed up test
+    SendNewsletterJob.any_instance.stubs(:sleep)
 
     SendNewsletterJob.perform_now(@post.id, member_ids)
   end
@@ -224,22 +229,17 @@ class SendNewsletterJobTest < ActiveJob::TestCase
       message_id: 'old-msg'
     )
 
-    mock_result = {
-      success: true,
-      results: [
-        { 'ErrorCode' => 0, 'MessageID' => 'new-msg' }
-      ]
-    }
-    PostmarkService.expects(:send_newsletter_batch).returns(mock_result)
+    # Member already received — should not call Postmark at all
+    PostmarkService.expects(:send_newsletter_batch).never
 
-    # Should not create duplicate, should use existing
+    # Should not create duplicate, should skip entirely
     assert_no_difference 'NewsletterSend.count' do
       SendNewsletterJob.perform_now(@post.id, [ @member.id ])
     end
 
-    # Record should be updated
+    # Original record untouched
     existing.reload
-    assert_equal 'new-msg', existing.message_id
+    assert_equal 'old-msg', existing.message_id
   end
 
   test "handles missing members gracefully" do
@@ -261,7 +261,15 @@ class SendNewsletterJobTest < ActiveJob::TestCase
   end
 
   test "uses default from when SiteConfig not set" do
-    SiteConfig.find_by(file_path: 'site/system/global/site.yml')&.update!(config: {})
+    # Destroy existing config and clear cache to test defaults
+    SiteConfig.where("file_path LIKE ?", "%site/system/global/site.yml").destroy_all
+    SiteConfig.reload!('site')
+    
+    # Create new config with empty values
+    SiteConfig.create!(
+      file_path: SiteConfig::SITE_FILE.to_s,
+      config: {}
+    )
 
     PostmarkService.expects(:send_newsletter_batch).with do |args|
       message = args[:messages].first

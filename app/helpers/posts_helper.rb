@@ -28,8 +28,12 @@ module PostsHelper
     member_status = current_member ? 'is-member' : 'is-guest'
     html = html.gsub('MEMBER_STATUS_PLACEHOLDER', member_status)
 
-    # Truncate at paywall if needed
-    html = truncate_at_paywall(html, post) if should_truncate_content?(post)
+    # Truncate at paywall if needed, or strip the gate entirely for paid members
+    if should_truncate_content?(post)
+      html = truncate_at_paywall(html, post)
+    else
+      html = strip_paywall_gate(html)
+    end
 
     html.html_safe  # ← Return safe buffer from helper
   end
@@ -51,5 +55,10 @@ module PostsHelper
     else
       html
     end
+  end
+
+  def strip_paywall_gate(html)
+    # Remove the gate comment and its div entirely for paid members/admins
+    html.gsub(/<!-- PAID_CONTENT_GATE -->.*?<\/div>/m, '')
   end
 end
