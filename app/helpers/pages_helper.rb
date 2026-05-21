@@ -9,8 +9,12 @@ module PagesHelper
     member_status = current_member ? 'is-member' : 'is-guest'
     html = html.gsub('MEMBER_STATUS_PLACEHOLDER', member_status)
 
-    # Truncate at paywall if user doesn't have access
-    html = truncate_at_paywall(html, page) if should_truncate_content?(page)
+    # Truncate at paywall if needed, or strip the gate entirely for paid members
+    if should_truncate_content?(page)
+      html = truncate_at_paywall(html, page)
+    else
+      html = strip_paywall_gate(html)
+    end
 
     html.html_safe
   end
@@ -34,5 +38,10 @@ module PagesHelper
       # No gate found - this shouldn't happen due to controller check
       html
     end
+  end
+
+  def strip_paywall_gate(html)
+    # Remove the gate comment and its div entirely for paid members/admins
+    html.gsub(/<!-- PAID_CONTENT_GATE -->.*?<\/div>/m, '')
   end
 end
