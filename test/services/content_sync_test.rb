@@ -214,7 +214,7 @@ class ContentSyncTest < ActiveSupport::TestCase
     Post.create_or_update_from_file(file_path)
     Post.create_or_update_from_file(file_path)
     
-    assert_equal 1, Post.where(file_path: File.expand_path(file_path)).count
+    assert_equal 1, Post.where(file_path: RoeSitePaths.normalize(file_path)).count
   end
 
   test "string tags converted to array" do
@@ -282,7 +282,7 @@ class ContentSyncTest < ActiveSupport::TestCase
     result = ContentSync.sync_file(file_path)
     
     assert_equal :success, result
-    assert Post.exists?(file_path: File.expand_path(file_path))
+    assert Post.exists?(file_path: RoeSitePaths.normalize(file_path))
   end
 
   test "sync_file routes to correct model for pages" do
@@ -298,7 +298,7 @@ class ContentSyncTest < ActiveSupport::TestCase
     result = ContentSync.sync_file(file_path)
     
     assert_equal :success, result
-    assert Page.exists?(file_path: File.expand_path(file_path))
+    assert Page.exists?(file_path: RoeSitePaths.normalize(file_path))
   end
 
   test "removes post by file path" do

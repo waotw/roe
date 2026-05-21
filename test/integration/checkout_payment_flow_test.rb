@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class CheckoutPaymentFlowTest < ActionDispatch::IntegrationTest
   def setup

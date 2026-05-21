@@ -97,7 +97,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
   end
 
   test "excludes Substack-imported members for Substack posts" do
-    import = create(:import, source: 'substack', status: 'completed')
+    import = create(:import, source_type: 'substack', status: 'completed')
     
     # Mark post as Substack-imported
     @post.update!(metadata: @post.metadata.merge('substack_post_id' => '12345'))
@@ -198,7 +198,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
   end
 
   test "includes import_id in recipient selection logic" do
-    import = create(:import, source: 'substack', status: 'completed')
+    import = create(:import, source_type: 'substack', status: 'completed')
     
     @post.update!(metadata: @post.metadata.merge('substack_post_id' => '12345'))
     

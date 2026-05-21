@@ -14,9 +14,6 @@ class SendNewsletterJob < ApplicationJob
 
     return { sent: 0, failed: 0 } if members_to_send.empty?
 
-    # Render newsletter once
-    renderer = NewsletterRenderer.new(post)
-    html_content = renderer.render
     from_email = SiteConfig.current('site')&.config&.dig('author_email') || 'noreply@example.com'
     from_name = SiteConfig.current('site')&.config&.dig('author') || 'Newsletter'
 
@@ -107,7 +104,7 @@ class SendNewsletterJob < ApplicationJob
 
     # Postmark returns 429 for rate limiting (though rare)
     if !result[:success] && result[:error].to_s.include?('429')
-      if attempt <= MAX_RETRIES
+      if attempt < MAX_RETRIES
         wait_time = 2 ** attempt
         Rails.logger.warn "Rate limited (429), waiting #{wait_time}s before retry #{attempt}/#{MAX_RETRIES}"
         sleep(wait_time)
