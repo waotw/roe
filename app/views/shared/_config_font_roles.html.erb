@@ -1,3 +1,9 @@
+<%
+  fixed_role_keys = roles.keys.map(&:to_s)
+  custom_families = (config_hash['fonts'] || {}).reject { |k, _| fixed_role_keys.include?(k) }
+  custom_family_variants = local_assigns[:custom_family_variants] || [ 'bold', 'italic', 'bold_italic', 'light', 'medium', 'semibold', 'black' ]
+%>
+
 <% roles.each do |role_key, role_config| %>
   <div class="font-role-section mb-6 pb-6 border-b border-gray-200 last:border-b-0">
     <h4 class="text-sm font-semibold text-gray-800 mb-1"><%= role_config[:label] %></h4>
@@ -69,7 +75,7 @@
       <!-- Add Variant Button -->
       <div class="mt-2">
         <button type="button"
-                onclick="showAddVariantMenu(this, '<%= role_key %>')"
+                onclick="showAddVariantMenu(this, '<%= role_key %>', false)"
                 class="text-xs px-3 py-1 border border-gray-300 hover:bg-gray-100">
           + Add Variant
         </button>
@@ -95,6 +101,118 @@
     </div>
   </div>
 <% end %>
+
+<!-- Custom Families -->
+<div id="custom-families-container">
+  <% custom_families.each do |family_key, family_data| %>
+    <% next unless family_data.is_a?(Hash) %>
+    <div class="font-role-section mb-6 pb-6 border-b border-gray-200 custom-family-block" data-family-key="<%= family_key %>">
+      <div class="flex items-center justify-between mb-1">
+        <h4 class="text-sm font-semibold text-gray-800">
+          Custom: <span class="font-mono text-gray-600">--font-<%= family_key.gsub('_', '-') %></span>
+        </h4>
+        <button type="button"
+                onclick="removeCustomFamily(this, '<%= family_key %>')"
+                class="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700">
+          Remove Family
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">Available in CSS as <code class="font-mono">var(--font-<%= family_key.gsub('_', '-') %>)</code></p>
+
+      <div class="space-y-2 pl-3">
+        <%
+          family_value = family_data['family']
+          regular_value = family_data['regular']
+          other_variants = family_data.except('family', 'regular')
+        %>
+
+        <!-- Family -->
+        <div class="flex items-start gap-2">
+          <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2">family:</label>
+          <input type="text"
+                 value="<%= family_value %>"
+                 class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                 data-config-field="fonts.<%= family_key %>.family"
+                 placeholder="e.g., 'Nimbus Sans Narrow'">
+          <span class="text-xs text-gray-500 pt-2">(required)</span>
+        </div>
+
+        <!-- Regular -->
+        <div class="flex items-start gap-2">
+          <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2">regular:</label>
+          <div class="flex-1">
+            <input type="text"
+                   value="<%= regular_value %>"
+                   class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                   data-config-field="fonts.<%= family_key %>.regular"
+                   data-validate-font="true"
+                   placeholder="filename.woff2">
+            <p class="text-xs text-red-600 mt-1 hidden" data-font-error="fonts.<%= family_key %>.regular">
+              Font file not found.
+            </p>
+          </div>
+          <span class="text-xs text-gray-500 pt-2">(required)</span>
+        </div>
+
+        <!-- Other variants -->
+        <div class="font-variants-container" data-role="<%= family_key %>">
+          <% other_variants.each do |variant_name, variant_value| %>
+            <div class="flex items-start gap-2 font-variant-row" data-variant="<%= variant_name %>">
+              <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2"><%= variant_name %>:</label>
+              <div class="flex-1">
+                <input type="text"
+                       value="<%= variant_value %>"
+                       class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                       data-config-field="fonts.<%= family_key %>.<%= variant_name %>"
+                       data-validate-font="true">
+                <p class="text-xs text-red-600 mt-1 hidden" data-font-error="fonts.<%= family_key %>.<%= variant_name %>">
+                  Font file not found.
+                </p>
+              </div>
+              <button type="button" onclick="removeFontVariant(this)"
+                      class="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0">×</button>
+            </div>
+          <% end %>
+        </div>
+
+        <!-- Add Variant -->
+        <div class="mt-2">
+          <button type="button"
+                  onclick="showAddVariantMenu(this, '<%= family_key %>', true)"
+                  class="text-xs px-3 py-1 border border-gray-300 hover:bg-gray-100">
+            + Add Variant
+          </button>
+          <div class="add-variant-menu hidden absolute bg-white border border-gray-800 shadow-lg z-10 mt-1"
+               data-role="<%= family_key %>">
+            <% custom_family_variants.each do |variant| %>
+              <button type="button"
+                      onclick="addFontVariant('<%= family_key %>', '<%= variant %>')"
+                      class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono">
+                <%= variant %>
+              </button>
+            <% end %>
+            <div class="border-t border-gray-200"></div>
+            <button type="button"
+                    onclick="addCustomFontVariant('<%= family_key %>')"
+                    class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono italic text-gray-600">
+              Custom variant...
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<!-- Add Family Button -->
+<div class="mt-4 pt-4 border-t border-gray-200">
+  <button type="button"
+          onclick="showAddFamilyPrompt(<%= custom_family_variants.to_json %>)"
+          class="text-xs px-3 py-1.5 border border-gray-400 hover:bg-gray-100 font-medium">
+    + Add Custom Family
+  </button>
+  <p class="text-xs text-gray-500 mt-1">Creates a new CSS variable (e.g. <code class="font-mono">--font-heading-narrow</code>) you can use anywhere in your theme CSS.</p>
+</div>
 
 <script>
 (function() {
@@ -165,6 +283,91 @@
     button.closest('.font-variant-row').remove();
   }
 
+  function showAddFamilyPrompt(commonVariants) {
+    const keyName = prompt('Enter a key name for this font family (e.g., "heading_narrow", "display"):');
+    if (!keyName) return;
+
+    const sanitized = keyName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+    // Check for duplicate
+    if (document.querySelector(`.custom-family-block[data-family-key="${sanitized}"]`)) {
+      alert(`A family with the key "${sanitized}" already exists.`);
+      return;
+    }
+
+    const cssVar = `--font-${sanitized.replace(/_/g, '-')}`;
+
+    const block = document.createElement('div');
+    block.className = 'font-role-section mb-6 pb-6 border-b border-gray-200 custom-family-block';
+    block.dataset.familyKey = sanitized;
+
+    // Build variant menu items
+    const variantButtons = commonVariants.map(v =>
+      `<button type="button" onclick="addFontVariant('${sanitized}', '${v}')" class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono">${v}</button>`
+    ).join('');
+
+    block.innerHTML = `
+      <div class="flex items-center justify-between mb-1">
+        <h4 class="text-sm font-semibold text-gray-800">
+          Custom: <span class="font-mono text-gray-600">${cssVar}</span>
+        </h4>
+        <button type="button"
+                onclick="removeCustomFamily(this, '${sanitized}')"
+                class="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700">
+          Remove Family
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">Available in CSS as <code class="font-mono">var(${cssVar})</code></p>
+      <div class="space-y-2 pl-3">
+        <div class="flex items-start gap-2">
+          <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2">family:</label>
+          <input type="text" value="" class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                 data-config-field="fonts.${sanitized}.family" placeholder="e.g., 'Nimbus Sans Narrow'">
+          <span class="text-xs text-gray-500 pt-2">(required)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <label class="font-mono text-xs text-gray-700 w-28 shrink-0 pt-2">regular:</label>
+          <div class="flex-1">
+            <input type="text" value="" class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                   data-config-field="fonts.${sanitized}.regular" data-validate-font="true" placeholder="filename.woff2">
+            <p class="text-xs text-red-600 mt-1 hidden" data-font-error="fonts.${sanitized}.regular">Font file not found.</p>
+          </div>
+          <span class="text-xs text-gray-500 pt-2">(required)</span>
+        </div>
+        <div class="font-variants-container" data-role="${sanitized}"></div>
+        <div class="mt-2">
+          <button type="button" onclick="showAddVariantMenu(this, '${sanitized}', true)"
+                  class="text-xs px-3 py-1 border border-gray-300 hover:bg-gray-100">
+            + Add Variant
+          </button>
+          <div class="add-variant-menu hidden absolute bg-white border border-gray-800 shadow-lg z-10 mt-1" data-role="${sanitized}">
+            ${variantButtons}
+            <div class="border-t border-gray-200"></div>
+            <button type="button" onclick="addCustomFontVariant('${sanitized}')"
+                    class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono italic text-gray-600">
+              Custom variant...
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('custom-families-container').appendChild(block);
+
+    if (window.setupFontValidation) window.setupFontValidation();
+  }
+
+  function removeCustomFamily(button, familyKey) {
+    if (!confirm(`Remove the "${familyKey}" font family? This will also remove it from your saved config.`)) return;
+
+    // Remove the block from the DOM
+    button.closest('.custom-family-block').remove();
+
+    // Mark all config fields for this family as deleted by clearing their values
+    // The config editor's collector will omit keys with no inputs present
+    document.querySelectorAll(`[data-config-field^="fonts.${familyKey}."]`).forEach(el => el.remove());
+  }
+
   // Close menus when clicking outside
   document.addEventListener('click', function(e) {
     if (!e.target.closest('[onclick*="showAddVariantMenu"]') &&
@@ -179,5 +382,7 @@
   window.addFontVariant = addFontVariant;
   window.addCustomFontVariant = addCustomFontVariant;
   window.removeFontVariant = removeFontVariant;
+  window.showAddFamilyPrompt = showAddFamilyPrompt;
+  window.removeCustomFamily = removeCustomFamily;
 })();
 </script>

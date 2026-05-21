@@ -87,7 +87,8 @@
       'episode_number' => { type: :text, label: 'episode_number', hint: 'Episode number' },
       'season' => { type: :text, label: 'season', hint: 'Season number' },
       'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' },
-      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this post?' }
+      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this post?' },
+      'image_in_header' => { type: :select, label: 'image_in_header', options: ['true', 'false'], hint: 'Show post image in the header?' }
     }
   elsif resource_type == 'product'
     {
@@ -158,6 +159,7 @@
   end
   if resource_type == 'post'
     metadata_hash['published_to'] = '' if newsletters_enabled? && !metadata_hash.key?('published_to')
+    metadata_hash['image_in_header'] = 'false' if metadata_hash['image'].present? && !metadata_hash.key?('image_in_header')
   end
 
   # Separate what's in the file vs what's available

@@ -32,7 +32,7 @@
       <span>• <%= display_author %></span>
     <% end %>
   </div>
-  <% if post.image %>
+  <% if post.image && post.metadata['image_in_header'].to_s == 'true' %>
     <div class="post-header__image">
       <%= raw ResponsiveImageRenderer.render(post.image, alt: post.title, class: "post-header__image-img", sizes: "(min-width: 1020px) 8rem, 100vw") %>
     </div>

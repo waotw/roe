@@ -39,6 +39,8 @@ export default class extends Controller {
     "excerpt",
     "audience",
     "published_to",
+    "show_sidebar",
+    "image_in_header",
   ];
 
   connect() {
@@ -64,6 +66,7 @@ export default class extends Controller {
     this.setupMediaDurationListeners();
     this.setupStatusListener();
     this.setupPublishModalListeners();
+    this.setupImageInHeaderListener();
 
     this.fieldsContainerTarget.addEventListener("click", (e) => {
       if (e.target.closest('[data-action*="removeMetadataField"]')) {
@@ -86,10 +89,16 @@ export default class extends Controller {
     }
 
     if (this.boundPublishCancel) {
-      document.removeEventListener("publish-modal:cancelled", this.boundPublishCancel);
+      document.removeEventListener(
+        "publish-modal:cancelled",
+        this.boundPublishCancel,
+      );
     }
     if (this.boundPublishConfirm) {
-      document.removeEventListener("publish-modal:confirmed", this.boundPublishConfirm);
+      document.removeEventListener(
+        "publish-modal:confirmed",
+        this.boundPublishConfirm,
+      );
     }
   }
 
@@ -173,8 +182,8 @@ export default class extends Controller {
     this.isYamlView = !this.isYamlView;
 
     if (this.isYamlView) {
-      // Show the RAW frontmatter from the file (with original quotes)
-      this.yamlTextareaTarget.value = this.rawFrontmatterValue;
+      // Show the current form state as YAML (not the stale file frontmatter)
+      this.yamlTextareaTarget.value = this.formToYaml();
 
       this.formViewTarget.classList.add("hidden");
       this.yamlViewTarget.classList.remove("hidden");
@@ -227,6 +236,12 @@ export default class extends Controller {
 
   addKnownField(event) {
     const fieldName = event.currentTarget.dataset.fieldName;
+    this._addKnownFieldByName(fieldName, null, true);
+  }
+
+  // Programmatic version — called internally without a click event
+  // toggleMenu=false skips closing the add-field dropdown (it isn't open)
+  _addKnownFieldByName(fieldName, initialValue = null, toggleMenu = false) {
     const config = this.knownFieldsValue[fieldName];
     const container = this.fieldsContainerTarget;
 
@@ -236,9 +251,11 @@ export default class extends Controller {
 
     // Use default author if adding author field
     const defaultValue =
-      fieldName === "author" && config.default_from_config
-        ? this.defaultAuthorValue
-        : "";
+      initialValue !== null
+        ? initialValue
+        : fieldName === "author" && config.default_from_config
+          ? this.defaultAuthorValue
+          : "";
 
     const inputHtml = this.buildInputHtml(fieldName, config, defaultValue);
 
@@ -280,7 +297,7 @@ export default class extends Controller {
       this.addFieldMenuTarget.querySelector(".border-t")?.remove();
     }
 
-    this.toggleAddFieldMenu();
+    if (toggleMenu) this.toggleAddFieldMenu();
     this.attachChangeListeners();
 
     if (fieldName === "post_type") {
@@ -298,10 +315,10 @@ export default class extends Controller {
 
     this._notifyMetadataChange();
 
-    // Focus the input
-    const input = row.querySelector("[data-metadata-field]");
-    if (input) {
-      input.focus();
+    // Focus the input only when triggered by user action
+    if (toggleMenu) {
+      const input = row.querySelector("[data-metadata-field]");
+      if (input) input.focus();
     }
   }
 
@@ -498,17 +515,27 @@ export default class extends Controller {
         // Media fields (audio/video/image/captions): mirror the ERB
         // partial's media-field + autocomplete wrapper so dynamically-added
         // media fields behave identically to ones rendered on initial load.
-        const mediaFieldKinds = { audio: "audio", video: "video", image: "image", captions: "file" };
+        const mediaFieldKinds = {
+          audio: "audio",
+          video: "video",
+          image: "image",
+          captions: "file",
+        };
         if (mediaFieldKinds[fieldName]) {
           const kind = mediaFieldKinds[fieldName];
-          const paths = (this.hasMediaPathsValue && this.mediaPathsValue[kind]) || [];
+          const paths =
+            (this.hasMediaPathsValue && this.mediaPathsValue[kind]) || [];
           const acEnabled = paths.length > 0;
           const escapedPaths = JSON.stringify(paths).replace(/"/g, "&quot;");
-          const acControllers = acEnabled ? "media-field autocomplete" : "media-field";
+          const acControllers = acEnabled
+            ? "media-field autocomplete"
+            : "media-field";
           const acOptionsAttr = acEnabled
             ? `data-autocomplete-options-value="${escapedPaths}"`
             : "";
-          const acTargetAttr = acEnabled ? 'data-autocomplete-target="input"' : "";
+          const acTargetAttr = acEnabled
+            ? 'data-autocomplete-target="input"'
+            : "";
           const acActionFragment = acEnabled
             ? "input->autocomplete#filter keydown->autocomplete#navigate"
             : "";
@@ -1156,6 +1183,51 @@ export default class extends Controller {
     this.updateDurationFieldVisibility();
   }
 
+  // ========== IMAGE IN HEADER ==========
+
+  setupImageInHeaderListener() {
+    if (this.resourceTypeValue !== "post") return;
+
+    const imageField = this.element.querySelector(
+      '[data-metadata-field="image"]',
+    );
+    if (!imageField) return;
+
+    // Delay initial check until after initialization so DOM rows are settled
+    setTimeout(() => {
+      this.updateImageInHeaderVisibility(imageField.value);
+    }, 150);
+
+    imageField.addEventListener("input", (e) => {
+      this.updateImageInHeaderVisibility(e.target.value);
+    });
+
+    imageField.addEventListener("blur", (e) => {
+      this.updateImageInHeaderVisibility(e.target.value);
+    });
+  }
+
+  updateImageInHeaderVisibility(imageValue) {
+    const row = this.fieldsContainerTarget.querySelector(
+      '.metadata-field-row[data-field-name="image_in_header"]',
+    );
+
+    if (imageValue && imageValue.trim().length > 0) {
+      // Image is set — show the field, adding it if not present
+      if (row) {
+        row.style.display = "";
+      } else if (this.knownFieldsValue["image_in_header"]) {
+        this._addKnownFieldByName("image_in_header", "false");
+      }
+    } else {
+      // Image is blank — hide the field only if it has no saved value
+      if (row) {
+        const hasValue = this.originalMetadataValue["image_in_header"] != null;
+        if (!hasValue) row.style.display = "none";
+      }
+    }
+  }
+
   // ========== STATUS / PUBLISH HANDLING ==========
 
   // When the user changes the status select to 'published' from 'draft'
@@ -1203,8 +1275,14 @@ export default class extends Controller {
   setupPublishModalListeners() {
     this.boundPublishCancel = this.handlePublishModalCancelled.bind(this);
     this.boundPublishConfirm = this.handlePublishModalConfirmed.bind(this);
-    document.addEventListener("publish-modal:cancelled", this.boundPublishCancel);
-    document.addEventListener("publish-modal:confirmed", this.boundPublishConfirm);
+    document.addEventListener(
+      "publish-modal:cancelled",
+      this.boundPublishCancel,
+    );
+    document.addEventListener(
+      "publish-modal:confirmed",
+      this.boundPublishConfirm,
+    );
   }
 
   handlePublishModalCancelled() {

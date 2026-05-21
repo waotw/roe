@@ -8,14 +8,13 @@ module AssetsHelper
 
     css = []
 
-    # Generate @font-face rules for each font role (only if fonts are configured)
+    # Generate @font-face rules for all font families (fixed roles + custom)
     if fonts_config
-      %w[heading body mono accent].each do |role|
-        next unless fonts_config[role]
+      fonts_config.each do |role, font_data|
+        next unless font_data.is_a?(Hash)
 
-        font_data = fonts_config[role]
         family = font_data['family']
-        next unless family # Skip if no family is defined
+        next unless family.present?
 
         # Generate @font-face rule for each variant dynamically
         font_data.each do |variant_name, filename|
@@ -29,12 +28,25 @@ module AssetsHelper
       end
     end
 
-    # Generate CSS variables for fonts and assets
+    # Generate CSS variables for fixed roles
     css << "\n:root {"
     css << "  --font-heading: #{font_stack('heading', fonts_config)};"
     css << "  --font-body: #{font_stack('body', fonts_config)};"
     css << "  --font-mono: #{font_stack('mono', fonts_config)};"
     css << "  --font-accent: #{font_stack('accent', fonts_config)};"
+
+    # Generate CSS variables for custom families (any key outside the fixed four)
+    if fonts_config
+      fixed_roles = %w[heading body mono accent]
+      fonts_config.each do |role, font_data|
+        next if fixed_roles.include?(role)
+        next unless font_data.is_a?(Hash) && font_data['family'].present?
+
+        css_var_name = "--font-#{role.to_s.gsub('_', '-')}"
+        css << "  #{css_var_name}: #{font_stack(role, fonts_config)};"
+      end
+    end
+
     css << asset_variables
     css << "}"
 
@@ -150,7 +162,7 @@ module AssetsHelper
     if fonts_config && fonts_config[role] && fonts_config[role]['family']
       custom = "\"#{fonts_config[role]['family']}\""
       fallback = default_fallback(role)
-      "#{custom}, #{fallback}"
+      fallback.present? ? "#{custom}, #{fallback}" : custom
     else
       default_fallback(role)
     end
@@ -162,6 +174,7 @@ module AssetsHelper
     when 'body' then 'system-ui, -apple-system, sans-serif'
     when 'mono' then 'Monaco, Consolas, monospace'
     when 'accent' then 'Georgia, serif'
+    else nil
     end
   end
 end

@@ -585,6 +585,15 @@ export default class extends Controller {
     this.wrapSelectionWithSavedPosition("~~", "~~", "struck text");
   }
 
+  insertMark(event) {
+    event.preventDefault();
+    this.wrapSelectionWithSavedPosition(
+      "<mark>",
+      "</mark>",
+      "highlighted text",
+    );
+  }
+
   insertFootnote(event) {
     event.preventDefault();
 

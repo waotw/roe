@@ -119,6 +119,7 @@ class ConfigGenerator
       grouped_products:
         button_text: "View"
         price_display: "range"  # Options: range, lowest, highest
+        price_separator: "-"    # Separator between min/max prices in range mode
       snipcart:
         load_strategy: "on-user-interaction"
         modal_style: "side"

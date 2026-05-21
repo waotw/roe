@@ -798,8 +798,9 @@ module HasMarkdownExtensions
 
     # Get grouped product settings
     grouped_config = SiteConfig.feature('store', 'grouped_products') || {}
-    grouped_button_text = grouped_config['button_text'] || 'View'
+    grouped_button_text = grouped_config['button_text'].presence
     price_display_mode = grouped_config['price_display'] || 'range'
+    price_separator = grouped_config['price_separator'].presence || '-'
 
     # Group items by their group field if groups enabled, otherwise show all
     if groups_enabled
@@ -869,15 +870,17 @@ module HasMarkdownExtensions
             if prices.min == prices.max
               "#{currency_symbol}#{sprintf('%.2f', prices.min)}"
             else
-              "#{currency_symbol}#{sprintf('%.2f', prices.min)} - #{currency_symbol}#{sprintf('%.2f', prices.max)}"
+              "#{currency_symbol}#{sprintf('%.2f', prices.min)} #{price_separator} #{currency_symbol}#{sprintf('%.2f', prices.max)}"
             end
           end
           output << %Q(      <span class="grid-item-price">#{formatted_price}</span>)
         end
 
-        # View button for grouped products - link to primary product
-        primary_for_link = find_primary_product(group_products) || display_product
-        output << %Q(      <a href="#{item_path(primary_for_link)}" class="grid-item-button">#{grouped_button_text}</a>)
+        # View button for grouped products - only render if button text is set
+        if grouped_button_text.present?
+          primary_for_link = find_primary_product(group_products) || display_product
+          output << %Q(      <a href="#{item_path(primary_for_link)}" class="grid-item-button">#{grouped_button_text}</a>)
+        end
       else
         # Single product - show individual price and Add to Cart
         if display_product.respond_to?(:price)
@@ -1586,14 +1589,14 @@ module HasMarkdownExtensions
   def process_buttons(content, preview: false)
     # Pattern to match button blocks
     button_pattern = /```button\r?\n(.*?)```/m
-    
+
     # Find all button blocks with their positions
     buttons = []
     content.scan(button_pattern) do |match|
       config_text = match[0]
       start_pos = $~.begin(0)
       end_pos = $~.end(0)
-      
+
       begin
         config = parse_button_config(config_text)
         buttons << {
@@ -1606,17 +1609,17 @@ module HasMarkdownExtensions
         Rails.logger.error "Button parsing error: #{e.message}"
       end
     end
-    
+
     return content if buttons.empty?
-    
+
     # Group consecutive buttons (no blank lines between)
     groups = []
     current_group = [buttons.first]
-    
+
     buttons.each_cons(2) do |prev, curr|
       # Check if there's a blank line between these buttons
       text_between = content[prev[:end_pos]...curr[:start_pos]]
-      
+
       if text_between =~ /\n\s*\n/
         # Blank line found - start new group
         groups << current_group
@@ -1627,18 +1630,18 @@ module HasMarkdownExtensions
       end
     end
     groups << current_group
-    
+
     # Render each group
     result = content.dup
     offset = 0
-    
+
     groups.each do |group|
       # Build context for button renderer
       context = {
         current_product: (self.is_a?(Product) ? self : nil),
         authenticated: preview
       }
-      
+
       if group.length > 1
         # Multiple consecutive buttons - render as variant list
         skus = group.map { |b| b[:config]['sku'] }.compact
@@ -1655,15 +1658,15 @@ module HasMarkdownExtensions
         # Single button - render normally
         rendered = ProductButtonRenderer.render(group.first[:config], context)
       end
-      
+
       # Replace in result
       first_btn = group.first
       last_btn = group.last
       original_text = content[first_btn[:start_pos]...last_btn[:end_pos]]
-      
+
       result.sub!(original_text, rendered)
     end
-    
+
     result
   end
 

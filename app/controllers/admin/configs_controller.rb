@@ -117,7 +117,9 @@ class Admin::ConfigsController < ApplicationController
           required_variants: [ 'family', 'regular' ],
           common_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium' ]
         }
-      }
+      },
+      # Common variants offered when adding a custom family
+      custom_family_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium', 'semibold', 'black' ]
     }
   }.freeze
 
