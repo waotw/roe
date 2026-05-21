@@ -28,10 +28,13 @@ class CollectionMembersFilter
   end
 
   def should_show_paid?
+    # Paid members always see paid content
+    return true if @config[:current_member]&.paid?
+
     # Per-collection override
     return @config[:show_paid] == 'true' if @config.key?(:show_paid)
 
-    # Global default from members.yml
+    # Global default from members.yml (shows to everyone with lock icon)
     SiteConfig.feature('members', 'everyone.show_paid_content') || false
   end
 end

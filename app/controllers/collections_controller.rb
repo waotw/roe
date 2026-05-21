@@ -94,7 +94,7 @@ class CollectionsController < ApplicationController
     end
 
     # Apply paid content filter (before ordering!)
-    filter_config = { show_paid: params[:show_paid] }
+    filter_config = { show_paid: params[:show_paid], current_member: current_member }
     @items = CollectionMembersFilter.filter(@items, filter_config)
 
     # Apply ordering
@@ -106,14 +106,9 @@ class CollectionsController < ApplicationController
   def apply_ordering(items, order_by)
     case order_by
     when 'filename'
-      items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, '.md')
-        if filename =~ /^(\d+)/
-          [ $1.to_i, filename ]
-        else
-          [ Float::INFINITY, filename ]
-        end
-      end
+      # Sort by file_path which includes directory structure and filename
+      # This keeps it as an ActiveRecord relation for pagination
+      items.order(:file_path)
     when 'title'
       items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
     when 'date-asc'

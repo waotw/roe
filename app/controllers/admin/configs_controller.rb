@@ -807,7 +807,7 @@ class Admin::ConfigsController < ApplicationController
       'payments.price' => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       'payments.donation_amounts' => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
       'newsletter & email.enabled' => 'Enable newsletter & email sending via Postmark (requires Postmark account & configuration)',
-      'everyone.show_paid_content' => 'Show paid content to public visitors and free members'
+      'everyone.show_paid_content' => 'Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.'
     }
   end
 

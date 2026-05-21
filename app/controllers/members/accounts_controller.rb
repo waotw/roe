@@ -18,12 +18,13 @@ module Members
 
       # Check if email is changing
       if account_params[:email].present? && account_params[:email] != @member.email
-        # Store new email as pending and send confirmation
+        # Store new email as pending and update name simultaneously
         @member.pending_email = account_params[:email]
+        @member.name = account_params[:name] if account_params[:name].present?
 
         if @member.save
           @member.generate_email_confirmation_token!
-          MemberMailer.email_confirmation(@member).deliver_later
+          MemberMailer.email_confirmation(@member)
 
           redirect_to account_path, notice: "A confirmation email has been sent to #{@member.pending_email}. Click the link to confirm your new email address."
         else

@@ -1,7 +1,9 @@
 require "test_helper"
 
 class CollectionsControllerTest < ActionDispatch::IntegrationTest
-  setup do
+  def setup
+    super
+    
     @ruby_post = create(:post, metadata: { 
       "title" => "Ruby Post", 
       "status" => "published", 

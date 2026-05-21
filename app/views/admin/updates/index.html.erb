@@ -30,33 +30,9 @@
     <% end %>
   </div>
 
-  <h2 class="mt-6 text-2xl font-bold text-gray-900 mb-6">Roe Version & Updates</h2>
-  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
-    <div class="flex items-center justify-between mb-4">
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900">Current Version</h2>
-        <p class="text-2xl font-mono font-bold text-gray-900 mt-1">
-          Roe CMS <%= @current_version %>
-        </p>
-      </div>
-      <div class="flex items-center gap-3">
-        <%= button_to "Check for Updates",
-                      admin_check_updates_path,
-                      method: :post,
-                      class: "uppercase text-sm inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
-
-        <% if @update_info && @update_info[:update_available] %>
-          <span class="relative flex h-2 w-2">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-          </span>
-        <% end %>
-      </div>
-    </div>
-  </div>
-
+  <h2 class="mt-4 text-2xl font-bold text-gray-900 mb-4">Roe Version & Updates</h2>
   <% if @in_progress %>
-    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6"
+    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-4"
          data-updates-target="inProgressPanel">
       <h2 class="text-lg font-semibold text-amber-900 mb-2">Update in Progress</h2>
       <p class="text-amber-800 mb-4">
@@ -131,9 +107,9 @@
         </div>
       </div>
     <% else %>
-      <div class="bg-green-50 border border-green-200 rounded-sm p-6">
-        <h2 class="text-lg font-semibold text-green-900">You're Up to Date</h2>
-        <p class="text-green-800 mt-2">
+      <div class="bg-green-50 border border-green-200 rounded-sm p-4 mb-4">
+        <h2 class="text-base font-semibold text-green-900">You're Up to Date</h2>
+        <p class="text-green-800 mt-2 text-sm">
           You're running the latest version of Roe CMS (<%= @current_version %>).
         </p>
       </div>
@@ -145,6 +121,29 @@
       </p>
     </div>
   <% end %>
+  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Current Version</h2>
+        <p class="text-2xl font-mono font-bold text-gray-900 mt-1">
+          Roe CMS <%= @current_version %>
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <%= button_to "Check for Updates",
+                      admin_check_updates_path,
+                      method: :post,
+                      class: "uppercase text-sm inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+
+        <% if @update_info && @update_info[:update_available] %>
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+          </span>
+        <% end %>
+      </div>
+    </div>
+  </div>
 
   <% if @last_update && @last_update.status == 'rolled_back' %>
     <%# Automatic rollback completed cleanly — the update was attempted,

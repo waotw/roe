@@ -19,6 +19,8 @@ class Member < ApplicationRecord
   validates :email, presence: true,
                     uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
+  validates :pending_email, uniqueness: { case_sensitive: false }, allow_nil: true
+  validate :pending_email_not_taken
   validates :name, presence: true
   validates :tier, presence: true
   validates :status, presence: true
@@ -236,5 +238,13 @@ class Member < ApplicationRecord
 
   def set_subscribed_at
     self.subscribed_at ||= Time.current
+  end
+
+  def pending_email_not_taken
+    return if pending_email.blank?
+
+    if Member.where.not(id: id).exists?(email: pending_email)
+      errors.add(:pending_email, "is already taken")
+    end
   end
 end

@@ -307,6 +307,7 @@ Rails.application.routes.draw do
 
   # Collections and posts archive
   get "posts", to: "collections#show", defaults: { filters: "all" }
+  get "collections", to: "collections#show", defaults: { filters: "all" }
   get "collections/*filters", to: "collections#show", as: :collection
 
   # Feeds
