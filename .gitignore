@@ -80,5 +80,10 @@ GRAPH_REPORT.md
 # Secrets:
 .kamal/secrets
 
+# Generated deploy configs (created via Admin > Configuration > deploy.yml)
+# Never commit these — they contain personal server/registry values.
+config/deploy.yml
+fly.toml
+
 # tmp files
 fly-2026-05-17.toml
