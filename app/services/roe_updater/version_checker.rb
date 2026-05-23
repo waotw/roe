@@ -1,7 +1,7 @@
 module RoeUpdater
   class VersionChecker
-    SOURCEHUT_REPO = "~benjaminwelch/roe"
-    GIT_REMOTE_URL = "https://git.sr.ht/~benjaminwelch/roe"
+    CODEBERG_REPO = "waotw/roe"
+    GIT_REMOTE_URL = "https://codeberg.org/waotw/roe"
     CACHE_KEY = "roe_latest_version"
     CACHE_TTL = 1.hour
 
@@ -128,8 +128,8 @@ module RoeUpdater
 
         {
           version: latest_tag,
-          url: "https://git.sr.ht/#{SOURCEHUT_REPO}/refs/#{latest_tag}",
-          notes: "View the changelog and commit history on Sourcehut.",
+          url: "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{latest_tag}",
+          notes: "View the changelog and commit history on Codeberg.",
           published_at: Time.now.iso8601
         }
       rescue => e
@@ -182,8 +182,8 @@ module RoeUpdater
         
         {
           version: latest_version,
-          url: "https://git.sr.ht/#{SOURCEHUT_REPO}",
-          notes: "View the changelog and commit history on Sourcehut.",
+          url: "https://codeberg.org/#{CODEBERG_REPO}",
+          notes: "View the changelog and commit history on Codeberg.",
           published_at: Time.now.iso8601
         }
       rescue => e
@@ -220,20 +220,20 @@ module RoeUpdater
         
         if tags.any?
           latest_tag = tags.sort { |a, b| compare_versions(a['name'].gsub(/^v/, ''), b['name'].gsub(/^v/, '')) }.last
-          Rails.logger.info "[VersionChecker] Latest version from Sourcehut API: #{latest_tag['name']}"
+          Rails.logger.info "[VersionChecker] Latest version from API: #{latest_tag['name']}"
           
           return {
             version: latest_tag['name'].gsub(/^v/, ''),
-            url: "https://git.sr.ht/#{SOURCEHUT_REPO}/refs/#{latest_tag['name']}",
-            notes: "View the changelog and commit history on Sourcehut.",
+            url: "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{latest_tag['name']}",
+            notes: "View the changelog and commit history on Codeberg.",
             published_at: latest_tag['created'] || Time.now.iso8601
           }
         end
         
-        Rails.logger.info "[VersionChecker] No version tags found in Sourcehut API response"
+        Rails.logger.info "[VersionChecker] No version tags found in API response"
         nil
       rescue => e
-        Rails.logger.error "[VersionChecker] Sourcehut API fetch failed: #{e.class} - #{e.message}"
+        Rails.logger.error "[VersionChecker] API fetch failed: #{e.class} - #{e.message}"
         nil
       end
 

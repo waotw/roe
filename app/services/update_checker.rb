@@ -1,13 +1,12 @@
 class UpdateChecker
   VERSION_FILE = Rails.root.join('config', 'version.yml')
   
-  # Configuration - Update these for your Sourcehut repository
-  # Format: ~username/reponame (e.g., ~ben/roe)
-  SOURCEHUT_REPO = "~benjaminwelch/roe"
-  SOURCEHUT_API_URL = "https://git.sr.ht/api/~benjaminwelch/repos/roe/log"
+  # Configuration - Update these for your Codeberg repository
+  CODEBERG_REPO = "waotw/roe"
+  CODEBERG_API_URL = "https://codeberg.org/api/v1/repos/waotw/roe/releases"
   
   # Alternative: Use git command to check remote tags (more reliable)
-  GIT_REMOTE_URL = "https://git.sr.ht/~benjaminwelch/roe"
+  GIT_REMOTE_URL = "https://codeberg.org/waotw/roe"
   
   CACHE_KEY = "roe_latest_version"
   CACHE_TTL = 1.hour

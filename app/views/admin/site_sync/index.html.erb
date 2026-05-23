@@ -1,7 +1,7 @@
 <% content_for :editor_js, false %>
 <div class="px-4 sm:px-0">
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900">Site Sync</h1>
+    <h1 class="text-3xl font-semibold text-gray-900">Site Sync</h1>
     <p class="mt-2 text-sm text-gray-700">
       Track changes to your <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder and manage backups.
     </p>
@@ -537,7 +537,7 @@
           this one is hidden in that case (avoids showing the same
           info twice). When peer is unreachable, the standalone panel
           shows instead — this section just doesn't render.
-          
+
           NOTE: On production, "local" means the production server itself.
           Changes here should be pulled to dev, not pushed. %>
       <% if @peer_reachable && @status[:state] == :local_drift %>
@@ -590,7 +590,7 @@
           <% if Rails.env.production? %>
             <%# On production, direct users to their local dev environment %>
             <p class="text-xs text-amber-700">
-              Site sync is controlled from your local development environment. 
+              Site sync is controlled from your local development environment.
               Visit your <strong>local</strong> admin Site Sync page to pull these changes.
             </p>
           <% elsif @peer_call_configured %>

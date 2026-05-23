@@ -84,3 +84,4 @@ GRAPH_REPORT.md
 # Never commit these — they contain personal server/registry values.
 config/deploy*.yml
 fly*.toml
+app/themes/egg.css
