@@ -5,7 +5,19 @@ class PageGenerator
     FileUtils.mkdir_p(PAGES_PATH)
 
     generate_home_page unless File.exist?(PAGES_PATH.join('home.md'))
-    # generate_archive_page unless File.exist?(PAGES_PATH.join('archive.md'))
+    activate_default_theme
+  end
+
+  def self.activate_default_theme
+    site_yml_path = File.join(RoeSitePaths::SITE_PATH, 'system', 'global', 'site.yml')
+    return unless File.exist?(site_yml_path)
+
+    config = YAML.load_file(site_yml_path) || {}
+    return if config['theme'].present?
+
+    config['theme'] = 'default'
+    File.write(site_yml_path, config.to_yaml.sub(/\A---\n/, ''))
+    Rails.logger.info "Set default theme in site.yml"
   end
 
   private
