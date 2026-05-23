@@ -40,4 +40,4 @@ See `current/docs/` for full documentation.
 
 ## License
 
-[Your license here]
+Roe is free to use in development forever. Deployment requires a license.
