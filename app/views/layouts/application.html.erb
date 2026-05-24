@@ -128,7 +128,7 @@
                   sync_in_sync  = peer_fp.present? && local_fp.present? && local_fp == peer_fp
                 %>
                 <% unless sync_in_sync %>
-                  <span class="absolute -top-1 -right-2 w-2 h-2 bg-amber-500 rounded-full" title="<%= peer_reachable ? 'Local content differs from live' : 'Live site unreachable' %>"></span>
+                  <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="<%= peer_reachable ? 'Local content differs from live' : 'Live site unreachable' %>"></span>
                 <% end %>
               <% end %>
             </div>
@@ -136,7 +136,7 @@
             <div class="relative inline-flex items-center">
               <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
               <% if any_integration_unconfigured? %>
-                <span class="absolute -top-1 -right-2 w-2 h-2 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
+                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
               <% end %>
             </div>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
