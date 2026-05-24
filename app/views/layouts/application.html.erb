@@ -80,9 +80,9 @@
     <%# Site-sync drift banner. Lives in the layout so it surfaces on every
         admin page once the ledger sees changes since the last recorded
         sync. Cached for ~30s — see SiteSync::Checker. %>
-    <% if authenticated? %>
-      <%= render "shared/site_sync_banner" %>
-    <% end %>
+    <% if authenticated? && request.path == admin_site_sync_path %>
+          <%= render "shared/site_sync_banner" %>
+        <% end %>
     <% if flash.any? %>
       <% flash.each do |type, message| %>
         <%# Skip internal flags, only show user-facing messages %>
@@ -117,7 +117,21 @@
           </div>
           <!-- Right: Settings, Updates & Logout -->
           <div class="flex items-center gap-6">
-            <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <div class="relative inline-flex items-center">
+              <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <% if Rails.env.development? && SiteSync::Exchange.can_call_peer? %>
+                <%
+                  peer_state    = (SiteSync::Exchange.refresh_if_stale rescue nil)
+                  peer_reachable = SiteSync::Exchange.peer_reachable?
+                  local_fp      = (SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil)
+                  peer_fp       = peer_state&.dig(:fingerprint)
+                  sync_in_sync  = peer_fp.present? && local_fp.present? && local_fp == peer_fp
+                %>
+                <% unless sync_in_sync %>
+                  <span class="absolute -top-1 -right-2 w-2 h-2 bg-amber-500 rounded-full" title="<%= peer_reachable ? 'Local content differs from live' : 'Live site unreachable' %>"></span>
+                <% end %>
+              <% end %>
+            </div>
             <%= link_to Rails.env.production? ? "Updates" : "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <div class="relative inline-flex items-center">
               <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
