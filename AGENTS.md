@@ -6,6 +6,8 @@ Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, p
 
 **Architecture**: Roe uses a **versioned directory structure** that supports seamless updates without touching user content. The Rails application lives in `current/`, while user content remains in `site/` at the root level.
 
+**Repository**: Primary development happens at [Codeberg](https://codeberg.org/waotw/roe) (migrated from Sourcehut).
+
 Primary integrations: **Stripe** (payments / paid memberships), **Postmark** (transactional + broadcast email, with a fallback to ActionMailer when unconfigured), and a multi-phase **Substack importer**.
 
 ## Directory Structure
@@ -65,7 +67,7 @@ vi site/posts/my-post.md
 
 ```bash
 # Setup
-bin/setup                         # Install deps, prepare DB, sync content
+bin/setup                         # Install deps, generate master.key, create site structure, prepare DB, sync content, bootstrap admin
 
 # Run dev server (from root)
 ./roe.sh start                    # Start server (recommended)
@@ -125,7 +127,8 @@ current/                          # Rails application (versioned)
                                     # Member, Product, User, Session,
                                     # SiteConfig, PodcastConfig,
                                     # PostmarkConfig, StripeConfig,
-                                    # SnipcartConfig, Import, NewsletterSend,
+                                    # SnipcartConfig, SyncConfig, DeploySecrets,
+                                    # Import, NewsletterSend,
                                     # MediaReference, Current, UpdateStatus
     services/
       roe_updater/                  # Staged update system
@@ -178,6 +181,9 @@ site/                             # Content root (file-backed, persistent)
   layout/                         # Layout config
   theme/                          # Theme files (CSS, fonts, images)
   system/                         # System-wide config
+    global/                       # Global settings (deploy.yml, etc.)
+    features/                     # Feature flags and configuration
+    integrations/                 # Test API keys (Stripe, Postmark, Snipcart)
   db/                             # SQLite database files
   missing_media.yml               # Tracking for unresolved media refs
 
@@ -196,7 +202,7 @@ test/
 Roe supports two workflows for updating production:
 
 **1. In-App Update System (for production-only installations):**
-- **VersionChecker**: Checks git.sr.ht for new releases
+- **VersionChecker**: Checks Codeberg repository (waotw/roe) for new releases with HTTPS → SSH fallback for private repos
 - **BackupManager**: Creates DB and full site backups before updating
 - **Downloader**: Clones new versions to `staging/`
 - **MigrationTester**: Tests migrations on a copy before applying to production
@@ -216,6 +222,16 @@ Deploy the current codebase from local to a live server via Kamal or Fly.io.
 
 ### Content sync
 Markdown files in `site/` are the source of truth. `ContentSync` parses front-matter and body and upserts `Post`, `Page`, `Documentation`, `Medium`, `Product`, and `*Config` rows. `ContentWatcher` (dev) re-syncs on file changes. JSON metadata is stored as a text column and queried via SQLite `json_extract`.
+
+### Integration Configuration (API Keys)
+Payment and email integrations support dual-storage for test/live environments:
+- **Test keys**: Stored in YAML files under `site/system/integrations/` (synced across environments)
+- **Live keys**: Stored encrypted in the database (environment-specific)
+
+**Access**: Admin → Settings → Integrations
+**Services**: StripeConfig, PostmarkConfig, SnipcartConfig
+
+This separation allows testing integrations in development with test keys while keeping live keys secure and environment-specific.
 
 ### Members + audiences
 `Member` records back a magic-link / token-based auth flow under `app/controllers/members/`. The `HasAudience` concern controls who can see what (public / paid / draft). Paid access is gated by Stripe subscriptions managed via `StripeProductManager` and the `checkout_controller`.
