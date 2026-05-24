@@ -140,15 +140,33 @@ Rails.application.routes.draw do
     end
 
     # Stripe Configuration
-    resource :stripe_config, only: [ :edit, :update, :destroy ]
+    resource :stripe_config, only: [ :edit, :update, :destroy ] do
+      post :verify, on: :member
+    end
 
     # Postmark Configuration
     resource :postmark_config, only: [ :edit, :update, :destroy ] do
       post :regenerate_webhook_token, on: :member
+      post :verify, on: :member
     end
 
     # Snipcart Configuration
-    resource :snipcart_config, only: [ :edit, :update, :destroy ]
+    resource :snipcart_config, only: [ :edit, :update, :destroy ] do
+      post :verify, on: :member
+    end
+
+    # Integration config pages (Settings → Integrations)
+    get  "configs/payments/edit",     to: "configs#edit_payments",     as: "edit_payments_config"
+    patch "configs/payments",         to: "configs#update_payments",   as: "payments_config"
+    post  "configs/payments/verify",  to: "configs#verify_payments",   as: "verify_payments_config"
+
+    get  "configs/newsletters/edit",     to: "configs#edit_newsletters",     as: "edit_newsletters_config"
+    patch "configs/newsletters",         to: "configs#update_newsletters",   as: "newsletters_config"
+    post  "configs/newsletters/verify",  to: "configs#verify_newsletters",   as: "verify_newsletters_config"
+
+    get  "configs/snipcart/edit",     to: "configs#edit_snipcart",     as: "edit_snipcart_integration_config"
+    patch "configs/snipcart",         to: "configs#update_snipcart",   as: "snipcart_integration_config"
+    post  "configs/snipcart/verify",  to: "configs#verify_snipcart",   as: "verify_snipcart_integration_config"
 
     resources :themes, only: [ :index, :destroy ] do
       member do

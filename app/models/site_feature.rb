@@ -1,22 +1,105 @@
 # Centralized feature-flag predicates. Used by both views (via
-# ApplicationHelper, which delegates here) and models. Keeping the logic
-# in one place avoids drift and lets things like Post#needs_attention?
-# check the same gates the publish modal does without pulling in the
-# whole helper context.
+# ApplicationHelper, which delegates here) and models.
+#
+# Two distinct concepts:
+#   enabled?   — feature file exists (user turned it on)
+#   configured? — integration file has keys AND last API verification succeeded
+#
+# Orange dot / [unconfigured] tag logic:
+#   Show when: feature enabled + current mode's key absent OR not yet verified
+#   Hide when: successful API verification for current active mode
+#   Return when: current mode's key is cleared
 module SiteFeature
   module_function
 
+  INTEGRATIONS_PATH = File.join(RoeSitePaths::SITE_PATH, 'system', 'integrations')
+  FEATURES_PATH     = File.join(RoeSitePaths::SITE_PATH, 'system', 'features')
+
+  # ── Feature enabled (file presence) ────────────────────────────────────
+
   def members_enabled?
-    File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system/features/members.yml'))
+    File.exist?(File.join(FEATURES_PATH, 'members.yml'))
   end
+
+  def store_enabled?
+    File.exist?(File.join(FEATURES_PATH, 'store.yml'))
+  end
+
+  def podcast_enabled?
+    File.exist?(File.join(FEATURES_PATH, 'podcast.yml'))
+  end
+
+  # Payments enabled = members enabled AND payments.enabled in members.yml
+  def payments_feature_enabled?
+    return false unless members_enabled?
+    SiteConfig.feature('members', 'payments.enabled') == true
+  end
+
+  # Newsletters enabled = members enabled AND newsletter.enabled in members.yml
+  def newsletters_feature_enabled?
+    return false unless members_enabled?
+    SiteConfig.feature('members', 'newsletter & email.enabled') == true
+  end
+
+  # ── Integration files present ───────────────────────────────────────────
+
+  def payments_integration_file?
+    File.exist?(File.join(INTEGRATIONS_PATH, 'payments.yml'))
+  end
+
+  def newsletters_integration_file?
+    File.exist?(File.join(INTEGRATIONS_PATH, 'newsletters.yml'))
+  end
+
+  def snipcart_integration_file?
+    File.exist?(File.join(INTEGRATIONS_PATH, 'snipcart.yml'))
+  end
+
+  # ── Keys present (integration file has keys) ────────────────────────────
 
   def payments_enabled?
-    members_enabled? && SiteConfig.feature('members', 'payments.enabled') == true
+    payments_feature_enabled? && StripeConfig.current.keys_present?
   end
 
-  # When payments is on, the writer picks one of three modes:
-  # memberships, donations, or both. Old configs without a mode default
-  # to memberships (the original behavior, preserved for back-compat).
+  def newsletters_enabled?
+    newsletters_feature_enabled? && PostmarkConfig.current.keys_present?
+  end
+
+  # ── Integration configured (keys + verified) ────────────────────────────
+
+  def stripe_configured?
+    StripeConfig.current.connected?
+  end
+
+  def postmark_configured?
+    PostmarkConfig.current.connected?
+  end
+
+  def snipcart_configured?
+    SnipcartConfig.current.connected?
+  end
+
+  # ── Orange dot / [unconfigured] tag ─────────────────────────────────────
+  # Returns true if ANY enabled integration needs attention for current mode.
+
+  def any_integration_unconfigured?
+    payments_unconfigured? || newsletters_unconfigured? || snipcart_unconfigured?
+  end
+
+  def payments_unconfigured?
+    payments_feature_enabled? && !stripe_configured?
+  end
+
+  def newsletters_unconfigured?
+    newsletters_feature_enabled? && !postmark_configured?
+  end
+
+  def snipcart_unconfigured?
+    store_enabled? && !snipcart_configured?
+  end
+
+  # ── Payments mode / memberships / donations ─────────────────────────────
+
   def payments_mode
     return nil unless payments_enabled?
     SiteConfig.feature('members', 'payments.mode').presence || 'memberships'
@@ -30,13 +113,6 @@ module SiteFeature
     payments_enabled? && payments_mode.in?(%w[donations both])
   end
 
-  # Donation preset amounts (whole dollars). Falls back to a sensible
-  # default if the writer hasn't customized them.
-  #
-  # Defensive parsing: the config editor sometimes stores the value as
-  # a literal string like `"[5, 10, 20, 50]"` instead of a true YAML
-  # array. We accept both shapes so the form doesn't render one button
-  # containing the array text.
   def donation_amounts
     raw = SiteConfig.feature('members', 'payments.donation_amounts')
 
@@ -44,7 +120,6 @@ module SiteFeature
              when Array
                raw
              when String
-               # Strip brackets and split on commas, tolerating whitespace.
                raw.delete("[]").split(",").map(&:strip).reject(&:empty?)
              else
                []
@@ -54,53 +129,9 @@ module SiteFeature
     nums.presence || [5, 10, 20, 50]
   end
 
-  def newsletters_enabled?
-    members_enabled? && SiteConfig.feature('members', "newsletter & email.enabled") == true
-  end
+  # ── Legacy / convenience ─────────────────────────────────────────────────
 
-  def store_enabled?
-    File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system/features/store.yml'))
-  end
-
-  # True when at least one integration (Members, Store) hasn't been
-  # enabled yet. Used by the configs index to hide the entire
-  # "Integrations" section once everything's set up — no point
-  # showing a section whose only purpose was the enable buttons.
-  # Podcasts are a separate "Features" group and not counted here.
   def integrations_to_enable?
     !members_enabled? || !store_enabled?
-  end
-
-  def postmark_configured?
-    PostmarkConfig.exists? && PostmarkConfig.current.connected?
-  end
-
-  # Framework-dev override: lets the Roe maintainer work on production-only
-  # features (members, store, integrations) from a development environment,
-  # and on dev-only features (Substack importer) from production. End users
-  # never set this — it's gated behind a non-obvious env var name and
-  # specific value so casual inspection of `Rails.env` checks won't reveal
-  # the seam.
-  #
-  # Why: the dev/prod feature split intentionally hides production-only
-  # surfaces in dev (and vice versa) so site owners aren't tempted to
-  # configure things in the wrong place. The maintainer still needs to
-  # build and test those surfaces, hence this escape hatch.
-  def framework_dev_mode?
-    ENV['ROE_DEV_OVERRIDE'] == 'on'
-  end
-
-  # Show production-only features (members, store, integrations) when:
-  #   - we're actually in production, OR
-  #   - the framework-dev override is on (maintainer working in dev)
-  def show_production_features?
-    Rails.env.production? || framework_dev_mode?
-  end
-
-  # Show development-only features (Substack importer, Tools menu) when:
-  #   - we're actually in development, OR
-  #   - the framework-dev override is on (maintainer testing on prod)
-  def show_development_features?
-    Rails.env.development? || framework_dev_mode?
   end
 end

@@ -2,62 +2,60 @@ module Admin
   class StripeConfigsController < Admin::BaseController
     layout 'application'
 
-    before_action :require_production_features
-
     def edit
       @stripe_config = StripeConfig.current
+      @test_config = StripeConfig.test_config
     end
 
     def update
       @stripe_config = StripeConfig.current
 
-      # Build update params
-      update_params = {}
+      # Save test keys to file (all environments)
+      test_config_data = {}
+      test_config_data['publishable_key']       = params[:stripe_config][:publishable_key_test]       if params[:stripe_config][:publishable_key_test].present?
+      test_config_data['secret_key']            = params[:stripe_config][:secret_key_test]            if params[:stripe_config][:secret_key_test].present?
+      test_config_data['webhook_signing_secret'] = params[:stripe_config][:webhook_signing_secret_test] if params[:stripe_config][:webhook_signing_secret_test].present?
 
-      # Test keys
-      if params[:stripe_config][:publishable_key_test].present?
-        update_params[:publishable_key_test] = params[:stripe_config][:publishable_key_test]
+      StripeConfig.save_test_config(test_config_data) if test_config_data.any?
+
+      # Live keys — production only; show a notice in dev so it's not silent
+      if params[:stripe_config][:publishable_key_live].present? ||
+         params[:stripe_config][:secret_key_live].present? ||
+         params[:stripe_config][:webhook_signing_secret_live].present?
+
+        if Rails.env.production?
+          @stripe_config.publishable_key_live       = params[:stripe_config][:publishable_key_live]       if params[:stripe_config][:publishable_key_live].present?
+          @stripe_config.secret_key_live            = params[:stripe_config][:secret_key_live]            if params[:stripe_config][:secret_key_live].present?
+          @stripe_config.webhook_signing_secret_live = params[:stripe_config][:webhook_signing_secret_live] if params[:stripe_config][:webhook_signing_secret_live].present?
+        else
+          flash.now[:notice] = "Live keys are only saved in production. Test keys were saved."
+        end
       end
 
-      if params[:stripe_config][:secret_key_test].present?
-        update_params[:secret_key_test] = params[:stripe_config][:secret_key_test]
-      end
-
-      # Live keys (optional)
-      if params[:stripe_config][:publishable_key_live].present?
-        update_params[:publishable_key_live] = params[:stripe_config][:publishable_key_live]
-      end
-
-      if params[:stripe_config][:secret_key_live].present?
-        update_params[:secret_key_live] = params[:stripe_config][:secret_key_live]
-      end
-
-      # Webhook signing secrets (one per mode)
-      if params[:stripe_config][:webhook_signing_secret_test].present?
-        update_params[:webhook_signing_secret_test] = params[:stripe_config][:webhook_signing_secret_test]
-      end
-
-      if params[:stripe_config][:webhook_signing_secret_live].present?
-        update_params[:webhook_signing_secret_live] = params[:stripe_config][:webhook_signing_secret_live]
-      end
-
-      # Mode
-      if params[:stripe_config][:mode].present?
-        update_params[:mode] = params[:stripe_config][:mode]
-      end
-
-      # Use direct assignment (not update! to ensure custom setters work)
-      update_params.each do |key, value|
-        @stripe_config.public_send("#{key}=", value)
-      end
+      # Update mode
+      @stripe_config.mode = params[:stripe_config][:mode] if params[:stripe_config][:mode].present?
 
       if @stripe_config.save
-        flash[:notice] = "Stripe configuration updated successfully"
+        # Verify asynchronously — result shown on next page load via Stimulus
+        @stripe_config.verify!
+        flash[:notice] = "Stripe configuration updated"
         redirect_to edit_admin_stripe_config_path
       else
         flash.now[:error] = "Failed to save Stripe configuration"
+        @test_config = StripeConfig.test_config
         render :edit, status: :unprocessable_entity
       end
+    end
+
+    def verify
+      @stripe_config = StripeConfig.current
+      success = @stripe_config.verify!
+
+      render json: {
+        verified: success,
+        verified_at: success ? @stripe_config.verified_at.iso8601 : nil,
+        error: success ? nil : "Could not connect to Stripe. Check your keys."
+      }
     end
 
     def destroy

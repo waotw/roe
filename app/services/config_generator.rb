@@ -4,6 +4,7 @@ class ConfigGenerator
   FEATURES_PATH = File.join(SYSTEM_PATH, 'features')
   DEFAULTS_PATH = File.join(SYSTEM_PATH, 'defaults')
   ASSETS_PATH = File.join(SYSTEM_PATH, 'assets')
+  INTEGRATIONS_PATH = File.join(SYSTEM_PATH, 'integrations')
 
   def self.generate_all
     new.generate_all
@@ -77,12 +78,28 @@ class ConfigGenerator
       File.write(File.join(FEATURES_PATH, 'members.yml'), content)
       puts "✓ Generated features/members.yml"
 
+      # Generate integration config files if features are enabled
+      generate_payments_config if payments_enabled
+      generate_newsletters_config if newsletter_enabled
+
     # Generate member pages
     generate_member_pages
   end
 
   def self.generate_store
     generate_store_defaults
+  end
+
+  def self.generate_payments
+    new.generate_payments_config
+  end
+
+  def self.generate_newsletters
+    new.generate_newsletters_config
+  end
+
+  def self.generate_snipcart
+    new.generate_snipcart_config
   end
 
   def self.generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
@@ -129,6 +146,59 @@ class ConfigGenerator
 
     File.write(File.join(FEATURES_PATH, 'store.yml'), content)
     puts "✓ Generated features/store.yml"
+    ConfigGenerator.new.generate_snipcart_config
+  end
+
+  def generate_payments_config
+    path = File.join(INTEGRATIONS_PATH, 'payments.yml')
+    return if File.exist?(path)
+
+    content = <<~YAML
+      # Stripe Test Keys
+      # These keys are for testing only. Live keys are stored in the database.
+      # Get your test keys from: https://dashboard.stripe.com/test/apikeys
+      test:
+        publishable_key: ""
+        secret_key: ""
+        webhook_signing_secret: ""
+    YAML
+
+    FileUtils.mkdir_p(INTEGRATIONS_PATH)
+    File.write(path, content)
+    puts "✓ Generated integrations/payments.yml"
+  end
+
+  def generate_newsletters_config
+    path = File.join(INTEGRATIONS_PATH, 'newsletters.yml')
+    return if File.exist?(path)
+
+    content = <<~YAML
+      # Postmark Test Token
+      # This token is for testing only. The live token is stored in the database.
+      # Get your server token from: https://account.postmarkapp.com/servers
+      test:
+        server_token: ""
+    YAML
+
+    FileUtils.mkdir_p(INTEGRATIONS_PATH)
+    File.write(path, content)
+    puts "✓ Generated integrations/newsletters.yml"
+  end
+
+  def generate_snipcart_config
+    path = File.join(INTEGRATIONS_PATH, 'snipcart.yml')
+    return if File.exist?(path)
+
+    content = <<~YAML
+      # Snipcart Configuration
+      # Get your API keys from: https://app.snipcart.com/dashboard/account/credentials
+      test:
+        api_key: ""
+    YAML
+
+    FileUtils.mkdir_p(INTEGRATIONS_PATH)
+    File.write(path, content)
+    puts "✓ Generated integrations/snipcart.yml"
   end
 
   def generate_member_pages
@@ -542,6 +612,7 @@ class ConfigGenerator
   private
 
   def ensure_directories
+    FileUtils.mkdir_p(INTEGRATIONS_PATH)
     FileUtils.mkdir_p(SYSTEM_PATH)
     FileUtils.mkdir_p(SITE_PATH)
     FileUtils.mkdir_p(FEATURES_PATH)

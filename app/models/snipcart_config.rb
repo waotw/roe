@@ -1,63 +1,97 @@
 class SnipcartConfig < ApplicationRecord
-  # Enum for mode
+  TEST_CONFIG_PATH = File.join(RoeSitePaths::SITE_PATH, 'system', 'integrations', 'snipcart.yml')
+
   enum :mode, { test: 0, live: 1 }, prefix: true
 
-  # Validations
   validates :mode, presence: true
 
-  # Callbacks
   before_create :set_connected_at
-  before_save :set_connected_at_on_first_key
 
-  # Singleton pattern
+  # AR Encryption — uses master.key
+  encrypts :api_key_test
+  encrypts :api_key_live
+
+  # ── Singleton ────────────────────────────────────────────────────────────
+
   def self.current
     first_or_create!(mode: :test)
   end
 
-  # Encrypted getters (decrypt when reading)
+  # ── Key accessors ─────────────────────────────────────────────────────────
+
   def api_key_test
-    decrypt(self[:api_key_test])
+    test_config['api_key'].presence || self[:api_key_test]
   end
 
   def api_key_live
-    decrypt(self[:api_key_live])
+    self[:api_key_live]
   end
 
-  # Encrypted setters (encrypt when writing)
-  def api_key_test=(value)
-    self[:api_key_test] = encrypt(value)
-  end
-
-  def api_key_live=(value)
-    self[:api_key_live] = encrypt(value)
-  end
-
-  # Get the active API key based on current mode
+  # Active key based on mode
   def current_api_key
     mode_test? ? api_key_test : api_key_live
   end
 
-  # Check if Snipcart is connected
-  def connected?
-    api_key_test.present?
+  # ── Connection status ────────────────────────────────────────────────────
+
+  def keys_present?
+    current_api_key.present?
   end
 
-  # Check if live mode is ready
+  # Verified = keys present AND last API check succeeded
+  def connected?
+    keys_present? && verified_at.present?
+  end
+
   def live_mode_ready?
     api_key_live.present?
   end
 
-  # Disconnect Snipcart (clear all keys)
+  # ── API verification ─────────────────────────────────────────────────────
+
+  def verify!
+    return false unless keys_present?
+
+    # Use Snipcart orders endpoint — returns 401 on bad key, 200 on valid
+    uri = URI("https://app.snipcart.com/api/orders?limit=1")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.read_timeout = 10
+
+    request = Net::HTTP::Get.new(uri)
+    # Snipcart uses HTTP Basic auth with api_key as username, empty password
+    request.basic_auth(current_api_key, '')
+    request['Accept'] = 'application/json'
+
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      update_column(:verified_at, Time.current)
+      true
+    else
+      update_column(:verified_at, nil)
+      false
+    end
+  rescue => e
+    Rails.logger.error "Snipcart verification failed: #{e.message}"
+    update_column(:verified_at, nil)
+    false
+  end
+
+  # ── Disconnect ───────────────────────────────────────────────────────────
+
   def disconnect!
     update!(
       api_key_test: nil,
       api_key_live: nil,
-      connected_at: nil
+      connected_at: nil,
+      verified_at: nil
     )
+    self.class.clear_test_config
   end
 
-  # Get store settings from store.yml
-  # Get store settings from store.yml
+  # ── Store settings (delegated to store.yml) ──────────────────────────────
+
   def currency
     SiteConfig.feature('store', 'currency') || 'usd'
   end
@@ -74,33 +108,32 @@ class SnipcartConfig < ApplicationRecord
     SiteConfig.feature('store', 'snipcart.modal_style') || 'side'
   end
 
+  # ── Test config file ─────────────────────────────────────────────────────
+
+  def self.test_config
+    return {} unless File.exist?(TEST_CONFIG_PATH)
+    YAML.load_file(TEST_CONFIG_PATH)['test'] || {}
+  rescue => e
+    Rails.logger.error "Failed to load Snipcart test config: #{e.message}"
+    {}
+  end
+
+  def self.save_test_config(config_data)
+    FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
+    File.write(TEST_CONFIG_PATH, { 'test' => config_data }.to_yaml)
+  end
+
+  def self.clear_test_config
+    File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
+  end
+
   private
 
+  def test_config
+    self.class.test_config
+  end
+
   def set_connected_at
-    self.connected_at ||= Time.current if api_key_test.present?
-  end
-
-  def set_connected_at_on_first_key
-    self.connected_at = Time.current if connected_at.nil? && (api_key_test.present? || api_key_live.present?)
-  end
-
-  # Encryption using Rails' secret_key_base
-  def encryptor
-    # Use first 32 bytes of secret_key_base as encryption key
-    key = Rails.application.secret_key_base[0..31]
-    ActiveSupport::MessageEncryptor.new(key)
-  end
-
-  def encrypt(value)
-    return nil if value.blank?
-    encryptor.encrypt_and_sign(value)
-  end
-
-  def decrypt(value)
-    return nil if value.blank?
-    encryptor.decrypt_and_verify(value)
-  rescue ActiveSupport::MessageEncryptor::InvalidMessage
-    # If decryption fails, return nil (handles corrupted data gracefully)
-    nil
+    self.connected_at ||= Time.current if current_api_key.present?
   end
 end

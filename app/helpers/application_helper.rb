@@ -40,9 +40,15 @@ module ApplicationHelper
   def postmark_configured?        = SiteFeature.postmark_configured?
   def store_enabled?              = SiteFeature.store_enabled?
   def integrations_to_enable?     = SiteFeature.integrations_to_enable?
-  def framework_dev_mode?         = SiteFeature.framework_dev_mode?
-  def show_production_features?   = SiteFeature.show_production_features?
-  def show_development_features?  = SiteFeature.show_development_features?
+  def stripe_configured?          = SiteFeature.stripe_configured?
+  def snipcart_configured?        = SiteFeature.snipcart_configured?
+  def podcast_enabled?            = SiteFeature.podcast_enabled?
+  def payments_feature_enabled?    = SiteFeature.payments_feature_enabled?
+  def newsletters_feature_enabled? = SiteFeature.newsletters_feature_enabled?
+  def any_integration_unconfigured? = SiteFeature.any_integration_unconfigured?
+  def payments_unconfigured?       = SiteFeature.payments_unconfigured?
+  def newsletters_unconfigured?    = SiteFeature.newsletters_unconfigured?
+  def snipcart_unconfigured?       = SiteFeature.snipcart_unconfigured?
 
   def snipcart_connected?
     store_enabled? && SnipcartConfig.current&.connected?

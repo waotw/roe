@@ -1,59 +1,65 @@
 class Admin::PostmarkConfigsController < Admin::BaseController
-  before_action :require_production_features
-
   def edit
     @postmark_config = PostmarkConfig.current
+    @test_config = PostmarkConfig.test_config
     @stats = PostmarkService.get_stats if @postmark_config.connected?
   end
 
   def update
-      @postmark_config = PostmarkConfig.current
+    @postmark_config = PostmarkConfig.current
 
-      # Get the value from params
-      server_token = params[:postmark_config][:server_token]
+    test_token = params[:postmark_config][:test_server_token]
+    live_token = params[:postmark_config][:server_token]
 
-      # Skip if it's the masked placeholder
-      server_token = nil if server_token == '••••••••••••••••'
+    # Skip masked placeholders
+    test_token = nil if test_token == '••••••••••••••••'
+    live_token = nil if live_token == '••••••••••••••••'
 
-      # Test credentials if provided
-      if server_token.present?
-        test_result = PostmarkService.test_connection(server_token)
+    # Save test token to file (all environments)
+    if test_token.present?
+      PostmarkConfig.save_test_config({ 'server_token' => test_token })
+    end
 
-        unless test_result[:success]
-          flash[:error] = "Failed to connect to Postmark: #{test_result[:error]}"
-          redirect_to edit_admin_postmark_config_path and return
-        end
-      end
-
-      # Update only if value is provided
-      if server_token.present?
-        @postmark_config.server_token = server_token
-      end
-
-      # Ensure webhook token exists (ADD THIS)
-      if @postmark_config.webhook_token.blank?
-        @postmark_config.webhook_token = SecureRandom.hex(32)
-      end
-
-      if @postmark_config.save
-        flash[:notice] = "Postmark configuration saved successfully"
-        redirect_to edit_admin_postmark_config_path
+    # Save live token to DB — production only
+    if live_token.present?
+      if Rails.env.production?
+        @postmark_config.server_token = live_token
       else
-        flash.now[:error] = "Failed to save Postmark configuration"
-        render :edit, status: :unprocessable_entity
+        flash.now[:notice] = "Live token is only saved in production. Test token was saved."
       end
     end
 
-    def destroy
+    # Update mode
+    @postmark_config.mode = params[:postmark_config][:mode] if params[:postmark_config][:mode].present?
+
+    # Ensure webhook token exists
+    @postmark_config.webhook_token ||= SecureRandom.hex(32)
+
+    if @postmark_config.save
+      @postmark_config.verify!
+      flash[:notice] = "Postmark configuration saved"
+      redirect_to edit_admin_postmark_config_path
+    else
+      flash.now[:error] = "Failed to save Postmark configuration"
+      @test_config = PostmarkConfig.test_config
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  def verify
     @postmark_config = PostmarkConfig.current
+    success = @postmark_config.verify!
 
-    Rails.logger.info "BEFORE disconnect - server_token present?: #{@postmark_config[:server_token].present?}"
+    render json: {
+      verified: success,
+      verified_at: success ? @postmark_config.verified_at.iso8601 : nil,
+      error: success ? nil : "Could not connect to Postmark. Check your server token."
+    }
+  end
 
+  def destroy
+    @postmark_config = PostmarkConfig.current
     @postmark_config.disconnect!
-
-    @postmark_config.reload
-    Rails.logger.info "AFTER disconnect - server_token present?: #{@postmark_config[:server_token].present?}"
-    Rails.logger.info "AFTER disconnect - connected?: #{@postmark_config.connected?}"
 
     flash[:notice] = "Postmark disconnected"
     redirect_to edit_admin_postmark_config_path

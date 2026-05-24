@@ -119,7 +119,12 @@
           <div class="flex items-center gap-6">
             <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to Rails.env.production? ? "Updates" : "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-            <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <div class="relative inline-flex items-center">
+              <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <% if any_integration_unconfigured? %>
+                <span class="absolute -top-1 -right-2 w-2 h-2 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
+              <% end %>
+            </div>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>
         </div>
@@ -136,92 +141,25 @@
             <%= link_to "Layouts", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
           </div>
-          <%# Members/Emails: gated on show_production_features? as well as
-              members_enabled? — the feature file may exist locally (synced
-              down from prod) but the screens aren't useful in dev. %>
-          <% if members_enabled? && show_production_features? %>
+          <% if members_enabled? %>
             <div class="flex gap-x-6">
               <%= link_to "Members", admin_members_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
               <%= link_to "Emails", admin_emails_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             </div>
           <% end %>
 
-          <%# Integrations area: production-only (or with framework-dev
-              override). The whole collection is gated so we skip the
-              connected? DB checks in dev, and the renderings below find
-              empty arrays. Initialize the arrays unconditionally so the
-              dropdown render below doesn't trip on undefined locals. %>
-          <% unconfigured_integrations = [] %>
-          <% configured_integrations   = [] %>
-
-          <% if show_production_features? %>
-            <% if members_enabled? %>
-              <% if newsletters_enabled? %>
-                <% if PostmarkConfig.current.connected? %>
-                  <% configured_integrations << { name: "Postmark", path: edit_admin_postmark_config_path } %>
-                <% else %>
-                  <% unconfigured_integrations << { name: "Postmark", path: edit_admin_postmark_config_path } %>
-                <% end %>
-              <% end %>
-
-              <% if payments_enabled? %>
-                <% if StripeConfig.current.connected? %>
-                  <% configured_integrations << { name: "Stripe", path: edit_admin_stripe_config_path } %>
-                <% else %>
-                  <% unconfigured_integrations << { name: "Stripe", path: edit_admin_stripe_config_path } %>
-                <% end %>
-              <% end %>
-            <% end %>
-
-            <% if store_enabled? %>
-              <% if SnipcartConfig.current.connected? %>
-                <% configured_integrations << { name: "Snipcart", path: edit_admin_snipcart_config_path } %>
-              <% else %>
-                <% unconfigured_integrations << { name: "Snipcart", path: edit_admin_snipcart_config_path } %>
-              <% end %>
-            <% end %>
-          <% end %>
-
-          <%# Unconfigured integrations: red-underlined inline links so
-              they're visible as "needs setup." Empty in dev → nothing
-              renders. %>
-          <div class="flex gap-x-6">
-            <% unconfigured_integrations.each do |integration| %>
-              <%= link_to integration[:name], integration[:path], class: "text-sm font-medium text-gray-500 border-b-2 border-red-600 hover:text-gray-900" %>
-            <% end %>
-          </div>
-
-          <%# Tools (dev-only) and configured Integrations (prod-only)
-              dropdowns, grouped on the right. %>
+          <%# Tools dropdown %>
           <div class="flex gap-x-4 items-center">
-            <% if show_development_features? %>
-              <%# Tools dropdown %>
-              <div class="relative p-0 m-0 leading-0" data-controller="dropdown">
-                <button type="button" data-action="click->dropdown#toggle" class="text-base font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1 cursor-pointer" title="Tools">
-                  <%# icon_svg('tools', class: 'w-4.5 h-4.5 text-gray-500 hover:text-gray-900') %>🛠️
-                </button>
-                <div data-dropdown-target="menu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
-                  <%= link_to "Substack Imports", admin_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
-                </div>
+            <div class="relative p-0 m-0 leading-0" data-controller="dropdown">
+              <button type="button" data-action="click->dropdown#toggle" class="text-base font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1 cursor-pointer" title="Tools">
+                <%# icon_svg('tools', class: 'w-4.5 h-4.5 text-gray-500 hover:text-gray-900') %>🛠️
+              </button>
+              <div data-dropdown-target="menu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
+                <%= link_to "Substack Imports", admin_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
               </div>
-            <% end %>
-
-            <%# Integrations dropdown — populated only when
-                show_production_features? was true above, so the
-                .any? check naturally also enforces the prod gate. %>
-            <% if configured_integrations.any? %>
-              <div class="relative p-0 m-0 leading-0" data-controller="dropdown">
-                <button type="button" data-action="click->dropdown#toggle" class="text-sm font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1 cursor-pointer" title="Integrations">
-                  <%= icon_svg('integration', class: 'w-4.5 h-4.5 text-gray-500 hover:text-gray-900') %>
-                </button>
-                <div data-dropdown-target="menu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
-                  <% configured_integrations.each do |integration| %>
-                    <%= link_to integration[:name], integration[:path], class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
+            </div>
           </div>
+        </div>
       </div>
     </nav>
     <!-- Page Content -->

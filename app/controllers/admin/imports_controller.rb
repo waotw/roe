@@ -1,5 +1,4 @@
 class Admin::ImportsController < Admin::BaseController
-  before_action :require_development_features
   before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch, :publish_to_live, :dismiss_publish_status, :refresh_peer_exchange, :members ]
 
   def index

@@ -20,6 +20,30 @@ FileUtils.chdir APP_ROOT do
     puts "✅ Master key created"
   end
 
+  puts "\n== Checking AR Encryption credentials =="
+  require "rails"
+  require_relative "../config/application"
+  Rails.application.initialize! unless Rails.application.initialized?
+
+  creds = Rails.application.credentials
+  unless creds.active_record_encryption&.dig(:primary_key).present?
+    puts "   Generating AR Encryption keys..."
+    require "securerandom"
+    creds.write(creds.read.then { |existing|
+      # Parse existing content and merge in the new keys
+      existing_hash = existing.blank? ? {} : YAML.safe_load(existing) || {}
+      existing_hash['active_record_encryption'] = {
+        'primary_key'        => SecureRandom.alphanumeric(32),
+        'deterministic_key'  => SecureRandom.alphanumeric(32),
+        'key_derivation_salt' => SecureRandom.alphanumeric(32)
+      }
+      existing_hash.to_yaml
+    })
+    puts "✅ AR Encryption keys added to credentials"
+  else
+    puts "   AR Encryption keys present, skipping"
+  end
+
   # Load Rails environment once — boots config/application automatically
   require_relative "../config/environment"
 

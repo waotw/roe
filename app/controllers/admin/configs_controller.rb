@@ -123,6 +123,35 @@ class Admin::ConfigsController < ApplicationController
     }
   }.freeze
 
+  PAYMENTS_CONFIG_SCHEMA = {
+    test_keys: {
+      label: "Stripe Test Keys",
+      fields: {
+        'publishable_key' => { type: :text,     label: 'Publishable Key (Test)', hint: 'Starts with pk_test_' },
+        'secret_key'      => { type: :password, label: 'Secret Key (Test)',      hint: 'Starts with sk_test_' },
+        'webhook_signing_secret' => { type: :password, label: 'Webhook Signing Secret (Test)', hint: 'Starts with whsec_' }
+      }
+    }
+  }.freeze
+
+  NEWSLETTERS_CONFIG_SCHEMA = {
+    test_keys: {
+      label: "Postmark Test Token",
+      fields: {
+        'server_token' => { type: :password, label: 'Server Token (Test)', hint: 'Your Postmark server API token for testing' }
+      }
+    }
+  }.freeze
+
+  SNIPCART_CONFIG_SCHEMA = {
+    test_keys: {
+      label: "Snipcart Test API Key",
+      fields: {
+        'api_key' => { type: :text, label: 'Public API Key (Test)', hint: 'Your Snipcart test public API key' }
+      }
+    }
+  }.freeze
+
   def itunes_subcategories
     {
       'Arts' => [ 'Books', 'Design', 'Fashion & Beauty', 'Food', 'Performing Arts', 'Visual Arts' ],
@@ -243,12 +272,51 @@ class Admin::ConfigsController < ApplicationController
       {
         section: "Features",
         files: features_files
-      },
-      {
-        section: "Defaults",
-        files: defaults_files
       }
     ]
+
+    # Integrations section — only shown when at least one integration feature is enabled
+    integration_files = []
+
+    if SiteFeature.payments_feature_enabled?
+      integration_files << {
+        name: "payments.yml",
+        path: "integrations/payments.yml",
+        description: "Stripe test keys",
+        edit_path: admin_edit_payments_config_path,
+        unconfigured: SiteFeature.payments_unconfigured?
+      }
+    end
+
+    if SiteFeature.newsletters_feature_enabled?
+      integration_files << {
+        name: "newsletters.yml",
+        path: "integrations/newsletters.yml",
+        description: "Postmark test token",
+        edit_path: admin_edit_newsletters_config_path,
+        unconfigured: SiteFeature.newsletters_unconfigured?
+      }
+    end
+
+    if SiteFeature.store_enabled?
+      integration_files << {
+        name: "snipcart.yml",
+        path: "integrations/snipcart.yml",
+        description: "Snipcart API keys",
+        edit_path: admin_edit_snipcart_integration_config_path,
+        unconfigured: SiteFeature.snipcart_unconfigured?
+      }
+    end
+
+    @config_files << {
+      section: "Integrations",
+      files: integration_files
+    } if integration_files.any?
+
+    @config_files << {
+      section: "Defaults",
+      files: defaults_files
+    }
   end
 
   def edit_site
@@ -687,6 +755,131 @@ class Admin::ConfigsController < ApplicationController
 
     flash[:notice] = "Development configuration deleted successfully"
     redirect_to admin_configs_path
+  end
+
+  def edit_payments
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'payments.yml')
+    unless File.exist?(path)
+      ConfigGenerator.new.generate_payments_config
+    end
+    @config_type    = 'payments'
+    @config_content = File.read(path)
+    @config_hash    = (YAML.load(@config_content) || {})['test'] || {}
+    @stripe_config  = StripeConfig.current
+    @schema         = PAYMENTS_CONFIG_SCHEMA
+    render :edit_integration
+  end
+
+  def update_payments
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'payments.yml')
+    test_data = params[:test] || {}
+
+    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing['test'] ||= {}
+    test_data.each { |k, v| existing['test'][k] = v if v.present? }
+
+    File.write(path, existing.to_yaml)
+    SiteConfig.sync_from_file('integrations/payments')
+
+    # Save to StripeConfig and verify
+    stripe = StripeConfig.current
+    StripeConfig.save_test_config(existing['test'])
+    stripe.verify!
+
+    flash[:notice] = "Payments configuration saved"
+    redirect_to admin_edit_payments_config_path
+  end
+
+  def verify_payments
+    stripe = StripeConfig.current
+    success = stripe.verify!
+    render json: {
+      verified:    success,
+      verified_at: success ? stripe.verified_at.iso8601 : nil,
+      error:       success ? nil : "Could not connect to Stripe. Check your test keys."
+    }
+  end
+
+  def edit_newsletters
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'newsletters.yml')
+    unless File.exist?(path)
+      ConfigGenerator.new.generate_newsletters_config
+    end
+    @config_type      = 'newsletters'
+    @config_content   = File.read(path)
+    @config_hash      = (YAML.load(@config_content) || {})['test'] || {}
+    @postmark_config  = PostmarkConfig.current
+    @schema           = NEWSLETTERS_CONFIG_SCHEMA
+    render :edit_integration
+  end
+
+  def update_newsletters
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'newsletters.yml')
+    test_data = params[:test] || {}
+
+    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing['test'] ||= {}
+    test_data.each { |k, v| existing['test'][k] = v if v.present? }
+
+    File.write(path, existing.to_yaml)
+    SiteConfig.sync_from_file('integrations/newsletters')
+
+    PostmarkConfig.save_test_config(existing['test'])
+    PostmarkConfig.current.verify!
+
+    flash[:notice] = "Newsletters configuration saved"
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  def verify_newsletters
+    postmark = PostmarkConfig.current
+    success  = postmark.verify!
+    render json: {
+      verified:    success,
+      verified_at: success ? postmark.verified_at.iso8601 : nil,
+      error:       success ? nil : "Could not connect to Postmark. Check your server token."
+    }
+  end
+
+  def edit_snipcart
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'snipcart.yml')
+    unless File.exist?(path)
+      ConfigGenerator.new.generate_snipcart_config
+    end
+    @config_type      = 'snipcart'
+    @config_content   = File.read(path)
+    @config_hash      = (YAML.load(@config_content) || {})['test'] || {}
+    @snipcart_config  = SnipcartConfig.current
+    @schema           = SNIPCART_CONFIG_SCHEMA
+    render :edit_integration
+  end
+
+  def update_snipcart
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'snipcart.yml')
+    test_data = params[:test] || {}
+
+    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing['test'] ||= {}
+    test_data.each { |k, v| existing['test'][k] = v if v.present? }
+
+    File.write(path, existing.to_yaml)
+    SiteConfig.sync_from_file('integrations/snipcart')
+
+    SnipcartConfig.save_test_config(existing['test'])
+    SnipcartConfig.current.verify!
+
+    flash[:notice] = "Store (Snipcart) configuration saved"
+    redirect_to admin_edit_snipcart_integration_config_path
+  end
+
+  def verify_snipcart
+    snipcart = SnipcartConfig.current
+    success  = snipcart.verify!
+    render json: {
+      verified:    success,
+      verified_at: success ? snipcart.verified_at.iso8601 : nil,
+      error:       success ? nil : "Could not connect to Snipcart. Check your API key."
+    }
   end
 
   private

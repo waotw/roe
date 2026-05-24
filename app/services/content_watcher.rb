@@ -172,6 +172,12 @@ class ContentWatcher
       SiteConfig.sync_from_file("defaults/#{type}")
       puts "\n   ✓ #{type.capitalize} defaults reloaded\n"
 
+    # Handle integration configs (payments.yml, newsletters.yml, snipcart.yml)
+    elsif absolute_file.include?('site/system/integrations/')
+      type = File.basename(file, '.yml')
+      SiteConfig.sync_from_file("integrations/#{type}")
+      puts "\n   ✓ #{type.capitalize} integration config reloaded\n"
+
     elsif absolute_file.include?('site/posts')
       result = Post.create_or_update_from_file(absolute_file)
 
@@ -368,17 +374,6 @@ class ContentWatcher
       handle_features_config_removed(filename, file_path)
     else
       puts "   ℹ️  Unknown config file removed: #{filename}"
-    end
-  end
-
-  def self.handle_global_config_removed(filename, file_path)
-    case filename
-    when 'site.yml'
-      restore_required_config('site', file_path)
-    when 'fonts.yml'
-      restore_required_config('fonts', file_path)
-    else
-      puts "   ℹ️  Unknown global config file removed: #{filename}"
     end
   end
 

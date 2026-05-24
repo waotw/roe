@@ -3,6 +3,7 @@ class SiteConfig < ApplicationRecord
   SITE_PATH = File.join(SYSTEM_PATH, 'global')
   FEATURES_PATH = Pathname.new(File.join(SYSTEM_PATH, 'features'))
   DEFAULTS_PATH = Pathname.new(File.join(SYSTEM_PATH, 'defaults'))
+  INTEGRATIONS_PATH = Pathname.new(File.join(SYSTEM_PATH, 'integrations'))
 
   SITE_FILE = File.join(SITE_PATH, 'site.yml')
   FONTS_FILE = File.join(SITE_PATH, 'fonts.yml')
@@ -55,6 +56,15 @@ class SiteConfig < ApplicationRecord
   # Get default config (cards, collections)
   def self.default(type, key)
     current("defaults/#{type}")&.config&.[](key.to_s)
+  end
+
+  # Get integration config (payments, newsletters, snipcart)
+  def self.integration(type, key = nil)
+    config = current("integrations/#{type}")&.config
+    return config unless key
+
+    keys = key.to_s.split('.')
+    config&.dig(*keys)
   end
 
   # Get feature config (members, podcast, store)

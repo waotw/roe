@@ -15,16 +15,19 @@
   <%= form_with model: @stripe_config, url: admin_stripe_config_path, method: :patch, class: "space-y-8" do |form| %>
 
     <!-- Connection Status -->
-    <div class="p-4 border mb-4 <%= @stripe_config.connected? ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50' %>">
-      <div class="flex items-center gap-2">
-        <% if @stripe_config.connected? %>
-          <span class="text-green-600 font-semibold">✓ Connected</span>
-          <span class="text-sm text-gray-600">
-            (Mode: <%= @stripe_config.mode_test? ? 'Test' : 'Live' %>)
+    <div class="p-4 border border-gray-200 bg-gray-50 mb-4"
+         data-controller="integration-verify"
+         data-integration-verify-url-value="<%= verify_admin_stripe_config_path %>"
+         data-integration-verify-verified-value="<%= @stripe_config.connected? %>"
+         data-integration-verify-verified-at-value="<%= @stripe_config.verified_at&.iso8601 %>">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span data-integration-verify-target="status"></span>
+          <span class="text-sm text-gray-500 font-mono">
+            Mode: <%= @stripe_config.mode_test? ? 'Test' : 'Live' %>
           </span>
-        <% else %>
-          <span class="text-gray-600">⚠ Not Connected</span>
-        <% end %>
+        </div>
+        <span data-integration-verify-target="timestamp" class="text-xs text-gray-400 font-mono"></span>
       </div>
     </div>
 
@@ -132,8 +135,8 @@
       </div>
     </div>
 
-    <!-- Mode Selection (show if connected) -->
-    <% if @stripe_config.connected? %>
+    <!-- Mode Selection (show if keys present) -->
+    <% if @stripe_config.keys_present? %>
       <div class="config-section">
         <h3 class="text-base font-semibold text-gray-900 mb-1">Active Mode</h3>
 
@@ -164,7 +167,7 @@
   <% end %>
 
   <!-- Disconnect form (outside main form) -->
-  <% if @stripe_config.connected? %>
+  <% if @stripe_config.keys_present? %>
     <%= form_with url: admin_stripe_config_path, method: :delete, class: "mt-4" do |disconnect_form| %>
       <%= disconnect_form.submit "Disconnect Stripe",
                     data: { turbo_confirm: "Are you sure? This will remove all Stripe keys." },

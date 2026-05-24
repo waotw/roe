@@ -80,28 +80,75 @@
     </div>
   <% end %>
 
+  <!-- Connection Status -->
+  <div class="mt-6 p-4 border border-gray-200 bg-gray-50"
+       data-controller="integration-verify"
+       data-integration-verify-url-value="<%= verify_admin_postmark_config_path %>"
+       data-integration-verify-verified-value="<%= @postmark_config.connected? %>"
+       data-integration-verify-verified-at-value="<%= @postmark_config.verified_at&.iso8601 %>">
+    <div class="flex items-center justify-between">
+      <span data-integration-verify-target="status"></span>
+      <span data-integration-verify-target="timestamp" class="text-xs text-gray-400 font-mono"></span>
+    </div>
+  </div>
+
   <div class="mt-8 bg-white border border-gray-300 p-6">
     <%= form_with model: @postmark_config, url: admin_postmark_config_path, method: :patch do |f| %>
       <div class="space-y-6">
+
+        <!-- Test Server Token -->
         <div>
           <label class="block text-sm font-semibold text-gray-900 mb-2">
-            Postmark Server Token
+            Server Token (Test)
           </label>
-          <%= f.text_field :server_token,
-              value: @postmark_config.connected? ? '••••••••••••••••' : '',
+          <%= f.text_field :test_server_token,
+              value: @postmark_config.test_mode? ? '••••••••••••••••' : '',
               placeholder: 'Your Postmark Server API Token',
               class: "w-full px-3 py-2 border border-gray-300 font-mono text-sm" %>
           <p class="mt-1 text-xs text-gray-500">
-            Find this in your Postmark server under API Tokens
+            Works in all environments. Find this in your Postmark server under API Tokens.
           </p>
         </div>
+
+        <!-- Live Server Token (production only) -->
+        <% if Rails.env.production? %>
+          <div>
+            <label class="block text-sm font-semibold text-gray-900 mb-2">
+              Server Token (Live)
+            </label>
+            <%= f.text_field :server_token,
+                value: @postmark_config.live_mode? ? '••••••••••••••••' : '',
+                placeholder: 'Your Postmark Live Server API Token',
+                class: "w-full px-3 py-2 border border-gray-300 font-mono text-sm" %>
+            <p class="mt-1 text-xs text-gray-500">
+              Saved to database only. Used when Live mode is active.
+            </p>
+          </div>
+        <% end %>
+
+        <!-- Mode toggle (shown when both tokens available) -->
+        <% if @postmark_config.test_mode? && @postmark_config.live_mode? %>
+          <div>
+            <label class="block text-sm font-semibold text-gray-900 mb-2">Active Mode</label>
+            <div class="space-y-2 pl-4 border-l-2 border-gray-200">
+              <label class="flex items-center gap-2">
+                <%= f.radio_button :mode, :test, class: "form-radio" %>
+                <span class="text-sm">Test Mode</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <%= f.radio_button :mode, :live, class: "form-radio" %>
+                <span class="text-sm font-semibold text-red-600">Live Mode (real emails)</span>
+              </label>
+            </div>
+          </div>
+        <% end %>
 
         <%= f.submit "Save Configuration",
             class: "uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
       </div>
     <% end %>
 
-    <% if @postmark_config.connected? %>
+    <% if @postmark_config.keys_present? %>
       <!-- Disconnect button OUTSIDE the form -->
       <div class="mt-4">
         <%= button_to "Disconnect",
@@ -112,12 +159,8 @@
       </div>
     <% end %>
 
-    <% if @postmark_config.connected? %>
-      <div class="mt-6 pt-6 border-t border-gray-300">
-        <p class="text-sm text-green-800 bg-green-50 px-4 py-2 border border-green-200">
-          ✓ Postmark is configured and ready to send
-        </p>
-      </div>
+    <% if @postmark_config.keys_present? %>
+      <div class="mt-6 pt-6 border-t border-gray-300"></div>
 
       <% if @postmark_config.webhook_token.present? %>
         <div class="mt-6 pt-6 border-t border-gray-300">

@@ -1,69 +1,56 @@
 class StripeConfig < ApplicationRecord
-  # Enum for mode (same as before)
+  TEST_CONFIG_PATH = File.join(RoeSitePaths::SITE_PATH, 'system', 'integrations', 'stripe.yml')
+
   enum :mode, { test: 0, live: 1 }, prefix: true
 
-  # Validations
   validates :mode, presence: true
 
-  # Callbacks
   before_create :set_connected_at
 
-  # Singleton pattern
+  # AR Encryption — uses master.key, no custom encrypt/decrypt needed
+  encrypts :publishable_key_test
+  encrypts :secret_key_test
+  encrypts :webhook_signing_secret_test
+  encrypts :publishable_key_live
+  encrypts :secret_key_live
+  encrypts :webhook_signing_secret_live
+
+  # ── Singleton ────────────────────────────────────────────────────────────
+
   def self.current
     first_or_create!(mode: :test)
   end
 
-  # Encrypted getters (decrypt when reading)
+  # ── Test key accessors (file first, DB fallback) ─────────────────────────
+
   def publishable_key_test
-    decrypt(self[:publishable_key_test])
+    test_config['publishable_key'].presence || self[:publishable_key_test]
   end
 
   def secret_key_test
-    decrypt(self[:secret_key_test])
-  end
-
-  def publishable_key_live
-    decrypt(self[:publishable_key_live])
-  end
-
-  def secret_key_live
-    decrypt(self[:secret_key_live])
+    test_config['secret_key'].presence || self[:secret_key_test]
   end
 
   def webhook_signing_secret_test
-    decrypt(self[:webhook_signing_secret_test])
+    test_config['webhook_signing_secret'].presence || self[:webhook_signing_secret_test]
+  end
+
+  # ── Live key accessors (DB only) ─────────────────────────────────────────
+
+  def publishable_key_live
+    self[:publishable_key_live]
+  end
+
+  def secret_key_live
+    self[:secret_key_live]
   end
 
   def webhook_signing_secret_live
-    decrypt(self[:webhook_signing_secret_live])
+    self[:webhook_signing_secret_live]
   end
 
-  # Encrypted setters (encrypt when writing)
-  def publishable_key_test=(value)
-    self[:publishable_key_test] = encrypt(value)
-  end
+  # ── Active key based on mode ─────────────────────────────────────────────
 
-  def secret_key_test=(value)
-    self[:secret_key_test] = encrypt(value)
-  end
-
-  def publishable_key_live=(value)
-    self[:publishable_key_live] = encrypt(value)
-  end
-
-  def secret_key_live=(value)
-    self[:secret_key_live] = encrypt(value)
-  end
-
-  def webhook_signing_secret_test=(value)
-    self[:webhook_signing_secret_test] = encrypt(value)
-  end
-
-  def webhook_signing_secret_live=(value)
-    self[:webhook_signing_secret_live] = encrypt(value)
-  end
-
-  # Get the active keys based on current mode
   def current_publishable_key
     mode_test? ? publishable_key_test : publishable_key_live
   end
@@ -72,50 +59,71 @@ class StripeConfig < ApplicationRecord
     mode_test? ? secret_key_test : secret_key_live
   end
 
-  # The webhook signing secret for the currently active mode. Used by
-  # WebhooksController to verify that incoming webhook events were
-  # actually sent by Stripe (not a forgery from someone who guessed the
-  # endpoint URL).
   def current_webhook_signing_secret
     mode_test? ? webhook_signing_secret_test : webhook_signing_secret_live
   end
 
-  # Options hash to pass as the trailing argument to any Stripe SDK call,
-  # so each request uses the *currently configured* secret key. Without
-  # this we'd fall back to the global Stripe.api_key, which is set once
-  # at boot and goes stale the moment the writer switches test↔live in
-  # the admin UI.
   def self.request_options
     { api_key: current.current_secret_key }
   end
 
-  # Check if Stripe is connected
-  def connected?
-    publishable_key_test.present? && secret_key_test.present?
+  # ── Connection status ────────────────────────────────────────────────────
+
+  # Keys present for current mode
+  def keys_present?
+    current_publishable_key.present? && current_secret_key.present?
   end
 
-  # Check if live mode is ready
+  # Verified = keys present AND last API check succeeded
+  def connected?
+    keys_present? && verified_at.present?
+  end
+
   def live_mode_ready?
     publishable_key_live.present? && secret_key_live.present?
   end
 
-  # Disconnect Stripe (clear all keys)
+  # ── API verification ─────────────────────────────────────────────────────
+
+  # Makes a live API call to confirm keys are valid.
+  # Writes verified_at on success, clears it on failure.
+  # Called on key save and from the verify controller action.
+  def verify!
+    return false unless keys_present?
+
+    Stripe::Account.retrieve(nil, api_key: current_secret_key)
+    update_column(:verified_at, Time.current)
+    true
+  rescue Stripe::AuthenticationError
+    update_column(:verified_at, nil)
+    false
+  rescue Stripe::StripeError => e
+    Rails.logger.error "Stripe verification failed: #{e.message}"
+    update_column(:verified_at, nil)
+    false
+  end
+
+  # ── Disconnect ───────────────────────────────────────────────────────────
+
   def disconnect!
     update!(
       publishable_key_test: nil,
       secret_key_test: nil,
       publishable_key_live: nil,
       secret_key_live: nil,
-      connected_at: nil
+      webhook_signing_secret_test: nil,
+      webhook_signing_secret_live: nil,
+      connected_at: nil,
+      verified_at: nil
     )
+    self.class.clear_test_config
   end
 
-  def fetch_currency!
-    return unless connected?
+  # ── Currency ─────────────────────────────────────────────────────────────
 
-    # Stripe::Account.retrieve(id, opts) — id is the account ID (string)
-    # or nil for the connected account. Passing `{}` here would be coerced
-    # to a string for the URL path and raise TypeError.
+  def fetch_currency!
+    return unless keys_present?
+
     account = Stripe::Account.retrieve(nil, api_key: current_secret_key)
     update!(currency: account.default_currency)
   rescue Stripe::StripeError => e
@@ -123,40 +131,38 @@ class StripeConfig < ApplicationRecord
     nil
   end
 
-  # Get currency (fetch if not cached). Falls back to "usd" when the
-  # cached value is blank AND the Stripe fetch returns nothing — either
-  # because the API call failed (network, rate limit, bad key) or because
-  # the connected Stripe account hasn't set a default currency yet. The
-  # fallback isn't persisted, so a subsequent request will retry the fetch.
   def default_currency
     return currency if currency.present?
     fetch_currency!
     currency.presence || "usd"
   end
 
+  # ── Test config file ─────────────────────────────────────────────────────
+
+  def self.test_config
+    return {} unless File.exist?(TEST_CONFIG_PATH)
+    YAML.load_file(TEST_CONFIG_PATH)['test'] || {}
+  rescue => e
+    Rails.logger.error "Failed to load Stripe test config: #{e.message}"
+    {}
+  end
+
+  def self.save_test_config(config_data)
+    FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
+    File.write(TEST_CONFIG_PATH, { 'test' => config_data }.to_yaml)
+  end
+
+  def self.clear_test_config
+    File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
+  end
+
   private
 
+  def test_config
+    self.class.test_config
+  end
+
   def set_connected_at
-    self.connected_at ||= Time.current if publishable_key_test.present?
-  end
-
-  # Encryption using Rails' secret_key_base (already exists in every Rails app)
-  def encryptor
-    # Use first 32 bytes of secret_key_base as encryption key
-    key = Rails.application.secret_key_base[0..31]
-    ActiveSupport::MessageEncryptor.new(key)
-  end
-
-  def encrypt(value)
-    return nil if value.blank?
-    encryptor.encrypt_and_sign(value)
-  end
-
-  def decrypt(value)
-    return nil if value.blank?
-    encryptor.decrypt_and_verify(value)
-  rescue ActiveSupport::MessageEncryptor::InvalidMessage
-    # If decryption fails, return nil (handles corrupted data gracefully)
-    nil
+    self.connected_at ||= Time.current if keys_present?
   end
 end

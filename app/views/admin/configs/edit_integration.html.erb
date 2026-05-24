@@ -1,0 +1,149 @@
+<%
+  # Determine the integration record and verify path based on config type
+  integration_record = case @config_type
+    when 'payments'    then @stripe_config
+    when 'newsletters' then @postmark_config
+    when 'snipcart'    then @snipcart_config
+  end
+
+  verify_path = case @config_type
+    when 'payments'    then admin_verify_payments_config_path
+    when 'newsletters' then admin_verify_newsletters_config_path
+    when 'snipcart'    then admin_verify_snipcart_integration_config_path
+  end
+
+  update_path = case @config_type
+    when 'payments'    then admin_payments_config_path
+    when 'newsletters' then admin_newsletters_config_path
+    when 'snipcart'    then admin_snipcart_integration_config_path
+  end
+
+  title = case @config_type
+    when 'payments'    then 'Payments (Stripe)'
+    when 'newsletters' then 'Newsletters (Postmark)'
+    when 'snipcart'    then 'Store (Snipcart)'
+  end
+
+  is_production = Rails.env.production?
+%>
+
+<div class="max-w-3xl mx-auto p-8 bg-white">
+  <div class="mb-6 flex justify-between items-center">
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2"><%= title %></h2>
+      <p class="text-sm text-gray-600">Configure API keys for <%= title %>.</p>
+    </div>
+    <div>
+      <%= link_to "← Back to Settings", admin_configs_path,
+          class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+    </div>
+  </div>
+
+  <%# Connection status — async Stimulus verify %>
+  <div class="p-4 border border-gray-200 bg-gray-50 mb-6"
+       data-controller="integration-verify"
+       data-integration-verify-url-value="<%= verify_path %>"
+       data-integration-verify-verified-value="<%= integration_record&.connected? %>"
+       data-integration-verify-verified-at-value="<%= integration_record&.verified_at&.iso8601 %>">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span data-integration-verify-target="status"></span>
+        <% if integration_record&.respond_to?(:mode) %>
+          <span class="text-sm text-gray-500 font-mono">
+            Mode: <%= integration_record.mode_test? ? 'Test' : 'Live' %>
+          </span>
+        <% end %>
+      </div>
+      <span data-integration-verify-target="timestamp" class="text-xs text-gray-400 font-mono"></span>
+    </div>
+  </div>
+
+  <%# Tabs %>
+  <div class="border-b border-gray-200 mb-6" data-controller="tabs">
+    <nav class="flex gap-4">
+      <button type="button"
+              data-tabs-target="tab"
+              data-action="click->tabs#show"
+              data-tabs-panel="test"
+              class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+        Test
+      </button>
+      <button type="button"
+              data-tabs-target="tab"
+              data-action="click->tabs#show"
+              data-tabs-panel="live"
+              class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 <%= 'opacity-50 cursor-not-allowed' unless is_production %>"
+              <%= 'disabled' unless is_production %>>
+        Live <%= '(production only)' unless is_production %>
+      </button>
+    </nav>
+  </div>
+
+  <%# Test tab %>
+  <div data-tabs-target="panel" data-tabs-panel="test">
+    <%= form_with url: update_path, method: :patch, class: "space-y-6" do |f| %>
+      <% @schema.each do |section_key, section| %>
+        <div class="config-section">
+          <h3 class="text-base font-semibold text-gray-900 mb-1"><%= section[:label] %></h3>
+          <div class="space-y-4 pl-4 border-l-2 border-gray-200">
+            <% section[:fields].each do |field_name, field_config| %>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  <%= field_config[:label] %>
+                </label>
+                <% current_value = @config_hash[field_name].to_s %>
+                <% masked = current_value.present? %>
+                <% if field_config[:type] == :password %>
+                  <input type="text"
+                         name="test[<%= field_name %>]"
+                         value="<%= masked ? '••••••••••••••••' : '' %>"
+                         placeholder="<%= field_config[:hint] %>"
+                         class="w-full font-mono text-sm p-2 border border-gray-300"
+                         autocomplete="off">
+                <% else %>
+                  <input type="text"
+                         name="test[<%= field_name %>]"
+                         value="<%= masked ? '••••••••••••••••' : '' %>"
+                         placeholder="<%= field_config[:hint] %>"
+                         class="w-full font-mono text-sm p-2 border border-gray-300">
+                <% end %>
+                <% if field_config[:hint] %>
+                  <p class="text-xs text-gray-500 mt-1"><%= field_config[:hint] %></p>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+        <input type="submit" value="Save Test Keys"
+               class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+      </div>
+    <% end %>
+  </div>
+
+  <%# Live tab %>
+  <div data-tabs-target="panel" data-tabs-panel="live" class="hidden">
+    <% if is_production %>
+      <%# Redirect to the existing dedicated config page for live keys %>
+      <% live_path = case @config_type
+           when 'payments'    then edit_admin_stripe_config_path
+           when 'newsletters' then edit_admin_postmark_config_path
+           when 'snipcart'    then edit_admin_snipcart_config_path
+         end %>
+      <div class="p-4 bg-blue-50 border border-blue-200 mb-4">
+        <p class="text-sm text-blue-800">
+          Live keys are stored encrypted in the database.
+          <%= link_to "Edit live keys →", live_path, class: "underline font-medium" %>
+        </p>
+      </div>
+    <% else %>
+      <div class="p-4 bg-gray-50 border border-gray-200">
+        <p class="text-sm text-gray-600">
+          Live keys are only available in production. Deploy your site and configure live keys there.
+        </p>
+      </div>
+    <% end %>
+  </div>
+</div>
