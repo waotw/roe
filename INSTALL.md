@@ -1,17 +1,102 @@
 # Roe Installation Guide
 
-## Quick Start
+## Directory Structure
 
-```bash
-# Clone the repository
-git clone git@codeberg.org:waotw/roe.git
-cd roe
+When you download Roe, you get a root folder (e.g. `/roe`) containing:
 
-# Run setup (installs dependencies, creates database, starts server)
-./bin/setup
+```
+your-roe-folder/         # Root — name this whatever you like
+  current/               # The Rails application (versioned)
+  site/                  # Your content — posts, pages, media, config
+  roe.sh                 # Server management script (see below)
+  start.command          # macOS: double-click to start the server
 ```
 
-Then visit http://localhost:3000
+`current/` and `site/` each have their own git repositories. The root
+folder is not tracked by git — rename it to anything you like.
+
+---
+
+## Quick Start
+
+### Option A: Double-click (macOS)
+
+Double-click `start.command` in the root folder. If this is your first
+time, it will run the requirements check and setup automatically, then
+start the server and open your browser.
+
+### Option B: Terminal
+
+```bash
+cd your-roe-folder
+./roe.sh check     # First time: checks requirements and guides setup
+./roe.sh start     # Start the server (after setup is complete)
+```
+
+Then visit **http://localhost:3000**
+
+---
+
+## `roe.sh` — Server Management Script
+
+All server management is done from the **root folder** via `roe.sh`.
+You never need to `cd` into `current/` for day-to-day use.
+
+### Commands
+
+```bash
+./roe.sh check      # Check system requirements and guide installation
+./roe.sh setup      # Run full setup (deps, database, config, admin user)
+./roe.sh start      # Start the development server
+./roe.sh stop       # Stop the server (Rails + Tailwind watcher)
+./roe.sh restart    # Restart the server
+./roe.sh status     # Show server status and requirements summary
+./roe.sh console    # Open Rails console
+./roe.sh update     # Check for Roe updates
+```
+
+### What `roe.sh start` does
+
+- Starts the Rails server on `http://localhost:3000`
+- Starts the Tailwind CSS watcher (dev only — recompiles CSS on changes)
+- Runs Solid Queue inside Puma for background job processing
+- Prompts to open the browser automatically
+- Manages PID files for clean stop/restart
+
+To use a different port:
+```bash
+PORT=4000 ./roe.sh start
+```
+
+### What `roe.sh check` does
+
+Interactively checks for all required dependencies and guides you through
+installing anything missing:
+
+1. Ruby 3.2.2+ (via rbenv or rvm)
+2. Git
+3. Bundler
+4. SQLite3
+5. libvips (optional, for image processing)
+
+After passing all checks, offers to run setup automatically.
+
+### What `roe.sh setup` does
+
+Runs `current/bin/setup` which:
+
+1. Installs Ruby gems (`bundle install`)
+2. Generates `config/master.key` if missing
+3. Generates Active Record Encryption keys in credentials
+4. Creates the `site/` directory structure if missing
+5. Creates and migrates all databases (main, cache, queue, cable)
+6. Generates default config files (`site.yml`, `fonts.yml`, etc.)
+7. Copies the default theme to `site/theme/`
+8. Generates default pages (`home.md`)
+9. Syncs content to the database
+10. Creates an admin user (interactive)
+11. Creates `start.command` if missing
+12. Starts the server automatically
 
 ---
 
@@ -19,26 +104,22 @@ Then visit http://localhost:3000
 
 ### Required
 
-#### 1. **Ruby 3.2.2**
+#### Ruby 3.2.2+
 
-Roe requires Ruby 3.2.2 exactly (specified in `.ruby-version`).
+Roe requires Ruby 3.2.2 or later (specified in `current/.ruby-version`).
+`roe.sh` automatically activates the correct version via rbenv or rvm
+when run from the root folder.
 
-**Option A: Using rbenv (recommended)**
+**Install via rbenv (recommended):**
 ```bash
-# Install rbenv
 brew install rbenv
-
-# Add to your shell (~/.zshrc or ~/.bash_profile)
-eval "$(rbenv init -)"
-
-# Restart terminal, then install Ruby
+eval "$(rbenv init -)"   # Add to ~/.zshrc or ~/.bash_profile
 rbenv install 3.2.2
 rbenv global 3.2.2
 ```
 
-**Option B: Using asdf**
+**Install via asdf:**
 ```bash
-# Install asdf and Ruby plugin
 brew install asdf
 asdf plugin add ruby
 asdf install ruby 3.2.2
@@ -47,147 +128,127 @@ asdf global ruby 3.2.2
 
 **Verify:**
 ```bash
-ruby --version  # Should show 3.2.2
+ruby --version  # Should show 3.2.2 or later
 ```
 
-#### 2. **Git**
+#### Git
 
 Required for cloning and the version checker.
 
 ```bash
-# macOS (usually pre-installed)
-git --version
-
-# If not installed:
-xcode-select --install
+git --version       # Usually pre-installed on macOS
+xcode-select --install  # If not installed
 ```
 
-#### 3. **Bundler**
+#### SQLite3
 
-Comes with Ruby, but verify:
+Usually pre-installed on macOS. Verify:
+```bash
+sqlite3 --version
+# If missing:
+brew install sqlite3
+```
+
+#### Bundler
+
+Comes with Ruby. If missing:
 ```bash
 gem install bundler
 ```
 
----
-
 ### Optional but Recommended
 
-#### 4. **libvips** (Image Processing)
+#### libvips (Image Processing)
 
-Needed for image variant generation (thumbnails, responsive images).
+Required for image variant generation (thumbnails, responsive images).
+Without it, image processing falls back to slower methods or skips variants.
 
 ```bash
 brew install libvips
 ```
 
-Without this, image processing will fall back to slower methods or skip variants.
-
-#### 5. **SQLite3**
-
-Usually pre-installed on macOS. Verify:
-```bash
-sqlite3 --version
-```
-
-If missing:
-```bash
-brew install sqlite3
-```
-
----
-
-## Detailed Installation
-
-### Step 1: Get Roe
-
-```bash
-# Clone from Codeberg
-git clone git@codeberg.org:waotw/roe.git
-
-# Or download ZIP from:
-# https://codeberg.org/waotw/roe/archive/main.zip
-```
-
-### Step 2: Run Setup
-
-```bash
-cd roe
-./bin/setup
-```
-
-This script will:
-- Install Ruby gems
-- Generate master.key for encryption
-- Create Active Record encryption keys
-- Set up the site directory structure
-- Create and migrate the database
-- Generate default configuration files
-- Copy default theme
-- Create an admin user
-- Start the development server
-
-### Step 3: Access the Site
-
-- **Public site:** http://localhost:3000
-- **Admin panel:** http://localhost:3000/admin
-- **Login credentials:** Displayed at end of setup
-
 ---
 
 ## Post-Setup Configuration
 
-### 1. Configure Integrations (Optional)
+### 1. Configure your site
 
-**Test Environment** (development):
-```bash
-# Edit test API keys
-vim site/system/integrations/stripe.yml
-vim site/system/integrations/postmark.yml
-vim site/system/integrations/snipcart.yml
+Edit `site/system/global/site.yml` — or use **Admin → Settings → site.yml**:
+
+```yaml
+title: "My Site"
+url: "https://mysite.com"
+author: "Your Name"
+author_email: "you@example.com"
 ```
 
-**Production**:
-- Go to Admin → Settings → Integrations
-- Enter live API keys (stored encrypted in database)
+### 2. Configure integrations (optional)
 
-### 2. Configure Site Settings
+Integrations are managed in **Admin → Settings → Integrations**.
+
+Test keys are saved to YAML files in `site/system/integrations/` and
+work in all environments. Live keys are stored encrypted in the database
+and are only saved in production.
+
+| Integration | Feature | Test config file |
+|---|---|---|
+| Stripe | Payments | `site/system/integrations/payments.yml` |
+| Postmark | Newsletters/email | `site/system/integrations/newsletters.yml` |
+| Snipcart | Store | `site/system/integrations/snipcart.yml` |
+
+### 3. Customize your theme
+
+Edit `site/theme/default.css` or create a new theme file and activate
+it in **Admin → Settings → site.yml → Theme**.
+
+---
+
+## For Developers
+
+If you're working on the Roe application itself, you can work directly
+in `current/` using standard Rails commands:
 
 ```bash
-vim site/system/global/site.yml
+cd current
+
+bin/dev              # Start server + Tailwind watcher via foreman
+bin/rails console    # Rails console
+bin/rails test       # Run test suite
+bin/rubocop          # Lint
 ```
 
-Set your site name, description, author info, etc.
-
-### 3. Customize Theme
-
-Edit `site/theme/default.css` or create new theme files.
+Note: `bin/dev` requires `foreman` to be installed:
+```bash
+gem install foreman
+```
 
 ---
 
 ## Troubleshooting
 
 ### "Ruby version mismatch"
-Install Ruby 3.2.2 using rbenv/asdf (see Prerequisites)
+Ensure rbenv/rvm is initialised in your shell and the correct version
+is installed. `roe.sh` reads `current/.ruby-version` and activates it
+automatically.
 
 ### "bundle install fails"
-Ensure you have the correct Ruby version and bundler:
 ```bash
+cd current
 gem install bundler
 bundle install
 ```
 
 ### "master.key missing"
-The setup script generates this automatically. If you need to regenerate:
+`roe.sh setup` generates this automatically. To regenerate manually:
 ```bash
-rm config/master.key
-bin/rails credentials:edit
+cd current
+ruby -e "require 'securerandom'; File.write('config/master.key', SecureRandom.hex(16))"
 ```
 
-### "Permission denied (SSH)" when checking updates
-Version checker needs SSH access to Codeberg. Ensure your SSH key is added:
+### "AR Encryption keys missing"
+Run setup again — it detects and generates these automatically:
 ```bash
-ssh-add ~/.ssh/id_ed25519  # or your key
+./roe.sh setup
 ```
 
 ### Images not generating variants
@@ -196,57 +257,52 @@ Install libvips:
 brew install libvips
 ```
 
+### Server won't stop
+```bash
+./roe.sh stop       # Stops Rails server + Tailwind watcher
+./roe.sh status     # Check what's running
+```
+
 ---
 
 ## Development vs Production
 
-### Development
-- Test API keys in `site/system/integrations/*.yml`
-- SQLite database
-- Letter opener for email preview
-- File-based content in `site/`
-
-### Production
-- Live API keys in encrypted database
-- Can use SQLite or PostgreSQL
-- Postmark for email (or configure SMTP)
-- Same file-based content structure
+| | Development | Production |
+|---|---|---|
+| API keys | Test keys in `site/system/integrations/*.yml` | Live keys encrypted in database |
+| Email | Letter opener (preview in browser) | Postmark |
+| Database | SQLite in `site/db/development/` | SQLite in `site/db/` |
+| Assets | Tailwind watcher rebuilds on change | Pre-compiled at deploy |
+| Content | Edit files in `site/` directly | Sync from dev via Site Sync |
 
 ---
 
-## Next Steps
+## Deployment
 
-1. **Create your first post:**
-   ```bash
-   vim site/posts/hello-world.md
-   ```
+Roe supports two deployment targets:
 
-2. **Customize your homepage:**
-   ```bash
-   vim site/pages/home.md
-   ```
+- **Kamal** — self-hosted on any VPS (DigitalOcean, Hetzner, etc.)
+- **Fly.io** — managed cloud deployment
 
-3. **Set up payments** (optional):
-   - Configure Stripe in Admin → Settings → Integrations
-   - Create products in `site/products/`
+Configure in **Admin → Settings → deploy.yml**, then deploy from
+**Admin → Updates & Deploy**.
 
-4. **Deploy to production:**
-   - Admin → Updates & Deploy
-   - Choose Kamal (self-hosted) or Fly.io
+See `docs/` for detailed deployment guides.
 
 ---
 
 ## System Requirements
 
-- **macOS:** 10.15+ (Catalina or later)
-- **Linux:** Ubuntu 20.04+ or similar
-- **RAM:** 4GB minimum, 8GB recommended
-- **Disk:** 2GB for Roe + content
+| | Minimum | Recommended |
+|---|---|---|
+| macOS | 10.15 (Catalina) | 13+ (Ventura) |
+| Linux | Ubuntu 20.04 | Ubuntu 22.04+ |
+| RAM | 2GB | 4GB+ |
+| Disk | 1GB | 5GB+ (for media) |
 
 ---
 
 ## Getting Help
 
-- **Documentation:** See `AGENTS.md` in the repository
+- **Documentation:** `current/docs/` and `current/AGENTS.md`
 - **Issues:** https://codeberg.org/waotw/roe/issues
-- **Discussions:** Check the Codeberg repository discussions
