@@ -101,7 +101,7 @@ module SiteFeature
   # ── Payments mode / memberships / donations ─────────────────────────────
 
   def payments_mode
-    return nil unless payments_enabled?
+    return nil unless payments_feature_enabled?
     SiteConfig.feature('members', 'payments.mode').presence || 'memberships'
   end
 

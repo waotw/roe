@@ -170,14 +170,18 @@ class Post < ApplicationRecord
 
   # Class method to get all unique tags efficiently
   def self.all_tags
-    # Get all tag arrays, flatten, and uniquify
-    select("json_extract(metadata, '$.tags') as tag_json")
-      .where("json_extract(metadata, '$.tags') IS NOT NULL")
-      .map { |p| JSON.parse(p.tag_json) rescue [] }
-      .flatten
-      .uniq
-      .compact
-      .sort
+    # Load all posts and extract tags from the already-parsed metadata hash.
+    # Using json_extract + JSON.parse was unreliable because SQLite may return
+    # the tags array in different forms depending on how it was stored.
+    # Reading from post.metadata directly is always correct.
+    all.flat_map { |p|
+      tags = p.metadata['tags']
+      case tags
+      when Array  then tags
+      when String then tags.gsub(/[\[\]"']/, '').split(',').map(&:strip)
+      else []
+      end
+    }.reject(&:blank?).uniq.sort
   end
 
   def tags

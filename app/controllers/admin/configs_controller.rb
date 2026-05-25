@@ -776,7 +776,8 @@ class Admin::ConfigsController < ApplicationController
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
     existing['test'] ||= {}
-    test_data.each { |k, v| existing['test'][k] = v if v.present? }
+    # Skip masked placeholder values — user didn't change those fields
+    test_data.each { |k, v| existing['test'][k] = v if v.present? && v != '•' * 16 }
 
     File.write(path, existing.to_yaml)
     SiteConfig.sync_from_file('integrations/payments')
@@ -819,7 +820,7 @@ class Admin::ConfigsController < ApplicationController
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
     existing['test'] ||= {}
-    test_data.each { |k, v| existing['test'][k] = v if v.present? }
+    test_data.each { |k, v| existing['test'][k] = v if v.present? && v != '•' * 16 }
 
     File.write(path, existing.to_yaml)
     SiteConfig.sync_from_file('integrations/newsletters')
@@ -860,7 +861,7 @@ class Admin::ConfigsController < ApplicationController
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
     existing['test'] ||= {}
-    test_data.each { |k, v| existing['test'][k] = v if v.present? }
+    test_data.each { |k, v| existing['test'][k] = v if v.present? && v != '•' * 16 }
 
     File.write(path, existing.to_yaml)
     SiteConfig.sync_from_file('integrations/snipcart')

@@ -18,7 +18,10 @@ class StripeConfig < ApplicationRecord
   # ── Singleton ────────────────────────────────────────────────────────────
 
   def self.current
-    first_or_create!(mode: :test)
+    record = first_or_create!(mode: :test)
+    # Dev is always test mode — prevent live mode from persisting locally
+    record.update_column(:mode, 0) if Rails.env.development? && record.mode_live?
+    record
   end
 
   # ── Test key accessors (file first, DB fallback) ─────────────────────────
@@ -91,13 +94,16 @@ class StripeConfig < ApplicationRecord
   def verify!
     return false unless keys_present?
 
-    Stripe::Account.retrieve(nil, api_key: current_secret_key)
+    # Balance.retrieve is the lightest auth check — works with any valid
+    # secret key without needing a connected account.
+    Stripe.api_key = current_secret_key
+    Stripe::Balance.retrieve
     update_column(:verified_at, Time.current)
     true
   rescue Stripe::AuthenticationError
     update_column(:verified_at, nil)
     false
-  rescue Stripe::StripeError => e
+  rescue => e
     Rails.logger.error "Stripe verification failed: #{e.message}"
     update_column(:verified_at, nil)
     false
@@ -124,7 +130,8 @@ class StripeConfig < ApplicationRecord
   def fetch_currency!
     return unless keys_present?
 
-    account = Stripe::Account.retrieve(nil, api_key: current_secret_key)
+    Stripe.api_key = current_secret_key
+    account = Stripe::Account.retrieve
     update!(currency: account.default_currency)
   rescue Stripe::StripeError => e
     Rails.logger.error "Failed to fetch Stripe currency: #{e.message}"

@@ -451,6 +451,35 @@ module HasMarkdownExtensions
     post_type = config[:post_type]
     post_type = nil if post_type == "all"
 
+    # Validate tags in dev — warn about tags that don't exist on any post
+    tag_warning = ""
+    if Rails.env.development? && tags.present?
+      requested = tags.split(',').map(&:strip)
+                      .reject { |t| t.start_with?('-') }  # ignore exclusions
+      existing  = Post.all_tags
+      unknown   = requested.reject { |t| existing.include?(t) }
+      if unknown.any?
+        return dev_warning(
+          "Unknown tag#{'s' if unknown.size > 1}",
+          "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any post.",
+          "Existing tags: #{existing.any? ? existing.join(', ') : '(none yet)'}. " \
+          "Add the tag to at least one post's metadata and that post will show up in this collection."
+        )
+      end
+    end
+
+    # Validate post_type in dev — catches typos like 'articles' instead of 'article'
+    if Rails.env.development? && post_type.present? && source == 'posts'
+      valid_types = Post.post_type_options
+      unless valid_types.include?(post_type)
+        return dev_warning(
+          "Unknown post_type",
+          "'#{post_type}' is not a recognised post type.",
+          "Valid types: #{valid_types.join(', ')}"
+        )
+      end
+    end
+
     # Get base collection
     items = case source
     when 'posts'
@@ -473,6 +502,12 @@ module HasMarkdownExtensions
       collection = apply_tag_filters(collection, tags) if tags
       collection
     else
+      if Rails.env.development?
+        valid = %w[posts pages documentation products]
+        return dev_warning("Unknown collection source",
+          "'#{source}' is not a valid source.",
+          "Valid sources: #{valid.join(', ')}")
+      end
       []
     end
 
@@ -534,7 +569,7 @@ module HasMarkdownExtensions
     output << ""
     output << '</div>'
 
-    output.join("\n")
+    tag_warning + output.join("\n")
   end
 
   def apply_collection_order(items, order_by)
@@ -1213,8 +1248,11 @@ module HasMarkdownExtensions
         # Override with any explicitly provided values
         config = post_data.merge(config.except(:post))
       else
-        # Post not found - render error card
-        return preview ? render_error_card("Post not found: #{config[:post]}") : ''
+        # Post not found - render error card in preview, dev warning otherwise
+        return render_error_card("Post not found: #{config[:post]}") if preview
+        return dev_warning("Post not found",
+          "No post with slug '#{config[:post]}' exists.",
+          "Check the url_name in the post's front matter.")
       end
     end
 
@@ -1386,7 +1424,7 @@ module HasMarkdownExtensions
         render_form(form_config)
       rescue => e
         Rails.logger.error "Form YAML parsing error: #{e.message}"
-        ""
+        dev_warning("Form YAML parse error", e.message, yaml_content.strip)
       end
     end
   end
@@ -1414,11 +1452,12 @@ module HasMarkdownExtensions
     when 'donate'
       render_donate_form(button_text)
     else
-      ""
+      dev_warning("Unknown form type", "'#{form_type}' is not a recognised form type.",
+        "Valid types: signup, signin, checkout, donate, unsubscribe, paid_content")
     end
   rescue => e
     Rails.logger.error "Form rendering error: #{e.message}"
-    ""
+    dev_warning("Form rendering error", e.message)
   end
 
   def default_button_text(form_type)
@@ -1431,7 +1470,21 @@ module HasMarkdownExtensions
   end
 
   def render_donate_form(button_text)
-    return "" unless SiteFeature.donations_enabled?
+    unless SiteFeature.donations_enabled?
+      if Rails.env.development?
+        reason = if !SiteFeature.payments_feature_enabled?
+          "payments not enabled in members.yml"
+        elsif !SiteFeature.payments_mode&.in?(%w[donations both])
+          "payments.mode in members.yml must be 'donations' or 'both' (currently '#{SiteFeature.payments_mode}')"
+        elsif !StripeConfig.current.keys_present?
+          "Stripe keys not configured — add them in Admin → Settings → Integrations"
+        else
+          "donations not enabled"
+        end
+        return dev_warning("Donate form unavailable", reason)
+      end
+      return ""
+    end
 
     currency = (StripeConfig.current.currency.presence || "usd").upcase
 
@@ -1614,6 +1667,16 @@ module HasMarkdownExtensions
         }
       rescue => e
         Rails.logger.error "Button parsing error: #{e.message}"
+        # Replace the failed button block with a dev warning
+        if Rails.env.development?
+          buttons << {
+            config: {},
+            start_pos: start_pos,
+            end_pos: end_pos,
+            error: e.message,
+            raw: config_text.strip
+          }
+        end
       end
     end
 
@@ -1649,7 +1712,16 @@ module HasMarkdownExtensions
         authenticated: preview
       }
 
-      if group.length > 1
+      # Check if any button in the group has a parse error
+      if group.any? { |b| b[:error] }
+        rendered = group.map do |btn|
+          if btn[:error]
+            dev_warning("Button parse error", btn[:error], btn[:raw])
+          else
+            ProductButtonRenderer.render(btn[:config], context)
+          end
+        end.join("\n")
+      elsif group.length > 1
         # Multiple consecutive buttons - render as variant list
         skus = group.map { |b| b[:config]['sku'] }.compact
         if skus.length > 1
@@ -1687,5 +1759,22 @@ module HasMarkdownExtensions
       end
     end
     config
+  end
+
+  # Renders an amber dev-only warning box.
+  # Silent (returns "") in production so no debug info leaks.
+  #
+  #   dev_warning("Title", "What went wrong", "optional hint or context")
+  #
+  def dev_warning(title, message, hint = nil)
+    return "" unless Rails.env.development?
+
+    hint_html = hint ? "<br><span style='color:#78350f'>#{CGI.escapeHTML(hint.to_s)}</span>" : ""
+    <<~HTML
+      <div style="border:2px dashed #f59e0b;padding:0.75rem 1rem;font-family:monospace;font-size:0.8rem;color:#92400e;background:#fffbeb;margin:0.5rem 0;">
+        <strong>⚠️ #{CGI.escapeHTML(title)}</strong><br>
+        #{CGI.escapeHTML(message.to_s)}#{hint_html}
+      </div>
+    HTML
   end
 end
