@@ -9,7 +9,7 @@ puts "=" * 60
 existing_user = User.first
 if existing_user
   puts "\n⚠️  Admin user already exists: #{existing_user.email_address}"
-  print "Do you want to reset the password? (y/N): "
+  print "Do you want to reset the password? (y/n): "
   response = gets.chomp.downcase
 
   unless response == 'y' || response == 'yes'

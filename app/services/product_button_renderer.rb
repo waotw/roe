@@ -196,7 +196,7 @@ class ProductButtonRenderer
     attr_string = attrs.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ')
 
     <<~HTML.strip
-      <button class="snipcart-add-item button-#{ERB::Util.html_escape(style)}"
+      <button class="snipcart-add-item btn-#{ERB::Util.html_escape(style)}"
               data-turbo="false"
               #{attr_string}>
         #{ERB::Util.html_escape(text)}

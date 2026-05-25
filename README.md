@@ -2,6 +2,18 @@
 
 Roe is a file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store.
 
+## Installation
+
+**Prerequisites:** Ruby 3.2.2, Git
+
+```bash
+git clone git@codeberg.org:waotw/roe.git
+cd roe
+./bin/setup
+```
+
+See [INSTALL.md](INSTALL.md) for detailed installation instructions and troubleshooting.
+
 ## Directory Structure
 
 This is a **versioned** Roe installation:

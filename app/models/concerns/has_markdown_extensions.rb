@@ -876,7 +876,7 @@ module HasMarkdownExtensions
         # View button for grouped products - only render if button text is set
         if grouped_button_text.present?
           primary_for_link = find_primary_product(group_products) || display_product
-          output << %Q(      <a href="#{item_path(primary_for_link)}" class="grid-item-button">#{grouped_button_text}</a>)
+          output << %Q(      <a href="#{item_path(primary_for_link)}" class="btn-primary btn--grid">#{grouped_button_text}</a>)
         end
       else
         # Single product - show individual price and Add to Cart
@@ -891,7 +891,7 @@ module HasMarkdownExtensions
           domain = SiteConfig.feature('store', 'default_domain')
           validation_url = domain ? "https://#{domain}#{product_url}" : product_url
 
-          output << %Q(      <button class="snipcart-add-item grid-item-button")
+          output << %Q(      <button class="snipcart-add-item btn-primary btn--grid")
           output << %Q(              data-turbo="false")
           output << %Q(              data-item-id="#{display_product.sku}")
           output << %Q(              data-item-name="#{display_product.title}")
