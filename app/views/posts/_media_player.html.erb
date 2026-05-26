@@ -15,7 +15,7 @@
       '[]'
     end
   %>
-  <div class="audio-player"
+  <div class="player audio-player"
        data-controller="audio-player"
        data-audio-player-type-value="audio"
        data-audio-player-skip-seconds-value="15"
@@ -31,7 +31,7 @@
       <% end %>
     </audio>
     <%# Top row: artwork + title + now playing chapter %>
-    <div class="audio-player__header">
+    <div class="player-header">
       <%# Player artwork is a small UI thumbnail — `small` variant is enough.
           image_variant_path falls through to the source path when the variant
           doesn't exist (e.g. /system/images/* podcast cover art that lives
@@ -39,18 +39,18 @@
       <% if podcast_artwork.present? %>
         <img src="<%= image_variant_path(podcast_artwork, :small) %>"
              alt="<%= podcast_config['title'] %>"
-             class="audio-player__artwork"
+             class="player-artwork"
              data-audio-player-target="artwork">
       <% elsif post.metadata['image'].present? %>
         <img src="<%= image_variant_path(post.metadata['image'], :small) %>"
              alt="<%= post.title %>"
-             class="audio-player__artwork"
+             class="player-artwork"
              data-audio-player-target="artwork">
       <% end %>
-      <div class="audio-player__info">
-        <div class="audio-player__title" data-audio-player-target="title"><%= post.title %></div>
+      <div class="player-info">
+        <div class="player-title" data-audio-player-target="title"><%= post.title %></div>
         <% if post.metadata['episode_number'].present? || post.metadata['season'].present? %>
-          <div class="audio-player__episode-meta">
+          <div class="episode-meta">
             <% if post.metadata['season'].present? %>
               <span>S<%= post.metadata['season'] %></span>
             <% end %>
@@ -59,20 +59,20 @@
             <% end %>
           </div>
         <% end %>
-        <div class="audio-player__now-playing" data-audio-player-target="nowPlaying"></div>
+        <div class="now-playing" data-audio-player-target="nowPlaying"></div>
       </div>
     </div>
     <%# Progress bar %>
-    <div class="audio-player__progress"
+    <div class="player-progress"
          data-audio-player-target="progressBar"
          data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub">
-      <div class="audio-player__progress-fill" data-audio-player-target="progressFill"></div>
-      <div class="audio-player__progress-handle" data-audio-player-target="progressHandle"></div>
+      <div class="progress-fill" data-audio-player-target="progressFill"></div>
+      <div class="progress-handle" data-audio-player-target="progressHandle"></div>
     </div>
     <%# Time display %>
-    <div class="audio-player__time">
-      <span class="audio-player__current-time" data-audio-player-target="currentTime">0:00</span>
-      <span class="audio-player__duration" data-audio-player-target="duration">
+    <div class="player-time">
+      <span class="current-time" data-audio-player-target="currentTime">0:00</span>
+      <span class="duration" data-audio-player-target="duration">
         <% if post.duration.present? %>
           <%= format_duration(post.duration) %>
         <% else %>
@@ -81,28 +81,28 @@
       </span>
     </div>
     <%# Controls %>
-    <div class="audio-player__controls">
-      <div class="audio-player__btn-wrapper">
+    <div class="player-controls">
+      <div class="btn-wrapper">
         <%# Prev episode %>
         <% if prev_episode %>
           <a href="<%= post_path(prev_episode.url_name) %>"
-            class="audio-player__btn audio-player__btn--episode audio-player__btn--prev"
+            class="player-btn btn-episode btn-prev"
             title="<%= prev_episode.title %>">
-            <span class="audio-player__episode-nav-title"><%= prev_episode.title %></span>
             <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 12.4512 11.8652">
             <g>
               <rect height="11.8652" opacity="0" width="12.4512" x="0" y="0"/>
               <path d="M12.0898 10.7129L12.0898 1.14258C12.0898 0.371094 11.6504 0 11.123 0C10.8789 0 10.6348 0.0683594 10.3906 0.205078L2.35352 4.85352C1.69922 5.23438 1.46484 5.50781 1.46484 5.92773C1.46484 6.34766 1.69922 6.62109 2.35352 7.00195L10.3906 11.6504C10.6348 11.7871 10.8789 11.8555 11.123 11.8555C11.6504 11.8555 12.0898 11.4844 12.0898 10.7129ZM10.6836 9.9707C10.6836 10.0488 10.6348 10.1074 10.5664 10.1074C10.5371 10.1074 10.5078 10.0977 10.4883 10.0879L3.55469 6.03516C3.49609 6.00586 3.47656 5.9668 3.47656 5.92773C3.47656 5.88867 3.49609 5.84961 3.55469 5.82031L10.4883 1.76758C10.5078 1.75781 10.5371 1.74805 10.5664 1.74805C10.6348 1.74805 10.6836 1.80664 10.6836 1.88477ZM0.751953 11.8555C1.17188 11.8555 1.50391 11.5332 1.50391 11.123L1.50391 0.732422C1.50391 0.322266 1.17188 0 0.751953 0C0.332031 0 0 0.322266 0 0.732422L0 11.123C0 11.5332 0.332031 11.8555 0.751953 11.8555Z" fill="currentColor" fill-opacity="0.85"/>
             </g>
             </svg>
+            <span class="episode-nav-title"><%= prev_episode.title %></span>
           </a>
         <% else %>
-          <span class="audio-player__btn audio-player__btn--episode audio-player__btn--prev is-disabled"></span>
+          <span class="player-btn btn-episode btn-prev is-disabled"></span>
         <% end %>
       </div>
-      <div class="audio-player__controls-center">
+      <div class="controls-center">
         <button type="button"
-                class="audio-player__btn audio-player__btn--skip"
+                class="player-btn btn-skip"
                 data-action="click->audio-player#skipBack"
                 aria-label="Skip back 15 seconds"
                 title="Skip back 15 seconds">
@@ -111,20 +111,20 @@
             <path d="M7.88285 3.36364V15H5.42262V5.69886H5.35444L2.68967 7.36932V5.1875L5.57035 3.36364H7.88285ZM14.8985 15.1591C14.0954 15.1591 13.3795 15.0114 12.7507 14.7159C12.1257 14.4205 11.6295 14.0133 11.2621 13.4943C10.8947 12.9754 10.7034 12.3807 10.6882 11.7102H13.0746C13.1011 12.161 13.2905 12.5265 13.6428 12.8068C13.9951 13.0871 14.4136 13.2273 14.8985 13.2273C15.2848 13.2273 15.6257 13.142 15.9212 12.9716C16.2204 12.7973 16.4534 12.5568 16.6201 12.25C16.7905 11.9394 16.8757 11.5833 16.8757 11.1818C16.8757 10.7727 16.7886 10.4129 16.6144 10.1023C16.4439 9.79167 16.2072 9.54924 15.9042 9.375C15.6011 9.20076 15.2545 9.11174 14.8644 9.10795C14.5235 9.10795 14.192 9.17803 13.8701 9.31818C13.5519 9.45833 13.3038 9.64962 13.1257 9.89205L10.9382 9.5L11.4894 3.36364H18.603V5.375H13.5178L13.2167 8.28977H13.2848C13.4894 8.00189 13.7981 7.76326 14.211 7.57386C14.6239 7.38447 15.086 7.28977 15.5973 7.28977C16.2981 7.28977 16.9231 7.45455 17.4723 7.78409C18.0216 8.11364 18.4553 8.56629 18.7735 9.14205C19.0917 9.71402 19.2489 10.3731 19.2451 11.1193C19.2489 11.9034 19.067 12.6004 18.6996 13.2102C18.336 13.8163 17.8265 14.2936 17.1712 14.642C16.5197 14.9867 15.7621 15.1591 14.8985 15.1591Z" fill="currentColor"/>
             </svg>
         </button>
-        <button class="audio-player__btn audio-player__btn--play"
+        <button class="player-btn btn-play"
                 data-action="click->audio-player#togglePlay"
           data-audio-player-target="playButton"
           data-playing="false"
           aria-label="Play">
-          <svg class="audio-player__icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <svg class="audio-player__icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
           </svg>
         </button>
         <button type="button"
-                class="audio-player__btn audio-player__btn--skip"
+                class="player-btn btn-skip"
                 data-action="click->audio-player#skipForward"
                 aria-label="Skip forward 15 seconds"
                 title="Skip forward 15 seconds">
@@ -134,19 +134,19 @@
             </svg>
         </button>
       </div>
-      <button class="audio-player__btn audio-player__btn--speed"
+      <button class="player-btn btn-speed"
               data-action="click->audio-player#cycleSpeed"
         data-audio-player-target="speedButton"
         aria-label="Playback speed: 1x">
         1×
       </button>
       <%# Next episode %>
-      <div class="audio-player__btn-wrapper">
+      <div class="btn-wrapper">
         <% if next_episode %>
           <a href="<%= post_path(next_episode.url_name) %>"
-            class="audio-player__btn audio-player__btn--episode audio-player__btn--next"
+            class="player-btn btn-episode btn-next"
             title="<%= next_episode.title %>">
-            <span class="audio-player__episode-nav-title"><%= next_episode.title %></span>
+            <span class="episode-nav-title"><%= next_episode.title %></span>
             <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 12.4512 11.8652">
             <g>
               <rect height="11.8652" opacity="0" width="12.4512" x="0" y="0"/>
@@ -155,67 +155,67 @@
             </svg>
           </a>
         <% else %>
-          <span class="audio-player__btn audio-player__btn--episode audio-player__btn--next is-disabled"></span>
+          <span class="player-btn btn-episode btn-next is-disabled"></span>
         <% end %>
       </div>
     </div>
     <%# Chapters (only rendered if chapters data exists) %>
     <% if post.metadata['chapters'].present? %>
-      <div class="audio-player__chapters">
-        <div class="audio-player__chapters-heading">Chapters</div>
-        <ol class="audio-player__chapter-list" data-audio-player-target="chapterList">
+      <div class="player-chapters">
+        <div class="chapters-heading">Chapters</div>
+        <ol class="chapter-list" data-audio-player-target="chapterList">
           <%# Rendered by JS from data-audio-player-chapters attribute %>
         </ol>
       </div>
     <% end %>
   </div>
 <% elsif (post.post_type == 'video' || post.post_type == 'podcast') && post.video.present? %>
-  <div class="audio-player video-player"
+  <div class="player video-player"
        data-controller="audio-player"
        data-audio-player-type-value="video"
        data-audio-player-skip-seconds-value="15">
     <video data-audio-player-target="video"
            preload="metadata"
-           class="audio-player__video">
+           class="player-video">
       <source src="<%= post.video %>" type="video/mp4">
       <source src="<%= post.video %>" type="video/webm">
       <source src="<%= post.video %>" type="video/ogg">
       Your browser doesn't support video playback.
     </video>
     <%# Progress bar %>
-    <div class="audio-player__progress"
+    <div class="player-progress"
          data-audio-player-target="progressBar"
          data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub">
-      <div class="audio-player__progress-fill" data-audio-player-target="progressFill"></div>
-      <div class="audio-player__progress-handle" data-audio-player-target="progressHandle"></div>
+      <div class="progress-fill" data-audio-player-target="progressFill"></div>
+      <div class="progress-handle" data-audio-player-target="progressHandle"></div>
     </div>
     <%# Time display %>
-    <div class="audio-player__time">
-      <span class="audio-player__current-time" data-audio-player-target="currentTime">0:00</span>
-      <span class="audio-player__duration" data-audio-player-target="duration">&mdash;</span>
+    <div class="player-time">
+      <span class="current-time" data-audio-player-target="currentTime">0:00</span>
+      <span class="duration" data-audio-player-target="duration">&mdash;</span>
     </div>
-    <div class="audio-player__controls">
-      <div class="audio-player__btn-wrapper">
+    <div class="player-controls">
+      <div class="btn-wrapper">
         <%# Prev episode %>
         <% if prev_episode %>
           <a href="<%= post_path(prev_episode.url_name) %>"
-            class="audio-player__btn audio-player__btn--episode audio-player__btn--prev"
+            class="player-btn btn-episode btn-prev"
             title="<%= prev_episode.title %>">
-            <span class="audio-player__episode-nav-title"><%= prev_episode.title %></span>
             <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 12.4512 11.8652">
             <g>
               <rect height="11.8652" opacity="0" width="12.4512" x="0" y="0"/>
               <path d="M12.0898 10.7129L12.0898 1.14258C12.0898 0.371094 11.6504 0 11.123 0C10.8789 0 10.6348 0.0683594 10.3906 0.205078L2.35352 4.85352C1.69922 5.23438 1.46484 5.50781 1.46484 5.92773C1.46484 6.34766 1.69922 6.62109 2.35352 7.00195L10.3906 11.6504C10.6348 11.7871 10.8789 11.8555 11.123 11.8555C11.6504 11.8555 12.0898 11.4844 12.0898 10.7129ZM10.6836 9.9707C10.6836 10.0488 10.6348 10.1074 10.5664 10.1074C10.5371 10.1074 10.5078 10.0977 10.4883 10.0879L3.55469 6.03516C3.49609 6.00586 3.47656 5.9668 3.47656 5.92773C3.47656 5.88867 3.49609 5.84961 3.55469 5.82031L10.4883 1.76758C10.5078 1.75781 10.5371 1.74805 10.5664 1.74805C10.6348 1.74805 10.6836 1.80664 10.6836 1.88477ZM0.751953 11.8555C1.17188 11.8555 1.50391 11.5332 1.50391 11.123L1.50391 0.732422C1.50391 0.322266 1.17188 0 0.751953 0C0.332031 0 0 0.322266 0 0.732422L0 11.123C0 11.5332 0.332031 11.8555 0.751953 11.8555Z" fill="currentColor" fill-opacity="0.85"/>
             </g>
             </svg>
+            <span class="episode-nav-title"><%= prev_episode.title %></span>
           </a>
         <% else %>
-          <span class="audio-player__btn audio-player__btn--episode audio-player__btn--prev is-disabled"></span>
+          <span class="player-btn btn-episode btn-prev is-disabled"></span>
         <% end %>
       </div>
-      <div class="audio-player__controls-center">
+      <div class="controls-center">
         <button type="button"
-                class="audio-player__btn audio-player__btn--skip"
+                class="player-btn btn-skip"
                 data-action="click->audio-player#skipBack"
                 aria-label="Skip back 15 seconds"
                 title="Skip back 15 seconds">
@@ -224,20 +224,20 @@
             <path d="M7.88285 3.36364V15H5.42262V5.69886H5.35444L2.68967 7.36932V5.1875L5.57035 3.36364H7.88285ZM14.8985 15.1591C14.0954 15.1591 13.3795 15.0114 12.7507 14.7159C12.1257 14.4205 11.6295 14.0133 11.2621 13.4943C10.8947 12.9754 10.7034 12.3807 10.6882 11.7102H13.0746C13.1011 12.161 13.2905 12.5265 13.6428 12.8068C13.9951 13.0871 14.4136 13.2273 14.8985 13.2273C15.2848 13.2273 15.6257 13.142 15.9212 12.9716C16.2204 12.7973 16.4534 12.5568 16.6201 12.25C16.7905 11.9394 16.8757 11.5833 16.8757 11.1818C16.8757 10.7727 16.7886 10.4129 16.6144 10.1023C16.4439 9.79167 16.2072 9.54924 15.9042 9.375C15.6011 9.20076 15.2545 9.11174 14.8644 9.10795C14.5235 9.10795 14.192 9.17803 13.8701 9.31818C13.5519 9.45833 13.3038 9.64962 13.1257 9.89205L10.9382 9.5L11.4894 3.36364H18.603V5.375H13.5178L13.2167 8.28977H13.2848C13.4894 8.00189 13.7981 7.76326 14.211 7.57386C14.6239 7.38447 15.086 7.28977 15.5973 7.28977C16.2981 7.28977 16.9231 7.45455 17.4723 7.78409C18.0216 8.11364 18.4553 8.56629 18.7735 9.14205C19.0917 9.71402 19.2489 10.3731 19.2451 11.1193C19.2489 11.9034 19.067 12.6004 18.6996 13.2102C18.336 13.8163 17.8265 14.2936 17.1712 14.642C16.5197 14.9867 15.7621 15.1591 14.8985 15.1591Z" fill="currentColor"/>
             </svg>
         </button>
-        <button class="audio-player__btn audio-player__btn--play"
+        <button class="player-btn btn-play"
                 data-action="click->audio-player#togglePlay"
           data-audio-player-target="playButton"
           data-playing="false"
           aria-label="Play">
-          <svg class="audio-player__icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <svg class="audio-player__icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
           </svg>
         </button>
         <button type="button"
-                class="audio-player__btn audio-player__btn--skip"
+                class="player-btn btn-skip"
                 data-action="click->audio-player#skipForward"
                 aria-label="Skip forward 15 seconds"
                 title="Skip forward 15 seconds">
@@ -247,19 +247,19 @@
             </svg>
         </button>
       </div>
-      <button class="audio-player__btn audio-player__btn--speed"
+      <button class="player-btn btn-speed"
               data-action="click->audio-player#cycleSpeed"
         data-audio-player-target="speedButton"
         aria-label="Playback speed: 1x">
         1×
       </button>
       <%# Next episode %>
-      <div class="audio-player__btn-wrapper">
+      <div class="btn-wrapper">
         <% if next_episode %>
           <a href="<%= post_path(next_episode.url_name) %>"
-            class="audio-player__btn audio-player__btn--episode audio-player__btn--next"
+            class="player-btn btn-episode btn-next"
             title="<%= next_episode.title %>">
-            <span class="audio-player__episode-nav-title"><%= next_episode.title %></span>
+            <span class="episode-nav-title"><%= next_episode.title %></span>
             <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 12.4512 11.8652">
             <g>
               <rect height="11.8652" opacity="0" width="12.4512" x="0" y="0"/>
@@ -268,7 +268,7 @@
             </svg>
           </a>
         <% else %>
-          <span class="audio-player__btn audio-player__btn--episode audio-player__btn--next is-disabled"></span>
+          <span class="player-btn btn-episode btn-next is-disabled"></span>
         <% end %>
       </div>
     </div>

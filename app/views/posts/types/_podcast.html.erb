@@ -7,11 +7,11 @@
 <div class="podcast-episode">
 
   <% has_cover = post.metadata['image'].present? %>
-  <div class="podcast-episode__hero <%= 'podcast-episode__hero--no-cover' unless has_cover %>">
+  <div class="podcast-hero <%= 'no-cover' unless has_cover %>">
     <% if has_cover %>
-      <%= raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title, class: "podcast-episode__cover") %>
+      <%# raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title, class: "podcast-hero-cover") %>
     <% end %>
-    <div class="podcast-episode__player-overlay">
+    <div class="hero-player">
       <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
     </div>
   </div>
@@ -44,27 +44,27 @@
   <% end %>
 
   <% if @podcast_episodes.present? && @podcast_episodes.length > 1 %>
-    <div class="podcast-episode__list">
-      <h2 class="podcast-episode__list-heading">All Episodes</h2>
-      <ol class="podcast-episode__episodes">
+    <div class="episode-list">
+      <h2 class="episode-list-heading">All Episodes</h2>
+      <ol class="episodes">
         <% @podcast_episodes.each do |episode| %>
-          <li class="podcast-episode__episodes-item <%= 'is-current' if episode.url_name == post.url_name %>">
-            <a href="<%= post_path(episode.url_name) %>" class="podcast-episode__episodes-link">
-              <div class="podcast-episode__episodes-meta">
+          <li class="episode-item <%= 'is-current' if episode.url_name == post.url_name %>">
+            <a href="<%= post_path(episode.url_name) %>" class="episode-link">
+              <div class="episode-meta-row">
                 <% if episode.metadata['season'].present? || episode.metadata['episode_number'].present? %>
-                  <span class="podcast-episode__episodes-number">
+                  <span class="episode-number">
                     <% if episode.metadata['season'].present? %>S<%= episode.metadata['season'] %><% end %>
                     <% if episode.metadata['episode_number'].present? %>E<%= episode.metadata['episode_number'] %><% end %>
                   </span>
                 <% end %>
                 <% if episode.metadata['duration'].present? %>
-                  <span class="podcast-episode__episodes-duration"><%= format_duration(episode.metadata['duration']) %></span>
+                  <span class="episode-duration"><%= format_duration(episode.metadata['duration']) %></span>
                 <% end %>
                 <% if episode.date.present? %>
-                  <span class="podcast-episode__episodes-date"><%= episode.date.strftime("%-d %B %Y") rescue episode.date.to_s %></span>
+                  <span class="episode-date"><%= episode.date.strftime("%-d %B %Y") rescue episode.date.to_s %></span>
                 <% end %>
               </div>
-              <span class="podcast-episode__episodes-title"><%= episode.title %></span>
+              <span class="episode-title"><%= episode.title %></span>
             </a>
           </li>
         <% end %>

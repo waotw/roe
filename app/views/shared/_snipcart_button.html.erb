@@ -7,12 +7,12 @@
 %>
   <button class="snipcart-add-item product-button"
           <%= product.snipcart_attributes.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ').html_safe %>>
-    <span class="product-button__text">Add to Cart</span>
+    Add to Cart
   </button>
 <% else %>
   <!-- Fallback if Snipcart not configured -->
-  <div class="product-notice product-notice--warning">
-    <p class="product-notice__text">
+  <div class="product-notice warning">
+    <p>
       <strong>Store not configured.</strong>
       <% if authenticated? %>
         Please configure Snipcart in the <%= link_to 'admin area', edit_admin_snipcart_config_path %>.

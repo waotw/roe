@@ -25,7 +25,7 @@ class CheckoutController < ApplicationController
           price: stripe_config.price_id,
           quantity: 1
         }],
-        success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
+        success_url: checkout_payment_processing_url + "?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: checkout_cancel_url,
         metadata: {
           member_id: current_member.id
@@ -39,13 +39,30 @@ class CheckoutController < ApplicationController
     redirect_to root_path, alert: "Payment error: #{e.message}"
   end
 
-  def success
+  def payment_processing
     @session_id = params[:session_id]
-    # Password will be shown here after webhook processes
+    # If already paid, redirect to success page
+    if current_member&.paid?
+      redirect_to checkout_success_path
+      return
+    end
+    # Load page for sidebar
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'checkout-success')
+  end
+
+  def success
+    # Load the checkout success markdown page
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'checkout-success')
+    if @page
+      render 'pages/show'
+    else
+      render plain: "Thank you for your purchase!", status: :ok
+    end
   end
 
   def cancel
-    # User cancelled checkout
+    # Load page for sidebar
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'checkout-cancel')
   end
 
   private

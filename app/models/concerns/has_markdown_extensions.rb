@@ -4,7 +4,7 @@ module HasMarkdownExtensions
   def to_html(preview: false, context: nil)
     # Store context for use by form renderers
     @render_context = context
-    
+
     # Step 1: Convert backtick fenced code blocks to HTML
     code_blocks = {}
     counter = 0
@@ -457,19 +457,35 @@ module HasMarkdownExtensions
     post_type = config[:post_type]
     post_type = nil if post_type == "all"
 
-    # Validate tags in dev — warn about tags that don't exist on any post
+    # Validate tags in dev — warn about tags that don't exist on the source
     tag_warning = ""
     if Rails.env.development? && tags.present?
       requested = tags.split(',').map(&:strip)
                       .reject { |t| t.start_with?('-') }  # ignore exclusions
-      existing  = Post.all_tags
-      unknown   = requested.reject { |t| existing.include?(t) }
+
+      # Get existing tags based on source
+      existing = case source
+      when 'products'
+        Product.all_tags
+      when 'documentation'
+        # Documentation doesn't have tags yet, skip validation
+        []
+      when 'pages'
+        # Pages don't have tags yet, skip validation
+        []
+      else
+        # Default to posts
+        Post.all_tags
+      end
+
+      unknown = requested.reject { |t| existing.include?(t) }
       if unknown.any?
+        source_name = source == 'products' ? 'product' : 'post'
         return dev_warning(
           "Unknown tag#{'s' if unknown.size > 1}",
-          "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any post.",
+          "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any #{source_name}.",
           "Existing tags: #{existing.any? ? existing.join(', ') : '(none yet)'}. " \
-          "Add the tag to at least one post's metadata and that post will show up in this collection."
+          "Add the tag to at least one #{source_name}'s metadata and it will show up in this collection."
         )
       end
     end
@@ -683,7 +699,7 @@ module HasMarkdownExtensions
 
       output = []
       output << '<div class="collection-item full">'
-      output << '  <div class="collection-item__body" markdown="1">'
+      output << '  <div class="item-body" markdown="1">'
       output << ""
 
       title_html = show_paid_indicator?(item) ? title_with_paid_icon(item.title || 'Untitled') : (item.title || 'Untitled')
@@ -713,12 +729,12 @@ module HasMarkdownExtensions
       output << "  </div>"
 
       if has_media_column
-        col_classes = [ 'collection-item__image' ]
-        col_classes << 'collection-item__image--icon-only' unless has_image
+        col_classes = [ 'item-image' ]
+        col_classes << 'item-image--icon-only' unless has_image
         output << %Q(  <a class="#{col_classes.join(' ')}" href="#{item_path(item)}">)
         output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}" if has_image
         if icon_type
-          output << %Q(    <span class="collection-item__media-icon">#{render_media_icon(icon_type)}</span>)
+          output << %Q(    <span class="item-media-icon">#{render_media_icon(icon_type)}</span>)
         end
         output << '  </a>'
       end
@@ -766,7 +782,16 @@ module HasMarkdownExtensions
     parts = []
 
     if item.respond_to?(:date) && item.date
-      parts << item.date.strftime('%B %d, %Y')
+      date = item.date
+      # Handle both Date objects and strings
+      if date.is_a?(String)
+        begin
+          date = Date.parse(date)
+        rescue
+          date = nil
+        end
+      end
+      parts << date.strftime('%B %d, %Y') if date
     end
 
     if show_author
@@ -1333,13 +1358,13 @@ module HasMarkdownExtensions
       <<~HTML
         <div class="card post-link-#{style}">
           <div class="card-content">
-            <h4 class="card-title-#{style}">#{title}</h4>
-            #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
+            <h4 class="card-title">#{title}</h4>
+            #{metadata.present? ? "<p class=\"card-metadata\">#{metadata}</p>" : ''}
           </div>
           #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 600px, 100vw\">" : ''}
           <div class="card-content">
             #{body_html}
-            <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+            <a href="#{url}" class="card-link">#{link_text}</a>
           </div>
         </div>
       HTML
@@ -1349,10 +1374,10 @@ module HasMarkdownExtensions
         <div class="card post-link-#{style}">
           #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 400px, 100vw\">" : ''}
           <div class="card-content">
-            <h4 class="card-title-#{style}">#{title}</h4>
-            #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
+            <h4 class="card-title">#{title}</h4>
+            #{metadata.present? ? "<p class=\"card-metadata\">#{metadata}</p>" : ''}
             #{body_html}
-            <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+            <a href="#{url}" class="card-link">#{link_text}</a>
           </div>
         </div>
       HTML
@@ -1362,9 +1387,9 @@ module HasMarkdownExtensions
         <div class="card post-link-#{style}">
           #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 300px, 100vw\">" : ''}
           <div class="card-content">
-            <h4 class="card-title-#{style}">#{title}</h4>
-            #{metadata.present? ? "<p class=\"card-metadata-#{style}\">#{metadata}</p>" : ''}
-            <a href="#{url}" class="card-link-#{style}">#{link_text}</a>
+            <h4 class="card-title">#{title}</h4>
+            #{metadata.present? ? "<p class=\"card-metadata\">#{metadata}</p>" : ''}
+            <a href="#{url}" class="card-link">#{link_text}</a>
           </div>
         </div>
       HTML

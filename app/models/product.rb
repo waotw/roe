@@ -34,6 +34,15 @@ class Product < ApplicationRecord
     where("json_extract(metadata, '$.tags') LIKE ?", "%\"#{tag}\"%")
   }
 
+  # Return all unique tags across all products
+  def self.all_tags
+    products = all.to_a
+    return [] if products.empty?
+
+    tags = products.flat_map { |p| p.tags }
+    tags.uniq.sort
+  end
+
   # Delegated metadata accessors
   def title
     metadata['title']

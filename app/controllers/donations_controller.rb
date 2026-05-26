@@ -41,7 +41,7 @@ class DonationsController < ApplicationController
             product_data: { name: "Support #{site_title}" }
           }
         } ],
-        success_url: donation_success_url + "?session_id={CHECKOUT_SESSION_ID}",
+        success_url: donation_payment_processing_url + "?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: donation_cancel_url,
         metadata: {
           purpose: "donation",
@@ -57,14 +57,26 @@ class DonationsController < ApplicationController
     redirect_to root_path, alert: "Payment error: #{e.message}"
   end
 
-  def success
+  def payment_processing
     @session_id = params[:session_id]
-    # The webhook records the Donation row asynchronously; we don't need
-    # to look anything up here. The page just thanks the donor.
+    # Redirect to success after brief delay
+    # Load page for sidebar
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'donation-success')
+  end
+
+  def success
+    # Load the donation success markdown page
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'donation-success')
+    if @page
+      render 'pages/show'
+    else
+      render plain: "Thank you for your support!", status: :ok
+    end
   end
 
   def cancel
-    # Donor cancelled checkout — just render the cancel view.
+    # Load page for sidebar
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'donation-cancel')
   end
 
   private

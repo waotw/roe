@@ -302,11 +302,13 @@ Rails.application.routes.draw do
 
   # Public checkout
   post "checkout", to: "checkout#create", as: :create_checkout
+  get "checkout/payment-processing", to: "checkout#payment_processing", as: :checkout_payment_processing
   get "checkout/success", to: "checkout#success", as: :checkout_success
   get "checkout/cancel", to: "checkout#cancel", as: :checkout_cancel
 
   # Public donations (one-time, anonymous-friendly support payments)
   post "donate", to: "donations#create", as: :create_donation
+  get "donate/payment-processing", to: "donations#payment_processing", as: :donation_payment_processing
   get "donate/success", to: "donations#success", as: :donation_success
   get "donate/cancel", to: "donations#cancel", as: :donation_cancel
 
