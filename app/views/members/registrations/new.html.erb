@@ -2,7 +2,7 @@
   <div class="auth-form">
     <h1>Sign Up</h1>
 
-    <%= form_with model: @member, url: signup_path do |f| %>
+    <%= form_with model: @member, url: signup_path, local: true do |f| %>
       <% if @member.errors.any? %>
         <div class="form-errors">
           <h3>Errors:</h3>

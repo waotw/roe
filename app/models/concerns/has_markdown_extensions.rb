@@ -1,7 +1,10 @@
 module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
-  def to_html(preview: false)
+  def to_html(preview: false, context: nil)
+    # Store context for use by form renderers
+    @render_context = context
+    
     # Step 1: Convert backtick fenced code blocks to HTML
     code_blocks = {}
     counter = 0
@@ -82,6 +85,9 @@ module HasMarkdownExtensions
     html = process_responsive_images(html)
 
     html
+  ensure
+    # Clear render context to prevent data leaking between requests
+    @render_context = nil
   end
 
   def process_responsive_images(html)
@@ -1564,18 +1570,40 @@ module HasMarkdownExtensions
       ""
     end
 
+    # Check if there's a member with errors (from failed submission)
+    # Access member from render context if available
+    member = @render_context&.dig(:member)
+    error_html = ""
+    if member && member.errors.any?
+      error_messages = member.errors.full_messages.map { |msg| "<li>#{CGI.escape_html(msg)}</li>" }.join
+      error_html = <<~HTML
+        <div class="form-errors">
+          <h3>Errors:</h3>
+          <ul>
+            #{error_messages}
+          </ul>
+        </div>
+      HTML
+    end
+
+    # Get values from failed submission if present
+    name_value = member ? CGI.escape_html(member.name.to_s) : ""
+    email_value = member ? CGI.escape_html(member.email.to_s) : ""
+
     <<~HTML
       <form action="/signup" method="post" class="signup-form">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
 
+        #{error_html}
+
         <div class="form-field">
           <label for="member_name">Name</label>
-          <input type="text" name="member[name]" id="member_name" required>
+          <input type="text" name="member[name]" id="member_name" value="#{name_value}" required>
         </div>
 
         <div class="form-field">
           <label for="member_email">Email</label>
-          <input type="email" name="member[email]" id="member_email" required>
+          <input type="email" name="member[email]" id="member_email" value="#{email_value}" required>
         </div>
 
         <button type="submit" class="signup-button btn-outline">#{button_text}</button>

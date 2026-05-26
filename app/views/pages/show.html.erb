@@ -1,6 +1,8 @@
 <article class="page page--<%= @page.url_name %><%= ' member-page' if @page.member_page? %>">
   <div class="content">
-    <%= render_page_content(@page).html_safe %>
+    <%# Pass member context if available (for form error display) %>
+    <% context = defined?(@member) ? { member: @member } : nil %>
+    <%= render_page_content(@page, context: context).html_safe %>
   </div>
 </article>
 <%= render 'shared/preview_auto_refresh' if params[:preview] == 'true' %>

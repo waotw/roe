@@ -1,7 +1,8 @@
 module Members
   class RegistrationsController < ApplicationController
     skip_before_action :require_authentication
-    before_action :redirect_if_signed_in, only: [:new, :create]
+    before_action :redirect_if_signed_in, only: [:new, :create, :create_and_checkout]
+    before_action :load_signup_page, only: [:new, :create, :create_and_checkout]
 
     def new
       @member = Member.new
@@ -17,7 +18,8 @@ module Members
         session[:member_id] = @member.id
         redirect_to root_path, notice: "Welcome! You're signed up."
       else
-        render :new, status: :unprocessable_entity
+        # Render the page template to preserve the full page content with form
+        render 'pages/show', status: :unprocessable_entity
       end
     end
 
@@ -63,7 +65,8 @@ module Members
           redirect_to root_path, alert: "Payment setup failed. Please try again."
         end
       else
-        render :new, status: :unprocessable_entity
+        # Render the page template to preserve the full page content with form
+        render 'pages/show', status: :unprocessable_entity
       end
     end
 
@@ -75,6 +78,11 @@ module Members
 
     def redirect_if_signed_in
       redirect_to root_path if current_member
+    end
+
+    def load_signup_page
+      # Load the signup page so sidebar and other page-specific features work
+      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'sign-up')
     end
   end
 end
