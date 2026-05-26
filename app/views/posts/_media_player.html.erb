@@ -170,106 +170,93 @@
     <% end %>
   </div>
 <% elsif (post.post_type == 'video' || post.post_type == 'podcast') && post.video.present? %>
-  <div class="player video-player"
+  <div class="video-player-container"
        data-controller="audio-player"
        data-audio-player-type-value="video"
        data-audio-player-skip-seconds-value="15">
     <video data-audio-player-target="video"
            preload="metadata"
-           class="player-video">
+           class="video-player-video"
+           playsinline>
       <source src="<%= post.video %>" type="video/mp4">
       <source src="<%= post.video %>" type="video/webm">
       <source src="<%= post.video %>" type="video/ogg">
       Your browser doesn't support video playback.
     </video>
-    <%# Progress bar %>
-    <div class="player-progress"
-         data-audio-player-target="progressBar"
-         data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub">
-      <div class="progress-fill" data-audio-player-target="progressFill"></div>
-      <div class="progress-handle" data-audio-player-target="progressHandle"></div>
-    </div>
-    <%# Time display %>
-    <div class="player-time">
-      <span class="current-time" data-audio-player-target="currentTime">0:00</span>
-      <span class="duration" data-audio-player-target="duration">&mdash;</span>
-    </div>
-    <div class="player-controls">
-      <div class="btn-wrapper">
-        <%# Prev episode %>
-        <% if prev_episode %>
-          <a href="<%= post_path(prev_episode.url_name) %>"
-            class="player-btn btn-episode btn-prev"
-            title="<%= prev_episode.title %>">
-            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 12.4512 11.8652">
-            <g>
-              <rect height="11.8652" opacity="0" width="12.4512" x="0" y="0"/>
-              <path d="M12.0898 10.7129L12.0898 1.14258C12.0898 0.371094 11.6504 0 11.123 0C10.8789 0 10.6348 0.0683594 10.3906 0.205078L2.35352 4.85352C1.69922 5.23438 1.46484 5.50781 1.46484 5.92773C1.46484 6.34766 1.69922 6.62109 2.35352 7.00195L10.3906 11.6504C10.6348 11.7871 10.8789 11.8555 11.123 11.8555C11.6504 11.8555 12.0898 11.4844 12.0898 10.7129ZM10.6836 9.9707C10.6836 10.0488 10.6348 10.1074 10.5664 10.1074C10.5371 10.1074 10.5078 10.0977 10.4883 10.0879L3.55469 6.03516C3.49609 6.00586 3.47656 5.9668 3.47656 5.92773C3.47656 5.88867 3.49609 5.84961 3.55469 5.82031L10.4883 1.76758C10.5078 1.75781 10.5371 1.74805 10.5664 1.74805C10.6348 1.74805 10.6836 1.80664 10.6836 1.88477ZM0.751953 11.8555C1.17188 11.8555 1.50391 11.5332 1.50391 11.123L1.50391 0.732422C1.50391 0.322266 1.17188 0 0.751953 0C0.332031 0 0 0.322266 0 0.732422L0 11.123C0 11.5332 0.332031 11.8555 0.751953 11.8555Z" fill="currentColor" fill-opacity="0.85"/>
-            </g>
-            </svg>
-            <span class="episode-nav-title"><%= prev_episode.title %></span>
-          </a>
-        <% else %>
-          <span class="player-btn btn-episode btn-prev is-disabled"></span>
-        <% end %>
+
+    <%# Video Controls - Tight integration below video %>
+    <div class="video-controls">
+      <%# Progress bar %>
+      <div class="video-progress"
+           data-audio-player-target="progressBar"
+           data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub">
+        <div class="video-progress-fill" data-audio-player-target="progressFill"></div>
+        <div class="video-progress-handle" data-audio-player-target="progressHandle"></div>
       </div>
-      <div class="controls-center">
-        <button type="button"
-                class="player-btn btn-skip"
-                data-action="click->audio-player#skipBack"
-                aria-label="Skip back 15 seconds"
-                title="Skip back 15 seconds">
-            <svg width="75" height="55" viewBox="0 0 75 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M66.6263 14.1396C66.6263 12.0044 65.4101 10.9774 63.9237 10.9774C63.275 10.9774 62.5723 11.1667 61.8967 11.545L39.6541 24.4096C37.8702 25.4636 37.1946 26.2203 37.1946 27.3825C37.1946 28.5446 37.8702 29.3013 39.6541 30.3553L61.8967 43.2199C62.5723 43.5982 63.275 43.7874 63.9237 43.7874C65.4101 43.7874 66.6263 42.7604 66.6263 40.6253L66.6263 14.1396ZM37.3029 14.1396C37.3029 12.0044 36.0865 10.9774 34.6001 10.9774C33.9514 10.9774 33.2759 11.1667 32.6001 11.545L10.3574 24.4096C8.54668 25.4636 7.89825 26.2203 7.89825 27.3825C7.89825 28.5446 8.54668 29.3013 10.3574 30.3553L32.6001 43.2199C33.2759 43.5982 33.9514 43.7874 34.6001 43.7874C36.0865 43.7874 37.3029 42.7604 37.3029 40.6253L37.3029 14.1396Z" fill="currentColor" fill-opacity="0.85"/>
-            <path d="M7.88285 3.36364V15H5.42262V5.69886H5.35444L2.68967 7.36932V5.1875L5.57035 3.36364H7.88285ZM14.8985 15.1591C14.0954 15.1591 13.3795 15.0114 12.7507 14.7159C12.1257 14.4205 11.6295 14.0133 11.2621 13.4943C10.8947 12.9754 10.7034 12.3807 10.6882 11.7102H13.0746C13.1011 12.161 13.2905 12.5265 13.6428 12.8068C13.9951 13.0871 14.4136 13.2273 14.8985 13.2273C15.2848 13.2273 15.6257 13.142 15.9212 12.9716C16.2204 12.7973 16.4534 12.5568 16.6201 12.25C16.7905 11.9394 16.8757 11.5833 16.8757 11.1818C16.8757 10.7727 16.7886 10.4129 16.6144 10.1023C16.4439 9.79167 16.2072 9.54924 15.9042 9.375C15.6011 9.20076 15.2545 9.11174 14.8644 9.10795C14.5235 9.10795 14.192 9.17803 13.8701 9.31818C13.5519 9.45833 13.3038 9.64962 13.1257 9.89205L10.9382 9.5L11.4894 3.36364H18.603V5.375H13.5178L13.2167 8.28977H13.2848C13.4894 8.00189 13.7981 7.76326 14.211 7.57386C14.6239 7.38447 15.086 7.28977 15.5973 7.28977C16.2981 7.28977 16.9231 7.45455 17.4723 7.78409C18.0216 8.11364 18.4553 8.56629 18.7735 9.14205C19.0917 9.71402 19.2489 10.3731 19.2451 11.1193C19.2489 11.9034 19.067 12.6004 18.6996 13.2102C18.336 13.8163 17.8265 14.2936 17.1712 14.642C16.5197 14.9867 15.7621 15.1591 14.8985 15.1591Z" fill="currentColor"/>
+
+      <%# Controls row %>
+      <div class="video-controls-bar">
+        <div class="video-controls-left">
+
+          <%# Play/Pause %>
+          <button class="video-btn btn-play-pause"
+                  data-action="click->audio-player#togglePlay"
+                  data-audio-player-target="playButton"
+                  aria-label="Play">
+            <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
             </svg>
-        </button>
-        <button class="player-btn btn-play"
-                data-action="click->audio-player#togglePlay"
-          data-audio-player-target="playButton"
-          data-playing="false"
-          aria-label="Play">
-          <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
-        </button>
-        <button type="button"
-                class="player-btn btn-skip"
-                data-action="click->audio-player#skipForward"
-                aria-label="Skip forward 15 seconds"
-                title="Skip forward 15 seconds">
-            <svg width="75" height="55" viewBox="0 0 75 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M7.89825 40.6253C7.89825 42.7604 9.11443 43.7874 10.6009 43.7874C11.2495 43.7874 11.9522 43.5981 12.6278 43.2198L34.8704 30.3553C36.6543 29.3012 37.3299 28.5445 37.3299 27.3824C37.3299 26.2202 36.6543 25.4635 34.8704 24.4095L12.6278 11.545C11.9522 11.1666 11.2495 10.9774 10.6009 10.9774C9.11443 10.9774 7.89825 12.0044 7.89825 14.1395V40.6253ZM37.2217 40.6253C37.2217 42.7604 38.438 43.7874 39.9244 43.7874C40.5731 43.7874 41.2487 43.5981 41.9245 43.2198L64.1671 30.3553C65.9779 29.3012 66.6263 28.5445 66.6263 27.3824C66.6263 26.2202 65.9779 25.4635 64.1671 24.4095L41.9245 11.545C41.2487 11.1666 40.5731 10.9774 39.9244 10.9774C38.438 10.9774 37.2217 12.0044 37.2217 14.1395V40.6253Z" fill="currentColor" fill-opacity="0.85"/>
-            <path d="M60.5302 3.36364V15H58.07V5.69886H58.0018L55.3371 7.36932V5.1875L58.2177 3.36364H60.5302ZM67.5459 15.1591C66.7428 15.1591 66.0269 15.0114 65.3981 14.7159C64.7731 14.4205 64.2769 14.0133 63.9095 13.4943C63.5421 12.9754 63.3508 12.3807 63.3356 11.7102H65.722C65.7485 12.161 65.9379 12.5265 66.2902 12.8068C66.6425 13.0871 67.061 13.2273 67.5459 13.2273C67.9322 13.2273 68.2731 13.142 68.5686 12.9716C68.8678 12.7973 69.1008 12.5568 69.2675 12.25C69.4379 11.9394 69.5231 11.5833 69.5231 11.1818C69.5231 10.7727 69.436 10.4129 69.2618 10.1023C69.0913 9.79167 68.8546 9.54924 68.5516 9.375C68.2485 9.20076 67.9019 9.11174 67.5118 9.10795C67.1709 9.10795 66.8394 9.17803 66.5175 9.31818C66.1993 9.45833 65.9512 9.64962 65.7731 9.89205L63.5856 9.5L64.1368 3.36364H71.2504V5.375H66.1652L65.8641 8.28977H65.9322C66.1368 8.00189 66.4455 7.76326 66.8584 7.57386C67.2713 7.38447 67.7334 7.28977 68.2447 7.28977C68.9455 7.28977 69.5705 7.45455 70.1197 7.78409C70.669 8.11364 71.1027 8.56629 71.4209 9.14205C71.7391 9.71402 71.8963 10.3731 71.8925 11.1193C71.8963 11.9034 71.7144 12.6004 71.347 13.2102C70.9834 13.8163 70.4739 14.2936 69.8186 14.642C69.1671 14.9867 68.4095 15.1591 67.5459 15.1591Z" fill="currentColor"/>
+            <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
             </svg>
-        </button>
-      </div>
-      <button class="player-btn btn-speed"
-              data-action="click->audio-player#cycleSpeed"
-        data-audio-player-target="speedButton"
-        aria-label="Playback speed: 1x">
-        1×
-      </button>
-      <%# Next episode %>
-      <div class="btn-wrapper">
-        <% if next_episode %>
-          <a href="<%= post_path(next_episode.url_name) %>"
-            class="player-btn btn-episode btn-next"
-            title="<%= next_episode.title %>">
-            <span class="episode-nav-title"><%= next_episode.title %></span>
-            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 12.4512 11.8652">
-            <g>
-              <rect height="11.8652" opacity="0" width="12.4512" x="0" y="0"/>
-              <path d="M0 10.7129C0 11.4844 0.439453 11.8555 0.976562 11.8555C1.21094 11.8555 1.46484 11.7871 1.70898 11.6504L9.74609 7.00195C10.3906 6.62109 10.6348 6.34766 10.6348 5.92773C10.6348 5.50781 10.3906 5.23438 9.74609 4.85352L1.70898 0.205078C1.46484 0.0683594 1.21094 0 0.976562 0C0.439453 0 0 0.371094 0 1.14258ZM1.40625 9.9707L1.40625 1.88477C1.40625 1.80664 1.45508 1.74805 1.5332 1.74805C1.5625 1.74805 1.58203 1.75781 1.60156 1.76758L8.54492 5.82031C8.59375 5.84961 8.61328 5.88867 8.61328 5.92773C8.61328 5.9668 8.59375 6.00586 8.54492 6.03516L1.60156 10.0879C1.58203 10.0977 1.5625 10.1074 1.5332 10.1074C1.45508 10.1074 1.40625 10.0488 1.40625 9.9707ZM11.3477 11.8555C11.7676 11.8555 12.0898 11.5332 12.0898 11.123L12.0898 0.732422C12.0898 0.322266 11.7676 0 11.3477 0C10.918 0 10.5957 0.322266 10.5957 0.732422L10.5957 11.123C10.5957 11.5332 10.918 11.8555 11.3477 11.8555Z" fill="currentColor" fill-opacity="0.85"/>
-            </g>
+          </button>
+
+          <%# Prev episode %>
+          <% if prev_episode %>
+            <a href="<%= post_path(prev_episode.url_name) %>"
+               class="video-btn btn-episode-nav btn-prev"
+               title="<%= prev_episode.title %>">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+              </svg>
+            </a>
+          <% else %>
+            <span class="video-btn btn-episode-nav btn-prev is-disabled"></span>
+          <% end %>
+
+          <%# Next episode %>
+          <% if next_episode %>
+            <a href="<%= post_path(next_episode.url_name) %>"
+               class="video-btn btn-episode-nav btn-next"
+               title="<%= next_episode.title %>">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+              </svg>
+            </a>
+          <% else %>
+            <span class="video-btn btn-episode-nav btn-next is-disabled"></span>
+          <% end %>
+        </div>
+
+        <div class="video-controls-right">
+          <%# Time display %>
+          <span class="video-time">
+            <span data-audio-player-target="currentTime">0:00</span>
+            <span class="video-time-separator">/</span>
+            <span data-audio-player-target="duration">0:00</span>
+          </span>
+          <%# Fullscreen %>
+          <button class="video-btn btn-fullscreen"
+                  data-action="click->audio-player#toggleFullscreen"
+                  aria-label="Fullscreen">
+            <svg class="icon-fullscreen" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
             </svg>
-          </a>
-        <% else %>
-          <span class="player-btn btn-episode btn-next is-disabled"></span>
-        <% end %>
+            <svg class="icon-fullscreen-exit" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>

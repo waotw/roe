@@ -118,6 +118,22 @@ export default class extends Controller {
     this.updateSpeedButton();
   }
 
+  toggleFullscreen() {
+    const container = this.element;
+    
+    if (!document.fullscreenElement) {
+      container.requestFullscreen?.().then(() => {
+        container.classList.add('is-fullscreen');
+      }).catch(err => {
+        console.warn('Fullscreen error:', err);
+      });
+    } else {
+      document.exitFullscreen?.().then(() => {
+        container.classList.remove('is-fullscreen');
+      });
+    }
+  }
+
   // ========== PROGRESS BAR ==========
 
   seek(event) {
@@ -276,13 +292,13 @@ export default class extends Controller {
     this.chapterListTarget.innerHTML = this.chapters
       .map(
         (chapter, i) => `
-      <li class="audio-player__chapter"
+      <li class="chapter"
           data-audio-player-target="chapterItem"
           data-time="${chapter.time}"
           data-action="click->audio-player#seekToChapter"
           data-index="${i}">
-        <span class="audio-player__chapter-time">${this.formatTime(chapter.time)}</span>
-        <span class="audio-player__chapter-title">${chapter.title}</span>
+        <span class="chapter-time">${this.formatTime(chapter.time)}</span>
+        <span class="chapter-title">${chapter.title}</span>
       </li>
     `,
       )
