@@ -18,6 +18,14 @@ FileUtils.chdir APP_ROOT do
     File.write("config/master.key", SecureRandom.hex(16))
     File.chmod(0600, "config/master.key")
     puts "✅ Master key created"
+
+    # Remove any existing credentials file — it was encrypted with a different
+    # key and would cause InvalidMessage errors on boot.
+    creds = File.expand_path("config/credentials.yml.enc", APP_ROOT)
+    if File.exist?(creds)
+      File.delete(creds)
+      puts "   Removed stale credentials.yml.enc (will be regenerated)"
+    end
   end
 
   puts "\n== Checking AR Encryption credentials =="
