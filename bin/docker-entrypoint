@@ -13,8 +13,16 @@ if [ "$(id -u)" = '0' ]; then
 
   # If running the rails server then create or migrate existing database
   # Check for both relative path (./bin/rails) and absolute path (/rails/current/bin/rails)
+  echo "[docker-entrypoint] Checking if should run db:prepare..."
+  echo "[docker-entrypoint] Args: $@"
+  echo "[docker-entrypoint] Last arg: ${@: -1:1}"
+  echo "[docker-entrypoint] Second to last: ${@: -2:1}"
   if [ "${@: -1:1}" == "server" ] && [[ "${@: -2:1}" == *"bin/rails" ]]; then
+    echo "[docker-entrypoint] Conditions met, running db:prepare..."
     gosu rails ./bin/rails db:prepare
+    echo "[docker-entrypoint] db:prepare completed"
+  else
+    echo "[docker-entrypoint] Skipping db:prepare (conditions not met)"
   fi
 
   # Re-execute as rails user

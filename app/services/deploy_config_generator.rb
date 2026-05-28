@@ -255,6 +255,9 @@ class DeployConfigGenerator
         PORT = '8080'
         SOLID_QUEUE_IN_PUMA = 'true'
 
+      [deploy]
+        release_command = '/rails/current/bin/rails db:migrate'
+
       [processes]
         app = '/rails/current/bin/rails server -b 0.0.0.0 -p 8080'
 
