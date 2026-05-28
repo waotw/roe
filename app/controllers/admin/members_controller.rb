@@ -1,7 +1,5 @@
 module Admin
-  class MembersController < ApplicationController
-
-    layout 'application'
+  class MembersController < Admin::BaseController
 
     before_action :set_member, only: [:show, :edit, :update, :destroy,
                                        :upgrade_to_paid, :downgrade_to_free,

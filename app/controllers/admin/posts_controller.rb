@@ -1,5 +1,5 @@
 class Admin::PostsController < Admin::BaseController
-  layout 'editor', only: [ :edit ]
+  layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
     @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))

@@ -1,5 +1,4 @@
-class Admin::ThemesController < ApplicationController
-  layout 'application'
+class Admin::ThemesController < Admin::BaseController
 
   THEMES_DIR = Rails.root.join('app/themes')
   USER_THEME_DIR = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'theme'))

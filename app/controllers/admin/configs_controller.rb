@@ -1,5 +1,4 @@
-class Admin::ConfigsController < ApplicationController
-  layout 'application'
+class Admin::ConfigsController < Admin::BaseController
 
   # Site Config Schema Definition
   SITE_CONFIG_SCHEMA = {

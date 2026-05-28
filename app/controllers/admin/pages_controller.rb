@@ -1,5 +1,5 @@
 class Admin::PagesController < Admin::BaseController
-  layout 'editor', only: [ :edit ]
+  layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
     all_pages = Page.order(:created_at)

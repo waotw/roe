@@ -1,5 +1,4 @@
-class Admin::SystemAssetsController < ApplicationController
-  layout "application"
+class Admin::SystemAssetsController < Admin::BaseController
 
   ASSETS_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'system/assets'))
   FONTS_PATH = ASSETS_PATH.join('fonts')

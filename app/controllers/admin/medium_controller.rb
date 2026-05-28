@@ -16,7 +16,7 @@ class Admin::MediumController < Admin::BaseController
     # Get distinct media types that exist
     @existing_types = Medium.distinct.pluck(:media_type).compact
 
-    render layout: 'application'
+    render layout: 'admin'
   end
 
   def create
@@ -128,17 +128,17 @@ class Admin::MediumController < Admin::BaseController
   # 2. Whether the expected media files exist in the database
   def check_upload_completion_status
     filenames = @batch['files'].map { |f| f['filename'] }
-    
+
     # Build list of possible paths for each file (different media types + counter suffixes)
     possible_paths = []
     filename_patterns = []
-    
+
     filenames.each do |name|
       base = File.basename(name, File.extname(name))
       ext = File.extname(name)
       # Match exact name or name with counter suffix (e.g., image.jpg or image-1.jpg)
       filename_patterns << "#{base}%#{ext}"
-      
+
       # Also add exact paths for all media types
       possible_paths.concat([
         "/media/images/#{name}",
@@ -146,18 +146,18 @@ class Admin::MediumController < Admin::BaseController
         "/media/video/#{name}"
       ])
     end
-    
+
     # Check for exact matches first
     existing_exact = Medium.where(file_path: possible_paths).count
-    
+
     # Check for files with counter suffixes using LIKE patterns
     existing_pattern = 0
     filename_patterns.each do |pattern|
       existing_pattern += 1 if Medium.where("file_path LIKE ?", "/media/%/#{pattern}").exists?
     end
-    
+
     existing_count = [existing_exact, existing_pattern].max
-    
+
     # Check if the bulk upload job is still running
     job_running = SolidQueue::Job.exists?(
       class_name: 'BulkUploadJob',
@@ -210,14 +210,14 @@ class Admin::MediumController < Admin::BaseController
 
   def regenerate_variants
     medium = Medium.find(params[:id])
-    
+
     unless medium.image?
       redirect_to browse_admin_medium_index_path, alert: "Only images can have variants generated"
       return
     end
-    
+
     path = File.join(RoeSitePaths::SITE_PATH, medium.file_path.sub(%r{^/}, ""))
-    
+
     unless File.exist?(path)
       redirect_to browse_admin_medium_index_path, alert: "Image file not found on disk"
       return

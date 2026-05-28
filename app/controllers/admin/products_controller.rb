@@ -1,5 +1,5 @@
 class Admin::ProductsController < Admin::BaseController
-  layout 'editor', only: [ :edit ]
+  layout -> { action_name == "edit" ? "editor" : "admin" }
 
   before_action :set_product, only: [ :edit, :update, :show, :destroy ]
 

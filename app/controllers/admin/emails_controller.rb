@@ -1,5 +1,5 @@
 class Admin::EmailsController < Admin::BaseController
-  layout 'editor', only: [ :edit ]
+  layout -> { action_name == "edit" ? "editor" : "admin" }
 
   TEMPLATES = {
     'magic_link' => {
