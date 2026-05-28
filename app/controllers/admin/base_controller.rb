@@ -1,7 +1,7 @@
 class Admin::BaseController < ApplicationController
   before_action :require_authentication
   before_action :ensure_integration_files
-  layout "application"
+  layout "admin"
 
   private
 
