@@ -6,6 +6,15 @@ module AssetsHelper
     # Extract the 'fonts' key if it exists, otherwise use the data as-is
     fonts_config = fonts_data.is_a?(Hash) ? (fonts_data['fonts'] || fonts_data) : nil
 
+    # Theme scoping: if `themes:` is set on fonts.yml, only emit font
+    # config when the active theme is in the list. Empty/missing list
+    # means "load for all themes" (backward-compatible).
+    scoped_themes = fonts_data.is_a?(Hash) ? Array(fonts_data['themes']) : []
+    if scoped_themes.any?
+      active_theme = SiteConfig.get('theme.active') || 'default'
+      fonts_config = nil unless scoped_themes.include?(active_theme)
+    end
+
     css = []
 
     # Generate @font-face rules for all font families (fixed roles + custom)

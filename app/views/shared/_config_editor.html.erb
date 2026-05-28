@@ -149,6 +149,27 @@
                 </div>
 
               <% elsif @config_type == 'fonts' %>
+                <!-- Themes Section -->
+                <div class="config-section mb-8">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Themes</h3>
+                  <p class="text-sm text-gray-600 mb-3">Themes that should load these fonts. Leave all unchecked to load for every theme.</p>
+                  <% selected_themes = Array(config_hash['themes']) %>
+                  <div class="space-y-1 pl-4 border-l-2 border-gray-200">
+                    <% (local_assigns[:available_themes] || []).each do |theme_name| %>
+                      <label class="flex items-center gap-2 text-sm font-mono">
+                        <input type="checkbox"
+                               value="<%= theme_name %>"
+                               data-config-multi-field="themes"
+                               <%= 'checked' if selected_themes.include?(theme_name) %>>
+                        <span><%= theme_name %></span>
+                      </label>
+                    <% end %>
+                    <% if (local_assigns[:available_themes] || []).empty? %>
+                      <p class="text-xs text-gray-500 italic">No themes found in app/themes/ or site/theme/.</p>
+                    <% end %>
+                  </div>
+                </div>
+
                 <!-- Custom Fonts Section -->
                 <h3 class="text-base font-semibold text-gray-900 mb-1">Custom Fonts</h3>
                 <p class="text-sm text-gray-600 mb-3">Upload font files with the FONTS button. Copy the url…</p>
@@ -1074,6 +1095,22 @@
       } else {
         fields[fieldName] = value.trim ? value.trim() : value;
       }
+    });
+
+    // Collect multi-value checkbox groups (e.g. themes) as arrays.
+    // Each checkbox shares the same data-config-multi-field name; checked
+    // values are aggregated into an array at that key. Always writes the
+    // key (empty array when nothing is checked) so unchecking persists.
+    const multiFieldNames = new Set();
+    document.querySelectorAll('[data-config-multi-field]').forEach(input => {
+      multiFieldNames.add(input.dataset.configMultiField);
+    });
+    multiFieldNames.forEach(name => {
+      const values = [];
+      document.querySelectorAll(`[data-config-multi-field="${name}"]`).forEach(input => {
+        if (input.checked) values.push(input.value);
+      });
+      fields[name] = values;
     });
 
     // Collect subcategories as arrays

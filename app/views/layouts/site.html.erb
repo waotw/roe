@@ -22,10 +22,6 @@
         <% end %>
       <% end %>
     <% end %>
-    <!-- Custom Fonts & Site Assets -->
-    <style>
-      <%= font_face_css.html_safe %>
-    </style>
     <!-- Public site theme -->
     <% if params[:preview_theme].present? %>
       <%= stylesheet_link_tag "/theme/#{params[:preview_theme]}.css?v=#{Time.now.to_i}" %>
@@ -35,6 +31,10 @@
       <% cache_buster = File.exist?(theme_file) ? "?v=#{File.mtime(theme_file).to_i}" : "" %>
       <%= stylesheet_link_tag "/theme/#{theme_name}.css#{cache_buster}" %>
     <% end %>
+    <!-- Custom Fonts & Site Assets -->
+    <style>
+      <%= font_face_css.html_safe %>
+    </style>
     <!-- Favicon -->
     <% if SiteConfig.get('favicon').present? %>
       <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">

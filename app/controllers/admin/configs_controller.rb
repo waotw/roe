@@ -86,6 +86,11 @@ class Admin::ConfigsController < Admin::BaseController
   }.freeze
 
   FONTS_CONFIG_SCHEMA = {
+    themes: {
+      label: "Themes",
+      help_text: "Themes that should load these fonts. Leave all unchecked to load for every theme.",
+      type: :theme_multi_select
+    },
     fonts: {
       label: "Custom Fonts",
       help_text: "Upload font files with the Fonts button and copy url…",
@@ -335,7 +340,17 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = File.read(SiteConfig::FONTS_FILE)
     @config_hash = YAML.load(@config_content) || {}
     @config_schema = FONTS_CONFIG_SCHEMA
+    @available_themes = list_available_themes
     render :edit
+  end
+
+  # Theme names available to scope fonts to. Master themes in app/themes/
+  # plus any user themes in /site/theme/ (deduped by name).
+  def list_available_themes
+    names = Dir.glob(Rails.root.join('app/themes/*.css')).map { |f| File.basename(f, '.css') }
+    user_dir = File.join(RoeSitePaths::SITE_PATH, 'theme')
+    names += Dir.glob(File.join(user_dir, '*.css')).map { |f| File.basename(f, '.css') } if Dir.exist?(user_dir)
+    names.uniq.sort
   end
 
   def update_fonts

@@ -14,7 +14,7 @@ module LayoutHelper
     # Add active class to navigation links if this is the navigation file
     if filename == 'navigation'
       html = add_active_nav_class(html, current_page)
-      html = add_cart_link(html) if store_enabled?
+      html = add_cart_link(html) if snipcart_configured?
     end
 
     html.html_safe
