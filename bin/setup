@@ -140,6 +140,9 @@ FileUtils.chdir APP_ROOT do
   puts "\n== Syncing content to database =="
   ContentSync.sync_all
 
+  puts "\n== Building Tailwind CSS =="
+  system! "bin/rails tailwindcss:build"
+
   puts "\n== Removing old logs and tempfiles =="
   system! "bin/rails log:clear tmp:clear"
 
