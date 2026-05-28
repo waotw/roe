@@ -217,6 +217,8 @@ Deploy the current codebase from local to a live server via Kamal or Fly.io.
 - **Access**: Admin → Updates & Deploy (or `./roe.sh deploy` from CLI)
 - **Targets**: Kamal (SSH-based) or Fly.io (container platform)
 - **VERSION file**: Must exist at `ROE_ROOT/VERSION` (git-tracked or manually created)
+- **Fly.io Migrations**: Automatically run via `[deploy] release_command` in fly.toml
+- **Docker Entrypoint**: Updated to detect Rails server and run `db:prepare` with proper path handling
 
 **Rollback**: Automatic on update failure; manual rollback available for deploy
 
@@ -310,6 +312,11 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Use `before_action` for shared setup
 - Raise `ActiveRecord::RecordNotFound` for 404s (handled by `render_not_found` in `ApplicationController`)
 - Paid-content gating goes through `SiteController#check_paid_access!`
+- Admin layout uses `content_for :admin_nav` flag system:
+  - `admin.html.erb` wrapper sets the flag
+  - `application.html.erb` conditionally renders navigation
+  - Sign-in page shows logo only; authenticated pages show full nav
+  - Edit pages (pages, posts, products, emails) use dynamic layout: `layout -> { action_name == "edit" ? "editor" : "admin" }`
 
 ### Services
 - Plain Ruby classes in `app/services/`
@@ -325,6 +332,13 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - ActiveJob with `solid_queue` adapter
 - Long-running operations (image variants, newsletter sends, Substack imports, Postmark webhooks, updates) run as jobs
 
+### Views
+- Layout inheritance uses `content_for` flags for conditional rendering
+- `admin.html.erb` - Wrapper that sets `content_for :admin_nav, true`
+- `application.html.erb` - Base layout with conditional navigation
+- `editor.html.erb` - Full-screen layout for editing (no navigation)
+- Video player uses YouTube-style controls with fullscreen support
+
 ### Error Handling
 - Rescue broad `=> e` in service methods, log with `Rails.logger.error`
 - Controller-level: `rescue_from ActiveRecord::RecordNotFound`
@@ -339,6 +353,10 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 ### CSS
 - Tailwind CSS (via `tailwindcss-rails`) for the application UI
 - Public site uses a theme system with dynamic CSS generation served from `/theme/:filename.css`
+- **Naming Convention**: All CSS classes use semantic naming (not BEM):
+  - Collections: `.collection-item`, `.item-body`, `.item-image`, `.item-title`
+  - Media Players: `.player`, `.player-header`, `.player-controls`, `.video-controls`
+  - Post Headers: `.post-header-top`, `.feed-link`, `.header-image`
 - System fonts and images are served from `/system/...`
 
 ## Site Path Configuration
