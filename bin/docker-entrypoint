@@ -12,7 +12,8 @@ if [ "$(id -u)" = '0' ]; then
   fi
 
   # If running the rails server then create or migrate existing database
-  if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+  # Check for both relative path (./bin/rails) and absolute path (/rails/current/bin/rails)
+  if [ "${@: -1:1}" == "server" ] && [[ "${@: -2:1}" == *"bin/rails" ]]; then
     gosu rails ./bin/rails db:prepare
   fi
 
