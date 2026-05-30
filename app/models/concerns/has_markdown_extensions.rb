@@ -1743,7 +1743,7 @@ module HasMarkdownExtensions
 
   def render_error_card(message)
     <<~HTML
-      <div class="card card-error">
+      <div class="card is-error">
         <div class="card-content">
           <p><strong>⚠️ Card Error:</strong> #{message}</p>
         </div>

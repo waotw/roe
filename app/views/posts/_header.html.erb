@@ -1,6 +1,6 @@
 <header class="post-header">
   <div class="post-header-top">
-    <h1 class="post-title"><%= post.title %></h1>
+    <h1><%= post.title %></h1>
     <div>
       <%# Feed links %>
       <% if post.post_type == 'podcast' && post.metadata['podcast'].present? %>
@@ -18,7 +18,7 @@
     </div>
   </div>
   <% if post.subtitle %>
-    <p class="page-subtitle"><%= post.subtitle %></p>
+    <p><%= post.subtitle %></p>
   <% end %>
 
   <div class="post-meta">
@@ -33,8 +33,6 @@
     <% end %>
   </div>
   <% if post.image && post.metadata['image_in_header'].to_s == 'true' %>
-    <div class="header-image">
-      <%= raw ResponsiveImageRenderer.render(post.image, alt: post.title, sizes: "(min-width: 1020px) 8rem, 100vw") %>
-    </div>
+    <%= raw ResponsiveImageRenderer.render(post.image, alt: post.title, sizes: "(min-width: 1020px) 8rem, 100vw") %>
   <% end %>
 </header>

@@ -1,4 +1,4 @@
-<article class="page page--<%= @page.url_name %><%= ' member-page' if @page.member_page? %>">
+<article class="page page-<%= @page.url_name %><%= ' member-page' if @page.member_page? %>">
   <div class="content">
     <%# Pass member context if available (for form error display) %>
     <% context = defined?(@member) ? { member: @member } : nil %>

@@ -7,16 +7,16 @@
 <div class="podcast-episode">
 
   <% has_cover = post.metadata['image'].present? %>
-  <div class="podcast-hero <%= 'no-cover' unless has_cover %>">
+  <div class="podcast-hero <%= 'is-no-cover' unless has_cover %>">
     <% if has_cover %>
-      <%# raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title, class: "podcast-hero-cover") %>
+      <%# raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title) %>
     <% end %>
     <div class="hero-player">
       <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
     </div>
   </div>
 
-  <div class="show-notes post-content">
+  <div class="post-content">
     <%= render_post_content(post) %>
   </div>
 
@@ -25,17 +25,17 @@
       <% if post.metadata['podcast'].present? %>
         <%# Show public feed unless podcast is paid-only (admins always see it) %>
         <% if authenticated? || @podcast_config&.dig('audience') != 'paid' %>
-          <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="subscribe-link subscribe-link--rss" target="_blank">
+          <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="feed-link" target="_blank">
             RSS Feed
           </a>
         <% end %>
         <%# Show private feed to paid members and admins %>
         <% if authenticated? %>
-          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml" class="subscribe-link subscribe-link--rss subscribe-link--private" target="_blank">
+          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml" class="feed-link feed-link-private" target="_blank">
             Private RSS Feed (Paid)
           </a>
         <% elsif current_member&.paid? && current_member&.active? %>
-          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml?token=<%= current_member.access_token %>" class="subscribe-link subscribe-link--rss subscribe-link--private" target="_blank">
+          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml?token=<%= current_member.access_token %>" class="feed-link feed-link-private" target="_blank">
             Private RSS Feed (Paid)
           </a>
         <% end %>
@@ -45,11 +45,11 @@
 
   <% if @podcast_episodes.present? && @podcast_episodes.length > 1 %>
     <div class="episode-list">
-      <h2 class="episode-list-heading">All Episodes</h2>
-      <ol class="episodes">
+      <h2>All Episodes</h2>
+      <ol>
         <% @podcast_episodes.each do |episode| %>
           <li class="episode-item <%= 'is-current' if episode.url_name == post.url_name %>">
-            <a href="<%= post_path(episode.url_name) %>" class="episode-link">
+            <a href="<%= post_path(episode.url_name) %>">
               <div class="episode-meta-row">
                 <% if episode.metadata['season'].present? || episode.metadata['episode_number'].present? %>
                   <span class="episode-number">
@@ -64,7 +64,7 @@
                   <span class="episode-date"><%= episode.date.strftime("%-d %B %Y") rescue episode.date.to_s %></span>
                 <% end %>
               </div>
-              <span class="episode-title"><%= episode.title %></span>
+              <span><%= episode.title %></span>
             </a>
           </li>
         <% end %>
