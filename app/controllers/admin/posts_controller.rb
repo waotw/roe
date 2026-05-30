@@ -47,7 +47,7 @@ class Admin::PostsController < Admin::BaseController
       end
 
       # Preserve url_name from database if not in submitted metadata
-      metadata['url_name'] ||= @post.metadata['url_name']
+      metadata["url_name"] ||= @post.metadata["url_name"]
 
       @post.metadata = metadata
       @post.content = content
@@ -58,7 +58,7 @@ class Admin::PostsController < Admin::BaseController
     @preview_mode = true
     @preview_id = "post-#{@post.id}"
 
-    render template: 'posts/show', layout: 'site'
+    render template: "posts/show", layout: "site"
   end
 
   def send_test_email
@@ -66,18 +66,18 @@ class Admin::PostsController < Admin::BaseController
     email = params[:email]
 
     unless email.present? && email.match?(URI::MailTo::EMAIL_REGEXP)
-      render json: { success: false, error: 'Invalid email address' }
+      render json: { success: false, error: "Invalid email address" }
       return
     end
 
     unless helpers.newsletters_enabled?
-      render json: { success: false, error: 'Newsletter feature is not enabled' }
+      render json: { success: false, error: "Newsletter feature is not enabled" }
       return
     end
 
     # Change to Postmark
     unless PostmarkConfig.configured?
-      render json: { success: false, error: 'Postmark is not configured. Check Settings > Postmark.' }
+      render json: { success: false, error: "Postmark is not configured. Check Settings > Postmark." }
       return
     end
 
@@ -88,16 +88,16 @@ class Admin::PostsController < Admin::BaseController
       # Change to Postmark
       result = PostmarkService.send_transactional_email(
         to_email: email,
-        to_name: email.split('@').first.titleize,
-        subject: @post.title || 'Newsletter Preview',
+        to_name: email.split("@").first.titleize,
+        subject: @post.title || "Newsletter Preview",
         html_content: html_content,
-        tag: 'test-newsletter'
+        tag: "test-newsletter"
       )
 
       if result[:success]
         render json: { success: true }
       else
-        render json: { success: false, error: result[:error] || 'Failed to send email' }
+        render json: { success: false, error: result[:error] || "Failed to send email" }
       end
 
     rescue => e
@@ -160,8 +160,8 @@ class Admin::PostsController < Admin::BaseController
     # Ensure podcast GUID (if podcast type + published)
     metadata = ensure_podcast_guid(metadata, Post.new)
 
-    if metadata['tags'].nil? || metadata['tags'] == ''
-      metadata['tags'] = []
+    if metadata["tags"].nil? || metadata["tags"] == ""
+      metadata["tags"] = []
     end
 
     # Format YAML consistently for new posts
@@ -189,7 +189,7 @@ class Admin::PostsController < Admin::BaseController
       parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
 
       # Convert hash to YAML without document separator
-      @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
+      @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, "")
       @content = parsed.content
 
     rescue Psych::SyntaxError, StandardError => e
@@ -200,7 +200,7 @@ class Admin::PostsController < Admin::BaseController
 
         begin
           parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
-          @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
+          @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, "")
           @content = parsed.content
 
           flash.now[:notice] = "Auto-fixed malformed GUID formatting"
@@ -235,16 +235,16 @@ class Admin::PostsController < Admin::BaseController
       end
 
       # Remove the error flag if it exists (YAML is now fixed)
-      metadata.delete('_yaml_parse_error')
+      metadata.delete("_yaml_parse_error")
 
-      if metadata['tags'].is_a?(String)
-        if metadata['tags'].strip.empty? || metadata['tags'] == '[]'
-          metadata['tags'] = []
+      if metadata["tags"].is_a?(String)
+        if metadata["tags"].strip.empty? || metadata["tags"] == "[]"
+          metadata["tags"] = []
         else
-          metadata['tags'] = metadata['tags'].split(',').map(&:strip).reject(&:empty?)
+          metadata["tags"] = metadata["tags"].split(",").map(&:strip).reject(&:empty?)
         end
-      elsif metadata['tags'].nil?
-        metadata['tags'] = []
+      elsif metadata["tags"].nil?
+        metadata["tags"] = []
       end
 
       # Ensure podcast GUID (if podcast type + published)
@@ -331,17 +331,17 @@ class Admin::PostsController < Admin::BaseController
     # Find new members who joined after last send
     new_members = Member.newsletter_subscribed
                         .active
-                        .where('subscribed_at > ?', last_send)
+                        .where("subscribed_at > ?", last_send)
 
     # If this is a Substack-imported post, exclude Substack-imported members.
     # Belt-and-suspenders: import_id FK + durable metadata flag (the latter
     # survives if the Import record is ever deleted).
-    if @post.metadata['substack_post_id'].present?
+    if @post.metadata["substack_post_id"].present?
       new_members = new_members.where(import_id: nil).not_substack_imported
     end
 
     # Filter by audience if needed
-    new_members = new_members.paid_tier if @post.audience == 'paid'
+    new_members = new_members.paid_tier if @post.audience == "paid"
 
     if new_members.empty?
       flash[:notice] = "No new members to send to"
@@ -374,12 +374,12 @@ class Admin::PostsController < Admin::BaseController
 
     # If this is a Substack-imported post, exclude Substack-imported members.
     # Belt-and-suspenders: import_id FK + durable metadata flag.
-    if @post.metadata['substack_post_id'].present?
+    if @post.metadata["substack_post_id"].present?
       new_members = new_members.where(import_id: nil).not_substack_imported
     end
 
     # Filter by audience if needed
-    new_members = new_members.paid_tier if @post.audience == 'paid'
+    new_members = new_members.paid_tier if @post.audience == "paid"
 
     if new_members.empty?
       flash[:notice] = "No new members to send to"
@@ -411,11 +411,11 @@ class Admin::PostsController < Admin::BaseController
                          .order(subscribed_at: :desc)
 
     # Filter by audience if needed
-    @new_members = @new_members.paid_tier if @post.audience == 'paid'
+    @new_members = @new_members.paid_tier if @post.audience == "paid"
 
     # If this is a Substack-imported post, exclude Substack-imported members.
     # Belt-and-suspenders: import_id FK + durable metadata flag.
-    if @post.metadata['substack_post_id'].present?
+    if @post.metadata["substack_post_id"].present?
       @new_members = @new_members.where(import_id: nil).not_substack_imported
     end
 
@@ -426,13 +426,13 @@ class Admin::PostsController < Admin::BaseController
       redirect_to edit_admin_post_path(@post) and return
     end
 
-    render partial: 'resend_modal', layout: false
+    render partial: "resend_modal", layout: false
   end
 
   def newsletter_status
     @post = Post.find(params[:id])
     calculate_new_members_count
-    render partial: 'newsletter_status', layout: false
+    render partial: "newsletter_status", layout: false
   end
 
   def destroy
@@ -472,14 +472,14 @@ class Admin::PostsController < Admin::BaseController
     end
 
     @missing_requirements = build_publish_requirements(@post)
-    @resource_label = 'Post'
+    @resource_label = "Post"
     @show_postmark_warning = helpers.newsletters_enabled? && !helpers.postmark_configured?
 
     # Pair audio/video with duration so the modal can extract duration into
     # the matching field client-side. The paired duration is nested, so we
     # strip it from the top-level list to avoid rendering it twice.
     media_section = @missing_requirements.find { |r| %w[audio video].include?(r[:name]) }
-    duration_section = @missing_requirements.find { |r| r[:name] == 'duration' }
+    duration_section = @missing_requirements.find { |r| r[:name] == "duration" }
     @paired_duration_for = nil
     if media_section && duration_section
       @paired_duration_for = media_section[:name]
@@ -487,12 +487,12 @@ class Admin::PostsController < Admin::BaseController
       @paired_duration = duration_section
     end
 
-    render partial: 'publish_modal', layout: false
+    render partial: "publish_modal", layout: false
   end
 
   def unpublish
     @post = Post.find(params[:id])
-    update_post_status(@post, 'draft')
+    update_post_status(@post, "draft")
     flash[:notice] = "Post unpublished"
     redirect_to edit_admin_post_path(@post)
   end
@@ -531,11 +531,11 @@ class Admin::PostsController < Admin::BaseController
                           .where.not(id: received_member_ids)
 
       # Filter by audience if needed
-      new_members = new_members.paid_tier if @post.audience == 'paid'
+      new_members = new_members.paid_tier if @post.audience == "paid"
 
       # If this is a Substack-imported post, exclude Substack-imported members.
       # Belt-and-suspenders: import_id FK + durable metadata flag.
-      if @post.metadata['substack_post_id'].present?
+      if @post.metadata["substack_post_id"].present?
         new_members = new_members.where(import_id: nil).not_substack_imported
       end
 
@@ -546,8 +546,8 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def should_send_newsletter?(post)
-    published_to = post.metadata['published_to'] || post.published_to
-    published_to.in?([ 'newsletter', 'both' ])
+    published_to = post.metadata["published_to"] || post.published_to
+    published_to.in?([ "newsletter", "both" ])
   end
 
   def send_newsletter(post)
@@ -569,16 +569,16 @@ class Admin::PostsController < Admin::BaseController
     # time they publish). Without payments, audience tiers are moot.
     if helpers.requires_audience_on_publish?
       requirements << {
-        name: 'audience',
+        name: "audience",
         type: :radio,
-        label: 'Audience',
-        hint: 'Who should be able to see this post?',
+        label: "Audience",
+        hint: "Who should be able to see this post?",
         options: [
-          [ 'everyone', 'Everyone', 'Public content visible to all visitors' ],
-          [ 'paid', 'Paid Members Only', 'Only accessible to paid members' ]
+          [ "everyone", "Everyone", "Public content visible to all visitors" ],
+          [ "paid", "Paid Members Only", "Only accessible to paid members" ]
         ],
-        default: 'everyone',
-        current: post.metadata['audience']
+        default: "everyone",
+        current: post.metadata["audience"]
       }
     end
 
@@ -586,23 +586,23 @@ class Admin::PostsController < Admin::BaseController
     # configured, so the user confirms where the post is being distributed).
     if helpers.requires_published_to_on_publish?
       requirements << {
-        name: 'published_to',
+        name: "published_to",
         type: :radio,
-        label: 'Distribution',
-        hint: 'Where should this post be published?',
+        label: "Distribution",
+        hint: "Where should this post be published?",
         options: [
-          [ 'both', 'Site & Newsletter', 'Publish to site and send as newsletter' ],
-          [ 'site', 'Site Only', "Publish to site, don't send newsletter" ],
-          [ 'newsletter', 'Newsletter Only', "Send as newsletter, don't publish to site" ]
+          [ "both", "Site & Newsletter", "Publish to site and send as newsletter" ],
+          [ "site", "Site Only", "Publish to site, don't send newsletter" ],
+          [ "newsletter", "Newsletter Only", "Send as newsletter, don't publish to site" ]
         ],
-        default: 'both',
-        current: post.metadata['published_to']
+        default: "both",
+        current: post.metadata["published_to"]
       }
     end
 
     # Type-specific requirements from POST_TYPES (blank required fields)
     post.missing_type_required_fields.each do |field|
-      next if field[:name].to_s == 'guid'  # auto-handled
+      next if field[:name].to_s == "guid"  # auto-handled
 
       options = field[:options].respond_to?(:call) ? field[:options].call : field[:options]
 
@@ -622,23 +622,23 @@ class Admin::PostsController < Admin::BaseController
     # are a valid mode — but we want the writer to make the call once at
     # publish time rather than silently ship an unconnected episode.
     # Suppressed once the value is set so we don't re-prompt on every edit.
-    if post.post_type == 'podcast' && post.metadata['podcast'].to_s.strip.empty?
+    if post.post_type == "podcast" && post.metadata["podcast"].to_s.strip.empty?
       feed_keys = PodcastConfig.podcast_keys
       if feed_keys.any?
         feed_options = feed_keys.map do |key|
-          title = PodcastConfig.get(key)&.dig('title').to_s.strip.presence || key
-          [key, title, "Add this episode to the #{title} RSS feed"]
+          title = PodcastConfig.get(key)&.dig("title").to_s.strip.presence || key
+          [ key, title, "Add this episode to the #{title} RSS feed" ]
         end
-        feed_options << ['', 'Local-only', "This episode appears on the site but doesn't go out in any RSS feed"]
+        feed_options << [ "", "Local-only", "This episode appears on the site but doesn't go out in any RSS feed" ]
 
         requirements << {
-          name: 'podcast',
+          name: "podcast",
           type: :radio,
-          label: 'Podcast feed',
-          hint: 'Which feed should this episode appear in?',
+          label: "Podcast feed",
+          hint: "Which feed should this episode appear in?",
           options: feed_options,
-          default: '',
-          current: post.metadata['podcast']
+          default: "",
+          current: post.metadata["podcast"]
         }
       end
     end
@@ -664,19 +664,19 @@ class Admin::PostsController < Admin::BaseController
 
   def ensure_podcast_guid(metadata_hash, post)
     # Only process for podcast posts
-    return metadata_hash unless metadata_hash['post_type'] == 'podcast'
+    return metadata_hash unless metadata_hash["post_type"] == "podcast"
 
     # Only process if status is published
-    return metadata_hash unless metadata_hash['status'] == 'published'
+    return metadata_hash unless metadata_hash["status"] == "published"
 
     # If this is an existing published podcast with a GUID in the database
     if post.persisted?
-      existing_guid = post.metadata['guid']
+      existing_guid = post.metadata["guid"]
 
       if existing_guid.present?
         # ALWAYS restore the database GUID (prevents editing/deletion)
-        if metadata_hash['guid'] != existing_guid
-          metadata_hash['guid'] = existing_guid
+        if metadata_hash["guid"] != existing_guid
+          metadata_hash["guid"] = existing_guid
           Rails.logger.warn "🔒 Restored immutable GUID for '#{metadata_hash['title']}'"
         end
         return metadata_hash  # GUID is set and immutable
@@ -684,8 +684,8 @@ class Admin::PostsController < Admin::BaseController
     end
 
     # No existing GUID - generate one (first publish)
-    if metadata_hash['guid'].blank?
-      metadata_hash['guid'] = SecureRandom.uuid
+    if metadata_hash["guid"].blank?
+      metadata_hash["guid"] = SecureRandom.uuid
       Rails.logger.info "✨ Generated new GUID for '#{metadata_hash['title']}'"
     end
 
@@ -704,19 +704,19 @@ class Admin::PostsController < Admin::BaseController
 
     # Use metadata from database (last known good state) and add error flag
     db_metadata = @post.metadata.dup
-    db_metadata['_yaml_parse_error'] = error.message
-    @metadata = db_metadata.to_yaml.sub(/\A---\n/, '')
+    db_metadata["_yaml_parse_error"] = error.message
+    @metadata = db_metadata.to_yaml.sub(/\A---\n/, "")
 
     flash.now[:alert] = "YAML parsing error detected. The form shows the last valid metadata from the database. Saving will fix the file formatting."
   end
 
   def sanitize_filename(filename)
-    filename = filename.to_s.sub(/\.md$/, '')
+    filename = filename.to_s.sub(/\.md$/, "")
     filename = File.basename(filename)
-    filename.gsub(/[^a-zA-Z0-9\-_]/, '-')
-            .gsub(/-+/, '-')
+    filename.gsub(/[^a-zA-Z0-9\-_]/, "-")
+            .gsub(/-+/, "-")
             .strip
-            .gsub(/^-|-$/, '')
+            .gsub(/^-|-$/, "")
   end
 
   def load_post_template
@@ -746,11 +746,11 @@ class Admin::PostsController < Admin::BaseController
 
   def filename_to_title(filename)
     # Remove .md extension if present
-    name = filename.sub(/\.md$/, '')
+    name = filename.sub(/\.md$/, "")
 
     # If filename has dashes or underscores, convert to title case
     if name.match?(/[-_]/)
-      name.split(/[-_]/).map(&:capitalize).join(' ')
+      name.split(/[-_]/).map(&:capitalize).join(" ")
     else
       # Keep original capitalization
       name
@@ -759,7 +759,7 @@ class Admin::PostsController < Admin::BaseController
 
   def sanitize_filename(filename)
     # Remove .md if they added it
-    filename = filename.sub(/\.md$/, '')
+    filename = filename.sub(/\.md$/, "")
     # Remove any path traversal attempts
     File.basename(filename)
   end
@@ -774,7 +774,7 @@ class Admin::PostsController < Admin::BaseController
 
       # Parse to update status
       metadata = YAML.safe_load(yaml_content, permitted_classes: [ Date, Time, Symbol ])
-      metadata['status'] = new_status
+      metadata["status"] = new_status
 
       # Re-format with consistent style
       new_yaml = Post.format_metadata_yaml(metadata)

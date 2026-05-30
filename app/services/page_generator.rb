@@ -1,22 +1,22 @@
 class PageGenerator
-  PAGES_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'pages'))
+  PAGES_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "pages"))
 
   def self.generate_defaults
     FileUtils.mkdir_p(PAGES_PATH)
 
-    generate_home_page unless File.exist?(PAGES_PATH.join('home.md'))
+    generate_home_page unless File.exist?(PAGES_PATH.join("home.md"))
     activate_default_theme
   end
 
   def self.activate_default_theme
-    site_yml_path = File.join(RoeSitePaths::SITE_PATH, 'system', 'global', 'site.yml')
+    site_yml_path = File.join(RoeSitePaths::SITE_PATH, "system", "global", "site.yml")
     return unless File.exist?(site_yml_path)
 
     config = YAML.load_file(site_yml_path) || {}
-    return if config['theme'].present?
+    return if config["theme"].present?
 
-    config['theme'] = 'default'
-    File.write(site_yml_path, config.to_yaml.sub(/\A---\n/, ''))
+    config["theme"] = "default"
+    File.write(site_yml_path, config.to_yaml.sub(/\A---\n/, ""))
     Rails.logger.info "Set default theme in site.yml"
   end
 
@@ -40,7 +40,7 @@ class PageGenerator
       ```
     MARKDOWN
 
-    File.write(PAGES_PATH.join('home.md'), content)
+    File.write(PAGES_PATH.join("home.md"), content)
     Rails.logger.info "Created default home.md"
   end
 
@@ -63,7 +63,7 @@ class PageGenerator
       ```
     MARKDOWN
 
-    File.write(PAGES_PATH.join('archive.md'), content)
+    File.write(PAGES_PATH.join("archive.md"), content)
     Rails.logger.info "Created default archive.md"
   end
 end

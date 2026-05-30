@@ -4,7 +4,7 @@ require "ostruct"
 class NewsletterRendererTest < ActiveSupport::TestCase
   def setup
     super
-    
+
     @public_post = create(:post,
       metadata: {
         "title" => "Test Post for Newsletter",
@@ -14,8 +14,8 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: "# Hello World\n\nThis is test content for the newsletter.\n\n- Item 1\n- Item 2"
     )
-    
-    @member = create(:member, 
+
+    @member = create(:member,
       name: "Test Member",
       email: "member@example.com"
     )
@@ -28,7 +28,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   test "renders post content to HTML" do
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render
-    
+
     assert_includes html, "Hello World"
     assert_includes html, "This is test content for the newsletter"
     assert_includes html, "<ul>"
@@ -38,7 +38,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   test "preview returns HTML without CSS inlining" do
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.preview
-    
+
     assert_includes html, "Hello World"
     assert_includes html, "<h1>"
   end
@@ -46,7 +46,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   test "render wraps content in email template" do
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render
-    
+
     # Should have email structure
     assert_includes html, "<!DOCTYPE"
     assert_includes html, "<html"
@@ -60,14 +60,14 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   test "includes post title in email" do
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render
-    
+
     assert_includes html, "Test Post for Newsletter"
   end
 
   test "includes post author when available" do
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render
-    
+
     assert_includes html, "Test Author"
   end
 
@@ -80,10 +80,10 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: "# Content"
     )
-    
+
     renderer = NewsletterRenderer.new(post_without_author)
     html = renderer.render
-    
+
     assert_includes html, "No Author Post"
   end
 
@@ -100,10 +100,10 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: "# Heading\n\n**Bold text** and *italic text*"
     )
-    
+
     renderer = NewsletterRenderer.new(post_with_markdown)
     html = renderer.render
-    
+
     assert_includes html, "<strong>Bold text</strong>"
     assert_includes html, "<em>italic text</em>"
   end
@@ -112,7 +112,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
     SiteConfig.stubs(:current).returns(
       OpenStruct.new(config: { "url" => "https://example.com" })
     )
-    
+
     post_with_links = create(:post,
       metadata: {
         "title" => "Link Post",
@@ -121,20 +121,20 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: "[Link](/posts/test) and ![Image](/media/test.jpg)"
     )
-    
+
     renderer = NewsletterRenderer.new(post_with_links)
     html = renderer.render
-    
+
     assert_includes html, "https://example.com/posts/test"
     assert_includes html, "https://example.com/media/test.jpg"
   end
 
   test "uses localhost fallback when site URL not configured" do
     SiteConfig.stubs(:current).returns(nil)
-    
+
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render
-    
+
     # Should still render successfully
     assert_includes html, "Hello World"
   end
@@ -152,10 +152,10 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: "```ruby\nputs 'Hello'\n```"
     )
-    
+
     renderer = NewsletterRenderer.new(post_with_code)
     html = renderer.render
-    
+
     assert_includes html, "puts"
     assert_includes html, "Hello"
   end
@@ -170,10 +170,10 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: long_content
     )
-    
+
     renderer = NewsletterRenderer.new(post_with_long_content)
     html = renderer.render
-    
+
     # Should render without errors
     assert html.length > 1000
   end
@@ -187,10 +187,10 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: "Special chars: ñ, é, ü, 日本語, 🎉, <script>"
     )
-    
+
     renderer = NewsletterRenderer.new(post_with_special)
     html = renderer.render
-    
+
     assert_includes html, "ñ"
     assert_includes html, "日本語"
   end
@@ -204,10 +204,10 @@ class NewsletterRendererTest < ActiveSupport::TestCase
       },
       content: ""
     )
-    
+
     renderer = NewsletterRenderer.new(post_with_empty)
     html = renderer.render
-    
+
     # Should render template even with empty content
     assert_includes html, "<!DOCTYPE"
     assert_includes html, "Empty Post"

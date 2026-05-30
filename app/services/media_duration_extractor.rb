@@ -21,14 +21,14 @@ class MediaDurationExtractor
     minutes = (seconds % 3600) / 60
     secs = seconds % 60
 
-    format('%02d:%02d:%02d', hours, minutes, secs)
+    format("%02d:%02d:%02d", hours, minutes, secs)
   end
 
   # Parse HH:MM:SS back to seconds (for RSS feed)
   def self.parse_duration(duration_string)
     return nil if duration_string.blank?
 
-    parts = duration_string.split(':').map(&:to_i)
+    parts = duration_string.split(":").map(&:to_i)
 
     case parts.length
     when 3 # HH:MM:SS

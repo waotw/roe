@@ -33,13 +33,13 @@ module SiteSync
           }
         end
 
-        diff = SiteSync::Ledger.diff(current, recorded['files'] || {})
+        diff = SiteSync::Ledger.diff(current, recorded["files"] || {})
         clean = diff[:modified].empty? && diff[:added].empty? && diff[:deleted].empty?
 
         {
           state: clean ? :clean : :local_drift,
           local: diff,
-          recorded_at: recorded['version']
+          recorded_at: recorded["version"]
         }
       rescue => e
         Rails.logger.error "[SiteSync::Checker] status failed: #{e.message}"

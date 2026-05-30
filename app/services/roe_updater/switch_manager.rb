@@ -2,9 +2,9 @@ module RoeUpdater
   class SwitchManager
     class SwitchError < StandardError; end
 
-    CURRENT_PATH = File.join(RoeSitePaths::ROE_ROOT, 'current')
-    BACKUP_PATH = File.join(RoeSitePaths::ROE_ROOT, 'current.backup')
-    STAGING_PATH = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+    CURRENT_PATH = File.join(RoeSitePaths::ROE_ROOT, "current")
+    BACKUP_PATH = File.join(RoeSitePaths::ROE_ROOT, "current.backup")
+    STAGING_PATH = File.join(RoeSitePaths::ROE_ROOT, "staging")
 
     class << self
       def switch_versions(status_record)

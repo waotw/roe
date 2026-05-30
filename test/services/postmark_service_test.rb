@@ -3,7 +3,7 @@ require "test_helper"
 class PostmarkServiceTest < ActiveSupport::TestCase
   def setup
     @config = PostmarkConfig.current
-    @config.update!(server_token: 'test-server-token')
+    @config.update!(server_token: "test-server-token")
   end
 
   test "configured? returns true when server_token is set" do
@@ -16,14 +16,14 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "test_connection succeeds with valid token" do
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
-    Net::HTTP.expects(:new).with('api.postmarkapp.com', 443).returns(http)
+    Net::HTTP.expects(:new).with("api.postmarkapp.com", 443).returns(http)
 
     result = PostmarkService.test_connection
     assert result[:success]
@@ -31,15 +31,15 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "test_connection fails with invalid token" do
-    response = mock('response')
-    response.stubs(:code).returns('401')
+    response = mock("response")
+    response.stubs(:code).returns("401")
     response.stubs(:body).returns('{"Message": "Invalid token"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
-    Net::HTTP.expects(:new).with('api.postmarkapp.com', 443).returns(http)
+    Net::HTTP.expects(:new).with("api.postmarkapp.com", 443).returns(http)
 
     result = PostmarkService.test_connection
     assert_not result[:success]
@@ -61,36 +61,36 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "send_transactional_email succeeds" do
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{"MessageID": "abc-123"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
-    Net::HTTP.expects(:new).with('api.postmarkapp.com', 443).returns(http)
+    Net::HTTP.expects(:new).with("api.postmarkapp.com", 443).returns(http)
 
     result = PostmarkService.send_transactional_email(
-      to_email: 'user@example.com',
-      to_name: 'Test User',
-      subject: 'Test Subject',
-      html_content: '<p>Hello</p>',
-      tag: 'welcome'
+      to_email: "user@example.com",
+      to_name: "Test User",
+      subject: "Test Subject",
+      html_content: "<p>Hello</p>",
+      tag: "welcome"
     )
 
     assert result[:success]
-    assert_equal 'abc-123', result[:message_id]
+    assert_equal "abc-123", result[:message_id]
   end
 
   test "send_transactional_email fails when not configured" do
     @config.update!(server_token: nil)
 
     result = PostmarkService.send_transactional_email(
-      to_email: 'user@example.com',
-      to_name: 'Test User',
-      subject: 'Test',
-      html_content: '<p>Hello</p>'
+      to_email: "user@example.com",
+      to_name: "Test User",
+      subject: "Test",
+      html_content: "<p>Hello</p>"
     )
 
     assert_not result[:success]
@@ -98,93 +98,93 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "send_transactional_email uses site config for from address" do
-    SiteConfig.find_by(file_path: 'site/system/global/site.yml')&.update!(
-      config: { 'author_email' => 'author@test.com', 'author' => 'Test Author' }
+    SiteConfig.find_by(file_path: "site/system/global/site.yml")&.update!(
+      config: { "author_email" => "author@test.com", "author" => "Test Author" }
     )
 
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{"MessageID": "msg-1"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).with do |request|
       body = JSON.parse(request.body)
-      body['From'] == 'Test Author <author@test.com>'
+      body["From"] == "Test Author <author@test.com>"
     end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
     PostmarkService.send_transactional_email(
-      to_email: 'user@example.com',
-      to_name: 'Test User',
-      subject: 'Test',
-      html_content: '<p>Hello</p>'
+      to_email: "user@example.com",
+      to_name: "Test User",
+      subject: "Test",
+      html_content: "<p>Hello</p>"
     )
   end
 
   test "send_transactional_email falls back to defaults when site config not set" do
-    SiteConfig.find_by(file_path: 'site/system/global/site.yml')&.update!(config: {})
+    SiteConfig.find_by(file_path: "site/system/global/site.yml")&.update!(config: {})
 
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{"MessageID": "msg-1"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).with do |request|
       body = JSON.parse(request.body)
-      body['From'] == 'Newsletter <noreply@example.com>'
+      body["From"] == "Newsletter <noreply@example.com>"
     end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
     PostmarkService.send_transactional_email(
-      to_email: 'user@example.com',
-      to_name: 'Test User',
-      subject: 'Test',
-      html_content: '<p>Hello</p>'
+      to_email: "user@example.com",
+      to_name: "Test User",
+      subject: "Test",
+      html_content: "<p>Hello</p>"
     )
   end
 
   test "send_transactional_email strips HTML for text body" do
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{"MessageID": "msg-1"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).with do |request|
       body = JSON.parse(request.body)
-      body['TextBody'] == 'Hello World'
+      body["TextBody"] == "Hello World"
     end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
     PostmarkService.send_transactional_email(
-      to_email: 'user@example.com',
-      to_name: 'Test User',
-      subject: 'Test',
-      html_content: '<p>Hello</p> <p>World</p>'
+      to_email: "user@example.com",
+      to_name: "Test User",
+      subject: "Test",
+      html_content: "<p>Hello</p> <p>World</p>"
     )
   end
 
   test "send_transactional_email handles API errors" do
-    response = mock('response')
-    response.stubs(:code).returns('422')
+    response = mock("response")
+    response.stubs(:code).returns("422")
     response.stubs(:body).returns('{"Message": "Invalid email address"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
     result = PostmarkService.send_transactional_email(
-      to_email: 'invalid',
-      to_name: 'Test',
-      subject: 'Test',
-      html_content: '<p>Hello</p>'
+      to_email: "invalid",
+      to_name: "Test",
+      subject: "Test",
+      html_content: "<p>Hello</p>"
     )
 
     assert_not result[:success]
@@ -193,22 +193,22 @@ class PostmarkServiceTest < ActiveSupport::TestCase
 
   test "send_newsletter_batch succeeds" do
     messages = [
-      { To: 'user1@example.com', Subject: 'Test 1' },
-      { To: 'user2@example.com', Subject: 'Test 2' }
+      { To: "user1@example.com", Subject: "Test 1" },
+      { To: "user2@example.com", Subject: "Test 2" }
     ]
 
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('[
       {"ErrorCode": 0, "MessageID": "msg-1"},
       {"ErrorCode": 0, "MessageID": "msg-2"}
     ]')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
-    Net::HTTP.expects(:new).with('api.postmarkapp.com', 443).returns(http)
+    Net::HTTP.expects(:new).with("api.postmarkapp.com", 443).returns(http)
 
     result = PostmarkService.send_newsletter_batch(messages: messages)
 
@@ -227,18 +227,18 @@ class PostmarkServiceTest < ActiveSupport::TestCase
 
   test "send_newsletter_batch handles partial failures" do
     messages = [
-      { To: 'user1@example.com', Subject: 'Test 1' },
-      { To: 'user2@example.com', Subject: 'Test 2' }
+      { To: "user1@example.com", Subject: "Test 1" },
+      { To: "user2@example.com", Subject: "Test 2" }
     ]
 
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('[
       {"ErrorCode": 0, "MessageID": "msg-1"},
       {"ErrorCode": 406, "Message": "Invalid recipient"}
     ]')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
@@ -247,22 +247,22 @@ class PostmarkServiceTest < ActiveSupport::TestCase
     result = PostmarkService.send_newsletter_batch(messages: messages)
 
     assert result[:success]
-    assert_equal 0, result[:results][0]['ErrorCode']
-    assert_equal 406, result[:results][1]['ErrorCode']
+    assert_equal 0, result[:results][0]["ErrorCode"]
+    assert_equal 406, result[:results][1]["ErrorCode"]
   end
 
   test "send_newsletter_batch handles API failure" do
-    response = mock('response')
-    response.stubs(:code).returns('500')
+    response = mock("response")
+    response.stubs(:code).returns("500")
     response.stubs(:body).returns('{"Message": "Server error"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
-    result = PostmarkService.send_newsletter_batch(messages: [ { To: 'test@example.com' } ])
+    result = PostmarkService.send_newsletter_batch(messages: [ { To: "test@example.com" } ])
 
     assert_not result[:success]
     assert_equal "Server error", result[:error]
@@ -272,19 +272,19 @@ class PostmarkServiceTest < ActiveSupport::TestCase
     # Create some test data
     create_list(:member, 5, newsletter_status: :subscribed)
     create_list(:member, 3, newsletter_status: :unsubscribed)
-    
+
     post = create(:post)
     member = create(:member)
     NewsletterSend.create!(post: post, member: member, sent_at: 1.day.ago)
 
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{
       "Name": "Test Server",
       "Color": "blue"
     }')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
@@ -312,10 +312,10 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "get_stats handles API errors" do
-    response = mock('response')
-    response.stubs(:code).returns('401')
+    response = mock("response")
+    response.stubs(:code).returns("401")
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
@@ -328,11 +328,11 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "handles malformed JSON in response" do
-    response = mock('response')
-    response.stubs(:code).returns('200')
-    response.stubs(:body).returns('not valid json')
+    response = mock("response")
+    response.stubs(:code).returns("200")
+    response.stubs(:body).returns("not valid json")
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).returns(response)
 
@@ -344,25 +344,25 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "uses correct headers for all requests" do
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{"MessageID": "msg-1"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).with do |request|
-      request['Accept'] == 'application/json' &&
-      request['Content-Type'] == 'application/json' &&
-      request['X-Postmark-Server-Token'] == 'test-server-token'
+      request["Accept"] == "application/json" &&
+      request["Content-Type"] == "application/json" &&
+      request["X-Postmark-Server-Token"] == "test-server-token"
     end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
     PostmarkService.send_transactional_email(
-      to_email: 'test@example.com',
-      to_name: 'Test',
-      subject: 'Test',
-      html_content: '<p>Hello</p>'
+      to_email: "test@example.com",
+      to_name: "Test",
+      subject: "Test",
+      html_content: "<p>Hello</p>"
     )
   end
 
@@ -376,17 +376,17 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "uses broadcast message stream for newsletters" do
-    messages = [ { To: 'test@example.com', Subject: 'Newsletter' } ]
+    messages = [ { To: "test@example.com", Subject: "Newsletter" } ]
 
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('[{"ErrorCode": 0, "MessageID": "msg-1"}]')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).with do |request|
       body = JSON.parse(request.body)
-      body[0]['MessageStream'] == 'broadcast'
+      body[0]["MessageStream"] == "broadcast"
     end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
@@ -395,24 +395,24 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "uses outbound message stream for transactional" do
-    response = mock('response')
-    response.stubs(:code).returns('200')
+    response = mock("response")
+    response.stubs(:code).returns("200")
     response.stubs(:body).returns('{"MessageID": "msg-1"}')
 
-    http = mock('http')
+    http = mock("http")
     http.expects(:use_ssl=).with(true)
     http.expects(:request).with do |request|
       body = JSON.parse(request.body)
-      body['MessageStream'] == 'outbound'
+      body["MessageStream"] == "outbound"
     end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
     PostmarkService.send_transactional_email(
-      to_email: 'test@example.com',
-      to_name: 'Test',
-      subject: 'Test',
-      html_content: '<p>Hello</p>'
+      to_email: "test@example.com",
+      to_name: "Test",
+      subject: "Test",
+      html_content: "<p>Hello</p>"
     )
   end
 end

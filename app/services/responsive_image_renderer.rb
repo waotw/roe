@@ -31,7 +31,7 @@ class ResponsiveImageRenderer
   end
 
   def render
-    return '' if source_path.blank?
+    return "" if source_path.blank?
     return simple_img_tag unless ImageVariantGenerator.available?
     return simple_img_tag unless image_file?
 
@@ -52,10 +52,10 @@ class ResponsiveImageRenderer
   private
 
   def build_picture_tag
-    alt_text = ERB::Util.html_escape(options[:alt] || '')
-    css_class = ERB::Util.html_escape(options[:class] || '')
-    loading = ERB::Util.html_escape(options[:loading] || 'lazy')
-    sizes = ERB::Util.html_escape(options[:sizes] || '(min-width: 1200px) 1200px, 100vw')
+    alt_text = ERB::Util.html_escape(options[:alt] || "")
+    css_class = ERB::Util.html_escape(options[:class] || "")
+    loading = ERB::Util.html_escape(options[:loading] || "lazy")
+    sizes = ERB::Util.html_escape(options[:sizes] || "(min-width: 1200px) 1200px, 100vw")
 
     # Build additional attributes
     extra_attrs = build_extra_attributes
@@ -96,9 +96,9 @@ class ResponsiveImageRenderer
   end
 
   def simple_img_tag
-    alt_text = ERB::Util.html_escape(options[:alt] || '')
-    css_class = ERB::Util.html_escape(options[:class] || '')
-    loading = ERB::Util.html_escape(options[:loading] || 'lazy')
+    alt_text = ERB::Util.html_escape(options[:alt] || "")
+    css_class = ERB::Util.html_escape(options[:class] || "")
+    loading = ERB::Util.html_escape(options[:loading] || "lazy")
     extra_attrs = build_extra_attributes
 
     # Use + to make string mutable
@@ -116,7 +116,7 @@ class ResponsiveImageRenderer
     known_keys = [ :alt, :class, :loading, :sizes ]
     extra = options.except(*known_keys)
 
-    extra.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ')
+    extra.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(" ")
   end
 
   # Both srcset builders intentionally OMIT the original. The originals-
@@ -135,7 +135,7 @@ class ResponsiveImageRenderer
       "#{ERB::Util.html_escape(webp_path)} #{width}w"
     end.compact
 
-    variants.any? ? variants.join(', ') : nil
+    variants.any? ? variants.join(", ") : nil
   end
 
   def build_fallback_srcset
@@ -146,7 +146,7 @@ class ResponsiveImageRenderer
       "#{ERB::Util.html_escape(web_path)} #{width}w"
     end.compact
 
-    variants.any? ? variants.join(', ') : nil
+    variants.any? ? variants.join(", ") : nil
   end
 
   # Web path for a native-format variant of the source.

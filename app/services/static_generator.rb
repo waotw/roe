@@ -84,23 +84,23 @@ class StaticGenerator
     # Reload only the configs that actually changed
     if changes[:changed_configs][:site]
       puts "  🔄 Reloading site config..."
-      SiteConfig.reload!('site')
+      SiteConfig.reload!("site")
     end
 
     if changes[:changed_configs][:collections]
       puts "  🔄 Reloading collections config..."
-      SiteConfig.reload!('defaults/collections')
+      SiteConfig.reload!("defaults/collections")
     end
 
     if changes[:changed_configs][:podcast]
       puts "  🔄 Reloading podcast config..."
-      SiteConfig.reload!('features/podcast')
+      SiteConfig.reload!("features/podcast")
       PodcastConfig.reload!
     end
 
     if changes[:changed_configs][:members]
       puts "  🔄 Reloading members config..."
-      SiteConfig.reload!('defaults/members')
+      SiteConfig.reload!("defaults/members")
       Rails.cache.clear
     end
 
@@ -156,7 +156,7 @@ class StaticGenerator
   # ============================================================================
 
   def load_manifest
-    manifest_file = @output_dir.join('.generation_manifest.json')
+    manifest_file = @output_dir.join(".generation_manifest.json")
 
     puts "📖 Loading manifest from: #{manifest_file}"
 
@@ -181,17 +181,17 @@ class StaticGenerator
       pages: build_content_manifest(static_pages_scope),
       documentation: build_content_manifest(Documentation),
       configs: {
-        'site' => SiteConfig.find_by("file_path LIKE ?", "%site.yml")&.updated_at&.iso8601(6),
-        'defaults/collections' => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
-        'defaults/cards' => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
-        'features/podcast' => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
-        'defaults/members' => SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.updated_at&.iso8601(6)
+        "site" => SiteConfig.find_by("file_path LIKE ?", "%site.yml")&.updated_at&.iso8601(6),
+        "defaults/collections" => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
+        "defaults/cards" => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
+        "features/podcast" => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
+        "defaults/members" => SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.updated_at&.iso8601(6)
       },
       layouts: layout_checksums,
       assets: asset_checksums
     }
 
-    manifest_path = @output_dir.join('.generation_manifest.json')
+    manifest_path = @output_dir.join(".generation_manifest.json")
     puts "💾 Saving manifest to: #{manifest_path}"
     File.write(manifest_path, JSON.pretty_generate(manifest))
     puts "   ✓ Manifest saved"
@@ -200,18 +200,18 @@ class StaticGenerator
   end
 
   def detect_changes
-    posts = changed_items(Post.not_draft, 'posts')
-    pages = changed_items(static_pages_scope, 'pages')
-    docs = changed_items(Documentation.not_draft, 'documentation')
+    posts = changed_items(Post.not_draft, "posts")
+    pages = changed_items(static_pages_scope, "pages")
+    docs = changed_items(Documentation.not_draft, "documentation")
 
-    podcast_posts = posts.select { |p| p.metadata['post_type'] == 'podcast' }
+    podcast_posts = posts.select { |p| p.metadata["post_type"] == "podcast" }
 
     # Track which specific configs changed
-    site_config_changed = config_file_changed?('site')
-    collections_config_changed = config_file_changed?('defaults/collections')
-    cards_config_changed = config_file_changed?('defaults/cards')
-    podcast_config_changed = config_file_changed?('features/podcast')
-    members_config_changed = config_file_changed?('defaults/members')
+    site_config_changed = config_file_changed?("site")
+    collections_config_changed = config_file_changed?("defaults/collections")
+    cards_config_changed = config_file_changed?("defaults/cards")
+    podcast_config_changed = config_file_changed?("features/podcast")
+    members_config_changed = config_file_changed?("defaults/members")
 
     global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed?
 
@@ -220,9 +220,9 @@ class StaticGenerator
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? static_pages_scope.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
-      collections: collections_config_changed || members_config_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
-      feeds: site_config_changed || posts.any? || @manifest['generated_at'].nil?,
-      podcast_feeds: podcast_config_changed || podcast_posts.any? || @manifest['generated_at'].nil?,
+      collections: collections_config_changed || members_config_changed || posts.any? || pages.any? || @manifest["generated_at"].nil?,
+      feeds: site_config_changed || posts.any? || @manifest["generated_at"].nil?,
+      podcast_feeds: podcast_config_changed || podcast_posts.any? || @manifest["generated_at"].nil?,
       assets: assets_changed?,
       media: media_changed?,
       config: global_changed,
@@ -244,7 +244,7 @@ class StaticGenerator
       if manifest_entry.nil?
         true
       else
-        last_generated = manifest_entry.is_a?(Hash) ? manifest_entry['updated_at'] : manifest_entry
+        last_generated = manifest_entry.is_a?(Hash) ? manifest_entry["updated_at"] : manifest_entry
         !last_generated || item.updated_at > Time.parse(last_generated)
       end
     end
@@ -254,28 +254,28 @@ class StaticGenerator
     home = Page.find_by("file_path LIKE ?", "%/home.md")
     return true unless home
 
-    manifest_entry = @manifest.dig('pages', home.id.to_s)
+    manifest_entry = @manifest.dig("pages", home.id.to_s)
     return true unless manifest_entry
 
-    last_generated = manifest_entry.is_a?(Hash) ? manifest_entry['updated_at'] : manifest_entry
+    last_generated = manifest_entry.is_a?(Hash) ? manifest_entry["updated_at"] : manifest_entry
     !last_generated || home.updated_at > Time.parse(last_generated)
   end
 
   def podcast_config_changed?
-    config_file_changed?('defaults/podcast')
+    config_file_changed?("defaults/podcast")
   end
 
   def config_changed?
     # Check all config files
-    site_changed = config_file_changed?('site')
-    collections_changed = config_file_changed?('defaults/collections')
-    cards_changed = config_file_changed?('defaults/cards')
+    site_changed = config_file_changed?("site")
+    collections_changed = config_file_changed?("defaults/collections")
+    cards_changed = config_file_changed?("defaults/cards")
 
     site_changed || collections_changed || cards_changed
   end
 
   def config_file_changed?(config_type)
-    last = @manifest.dig('configs', config_type)
+    last = @manifest.dig("configs", config_type)
     config = SiteConfig.find_by("file_path LIKE ?", "%#{config_type}.yml")
 
     if last && config
@@ -289,36 +289,36 @@ class StaticGenerator
   end
 
   def layouts_changed?
-    @manifest['layouts'] != layout_checksums
+    @manifest["layouts"] != layout_checksums
   end
 
   def assets_changed?
-    @manifest['assets'] != asset_checksums
+    @manifest["assets"] != asset_checksums
   end
 
   def media_changed?
-    @manifest.dig('assets', 'media') != asset_checksums[:media]
+    @manifest.dig("assets", "media") != asset_checksums[:media]
   end
 
   def layout_checksums
-    layout_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'layout'))
+    layout_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "layout"))
     return nil unless layout_dir.exist?
 
-    Dir.glob(layout_dir.join('*.md')).map { |f| [ f, File.mtime(f).to_i ] }.to_h
+    Dir.glob(layout_dir.join("*.md")).map { |f| [ f, File.mtime(f).to_i ] }.to_h
   end
 
   def asset_checksums
     {
-      fonts: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'fonts'))),
-      images: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'images'))),
-      media: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'media'))),
-      theme: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'theme')))
+      fonts: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, "system", "assets", "fonts"))),
+      images: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images"))),
+      media: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, "media"))),
+      theme: dir_checksum(Pathname.new(File.join(RoeSitePaths::SITE_PATH, "theme")))
     }
   end
 
   def dir_checksum(path)
     return nil unless path.exist?
-    files = Dir.glob(path.join('**', '*')).select { |f| File.file?(f) }
+    files = Dir.glob(path.join("**", "*")).select { |f| File.file?(f) }
     files.map { |f| [ f, File.mtime(f).to_i ] }.to_h
   end
 
@@ -335,9 +335,9 @@ class StaticGenerator
 
   def html_filename_for_type(model_name, url_name)
     case model_name
-    when 'Post' then "posts/#{url_name}.html"
-    when 'Page' then "#{url_name}.html"
-    when 'Documentation' then "documentation/#{url_name}.html"
+    when "Post" then "posts/#{url_name}.html"
+    when "Page" then "#{url_name}.html"
+    when "Documentation" then "documentation/#{url_name}.html"
     end
   end
 
@@ -349,7 +349,7 @@ class StaticGenerator
       @manifest.fetch(type, {}).each do |id, data|
         model = type.singularize.capitalize.constantize
         unless model.exists?(id.to_i)
-          html_file = data.is_a?(Hash) ? data['html_file'] : nil
+          html_file = data.is_a?(Hash) ? data["html_file"] : nil
           if html_file
             file_to_delete = @output_dir.join(html_file)
             if file_to_delete.exist?
@@ -366,9 +366,9 @@ class StaticGenerator
     # after a previous run). Without this, stale signin/signup/donate
     # html files would linger in the output.
     eligible_ids = static_pages_scope.pluck(:id).map(&:to_s).to_set
-    @manifest.fetch('pages', {}).each do |id, data|
+    @manifest.fetch("pages", {}).each do |id, data|
       next if eligible_ids.include?(id)
-      html_file = data.is_a?(Hash) ? data['html_file'] : nil
+      html_file = data.is_a?(Hash) ? data["html_file"] : nil
       next unless html_file
       file_to_delete = @output_dir.join(html_file)
       if file_to_delete.exist?
@@ -393,11 +393,11 @@ class StaticGenerator
       return
     end
 
-    html = render_with_layout(template: 'pages/show', assigns: { page: home_page })
-    write_file('index.html', html)
+    html = render_with_layout(template: "pages/show", assigns: { page: home_page })
+    write_file("index.html", html)
     puts "  ✓ Home page generated"
   rescue => e
-    log_error('home', nil, e)
+    log_error("home", nil, e)
   end
 
   # ============================================================================
@@ -412,13 +412,13 @@ class StaticGenerator
       generate_post(post)
       @stats[:posts] += 1
     rescue => e
-      log_error('post', post.slug, e)
+      log_error("post", post.slug, e)
     end
     puts "  ✓ Generated #{@stats[:posts]} posts"
   end
 
   def generate_post(post)
-    html = render_with_layout(template: 'posts/show', assigns: { post: post })
+    html = render_with_layout(template: "posts/show", assigns: { post: post })
     write_file("posts/#{post.url_name}.html", html)
   end
 
@@ -434,13 +434,13 @@ class StaticGenerator
       generate_page(page)
       @stats[:pages] += 1
     rescue => e
-      log_error('page', page.slug, e)
+      log_error("page", page.slug, e)
     end
     puts "  ✓ Generated #{@stats[:pages]} pages"
   end
 
   def generate_page(page)
-    html = render_with_layout(template: 'pages/show', assigns: { page: page })
+    html = render_with_layout(template: "pages/show", assigns: { page: page })
     write_file("#{page.url_name}.html", html)
   end
 
@@ -458,13 +458,13 @@ class StaticGenerator
       generate_documentation_page(doc)
       @stats[:documentation] += 1
     rescue => e
-      log_error('documentation', doc.slug, e)
+      log_error("documentation", doc.slug, e)
     end
     puts "  ✓ Generated #{@stats[:documentation]} documentation pages"
   end
 
   def generate_documentation_page(doc)
-    html = render_with_layout(template: 'documentation/show', assigns: { doc: doc })
+    html = render_with_layout(template: "documentation/show", assigns: { doc: doc })
     write_file("documentation/#{doc.url_name}.html", html)
   end
 
@@ -486,8 +486,8 @@ class StaticGenerator
 
     generate_paginated_collection(
       items: posts,
-      slug: 'posts',
-      title: 'All Posts',
+      slug: "posts",
+      title: "All Posts",
       per_page: default_per_page
     )
   end
@@ -498,7 +498,7 @@ class StaticGenerator
     collections.each do |config|
       generate_named_collection(config)
     rescue => e
-      log_error('collection', config[:heading] || 'unnamed', e)
+      log_error("collection", config[:heading] || "unnamed", e)
     end
   end
 
@@ -509,7 +509,7 @@ class StaticGenerator
       model.not_draft.each do |item|
         item.content.scan(/```collection\r?\n(.*?)```/m) do
           config = parse_collection_config($1)
-          if config[:show_more] == 'true' || config[:show_more] == true
+          if config[:show_more] == "true" || config[:show_more] == true
             configs << config
           end
         end
@@ -523,7 +523,7 @@ class StaticGenerator
     config = {}
     text.split("\n").each do |line|
       next if line.strip.empty?
-      key, value = line.split(':', 2).map(&:strip)
+      key, value = line.split(":", 2).map(&:strip)
       config[key.to_sym] = value if key && value
     end
     config
@@ -542,13 +542,13 @@ class StaticGenerator
   end
 
   def default_per_page
-    SiteConfig.default('collections', 'items_per_page')&.to_i || 20
+    SiteConfig.default("collections", "items_per_page")&.to_i || 20
   end
 
   def generate_collection_slug(config)
     heading = config[:heading]
     tags = config[:tags]
-    post_type = config[:post_type] unless config[:post_type] == 'all'
+    post_type = config[:post_type] unless config[:post_type] == "all"
     podcast_key = config[:podcast]
 
     if heading.present?
@@ -559,13 +559,13 @@ class StaticGenerator
       segments << "podcast-#{podcast_key.parameterize}" if podcast_key.present?
 
       if tags.present?
-        positive_tags = tags.split(',').map(&:strip).reject { |t| t.start_with?('-') }
-        segments << positive_tags.map(&:parameterize).join(',') if positive_tags.any?
+        positive_tags = tags.split(",").map(&:strip).reject { |t| t.start_with?("-") }
+        segments << positive_tags.map(&:parameterize).join(",") if positive_tags.any?
       end
 
-      segments.join('/')
+      segments.join("/")
     else
-      'all'
+      "all"
     end
   end
 
@@ -575,22 +575,22 @@ class StaticGenerator
   end
 
   def fetch_collection_items(config)
-    source = config[:source] || 'posts'
+    source = config[:source] || "posts"
     tags = config[:tags]
-    post_type = config[:post_type] unless config[:post_type] == 'all'
-    order = config[:order] || 'date'
+    post_type = config[:post_type] unless config[:post_type] == "all"
+    order = config[:order] || "date"
     podcast_key = config[:podcast]
 
     items = case source
-    when 'posts'
+    when "posts"
       collection = Post.published.regular_posts
       collection = collection.by_type(post_type) if post_type
       collection = collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip) if podcast_key.present?
       collection = apply_tag_filters(collection, tags) if tags
       collection
-    when 'pages'
+    when "pages"
       Page.public_pages
-    when 'documentation'
+    when "documentation"
       Documentation.not_draft
     else
       Post.published.regular_posts
@@ -605,9 +605,9 @@ class StaticGenerator
   def apply_tag_filters(collection, tag_string)
     return collection if tag_string.blank?
 
-    tags = tag_string.split(',').map(&:strip)
-    positive_tags = tags.reject { |t| t.start_with?('-') }
-    negative_tags = tags.select { |t| t.start_with?('-') }.map { |t| t[1..-1] }
+    tags = tag_string.split(",").map(&:strip)
+    positive_tags = tags.reject { |t| t.start_with?("-") }
+    negative_tags = tags.select { |t| t.start_with?("-") }.map { |t| t[1..-1] }
 
     collection = collection.tagged_with(positive_tags) if positive_tags.any?
 
@@ -623,14 +623,14 @@ class StaticGenerator
 
   def apply_collection_order(items, order_by)
     case order_by
-    when 'filename'
+    when "filename"
       items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, '.md')
+        filename = File.basename(item.file_path, ".md")
         filename =~ /^(\d+)/ ? [ $1.to_i, filename ] : [ Float::INFINITY, filename ]
       end
-    when 'title'
+    when "title"
       items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
-    when 'date-asc'
+    when "date-asc"
       items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
     else
       items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
@@ -639,12 +639,12 @@ class StaticGenerator
 
   def generate_title_from_config(config)
     if config[:tags].present?
-      tags = config[:tags].split(',').map(&:strip).reject { |t| t.start_with?('-') }
-      tags.map(&:titleize).join(', ')
+      tags = config[:tags].split(",").map(&:strip).reject { |t| t.start_with?("-") }
+      tags.map(&:titleize).join(", ")
     elsif config[:post_type].present?
       pluralize_post_type(config[:post_type])
     else
-      'Collection'
+      "Collection"
     end
   end
 
@@ -665,7 +665,7 @@ class StaticGenerator
     total_pages = (total_items.to_f / per_page).ceil
 
     # Determine if this is a root-level archive or a filtered collection
-    is_root_archive = slug == 'posts'
+    is_root_archive = slug == "posts"
     base_path = is_root_archive ? slug : "collections/#{slug}"
 
     total_pages.times do |page_num|
@@ -673,10 +673,10 @@ class StaticGenerator
       page_items = items_array[(page - 1) * per_page, per_page] || []
 
       html = render_with_layout(
-        template: 'collections/show',
+        template: "collections/show",
         assigns: {
           page_heading: title,
-          page_description: 'latest',
+          page_description: "latest",
           items: page_items,
           page: page,
           total_pages: total_pages,
@@ -702,14 +702,14 @@ class StaticGenerator
     puts "📡 Generating RSS/Atom feeds..."
 
     rss_xml = render_feed(format: :rss)
-    write_file('feed.rss', rss_xml) if rss_xml.present?
+    write_file("feed.rss", rss_xml) if rss_xml.present?
 
     atom_xml = render_feed(format: :atom)
-    write_file('feed.atom', atom_xml) if atom_xml.present?
+    write_file("feed.atom", atom_xml) if atom_xml.present?
 
     puts "  ✓ Generated feeds"
   rescue => e
-    log_error('feeds', nil, e)
+    log_error("feeds", nil, e)
   end
 
   def generate_podcast_feeds
@@ -721,7 +721,7 @@ class StaticGenerator
     podcast_keys.each do |podcast_key|
       generate_podcast_feed(podcast_key)
     rescue => e
-      log_error('podcast_feed', podcast_key, e)
+      log_error("podcast_feed", podcast_key, e)
     end
 
     puts "  ✓ Generated #{podcast_keys.count} podcast feeds"
@@ -730,7 +730,7 @@ class StaticGenerator
   def generate_podcast_feed(podcast_key)
     podcast_config = PodcastConfig.get(podcast_key)
     episodes = Post.published
-      .where("json_extract(metadata, '$.post_type') = ?", 'podcast')
+      .where("json_extract(metadata, '$.post_type') = ?", "podcast")
       .where("json_extract(metadata, '$.podcast') = ?", podcast_key)
       .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
 
@@ -738,10 +738,10 @@ class StaticGenerator
       posts: episodes,
       format: :podcast,
       site_config: {
-        title: podcast_config['title'],
-        description: podcast_config['description'],
+        title: podcast_config["title"],
+        description: podcast_config["description"],
         url: "https://#{site_host}",
-        author: podcast_config['author']
+        author: podcast_config["author"]
       },
       podcast_config: podcast_config
     ).generate
@@ -751,7 +751,7 @@ class StaticGenerator
 
   def render_feed(format:)
     controller = FeedsController.new
-    controller.request = ActionDispatch::TestRequest.create('HTTP_HOST' => site_host, 'HTTPS' => 'on')
+    controller.request = ActionDispatch::TestRequest.create("HTTP_HOST" => site_host, "HTTPS" => "on")
     controller.response = ActionDispatch::TestResponse.new
 
     case format
@@ -771,9 +771,9 @@ class StaticGenerator
 
   def copy_assets
     puts "🎨 Copying changed assets..."
-    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'fonts'), @output_dir.join('system', 'fonts'))
-    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'images'), @output_dir.join('system', 'images'))
-    sync_directory(File.join(RoeSitePaths::SITE_PATH, 'theme'), @output_dir.join('theme'))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, "system", "assets", "fonts"), @output_dir.join("system", "fonts"))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images"), @output_dir.join("system", "images"))
+    sync_directory(File.join(RoeSitePaths::SITE_PATH, "theme"), @output_dir.join("theme"))
     copy_bundled_themes
     puts "  ✓ Assets synced"
   end
@@ -782,12 +782,12 @@ class StaticGenerator
   # the bundled copy in app/themes/. Without this, sites running the
   # out-of-box default theme would publish with no stylesheet.
   def copy_bundled_themes
-    theme_name = SiteConfig.get('theme.active') || 'default'
+    theme_name = SiteConfig.get("theme.active") || "default"
     %W[#{theme_name}.css checkout.js].each do |filename|
-      dest = @output_dir.join('theme', filename)
+      dest = @output_dir.join("theme", filename)
       next if dest.exist? # site/theme/<file> already won the copy
 
-      bundled = Rails.root.join('app', 'themes', filename)
+      bundled = Rails.root.join("app", "themes", filename)
       next unless bundled.exist?
 
       FileUtils.mkdir_p(dest.dirname)
@@ -805,8 +805,8 @@ class StaticGenerator
   def copy_media
     puts "🖼️  Copying changed media..."
     sync_directory(
-      File.join(RoeSitePaths::SITE_PATH, 'media'),
-      @output_dir.join('media'),
+      File.join(RoeSitePaths::SITE_PATH, "media"),
+      @output_dir.join("media"),
       skip_if: ->(rel) { rel =~ IMAGE_ORIGINAL_PATTERN }
     )
     puts "  ✓ Media synced"
@@ -821,7 +821,7 @@ class StaticGenerator
     copied = skipped = deleted = 0
     source_files = Set.new
 
-    Dir.glob(source.join('**', '*')).each do |source_file|
+    Dir.glob(source.join("**", "*")).each do |source_file|
       next unless File.file?(source_file)
 
       relative_path = Pathname.new(source_file).relative_path_from(source)
@@ -846,7 +846,7 @@ class StaticGenerator
       end
     end
 
-    Dir.glob(dest.join('**', '*')).each do |dest_file|
+    Dir.glob(dest.join("**", "*")).each do |dest_file|
       next unless File.file?(dest_file)
       relative_path = Pathname.new(dest_file).relative_path_from(dest).to_s
       unless source_files.include?(relative_path)
@@ -864,12 +864,12 @@ class StaticGenerator
 
   def generate_404
     puts "🔍 Generating 404 page..."
-    html = render_with_layout(template: 'errors/not_found')
-    write_file('404.html', html)
+    html = render_with_layout(template: "errors/not_found")
+    write_file("404.html", html)
     puts "  ✓ 404 page generated"
   rescue => e
     puts "  ⚠ Using basic 404"
-    write_file('404.html', basic_404_html)
+    write_file("404.html", basic_404_html)
   end
 
   def basic_404_html
@@ -927,7 +927,7 @@ class StaticGenerator
     end
     xml << "</urlset>\n"
 
-    write_file('sitemap.xml', xml)
+    write_file("sitemap.xml", xml)
     puts "  ✓ sitemap.xml (#{urls.size} urls)"
   end
 
@@ -935,14 +935,14 @@ class StaticGenerator
     puts "🤖 Generating robots.txt..."
     host = site_url_base
     body = "User-agent: *\nAllow: /\n\nSitemap: #{host}/sitemap.xml\n"
-    write_file('robots.txt', body)
+    write_file("robots.txt", body)
     puts "  ✓ robots.txt"
   end
 
   def site_url_base
-    raw = SiteConfig.get('url').to_s.strip
+    raw = SiteConfig.get("url").to_s.strip
     return "https://#{site_host}" if raw.empty?
-    raw.match?(/\Ahttps?:\/\//) ? raw.sub(/\/+\z/, '') : "https://#{raw.sub(/\/+\z/, '')}"
+    raw.match?(/\Ahttps?:\/\//) ? raw.sub(/\/+\z/, "") : "https://#{raw.sub(/\/+\z/, '')}"
   end
 
   # ============================================================================
@@ -964,7 +964,7 @@ class StaticGenerator
     ApplicationController.render(
       template: template,
       assigns: assigns.merge(static_generation: true),
-      layout: 'site'
+      layout: "site"
     )
   rescue ActionController::UrlGenerationError => e
     # Extract context from error
@@ -1016,13 +1016,13 @@ class StaticGenerator
   end
 
   def site_host
-    @site_host ||= SiteConfig.first&.config&.dig('url')&.gsub(%r{https?://}, '') || 'localhost'
+    @site_host ||= SiteConfig.first&.config&.dig("url")&.gsub(%r{https?://}, "") || "localhost"
   end
 
   def write_file(relative_path, content)
     full_path = @output_dir.join(relative_path)
     FileUtils.mkdir_p(full_path.dirname)
-    content = post_process_html(content, relative_path) if relative_path.end_with?('.html')
+    content = post_process_html(content, relative_path) if relative_path.end_with?(".html")
     File.write(full_path, content)
   end
 
@@ -1034,31 +1034,31 @@ class StaticGenerator
   end
 
   def rewrite_urls(doc, current_path)
-    depth = current_path.count('/')
-    prefix = depth > 0 ? ('../' * depth) : './'
+    depth = current_path.count("/")
+    prefix = depth > 0 ? ("../" * depth) : "./"
 
     doc.css('a[href^="/"]').each do |link|
-      href = link['href']
-      next if href.start_with?('/media/', '/system/', '/assets/')
+      href = link["href"]
+      next if href.start_with?("/media/", "/system/", "/assets/")
 
       clean_href = href[1..-1]
 
       # Keep root path as-is (don't convert / to /index.html)
       if clean_href.empty?
-        link['href'] = prefix.chomp('./') + '/'
-      elsif clean_href == 'index'
-        link['href'] = prefix.chomp('./') + '/'
+        link["href"] = prefix.chomp("./") + "/"
+      elsif clean_href == "index"
+        link["href"] = prefix.chomp("./") + "/"
       elsif !clean_href.match?(/\.\w+$/)
-        link['href'] = "#{prefix}#{clean_href}.html"
+        link["href"] = "#{prefix}#{clean_href}.html"
       end
     end
   end
 
   def add_generator_meta(doc)
-    meta = Nokogiri::XML::Node.new('meta', doc)
-    meta['name'] = 'generator'
-    meta['content'] = 'Roe CMS'
-    doc.at_css('head')&.add_child(meta)
+    meta = Nokogiri::XML::Node.new("meta", doc)
+    meta["name"] = "generator"
+    meta["content"] = "Roe CMS"
+    doc.at_css("head")&.add_child(meta)
   end
 
   # ============================================================================

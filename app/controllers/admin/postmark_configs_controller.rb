@@ -12,12 +12,12 @@ class Admin::PostmarkConfigsController < Admin::BaseController
     live_token = params[:postmark_config][:server_token]
 
     # Skip masked placeholders
-    test_token = nil if test_token == '••••••••••••••••'
-    live_token = nil if live_token == '••••••••••••••••'
+    test_token = nil if test_token == "••••••••••••••••"
+    live_token = nil if live_token == "••••••••••••••••"
 
     # Save test token to file (all environments)
     if test_token.present?
-      PostmarkConfig.save_test_config({ 'server_token' => test_token })
+      PostmarkConfig.save_test_config({ "server_token" => test_token })
     end
 
     # Save live token to DB — production only

@@ -1,6 +1,6 @@
 module Admin
   class StripeConfigsController < Admin::BaseController
-    layout 'application'
+    layout "application"
 
     def edit
       @stripe_config = StripeConfig.current
@@ -12,9 +12,9 @@ module Admin
 
       # Save test keys to file (all environments)
       test_config_data = {}
-      test_config_data['publishable_key']       = params[:stripe_config][:publishable_key_test]       if params[:stripe_config][:publishable_key_test].present?
-      test_config_data['secret_key']            = params[:stripe_config][:secret_key_test]            if params[:stripe_config][:secret_key_test].present?
-      test_config_data['webhook_signing_secret'] = params[:stripe_config][:webhook_signing_secret_test] if params[:stripe_config][:webhook_signing_secret_test].present?
+      test_config_data["publishable_key"]       = params[:stripe_config][:publishable_key_test]       if params[:stripe_config][:publishable_key_test].present?
+      test_config_data["secret_key"]            = params[:stripe_config][:secret_key_test]            if params[:stripe_config][:secret_key_test].present?
+      test_config_data["webhook_signing_secret"] = params[:stripe_config][:webhook_signing_secret_test] if params[:stripe_config][:webhook_signing_secret_test].present?
 
       StripeConfig.save_test_config(test_config_data) if test_config_data.any?
 

@@ -1,4 +1,4 @@
-require 'psych'
+require "psych"
 
 # Monkey-patch Psych to allow Date, Time, Symbol globally for this app
 module Psych

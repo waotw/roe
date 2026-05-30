@@ -4,9 +4,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
   setup do
     @stripe_config = StripeConfig.current
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      webhook_signing_secret_test: 'whsec_test_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      webhook_signing_secret_test: "whsec_test_123"
     )
     @member = create(:member, tier: :free, status: :active)
   end
@@ -14,15 +14,15 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
   # POST /webhooks/stripe
   test "returns 200 for valid checkout.session.completed webhook" do
     event_data = {
-      id: 'evt_test_123',
-      type: 'checkout.session.completed',
+      id: "evt_test_123",
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
-          customer: 'cus_test_123',
-          payment_intent: 'pi_test_123',
+          id: "cs_test_123",
+          customer: "cus_test_123",
+          payment_intent: "pi_test_123",
           amount_total: 4900,
-          currency: 'usd',
+          currency: "usd",
           metadata: {
             member_id: @member.id
           }
@@ -36,18 +36,18 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
-    
+
     # Verify member was upgraded
     @member.reload
     assert @member.paid?
-    assert_equal 'cus_test_123', @member.stripe_customer_id
-    assert_equal 'pi_test_123', @member.stripe_payment_intent_id
+    assert_equal "cus_test_123", @member.stripe_customer_id
+    assert_equal "pi_test_123", @member.stripe_payment_intent_id
   end
 
   test "returns 400 for invalid signature" do
@@ -56,9 +56,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: {}.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'invalid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "invalid_signature"
       }
 
     assert_response :bad_request
@@ -66,10 +66,10 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
   test "returns 400 for malformed JSON" do
     post "/webhooks/stripe",
-      params: 'not valid json',
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'some_signature'
+      params: "not valid json",
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "some_signature"
       }
 
     assert_response :bad_request
@@ -79,14 +79,14 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(webhook_signing_secret_test: nil)
 
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
-          customer: 'cus_test_123',
-          payment_intent: 'pi_test_123',
+          id: "cs_test_123",
+          customer: "cus_test_123",
+          payment_intent: "pi_test_123",
           amount_total: 4900,
-          currency: 'usd',
+          currency: "usd",
           metadata: { member_id: @member.id }
         }
       }
@@ -99,7 +99,7 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 'CONTENT_TYPE' => 'application/json' }
+      headers: { "CONTENT_TYPE" => "application/json" }
 
     assert_response :ok
     # Verify member was upgraded
@@ -109,10 +109,10 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
   test "ignores webhook when member_id missing from metadata" do
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
+          id: "cs_test_123",
           metadata: {}
         }
       }
@@ -123,9 +123,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
@@ -135,10 +135,10 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
   test "ignores webhook when member not found" do
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
+          id: "cs_test_123",
           metadata: { member_id: 99999 }
         }
       }
@@ -149,9 +149,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
@@ -159,22 +159,22 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
   test "skips already paid member (idempotent)" do
     # Create a paid member with existing Stripe info
-    paid_member = create(:member, 
-      tier: :paid, 
+    paid_member = create(:member,
+      tier: :paid,
       status: :active,
-      stripe_customer_id: 'cus_existing',
-      stripe_payment_intent_id: 'pi_existing'
+      stripe_customer_id: "cus_existing",
+      stripe_payment_intent_id: "pi_existing"
     )
-    
+
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
-          customer: 'cus_new',
-          payment_intent: 'pi_new',
+          id: "cs_test_123",
+          customer: "cus_new",
+          payment_intent: "pi_new",
           amount_total: 4900,
-          currency: 'usd',
+          currency: "usd",
           metadata: { member_id: paid_member.id }
         }
       }
@@ -185,28 +185,28 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
     # Should not change - keeps original Stripe info
     paid_member.reload
-    assert_equal 'cus_existing', paid_member.stripe_customer_id
-    assert_equal 'pi_existing', paid_member.stripe_payment_intent_id
+    assert_equal "cus_existing", paid_member.stripe_customer_id
+    assert_equal "pi_existing", paid_member.stripe_payment_intent_id
   end
 
   test "stores password in cache for success page" do
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
-          customer: 'cus_test_123',
-          payment_intent: 'pi_test_123',
+          id: "cs_test_123",
+          customer: "cus_test_123",
+          payment_intent: "pi_test_123",
           amount_total: 4900,
-          currency: 'usd',
+          currency: "usd",
           metadata: { member_id: @member.id }
         }
       }
@@ -217,9 +217,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
@@ -232,14 +232,14 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
   test "records payment amount and currency" do
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
-          customer: 'cus_test_123',
-          payment_intent: 'pi_test_123',
+          id: "cs_test_123",
+          customer: "cus_test_123",
+          payment_intent: "pi_test_123",
           amount_total: 9900,
-          currency: 'eur',
+          currency: "eur",
           metadata: { member_id: @member.id }
         }
       }
@@ -250,19 +250,19 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     @member.reload
     assert_equal 9900, @member.paid_amount_cents
-    assert_equal 'eur', @member.paid_currency
+    assert_equal "eur", @member.paid_currency
   end
 
   test "handles unknown event types gracefully" do
     event_data = {
-      type: 'unknown.event',
+      type: "unknown.event",
       data: { object: {} }
     }
 
@@ -271,9 +271,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
@@ -283,10 +283,10 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
   test "skips CSRF verification" do
     # Should not raise InvalidAuthenticityToken
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
+          id: "cs_test_123",
           metadata: { member_id: @member.id }
         }
       }
@@ -298,9 +298,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
     # No CSRF token provided
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok
@@ -309,14 +309,14 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
   # Error handling
   test "returns 200 even when member upgrade fails" do
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
-          customer: 'cus_test_123',
-          payment_intent: 'pi_test_123',
+          id: "cs_test_123",
+          customer: "cus_test_123",
+          payment_intent: "pi_test_123",
           amount_total: 4900,
-          currency: 'usd',
+          currency: "usd",
           metadata: { member_id: @member.id }
         }
       }
@@ -332,9 +332,9 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     # Should return 200 so Stripe doesn't retry
@@ -344,14 +344,14 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
   test "uses correct webhook signing secret based on mode" do
     @stripe_config.update!(mode: :live)
     @stripe_config.update!(
-      webhook_signing_secret_live: 'whsec_live_456'
+      webhook_signing_secret_live: "whsec_live_456"
     )
 
     event_data = {
-      type: 'checkout.session.completed',
+      type: "checkout.session.completed",
       data: {
         object: {
-          id: 'cs_test_123',
+          id: "cs_test_123",
           metadata: { member_id: @member.id }
         }
       }
@@ -359,14 +359,14 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
 
     # Should use live mode secret
     Stripe::Webhook.expects(:construct_event)
-      .with(anything, anything, 'whsec_live_456')
+      .with(anything, anything, "whsec_live_456")
       .returns(Stripe::Event.construct_from(event_data))
 
     post "/webhooks/stripe",
       params: event_data.to_json,
-      headers: { 
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_STRIPE_SIGNATURE' => 'valid_signature'
+      headers: {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_STRIPE_SIGNATURE" => "valid_signature"
       }
 
     assert_response :ok

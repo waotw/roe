@@ -1,38 +1,37 @@
 class Admin::ConfigsController < Admin::BaseController
-
   # Site Config Schema Definition
   SITE_CONFIG_SCHEMA = {
     site_info: {
       label: "Site Information",
       fields: {
-        'title' => {
+        "title" => {
           type: :text,
-          label: 'Site Title',
+          label: "Site Title",
           required: true,
-          hint: 'Used in page titles, feeds, and site header'
+          hint: "Used in page titles, feeds, and site header"
         },
-        'url' => {
+        "url" => {
           type: :text,
-          label: 'Site URL',
+          label: "Site URL",
           required: true,
-          hint: 'Full URL of your site (e.g., https://example.com) - used in emails and feeds',
-          placeholder: 'https://example.com'
+          hint: "Full URL of your site (e.g., https://example.com) - used in emails and feeds",
+          placeholder: "https://example.com"
         },
-        'description' => {
+        "description" => {
           type: :textarea,
-          label: 'Site Description',
+          label: "Site Description",
           rows: 3,
-          hint: 'Used in meta tags and RSS/Atom feeds'
+          hint: "Used in meta tags and RSS/Atom feeds"
         },
-        'author' => {
+        "author" => {
           type: :text,
-          label: 'Author Name',
-          hint: 'Default author for posts and pages'
+          label: "Author Name",
+          hint: "Default author for posts and pages"
         },
-        'author_email' => {
+        "author_email" => {
           type: :text,
-          label: 'Author Email',
-          hint: 'Email address of the site author'
+          label: "Author Email",
+          hint: "Email address of the site author"
         }
       }
     },
@@ -40,22 +39,22 @@ class Admin::ConfigsController < Admin::BaseController
     branding: {
       label: "Branding",
       fields: {
-        'logo' => {
+        "logo" => {
           type: :text,
-          label: 'Logo Image Path',
-          hint: 'Copy logo url from Global Images.'
+          label: "Logo Image Path",
+          hint: "Copy logo url from Global Images."
         },
-        'logo_style' => {
+        "logo_style" => {
           type: :select,
-          label: 'Logo Style',
-          options: [ 'beside_text', 'replace_text' ],
+          label: "Logo Style",
+          options: [ "beside_text", "replace_text" ],
           depends_on: "logo",
           hint: "How the logo should be displayed"
         },
-        'favicon' => {
+        "favicon" => {
           type: :text,
-          label: 'Favicon',
-          hint: 'Copy logo url from Global Images.',
+          label: "Favicon",
+          hint: "Copy logo url from Global Images.",
           placeholder: "favicon.ico"
         }
       }
@@ -64,11 +63,11 @@ class Admin::ConfigsController < Admin::BaseController
     theme: {
       label: "Theme",
       fields: {
-        'active' => {
+        "active" => {
           type: :select,
-          label: 'Active Theme',
-          options: [ 'egg', 'default' ],
-          hint: 'Select the theme for your site'
+          label: "Active Theme",
+          options: [ "egg", "default" ],
+          hint: "Select the theme for your site"
         }
       }
     },
@@ -76,10 +75,10 @@ class Admin::ConfigsController < Admin::BaseController
     static_generation: {
       label: "Static Site Generation",
       fields: {
-        'static_generation_enabled' => {
+        "static_generation_enabled" => {
           type: :checkbox,
-          label: 'Enable Auto-Generation',
-          hint: 'Automatically generate static files when content changes'
+          label: "Enable Auto-Generation",
+          hint: "Automatically generate static files when content changes"
         }
       }
     }
@@ -100,30 +99,30 @@ class Admin::ConfigsController < Admin::BaseController
         heading: {
           label: "Heading Font",
           description: "Used for all headings (h1-h6)",
-          required_variants: [ 'family', 'regular' ],
-          common_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium', 'semibold', 'black' ]
+          required_variants: [ "family", "regular" ],
+          common_variants: [ "bold", "italic", "bold_italic", "light", "medium", "semibold", "black" ]
         },
         body: {
           label: "Body Font",
           description: "Used for paragraphs and body text",
-          required_variants: [ 'family', 'regular' ],
-          common_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium', 'semibold' ]
+          required_variants: [ "family", "regular" ],
+          common_variants: [ "bold", "italic", "bold_italic", "light", "medium", "semibold" ]
         },
         mono: {
           label: "Monospace Font",
           description: "Used for code blocks and preformatted text",
-          required_variants: [ 'family', 'regular' ],
-          common_variants: [ 'bold', 'italic', 'bold_italic' ]
+          required_variants: [ "family", "regular" ],
+          common_variants: [ "bold", "italic", "bold_italic" ]
         },
         accent: {
           label: "Accent Font",
           description: "Optional font for special elements like collection titles, pullquotes, or emphasis",
-          required_variants: [ 'family', 'regular' ],
-          common_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium' ]
+          required_variants: [ "family", "regular" ],
+          common_variants: [ "bold", "italic", "bold_italic", "light", "medium" ]
         }
       },
       # Common variants offered when adding a custom family
-      custom_family_variants: [ 'bold', 'italic', 'bold_italic', 'light', 'medium', 'semibold', 'black' ]
+      custom_family_variants: [ "bold", "italic", "bold_italic", "light", "medium", "semibold", "black" ]
     }
   }.freeze
 
@@ -131,9 +130,9 @@ class Admin::ConfigsController < Admin::BaseController
     test_keys: {
       label: "Stripe Test Keys",
       fields: {
-        'publishable_key' => { type: :text,     label: 'Publishable Key (Test)', hint: 'Starts with pk_test_' },
-        'secret_key'      => { type: :password, label: 'Secret Key (Test)',      hint: 'Starts with sk_test_' },
-        'webhook_signing_secret' => { type: :password, label: 'Webhook Signing Secret (Test)', hint: 'Starts with whsec_' }
+        "publishable_key" => { type: :text,     label: "Publishable Key (Test)", hint: "Starts with pk_test_" },
+        "secret_key"      => { type: :password, label: "Secret Key (Test)",      hint: "Starts with sk_test_" },
+        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Test)", hint: "Starts with whsec_" }
       }
     }
   }.freeze
@@ -142,7 +141,7 @@ class Admin::ConfigsController < Admin::BaseController
     test_keys: {
       label: "Postmark Test Token",
       fields: {
-        'server_token' => { type: :password, label: 'Server Token (Test)', hint: 'Your Postmark server API token for testing' }
+        "server_token" => { type: :password, label: "Server Token (Test)", hint: "Your Postmark server API token for testing" }
       }
     }
   }.freeze
@@ -151,32 +150,32 @@ class Admin::ConfigsController < Admin::BaseController
     test_keys: {
       label: "Snipcart Test API Key",
       fields: {
-        'api_key' => { type: :text, label: 'Public API Key (Test)', hint: 'Your Snipcart test public API key' }
+        "api_key" => { type: :text, label: "Public API Key (Test)", hint: "Your Snipcart test public API key" }
       }
     }
   }.freeze
 
   def itunes_subcategories
     {
-      'Arts' => [ 'Books', 'Design', 'Fashion & Beauty', 'Food', 'Performing Arts', 'Visual Arts' ],
-      'Business' => [ 'Careers', 'Entrepreneurship', 'Investing', 'Management', 'Marketing', 'Non-Profit' ],
-      'Comedy' => [ 'Comedy Interviews', 'Improv', 'Stand-Up' ],
-      'Education' => [ 'Courses', 'How To', 'Language Learning', 'Self-Improvement' ],
-      'Fiction' => [ 'Comedy Fiction', 'Drama', 'Science Fiction' ],
-      'Government' => [],  # ← No subcategories
-      'Health & Fitness' => [ 'Alternative Health', 'Fitness', 'Medicine', 'Mental Health', 'Nutrition', 'Sexuality' ],
-      'History' => [],  # ← No subcategories
-      'Kids & Family' => [ 'Education for Kids', 'Parenting', 'Pets & Animals', 'Stories for Kids' ],
-      'Leisure' => [ 'Animation & Manga', 'Automotive', 'Aviation', 'Crafts', 'Games', 'Hobbies', 'Home & Garden', 'Video Games' ],
-      'Music' => [ 'Music Commentary', 'Music History', 'Music Interviews' ],
-      'News' => [ 'Business News', 'Daily News', 'Entertainment News', 'News Commentary', 'Politics', 'Sports News', 'Tech News' ],
-      'Religion & Spirituality' => [ 'Buddhism', 'Christianity', 'Hinduism', 'Islam', 'Judaism', 'Religion', 'Spirituality' ],
-      'Science' => [ 'Astronomy', 'Chemistry', 'Earth Sciences', 'Life Sciences', 'Mathematics', 'Natural Sciences', 'Nature', 'Physics', 'Social Sciences' ],
-      'Society & Culture' => [ 'Documentary', 'Personal Journals', 'Philosophy', 'Places & Travel', 'Relationships' ],
-      'Sports' => [ 'Baseball', 'Basketball', 'Cricket', 'Fantasy Sports', 'Football', 'Golf', 'Hockey', 'Rugby', 'Running', 'Soccer', 'Swimming', 'Tennis', 'Volleyball', 'Wilderness', 'Wrestling' ],
-      'Technology' => [],  # ← No subcategories
-      'True Crime' => [],  # ← No subcategories
-      'TV & Film' => [ 'After Shows', 'Film History', 'Film Interviews', 'Film Reviews', 'TV Reviews' ]  # ← Was missing
+      "Arts" => [ "Books", "Design", "Fashion & Beauty", "Food", "Performing Arts", "Visual Arts" ],
+      "Business" => [ "Careers", "Entrepreneurship", "Investing", "Management", "Marketing", "Non-Profit" ],
+      "Comedy" => [ "Comedy Interviews", "Improv", "Stand-Up" ],
+      "Education" => [ "Courses", "How To", "Language Learning", "Self-Improvement" ],
+      "Fiction" => [ "Comedy Fiction", "Drama", "Science Fiction" ],
+      "Government" => [],  # ← No subcategories
+      "Health & Fitness" => [ "Alternative Health", "Fitness", "Medicine", "Mental Health", "Nutrition", "Sexuality" ],
+      "History" => [],  # ← No subcategories
+      "Kids & Family" => [ "Education for Kids", "Parenting", "Pets & Animals", "Stories for Kids" ],
+      "Leisure" => [ "Animation & Manga", "Automotive", "Aviation", "Crafts", "Games", "Hobbies", "Home & Garden", "Video Games" ],
+      "Music" => [ "Music Commentary", "Music History", "Music Interviews" ],
+      "News" => [ "Business News", "Daily News", "Entertainment News", "News Commentary", "Politics", "Sports News", "Tech News" ],
+      "Religion & Spirituality" => [ "Buddhism", "Christianity", "Hinduism", "Islam", "Judaism", "Religion", "Spirituality" ],
+      "Science" => [ "Astronomy", "Chemistry", "Earth Sciences", "Life Sciences", "Mathematics", "Natural Sciences", "Nature", "Physics", "Social Sciences" ],
+      "Society & Culture" => [ "Documentary", "Personal Journals", "Philosophy", "Places & Travel", "Relationships" ],
+      "Sports" => [ "Baseball", "Basketball", "Cricket", "Fantasy Sports", "Football", "Golf", "Hockey", "Rugby", "Running", "Soccer", "Swimming", "Tennis", "Volleyball", "Wilderness", "Wrestling" ],
+      "Technology" => [],  # ← No subcategories
+      "True Crime" => [],  # ← No subcategories
+      "TV & Film" => [ "After Shows", "Film History", "Film Interviews", "Film Reviews", "TV Reviews" ]  # ← Was missing
     }
   end
 
@@ -224,7 +223,7 @@ class Admin::ConfigsController < Admin::BaseController
     # Feature configs
     features_files = []
 
-    if File.exist?(SiteConfig::FEATURES_PATH.join('members.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join("members.yml"))
       features_files << {
         name: "members.yml",
         path: "features/members.yml",
@@ -233,7 +232,7 @@ class Admin::ConfigsController < Admin::BaseController
       }
     end
 
-    if File.exist?(SiteConfig::FEATURES_PATH.join('podcast.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join("podcast.yml"))
       features_files << {
         name: "podcast.yml",
         path: "features/podcast.yml",
@@ -242,7 +241,7 @@ class Admin::ConfigsController < Admin::BaseController
       }
     end
 
-    if File.exist?(SiteConfig::FEATURES_PATH.join('store.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join("store.yml"))
       features_files << {
         name: "store.yml",
         path: "features/store.yml",
@@ -324,7 +323,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_site
-    @config_type = 'site'
+    @config_type = "site"
     @config_content = File.read(SiteConfig::SITE_FILE)
     @config_hash = YAML.load(@config_content) || {}
     @config_schema = SITE_CONFIG_SCHEMA
@@ -332,11 +331,11 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_site
-    update_config('site', SiteConfig::SITE_FILE)
+    update_config("site", SiteConfig::SITE_FILE)
   end
 
   def edit_fonts
-    @config_type = 'fonts'
+    @config_type = "fonts"
     @config_content = File.read(SiteConfig::FONTS_FILE)
     @config_hash = YAML.load(@config_content) || {}
     @config_schema = FONTS_CONFIG_SCHEMA
@@ -347,18 +346,18 @@ class Admin::ConfigsController < Admin::BaseController
   # Theme names available to scope fonts to. Master themes in app/themes/
   # plus any user themes in /site/theme/ (deduped by name).
   def list_available_themes
-    names = Dir.glob(Rails.root.join('app/themes/*.css')).map { |f| File.basename(f, '.css') }
-    user_dir = File.join(RoeSitePaths::SITE_PATH, 'theme')
-    names += Dir.glob(File.join(user_dir, '*.css')).map { |f| File.basename(f, '.css') } if Dir.exist?(user_dir)
+    names = Dir.glob(Rails.root.join("app/themes/*.css")).map { |f| File.basename(f, ".css") }
+    user_dir = File.join(RoeSitePaths::SITE_PATH, "theme")
+    names += Dir.glob(File.join(user_dir, "*.css")).map { |f| File.basename(f, ".css") } if Dir.exist?(user_dir)
     names.uniq.sort
   end
 
   def update_fonts
-    update_config('fonts', SiteConfig::FONTS_FILE)
+    update_config("fonts", SiteConfig::FONTS_FILE)
   end
 
   def edit_podcast
-    podcast_config_path = SiteConfig::FEATURES_PATH.join('podcast.yml')
+    podcast_config_path = SiteConfig::FEATURES_PATH.join("podcast.yml")
 
     unless File.exist?(podcast_config_path)
       SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
@@ -366,7 +365,7 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path and return
     end
 
-    @config_type = 'podcast'
+    @config_type = "podcast"
     @config_content = File.read(podcast_config_path)
     @config_hash = YAML.load(@config_content) || {}
 
@@ -378,7 +377,7 @@ class Admin::ConfigsController < Admin::BaseController
     if helpers.memberships_enabled?
       @config_hash.each do |key, podcast|
         next unless podcast.is_a?(Hash)
-        podcast['audience'] ||= '' unless podcast.key?('audience')
+        podcast["audience"] ||= "" unless podcast.key?("audience")
       end
     end
 
@@ -422,31 +421,31 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_podcast
-    update_config('features/podcast', SiteConfig::FEATURES_PATH.join('podcast.yml'))
+    update_config("features/podcast", SiteConfig::FEATURES_PATH.join("podcast.yml"))
   end
 
   def edit_cards
-    @config_type = 'cards'
-    @config_content = File.read(SiteConfig::DEFAULTS_PATH.join('cards.yml'))
+    @config_type = "cards"
+    @config_content = File.read(SiteConfig::DEFAULTS_PATH.join("cards.yml"))
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_cards
     render :edit
   end
 
   def update_cards
-    update_config('defaults/cards', SiteConfig::DEFAULTS_PATH.join('cards.yml'))
+    update_config("defaults/cards", SiteConfig::DEFAULTS_PATH.join("cards.yml"))
   end
 
   def edit_collections
-    @config_type = 'collections'
-    @config_content = File.read(SiteConfig::DEFAULTS_PATH.join('collections.yml'))
+    @config_type = "collections"
+    @config_content = File.read(SiteConfig::DEFAULTS_PATH.join("collections.yml"))
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_collections
     render :edit
   end
 
   def update_collections
-    update_config('defaults/collections', SiteConfig::DEFAULTS_PATH.join('collections.yml'))
+    update_config("defaults/collections", SiteConfig::DEFAULTS_PATH.join("collections.yml"))
   end
 
   def field_options_for(config_type, field_name)
@@ -469,11 +468,11 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def generate_podcast
-    if File.exist?(SiteConfig::FEATURES_PATH.join('podcast.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join("podcast.yml"))
       flash[:alert] = "Podcast configuration already exists"
     else
       ConfigGenerator.generate_podcast
-      SiteConfig.sync_from_file('features/podcast')
+      SiteConfig.sync_from_file("features/podcast")
       flash[:notice] = "Podcast configuration created successfully"
     end
 
@@ -481,25 +480,25 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def delete_podcast
-    file_path = SiteConfig::FEATURES_PATH.join('podcast.yml')
+    file_path = SiteConfig::FEATURES_PATH.join("podcast.yml")
 
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
-    SiteConfig.reload!('features/podcast')
+    SiteConfig.reload!("features/podcast")
 
     flash[:notice] = "Podcast configuration deleted successfully"
     redirect_to admin_configs_path
   end
 
   def edit_members
-    members_config_path = SiteConfig::FEATURES_PATH.join('members.yml')
+    members_config_path = SiteConfig::FEATURES_PATH.join("members.yml")
 
     unless File.exist?(members_config_path)
       flash[:alert] = "Members configuration doesn't exist."
       redirect_to admin_configs_path and return
     end
 
-    @config_type = 'members'
+    @config_type = "members"
     @config_content = File.read(members_config_path)
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_members
@@ -509,11 +508,11 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_members
-    update_config('features/members', SiteConfig::FEATURES_PATH.join('members.yml'))
+    update_config("features/members", SiteConfig::FEATURES_PATH.join("members.yml"))
   end
 
   def new_members_setup
-    if File.exist?(SiteConfig::FEATURES_PATH.join('members.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join("members.yml"))
       flash[:alert] = "Members configuration already exists"
       redirect_to admin_configs_path
     else
@@ -522,10 +521,10 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def create_members
-    show_paid = params[:show_paid_content] == 'true'
-    payments_enabled = params[:payments_enabled] == 'true'
+    show_paid = params[:show_paid_content] == "true"
+    payments_enabled = params[:payments_enabled] == "true"
     payment_price = params[:payment_price].presence || "0.00"
-    newsletter_enabled = params[:newsletter_enabled] == 'true'
+    newsletter_enabled = params[:newsletter_enabled] == "true"
 
     ConfigGenerator.new.generate_members_defaults(
       show_paid_content: show_paid,
@@ -533,7 +532,7 @@ class Admin::ConfigsController < Admin::BaseController
       payment_price: payment_price,
       newsletter_enabled: newsletter_enabled
     )
-    SiteConfig.sync_from_file('defaults/members')
+    SiteConfig.sync_from_file("defaults/members")
 
     # Sync the new upgrade page
     ContentSync.new.sync_pages
@@ -543,18 +542,18 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def delete_members
-    file_path = SiteConfig::FEATURES_PATH.join('members.yml')
+    file_path = SiteConfig::FEATURES_PATH.join("members.yml")
 
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.destroy
-    SiteConfig.reload!('features/members')
+    SiteConfig.reload!("features/members")
 
     flash[:notice] = "Members feature disabled successfully"
     redirect_to admin_configs_path
   end
 
   def new_store_setup
-    if File.exist?(SiteConfig::FEATURES_PATH.join('store.yml'))
+    if File.exist?(SiteConfig::FEATURES_PATH.join("store.yml"))
       flash[:alert] = "Store configuration already exists"
       redirect_to admin_configs_path
     else
@@ -572,14 +571,14 @@ class Admin::ConfigsController < Admin::BaseController
       default_domain: params[:default_domain],
       product_categories: params[:product_categories]
     )
-    SiteConfig.sync_from_file('features/store')
+    SiteConfig.sync_from_file("features/store")
 
     flash[:notice] = "Store feature enabled! Now configure your Snipcart API keys."
     redirect_to edit_admin_snipcart_config_path
   end
 
   def edit_store
-    store_config_path = SiteConfig::FEATURES_PATH.join('store.yml')
+    store_config_path = SiteConfig::FEATURES_PATH.join("store.yml")
 
     unless File.exist?(store_config_path)
       SiteConfig.find_by("file_path LIKE ?", "%store.yml")&.destroy
@@ -587,22 +586,22 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path and return
     end
 
-    @config_type = 'store'
+    @config_type = "store"
     @config_content = File.read(store_config_path)
     @config_hash = YAML.load(@config_content) || {}
     render :edit
   end
 
   def update_store
-    update_config('features/store', SiteConfig::FEATURES_PATH.join('store.yml'))
+    update_config("features/store", SiteConfig::FEATURES_PATH.join("store.yml"))
   end
 
   def delete_store
-    file_path = SiteConfig::FEATURES_PATH.join('store.yml')
+    file_path = SiteConfig::FEATURES_PATH.join("store.yml")
 
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%store.yml")&.destroy
-    SiteConfig.reload!('features/store')
+    SiteConfig.reload!("features/store")
 
     flash[:notice] = "Store feature disabled successfully"
     redirect_to admin_configs_path
@@ -627,23 +626,23 @@ class Admin::ConfigsController < Admin::BaseController
     dp = params[:deploy_config] || {}
 
     config = {
-      'target'   => dp[:target].to_s.presence || 'kamal',
-      'app_name' => dp[:app_name].to_s.strip,
-      'ssl'      => dp[:ssl] == '1',
-      'kamal'    => {
-        'servers'           => (dp.dig(:kamal, :servers) || []).reject(&:blank?),
-        'registry_username' => dp.dig(:kamal, :registry_username).to_s.strip,
-        'image_name'        => dp.dig(:kamal, :image_name).to_s.strip
+      "target"   => dp[:target].to_s.presence || "kamal",
+      "app_name" => dp[:app_name].to_s.strip,
+      "ssl"      => dp[:ssl] == "1",
+      "kamal"    => {
+        "servers"           => (dp.dig(:kamal, :servers) || []).reject(&:blank?),
+        "registry_username" => dp.dig(:kamal, :registry_username).to_s.strip,
+        "image_name"        => dp.dig(:kamal, :image_name).to_s.strip
       },
-      'fly'      => {
-        'region'    => dp.dig(:fly, :region).to_s.strip,
-        'vm_memory' => dp.dig(:fly, :vm_memory).to_s.strip
+      "fly"      => {
+        "region"    => dp.dig(:fly, :region).to_s.strip,
+        "vm_memory" => dp.dig(:fly, :vm_memory).to_s.strip
       }
     }
 
     FileUtils.mkdir_p(File.dirname(SiteConfig::DEPLOY_FILE))
     File.write(SiteConfig::DEPLOY_FILE, config.to_yaml)
-    SiteConfig.sync_from_file('deploy')
+    SiteConfig.sync_from_file("deploy")
 
     # Save registry password if a new one was provided (blank = keep existing).
     deploy_secrets   = DeploySecrets.current
@@ -664,12 +663,12 @@ class Admin::ConfigsController < Admin::BaseController
       alerts << e.message
     end
 
-    if config['target'] == 'kamal' &&
+    if config["target"] == "kamal" &&
        deploy_secrets.registry_password.present? &&
        DeployConfigGenerator.master_key_present?
       begin
         DeployConfigGenerator.generate_secrets!
-        generated << '.kamal/secrets'
+        generated << ".kamal/secrets"
       rescue DeployConfigGenerator::GenerationError => e
         Rails.logger.error "DeployConfigGenerator.generate_secrets! failed: #{e.message}"
         alerts << e.message
@@ -677,7 +676,7 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     flash[:notice] = "Deploy configuration saved#{generated.any? ? ". Generated: #{generated.join(', ')}" : ""}."
-    flash[:alert]  = alerts.join(' ') if alerts.any?
+    flash[:alert]  = alerts.join(" ") if alerts.any?
 
     redirect_to admin_edit_deploy_config_path
   rescue => e
@@ -699,10 +698,10 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path and return
     end
 
-    @config_type = 'development'
+    @config_type = "development"
     @config_content = File.read(development_config_path)
     @config_hash = YAML.load(@config_content) || {}
-    @allowed_hosts = @config_hash['allowed_hosts'] || []
+    @allowed_hosts = @config_hash["allowed_hosts"] || []
     render :edit_development
   end
 
@@ -724,16 +723,16 @@ class Admin::ConfigsController < Admin::BaseController
     File.write(SiteConfig::DEVELOPMENT_FILE, yaml_content)
 
     # Sync to database
-    SiteConfig.sync_from_file('development')
+    SiteConfig.sync_from_file("development")
 
     flash[:notice] = "Development configuration updated successfully"
     redirect_to admin_configs_path
   rescue => e
     flash.now[:error] = "Failed to update configuration: #{e.message}"
-    @config_type = 'development'
+    @config_type = "development"
     @config_content = File.read(SiteConfig::DEVELOPMENT_FILE)
     @config_hash = YAML.load(@config_content) || {}
-    @allowed_hosts = @config_hash['allowed_hosts'] || []
+    @allowed_hosts = @config_hash["allowed_hosts"] || []
     render :edit_development
   end
 
@@ -753,7 +752,7 @@ class Admin::ConfigsController < Admin::BaseController
           - your-site.ngrok-free.app
       YAML
 
-      SiteConfig.sync_from_file('development')
+      SiteConfig.sync_from_file("development")
       flash[:notice] = "Development features enabled! Edit development.yml to add allowed hosts."
     end
 
@@ -765,40 +764,40 @@ class Admin::ConfigsController < Admin::BaseController
 
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%development.yml")&.destroy
-    SiteConfig.reload!('development')
+    SiteConfig.reload!("development")
 
     flash[:notice] = "Development configuration deleted successfully"
     redirect_to admin_configs_path
   end
 
   def edit_payments
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'payments.yml')
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml")
     unless File.exist?(path)
       ConfigGenerator.new.generate_payments_config
     end
-    @config_type    = 'payments'
+    @config_type    = "payments"
     @config_content = File.read(path)
-    @config_hash    = (YAML.load(@config_content) || {})['test'] || {}
+    @config_hash    = (YAML.load(@config_content) || {})["test"] || {}
     @stripe_config  = StripeConfig.current
     @schema         = PAYMENTS_CONFIG_SCHEMA
     render :edit_integration
   end
 
   def update_payments
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'payments.yml')
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml")
     test_data = params[:test] || {}
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
-    existing['test'] ||= {}
+    existing["test"] ||= {}
     # Skip masked placeholder values — user didn't change those fields
-    test_data.each { |k, v| existing['test'][k] = v if v.present? && v != '•' * 16 }
+    test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
     File.write(path, existing.to_yaml)
-    SiteConfig.sync_from_file('integrations/payments')
+    SiteConfig.sync_from_file("integrations/payments")
 
     # Save to StripeConfig and verify
     stripe = StripeConfig.current
-    StripeConfig.save_test_config(existing['test'])
+    StripeConfig.save_test_config(existing["test"])
     stripe.verify!
 
     flash[:notice] = "Payments configuration saved"
@@ -816,30 +815,30 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_newsletters
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'newsletters.yml')
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "newsletters.yml")
     unless File.exist?(path)
       ConfigGenerator.new.generate_newsletters_config
     end
-    @config_type      = 'newsletters'
+    @config_type      = "newsletters"
     @config_content   = File.read(path)
-    @config_hash      = (YAML.load(@config_content) || {})['test'] || {}
+    @config_hash      = (YAML.load(@config_content) || {})["test"] || {}
     @postmark_config  = PostmarkConfig.current
     @schema           = NEWSLETTERS_CONFIG_SCHEMA
     render :edit_integration
   end
 
   def update_newsletters
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'newsletters.yml')
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "newsletters.yml")
     test_data = params[:test] || {}
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
-    existing['test'] ||= {}
-    test_data.each { |k, v| existing['test'][k] = v if v.present? && v != '•' * 16 }
+    existing["test"] ||= {}
+    test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
     File.write(path, existing.to_yaml)
-    SiteConfig.sync_from_file('integrations/newsletters')
+    SiteConfig.sync_from_file("integrations/newsletters")
 
-    PostmarkConfig.save_test_config(existing['test'])
+    PostmarkConfig.save_test_config(existing["test"])
     PostmarkConfig.current.verify!
 
     flash[:notice] = "Newsletters configuration saved"
@@ -857,30 +856,30 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_snipcart
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'snipcart.yml')
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     unless File.exist?(path)
       ConfigGenerator.new.generate_snipcart_config
     end
-    @config_type      = 'snipcart'
+    @config_type      = "snipcart"
     @config_content   = File.read(path)
-    @config_hash      = (YAML.load(@config_content) || {})['test'] || {}
+    @config_hash      = (YAML.load(@config_content) || {})["test"] || {}
     @snipcart_config  = SnipcartConfig.current
     @schema           = SNIPCART_CONFIG_SCHEMA
     render :edit_integration
   end
 
   def update_snipcart
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, 'snipcart.yml')
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     test_data = params[:test] || {}
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
-    existing['test'] ||= {}
-    test_data.each { |k, v| existing['test'][k] = v if v.present? && v != '•' * 16 }
+    existing["test"] ||= {}
+    test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
     File.write(path, existing.to_yaml)
-    SiteConfig.sync_from_file('integrations/snipcart')
+    SiteConfig.sync_from_file("integrations/snipcart")
 
-    SnipcartConfig.save_test_config(existing['test'])
+    SnipcartConfig.save_test_config(existing["test"])
     SnipcartConfig.current.verify!
 
     flash[:notice] = "Store (Snipcart) configuration saved"
@@ -900,10 +899,10 @@ class Admin::ConfigsController < Admin::BaseController
   private
 
   def sync_stripe_payments(members_config)
-    payments_config = members_config&.dig('payments')
+    payments_config = members_config&.dig("payments")
 
     # If payments not configured or not enabled, just return success
-    unless payments_config && (payments_config['enabled'] == true || payments_config['enabled'] == 'true')
+    unless payments_config && (payments_config["enabled"] == true || payments_config["enabled"] == "true")
       return { success: true, message: "Members configuration updated successfully" }
     end
 
@@ -927,28 +926,28 @@ class Admin::ConfigsController < Admin::BaseController
     all_subcategories = itunes_subcategories.values.flatten.sort
 
     base_options = {
-      'type' => [ 'episodic', 'serial' ],
-      'category' => [
-        '', # Blank option
-        'Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government',
-        'Health & Fitness', 'History', 'Kids & Family', 'Leisure', 'Music',
-        'News', 'Religion & Spirituality', 'Science', 'Society & Culture',
-        'Sports', 'Technology', 'True Crime', 'TV & Film'
+      "type" => [ "episodic", "serial" ],
+      "category" => [
+        "", # Blank option
+        "Arts", "Business", "Comedy", "Education", "Fiction", "Government",
+        "Health & Fitness", "History", "Kids & Family", "Leisure", "Music",
+        "News", "Religion & Spirituality", "Science", "Society & Culture",
+        "Sports", "Technology", "True Crime", "TV & Film"
       ],
-      'category_2' => [
-        '',
-        'Arts', 'Business', 'Comedy', 'Education', 'Fiction', 'Government',
-        'Health & Fitness', 'History', 'Kids & Family', 'Leisure', 'Music',
-        'News', 'Religion & Spirituality', 'Science', 'Society & Culture',
-        'Sports', 'Technology', 'True Crime', 'TV & Film'
+      "category_2" => [
+        "",
+        "Arts", "Business", "Comedy", "Education", "Fiction", "Government",
+        "Health & Fitness", "History", "Kids & Family", "Leisure", "Music",
+        "News", "Religion & Spirituality", "Science", "Society & Culture",
+        "Sports", "Technology", "True Crime", "TV & Film"
       ],
       # Note: subcategory/subcategory_2 are arrays, handled by JS
-      'language' => [ 'en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'zh', 'ko', 'ru' ],
-      'explicit' => [ 'false', 'true' ],
-      'episode_type' => [ 'full', 'trailer', 'bonus' ],
+      "language" => [ "en", "es", "fr", "de", "it", "pt", "ja", "zh", "ko", "ru" ],
+      "explicit" => [ "false", "true" ],
+      "episode_type" => [ "full", "trailer", "bonus" ],
       # Per-podcast audience gate. Renders as a select when the field is
       # present (auto-surfaced above when payments are enabled).
-      'audience' => [ 'everyone', 'paid' ]
+      "audience" => [ "everyone", "paid" ]
     }
 
     # Build prefixed versions separately
@@ -968,27 +967,27 @@ class Admin::ConfigsController < Admin::BaseController
     existing_post_types = Post.all.map(&:post_type).compact.uniq.sort
 
     {
-      'default_source' => [ 'posts', 'pages', 'documentation' ],
-      'default_post_type' => [ 'all' ] + existing_post_types,
-      'default_order' => [ 'date', 'date-asc', 'title', 'filename' ],
-      'default_template' => [ 'list', 'compact', 'links' ],
-      'items_per_page' => [ '10', '20', '25', '50', '100' ]
+      "default_source" => [ "posts", "pages", "documentation" ],
+      "default_post_type" => [ "all" ] + existing_post_types,
+      "default_order" => [ "date", "date-asc", "title", "filename" ],
+      "default_template" => [ "list", "compact", "links" ],
+      "items_per_page" => [ "10", "20", "25", "50", "100" ]
     }
   end
 
   def build_field_options_for_cards
     {
-      'post-link.default_style' => [ 'small', 'large' ],
-      'pullquote.default_position' => [ 'center', 'left', 'right' ]
+      "post-link.default_style" => [ "small", "large" ],
+      "pullquote.default_position" => [ "center", "left", "right" ]
     }
   end
 
   def build_field_options_for_members
     {
-      'payments.enabled' => [ 'false', 'true' ],
-      'payments.mode' => [ 'memberships', 'donations', 'both' ],
-      'newsletter & email.enabled' => [ 'false', 'true' ],
-      'everyone.show_paid_content' => [ 'true', 'false' ]
+      "payments.enabled" => [ "false", "true" ],
+      "payments.mode" => [ "memberships", "donations", "both" ],
+      "newsletter & email.enabled" => [ "false", "true" ],
+      "everyone.show_paid_content" => [ "true", "false" ]
     }
   end
 
@@ -998,10 +997,10 @@ class Admin::ConfigsController < Admin::BaseController
   # formatting (e.g. <strong>, <br>).
   def build_field_help_for_podcast
     {
-      'type' => {
-        title: 'Episodic vs. Serial',
-        text: ('<strong>Episodic</strong> — episodes stand alone and can be played in any order. Apple Podcasts shows newest first. Good for interviews, news, talk shows.<br><br>' \
-               '<strong>Serial</strong> — episodes are meant to be played in order, like chapters. Apple shows oldest first. Good for narrative shows, audio dramas, limited series.').html_safe
+      "type" => {
+        title: "Episodic vs. Serial",
+        text: ("<strong>Episodic</strong> — episodes stand alone and can be played in any order. Apple Podcasts shows newest first. Good for interviews, news, talk shows.<br><br>" \
+               "<strong>Serial</strong> — episodes are meant to be played in order, like chapters. Apple shows oldest first. Good for narrative shows, audio dramas, limited series.").html_safe
       }
     }
   end
@@ -1009,15 +1008,15 @@ class Admin::ConfigsController < Admin::BaseController
   def build_field_hints_for_members
     # Get currency from Stripe if connected
     stripe_config = StripeConfig.current
-    currency = stripe_config.connected? ? stripe_config.default_currency.upcase : 'USD'
+    currency = stripe_config.connected? ? stripe_config.default_currency.upcase : "USD"
 
     {
-      'payments.enabled' => 'Turn on the payments system (requires connection to your Stripe account). Then choose what you want to offer in the mode field below.',
-      'payments.mode' => 'memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.',
-      'payments.price' => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
-      'payments.donation_amounts' => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
-      'newsletter & email.enabled' => 'Enable newsletter & email sending via Postmark (requires Postmark account & configuration)',
-      'everyone.show_paid_content' => 'Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.'
+      "payments.enabled" => "Turn on the payments system (requires connection to your Stripe account). Then choose what you want to offer in the mode field below.",
+      "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.",
+      "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
+      "payments.donation_amounts" => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
+      "newsletter & email.enabled" => "Enable newsletter & email sending via Postmark (requires Postmark account & configuration)",
+      "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it."
     }
   end
 
@@ -1026,7 +1025,7 @@ class Admin::ConfigsController < Admin::BaseController
 
     # Load old config to compare (only for site config)
     old_config = nil
-    if type == 'site' && File.exist?(file_path)
+    if type == "site" && File.exist?(file_path)
       old_config = YAML.load_file(file_path) rescue {}
     end
 
@@ -1035,7 +1034,7 @@ class Admin::ConfigsController < Admin::BaseController
       new_config = YAML.load(content)
     rescue Psych::SyntaxError => e
       flash.now[:error] = "Invalid YAML syntax: #{e.message}"
-      @config_type = type.split('/').last
+      @config_type = type.split("/").last
       @config_content = content
       render :edit and return
     end
@@ -1048,25 +1047,25 @@ class Admin::ConfigsController < Admin::BaseController
 
     # Handle different config types
     case type
-    when 'site'
+    when "site"
       Rails.cache.clear
 
       # Auto-generate when enabling static mode
-      if old_config && !old_config['static_generation_enabled'] && new_config['static_generation_enabled']
+      if old_config && !old_config["static_generation_enabled"] && new_config["static_generation_enabled"]
         StaticGenerator.new.generate_all
         flash[:notice] = "Site configuration updated and static site generated successfully"
       else
         flash[:notice] = "Site configuration updated successfully"
       end
 
-    when 'defaults/members'
+    when "defaults/members"
       Rails.cache.clear
 
       # Sync Stripe product/price if payments are enabled
       sync_result = sync_stripe_payments(new_config)
 
       # Regenerate collections if static mode is enabled
-      if SiteConfig.current('site')&.static_generation_enabled
+      if SiteConfig.current("site")&.static_generation_enabled
         StaticGenerator.new.generate_all
         flash[:notice] = sync_result[:message] + " and static site regenerated"
       else
@@ -1078,11 +1077,11 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     # Dynamic redirect based on type
-    config_key = type.split('/').last
+    config_key = type.split("/").last
     redirect_to send("admin_edit_#{config_key}_config_path")
   rescue => e
     flash.now[:error] = "Failed to update configuration: #{e.message}"
-    @config_type = type.split('/').last
+    @config_type = type.split("/").last
     @config_content = content
     render :edit
   end

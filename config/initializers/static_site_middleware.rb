@@ -9,27 +9,27 @@ class StaticSiteMiddleware
   ASSET_PREFIXES = %w[/theme/ /media/ /system/ /assets/].freeze
 
   MIME_TYPES = {
-    '.html' => 'text/html; charset=utf-8',
-    '.css'  => 'text/css; charset=utf-8',
-    '.js'   => 'application/javascript; charset=utf-8',
-    '.json' => 'application/json; charset=utf-8',
-    '.xml'  => 'application/xml; charset=utf-8',
-    '.txt'  => 'text/plain; charset=utf-8',
-    '.svg'  => 'image/svg+xml',
-    '.png'  => 'image/png',
-    '.jpg'  => 'image/jpeg',
-    '.jpeg' => 'image/jpeg',
-    '.gif'  => 'image/gif',
-    '.webp' => 'image/webp',
-    '.ico'  => 'image/x-icon',
-    '.woff' => 'font/woff',
-    '.woff2' => 'font/woff2',
-    '.ttf'  => 'font/ttf',
-    '.otf'  => 'font/otf',
-    '.mp3'  => 'audio/mpeg',
-    '.mp4'  => 'video/mp4',
-    '.m4a'  => 'audio/mp4',
-    '.webm' => 'video/webm'
+    ".html" => "text/html; charset=utf-8",
+    ".css"  => "text/css; charset=utf-8",
+    ".js"   => "application/javascript; charset=utf-8",
+    ".json" => "application/json; charset=utf-8",
+    ".xml"  => "application/xml; charset=utf-8",
+    ".txt"  => "text/plain; charset=utf-8",
+    ".svg"  => "image/svg+xml",
+    ".png"  => "image/png",
+    ".jpg"  => "image/jpeg",
+    ".jpeg" => "image/jpeg",
+    ".gif"  => "image/gif",
+    ".webp" => "image/webp",
+    ".ico"  => "image/x-icon",
+    ".woff" => "font/woff",
+    ".woff2" => "font/woff2",
+    ".ttf"  => "font/ttf",
+    ".otf"  => "font/otf",
+    ".mp3"  => "audio/mpeg",
+    ".mp4"  => "video/mp4",
+    ".m4a"  => "audio/mp4",
+    ".webm" => "video/webm"
   }.freeze
 
   def initialize(app)
@@ -54,7 +54,7 @@ class StaticSiteMiddleware
   end
 
   def static_mode?
-    SiteConfig.current('site')&.static_generation_enabled || false
+    SiteConfig.current("site")&.static_generation_enabled || false
   rescue
     false
   end
@@ -72,13 +72,13 @@ class StaticSiteMiddleware
     end
 
     # Root → index.html
-    if path == '/' || path.empty?
-      candidate = static_root.join('index.html')
+    if path == "/" || path.empty?
+      candidate = static_root.join("index.html")
       return candidate.to_s if candidate.exist?
       return nil
     end
 
-    clean = path.sub(%r{\A/}, '').sub(%r{/\z}, '')
+    clean = path.sub(%r{\A/}, "").sub(%r{/\z}, "")
 
     # Exact file (e.g. /sitemap.xml, /robots.txt)
     if File.extname(clean).present?
@@ -100,7 +100,7 @@ class StaticSiteMiddleware
   # Join a request path onto static_root and confirm the result is still
   # under static_root (defense against `/../etc/passwd`).
   def safe_join(path)
-    joined = static_root.join(path.sub(%r{\A/}, '')).cleanpath
+    joined = static_root.join(path.sub(%r{\A/}, "")).cleanpath
     return nil unless joined.to_s.start_with?(static_root.realpath.to_s)
     joined.to_s
   rescue
@@ -108,13 +108,13 @@ class StaticSiteMiddleware
   end
 
   def serve(file_path)
-    content_type = MIME_TYPES[File.extname(file_path).downcase] || 'application/octet-stream'
+    content_type = MIME_TYPES[File.extname(file_path).downcase] || "application/octet-stream"
     [
       200,
       {
-        'Content-Type' => content_type,
-        'Content-Length' => File.size(file_path).to_s,
-        'Cache-Control' => 'public, max-age=3600'
+        "Content-Type" => content_type,
+        "Content-Length" => File.size(file_path).to_s,
+        "Cache-Control" => "public, max-age=3600"
       },
       [ File.binread(file_path) ]
     ]

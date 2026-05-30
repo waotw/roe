@@ -1,5 +1,5 @@
 class PostmarkService
-  API_BASE = 'https://api.postmarkapp.com'
+  API_BASE = "https://api.postmarkapp.com"
 
   class << self
     def configured?
@@ -16,16 +16,16 @@ class PostmarkService
       http.use_ssl = true
 
       request = Net::HTTP::Get.new(uri.path)
-      request['Accept'] = 'application/json'
-      request['X-Postmark-Server-Token'] = token
+      request["Accept"] = "application/json"
+      request["X-Postmark-Server-Token"] = token
 
       response = http.request(request)
 
-      if response.code == '200'
+      if response.code == "200"
         { success: true, message: "Connection successful" }
       else
         error_data = JSON.parse(response.body) rescue {}
-        { success: false, error: error_data['Message'] || response.body }
+        { success: false, error: error_data["Message"] || response.body }
       end
     rescue => e
       { success: false, error: e.message }
@@ -35,8 +35,8 @@ class PostmarkService
       return { success: false, error: "Postmark not configured" } unless configured?
 
       config = PostmarkConfig.current
-      from_email = SiteConfig.current('site')&.config&.dig('author_email') || 'noreply@example.com'
-      from_name = SiteConfig.current('site')&.config&.dig('author') || 'Newsletter'
+      from_email = SiteConfig.current("site")&.config&.dig("author_email") || "noreply@example.com"
+      from_name = SiteConfig.current("site")&.config&.dig("author") || "Newsletter"
 
       Rails.logger.info "📤 Sending from: #{from_email} (#{from_name})"
 
@@ -45,9 +45,9 @@ class PostmarkService
       http.use_ssl = true
 
       request = Net::HTTP::Post.new(uri.path)
-      request['Accept'] = 'application/json'
-      request['Content-Type'] = 'application/json'
-      request['X-Postmark-Server-Token'] = config.server_token
+      request["Accept"] = "application/json"
+      request["Content-Type"] = "application/json"
+      request["X-Postmark-Server-Token"] = config.server_token
 
       body = {
         From: "#{from_name} <#{from_email}>",
@@ -55,7 +55,7 @@ class PostmarkService
         Subject: subject,
         HtmlBody: html_content,
         TextBody: strip_html(html_content),
-        MessageStream: 'outbound'
+        MessageStream: "outbound"
       }
       body[:Tag] = tag if tag.present?
 
@@ -66,13 +66,13 @@ class PostmarkService
       Rails.logger.info "📡 Response Code: #{response.code}"
       Rails.logger.info "📡 Response Body: #{response.body}"
 
-      if response.code == '200'
+      if response.code == "200"
         data = JSON.parse(response.body)
         Rails.logger.info "📊 Parsed data: #{data.inspect}"
-        { success: true, message_id: data['MessageID'] }
+        { success: true, message_id: data["MessageID"] }
       else
         error_data = JSON.parse(response.body) rescue {}
-        { success: false, error: error_data['Message'] || response.body }
+        { success: false, error: error_data["Message"] || response.body }
       end
     rescue => e
       Rails.logger.error "Postmark transactional send failed: #{e.message}"
@@ -91,20 +91,20 @@ class PostmarkService
       http.use_ssl = true
 
       request = Net::HTTP::Post.new(uri.path)
-      request['Accept'] = 'application/json'
-      request['Content-Type'] = 'application/json'
-      request['X-Postmark-Server-Token'] = config.server_token
+      request["Accept"] = "application/json"
+      request["Content-Type"] = "application/json"
+      request["X-Postmark-Server-Token"] = config.server_token
 
       request.body = messages.to_json
 
       response = http.request(request)
 
-      if response.code == '200'
+      if response.code == "200"
         data = JSON.parse(response.body)
         { success: true, results: data }
       else
         error_data = JSON.parse(response.body) rescue {}
-        { success: false, error: error_data['Message'] || response.body }
+        { success: false, error: error_data["Message"] || response.body }
       end
     rescue => e
       Rails.logger.error "Postmark batch send failed: #{e.message}"
@@ -122,17 +122,17 @@ class PostmarkService
       http.use_ssl = true
 
       request = Net::HTTP::Get.new(uri.path)
-      request['Accept'] = 'application/json'
-      request['X-Postmark-Server-Token'] = config.server_token
+      request["Accept"] = "application/json"
+      request["X-Postmark-Server-Token"] = config.server_token
 
       response = http.request(request)
 
-      if response.code == '200'
+      if response.code == "200"
         server_data = JSON.parse(response.body)
 
         {
-          server_name: server_data['Name'],
-          server_color: server_data['Color'],
+          server_name: server_data["Name"],
+          server_color: server_data["Color"],
           total_members: Member.count,
           subscribed: Member.newsletter_subscribed.count,
           unsubscribed: Member.newsletter_unsubscribed.count,
@@ -151,7 +151,7 @@ class PostmarkService
     private
 
     def strip_html(html)
-      html.gsub(/<[^>]*>/, '').gsub(/\s+/, ' ').strip
+      html.gsub(/<[^>]*>/, "").gsub(/\s+/, " ").strip
     end
   end
 end

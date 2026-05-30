@@ -14,8 +14,8 @@ class SendNewsletterJob < ApplicationJob
 
     return { sent: 0, failed: 0 } if members_to_send.empty?
 
-    from_email = SiteConfig.current('site')&.config&.dig('author_email') || 'noreply@example.com'
-    from_name = SiteConfig.current('site')&.config&.dig('author') || 'Newsletter'
+    from_email = SiteConfig.current("site")&.config&.dig("author_email") || "noreply@example.com"
+    from_name = SiteConfig.current("site")&.config&.dig("author") || "Newsletter"
 
     # Build messages array with member association
     messages_with_members = members_to_send.map do |member|
@@ -26,17 +26,17 @@ class SendNewsletterJob < ApplicationJob
       message = {
         From: "#{from_name} <#{from_email}>",
         To: "#{member.name} <#{member.email}>",
-        Subject: post.title || 'Newsletter',
+        Subject: post.title || "Newsletter",
         HtmlBody: html_content,
         TextBody: strip_html(html_content),
-        MessageStream: 'broadcast',
-        Tag: 'newsletter',
+        MessageStream: "broadcast",
+        Tag: "newsletter",
         Metadata: {
           post_id: post.id.to_s,
           member_id: member.id.to_s
         }
       }
-      [member, message]
+      [ member, message ]
     end
 
     # Send in bulk batches
@@ -54,8 +54,8 @@ class SendNewsletterJob < ApplicationJob
         result[:results].each_with_index do |msg_result, index|
           member = batch_members[index]
 
-          if msg_result['ErrorCode'] == 0
-            message_id = msg_result['MessageID']
+          if msg_result["ErrorCode"] == 0
+            message_id = msg_result["MessageID"]
 
             # Use find_or_create_by to avoid duplicates
             NewsletterSend.find_or_create_by!(post: post, member: member) do |ns|
@@ -103,7 +103,7 @@ class SendNewsletterJob < ApplicationJob
     result = PostmarkService.send_newsletter_batch(messages: batch)
 
     # Postmark returns 429 for rate limiting (though rare)
-    if !result[:success] && result[:error].to_s.include?('429')
+    if !result[:success] && result[:error].to_s.include?("429")
       if attempt < MAX_RETRIES
         wait_time = 2 ** attempt
         Rails.logger.warn "Rate limited (429), waiting #{wait_time}s before retry #{attempt}/#{MAX_RETRIES}"
@@ -118,6 +118,6 @@ class SendNewsletterJob < ApplicationJob
   end
 
   def strip_html(html)
-    html.gsub(/<[^>]*>/, '').gsub(/\s+/, ' ').strip
+    html.gsub(/<[^>]*>/, "").gsub(/\s+/, " ").strip
   end
 end

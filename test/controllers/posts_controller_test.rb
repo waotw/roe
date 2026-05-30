@@ -4,17 +4,17 @@ require "ostruct"
 class PostsControllerTest < ActionDispatch::IntegrationTest
   def setup
     super
-    
-    @public_post = create(:post, 
-      metadata: { 
-        "title" => "Public Post", 
-        "status" => "published", 
+
+    @public_post = create(:post,
+      metadata: {
+        "title" => "Public Post",
+        "status" => "published",
         "date" => "2024-01-01",
         "audience" => "everyone"
       },
       content: "# Public Post\n\nThis is a public post."
     )
-    
+
     @paid_post_no_form = create(:post,
       metadata: {
         "title" => "Paid Post",
@@ -24,7 +24,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Paid Post\n\nThis is paid content without a form."
     )
-    
+
     @paid_post_with_form = create(:post,
       metadata: {
         "title" => "Paid Post With Paywall",
@@ -34,7 +34,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Paid Post With Paywall\n\nThis is free content.\n\n```form for: paid_content\nUpgrade now!\n```"
     )
-    
+
     @draft_post = create(:post,
       metadata: {
         "title" => "Draft Post",
@@ -43,7 +43,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Draft Post\n\nThis is a draft post."
     )
-    
+
     @unlisted_post = create(:post,
       metadata: {
         "title" => "Unlisted Post",
@@ -52,7 +52,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Unlisted Post\n\nThis is an unlisted post."
     )
-    
+
     @free_member = create(:member, tier: :free, status: :active)
     @paid_member = create(:member, tier: :paid, status: :active)
     @cancelled_member = create(:member, tier: :paid, status: :cancelled)
@@ -62,7 +62,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Public Content Tests
   # ============================================================================
-  
+
   test "shows public published post to guest" do
     get post_path(@public_post.url_name)
     assert_response :success
@@ -90,7 +90,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Unlisted Content Tests
   # ============================================================================
-  
+
   test "shows unlisted post to guest" do
     get post_path(@unlisted_post.url_name)
     assert_response :success
@@ -105,7 +105,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Draft Content Tests
   # ============================================================================
-  
+
   test "returns 404 for draft post when guest" do
     get post_path(@draft_post.url_name)
     assert_response :not_found
@@ -127,14 +127,14 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Paid Content Tests - No Paywall Form
   # ============================================================================
-  
+
   test "redirects guest to upgrade when accessing paid content without form" do
     # Enable members feature
     SiteConfig.current.update!(
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     get post_path(@paid_post_no_form.url_name)
     assert_redirected_to "/upgrade"
     assert_equal "This content requires a paid membership", flash[:alert]
@@ -145,7 +145,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@free_member)
     get post_path(@paid_post_no_form.url_name)
     assert_redirected_to "/upgrade"
@@ -157,7 +157,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@paid_member)
     get post_path(@paid_post_no_form.url_name)
     assert_response :success
@@ -169,7 +169,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@cancelled_member)
     get post_path(@paid_post_no_form.url_name)
     assert_redirected_to "/upgrade"
@@ -181,7 +181,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_as(@admin)
     get post_path(@paid_post_no_form.url_name)
     assert_response :success
@@ -190,13 +190,13 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Paid Content Tests - With Paywall Form
   # ============================================================================
-  
+
   test "shows paid content with paywall form to guest" do
     SiteConfig.current.update!(
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     # With paywall form, content loads but shows teaser
     get post_path(@paid_post_with_form.url_name)
     assert_response :success
@@ -207,7 +207,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@free_member)
     get post_path(@paid_post_with_form.url_name)
     assert_response :success
@@ -218,7 +218,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@paid_member)
     get post_path(@paid_post_with_form.url_name)
     assert_response :success
@@ -227,11 +227,11 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Members Feature Disabled Tests
   # ============================================================================
-  
+
   test "shows paid content to everyone when members feature is disabled" do
     # Stub members_enabled? to return false (no members.yml file)
     SiteFeature.stubs(:members_enabled?).returns(false)
-    
+
     get post_path(@paid_post_no_form.url_name)
     assert_response :success
   end
@@ -239,7 +239,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Edge Cases
   # ============================================================================
-  
+
   test "returns 404 for non-existent post" do
     get post_path("non-existent-post")
     assert_response :not_found
@@ -254,7 +254,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
         "url_name" => "special-post-123"
       }
     )
-    
+
     get post_path(special_post.url_name)
     assert_response :success
   end
@@ -262,7 +262,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Route Tests
   # ============================================================================
-  
+
   test "show_by_id redirects to named route" do
     get post_by_id_path(@public_post.id)
     assert_redirected_to post_path(@public_post.url_name)

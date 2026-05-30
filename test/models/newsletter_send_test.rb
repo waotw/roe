@@ -2,7 +2,7 @@ require "test_helper"
 
 class NewsletterSendTest < ActiveSupport::TestCase
   def setup
-    @member = create(:member, email: 'subscriber@example.com')
+    @member = create(:member, email: "subscriber@example.com")
     @post = create(:post, metadata: { "title" => "Test Newsletter", "status" => "published", "date" => "2024-01-01" })
   end
 
@@ -11,7 +11,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
       post: @post,
       member: @member,
       sent_at: Time.current,
-      message_id: 'test-message-123'
+      message_id: "test-message-123"
     )
     assert ns.valid?
   end
@@ -82,7 +82,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
       sent_at: Time.current
     )
 
-    other_member = create(:member, email: 'other@example.com')
+    other_member = create(:member, email: "other@example.com")
     ns = NewsletterSend.new(
       post: @post,
       member: other_member,
@@ -92,7 +92,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
   end
 
   test "optional import association" do
-    import = create(:import, status: 'completed')
+    import = create(:import, status: "completed")
     ns = NewsletterSend.new(
       post: @post,
       member: @member,
@@ -109,7 +109,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
       sent_at: 2.days.ago
     )
 
-    new_member = create(:member, email: 'new@example.com')
+    new_member = create(:member, email: "new@example.com")
     new_send = NewsletterSend.create!(
       post: @post,
       member: new_member,
@@ -129,7 +129,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
     )
 
     other_post = create(:post, metadata: { "title" => "Other Post", "status" => "published", "date" => "2024-01-01" })
-    other_member = create(:member, email: 'other@example.com')
+    other_member = create(:member, email: "other@example.com")
     NewsletterSend.create!(
       post: other_post,
       member: other_member,
@@ -149,7 +149,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
     )
 
     other_post = create(:post, metadata: { "title" => "Other Post", "status" => "published", "date" => "2024-01-01" })
-    other_member = create(:member, email: 'other@example.com')
+    other_member = create(:member, email: "other@example.com")
     NewsletterSend.create!(
       post: other_post,
       member: other_member,
@@ -162,7 +162,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
   end
 
   test "stores message_id" do
-    message_id = 'msg-abc123@postmark'
+    message_id = "msg-abc123@postmark"
     ns = NewsletterSend.create!(
       post: @post,
       member: @member,
@@ -199,7 +199,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
       sent_at: Time.current
     )
 
-    assert_difference 'NewsletterSend.count', -1 do
+    assert_difference "NewsletterSend.count", -1 do
       @post.destroy
     end
   end
@@ -211,7 +211,7 @@ class NewsletterSendTest < ActiveSupport::TestCase
       sent_at: Time.current
     )
 
-    assert_difference 'NewsletterSend.count', -1 do
+    assert_difference "NewsletterSend.count", -1 do
       @member.destroy
     end
   end

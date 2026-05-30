@@ -1,5 +1,5 @@
-require 'net/http'
-require 'json'
+require "net/http"
+require "json"
 
 module SiteSync
   # Cross-environment state exchange. The communication is
@@ -31,7 +31,7 @@ module SiteSync
     LAST_EXCHANGE_TTL        = 1.day
     REFRESH_STALE_AFTER      = 60.seconds       # threshold for opportunistic refresh
     PEER_REACHABLE_WINDOW    = 2.hours          # peer counts as "reachable" if we
-                                                # heard from them within this window
+    # heard from them within this window
     HTTP_TIMEOUT_SECONDS     = 5
 
     # Cap for the per-category drift file list we ship in the
@@ -52,7 +52,7 @@ module SiteSync
       def local_state
         current_files = SiteSync::Ledger.current
         recorded      = SiteSync::Ledger.recorded
-        recorded_files = recorded&.dig('files') || {}
+        recorded_files = recorded&.dig("files") || {}
 
         state = {
           fingerprint:          SiteSync::Ledger.fingerprint_of(current_files),
@@ -96,16 +96,16 @@ module SiteSync
       def call_peer
         return nil unless can_call_peer?
 
-        uri = URI.parse(File.join(peer_url, '/api/site_sync/exchange'))
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/exchange"))
 
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl      = (uri.scheme == 'https')
+        http.use_ssl      = (uri.scheme == "https")
         http.read_timeout = HTTP_TIMEOUT_SECONDS
         http.open_timeout = HTTP_TIMEOUT_SECONDS
 
         request = Net::HTTP::Post.new(uri.request_uri)
-        request['Content-Type']  = 'application/json'
-        request['Authorization'] = "Bearer #{token}"
+        request["Content-Type"]  = "application/json"
+        request["Authorization"] = "Bearer #{token}"
         request.body             = local_state.to_json
 
         response = http.request(request)
@@ -114,11 +114,11 @@ module SiteSync
           Rails.logger.warn "[SiteSync::Exchange] peer responded #{response.code}: #{response.body}"
           # Track the specific error type
           error_type = case response.code.to_i
-                       when 401 then :auth_error
-                       when 404 then :not_found
-                       when 500..599 then :server_error
-                       else :request_error
-                       end
+          when 401 then :auth_error
+          when 404 then :not_found
+          when 500..599 then :server_error
+          else :request_error
+          end
           save_exchange_result(success: false, error_type: error_type, http_code: response.code)
           return nil
         end
@@ -178,7 +178,7 @@ module SiteSync
           return false
         end
 
-        uri = URI.parse(File.join(peer_url, '/api/site_sync/refresh_ledger'))
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/refresh_ledger"))
         Rails.logger.info "[SiteSync::Exchange] refresh_peer_ledger → POST #{uri}"
 
         # 1 attempt + 2 retries on transient failures (network blip,
@@ -186,8 +186,8 @@ module SiteSync
         # retried — they won't fix themselves. Retries use brief
         # exponential backoff (1s, then 2s) so we don't compound a
         # struggling peer.
-        with_retries(label: 'refresh_peer_ledger', max_retries: 2) do
-          response = post_to_peer(uri, '{}')
+        with_retries(label: "refresh_peer_ledger", max_retries: 2) do
+          response = post_to_peer(uri, "{}")
           if response.nil?
             raise "no response (network error)"
           elsif response.is_a?(Net::HTTPSuccess)
@@ -219,11 +219,11 @@ module SiteSync
         paths = Array(paths).reject(&:blank?).uniq
         return {} if paths.empty?
 
-        uri = URI.parse(File.join(peer_url, '/api/site_sync/file_states'))
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/file_states"))
         response = post_to_peer(uri, { paths: paths }.to_json)
         return {} unless response.is_a?(Net::HTTPSuccess)
 
-        JSON.parse(response.body)['files'] || {}
+        JSON.parse(response.body)["files"] || {}
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] fetch_peer_file_states failed: #{e.class} #{e.message}"
         {}
@@ -238,15 +238,15 @@ module SiteSync
       def fetch_peer_manifest
         return nil unless can_call_peer?
 
-        uri = URI.parse(File.join(peer_url, '/api/site_sync/manifest'))
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/manifest"))
         response = get_from_peer(uri)
         return nil unless response.is_a?(Net::HTTPSuccess)
 
         data = JSON.parse(response.body)
         {
-          'files' => data['files'] || {},
-          'fingerprint' => data['fingerprint'],
-          'file_count' => data['file_count']
+          "files" => data["files"] || {},
+          "fingerprint" => data["fingerprint"],
+          "file_count" => data["file_count"]
         }
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] fetch_peer_manifest failed: #{e.class} #{e.message}"
@@ -262,7 +262,7 @@ module SiteSync
       def publish_members(batch)
         return nil unless can_call_peer?
 
-        uri = URI.parse(File.join(peer_url, '/api/site_sync/publish_members'))
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/publish_members"))
         response = post_to_peer(uri, { members: batch }.to_json)
         return nil unless response.is_a?(Net::HTTPSuccess)
 
@@ -280,7 +280,7 @@ module SiteSync
       def publish_newsletter_sends(batch)
         return nil unless can_call_peer?
 
-        uri = URI.parse(File.join(peer_url, '/api/site_sync/publish_newsletter_sends'))
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/publish_newsletter_sends"))
         response = post_to_peer(uri, { sends: batch }.to_json)
         return nil unless response.is_a?(Net::HTTPSuccess)
 
@@ -294,13 +294,13 @@ module SiteSync
       # treat network errors and HTTP responses uniformly.
       def post_to_peer(uri, body)
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl      = (uri.scheme == 'https')
+        http.use_ssl      = (uri.scheme == "https")
         http.read_timeout = 30
         http.open_timeout = HTTP_TIMEOUT_SECONDS
 
         request = Net::HTTP::Post.new(uri.request_uri)
-        request['Content-Type']  = 'application/json'
-        request['Authorization'] = "Bearer #{token}"
+        request["Content-Type"]  = "application/json"
+        request["Authorization"] = "Bearer #{token}"
         request.body             = body
 
         http.request(request)
@@ -312,12 +312,12 @@ module SiteSync
       # HTTP GET helper for fetching data from peer (used by manifest fetch).
       def get_from_peer(uri)
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl      = (uri.scheme == 'https')
+        http.use_ssl      = (uri.scheme == "https")
         http.read_timeout = 30
         http.open_timeout = HTTP_TIMEOUT_SECONDS
 
         request = Net::HTTP::Get.new(uri.request_uri)
-        request['Authorization'] = "Bearer #{token}"
+        request["Authorization"] = "Bearer #{token}"
 
         http.request(request)
       rescue => e
@@ -383,8 +383,8 @@ module SiteSync
       # so it reads naturally regardless of which side we're on.
       def peer_label
         case peer_state&.dig(:env)
-        when 'production'  then 'Live site'
-        when 'development' then 'Local site'
+        when "production"  then "Live site"
+        when "development" then "Local site"
         else                    peer_state&.dig(:env)&.to_s&.capitalize
         end
       end
@@ -443,14 +443,14 @@ module SiteSync
       # Skips when fingerprints differ (real drift exists — don't
       # paper over it) or when our ledger already records this state.
       def self_heal_ledger_if_in_sync_with(payload)
-        peer_fp = payload['fingerprint'] || payload[:fingerprint]
+        peer_fp = payload["fingerprint"] || payload[:fingerprint]
         return if peer_fp.blank?
 
         current_fp = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH)
         return unless current_fp == peer_fp
 
         recorded = SiteSync::Ledger.recorded
-        return if recorded && recorded['fingerprint'] == current_fp
+        return if recorded && recorded["fingerprint"] == current_fp
 
         Rails.logger.info "[SiteSync::Exchange] self-heal: peer fingerprint matches ours, refreshing local ledger"
         SiteSync::Ledger.write_current!
@@ -465,11 +465,11 @@ module SiteSync
       # can rely on either path producing the same shape.
       def save_peer_state(payload)
         normalized = {
-          fingerprint:          payload['fingerprint']          || payload[:fingerprint],
-          recorded_fingerprint: payload['recorded_fingerprint'] || payload[:recorded_fingerprint],
-          env:                  payload['env']                  || payload[:env],
-          version:              payload['version']              || payload[:version],
-          drift:                normalize_drift(payload['drift'] || payload[:drift]),
+          fingerprint:          payload["fingerprint"]          || payload[:fingerprint],
+          recorded_fingerprint: payload["recorded_fingerprint"] || payload[:recorded_fingerprint],
+          env:                  payload["env"]                  || payload[:env],
+          version:              payload["version"]              || payload[:version],
+          drift:                normalize_drift(payload["drift"] || payload[:drift]),
           received_at:          Time.current
         }
         Rails.cache.write(PEER_STATE_CACHE_KEY, normalized, expires_in: PEER_STATE_TTL)
@@ -498,17 +498,17 @@ module SiteSync
       # or symbol keys.
       def normalize_drift(drift)
         return nil unless drift
-        counts = drift['counts'] || drift[:counts] || {}
+        counts = drift["counts"] || drift[:counts] || {}
         {
           counts: {
-            modified: counts['modified'] || counts[:modified] || (drift['modified'] || drift[:modified] || []).size,
-            added:    counts['added']    || counts[:added]    || (drift['added']    || drift[:added]    || []).size,
-            deleted:  counts['deleted']  || counts[:deleted]  || (drift['deleted']  || drift[:deleted]  || []).size
+            modified: counts["modified"] || counts[:modified] || (drift["modified"] || drift[:modified] || []).size,
+            added:    counts["added"]    || counts[:added]    || (drift["added"]    || drift[:added]    || []).size,
+            deleted:  counts["deleted"]  || counts[:deleted]  || (drift["deleted"]  || drift[:deleted]  || []).size
           },
-          modified:  drift['modified']  || drift[:modified]  || [],
-          added:     drift['added']     || drift[:added]     || [],
-          deleted:   drift['deleted']   || drift[:deleted]   || [],
-          truncated: drift['truncated'] || drift[:truncated] || false
+          modified:  drift["modified"]  || drift[:modified]  || [],
+          added:     drift["added"]     || drift[:added]     || [],
+          deleted:   drift["deleted"]   || drift[:deleted]   || [],
+          truncated: drift["truncated"] || drift[:truncated] || false
         }
       end
     end

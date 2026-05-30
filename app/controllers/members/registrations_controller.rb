@@ -1,8 +1,8 @@
 module Members
   class RegistrationsController < ApplicationController
     skip_before_action :require_authentication
-    before_action :redirect_if_signed_in, only: [:new, :create, :create_and_checkout]
-    before_action :load_signup_page, only: [:new, :create, :create_and_checkout]
+    before_action :redirect_if_signed_in, only: [ :new, :create, :create_and_checkout ]
+    before_action :load_signup_page, only: [ :new, :create, :create_and_checkout ]
 
     def new
       @member = Member.new
@@ -19,7 +19,7 @@ module Members
         redirect_to root_path, notice: "Welcome! You're signed up."
       else
         # Render the page template to preserve the full page content with form
-        render 'pages/show', status: :unprocessable_entity
+        render "pages/show", status: :unprocessable_entity
       end
     end
 
@@ -44,11 +44,11 @@ module Members
           checkout_session = Stripe::Checkout::Session.create(
             {
               customer_email: @member.email,
-              line_items: [{
+              line_items: [ {
                 price: stripe_config.price_id,
                 quantity: 1
-              }],
-              mode: 'payment',
+              } ],
+              mode: "payment",
               success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
               cancel_url: checkout_cancel_url,
               metadata: {
@@ -66,7 +66,7 @@ module Members
         end
       else
         # Render the page template to preserve the full page content with form
-        render 'pages/show', status: :unprocessable_entity
+        render "pages/show", status: :unprocessable_entity
       end
     end
 
@@ -82,7 +82,7 @@ module Members
 
     def load_signup_page
       # Load the signup page so sidebar and other page-specific features work
-      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'sign-up')
+      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-up")
     end
   end
 end

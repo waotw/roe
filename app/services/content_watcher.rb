@@ -1,11 +1,11 @@
 class ContentWatcher
   WATCH_PATHS = [
-    File.join(RoeSitePaths::SITE_PATH, 'posts'),
-    File.join(RoeSitePaths::SITE_PATH, 'pages'),
-    File.join(RoeSitePaths::SITE_PATH, 'documentation'),
-    File.join(RoeSitePaths::SITE_PATH, 'products'),
-    File.join(RoeSitePaths::SITE_PATH, 'system'),
-    File.join(RoeSitePaths::SITE_PATH, 'media')
+    File.join(RoeSitePaths::SITE_PATH, "posts"),
+    File.join(RoeSitePaths::SITE_PATH, "pages"),
+    File.join(RoeSitePaths::SITE_PATH, "documentation"),
+    File.join(RoeSitePaths::SITE_PATH, "products"),
+    File.join(RoeSitePaths::SITE_PATH, "system"),
+    File.join(RoeSitePaths::SITE_PATH, "media")
   ].freeze
 
     # Define what file types we process
@@ -107,7 +107,7 @@ class ContentWatcher
 
   def self.static_generation_enabled?
     site_config = SiteConfig.first
-    site_config&.config&.dig('static_generation_enabled') == true  # Change to 'config'
+    site_config&.config&.dig("static_generation_enabled") == true  # Change to 'config'
   rescue => e
     Rails.logger.debug "Static generation check failed: #{e.message}"
     false
@@ -155,30 +155,30 @@ class ContentWatcher
     absolute_file = RoeSitePaths.normalize(file)
 
     # Handle global configs (site.yml, fonts.yml)
-    if absolute_file.include?('site/system/global/')
-      filename = File.basename(file, '.yml')
+    if absolute_file.include?("site/system/global/")
+      filename = File.basename(file, ".yml")
       SiteConfig.sync_from_file(filename)
       puts "\n   ✓ #{filename.capitalize} config reloaded\n"
 
     # Handle feature configs (members.yml, podcast.yml, store.yml)
-    elsif absolute_file.include?('site/system/features/')
-      type = File.basename(file, '.yml')
+    elsif absolute_file.include?("site/system/features/")
+      type = File.basename(file, ".yml")
       SiteConfig.sync_from_file("features/#{type}")
       puts "\n   ✓ #{type.capitalize} feature config reloaded\n"
 
     # Handle default configs (cards.yml, collections.yml)
-    elsif absolute_file.include?('site/system/defaults/')
-      type = File.basename(file, '.yml')
+    elsif absolute_file.include?("site/system/defaults/")
+      type = File.basename(file, ".yml")
       SiteConfig.sync_from_file("defaults/#{type}")
       puts "\n   ✓ #{type.capitalize} defaults reloaded\n"
 
     # Handle integration configs (payments.yml, newsletters.yml, snipcart.yml)
-    elsif absolute_file.include?('site/system/integrations/')
-      type = File.basename(file, '.yml')
+    elsif absolute_file.include?("site/system/integrations/")
+      type = File.basename(file, ".yml")
       SiteConfig.sync_from_file("integrations/#{type}")
       puts "\n   ✓ #{type.capitalize} integration config reloaded\n"
 
-    elsif absolute_file.include?('site/posts')
+    elsif absolute_file.include?("site/posts")
       result = Post.create_or_update_from_file(absolute_file)
 
       case result
@@ -190,30 +190,30 @@ class ContentWatcher
         puts "\n   ✓ Post saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('site/pages')
+    elsif absolute_file.include?("site/pages")
       result = Page.create_or_update_from_file(absolute_file)
 
       if result
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('site/documentation')
+    elsif absolute_file.include?("site/documentation")
       result = Documentation.create_or_update_from_file(absolute_file)
 
       if result
         puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('site/products')
+    elsif absolute_file.include?("site/products")
       result = Product.create_or_update_from_file(absolute_file)
 
       if result
         puts "\n   ✓ Product saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?('site/media') && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg|mp3|m4a|wav|ogg|flac|aac|mp4|webm|ogv|mov|avi|mkv)$/i)
+    elsif absolute_file.include?("site/media") && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg|mp3|m4a|wav|ogg|flac|aac|mp4|webm|ogv|mov|avi|mkv)$/i)
       # Skip variant files - they shouldn't be tracked in media table
-      if absolute_file.include?('/variants/')
+      if absolute_file.include?("/variants/")
         puts "DEBUG: Skipping variant file: #{absolute_file}"
         return
       end
@@ -224,14 +224,14 @@ class ContentWatcher
       # In production, /rails/site is a symlink to /data/site
       real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
       real_file_path = File.realpath(absolute_file)
-      web_path = real_file_path.sub(real_site_path, '')
+      web_path = real_file_path.sub(real_site_path, "")
       puts "DEBUG: Web path: #{web_path}"
 
       if Medium.exists?(file_path: web_path)
         puts "DEBUG: Record already exists, skipping"
       else
         puts "DEBUG: Creating new record..."
-        extension = File.extname(absolute_file).delete_prefix('.')
+        extension = File.extname(absolute_file).delete_prefix(".")
         medium = Medium.create!(
           file_path: web_path,
           media_type: extension,
@@ -252,15 +252,15 @@ class ContentWatcher
 
     removed.each do |old_file|
       # Handle markdown files
-      if old_file.end_with?('.md')
-        old_basename = File.basename(old_file, '.md')
+      if old_file.end_with?(".md")
+        old_basename = File.basename(old_file, ".md")
 
         new_file = added.find do |file|
-          next unless file.end_with?('.md')
-          new_basename = File.basename(file, '.md')
+          next unless file.end_with?(".md")
+          new_basename = File.basename(file, ".md")
 
           new_basename.include?(old_basename) ||
-            old_basename.include?(new_basename.sub(/^\d+-/, ''))
+            old_basename.include?(new_basename.sub(/^\d+-/, ""))
         end
 
         renames[old_file] = new_file if new_file
@@ -291,33 +291,33 @@ class ContentWatcher
     absolute_old = RoeSitePaths.normalize(old_path)
     absolute_new = RoeSitePaths.normalize(new_path)
 
-    if absolute_old.include?('site/posts')
+    if absolute_old.include?("site/posts")
       post = Post.find_by(file_path: absolute_old)
       if post
         post.update(file_path: absolute_new)
         Post.create_or_update_from_file(absolute_new)
         puts "   ✓ Post renamed in database"
       end
-    elsif absolute_old.include?('site/pages')
+    elsif absolute_old.include?("site/pages")
       page = Page.find_by(file_path: absolute_old)
       if page
         page.update(file_path: absolute_new)
         Page.create_or_update_from_file(absolute_new)
         puts "   ✓ Page renamed in database"
       end
-    elsif absolute_old.include?('site/documentation')
+    elsif absolute_old.include?("site/documentation")
       doc = Documentation.find_by(file_path: absolute_old)
       if doc
         doc.update(file_path: absolute_new)
         Documentation.create_or_update_from_file(absolute_new)
         puts "   ✓ Documentation renamed in database"
       end
-    elsif absolute_old.include?('site/media')
+    elsif absolute_old.include?("site/media")
       # Media files are stored with web paths like "/media/images/file.jpg"
       # Handle symlinks - resolve to real path before substitution
       real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-      old_web_path = File.realpath(absolute_old).sub(real_site_path, '')
-      new_web_path = File.realpath(absolute_new).sub(real_site_path, '')
+      old_web_path = File.realpath(absolute_old).sub(real_site_path, "")
+      new_web_path = File.realpath(absolute_new).sub(real_site_path, "")
 
       medium = Medium.find_by(file_path: old_web_path)
       if medium
@@ -335,21 +335,21 @@ class ContentWatcher
     absolute_file = RoeSitePaths.normalize(file)
 
     # Handle config files first
-    if absolute_file.include?('site/system')
+    if absolute_file.include?("site/system")
       handle_config_removed(absolute_file)
-    elsif absolute_file.include?('site/posts')
+    elsif absolute_file.include?("site/posts")
       Post.remove_by_file_path(absolute_file)
       puts "   Removed post from database"
-    elsif absolute_file.include?('site/pages')
+    elsif absolute_file.include?("site/pages")
       Page.remove_by_file_path(absolute_file)
       puts "   Removed page from database"
-    elsif absolute_file.include?('site/documentation')
+    elsif absolute_file.include?("site/documentation")
       Documentation.remove_by_file_path(absolute_file)
       puts "   Removed documentation from database"
-    elsif absolute_file.include?('site/media')
+    elsif absolute_file.include?("site/media")
       # Handle symlinks - resolve to real path before substitution
       real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-      web_path = File.realpath(absolute_file).sub(real_site_path, '')
+      web_path = File.realpath(absolute_file).sub(real_site_path, "")
       Medium.remove_by_file_path(web_path)
       puts "   Removed media file from database"
     end
@@ -359,18 +359,18 @@ class ContentWatcher
     filename = File.basename(file_path)
 
     # Handle OLD structure (for backward compatibility during migration)
-    if file_path.include?('site/system/') && !file_path.include?('defaults/') && !file_path.include?('global/') && !file_path.include?('features/')
+    if file_path.include?("site/system/") && !file_path.include?("defaults/") && !file_path.include?("global/") && !file_path.include?("features/")
       # Old root-level config (site.yml) - ignore it, should be in global/ now
       puts "   ℹ️  Ignoring old config location: #{filename} (should be in global/ or features/)"
       return
     end
 
     # Determine config type based on NEW directory structure
-    if file_path.include?('system/global')
+    if file_path.include?("system/global")
       handle_global_config_removed(filename, file_path)
-    elsif file_path.include?('system/defaults')
+    elsif file_path.include?("system/defaults")
       handle_defaults_config_removed(filename, file_path)
-    elsif file_path.include?('system/features')
+    elsif file_path.include?("system/features")
       handle_features_config_removed(filename, file_path)
     else
       puts "   ℹ️  Unknown config file removed: #{filename}"
@@ -379,10 +379,10 @@ class ContentWatcher
 
   def self.handle_global_config_removed(filename, file_path)
     case filename
-    when 'site.yml'
-      restore_required_config('site', file_path)
-    when 'fonts.yml'
-      restore_required_config('fonts', file_path)
+    when "site.yml"
+      restore_required_config("site", file_path)
+    when "fonts.yml"
+      restore_required_config("fonts", file_path)
     else
       puts "   ℹ️  Unknown global config file removed: #{filename}"
     end
@@ -390,10 +390,10 @@ class ContentWatcher
 
   def self.handle_defaults_config_removed(filename, file_path)
     case filename
-    when 'cards.yml'
-      restore_required_config('defaults/cards', file_path)
-    when 'collections.yml'
-      restore_required_config('defaults/collections', file_path)
+    when "cards.yml"
+      restore_required_config("defaults/cards", file_path)
+    when "collections.yml"
+      restore_required_config("defaults/collections", file_path)
     else
       puts "   ℹ️  Unknown defaults config file removed: #{filename}"
     end
@@ -402,7 +402,7 @@ class ContentWatcher
   def self.handle_features_config_removed(filename, file_path)
     # Features are optional - allow deletion
     case filename
-    when 'members.yml', 'podcast.yml', 'store.yml'
+    when "members.yml", "podcast.yml", "store.yml"
       SiteConfig.find_by("file_path LIKE ?", "%#{filename}")&.destroy
       puts "   🗑️  #{filename.gsub('.yml', '').capitalize} feature disabled (file removed)"
     else
@@ -411,7 +411,7 @@ class ContentWatcher
   end
 
   def self.restore_required_config(config_type, file_path)
-    filename = config_type.split('/').last
+    filename = config_type.split("/").last
     site_config = SiteConfig.find_by("file_path LIKE ?", "%#{filename}.yml")
 
     if site_config&.config.present?
@@ -424,13 +424,13 @@ class ContentWatcher
       generator.send(:ensure_directories)
 
       case config_type
-      when 'site'
+      when "site"
         generator.send(:generate_site_config)
-      when 'fonts'
+      when "fonts"
         generator.send(:generate_fonts_config)
-      when 'defaults/cards'
+      when "defaults/cards"
         generator.send(:generate_cards_defaults)
-      when 'defaults/collections'
+      when "defaults/collections"
         generator.send(:generate_collections_defaults)
       end
 

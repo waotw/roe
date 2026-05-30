@@ -1,13 +1,13 @@
 class UpdateChecker
-  VERSION_FILE = Rails.root.join('config', 'version.yml')
-  
+  VERSION_FILE = Rails.root.join("config", "version.yml")
+
   # Configuration - Update these for your Codeberg repository
   CODEBERG_REPO = "waotw/roe"
   CODEBERG_API_URL = "https://codeberg.org/api/v1/repos/waotw/roe/releases"
-  
+
   # Alternative: Use git command to check remote tags (more reliable)
   GIT_REMOTE_URL = "https://codeberg.org/waotw/roe"
-  
+
   CACHE_KEY = "roe_latest_version"
   CACHE_TTL = 1.hour
 
@@ -47,9 +47,9 @@ class UpdateChecker
 
     def load_current_version
       return "0.0.0" unless File.exist?(VERSION_FILE)
-      
+
       config = YAML.load_file(VERSION_FILE)
-      config['version'] || "0.0.0"
+      config["version"] || "0.0.0"
     rescue => e
       Rails.logger.error "Failed to load version file: #{e.message}"
       "0.0.0"
@@ -105,21 +105,21 @@ class UpdateChecker
     def fetch_via_sourcehut_api
       uri = URI(SOURCEHUT_API_URL)
       response = Net::HTTP.get_response(uri)
-      
+
       return nil unless response.is_a?(Net::HTTPSuccess)
-      
+
       data = JSON.parse(response.body)
-      commits = data['results'] || []
+      commits = data["results"] || []
       return nil if commits.empty?
 
       # Look for version tags in recent commits
       latest_commit = commits.first
-      
+
       {
         version: extract_version_from_commit(latest_commit),
         url: "https://git.sr.ht/#{SOURCEHUT_REPO}",
         notes: "Latest commit: #{latest_commit['message']&.lines&.first}",
-        published_at: latest_commit['timestamp']
+        published_at: latest_commit["timestamp"]
       }
     rescue => e
       Rails.logger.error "Sourcehut API fetch failed: #{e.message}"
@@ -129,7 +129,7 @@ class UpdateChecker
     def extract_version_from_commit(commit)
       # Try to extract version from commit message
       # Looks for patterns like "Release v0.2.0" or "Version 0.2.0"
-      message = commit['message'] || ""
+      message = commit["message"] || ""
       if match = message.match(/(?:release|version)\s*v?(\d+\.\d+(?:\.\d+)?)/i)
         match[1]
       else
@@ -138,31 +138,31 @@ class UpdateChecker
     end
 
     def git_available?
-      system('which git > /dev/null 2>&1')
+      system("which git > /dev/null 2>&1")
     end
 
     def update_available?(current, latest)
       return false if latest.nil? || current.nil?
       return false if latest == "unknown"
-      
+
       compare_versions(latest, current) > 0
     end
 
     # Compare two version strings
     # Returns: 1 if a > b, -1 if a < b, 0 if equal
     def compare_versions(a, b)
-      a_parts = a.to_s.split('.').map(&:to_i)
-      b_parts = b.to_s.split('.').map(&:to_i)
-      
-      max_length = [a_parts.length, b_parts.length].max
+      a_parts = a.to_s.split(".").map(&:to_i)
+      b_parts = b.to_s.split(".").map(&:to_i)
+
+      max_length = [ a_parts.length, b_parts.length ].max
       a_parts.fill(0, a_parts.length...max_length)
       b_parts.fill(0, b_parts.length...max_length)
-      
+
       a_parts.zip(b_parts).each do |a_part, b_part|
         return 1 if a_part > b_part
         return -1 if a_part < b_part
       end
-      
+
       0
     end
 

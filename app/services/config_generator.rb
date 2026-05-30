@@ -1,10 +1,10 @@
 class ConfigGenerator
-  SYSTEM_PATH = File.join(RoeSitePaths::SITE_PATH, 'system')
-  SITE_PATH = File.join(SYSTEM_PATH, 'global')
-  FEATURES_PATH = File.join(SYSTEM_PATH, 'features')
-  DEFAULTS_PATH = File.join(SYSTEM_PATH, 'defaults')
-  ASSETS_PATH = File.join(SYSTEM_PATH, 'assets')
-  INTEGRATIONS_PATH = File.join(SYSTEM_PATH, 'integrations')
+  SYSTEM_PATH = File.join(RoeSitePaths::SITE_PATH, "system")
+  SITE_PATH = File.join(SYSTEM_PATH, "global")
+  FEATURES_PATH = File.join(SYSTEM_PATH, "features")
+  DEFAULTS_PATH = File.join(SYSTEM_PATH, "defaults")
+  ASSETS_PATH = File.join(SYSTEM_PATH, "assets")
+  INTEGRATIONS_PATH = File.join(SYSTEM_PATH, "integrations")
 
   def self.generate_all
     new.generate_all
@@ -16,10 +16,10 @@ class ConfigGenerator
 
   def generate_all
     ensure_directories
-    generate_site_config unless File.exist?(File.join(SITE_PATH, 'site.yml'))
-    generate_fonts_config unless File.exist?(File.join(SITE_PATH, 'fonts.yml'))
-    generate_cards_defaults unless File.exist?(File.join(DEFAULTS_PATH, 'cards.yml'))
-    generate_collections_defaults unless File.exist?(File.join(DEFAULTS_PATH, 'collections.yml'))
+    generate_site_config unless File.exist?(File.join(SITE_PATH, "site.yml"))
+    generate_fonts_config unless File.exist?(File.join(SITE_PATH, "fonts.yml"))
+    generate_cards_defaults unless File.exist?(File.join(DEFAULTS_PATH, "cards.yml"))
+    generate_collections_defaults unless File.exist?(File.join(DEFAULTS_PATH, "collections.yml"))
     generate_welcome_post
   end
 
@@ -29,10 +29,10 @@ class ConfigGenerator
     # user has already set on the site as a whole. SiteConfig.site_url
     # normalizes (adds https:// when missing); the raw `url` key in
     # site.yml is what the user typed.
-    site_url     = (SiteConfig.get('url').presence && SiteConfig.site_url) || 'https://yoursite.com'
-    author       = SiteConfig.get('author').presence       || ''
-    author_email = SiteConfig.get('author_email').presence || 'you@example.com'
-    copyright_holder = author.presence || 'Your Name'
+    site_url     = (SiteConfig.get("url").presence && SiteConfig.site_url) || "https://yoursite.com"
+    author       = SiteConfig.get("author").presence       || ""
+    author_email = SiteConfig.get("author_email").presence || "you@example.com"
+    copyright_holder = author.presence || "Your Name"
 
     content = <<~YAML
       # Podcast Configuration
@@ -53,7 +53,7 @@ class ConfigGenerator
         link: "#{site_url}"
     YAML
 
-    File.write(File.join(FEATURES_PATH, 'podcast.yml'), content)
+    File.write(File.join(FEATURES_PATH, "podcast.yml"), content)
     puts "✓ Generated features/podcast.yml"
   end
 
@@ -75,7 +75,7 @@ class ConfigGenerator
           show_paid_content: #{show_paid_content}
       YAML
 
-      File.write(File.join(FEATURES_PATH, 'members.yml'), content)
+      File.write(File.join(FEATURES_PATH, "members.yml"), content)
       puts "✓ Generated features/members.yml"
 
       # Generate integration config files if features are enabled
@@ -105,13 +105,13 @@ class ConfigGenerator
   def self.generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
     # Parse categories if it's a string
     categories = if product_categories.is_a?(String)
-      product_categories.split(',').map(&:strip).map(&:downcase).reject(&:blank?)
+      product_categories.split(",").map(&:strip).map(&:downcase).reject(&:blank?)
     else
       product_categories || []
     end
 
     # Format categories for YAML output
-    categories_string = categories.any? ? categories.join(', ') : 'book, ebook, file'
+    categories_string = categories.any? ? categories.join(", ") : "book, ebook, file"
 
     content = <<~YAML
       enabled: true
@@ -144,13 +144,13 @@ class ConfigGenerator
         show_quantity: true
     YAML
 
-    File.write(File.join(FEATURES_PATH, 'store.yml'), content)
+    File.write(File.join(FEATURES_PATH, "store.yml"), content)
     puts "✓ Generated features/store.yml"
     ConfigGenerator.new.generate_snipcart_config
   end
 
   def generate_payments_config
-    path = File.join(INTEGRATIONS_PATH, 'payments.yml')
+    path = File.join(INTEGRATIONS_PATH, "payments.yml")
     return if File.exist?(path)
 
     content = <<~YAML
@@ -169,7 +169,7 @@ class ConfigGenerator
   end
 
   def generate_newsletters_config
-    path = File.join(INTEGRATIONS_PATH, 'newsletters.yml')
+    path = File.join(INTEGRATIONS_PATH, "newsletters.yml")
     return if File.exist?(path)
 
     content = <<~YAML
@@ -186,7 +186,7 @@ class ConfigGenerator
   end
 
   def generate_snipcart_config
-    path = File.join(INTEGRATIONS_PATH, 'snipcart.yml')
+    path = File.join(INTEGRATIONS_PATH, "snipcart.yml")
     return if File.exist?(path)
 
     content = <<~YAML
@@ -202,7 +202,7 @@ class ConfigGenerator
   end
 
   def generate_member_pages
-    pages_path = File.join(RoeSitePaths::SITE_PATH, 'pages', 'members')
+    pages_path = File.join(RoeSitePaths::SITE_PATH, "pages", "members")
     FileUtils.mkdir_p(pages_path)
 
     generate_signup_page(pages_path)
@@ -218,7 +218,7 @@ class ConfigGenerator
   end
 
   def generate_signup_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'signup.md'))
+    return if File.exist?(File.join(pages_path, "signup.md"))
 
     signup_content = <<~MARKDOWN
       ---
@@ -248,12 +248,12 @@ class ConfigGenerator
       [^1]: I will never sell your data either.
     MARKDOWN
 
-    File.write(File.join(pages_path, 'signup.md'), signup_content)
+    File.write(File.join(pages_path, "signup.md"), signup_content)
     puts "✓ Generated members/signup.md page"
   end
 
   def generate_signin_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'signin.md'))
+    return if File.exist?(File.join(pages_path, "signin.md"))
 
     signin_content = <<~MARKDOWN
       ---
@@ -279,12 +279,12 @@ class ConfigGenerator
       Don't have an account? [Sign up](/signup)
     MARKDOWN
 
-    File.write(File.join(pages_path, 'signin.md'), signin_content)
+    File.write(File.join(pages_path, "signin.md"), signin_content)
     puts "✓ Generated members/signin.md page"
   end
 
   def generate_check_email_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'check-email.md'))
+    return if File.exist?(File.join(pages_path, "check-email.md"))
 
     check_email_content = <<~MARKDOWN
       ---
@@ -307,12 +307,12 @@ class ConfigGenerator
       Didn't receive it? [Try again](/signin)
     MARKDOWN
 
-    File.write(File.join(pages_path, 'check-email.md'), check_email_content)
+    File.write(File.join(pages_path, "check-email.md"), check_email_content)
     puts "✓ Generated members/check-email.md page"
   end
 
   def generate_upgrade_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'upgrade.md'))
+    return if File.exist?(File.join(pages_path, "upgrade.md"))
 
     upgrade_content = <<~MARKDOWN
       ---
@@ -346,12 +346,12 @@ class ConfigGenerator
       [^1]: As long as this site is around (and perhaps even longer).
     MARKDOWN
 
-    File.write(File.join(pages_path, 'upgrade.md'), upgrade_content)
+    File.write(File.join(pages_path, "upgrade.md"), upgrade_content)
     puts "✓ Generated members/upgrade.md page"
   end
 
   def generate_donate_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'donate.md'))
+    return if File.exist?(File.join(pages_path, "donate.md"))
 
     donate_content = <<~MARKDOWN
       ---
@@ -373,12 +373,12 @@ class ConfigGenerator
       Secure payment powered by Stripe.
     MARKDOWN
 
-    File.write(File.join(pages_path, 'donate.md'), donate_content)
+    File.write(File.join(pages_path, "donate.md"), donate_content)
     puts "✓ Generated members/donate.md page"
   end
 
   def generate_unsubscribe_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'unsubscribe.md'))
+    return if File.exist?(File.join(pages_path, "unsubscribe.md"))
 
     unsubscribe_content = <<~MARKDOWN
       ---
@@ -402,12 +402,12 @@ class ConfigGenerator
       [Go back home](/)
     MARKDOWN
 
-    File.write(File.join(pages_path, 'unsubscribe.md'), unsubscribe_content)
+    File.write(File.join(pages_path, "unsubscribe.md"), unsubscribe_content)
     puts "✓ Generated members/unsubscribe.md page"
   end
 
   def generate_unsubscribed_page(pages_path)
-    return if File.exist?(File.join(pages_path, 'unsubscribed.md'))
+    return if File.exist?(File.join(pages_path, "unsubscribed.md"))
 
     unsubscribed_content = <<~MARKDOWN
       ---
@@ -430,16 +430,16 @@ class ConfigGenerator
       [Return home](/)
     MARKDOWN
 
-    File.write(File.join(pages_path, 'unsubscribed.md'), unsubscribed_content)
+    File.write(File.join(pages_path, "unsubscribed.md"), unsubscribed_content)
     puts "✓ Generated members/unsubscribed.md page"
   end
 
   def generate_member_emails
-    emails_path = File.join(RoeSitePaths::SITE_PATH, 'emails')
+    emails_path = File.join(RoeSitePaths::SITE_PATH, "emails")
     FileUtils.mkdir_p(emails_path)
 
     # Magic link email
-    unless File.exist?(File.join(emails_path, 'magic_link.md'))
+    unless File.exist?(File.join(emails_path, "magic_link.md"))
       magic_link_content = <<~MARKDOWN
         # Sign in to @site_name
 
@@ -456,12 +456,12 @@ class ConfigGenerator
         If you didn't request this, you can safely ignore this email.
       MARKDOWN
 
-      File.write(File.join(emails_path, 'magic_link.md'), magic_link_content)
+      File.write(File.join(emails_path, "magic_link.md"), magic_link_content)
       puts "✓ Generated magic_link.md email template"
     end
 
     # Welcome email
-    unless File.exist?(File.join(emails_path, 'welcome.md'))
+    unless File.exist?(File.join(emails_path, "welcome.md"))
       welcome_content = <<~MARKDOWN
         # Welcome to @site_name!
 
@@ -474,12 +474,12 @@ class ConfigGenerator
         If you have any questions, just reply to this email.
       MARKDOWN
 
-      File.write(File.join(emails_path, 'welcome.md'), welcome_content)
+      File.write(File.join(emails_path, "welcome.md"), welcome_content)
       puts "✓ Generated welcome.md email template"
     end
 
     # Upgrade success email
-    unless File.exist?(File.join(emails_path, 'upgrade_success.md'))
+    unless File.exist?(File.join(emails_path, "upgrade_success.md"))
       upgrade_success_content = <<~MARKDOWN
         # Your membership is active!
 
@@ -496,12 +496,12 @@ class ConfigGenerator
         If you have any questions, just reply to this email.
       MARKDOWN
 
-      File.write(File.join(emails_path, 'upgrade_success.md'), upgrade_success_content)
+      File.write(File.join(emails_path, "upgrade_success.md"), upgrade_success_content)
       puts "✓ Generated upgrade_success.md email template"
     end
 
     # Email changed email
-    unless File.exist?(File.join(emails_path, 'email_changed.md'))
+    unless File.exist?(File.join(emails_path, "email_changed.md"))
       email_changed_content = <<~MARKDOWN
         # Your email has been changed
 
@@ -516,12 +516,12 @@ class ConfigGenerator
         @site_name
       MARKDOWN
 
-      File.write(File.join(emails_path, 'email_changed.md'), email_changed_content)
+      File.write(File.join(emails_path, "email_changed.md"), email_changed_content)
       puts "✓ Generated email_changed.md email template"
     end
 
     # Membership cancelled email
-    unless File.exist?(File.join(emails_path, 'membership_cancelled.md'))
+    unless File.exist?(File.join(emails_path, "membership_cancelled.md"))
       membership_cancelled_content = <<~MARKDOWN
         # Your membership has been cancelled
 
@@ -538,12 +538,12 @@ class ConfigGenerator
         @site_name
       MARKDOWN
 
-      File.write(File.join(emails_path, 'membership_cancelled.md'), membership_cancelled_content)
+      File.write(File.join(emails_path, "membership_cancelled.md"), membership_cancelled_content)
       puts "✓ Generated membership_cancelled.md email template"
     end
 
     # Email confirmation email
-    unless File.exist?(File.join(emails_path, 'email_confirmation.md'))
+    unless File.exist?(File.join(emails_path, "email_confirmation.md"))
       email_confirmation_content = <<~MARKDOWN
         # Confirm your email address
 
@@ -560,12 +560,12 @@ class ConfigGenerator
         If you didn't request this change, you can safely ignore this email and your email address will remain unchanged.
       MARKDOWN
 
-      File.write(File.join(emails_path, 'email_confirmation.md'), email_confirmation_content)
+      File.write(File.join(emails_path, "email_confirmation.md"), email_confirmation_content)
       puts "✓ Generated email_confirmation.md email template"
     end
 
     # Payment failed email
-    unless File.exist?(File.join(emails_path, 'payment_failed.md'))
+    unless File.exist?(File.join(emails_path, "payment_failed.md"))
       payment_failed_content = <<~MARKDOWN
         # Payment Update Required
 
@@ -582,12 +582,12 @@ class ConfigGenerator
         Questions? Just reply to this email.
       MARKDOWN
 
-      File.write(File.join(emails_path, 'payment_failed.md'), payment_failed_content)
+      File.write(File.join(emails_path, "payment_failed.md"), payment_failed_content)
       puts "✓ Generated payment_failed.md email template"
     end
 
     # Account deletion email
-    unless File.exist?(File.join(emails_path, 'account_deletion.md'))
+    unless File.exist?(File.join(emails_path, "account_deletion.md"))
       account_deletion_content = <<~MARKDOWN
         # Your account has been deleted
 
@@ -604,7 +604,7 @@ class ConfigGenerator
         @site_name
       MARKDOWN
 
-      File.write(File.join(emails_path, 'account_deletion.md'), account_deletion_content)
+      File.write(File.join(emails_path, "account_deletion.md"), account_deletion_content)
       puts "✓ Generated account_deletion.md email template"
     end
   end
@@ -617,16 +617,16 @@ class ConfigGenerator
     FileUtils.mkdir_p(SITE_PATH)
     FileUtils.mkdir_p(FEATURES_PATH)
     FileUtils.mkdir_p(DEFAULTS_PATH)
-    FileUtils.mkdir_p(File.join(ASSETS_PATH, 'fonts'))
-    FileUtils.mkdir_p(File.join(ASSETS_PATH, 'images'))
+    FileUtils.mkdir_p(File.join(ASSETS_PATH, "fonts"))
+    FileUtils.mkdir_p(File.join(ASSETS_PATH, "images"))
 
     # Copy default 404 image if it doesn't exist
     copy_default_404_image
   end
 
   def copy_default_404_image
-    source = Rails.root.join('app', 'assets', 'images', '404.png')
-    dest = File.join(ASSETS_PATH, 'images', '404.png')
+    source = Rails.root.join("app", "assets", "images", "404.png")
+    dest = File.join(ASSETS_PATH, "images", "404.png")
 
     # Only copy if source exists and dest doesn't
     if File.exist?(source) && !File.exist?(dest)
@@ -649,7 +649,7 @@ class ConfigGenerator
       static_generation_enabled: false
     YAML
 
-    File.write(File.join(SITE_PATH, 'site.yml'), content)
+    File.write(File.join(SITE_PATH, "site.yml"), content)
     puts "✓ Generated site/site.yml"
   end
 
@@ -669,7 +669,7 @@ class ConfigGenerator
         source: ""
     YAML
 
-    File.write(File.join(SITE_PATH, 'fonts.yml'), content)
+    File.write(File.join(SITE_PATH, "fonts.yml"), content)
     puts "✓ Generated site/fonts.yml"
   end
 
@@ -696,7 +696,7 @@ class ConfigGenerator
         text: __PLACEHOLDER__
     YAML
 
-    File.write(File.join(DEFAULTS_PATH, 'cards.yml'), content)
+    File.write(File.join(DEFAULTS_PATH, "cards.yml"), content)
     puts "✓ Generated defaults/cards.yml"
   end
 
@@ -716,16 +716,16 @@ class ConfigGenerator
         template: list
     YAML
 
-    File.write(File.join(DEFAULTS_PATH, 'collections.yml'), content)
+    File.write(File.join(DEFAULTS_PATH, "collections.yml"), content)
     puts "✓ Generated defaults/collections.yml"
   end
 
   def generate_welcome_post
-    posts_path = File.join(RoeSitePaths::SITE_PATH, 'posts')
-    welcome_file = File.join(posts_path, 'welcome.md')
+    posts_path = File.join(RoeSitePaths::SITE_PATH, "posts")
+    welcome_file = File.join(posts_path, "welcome.md")
 
     return if File.exist?(welcome_file)
-    return if Dir.exist?(posts_path) && Dir.glob(File.join(posts_path, '*.md')).any?
+    return if Dir.exist?(posts_path) && Dir.glob(File.join(posts_path, "*.md")).any?
 
     FileUtils.mkdir_p(posts_path)
 

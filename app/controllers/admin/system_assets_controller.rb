@@ -1,7 +1,6 @@
 class Admin::SystemAssetsController < Admin::BaseController
-
-  ASSETS_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'system/assets'))
-  FONTS_PATH = ASSETS_PATH.join('fonts')
+  ASSETS_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "system/assets"))
+  FONTS_PATH = ASSETS_PATH.join("fonts")
 
   def index
     # Main index if we want it later
@@ -11,7 +10,7 @@ class Admin::SystemAssetsController < Admin::BaseController
     # Ensure fonts directory exists
     FileUtils.mkdir_p(FONTS_PATH)
 
-    @fonts = Dir.glob(FONTS_PATH.join('*')).map do |file_path|
+    @fonts = Dir.glob(FONTS_PATH.join("*")).map do |file_path|
       {
         filename: File.basename(file_path),
         path: file_path,
@@ -22,11 +21,11 @@ class Admin::SystemAssetsController < Admin::BaseController
   end
 
   def browse_images
-    images_path = ASSETS_PATH.join('images')
+    images_path = ASSETS_PATH.join("images")
     # Ensure images directory exists
     FileUtils.mkdir_p(images_path)
 
-    @images = Dir.glob(images_path.join('*')).map do |file_path|
+    @images = Dir.glob(images_path.join("*")).map do |file_path|
       {
         filename: File.basename(file_path),
         path: file_path,
@@ -38,7 +37,7 @@ class Admin::SystemAssetsController < Admin::BaseController
 
   def create
     uploaded_file = params[:file]
-    asset_type = params[:asset_type] || 'fonts'
+    asset_type = params[:asset_type] || "fonts"
 
     folder_path = ASSETS_PATH.join(asset_type)
     FileUtils.mkdir_p(folder_path)
@@ -60,7 +59,7 @@ class Admin::SystemAssetsController < Admin::BaseController
     file_path = folder_path.join(final_filename)
 
     # Save file
-    File.open(file_path, 'wb') do |file|
+    File.open(file_path, "wb") do |file|
       file.write(uploaded_file.read)
     end
 
@@ -77,7 +76,7 @@ class Admin::SystemAssetsController < Admin::BaseController
 
   def destroy
     filename = params[:id]
-    asset_type = params[:asset_type] || 'fonts'
+    asset_type = params[:asset_type] || "fonts"
     file_path = ASSETS_PATH.join(asset_type, filename)
 
     Rails.logger.info "Attempting to delete: #{file_path}"
@@ -93,7 +92,7 @@ class Admin::SystemAssetsController < Admin::BaseController
   end
 
   def available_fonts
-    fonts = Dir.glob(FONTS_PATH.join('*')).map { |f| File.basename(f) }
+    fonts = Dir.glob(FONTS_PATH.join("*")).map { |f| File.basename(f) }
     render json: { fonts: fonts }
   end
 
@@ -105,7 +104,7 @@ class Admin::SystemAssetsController < Admin::BaseController
     basename = File.basename(filename, ext)
 
     # Keep original case for fonts, just remove dangerous characters
-    clean_name = basename.gsub(/[^a-zA-Z0-9\-_]/, '-').gsub(/-+/, '-')
+    clean_name = basename.gsub(/[^a-zA-Z0-9\-_]/, "-").gsub(/-+/, "-")
 
     "#{clean_name}#{ext}"
   end

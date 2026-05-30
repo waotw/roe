@@ -5,7 +5,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   setup do
     @post_class = Post
     @page_class = Page
-    
+
     @free_member = create(:member, tier: :free, status: :active)
     @paid_member = create(:member, tier: :paid, status: :active)
     @cancelled_member = create(:member, tier: :paid, status: :cancelled)
@@ -79,7 +79,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   # Instance method: accessible_to?
   test "accessible_to? returns true for public content regardless of member" do
     post = create(:post, metadata: { "audience" => "everyone" })
-    
+
     assert post.accessible_to?(nil)
     assert post.accessible_to?(@free_member)
     assert post.accessible_to?(@paid_member)
@@ -126,7 +126,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   test "public_content scope includes posts with nil audience" do
     public_post = create(:post, metadata: { "title" => "Public" })
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     results = Post.public_content
     assert_includes results, public_post
     assert_not_includes results, paid_post
@@ -134,32 +134,32 @@ class HasAudienceTest < ActiveSupport::TestCase
 
   test "public_content scope includes posts with empty audience" do
     public_post = create(:post, metadata: { "audience" => "" })
-    
+
     assert_includes Post.public_content, public_post
   end
 
   test "public_content scope includes posts with everyone audience" do
     public_post = create(:post, metadata: { "audience" => "everyone" })
-    
+
     assert_includes Post.public_content, public_post
   end
 
   test "public_content scope excludes posts with paid audience" do
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     assert_not_includes Post.public_content, paid_post
   end
 
   # Scope: premium_content
   test "premium_content scope includes posts with paid audience" do
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     assert_includes Post.premium_content, paid_post
   end
 
   test "premium_content scope excludes posts with everyone audience" do
     public_post = create(:post, metadata: { "audience" => "everyone" })
-    
+
     assert_not_includes Post.premium_content, public_post
   end
 
@@ -167,7 +167,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   test "accessible_to scope returns all content for paid active member" do
     public_post = create(:post, metadata: { "audience" => "everyone" })
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     results = Post.accessible_to(@paid_member)
     assert_includes results, public_post
     assert_includes results, paid_post
@@ -176,7 +176,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   test "accessible_to scope returns only public content for free member" do
     public_post = create(:post, metadata: { "audience" => "everyone" })
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     results = Post.accessible_to(@free_member)
     assert_includes results, public_post
     assert_not_includes results, paid_post
@@ -185,7 +185,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   test "accessible_to scope returns only public content for nil member" do
     public_post = create(:post, metadata: { "audience" => "everyone" })
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     results = Post.accessible_to(nil)
     assert_includes results, public_post
     assert_not_includes results, paid_post
@@ -194,7 +194,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   test "accessible_to scope returns only public content for cancelled paid member" do
     public_post = create(:post, metadata: { "audience" => "everyone" })
     paid_post = create(:post, metadata: { "audience" => "paid" })
-    
+
     results = Post.accessible_to(@cancelled_member)
     assert_includes results, public_post
     assert_not_includes results, paid_post
@@ -204,7 +204,7 @@ class HasAudienceTest < ActiveSupport::TestCase
   test "HasAudience works with Page model" do
     public_page = create(:page, metadata: { "audience" => "everyone" })
     paid_page = create(:page, metadata: { "audience" => "paid" })
-    
+
     assert public_page.publicly_accessible?
     assert paid_page.premium?
     assert Page.public_content.include?(public_page)
@@ -213,7 +213,7 @@ class HasAudienceTest < ActiveSupport::TestCase
 
   test "HasAudience works with Documentation model" do
     doc = create(:documentation, metadata: { "audience" => "paid" })
-    
+
     assert doc.premium?
     assert_not doc.publicly_accessible?
     assert_not doc.accessible_to?(@free_member)

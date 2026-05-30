@@ -1,7 +1,6 @@
 class Admin::ThemesController < Admin::BaseController
-
-  THEMES_DIR = Rails.root.join('app/themes')
-  USER_THEME_DIR = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'theme'))
+  THEMES_DIR = Rails.root.join("app/themes")
+  USER_THEME_DIR = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "theme"))
 
   def index
     @available_themes = list_available_themes
@@ -82,13 +81,13 @@ class Admin::ThemesController < Admin::BaseController
       redirect_to edit_admin_theme_path(theme_name) and return
     end
 
-    if reset_type == 'overwrite'
+    if reset_type == "overwrite"
       # Reset to original - overwrite existing file
       dest_file = USER_THEME_DIR.join("#{theme_name}.css")
       FileUtils.cp(source_file, dest_file)
       flash[:notice] = "#{theme_name.capitalize} theme reset to original. Your customizations have been overwritten."
       redirect_to edit_admin_theme_path(theme_name)
-    elsif reset_type == 'fresh'
+    elsif reset_type == "fresh"
       # Install fresh copy with custom/new name
       new_name = custom_name.presence || generate_unique_theme_name(theme_name)
       dest_file = USER_THEME_DIR.join("#{new_name}.css")
@@ -133,8 +132,8 @@ class Admin::ThemesController < Admin::BaseController
     themes = {}
 
     # First, collect master themes from /app/themes/
-    Dir.glob(THEMES_DIR.join('*.css')).each do |file|
-      name = File.basename(file, '.css')
+    Dir.glob(THEMES_DIR.join("*.css")).each do |file|
+      name = File.basename(file, ".css")
       themes[name] = {
         name: name,
         path: file,
@@ -144,8 +143,8 @@ class Admin::ThemesController < Admin::BaseController
     end
 
     # Then, add user themes from /site/theme/ that aren't already listed
-    Dir.glob(USER_THEME_DIR.join('*.css')).each do |file|
-      name = File.basename(file, '.css')
+    Dir.glob(USER_THEME_DIR.join("*.css")).each do |file|
+      name = File.basename(file, ".css")
       unless themes.key?(name)
         themes[name] = {
           name: name,
@@ -161,10 +160,10 @@ class Admin::ThemesController < Admin::BaseController
 
   def get_active_theme
     site_file = SiteConfig::SITE_FILE
-    return 'default' unless File.exist?(site_file)
+    return "default" unless File.exist?(site_file)
 
-    config = YAML.safe_load_file(site_file, permitted_classes: [Date, Time, Symbol]) || {}
-    config.dig('theme', 'active') || 'default'
+    config = YAML.safe_load_file(site_file, permitted_classes: [ Date, Time, Symbol ]) || {}
+    config.dig("theme", "active") || "default"
   end
 
   def update_active_theme(theme_name)
@@ -172,20 +171,20 @@ class Admin::ThemesController < Admin::BaseController
 
     # Read existing config
     config = if File.exist?(site_file)
-      YAML.safe_load_file(site_file, permitted_classes: [Date, Time, Symbol]) || {}
+      YAML.safe_load_file(site_file, permitted_classes: [ Date, Time, Symbol ]) || {}
     else
       {}
     end
 
     # Update theme
-    config['theme'] ||= {}
-    config['theme']['active'] = theme_name
+    config["theme"] ||= {}
+    config["theme"]["active"] = theme_name
 
     # Write back to file (preserving structure)
     File.write(site_file, config.to_yaml)
 
     # Sync to database and clear cache
-    SiteConfig.sync_from_file('site')
+    SiteConfig.sync_from_file("site")
   end
 
   def generate_unique_theme_name(base_name)

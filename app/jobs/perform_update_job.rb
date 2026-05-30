@@ -3,10 +3,10 @@ class PerformUpdateJob < ApplicationJob
 
   def perform(version:)
     status = UpdateStatus.create!(
-      status: 'in_progress',
+      status: "in_progress",
       from_version: RoeUpdater::VersionChecker.current_version,
       to_version: version,
-      current_step: 'Starting update...',
+      current_step: "Starting update...",
       started_at: Time.current
     )
 

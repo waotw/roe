@@ -17,9 +17,9 @@ Rails.application.configure do
 
   # Allow additional hosts from development config (e.g., ngrok for testing webhooks)
   # These are configured in site/system/global/development.yml
-  if File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'global', 'development.yml'))
-    dev_config = YAML.load_file(File.join(RoeSitePaths::SITE_PATH, 'system', 'global', 'development.yml'))
-    allowed_hosts = dev_config&.dig('allowed_hosts') || []
+  if File.exist?(File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml"))
+    dev_config = YAML.load_file(File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml"))
+    allowed_hosts = dev_config&.dig("allowed_hosts") || []
     allowed_hosts.each { |host| config.hosts << host }
   end
 
@@ -50,7 +50,7 @@ Rails.application.configure do
   # Set localhost to be used by links generated in mailer templates.
   config.action_mailer.delivery_method = :letter_opener
   config.action_mailer.perform_deliveries = true
-  config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log

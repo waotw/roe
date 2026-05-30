@@ -4,23 +4,23 @@ class WebhooksController < ApplicationController
 
   def stripe
     payload = request.body.read
-    sig_header = request.env['HTTP_STRIPE_SIGNATURE']
+    sig_header = request.env["HTTP_STRIPE_SIGNATURE"]
     signing_secret = StripeConfig.current.current_webhook_signing_secret
 
     event = if signing_secret.present?
               # Verified path. Stripe::Webhook.construct_event raises
               # SignatureVerificationError on tampered or forged payloads.
               Stripe::Webhook.construct_event(payload, sig_header, signing_secret)
-            else
+    else
               # Unverified fallback for fresh installs or local development
               # where the writer hasn't pasted in the signing secret yet.
               # Logged loudly so it's not silently insecure forever.
               Rails.logger.warn "[Webhook] No signing secret configured for #{StripeConfig.current.mode} mode — accepting unverified payload. Add it in admin → Stripe Configuration."
               Stripe::Event.construct_from(JSON.parse(payload))
-            end
+    end
 
     case event.type
-    when 'checkout.session.completed'
+    when "checkout.session.completed"
       session = event.data.object
       # Branch on metadata.purpose. Member upgrade flow predates donations
       # and doesn't set the purpose key — treat that as the default for
@@ -31,11 +31,11 @@ class WebhooksController < ApplicationController
       else
         handle_checkout_completed(session)
       end
-    when 'charge.refunded'
+    when "charge.refunded"
       handle_charge_refunded(event.data.object)
-    when 'charge.dispute.created'
+    when "charge.dispute.created"
       handle_dispute_created(event.data.object)
-    when 'charge.dispute.closed'
+    when "charge.dispute.closed"
       handle_dispute_closed(event.data.object)
     end
 

@@ -1,7 +1,7 @@
 module Members
   class SessionsController < BaseController
-    skip_before_action :set_current_member, only: [:new, :create, :signin_with_token]
-    before_action :redirect_if_signed_in, only: [:new, :create]
+    skip_before_action :set_current_member, only: [ :new, :create, :signin_with_token ]
+    before_action :redirect_if_signed_in, only: [ :new, :create ]
 
     def new
       # Render sign in form
@@ -17,7 +17,7 @@ module Members
         MemberMailer.magic_link(member)
 
         # Redirect to confirmation page instead of home
-        check_email_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'check-email')
+        check_email_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "check-email")
         if check_email_page
           redirect_to "/#{check_email_page.url_name}"
         else
@@ -25,8 +25,8 @@ module Members
         end
       else
         flash.now[:alert] = "No account found with that email"
-        @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'sign-in')
-        render 'pages/show', status: :unprocessable_entity
+        @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")
+        render "pages/show", status: :unprocessable_entity
       end
     end
 

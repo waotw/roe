@@ -169,8 +169,8 @@ class UpdatePreflightChecker
 
   def check_database_files
     [
-      ["development", "development.sqlite3"],
-      ["production",  "production.sqlite3"]
+      [ "development", "development.sqlite3" ],
+      [ "production",  "production.sqlite3" ]
     ].each do |env, fname|
       path = File.join(RoeSitePaths::SITE_DB_PATH, env, fname)
       if File.exist?(path)

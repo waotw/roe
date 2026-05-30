@@ -1,7 +1,7 @@
 Rails.application.routes.draw do
   # Block database file access
   constraints(->(req) { req.path =~ /^\/db\// }) do
-    match '*path', to: proc { [ 404, {}, [ 'Not Found' ] ] }, via: :all
+    match "*path", to: proc { [ 404, {}, [ "Not Found" ] ] }, via: :all
   end
 
   get "up" => "rails/health#show", as: :rails_health_check
@@ -100,7 +100,7 @@ Rails.application.routes.draw do
         post :clear_failed_jobs
         post :queue_missing_variants
         post :bulk_destroy
-        get 'upload_progress/:batch_id', action: :upload_progress, as: :upload_progress
+        get "upload_progress/:batch_id", action: :upload_progress, as: :upload_progress
       end
       member do
         patch :rename
@@ -156,15 +156,15 @@ Rails.application.routes.draw do
     end
 
     # Integration config pages (Settings → Integrations)
-    get  "configs/payments/edit",     to: "configs#edit_payments",     as: "edit_payments_config"
+    get "configs/payments/edit",     to: "configs#edit_payments",     as: "edit_payments_config"
     patch "configs/payments",         to: "configs#update_payments",   as: "payments_config"
     post  "configs/payments/verify",  to: "configs#verify_payments",   as: "verify_payments_config"
 
-    get  "configs/newsletters/edit",     to: "configs#edit_newsletters",     as: "edit_newsletters_config"
+    get "configs/newsletters/edit",     to: "configs#edit_newsletters",     as: "edit_newsletters_config"
     patch "configs/newsletters",         to: "configs#update_newsletters",   as: "newsletters_config"
     post  "configs/newsletters/verify",  to: "configs#verify_newsletters",   as: "verify_newsletters_config"
 
-    get  "configs/snipcart/edit",     to: "configs#edit_snipcart",     as: "edit_snipcart_integration_config"
+    get "configs/snipcart/edit",     to: "configs#edit_snipcart",     as: "edit_snipcart_integration_config"
     patch "configs/snipcart",         to: "configs#update_snipcart",   as: "snipcart_integration_config"
     post  "configs/snipcart/verify",  to: "configs#verify_snipcart",   as: "verify_snipcart_integration_config"
 
@@ -256,7 +256,7 @@ Rails.application.routes.draw do
     get "configs/store/edit", to: "configs#edit_store", as: "edit_store_config"
     patch "configs/store", to: "configs#update_store", as: "store_config"
 
-    get  "configs/deploy/edit",           to: "configs#edit_deploy",            as: "edit_deploy_config"
+    get "configs/deploy/edit",           to: "configs#edit_deploy",            as: "edit_deploy_config"
     patch "configs/deploy",                to: "configs#update_deploy",           as: "deploy_config"
     post  "configs/deploy/clear_password", to: "configs#clear_deploy_password",   as: "clear_deploy_password"
 

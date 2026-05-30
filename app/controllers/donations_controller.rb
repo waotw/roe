@@ -61,14 +61,14 @@ class DonationsController < ApplicationController
     @session_id = params[:session_id]
     # Redirect to success after brief delay
     # Load page for sidebar
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'donation-success')
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "donation-success")
   end
 
   def success
     # Load the donation success markdown page
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'donation-success')
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "donation-success")
     if @page
-      render 'pages/show'
+      render "pages/show"
     else
       render plain: "Thank you for your support!", status: :ok
     end
@@ -76,7 +76,7 @@ class DonationsController < ApplicationController
 
   def cancel
     # Load page for sidebar
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'donation-cancel')
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "donation-cancel")
   end
 
   private

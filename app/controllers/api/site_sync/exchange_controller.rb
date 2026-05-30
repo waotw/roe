@@ -50,11 +50,11 @@ module Api
       # files made it through and which didn't.
       def file_states
         payload = JSON.parse(request.body.read)
-        paths = Array(payload['paths']).first(2000) # cap to keep payload sane
+        paths = Array(payload["paths"]).first(2000) # cap to keep payload sane
 
         result = paths.each_with_object({}) do |path, h|
           # Defensive: refuse paths that try to escape /site
-          if path.to_s.include?('..') || path.to_s.start_with?('/')
+          if path.to_s.include?("..") || path.to_s.start_with?("/")
             h[path] = nil
             next
           end
@@ -62,7 +62,7 @@ module Api
           full = File.join(::RoeSitePaths::SITE_PATH, path)
           h[path] = if File.exist?(full)
             stat = File.stat(full)
-            { 'size' => stat.size, 'mtime' => stat.mtime.to_i }
+            { "size" => stat.size, "mtime" => stat.mtime.to_i }
           end
         end
 
@@ -92,7 +92,6 @@ module Api
         Rails.logger.error "[Api::SiteSync::ExchangeController] manifest FAILED: #{e.class} #{e.message}"
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
-
     end
   end
 end

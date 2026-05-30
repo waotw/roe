@@ -25,8 +25,8 @@ class Product < ApplicationRecord
   after_save :register_category
 
   # Scopes — SQLite uses json_extract, NOT the PostgreSQL `metadata->>'key'` syntax.
-  scope :published, -> { where("json_extract(metadata, '$.status') = ?", 'published') }
-  scope :draft, -> { where("json_extract(metadata, '$.status') = ?", 'draft') }
+  scope :published, -> { where("json_extract(metadata, '$.status') = ?", "published") }
+  scope :draft, -> { where("json_extract(metadata, '$.status') = ?", "draft") }
   scope :by_newest, -> { order(created_at: :desc) }
   scope :with_tag, ->(tag) {
     # Tags are stored as a JSON array, e.g. ["featured","sale"]. We match by
@@ -45,30 +45,30 @@ class Product < ApplicationRecord
 
   # Delegated metadata accessors
   def title
-    metadata['title']
+    metadata["title"]
   end
 
   def group
-    metadata['group']
+    metadata["group"]
   end
 
   def variant
-    metadata['variant']
+    metadata["variant"]
   end
 
   def primary?
-    metadata['primary'] == true || metadata['primary'] == 'true'
+    metadata["primary"] == true || metadata["primary"] == "true"
   end
 
   def url_name
     # If url_name is explicitly set, use it exactly
-    explicit = metadata['url_name']
+    explicit = metadata["url_name"]
     return explicit if explicit.present?
-    
+
     # Auto-generate from title
     base = title&.parameterize
     return nil if base.blank?
-    
+
     # Only append variant if: there's a group AND variant AND no explicit url_name
     if group.present? && variant.present?
       "#{base}-#{variant.parameterize}"
@@ -78,27 +78,27 @@ class Product < ApplicationRecord
   end
 
   def status
-    metadata['status'] || 'draft'
+    metadata["status"] || "draft"
   end
 
   def price
-    metadata['price']&.to_f || 0.0
+    metadata["price"]&.to_f || 0.0
   end
 
   def sku
-    metadata['sku']
+    metadata["sku"]
   end
 
   def image
-    metadata['image']
+    metadata["image"]
   end
 
   def description
-    metadata['description']
+    metadata["description"]
   end
 
   def tags
-    metadata['tags'] || []
+    metadata["tags"] || []
   end
 
   # URL helpers
@@ -109,12 +109,12 @@ class Product < ApplicationRecord
   # Snipcart data attributes
   def snipcart_attributes
     {
-      'data-item-id' => sku,
-      'data-item-name' => title,
-      'data-item-price' => price,
-      'data-item-url' => public_url,
-      'data-item-description' => description,
-      'data-item-image' => image
+      "data-item-id" => sku,
+      "data-item-name" => title,
+      "data-item-price" => price,
+      "data-item-url" => public_url,
+      "data-item-description" => description,
+      "data-item-image" => image
     }.compact
   end
 
@@ -140,12 +140,12 @@ class Product < ApplicationRecord
     # File-first: save whatever's in the file, even if title or price is
     # missing. The admin warning system (Product#needs_attention?) flags
     # the gaps in the UI; ContentSync should never silently skip a file.
-    if parsed.front_matter['title'].blank?
+    if parsed.front_matter["title"].blank?
       Rails.logger.warn "Product missing title: #{file_path}"
       puts "  ⚠ Missing title: #{File.basename(file_path)}"
     end
 
-    if parsed.front_matter['price'].blank?
+    if parsed.front_matter["price"].blank?
       Rails.logger.warn "Product missing price: #{file_path}"
       puts "  ⚠ Missing price: #{File.basename(file_path)}"
     end
@@ -197,14 +197,14 @@ class Product < ApplicationRecord
 
   def generate_sku_suggestion(category: nil, number: nil)
     # Use category from metadata if not provided
-    category ||= metadata['category']
-    category = category.presence || 'PROD'
+    category ||= metadata["category"]
+    category = category.presence || "PROD"
 
     # Get next number if not provided
     number ||= self.class.next_number_for_category(category)
 
     # Generate title slug (limit to 20 chars, uppercase)
-    title_slug = title.to_s.parameterize.gsub('-', '').upcase.first(30)
+    title_slug = title.to_s.parameterize.gsub("-", "").upcase.first(30)
 
     # Format: CATEGORY-NUMBER-TITLESLUG
     "#{category.upcase}-#{number.to_s.rjust(3, '0')}-#{title_slug}"
@@ -212,7 +212,7 @@ class Product < ApplicationRecord
 
   def self.duplicate_skus
     # Find all published products with SKUs (SQLite syntax)
-    published_with_skus = where(<<~SQL.squish, 'published')
+    published_with_skus = where(<<~SQL.squish, "published")
       json_extract(metadata, '$.status') = ?
         AND json_extract(metadata, '$.sku') IS NOT NULL
         AND json_extract(metadata, '$.sku') != ''
@@ -239,11 +239,11 @@ class Product < ApplicationRecord
       path = metadata[field].to_s.strip
       next if path.empty?
 
-      exists = if path.start_with?('/media/')
+      exists = if path.start_with?("/media/")
                  Post.media_file_set.include?(path)
-               else
+      else
                  true
-               end
+      end
       { field: field, path: path, exists: exists }
     end
   end
@@ -256,16 +256,16 @@ class Product < ApplicationRecord
   # or any media path doesn't resolve to a real file on disk. Used by
   # the admin UI to surface mistakes without blocking save.
   def needs_attention?
-    return false unless status == 'published'
+    return false unless status == "published"
     missing_required_fields.any? || missing_media_refs.any?
   end
 
   private
 
   def register_category
-    return if metadata['category'].blank?
+    return if metadata["category"].blank?
 
-    category = metadata['category'].strip.downcase
+    category = metadata["category"].strip.downcase
     ProductCategory.add(category)
   end
 end

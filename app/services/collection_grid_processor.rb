@@ -3,7 +3,7 @@ class CollectionGridProcessor
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
     # Find all collection divs
-    collections = doc.css('.collection')
+    collections = doc.css(".collection")
 
     return doc.to_html if collections.empty?
 
@@ -61,8 +61,8 @@ class CollectionGridProcessor
     count = [ group.size, 3 ].min # Cap at 3 columns
 
     # Create wrapper div
-    wrapper = Nokogiri::XML::Node.new('div', group.first.document)
-    wrapper['class'] = "collection-grid collection-grid-#{count}"
+    wrapper = Nokogiri::XML::Node.new("div", group.first.document)
+    wrapper["class"] = "collection-grid collection-grid-#{count}"
 
     # Insert wrapper before first collection
     group.first.add_previous_sibling(wrapper)

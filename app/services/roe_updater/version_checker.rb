@@ -39,11 +39,11 @@ module RoeUpdater
       private
 
       def load_current_version
-        version_file = File.join(RoeSitePaths::ROE_ROOT, 'VERSION')
+        version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
         return "0.0.0" unless File.exist?(version_file)
 
         config = YAML.load_file(version_file)
-        config['version'] || "0.0.0"
+        config["version"] || "0.0.0"
       rescue => e
         Rails.logger.error "Failed to load version file: #{e.message}"
         "0.0.0"
@@ -54,7 +54,7 @@ module RoeUpdater
         #   - running tests (so we never hit the network), or
         #   - the developer explicitly opts in via ROE_MOCK_UPDATE=1
         return mock_release if Rails.env.test?
-        return mock_release if ENV['ROE_MOCK_UPDATE'].present?
+        return mock_release if ENV["ROE_MOCK_UPDATE"].present?
 
         Rails.logger.info "[VersionChecker] Checking for updates from Codeberg"
 
@@ -75,8 +75,8 @@ module RoeUpdater
       def fetch_via_git_tags
         return nil unless git_available?
 
-        require 'timeout'
-        require 'open3'
+        require "timeout"
+        require "open3"
 
         # Build environment with SSH agent support for private repos
         env = {
@@ -144,7 +144,7 @@ module RoeUpdater
       end
 
       def git_available?
-        system('which git > /dev/null 2>&1')
+        system("which git > /dev/null 2>&1")
       end
 
       def update_available?(current, latest)
@@ -154,8 +154,8 @@ module RoeUpdater
       end
 
       def compare_versions(a, b)
-        a_parts = a.to_s.split('.').map(&:to_i)
-        b_parts = b.to_s.split('.').map(&:to_i)
+        a_parts = a.to_s.split(".").map(&:to_i)
+        b_parts = b.to_s.split(".").map(&:to_i)
 
         max_length = [ a_parts.length, b_parts.length ].max
         a_parts.fill(0, a_parts.length...max_length)

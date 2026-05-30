@@ -1,5 +1,5 @@
 class StripeConfig < ApplicationRecord
-  TEST_CONFIG_PATH = File.join(RoeSitePaths::SITE_PATH, 'system', 'integrations', 'stripe.yml')
+  TEST_CONFIG_PATH = File.join(RoeSitePaths::SITE_PATH, "system", "integrations", "stripe.yml")
 
   enum :mode, { test: 0, live: 1 }, prefix: true
 
@@ -27,15 +27,15 @@ class StripeConfig < ApplicationRecord
   # ── Test key accessors (file first, DB fallback) ─────────────────────────
 
   def publishable_key_test
-    test_config['publishable_key'].presence || self[:publishable_key_test]
+    test_config["publishable_key"].presence || self[:publishable_key_test]
   end
 
   def secret_key_test
-    test_config['secret_key'].presence || self[:secret_key_test]
+    test_config["secret_key"].presence || self[:secret_key_test]
   end
 
   def webhook_signing_secret_test
-    test_config['webhook_signing_secret'].presence || self[:webhook_signing_secret_test]
+    test_config["webhook_signing_secret"].presence || self[:webhook_signing_secret_test]
   end
 
   # ── Live key accessors (DB only) ─────────────────────────────────────────
@@ -148,7 +148,7 @@ class StripeConfig < ApplicationRecord
 
   def self.test_config
     return {} unless File.exist?(TEST_CONFIG_PATH)
-    YAML.load_file(TEST_CONFIG_PATH)['test'] || {}
+    YAML.load_file(TEST_CONFIG_PATH)["test"] || {}
   rescue => e
     Rails.logger.error "Failed to load Stripe test config: #{e.message}"
     {}
@@ -156,7 +156,7 @@ class StripeConfig < ApplicationRecord
 
   def self.save_test_config(config_data)
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
-    File.write(TEST_CONFIG_PATH, { 'test' => config_data }.to_yaml)
+    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml)
   end
 
   def self.clear_test_config

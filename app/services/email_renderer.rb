@@ -1,6 +1,6 @@
 class EmailRenderer
   def self.render(template_name, variables = {})
-    template_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{template_name}.md")
+    template_path = File.join(RoeSitePaths::SITE_PATH, "emails", "#{template_name}.md")
 
     unless File.exist?(template_path)
       raise "Email template not found: #{template_name}"
@@ -70,7 +70,7 @@ class EmailRenderer
     # earlier `Rails.root.join('themes', theme_name)` form pointed at a
     # path that never existed under either the current/ or versioned
     # layout, so this always silently fell through to defaults.
-    email_yml = File.join(RoeSitePaths::SITE_PATH, 'theme', 'email.yml')
+    email_yml = File.join(RoeSitePaths::SITE_PATH, "theme", "email.yml")
 
     if File.exist?(email_yml)
       YAML.load_file(email_yml).symbolize_keys

@@ -31,7 +31,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
   test "filters paid posts to paid members only" do
     paid_post = create(:post, metadata: { "title" => "Paid Newsletter", "status" => "published", "audience" => "paid", "date" => "2024-01-01" })
-    
+
     paid_members = create_list(:member, 3, :paid, newsletter_status: :subscribed, status: :active)
     free_members = create_list(:member, 3, newsletter_status: :subscribed, status: :active)
 
@@ -39,7 +39,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     # Should only include paid members
     assert_equal 3, recipient_ids.size
     paid_members.each do |member|
@@ -58,7 +58,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     assert_includes recipient_ids, subscribed.id
     assert_not_includes recipient_ids, unsubscribed.id
   end
@@ -71,7 +71,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     assert_includes recipient_ids, active.id
     assert_not_includes recipient_ids, cancelled.id
   end
@@ -91,17 +91,17 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     assert_not_includes recipient_ids, member_received.id
     assert_includes recipient_ids, member_new.id
   end
 
   test "excludes Substack-imported members for Substack posts" do
-    import = create(:import, source_type: 'substack', status: 'completed')
-    
+    import = create(:import, source_type: "substack", status: "completed")
+
     # Mark post as Substack-imported
-    @post.update!(metadata: @post.metadata.merge('substack_post_id' => '12345'))
-    
+    @post.update!(metadata: @post.metadata.merge("substack_post_id" => "12345"))
+
     regular_member = create(:member, newsletter_status: :subscribed, status: :active)
     substack_member = create(:member, newsletter_status: :subscribed, status: :active, import: import)
 
@@ -109,7 +109,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     assert_includes recipient_ids, regular_member.id
     assert_not_includes recipient_ids, substack_member.id
   end
@@ -123,7 +123,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     # Should include both even though one is unsubscribed
     assert_equal 2, recipient_ids.size
     assert_includes recipient_ids, subscribed.id
@@ -150,11 +150,11 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
     QueueNewsletterBatchesJob.perform_now(@post.id)
 
     assert_equal 2, enqueued_jobs.size
-    
+
     # First batch should have 500
     first_batch = enqueued_jobs.first[:args][1]
     assert_equal 500, first_batch.size
-    
+
     # Second batch should have 50
     second_batch = enqueued_jobs.last[:args][1]
     assert_equal 50, second_batch.size
@@ -162,7 +162,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
   test "public posts go to all subscribed members regardless of tier" do
     public_post = create(:post, metadata: { "title" => "Public Post", "status" => "published", "audience" => "public", "date" => "2024-01-01" })
-    
+
     free_member = create(:member, tier: :free, newsletter_status: :subscribed, status: :active)
     paid_member = create(:member, :paid, newsletter_status: :subscribed, status: :active)
 
@@ -170,38 +170,38 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     assert_includes recipient_ids, free_member.id
     assert_includes recipient_ids, paid_member.id
   end
 
   test "does not double-queue same members" do
     member = create(:member, newsletter_status: :subscribed, status: :active)
-    
+
     # First send
     QueueNewsletterBatchesJob.perform_now(@post.id)
     assert_equal 1, enqueued_jobs.size
-    
+
     # Record the send
     NewsletterSend.create!(
       post: @post,
       member: member,
       sent_at: Time.current
     )
-    
+
     # Clear jobs
     enqueued_jobs.clear
-    
+
     # Second attempt - should have no recipients
     QueueNewsletterBatchesJob.perform_now(@post.id)
     assert_equal 0, enqueued_jobs.size
   end
 
   test "includes import_id in recipient selection logic" do
-    import = create(:import, source_type: 'substack', status: 'completed')
-    
-    @post.update!(metadata: @post.metadata.merge('substack_post_id' => '12345'))
-    
+    import = create(:import, source_type: "substack", status: "completed")
+
+    @post.update!(metadata: @post.metadata.merge("substack_post_id" => "12345"))
+
     # Member without import_id
     regular_member = create(:member, newsletter_status: :subscribed, status: :active, import: nil)
     # Member with substack import
@@ -211,7 +211,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
 
     job = enqueued_jobs.last
     recipient_ids = job[:args][1]
-    
+
     assert_includes recipient_ids, regular_member.id
     assert_not_includes recipient_ids, substack_member.id
   end
@@ -220,7 +220,7 @@ class QueueNewsletterBatchesJobTest < ActiveJob::TestCase
     create_list(:member, 10, newsletter_status: :subscribed, status: :active)
 
     Rails.logger.expects(:info).with(regexp_matches(/Queueing \d+ batch jobs for \d+ recipients/))
-    
+
     QueueNewsletterBatchesJob.perform_now(@post.id)
   end
 end

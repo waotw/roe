@@ -2,8 +2,8 @@ class ProcessPostmarkWebhookJob < ApplicationJob
   queue_as :default
 
   def perform(webhook_data)
-    record_type = webhook_data['RecordType']
-    email = webhook_data['Recipient'] || webhook_data['Email']
+    record_type = webhook_data["RecordType"]
+    email = webhook_data["Recipient"] || webhook_data["Email"]
 
     return unless email.present?
 
@@ -15,11 +15,11 @@ class ProcessPostmarkWebhookJob < ApplicationJob
     end
 
     case record_type
-    when 'Bounce'
+    when "Bounce"
       handle_bounce(member, webhook_data)
-    when 'SpamComplaint'
+    when "SpamComplaint"
       handle_spam_complaint(member, webhook_data)
-    when 'Delivery'
+    when "Delivery"
       handle_delivery(member, webhook_data)
     else
       Rails.logger.info "Unhandled Postmark webhook type: #{record_type}"
@@ -29,17 +29,17 @@ class ProcessPostmarkWebhookJob < ApplicationJob
   private
 
   def handle_bounce(member, data)
-    bounce_type = data['Type']
+    bounce_type = data["Type"]
 
-    if bounce_type == 'HardBounce'
+    if bounce_type == "HardBounce"
       member.update!(newsletter_status: :bounced)
       Rails.logger.info "Member #{member.email} marked as bounced (#{data['Description']})"
     else
       # Track soft bounces
       metadata = member.metadata || {}
-      count = (metadata['soft_bounce_count'] || 0) + 1
-      metadata['soft_bounce_count'] = count
-      metadata['last_soft_bounce_at'] = Time.current.iso8601
+      count = (metadata["soft_bounce_count"] || 0) + 1
+      metadata["soft_bounce_count"] = count
+      metadata["last_soft_bounce_at"] = Time.current.iso8601
 
       if count >= 5
         # Too many soft bounces, treat as hard bounce

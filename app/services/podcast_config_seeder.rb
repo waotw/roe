@@ -56,7 +56,7 @@ class PodcastConfigSeeder
 
   def load_config
     return {} unless File.exist?(PODCAST_YML)
-    YAML.load_file(PODCAST_YML, permitted_classes: [Date, Time]) || {}
+    YAML.load_file(PODCAST_YML, permitted_classes: [ Date, Time ]) || {}
   rescue Psych::SyntaxError => e
     Rails.logger.error "[PodcastConfigSeeder] podcast.yml has invalid YAML: #{e.message}; refusing to overwrite"
     raise

@@ -186,7 +186,7 @@ class SiteSyncTransferJob < ApplicationJob
     # can only use the cached peer state, which may be stale.
     if SiteSync::Exchange.can_call_peer?
       peer_payload = SiteSync::Exchange.call_peer
-      peer_fp = peer_payload && (peer_payload['fingerprint'] || peer_payload[:fingerprint])
+      peer_fp = peer_payload && (peer_payload["fingerprint"] || peer_payload[:fingerprint])
     else
       cached = SiteSync::Exchange.peer_state
       peer_fp = cached && cached[:fingerprint]
@@ -281,7 +281,7 @@ class SiteSyncTransferJob < ApplicationJob
     full = File.join(RoeSitePaths::SITE_PATH, path)
     return nil unless File.exist?(full)
     stat = File.stat(full)
-    { 'size' => stat.size, 'mtime' => stat.mtime.to_i }
+    { "size" => stat.size, "mtime" => stat.mtime.to_i }
   rescue
     nil
   end
@@ -290,7 +290,7 @@ class SiteSyncTransferJob < ApplicationJob
   # size + mtime (rsync's default change-detection signature).
   def states_match?(a, b)
     return false unless a && b
-    a['size'] == b['size'] && a['mtime'] == b['mtime']
+    a["size"] == b["size"] && a["mtime"] == b["mtime"]
   end
 
   # Diffs are symbol-keyed in memory but solid_cache serializes them
@@ -327,7 +327,7 @@ class SiteSyncTransferJob < ApplicationJob
     return local_diff unless peer_manifest
 
     current = SiteSync::Ledger.current
-    SiteSync::Ledger.diff(current, peer_manifest['files'])
+    SiteSync::Ledger.diff(current, peer_manifest["files"])
   rescue => e
     Rails.logger.warn "[SiteSyncTransferJob] cross_site_diff failed: #{e.class} #{e.message}, falling back to local_diff"
     local_diff
@@ -344,7 +344,7 @@ class SiteSyncTransferJob < ApplicationJob
     peer_manifest = SiteSync::Exchange.fetch_peer_manifest
     if peer_manifest
       current = SiteSync::Ledger.current
-      diff = SiteSync::Ledger.diff(peer_manifest['files'], current)
+      diff = SiteSync::Ledger.diff(peer_manifest["files"], current)
       return {
         modified: diff[:modified],
         added: diff[:added],

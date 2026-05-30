@@ -1,4 +1,4 @@
-require 'open3'
+require "open3"
 
 # Runs `kamal deploy` or `fly deploy` in a background job, capturing
 # streaming output and writing it to the Rails cache so the Updates &
@@ -18,15 +18,15 @@ require 'open3'
 class PerformDeployJob < ApplicationJob
   queue_as :default
 
-  STATUS_CACHE_KEY = 'deploy:status'.freeze
+  STATUS_CACHE_KEY = "deploy:status".freeze
   STATUS_TTL       = 24.hours
-  LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, 'system', 'global', '.last_deploy.yml')
+  LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, "system", "global", ".last_deploy.yml")
 
   def perform(target:, version_tag:)
     # Kamal builds from git-tracked files only, so uncommitted changes are
     # silently excluded from the image. Auto-commit anything pending before
     # building so the deployed image always reflects the current state on disk.
-    auto_commit if target == 'kamal'
+    auto_commit if target == "kamal"
 
     # Copy VERSION from root to current/ so Docker can access it during build
     prepare_version_file
@@ -48,17 +48,17 @@ class PerformDeployJob < ApplicationJob
   def auto_commit
     Bundler.with_original_env do
       # Use Open3/array-form system so spaces in Rails.root don't break the shell.
-      output, = Open3.capture2('git', '-C', Rails.root.to_s, 'status', '--porcelain')
+      output, = Open3.capture2("git", "-C", Rails.root.to_s, "status", "--porcelain")
       return if output.strip.empty?
 
-      timestamp = Time.current.strftime('%Y-%m-%d %H:%M')
-      system('git', '-C', Rails.root.to_s, 'add', '-A')
+      timestamp = Time.current.strftime("%Y-%m-%d %H:%M")
+      system("git", "-C", Rails.root.to_s, "add", "-A")
       system(
-        'git',
-        '-C', Rails.root.to_s,
-        '-c', 'user.email=roe@deploy.local',
-        '-c', 'user.name=Roe Deploy',
-        'commit', '-m', "Deploy #{timestamp}"
+        "git",
+        "-C", Rails.root.to_s,
+        "-c", "user.email=roe@deploy.local",
+        "-c", "user.name=Roe Deploy",
+        "commit", "-m", "Deploy #{timestamp}"
       )
       Rails.logger.info "[PerformDeployJob] Auto-committed pending changes before deploy"
     end
@@ -67,8 +67,8 @@ class PerformDeployJob < ApplicationJob
   end
 
   def prepare_version_file
-    version_source = File.join(RoeSitePaths::ROE_ROOT, 'VERSION')
-    version_dest = File.join(Rails.root, 'VERSION')
+    version_source = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
+    version_dest = File.join(Rails.root, "VERSION")
 
     if File.exist?(version_source)
       FileUtils.cp(version_source, version_dest)
@@ -79,18 +79,18 @@ class PerformDeployJob < ApplicationJob
   end
 
   def cleanup_version_file
-    version_file = File.join(Rails.root, 'VERSION')
+    version_file = File.join(Rails.root, "VERSION")
     FileUtils.rm_f(version_file)
     Rails.logger.info "[PerformDeployJob] Cleaned up temporary VERSION file"
   end
 
   def build_command(target, version_tag)
     case target
-    when 'kamal'
+    when "kamal"
       # --version bypasses git SHA versioning so the deploy always uses
       # the files on disk, no commit required.
       "bundle exec kamal deploy --version=#{version_tag}"
-    when 'fly'
+    when "fly"
       "fly deploy"
     else
       raise ArgumentError, "Unknown deploy target: #{target.inspect}"

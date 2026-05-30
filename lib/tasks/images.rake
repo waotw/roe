@@ -29,7 +29,7 @@ namespace :images do
     print "Continue? (y/N): "
 
     response = STDIN.gets.chomp
-    unless response.downcase == 'y'
+    unless response.downcase == "y"
       puts "Cancelled."
       exit 0
     end

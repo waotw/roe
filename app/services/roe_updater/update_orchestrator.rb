@@ -1,17 +1,17 @@
 module RoeUpdater
   class UpdateOrchestrator
     STEPS = [
-      { name: 'validating',         percent: 5,   description: 'Validating update prerequisites' },
-      { name: 'backing_up_db',      percent: 15,  description: 'Creating database backup' },
-      { name: 'downloading',        percent: 30,  description: 'Downloading new version' },
-      { name: 'testing',            percent: 50,  description: 'Testing migrations' },
-      { name: 'migrating',          percent: 70,  description: 'Running production migrations' },
-      { name: 'switching',          percent: 85,  description: 'Switching to new version' },
-      { name: 'syncing_root_files', percent: 87,  description: 'Syncing root-level files' },
-      { name: 'writing_version',    percent: 89,  description: 'Updating VERSION file' },
-      { name: 'building_assets',    percent: 92,  description: 'Building assets' },
-      { name: 'restarting',         percent: 95,  description: 'Restarting server' },
-      { name: 'completed',          percent: 100, description: 'Update complete' }
+      { name: "validating",         percent: 5,   description: "Validating update prerequisites" },
+      { name: "backing_up_db",      percent: 15,  description: "Creating database backup" },
+      { name: "downloading",        percent: 30,  description: "Downloading new version" },
+      { name: "testing",            percent: 50,  description: "Testing migrations" },
+      { name: "migrating",          percent: 70,  description: "Running production migrations" },
+      { name: "switching",          percent: 85,  description: "Switching to new version" },
+      { name: "syncing_root_files", percent: 87,  description: "Syncing root-level files" },
+      { name: "writing_version",    percent: 89,  description: "Updating VERSION file" },
+      { name: "building_assets",    percent: 92,  description: "Building assets" },
+      { name: "restarting",         percent: 95,  description: "Restarting server" },
+      { name: "completed",          percent: 100, description: "Update complete" }
     ].freeze
 
     # Files whose source-of-truth lives in current/ but need to appear
@@ -45,14 +45,14 @@ module RoeUpdater
 
       def execute_step(step_name)
         step = STEPS.find { |s| s[:name] == step_name.to_s }
-        
+
         @status.update!(
           current_step: step[:description],
           progress_percent: step[:percent]
         )
 
         log("Starting: #{step[:description]}")
-        
+
         begin
           yield
           log("Completed: #{step[:description]}")
@@ -73,7 +73,7 @@ module RoeUpdater
         # means either an update is in progress or a previous run
         # crashed without cleanup; either way we don't want to clobber
         # whatever's there.
-        staging = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+        staging = File.join(RoeSitePaths::ROE_ROOT, "staging")
         if Dir.exist?(staging) && !Dir.empty?(staging)
           raise "Staging directory has unexpected content (#{Dir.children(staging).size} items). " \
                 "Either an update is in progress, or a previous run crashed — clean up #{staging} manually."
@@ -88,7 +88,7 @@ module RoeUpdater
         # happened yet. Running from current/ would silently no-op
         # (no new migration files visible) and the new app would boot
         # against an unmigrated schema after the switch.
-        staging_app = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+        staging_app = File.join(RoeSitePaths::ROE_ROOT, "staging")
 
         # Inherit the parent's Rails.env. In real production updates
         # this is `production` (and credentials are available); in dev
@@ -120,7 +120,7 @@ module RoeUpdater
       # doesn't break the update.
       def sync_root_files
         ROOT_SYNC_FILES.each do |filename|
-          source = File.join(RoeSitePaths::ROE_ROOT, 'current', filename)
+          source = File.join(RoeSitePaths::ROE_ROOT, "current", filename)
           dest   = File.join(RoeSitePaths::ROE_ROOT, filename)
 
           unless File.exist?(source)
@@ -140,12 +140,12 @@ module RoeUpdater
       # to ship a separate root-level VERSION; the file gets created/
       # rewritten on every successful update.
       def write_root_version_file
-        version_path = File.join(RoeSitePaths::ROE_ROOT, 'VERSION')
+        version_path = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
 
         existing = File.exist?(version_path) ? (YAML.load_file(version_path) || {}) : {}
         updated = existing.merge(
-          'version'      => @version,
-          'release_date' => Date.today.iso8601
+          "version"      => @version,
+          "release_date" => Date.today.iso8601
         )
 
         File.write(version_path, updated.to_yaml)
@@ -162,7 +162,7 @@ module RoeUpdater
       # into it automatically, and it's a no-op for asset types that
       # aren't configured.
       def build_assets
-        current_app = File.join(RoeSitePaths::ROE_ROOT, 'current')
+        current_app = File.join(RoeSitePaths::ROE_ROOT, "current")
         rails_env = Rails.env
 
         cmd = "cd '#{current_app}' && RAILS_ENV=#{rails_env} bundle exec rails assets:precompile 2>&1"
@@ -205,14 +205,14 @@ module RoeUpdater
 
       def complete_update
         @status.update!(
-          status: 'completed',
-          current_step: 'Update completed successfully',
+          status: "completed",
+          current_step: "Update completed successfully",
           completed_at: Time.current
         )
 
         BackupManager.cleanup_update_backups
         SwitchManager.cleanup_backup
-        
+
         log("✓ Update completed successfully!")
       end
 
@@ -232,7 +232,7 @@ module RoeUpdater
           Downloader.cleanup_staging
 
           @status.update!(
-            status: 'rolled_back',
+            status: "rolled_back",
             error_message: error.message,
             current_step: "Rolled back to previous version"
           )
@@ -241,7 +241,7 @@ module RoeUpdater
         rescue => rollback_error
           log("CRITICAL: Rollback failed: #{rollback_error.message}")
           @status.update!(
-            status: 'failed',
+            status: "failed",
             error_message: "#{error.message}. Rollback also failed: #{rollback_error.message}",
             current_step: "CRITICAL: Manual intervention required"
           )
@@ -256,7 +256,7 @@ module RoeUpdater
       end
 
       def git_available?
-        system('which git > /dev/null 2>&1')
+        system("which git > /dev/null 2>&1")
       end
     end
   end

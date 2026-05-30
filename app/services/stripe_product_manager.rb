@@ -11,7 +11,7 @@ class StripeProductManager
     return false unless validate_config(payments_config)
     return false unless stripe_config.connected?
 
-    price_amount = parse_price(payments_config['price'])
+    price_amount = parse_price(payments_config["price"])
     return false if price_amount.nil?
 
     # Ensure product exists
@@ -38,12 +38,12 @@ class StripeProductManager
   private
 
   def validate_config(config)
-    unless config['enabled'] == true || config['enabled'] == 'true'
+    unless config["enabled"] == true || config["enabled"] == "true"
       @errors << "Payments not enabled"
       return false
     end
 
-    unless config['price'].present?
+    unless config["price"].present?
       @errors << "Price not set"
       return false
     end
@@ -72,7 +72,7 @@ class StripeProductManager
     end
 
     # Create new product
-    site_title = SiteConfig.get('title') || 'My Site'
+    site_title = SiteConfig.get("title") || "My Site"
 
     Stripe::Product.create(
       {

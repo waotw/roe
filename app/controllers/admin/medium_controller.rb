@@ -16,7 +16,7 @@ class Admin::MediumController < Admin::BaseController
     # Get distinct media types that exist
     @existing_types = Medium.distinct.pluck(:media_type).compact
 
-    render layout: 'admin'
+    render layout: "admin"
   end
 
   def create
@@ -54,7 +54,7 @@ class Admin::MediumController < Admin::BaseController
       # Save uploaded files temporarily and track their info
       temp_files = uploaded_files.map do |file|
         temp_path = temp_dir.join(file.original_filename)
-        File.open(temp_path, 'wb') { |f| f.write(file.read) }
+        File.open(temp_path, "wb") { |f| f.write(file.read) }
 
         {
           temp_path: temp_path.to_s,
@@ -114,7 +114,7 @@ class Admin::MediumController < Admin::BaseController
     Rails.logger.info "Session keys: #{session.keys.inspect}"
     Rails.logger.info "Match? #{@batch && @batch[:id] == @batch_id}"
 
-    unless @batch && @batch['id'] == @batch_id
+    unless @batch && @batch["id"] == @batch_id
       redirect_to browse_admin_medium_index_path, alert: "Upload session not found"
       return
     end
@@ -127,7 +127,7 @@ class Admin::MediumController < Admin::BaseController
   # 1. Whether the job is still in the queue
   # 2. Whether the expected media files exist in the database
   def check_upload_completion_status
-    filenames = @batch['files'].map { |f| f['filename'] }
+    filenames = @batch["files"].map { |f| f["filename"] }
 
     # Build list of possible paths for each file (different media types + counter suffixes)
     possible_paths = []
@@ -156,11 +156,11 @@ class Admin::MediumController < Admin::BaseController
       existing_pattern += 1 if Medium.where("file_path LIKE ?", "/media/%/#{pattern}").exists?
     end
 
-    existing_count = [existing_exact, existing_pattern].max
+    existing_count = [ existing_exact, existing_pattern ].max
 
     # Check if the bulk upload job is still running
     job_running = SolidQueue::Job.exists?(
-      class_name: 'BulkUploadJob',
+      class_name: "BulkUploadJob",
       finished_at: nil
     )
 
@@ -179,7 +179,7 @@ class Admin::MediumController < Admin::BaseController
     if Rails.env.development?
       SolidQueue::FailedExecution
         .joins("INNER JOIN solid_queue_jobs ON solid_queue_jobs.id = solid_queue_failed_executions.job_id")
-        .where("solid_queue_jobs.class_name = ?", 'GenerateImageVariantsJob')
+        .where("solid_queue_jobs.class_name = ?", "GenerateImageVariantsJob")
         .destroy_all
     end
 
@@ -286,12 +286,12 @@ class Admin::MediumController < Admin::BaseController
       redirect_to browse_admin_medium_index_path and return
     end
 
-    relative_path = @medium.file_path.delete_prefix('/')
+    relative_path = @medium.file_path.delete_prefix("/")
     old_path = File.join(RoeSitePaths::SITE_PATH, relative_path)
     extension = File.extname(old_path)
 
     # Keep same media type folder
-    media_type = determine_media_type(extension.delete_prefix('.'))
+    media_type = determine_media_type(extension.delete_prefix("."))
     new_path = old_path.dirname.join("#{new_filename}#{extension}")
 
     if File.exist?(new_path) && new_path != old_path
@@ -316,15 +316,15 @@ class Admin::MediumController < Admin::BaseController
     media_path = params[:path]
 
     unless media_path.present?
-      render json: { error: 'Missing path parameter' }, status: :bad_request
+      render json: { error: "Missing path parameter" }, status: :bad_request
       return
     end
 
     # Convert /media/audio/file.mp3 to absolute path (as STRING)
-    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix('/')).to_s  # ← Add .to_s
+    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix("/")).to_s  # ← Add .to_s
 
     unless File.exist?(file_path)
-      render json: { error: 'File not found' }, status: :not_found
+      render json: { error: "File not found" }, status: :not_found
       return
     end
 
@@ -333,7 +333,7 @@ class Admin::MediumController < Admin::BaseController
     if duration
       render json: { duration: duration }
     else
-      render json: { error: 'Could not extract duration' }, status: :unprocessable_entity
+      render json: { error: "Could not extract duration" }, status: :unprocessable_entity
     end
   end
 
@@ -348,12 +348,12 @@ class Admin::MediumController < Admin::BaseController
       return
     end
 
-    unless media_path.start_with?('/media/')
+    unless media_path.start_with?("/media/")
       render json: { exists: true, checked: false }
       return
     end
 
-    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix('/')).to_s
+    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix("/")).to_s
     render json: { exists: File.exist?(file_path), checked: true, path: media_path }
   end
 
@@ -361,7 +361,7 @@ class Admin::MediumController < Admin::BaseController
 
   def process_single_upload(uploaded_file)
     # Your existing upload logic, extracted to a method
-    extension = File.extname(uploaded_file.original_filename).delete_prefix('.')
+    extension = File.extname(uploaded_file.original_filename).delete_prefix(".")
     media_type = determine_media_type(extension)
 
     folder_path = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "media/#{media_type}"))
@@ -383,7 +383,7 @@ class Admin::MediumController < Admin::BaseController
     file_path = folder_path.join(filename)
 
     # Save file
-    File.open(file_path, 'wb') do |file|
+    File.open(file_path, "wb") do |file|
       file.write(uploaded_file.read)
     end
 
@@ -398,7 +398,7 @@ class Admin::MediumController < Admin::BaseController
 
   def determine_media_type_from_files(files)
     # Use the first file's extension to determine type
-    first_ext = File.extname(files.first.original_filename).delete_prefix('.')
+    first_ext = File.extname(files.first.original_filename).delete_prefix(".")
     determine_media_type(first_ext)
   end
 
@@ -406,27 +406,27 @@ class Admin::MediumController < Admin::BaseController
     ext = extension.downcase
 
     case ext
-    when 'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp'
-      'images'
-    when 'mp3', 'm4a', 'wav', 'ogg', 'flac', 'aac'
-      'audio'
-    when 'mp4', 'webm', 'ogv', 'mov', 'avi', 'mkv'
-      'video'
-    when 'woff', 'woff2', 'ttf', 'otf'
-      'fonts'
+    when "png", "jpg", "jpeg", "webp", "gif", "svg", "bmp"
+      "images"
+    when "mp3", "m4a", "wav", "ogg", "flac", "aac"
+      "audio"
+    when "mp4", "webm", "ogv", "mov", "avi", "mkv"
+      "video"
+    when "woff", "woff2", "ttf", "otf"
+      "fonts"
     else
-      'images'  # default fallback
+      "images"  # default fallback
     end
   end
 
   def sanitize_media_filename(filename)
-    basename = File.basename(filename, '.*')
+    basename = File.basename(filename, ".*")
 
     # Convert to lowercase, replace spaces/special chars with hyphens
     basename.downcase
-            .gsub(/[^a-z0-9\-_]/, '-')
-            .gsub(/-+/, '-')
+            .gsub(/[^a-z0-9\-_]/, "-")
+            .gsub(/-+/, "-")
             .strip
-            .gsub(/^-|-$/, '')
+            .gsub(/^-|-$/, "")
   end
 end

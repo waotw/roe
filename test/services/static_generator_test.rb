@@ -19,16 +19,16 @@ class StaticGeneratorTest < ActiveSupport::TestCase
 
   test "manifest created on first run" do
     generator = StaticGenerator.new(output_dir: @public_test_dir)
-    
+
     # Trigger manifest loading (which returns empty hash when not exists)
     manifest = generator.send(:load_manifest)
-    
+
     # Should return empty hash, not raise error
     assert_equal({}, manifest)
-    
+
     # Save manifest should create the file
     generator.send(:save_manifest)
-    
+
     manifest_path = File.join(@public_test_dir, ".generation_manifest.json")
     assert File.exist?(manifest_path)
   end
@@ -65,8 +65,8 @@ class StaticGeneratorTest < ActiveSupport::TestCase
     generator.instance_variable_set(:@manifest, generator.send(:load_manifest))
 
     # Create a site config that's newer than manifest
-    site_config = create(:site_config, 
-      file_path: "site/system/global/site.yml", 
+    site_config = create(:site_config,
+      file_path: "site/system/global/site.yml",
       config: { "title" => "Updated" }
     )
     site_config.touch
@@ -89,8 +89,8 @@ class StaticGeneratorTest < ActiveSupport::TestCase
     generator.instance_variable_set(:@manifest, generator.send(:load_manifest))
 
     # Create old config
-    site_config = create(:site_config, 
-      file_path: "site/system/global/site.yml", 
+    site_config = create(:site_config,
+      file_path: "site/system/global/site.yml",
       config: { "title" => "Old" }
     )
     site_config.update_column(:updated_at, 2.hours.ago)
@@ -153,7 +153,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
   test "prepare_output_directory creates output directory" do
     new_output_dir = File.join(@public_test_dir, "new_output")
     generator = StaticGenerator.new(output_dir: new_output_dir)
-    
+
     assert_not Dir.exist?(new_output_dir)
     generator.send(:prepare_output_directory)
     assert Dir.exist?(new_output_dir)

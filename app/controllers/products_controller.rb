@@ -6,7 +6,7 @@ class ProductsController < SiteController
     raise ActiveRecord::RecordNotFound unless @product
 
     # Only show published products to non-admins
-    unless @product.status == 'published' || authenticated?
+    unless @product.status == "published" || authenticated?
       raise ActiveRecord::RecordNotFound
     end
 
@@ -29,12 +29,12 @@ class ProductsController < SiteController
     # Use the full URL for Snipcart validation
     if Rails.env.production?
       # Use configured domain from store.yml
-      domain = SiteConfig.feature('store', 'default_domain') || request.host
+      domain = SiteConfig.feature("store", "default_domain") || request.host
 
       # Remove protocol prefix and trailing slashes
-      clean_domain = domain.to_s.sub(/\Ahttps?:\/\//, '').sub(/\/+\z/, '')
+      clean_domain = domain.to_s.sub(/\Ahttps?:\/\//, "").sub(/\/+\z/, "")
 
-      protocol = clean_domain.include?('localhost') ? 'http' : 'https'
+      protocol = clean_domain.include?("localhost") ? "http" : "https"
       "#{protocol}://#{clean_domain}/store/#{product.url_name}.json"
     else
       # Development: use request base URL

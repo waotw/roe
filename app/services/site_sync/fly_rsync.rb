@@ -1,6 +1,6 @@
-require 'shellwords'
-require 'json'
-require 'tempfile'
+require "shellwords"
+require "json"
+require "tempfile"
 
 module SiteSync
   # Fly-specific transport for site sync operations. Wraps the
@@ -29,8 +29,8 @@ module SiteSync
   class FlyRsync
     class FlyRsyncError < StandardError; end
 
-    DEFAULT_APP_NAME  = 'roe'.freeze
-    REMOTE_SITE_PATH  = '/data/site/'.freeze
+    DEFAULT_APP_NAME  = "roe".freeze
+    REMOTE_SITE_PATH  = "/data/site/".freeze
 
     # Excludes that apply in both directions. These should mirror
     # SiteSync::Ledger's EXCLUDED_DIRS/EXCLUDED_FILES so that the
@@ -47,31 +47,31 @@ module SiteSync
     # Rails app on prod runs as non-root, so it can't rewrite the
     # ledger afterwards (Errno::EACCES → refresh_peer_ledger 500s).
     COMMON_EXCLUDES = [
-      '--exclude=.sync-state.json',
-      '--exclude=.git',
-      '--exclude=.sync-backups',
-      '--exclude=.DS_Store',
-      '--exclude=system/global/.last_deploy.yml'
+      "--exclude=.sync-state.json",
+      "--exclude=.git",
+      "--exclude=.sync-backups",
+      "--exclude=.DS_Store",
+      "--exclude=system/global/.last_deploy.yml"
     ].freeze
 
     # Push (dev → prod): protect prod's DB from being clobbered
     # by dev's. Same DB-protection rules as the rake site:* tasks.
     PUSH_EXCLUDES = (COMMON_EXCLUDES + [
-      '--exclude=db/production/',
-      '--exclude=db/development/.gitkeep'
+      "--exclude=db/production/",
+      "--exclude=db/development/.gitkeep"
     ]).freeze
 
     # Pull (prod → dev): protect dev's DB from being clobbered
     # by prod's. Mirror image of PUSH_EXCLUDES.
     PULL_EXCLUDES = (COMMON_EXCLUDES + [
-      '--exclude=db/development/',
-      '--exclude=db/production/.gitkeep'
+      "--exclude=db/development/",
+      "--exclude=db/production/.gitkeep"
     ]).freeze
 
     # Backup (live → local snapshot): exclude the entire DB tree
     # since DBs have their own backup system.
     BACKUP_EXCLUDES = (COMMON_EXCLUDES + [
-      '--exclude=db/'
+      "--exclude=db/"
     ]).freeze
 
     # When deleting many files via fly ssh console, batch them so
@@ -244,7 +244,7 @@ module SiteSync
       # ─── Common helpers ───────────────────────────────────────────
 
       def app_name
-        ENV['FLY_APP_NAME'] || DEFAULT_APP_NAME
+        ENV["FLY_APP_NAME"] || DEFAULT_APP_NAME
       end
 
       # Cached for the lifetime of the process — machine ID is stable
@@ -259,10 +259,10 @@ module SiteSync
           end
           machines = JSON.parse(output) rescue []
           machine = machines.first
-          unless machine && machine['id']
+          unless machine && machine["id"]
             raise FlyRsyncError, "No fly machines found for app '#{app_name}'."
           end
-          machine['id']
+          machine["id"]
         end
       end
 
@@ -285,7 +285,7 @@ module SiteSync
         files = Array(files).uniq
         return if files.empty?
 
-        list = Tempfile.create([ 'site-sync-files', '.txt' ])
+        list = Tempfile.create([ "site-sync-files", ".txt" ])
         begin
           list.write(files.join("\n"))
           list.close
@@ -331,7 +331,7 @@ module SiteSync
       end
 
       def build_cmd(source:, dest:, flags:, excludes:)
-        excludes_str = excludes.join(' ')
+        excludes_str = excludes.join(" ")
         # cd into Rails.root so we can use a relative path for the
         # -e argument. rsync re-tokenizes the -e value on whitespace
         # (so it can support things like `-e "ssh -p 2222"`), which
@@ -360,7 +360,7 @@ module SiteSync
 
         paths.each_slice(REMOTE_DELETE_BATCH) do |chunk|
           remote_paths = chunk.map { |p| File.join(REMOTE_SITE_PATH, p) }
-          rm_arg = remote_paths.map { |p| Shellwords.escape(p) }.join(' ')
+          rm_arg = remote_paths.map { |p| Shellwords.escape(p) }.join(" ")
           # rm -f: don't error on already-missing files.
           remote_cmd = "rm -f #{rm_arg}"
           cmd = "fly ssh console --quiet --machine #{Shellwords.escape(machine_id)} " \
@@ -377,10 +377,10 @@ module SiteSync
         site_root = File.expand_path(RoeSitePaths::SITE_PATH)
         paths.each do |p|
           # Defense in depth: refuse paths that try to escape /site.
-          next if p.to_s.include?('..') || p.to_s.start_with?('/')
+          next if p.to_s.include?("..") || p.to_s.start_with?("/")
 
           full = File.expand_path(File.join(RoeSitePaths::SITE_PATH, p))
-          next unless full.start_with?(site_root + '/')
+          next unless full.start_with?(site_root + "/")
 
           File.delete(full) if File.exist?(full)
         rescue => e
@@ -390,7 +390,7 @@ module SiteSync
 
       def new_backup_dir
         timestamp   = Time.now.strftime("%Y-%m-%d-%H%M%S")
-        backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+        backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
         FileUtils.mkdir_p(backup_root)
         backup_dir  = File.join(backup_root, timestamp)
         [ backup_dir, backup_root, timestamp ]
@@ -404,7 +404,7 @@ module SiteSync
       end
 
       def update_latest_symlink(backup_root, timestamp)
-        latest = File.join(backup_root, 'latest')
+        latest = File.join(backup_root, "latest")
         FileUtils.rm_f(latest) if File.symlink?(latest) || File.exist?(latest)
         FileUtils.ln_s(timestamp, latest)
       end

@@ -10,7 +10,7 @@ class FeedsController < ApplicationController
       site_config: site_config
     ).generate
 
-    response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+    response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
     render xml: feed_xml
   end
 
@@ -23,7 +23,7 @@ class FeedsController < ApplicationController
       site_config: site_config
     ).generate
 
-    response.headers['Content-Type'] = 'application/atom+xml; charset=utf-8'
+    response.headers["Content-Type"] = "application/atom+xml; charset=utf-8"
     render xml: feed_xml
   end
 
@@ -37,7 +37,7 @@ class FeedsController < ApplicationController
     end
 
     # If the whole podcast is paid-only, no public feed exists
-    if podcast_config['audience'] == 'paid'
+    if podcast_config["audience"] == "paid"
       head :not_found
       return
     end
@@ -46,7 +46,7 @@ class FeedsController < ApplicationController
     episodes = podcast_episodes(@podcast_key)
 
     # Check members.yml for whether to tease paid episode titles/descriptions
-    show_paid_teasers = SiteConfig.feature('members', 'everyone.show_paid_content') || false
+    show_paid_teasers = SiteConfig.feature("members", "everyone.show_paid_content") || false
 
     feed_xml = FeedGenerator.new(
       posts: episodes,
@@ -57,7 +57,7 @@ class FeedsController < ApplicationController
       show_paid_teasers: show_paid_teasers
     ).generate
 
-    response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+    response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
     render xml: feed_xml
   end
 
@@ -100,7 +100,7 @@ class FeedsController < ApplicationController
       show_paid_teasers: false
     ).generate
 
-    response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+    response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
     render xml: feed_xml
   end
 
@@ -109,17 +109,17 @@ class FeedsController < ApplicationController
   def podcast_episodes(podcast_key)
     Post
       .published
-      .where("json_extract(metadata, '$.post_type') = ?", 'podcast')
+      .where("json_extract(metadata, '$.post_type') = ?", "podcast")
       .where("json_extract(metadata, '$.podcast') = ?", podcast_key)
       .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
   end
 
   def site_config
     {
-      title: SiteConfig.get('title') || "My Blog",
-      description: SiteConfig.get('description') || "Blog posts and updates",
+      title: SiteConfig.get("title") || "My Blog",
+      description: SiteConfig.get("description") || "Blog posts and updates",
       url: request.base_url,
-      author: SiteConfig.get('author') || "Site Author"
+      author: SiteConfig.get("author") || "Site Author"
     }
   end
 end

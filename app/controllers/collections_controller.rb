@@ -4,9 +4,9 @@ class CollectionsController < ApplicationController
   def show
     @filters = params[:filters]
     @page = params[:page]&.to_i || 1
-    @exclude_tags = params[:exclude]&.split(',') || []
-    @source = params[:source] || 'posts'
-    @order = params[:order] || 'date'
+    @exclude_tags = params[:exclude]&.split(",") || []
+    @source = params[:source] || "posts"
+    @order = params[:order] || "date"
     @heading = params[:heading]
     @podcast_key = params[:podcast]
 
@@ -20,7 +20,7 @@ class CollectionsController < ApplicationController
 
   def per_page
     # Use SiteConfig.default() for defaults/collections.yml
-    SiteConfig.default('collections', 'items_per_page')&.to_i || 20
+    SiteConfig.default("collections", "items_per_page")&.to_i || 20
   end
 
   def paginate_items
@@ -31,7 +31,7 @@ class CollectionsController < ApplicationController
   end
 
   def parse_filters
-    segments = @filters.split('/')
+    segments = @filters.split("/")
 
     @post_type = nil
     @tags = []
@@ -45,16 +45,16 @@ class CollectionsController < ApplicationController
     # Check if first segment could be a heading (not a type- prefix, not 'all')
     first_segment = segments.first
 
-    if first_segment && !first_segment.start_with?('type-') && first_segment != 'all'
+    if first_segment && !first_segment.start_with?("type-") && first_segment != "all"
       # Treat as tags
-      @tags.concat(first_segment.split(','))
+      @tags.concat(first_segment.split(","))
     end
 
     segments.each do |segment|
-      if segment.start_with?('type-')
-        @post_type = segment.sub('type-', '')
-      elsif segment != 'all' && segment != first_segment
-        @tags.concat(segment.split(','))
+      if segment.start_with?("type-")
+        @post_type = segment.sub("type-", "")
+      elsif segment != "all" && segment != first_segment
+        @tags.concat(segment.split(","))
       end
     end
   end
@@ -62,21 +62,21 @@ class CollectionsController < ApplicationController
   def fetch_items
     # Fetch items based on source
     @items = case @source
-    when 'pages'
+    when "pages"
       Page.public_pages
-    when 'documentation'
+    when "documentation"
       Documentation.public_documentation
     else
       Post.published.regular_posts
     end
 
     # Apply post_type filter (only for posts)
-    if @post_type && @source == 'posts'
+    if @post_type && @source == "posts"
       @items = @items.by_type(@post_type)
     end
 
     # Apply podcast filter (only for posts)
-    if @podcast_key.present? && @source == 'posts'
+    if @podcast_key.present? && @source == "posts"
       @items = @items.where("json_extract(metadata, '$.podcast') = ?", @podcast_key.strip)
     end
 
@@ -105,13 +105,13 @@ class CollectionsController < ApplicationController
 
   def apply_ordering(items, order_by)
     case order_by
-    when 'filename'
+    when "filename"
       # Sort by file_path which includes directory structure and filename
       # This keeps it as an ActiveRecord relation for pagination
       items.order(:file_path)
-    when 'title'
+    when "title"
       items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
-    when 'date-asc'
+    when "date-asc"
       items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
     else # 'date' or default
       items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
@@ -126,17 +126,17 @@ class CollectionsController < ApplicationController
 
   def generate_heading
     base_heading = case @source
-    when 'documentation'
-      'Documentation'
-    when 'pages'
-      'Pages'
+    when "documentation"
+      "Documentation"
+    when "pages"
+      "Pages"
     else
       if @post_type
         pluralize_post_type(@post_type)
       elsif @tags.any?
-        @tags.map(&:titleize).join(', ')  # Changed from ' + ' to ', '
+        @tags.map(&:titleize).join(", ")  # Changed from ' + ' to ', '
       else
-        'Archive'
+        "Archive"
       end
     end
 
@@ -163,20 +163,20 @@ class CollectionsController < ApplicationController
     parts = []
 
     # Source type
-    parts << "All #{@source}" unless @source == 'posts'
+    parts << "All #{@source}" unless @source == "posts"
 
     # Ordering
     case @order
-    when 'filename'
-      parts << 'ordered by filename'
-    when 'title'
-      parts << 'alphabetically'
-    when 'date-asc'
-      parts << 'oldest'
+    when "filename"
+      parts << "ordered by filename"
+    when "title"
+      parts << "alphabetically"
+    when "date-asc"
+      parts << "oldest"
     else
-      parts << 'latest'
+      parts << "latest"
     end
 
-    parts.join(' • ')
+    parts.join(" • ")
   end
 end

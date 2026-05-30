@@ -4,16 +4,16 @@ require "ostruct"
 class PagesControllerTest < ActionDispatch::IntegrationTest
   def setup
     super
-    
-    @public_page = create(:page, 
-      metadata: { 
-        "title" => "Public Page", 
+
+    @public_page = create(:page,
+      metadata: {
+        "title" => "Public Page",
         "status" => "published",
         "url_name" => "public-page"
       },
       content: "# Public Page\n\nThis is a public page."
     )
-    
+
     @paid_page_no_form = create(:page,
       metadata: {
         "title" => "Paid Page",
@@ -23,7 +23,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Paid Page\n\nThis is paid content without a form."
     )
-    
+
     @paid_page_with_form = create(:page,
       metadata: {
         "title" => "Paid Page With Paywall",
@@ -33,7 +33,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Paid Page With Paywall\n\nThis is free content.\n\n```form for: paid_content\nUpgrade now!\n```"
     )
-    
+
     @draft_page = create(:page,
       metadata: {
         "title" => "Draft Page",
@@ -42,7 +42,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Draft Page\n\nThis is a draft page."
     )
-    
+
     @unlisted_page = create(:page,
       metadata: {
         "title" => "Unlisted Page",
@@ -51,7 +51,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       },
       content: "# Unlisted Page\n\nThis is an unlisted page."
     )
-    
+
     @free_member = create(:member, tier: :free, status: :active)
     @paid_member = create(:member, tier: :paid, status: :active)
     @cancelled_member = create(:member, tier: :paid, status: :cancelled)
@@ -61,7 +61,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Public Content Tests
   # ============================================================================
-  
+
   test "shows public published page to guest" do
     get page_path(@public_page.url_name)
     assert_response :success
@@ -89,7 +89,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Unlisted Content Tests
   # ============================================================================
-  
+
   test "shows unlisted page to guest" do
     get page_path(@unlisted_page.url_name)
     assert_response :success
@@ -104,7 +104,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Draft Content Tests
   # ============================================================================
-  
+
   test "returns 404 for draft page when guest" do
     get page_path(@draft_page.url_name)
     assert_response :not_found
@@ -126,13 +126,13 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Paid Content Tests - No Paywall Form
   # ============================================================================
-  
+
   test "redirects guest to upgrade when accessing paid page without form" do
     SiteConfig.current.update!(
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     get page_path(@paid_page_no_form.url_name)
     assert_redirected_to "/upgrade"
     assert_equal "This content requires a paid membership", flash[:alert]
@@ -143,7 +143,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@free_member)
     get page_path(@paid_page_no_form.url_name)
     assert_redirected_to "/upgrade"
@@ -155,7 +155,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@paid_member)
     get page_path(@paid_page_no_form.url_name)
     assert_response :success
@@ -167,7 +167,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@cancelled_member)
     get page_path(@paid_page_no_form.url_name)
     assert_redirected_to "/upgrade"
@@ -179,7 +179,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_as(@admin)
     get page_path(@paid_page_no_form.url_name)
     assert_response :success
@@ -188,13 +188,13 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Paid Content Tests - With Paywall Form
   # ============================================================================
-  
+
   test "shows paid page with paywall form to guest" do
     SiteConfig.current.update!(
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     # With paywall form, content loads but shows teaser
     get page_path(@paid_page_with_form.url_name)
     assert_response :success
@@ -205,7 +205,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@free_member)
     get page_path(@paid_page_with_form.url_name)
     assert_response :success
@@ -216,7 +216,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
       file_path: "site/system/features/members.yml",
       config: { "enabled" => true }
     )
-    
+
     sign_in_member(@paid_member)
     get page_path(@paid_page_with_form.url_name)
     assert_response :success
@@ -225,11 +225,11 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Members Feature Disabled Tests
   # ============================================================================
-  
+
   test "shows paid page to everyone when members feature is disabled" do
     # Stub members_enabled? to return false (no members.yml file)
     SiteFeature.stubs(:members_enabled?).returns(false)
-    
+
     get page_path(@paid_page_no_form.url_name)
     assert_response :success
   end
@@ -237,7 +237,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Edge Cases
   # ============================================================================
-  
+
   test "returns 404 for non-existent page" do
     get page_path("non-existent-page")
     assert_response :not_found
@@ -251,7 +251,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
         "url_name" => "special-page-123"
       }
     )
-    
+
     get page_path(special_page.url_name)
     assert_response :success
   end
@@ -264,7 +264,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
         "url_name" => "parent/child"
       }
     )
-    
+
     get page_path(nested_page.url_name)
     assert_response :success
   end
@@ -277,7 +277,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
         "url_name" => "my-awesome_page-123"
       }
     )
-    
+
     get page_path(complex_page.url_name)
     assert_response :success
   end
@@ -285,7 +285,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
   # Static Site Generation Flag Tests
   # ============================================================================
-  
+
   test "page renders in dynamic mode" do
     get page_path(@public_page.url_name)
     assert_response :success

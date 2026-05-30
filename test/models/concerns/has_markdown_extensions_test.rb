@@ -4,13 +4,13 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   class TestModel
     include HasMarkdownExtensions
     include HasInlineFootnotes
-    
+
     attr_accessor :content
-    
+
     def initialize(content)
       @content = content
     end
-    
+
     def to_html(preview: false)
       super(preview: preview)
     end
@@ -27,7 +27,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "preserves triple backtick code blocks" do
     content = MarkdownFixture::CODE_BLOCK_RUBY
     result = render(content)
-    
+
     assert_match(/def hello/, result)
     assert_match(/puts "Hello, World!"/, result)
   end
@@ -35,7 +35,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "preserves 4+ backtick code blocks" do
     content = MarkdownFixture::CODE_BLOCK_FOUR_BACKTICKS
     result = render(content)
-    
+
     assert_match(/Code with four backticks/, result)
   end
 
@@ -49,9 +49,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     # The code is processed, not preserved (current implementation limitation)
     # The collection renders with the code block processed
     assert_match(/<div class="collection"/, result)
@@ -64,15 +64,15 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```card
       type: aside
       text: "Something"
-      
+
       ```ruby
       puts "code in card"
       ```
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     # The card renders, and code is processed separately (current implementation limitation)
     assert_match(/class="card card-aside"/, result)
   end
@@ -87,9 +87,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     # The gallery block isn't recognized due to nested code (current limitation)
     # Content is processed as regular markdown instead
     refute_match(/class="gallery"/, result)
@@ -99,14 +99,14 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "complex nested structures preserved" do
     content = <<~MARKDOWN
       # Header
-      
+
       ```card
       type: pullquote
       text: "Quote"
       ```
-      
+
       Regular paragraph with `inline code`.
-      
+
       ```ruby
       class Test
         def method
@@ -115,9 +115,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       end
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/class Test/, result)
     assert_match(/inline code/, result)
     assert_match(/Quote/, result)
@@ -130,7 +130,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "manual gallery renders gallery elements" do
     content = MarkdownFixture::GALLERY_SIMPLE
     result = render(content)
-    
+
     assert_match(/<div class="gallery"/, result)
     assert_match(/<div class="gallery-row gallery-col-3"/, result)
     assert_match(/<img src="mountain.jpg"/, result)
@@ -141,7 +141,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "manual gallery with multiple images" do
     content = MarkdownFixture::GALLERY_SIMPLE
     result = render(content)
-    
+
     assert_match(/mountain\.jpg/, result)
     assert_match(/ocean\.jpg/, result)
     assert_match(/forest\.jpg/, result)
@@ -150,7 +150,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "manual gallery with captions" do
     content = MarkdownFixture::GALLERY_WITH_CAPTIONS
     result = render(content)
-    
+
     assert_match(/<figcaption>/, result)
     assert_match(/The majestic peak/, result)
     assert_match(/Calm waters/, result)
@@ -159,7 +159,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "auto_gallery groups consecutive images" do
     content = MarkdownFixture::CONSECUTIVE_IMAGES
     result = render(content)
-    
+
     assert_match(/<div class="gallery"/, result)
     assert_match(/photo1\.jpg/, result)
     assert_match(/photo2\.jpg/, result)
@@ -185,21 +185,21 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "gallery output has gallery class" do
     content = MarkdownFixture::GALLERY_SIMPLE
     result = render(content)
-    
+
     assert_match(/class="gallery"/, result)
   end
 
   test "gallery captions use figcaption" do
     content = MarkdownFixture::GALLERY_WITH_CAPTIONS
     result = render(content)
-    
+
     assert_match(/<figcaption>The majestic peak<\/figcaption>/, result)
   end
 
   test "gallery handles single image not as gallery" do
     content = "![Single](single.jpg)"
     result = render(content)
-    
+
     refute_match(/class="gallery"/, result)
     assert_match(/single\.jpg/, result)
   end
@@ -210,9 +210,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ![Mountain Image](mountain.jpg)
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/alt="Mountain Image"/, result)
   end
 
@@ -224,9 +224,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ![Another](img3.jpg)(*Caption three*)
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/img1\.jpg/, result)
     assert_match(/img2\.jpg/, result)
     assert_match(/img3\.jpg/, result)
@@ -239,7 +239,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "pullquote center renders card with pullquote classes" do
     content = MarkdownFixture::PULLQUOTE_CENTER
     result = render(content)
-    
+
     assert_match(/class="card card-pullquote pullquote-center"/, result)
     assert_match(/The only way to do great work/, result)
   end
@@ -247,7 +247,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "pullquote left renders floated aside" do
     content = MarkdownFixture::PULLQUOTE_LEFT
     result = render(content)
-    
+
     assert_match(/pullquote-left/, result)
     assert_match(/Float this to the left/, result)
   end
@@ -255,7 +255,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "pullquote right renders floated aside" do
     content = MarkdownFixture::PULLQUOTE_RIGHT
     result = render(content)
-    
+
     assert_match(/pullquote-right/, result)
     assert_match(/Float this to the right/, result)
   end
@@ -263,7 +263,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "pullquote with attribution renders cite" do
     content = MarkdownFixture::PULLQUOTE_CENTER
     result = render(content)
-    
+
     assert_match(/<cite>/, result)
     assert_match(/Steve Jobs/, result)
   end
@@ -276,9 +276,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       position: center
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Quote without attribution/, result)
     refute_match(/<cite>/, result)
   end
@@ -290,16 +290,16 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       text: "No position specified"
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/pullquote-center/, result)
   end
 
   test "pullquote card classes include card and card-pullquote" do
     content = MarkdownFixture::PULLQUOTE_CENTER
     result = render(content)
-    
+
     assert_match(/class=".*card.*"/, result)
     assert_match(/card-pullquote/, result)
   end
@@ -324,9 +324,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       text: "Simple aside text"
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Simple aside text/, result)
   end
 
@@ -338,16 +338,16 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       link: /related
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/href="\/related"/, result)
   end
 
   test "aside with link and link_text" do
     content = MarkdownFixture::ASIDE_WITH_LINK
     result = render(content)
-    
+
     assert_match(/href="\/related-page"/, result)
     assert_match(/Read more/, result)
   end
@@ -355,7 +355,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "aside with image" do
     content = MarkdownFixture::ASIDE_WITH_IMAGE
     result = render(content)
-    
+
     assert_match(/class="aside-image"/, result)
     assert_match(/src="\/media\/images\/sidebar\.jpg"/, result)
   end
@@ -368,9 +368,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       link: /some-page
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     # Arrow is added when link is provided but link_text is not
     assert_match(/→/, result)
     assert_match(/class="aside-link-inline"/, result)
@@ -381,13 +381,13 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   # =============================================================================
 
   test "post_link small style" do
-    post = create(:post, metadata: { 
-      "title" => "Hello World", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Hello World",
+      "status" => "published",
       "date" => "2024-01-01",
       "url_name" => "hello-world"
     })
-    
+
     content = <<~MARKDOWN
       ```card
       type: post-link
@@ -395,21 +395,21 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       style: small
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/post-link-small/, result)
     assert_match(/Hello World/, result)
   end
 
   test "post_link large style" do
-    post = create(:post, metadata: { 
-      "title" => "Hello World", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Hello World",
+      "status" => "published",
       "date" => "2024-01-01",
       "url_name" => "hello-world"
     })
-    
+
     content = <<~MARKDOWN
       ```card
       type: post-link
@@ -417,9 +417,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       style: large
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/post-link-large/, result)
   end
 
@@ -431,21 +431,21 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       style: small
       ```
     MARKDOWN
-    
+
     # Error only shows in preview mode
     result = render(content, preview: true)
-    
+
     assert_match(/Post not found/, result)
   end
 
   test "post_link renders link href" do
-    post = create(:post, metadata: { 
-      "title" => "Test Post", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Test Post",
+      "status" => "published",
       "date" => "2024-01-01",
       "url_name" => "test-post"
     })
-    
+
     content = <<~MARKDOWN
       ```card
       type: post-link
@@ -453,20 +453,20 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       style: small
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/href="\/posts\/test-post"/, result)
   end
 
   test "post_link override title" do
-    post = create(:post, metadata: { 
-      "title" => "Original Title", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Original Title",
+      "status" => "published",
       "date" => "2024-01-01",
       "url_name" => "test-post"
     })
-    
+
     content = <<~MARKDOWN
       ```card
       type: post-link
@@ -474,9 +474,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       title: Custom Title
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Custom Title/, result)
     refute_match(/Original Title/, result)
   end
@@ -491,20 +491,20 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       heading: Latest Posts
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Latest Posts/, result)
     assert_match(/class="collection"/, result)
   end
 
   test "collection with list template" do
-    post = create(:post, metadata: { 
-      "title" => "Test Post", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Test Post",
+      "status" => "published",
       "date" => "2024-01-01"
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Posts
@@ -512,19 +512,19 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       limit: 1
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Test Post/, result)
   end
 
   test "collection with compact template" do
-    post = create(:post, metadata: { 
-      "title" => "Compact Post", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Compact Post",
+      "status" => "published",
       "date" => "2024-01-01"
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Recent
@@ -532,19 +532,19 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       limit: 1
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Compact Post/, result)
   end
 
   test "collection with links template" do
-    post = create(:post, metadata: { 
-      "title" => "Links Post", 
-      "status" => "published", 
+    post = create(:post, metadata: {
+      "title" => "Links Post",
+      "status" => "published",
       "date" => "2024-01-01"
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Quick Links
@@ -552,30 +552,30 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       limit: 1
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Links Post/, result)
   end
 
   test "collection respects limit" do
     3.times do |i|
-      create(:post, metadata: { 
-        "title" => "Post #{i}", 
-        "status" => "published", 
+      create(:post, metadata: {
+        "title" => "Post #{i}",
+        "status" => "published",
         "date" => "2024-01-0#{i+1}"
       })
     end
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Limited
       limit: 2
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     # Collections are ordered by date descending (newest first)
     # Post 2 (Jan 03) and Post 1 (Jan 02) should appear, Post 0 (Jan 01) should not
     assert_match(/Post 2/, result)
@@ -584,106 +584,106 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   end
 
   test "collection filters by tags" do
-    create(:post, metadata: { 
-      "title" => "Ruby Post", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Ruby Post",
+      "status" => "published",
       "date" => "2024-01-01",
-      "tags" => ["ruby"]
+      "tags" => [ "ruby" ]
     })
-    create(:post, metadata: { 
-      "title" => "Python Post", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Python Post",
+      "status" => "published",
       "date" => "2024-01-02",
-      "tags" => ["python"]
+      "tags" => [ "python" ]
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Ruby Only
       tags: ruby
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Ruby Post/, result)
     refute_match(/Python Post/, result)
   end
 
   test "collection filters by post_type" do
-    create(:post, metadata: { 
-      "title" => "Article", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Article",
+      "status" => "published",
       "date" => "2024-01-01",
       "post_type" => "article"
     })
-    create(:post, metadata: { 
-      "title" => "Music", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Music",
+      "status" => "published",
       "date" => "2024-01-02",
       "post_type" => "music"
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Articles
       post_type: article
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/Article/, result)
     refute_match(/Music/, result)
   end
 
   test "collection orders by date" do
-    create(:post, metadata: { 
-      "title" => "Older", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Older",
+      "status" => "published",
       "date" => "2024-01-01"
     })
-    create(:post, metadata: { 
-      "title" => "Newer", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Newer",
+      "status" => "published",
       "date" => "2024-12-31"
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: By Date
       order: date
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     newer_pos = result.index("Newer")
     older_pos = result.index("Older")
     assert newer_pos < older_pos, "Newer should appear before Older"
   end
 
   test "collection orders by title" do
-    create(:post, metadata: { 
-      "title" => "Zebra Post", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Zebra Post",
+      "status" => "published",
       "date" => "2024-01-01"
     })
-    create(:post, metadata: { 
-      "title" => "Apple Post", 
-      "status" => "published", 
+    create(:post, metadata: {
+      "title" => "Apple Post",
+      "status" => "published",
       "date" => "2024-01-02"
     })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: A-Z
       order: title
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     apple_pos = result.index("Apple Post")
     zebra_pos = result.index("Zebra Post")
     assert apple_pos < zebra_pos, "Apple should appear before Zebra"
@@ -692,13 +692,13 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "collection show_more link" do
     # Create posts to have something to show
     3.times do |i|
-      create(:post, metadata: { 
-        "title" => "Post #{i}", 
-        "status" => "published", 
+      create(:post, metadata: {
+        "title" => "Post #{i}",
+        "status" => "published",
         "date" => "2024-01-0#{i+1}"
       })
     end
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: Featured
@@ -707,9 +707,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       show_more_text: "View all articles"
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/View all articles/, result)
   end
 
@@ -747,21 +747,21 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     post1 = create(:post, metadata: { "title" => "Post 1", "status" => "published", "date" => "2024-01-01" })
     post2 = create(:post, metadata: { "title" => "Post 2", "status" => "published", "date" => "2024-01-02" })
     post3 = create(:post, metadata: { "title" => "Post 3", "status" => "published", "date" => "2024-01-03" })
-    
+
     content = <<~MARKDOWN
       ```collection
       heading: First
       limit: 1
       ```
-      
+
       ```collection
       heading: Second
       limit: 1
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert_match(/First/, result)
     assert_match(/Second/, result)
   end
@@ -775,9 +775,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```card
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert result.present?
   end
 
@@ -786,9 +786,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```collection
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert result.present?
   end
 
@@ -797,11 +797,11 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```gallery
       ```
     MARKDOWN
-    
+
     # Empty galleries return empty or whitespace-only string in production
     result = render(content)
     assert result.blank?, "Expected empty gallery to return blank result, got: #{result.inspect}"
-    
+
     # Empty galleries return HTML comment in preview mode
     result_preview = render(content, preview: true)
     assert_match(/<!-- Empty gallery -->/, result_preview)
@@ -814,21 +814,21 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       text: "Something"
       ```
     MARKDOWN
-    
+
     result = render(content)
-    
+
     assert result.blank?
   end
 
   test "basic markdown still processed" do
     content = <<~MARKDOWN
       # Header
-      
+
       Paragraph with **bold** text.
     MARKDOWN
-    
+
     result = render(content)
-    
+
     # Headers get auto-generated IDs
     assert_match(/<h1 id="header">Header<\/h1>/, result)
     assert_match(/<strong>bold<\/strong>/, result)

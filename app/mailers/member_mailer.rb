@@ -1,14 +1,14 @@
 class MemberMailer
   class << self
     def magic_link(member)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
       signin_url = Rails.application.routes.url_helpers.token_signin_url(
         member.access_token,
         host: site_url
       )
 
-      html_body = EmailRenderer.render('magic_link', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("magic_link", {
+        member_name: member.name || "there",
         member_email: member.email,
         magic_link: signin_url,
         site_name: site_name
@@ -23,14 +23,14 @@ class MemberMailer
     end
 
     def email_confirmation(member)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
       confirmation_url = Rails.application.routes.url_helpers.confirm_email_url(
         token: member.email_confirmation_token,
         host: site_url
       )
 
-      html_body = EmailRenderer.render('email_confirmation', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("email_confirmation", {
+        member_name: member.name || "there",
         member_email: member.pending_email,
         confirmation_url: confirmation_url,
         site_name: site_name
@@ -45,10 +45,10 @@ class MemberMailer
     end
 
     def welcome(member)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
 
-      html_body = EmailRenderer.render('welcome', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("welcome", {
+        member_name: member.name || "there",
         member_email: member.email,
         site_name: site_name
       })
@@ -62,11 +62,11 @@ class MemberMailer
     end
 
     def upgrade_success(member, password)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
       account_url = Rails.application.routes.url_helpers.account_url(host: site_url)
 
-      html_body = EmailRenderer.render('upgrade_success', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("upgrade_success", {
+        member_name: member.name || "there",
         member_email: member.email,
         password: password,
         site_name: site_name,
@@ -82,10 +82,10 @@ class MemberMailer
     end
 
     def email_changed(member, old_email)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
 
-      html_body = EmailRenderer.render('email_changed', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("email_changed", {
+        member_name: member.name || "there",
         new_email: member.email,
         old_email: old_email,
         site_name: site_name
@@ -103,10 +103,10 @@ class MemberMailer
     end
 
     def membership_cancelled(member)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
 
-      html_body = EmailRenderer.render('membership_cancelled', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("membership_cancelled", {
+        member_name: member.name || "there",
         member_email: member.email,
         site_name: site_name
       })
@@ -120,11 +120,11 @@ class MemberMailer
     end
 
     def payment_failed(member)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
       update_payment_url = Rails.application.routes.url_helpers.account_url(host: site_url)
 
-      html_body = EmailRenderer.render('payment_failed', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("payment_failed", {
+        member_name: member.name || "there",
         member_email: member.email,
         update_payment_url: update_payment_url,
         site_name: site_name
@@ -139,10 +139,10 @@ class MemberMailer
     end
 
     def account_deletion(member)
-      site_name = SiteConfig.get('title') || 'the site'
+      site_name = SiteConfig.get("title") || "the site"
 
-      html_body = EmailRenderer.render('account_deletion', {
-        member_name: member.name || 'there',
+      html_body = EmailRenderer.render("account_deletion", {
+        member_name: member.name || "there",
         member_email: member.email,
         site_name: site_name
       })
@@ -170,7 +170,7 @@ class MemberMailer
           to_name: to_name,
           subject: subject,
           html_content: html_content,
-          tag: 'member-email'
+          tag: "member-email"
         )
 
         Rails.logger.info "📬 Result: #{result.inspect}"

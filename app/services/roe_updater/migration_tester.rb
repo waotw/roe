@@ -2,7 +2,7 @@ module RoeUpdater
   class MigrationTester
     class MigrationError < StandardError; end
 
-    TEST_SITE_PATH = File.join(RoeSitePaths::ROE_ROOT, 'staging', 'test_site')
+    TEST_SITE_PATH = File.join(RoeSitePaths::ROE_ROOT, "staging", "test_site")
 
     class << self
       def test_migrations(status_record)
@@ -13,7 +13,7 @@ module RoeUpdater
 
         copy_site_to_test
 
-        staging_app_path = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+        staging_app_path = File.join(RoeSitePaths::ROE_ROOT, "staging")
 
         # ROE_SITE_PATH is honored by RoeSitePaths in current/config/
         # application.rb — the staging Rails subprocess will boot with
@@ -22,11 +22,11 @@ module RoeUpdater
         # the COPY rather than the real production DB.
         bundle_cmd = "cd '#{staging_app_path}' && bundle install --quiet 2>&1"
         output = nil
-        
+
         Bundler.with_original_env do
           output = `#{bundle_cmd}`
         end
-        
+
         unless $?.success?
           cleanup_test_site
           raise MigrationError, "Bundle install failed: #{output}"
@@ -42,11 +42,11 @@ module RoeUpdater
         rails_env = Rails.env
         migrate_cmd = "cd '#{staging_app_path}' && RAILS_ENV=#{rails_env} ROE_SITE_PATH='#{TEST_SITE_PATH}' bundle exec rails db:migrate 2>&1"
         output = nil
-        
+
         Bundler.with_original_env do
           output = `#{migrate_cmd}`
         end
-        
+
         unless $?.success?
           cleanup_test_site
           raise MigrationError, "Migration test failed: #{output}"
@@ -68,12 +68,12 @@ module RoeUpdater
 
       def copy_site_to_test
         cleanup_test_site
-        
+
         # Exclude generated image variants - they can be rebuilt from originals
         # This saves significant space during the migration test
         rsync_cmd = "rsync -av --delete --exclude='media/images/variants/' '#{RoeSitePaths::SITE_PATH}/' '#{TEST_SITE_PATH}/' 2>&1"
         output = `rsync_cmd`
-        
+
         unless $?.success?
           raise MigrationError, "Failed to copy site for testing: #{output}"
         end

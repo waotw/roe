@@ -175,10 +175,10 @@ class Post < ApplicationRecord
     # the tags array in different forms depending on how it was stored.
     # Reading from post.metadata directly is always correct.
     all.flat_map { |p|
-      tags = p.metadata['tags']
+      tags = p.metadata["tags"]
       case tags
       when Array  then tags
-      when String then tags.gsub(/[\[\]"']/, '').split(',').map(&:strip)
+      when String then tags.gsub(/[\[\]"']/, "").split(",").map(&:strip)
       else []
       end
     }.reject(&:blank?).uniq.sort
@@ -403,8 +403,8 @@ class Post < ApplicationRecord
     # audio "required" flag is downgraded to a soft notice (see
     # informational_notices) — the episode renders on the site as video
     # and won't appear in the podcast RSS feed until audio is added.
-    if post_type == 'podcast' && metadata['video'].to_s.strip.present?
-      required = required.reject { |f| f[:name].to_s == 'audio' }
+    if post_type == "podcast" && metadata["video"].to_s.strip.present?
+      required = required.reject { |f| f[:name].to_s == "audio" }
     end
     required.reject do |field|
       metadata[field[:name].to_s].to_s.strip.present?
@@ -417,9 +417,9 @@ class Post < ApplicationRecord
   # about how the post will behave.
   def informational_notices
     notes = []
-    if post_type == 'podcast' &&
-       metadata['video'].to_s.strip.present? &&
-       metadata['audio'].to_s.strip.blank?
+    if post_type == "podcast" &&
+       metadata["video"].to_s.strip.present? &&
+       metadata["audio"].to_s.strip.blank?
       notes << "This episode will play on the site as video, but it won't appear in the podcast RSS feed until you add an audio file."
     end
     notes
@@ -433,8 +433,8 @@ class Post < ApplicationRecord
   def self.resolve_media_path(path)
     str = path.to_s.strip
     return nil if str.empty?
-    return nil unless str.start_with?('/media/')
-    File.join(RoeSitePaths::SITE_PATH, str.delete_prefix('/')).to_s
+    return nil unless str.start_with?("/media/")
+    File.join(RoeSitePaths::SITE_PATH, str.delete_prefix("/")).to_s
   end
 
   # Per-request Set of every /media/... path that resolves to a real file.
@@ -442,8 +442,8 @@ class Post < ApplicationRecord
   # pay for one directory glob, not one File.exist? per ref.
   def self.media_file_set
     Current.media_file_set ||= begin
-      base = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'media'))
-      files = Dir.glob(base.join('**/*'))
+      base = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "media"))
+      files = Dir.glob(base.join("**/*"))
                  .select { |f| File.file?(f) }
                  .map { |f| "/media/" + Pathname.new(f).relative_path_from(base).to_s }
       Set.new(files)
@@ -457,11 +457,11 @@ class Post < ApplicationRecord
       next if path.empty?
 
       # Paths that don't start with /media/ aren't checkable — treat as present.
-      exists = if path.start_with?('/media/')
+      exists = if path.start_with?("/media/")
                  self.class.media_file_set.include?(path)
-               else
+      else
                  true
-               end
+      end
       { field: field, path: path, exists: exists }
     end
   end
@@ -475,11 +475,11 @@ class Post < ApplicationRecord
   # the admin warning catches file-edit-bypass cases.
   def missing_site_gated_fields
     gaps = []
-    if SiteFeature.memberships_enabled? && metadata['audience'].to_s.strip.blank?
-      gaps << 'audience'
+    if SiteFeature.memberships_enabled? && metadata["audience"].to_s.strip.blank?
+      gaps << "audience"
     end
-    if SiteFeature.newsletters_enabled? && metadata['published_to'].to_s.strip.blank?
-      gaps << 'published_to'
+    if SiteFeature.newsletters_enabled? && metadata["published_to"].to_s.strip.blank?
+      gaps << "published_to"
     end
     gaps
   end
@@ -489,8 +489,8 @@ class Post < ApplicationRecord
   # renamed a podcast and old episode references are now orphaned).
   # Returns nil when the reference is valid or not applicable.
   def invalid_podcast_reference
-    return nil unless post_type == 'podcast'
-    value = metadata['podcast'].to_s.strip
+    return nil unless post_type == "podcast"
+    value = metadata["podcast"].to_s.strip
     return nil if value.empty?
     return nil if PodcastConfig.podcast_keys.include?(value)
     value

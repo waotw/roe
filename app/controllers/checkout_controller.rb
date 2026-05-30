@@ -1,6 +1,6 @@
 class CheckoutController < ApplicationController
   skip_before_action :require_authentication
-  before_action :require_member, only: [:create]
+  before_action :require_member, only: [ :create ]
 
   def create
     # Ensure member is free tier
@@ -20,11 +20,11 @@ class CheckoutController < ApplicationController
     session = Stripe::Checkout::Session.create(
       {
         customer_email: current_member.email,
-        mode: 'payment',
-        line_items: [{
+        mode: "payment",
+        line_items: [ {
           price: stripe_config.price_id,
           quantity: 1
-        }],
+        } ],
         success_url: checkout_payment_processing_url + "?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: checkout_cancel_url,
         metadata: {
@@ -47,14 +47,14 @@ class CheckoutController < ApplicationController
       return
     end
     # Load page for sidebar
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'checkout-success')
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-success")
   end
 
   def success
     # Load the checkout success markdown page
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'checkout-success')
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-success")
     if @page
-      render 'pages/show'
+      render "pages/show"
     else
       render plain: "Thank you for your purchase!", status: :ok
     end
@@ -62,7 +62,7 @@ class CheckoutController < ApplicationController
 
   def cancel
     # Load page for sidebar
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'checkout-cancel')
+    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-cancel")
   end
 
   private

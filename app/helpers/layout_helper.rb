@@ -1,8 +1,8 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-    file_path = File.join(RoeSitePaths::SITE_PATH, 'layout', "#{filename}.md")
+    file_path = File.join(RoeSitePaths::SITE_PATH, "layout", "#{filename}.md")
 
-    return '' unless File.exist?(file_path)
+    return "" unless File.exist?(file_path)
 
     content = File.read(file_path)
 
@@ -12,7 +12,7 @@ module LayoutHelper
     html = Kramdown::Document.new(content).to_html
 
     # Add active class to navigation links if this is the navigation file
-    if filename == 'navigation'
+    if filename == "navigation"
       html = add_active_nav_class(html, current_page)
       html = add_cart_link(html) if snipcart_configured?
     end
@@ -20,7 +20,7 @@ module LayoutHelper
     html.html_safe
   rescue => e
     Rails.logger.error "Error rendering layout file #{filename}: #{e.message}"
-    ''
+    ""
   end
 
   # Check if sidebar should be shown for current content
@@ -31,24 +31,24 @@ module LayoutHelper
     content = @post || @page || @doc
     if content.respond_to?(:metadata)
       # If show_sidebar is explicitly false, hide it
-      return false if content.metadata['show_sidebar'] == false
+      return false if content.metadata["show_sidebar"] == false
     end
 
     # Check sidebar scope from frontmatter
     scope = sidebar_scope
-    return true if scope.include?('all')
+    return true if scope.include?("all")
 
     # Determine current content type
     current_type = if @post
-      'posts'
+      "posts"
     elsif @page
-      'pages'
+      "pages"
     elsif @doc
-      'documentation'
+      "documentation"
     elsif @product
-      'products'
+      "products"
     else
-      'unknown'
+      "unknown"
     end
 
     scope.include?(current_type)
@@ -58,7 +58,7 @@ module LayoutHelper
   def sidebar_position
     return @sidebar_position if defined?(@sidebar_position)
 
-    @sidebar_position = parse_sidebar_frontmatter['position'] || 'left'
+    @sidebar_position = parse_sidebar_frontmatter["position"] || "left"
   end
 
   # Get sidebar scope from frontmatter (default: ['all'])
@@ -67,23 +67,23 @@ module LayoutHelper
   def sidebar_scope
     return @sidebar_scope if defined?(@sidebar_scope)
 
-    scope_value = parse_sidebar_frontmatter['scope'] || 'all'
+    scope_value = parse_sidebar_frontmatter["scope"] || "all"
 
     # Handle both string and array inputs
     @sidebar_scope = case scope_value
     when String
       # Split by comma and clean up whitespace
-      scope_value.split(',').map(&:strip)
+      scope_value.split(",").map(&:strip)
     when Array
       scope_value
     else
-      ['all']
+      [ "all" ]
     end
   end
 
   # Render sidebar with proper positioning class
   def render_sidebar
-    return '' unless show_sidebar?
+    return "" unless show_sidebar?
 
     file_path = sidebar_file_path
     content = File.read(file_path)
@@ -98,13 +98,13 @@ module LayoutHelper
     html.html_safe
   rescue => e
     Rails.logger.error "Error rendering sidebar: #{e.message}"
-    ''
+    ""
   end
 
   private
 
   def sidebar_file_path
-    File.join(RoeSitePaths::SITE_PATH, 'layout', 'sidebar.md')
+    File.join(RoeSitePaths::SITE_PATH, "layout", "sidebar.md")
   end
 
   def parse_sidebar_frontmatter
@@ -135,21 +135,21 @@ module LayoutHelper
   def extract_body_from_content(content)
     # Remove YAML frontmatter if present
     if content =~ /\A---\s*\n.*?^---\s*\n?/m
-      content.sub(/\A---\s*\n.*?^---\s*\n?/m, '')
+      content.sub(/\A---\s*\n.*?^---\s*\n?/m, "")
     else
       content
     end
   end
 
   def logo_classes
-    logo_url = SiteConfig.get('logo')
-    logo_style = SiteConfig.get('logo_style')
-    has_logo = logo_url.present? && logo_url != 'none'
+    logo_url = SiteConfig.get("logo")
+    logo_style = SiteConfig.get("logo_style")
+    has_logo = logo_url.present? && logo_url != "none"
 
     classes = []
-    classes << 'logo' if has_logo
+    classes << "logo" if has_logo
     classes << "logo-#{logo_style}" if has_logo && logo_style.present?
-    classes.join(' ')
+    classes.join(" ")
   end
 
   private
@@ -179,38 +179,38 @@ module LayoutHelper
       doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
       # Find the paragraph containing the nav links (the one with pipes)
-      nav_paragraph = doc.css('p').find { |p| p.text.include?('|') }
+      nav_paragraph = doc.css("p").find { |p| p.text.include?("|") }
 
       return html unless nav_paragraph
 
       # Create cart link with Snipcart class
-      cart_link = Nokogiri::XML::Node.new('a', doc)
-      cart_link['href'] = '#'
-      cart_link['class'] = 'snipcart-checkout nav-cart'
+      cart_link = Nokogiri::XML::Node.new("a", doc)
+      cart_link["href"] = "#"
+      cart_link["class"] = "snipcart-checkout nav-cart"
       cart_link.inner_html = 'Cart <sup class="snipcart-items-count"></sup>'
 
       # Wrap in span for positioning
-      cart_wrapper = Nokogiri::XML::Node.new('span', doc)
-      cart_wrapper['class'] = 'nav-cart-wrapper'
+      cart_wrapper = Nokogiri::XML::Node.new("span", doc)
+      cart_wrapper["class"] = "nav-cart-wrapper"
       cart_wrapper.add_child(cart_link)
 
       # Add to the end of the nav paragraph
-      nav_paragraph.add_child(' ')
+      nav_paragraph.add_child(" ")
       nav_paragraph.add_child(cart_wrapper)
 
       doc.to_html
     end
 
-    doc.css('a').each do |link|
-      href = link['href']
+    doc.css("a").each do |link|
+      href = link["href"]
       next unless href
 
       # Normalize href for comparison (remove leading slash and .html)
-      normalized_href = href.sub(/^\.\.\//, '').sub(/^\.\//, '').sub(/^\//, '').sub(/\.html$/, '')
+      normalized_href = href.sub(/^\.\.\//, "").sub(/^\.\//, "").sub(/^\//, "").sub(/\.html$/, "")
 
       # Handle root/home - href is '/' or empty
-      if href == '/' || href == './' || href.end_with?('index.html') || normalized_href.empty?
-        if current_url_name == 'home' || current_path == '/'
+      if href == "/" || href == "./" || href.end_with?("index.html") || normalized_href.empty?
+        if current_url_name == "home" || current_path == "/"
           add_active_class(link)
         end
         next
@@ -229,8 +229,8 @@ module LayoutHelper
   end
 
   def add_active_class(link)
-    existing_class = link['class'].to_s
-    link['class'] = existing_class.blank? ? 'active' : "#{existing_class} active"
+    existing_class = link["class"].to_s
+    link["class"] = existing_class.blank? ? "active" : "#{existing_class} active"
   end
 
   def escape_inline_pipes_for_layout(content)
@@ -262,7 +262,7 @@ module LayoutHelper
         end
 
         # Not in table, escape pipes
-        line.gsub(/\|/, '&#124;')
+        line.gsub(/\|/, "&#124;")
       end.join("\n")
     end
 

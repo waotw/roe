@@ -1,13 +1,13 @@
-require 'shellwords'
+require "shellwords"
 
 namespace :site do
   def app_name
-    ENV['FLY_APP_NAME'] || 'roe'
+    ENV["FLY_APP_NAME"] || "roe"
   end
 
   def machine_id
     machines = `fly machine list --json -a #{app_name}`.strip
-    JSON.parse(machines).first['id']
+    JSON.parse(machines).first["id"]
   rescue
     puts "❌ Could not get machine ID"
     exit 1
@@ -17,13 +17,13 @@ namespace :site do
   # NEVER push local production DB copies to production
   # NEVER pull production DB into development folder
   PUSH_EXCLUDES = [
-    '--exclude=db/production/',           # Never overwrite production DBs
-    '--exclude=db/development/.gitkeep'   # Don't delete development .gitkeep
+    "--exclude=db/production/",           # Never overwrite production DBs
+    "--exclude=db/development/.gitkeep"   # Don't delete development .gitkeep
   ].freeze
 
   PULL_EXCLUDES = [
-    '--exclude=db/development/',          # Never overwrite development DBs
-    '--exclude=db/production/.gitkeep'    # Don't delete production .gitkeep
+    "--exclude=db/development/",          # Never overwrite development DBs
+    "--exclude=db/production/.gitkeep"    # Don't delete production .gitkeep
   ].freeze
 
   desc "Push site folder to production (protects production databases)"
@@ -35,7 +35,7 @@ namespace :site do
     print "Type 'yes' to confirm: "
 
     confirmation = STDIN.gets.chomp
-    unless confirmation == 'yes'
+    unless confirmation == "yes"
       puts "❌ Aborted"
       exit 0
     end
@@ -73,7 +73,7 @@ namespace :site do
     print "Type 'YES I UNDERSTAND' to confirm: "
 
     confirmation = STDIN.gets.chomp
-    unless confirmation == 'YES I UNDERSTAND'
+    unless confirmation == "YES I UNDERSTAND"
       puts "❌ Aborted"
       exit 0
     end
@@ -96,7 +96,7 @@ namespace :site do
     # local-side admin UI can have its own site_backups/local/ subdir
     # without the two getting tangled. Both follow the same hard-linked
     # snapshot format.
-    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+    backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
     FileUtils.mkdir_p(backup_root)
     backup_dir = File.join(backup_root, timestamp)
 
@@ -153,7 +153,7 @@ namespace :site do
     end
 
     # Update 'latest' symlink
-    latest_link = File.join(backup_root, 'latest')
+    latest_link = File.join(backup_root, "latest")
     FileUtils.rm_f(latest_link) if File.symlink?(latest_link)
     FileUtils.ln_s(timestamp, latest_link)
     puts "   Updated: site_backups/production/latest → #{timestamp}"
@@ -188,7 +188,7 @@ namespace :site do
     end
 
     machine = machine_id
-    folders = args[:folders].split(',')
+    folders = args[:folders].split(",")
 
     # Safety check: prevent database folders from being pushed
     db_folders = folders.select { |f| f.strip.match?(/^db(\/|$)/) }
@@ -203,7 +203,7 @@ namespace :site do
     print "Type 'yes' to confirm: "
 
     confirmation = STDIN.gets.chomp
-    unless confirmation == 'yes'
+    unless confirmation == "yes"
       puts "❌ Aborted"
       exit 0
     end
@@ -244,13 +244,13 @@ namespace :site do
   task :rollback, [ :backup_name ] do |t, args|
     backup_name = args[:backup_name]
     # Production backups live in site_backups/production/ — see site:backup.
-    backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+    backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
 
     # --- Direct Mode (with argument) ---
     if backup_name
       # Resolve 'latest' symlink
-      if backup_name == 'latest'
-        latest_link = File.join(backup_root, 'latest')
+      if backup_name == "latest"
+        latest_link = File.join(backup_root, "latest")
         unless File.symlink?(latest_link)
           puts "❌ No 'latest' symlink found"
           exit 1
@@ -271,7 +271,7 @@ namespace :site do
       puts "\n⚠️  This will OVERWRITE production with: #{backup_name}"
       puts "This includes content AND production databases from the backup."
       print "Type 'yes' to confirm: "
-      unless STDIN.gets.chomp == 'yes'
+      unless STDIN.gets.chomp == "yes"
         puts "❌ Rollback cancelled"
         exit 0
       end
@@ -298,7 +298,7 @@ namespace :site do
       size = `du -sh #{backup}`.split.first rescue "?"
 
       # Show 'latest' indicator
-      latest_link = File.join(backup_root, 'latest')
+      latest_link = File.join(backup_root, "latest")
       is_latest = File.symlink?(latest_link) &&
                   File.readlink(latest_link) == timestamp
       latest_marker = is_latest ? " ← latest" : ""
@@ -309,7 +309,7 @@ namespace :site do
     print "\nChoose backup to restore (1-#{backups.length}) or 'q' to quit: "
     choice = STDIN.gets.chomp
 
-    exit 0 if choice.downcase == 'q'
+    exit 0 if choice.downcase == "q"
 
     choice = choice.to_i
     unless choice.between?(1, backups.length)
@@ -324,7 +324,7 @@ namespace :site do
     puts "This includes content AND production databases from the backup."
     print "Type 'yes' to confirm: "
 
-    unless STDIN.gets.chomp == 'yes'
+    unless STDIN.gets.chomp == "yes"
       puts "❌ Rollback cancelled"
       exit 0
     end

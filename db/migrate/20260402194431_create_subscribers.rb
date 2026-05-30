@@ -29,7 +29,7 @@ class CreateSubscribers < ActiveRecord::Migration[8.0]
       # Indexes
       t.index :email, unique: true
       t.index :access_token, unique: true
-      t.index [:tier, :status]
+      t.index [ :tier, :status ]
       t.index :status
     end
   end

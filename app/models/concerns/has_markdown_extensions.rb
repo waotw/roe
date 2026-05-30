@@ -15,8 +15,8 @@ module HasMarkdownExtensions
     # processing so downstream renderers never see them.
     source = if static
       content.to_s
-             .gsub(/```form\r?\n.*?```/m, '')
-             .gsub(/```button\r?\n.*?```/m, '')
+             .gsub(/```form\r?\n.*?```/m, "")
+             .gsub(/```button\r?\n.*?```/m, "")
     else
       content
     end
@@ -27,7 +27,7 @@ module HasMarkdownExtensions
 
     # Handle 4+ backticks first (allow optional whitespace after language)
     processed_content = source.gsub(/````+(\w*)\s*\r?\n(.*?)````+/m) do
-      lang = $1.empty? ? 'text' : $1
+      lang = $1.empty? ? "text" : $1
       code = $2
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
       code_blocks[token] = render_code_block(code, lang)
@@ -41,12 +41,12 @@ module HasMarkdownExtensions
       code = $2
 
       # Skip special blocks
-      if [ 'collection', 'card', 'gallery', 'form', 'button' ].include?(lang)
+      if [ "collection", "card", "gallery", "form", "button" ].include?(lang)
         next $~.to_s
       end
 
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
-      code_blocks[token] = if lang == 'poetry'
+      code_blocks[token] = if lang == "poetry"
         render_poetry_block(code)
       else
         render_code_block(code, lang)
@@ -58,7 +58,7 @@ module HasMarkdownExtensions
     # Protect || split markers from Kramdown's table parsing. Every
     # marker restores to the same value, so a single shared placeholder
     # is enough — no per-occurrence indexing needed.
-    processed_content = processed_content.gsub('||', 'PULLQUOTE_SPLIT_END')
+    processed_content = processed_content.gsub("||", "PULLQUOTE_SPLIT_END")
 
     # Process galleries, collections, cards, etc.
     processed_content = process_auto_galleries(processed_content)
@@ -86,7 +86,7 @@ module HasMarkdownExtensions
     end
 
     # Restore pullquote splits
-    html.gsub!('PULLQUOTE_SPLIT_END', '||')
+    html.gsub!("PULLQUOTE_SPLIT_END", "||")
 
     # Add footnote backlinks
     html = add_footnote_backlinks(html)
@@ -118,20 +118,20 @@ module HasMarkdownExtensions
       sizes = if match_str =~ /data-sizes=["']([^"']+)["']/
                 $1
       else
-                '(min-width: 1200px) 1200px, 100vw'  # Default for non-gallery images
+                "(min-width: 1200px) 1200px, 100vw"  # Default for non-gallery images
       end
 
       # Extract other attributes...
       alt = if pre_attrs =~ /alt=["']([^"']+)["']/i || post_attrs =~ /alt=["']([^"']+)["']/i
               $1
       else
-              ''
+              ""
       end
 
       css_class = if pre_attrs =~ /class=["']([^"']+)["']/i || post_attrs =~ /class=["']([^"']+)["']/i
                     $1
       else
-                    ''
+                    ""
       end
 
       next match_str unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
@@ -152,7 +152,7 @@ module HasMarkdownExtensions
 
   def render_code_block(code, language)
     escaped_code = CGI.escapeHTML(code)
-    lang_class = language.empty? ? '' : " class=\"language-#{CGI.escapeHTML(language)}\""
+    lang_class = language.empty? ? "" : " class=\"language-#{CGI.escapeHTML(language)}\""
     "<pre><code#{lang_class}>#{escaped_code}</code></pre>"
   end
 
@@ -231,7 +231,7 @@ module HasMarkdownExtensions
       end
 
       # Not in table, escape pipes
-      line.gsub(/\|/, '&#124;')
+      line.gsub(/\|/, "&#124;")
     end.join("\n")
   end
 
@@ -239,27 +239,27 @@ module HasMarkdownExtensions
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
     # Find all footnote list items
-    footnotes = doc.css('.footnotes ol li')
+    footnotes = doc.css(".footnotes ol li")
 
     footnotes.each_with_index do |li, index|
-      footnote_id = li['id'] # e.g., "fn:1"
+      footnote_id = li["id"] # e.g., "fn:1"
       next unless footnote_id
 
       # Extract the footnote number/name
-      ref_id = footnote_id.sub('fn:', 'fnref:')
+      ref_id = footnote_id.sub("fn:", "fnref:")
       number = index + 1
 
       # Create backlink styled as a number
-      backlink = Nokogiri::XML::Node.new('a', doc)
-      backlink['href'] = "##{ref_id}"
-      backlink['class'] = 'footnote-backlink-number'
-      backlink['role'] = 'doc-backlink'
-      backlink['aria-label'] = "Return to reference #{number}"
+      backlink = Nokogiri::XML::Node.new("a", doc)
+      backlink["href"] = "##{ref_id}"
+      backlink["class"] = "footnote-backlink-number"
+      backlink["role"] = "doc-backlink"
+      backlink["aria-label"] = "Return to reference #{number}"
       backlink.content = "#{number}."
 
       # Insert at the very beginning of the <li>
       li.prepend_child(backlink)
-      li.prepend_child(Nokogiri::XML::Text.new(' ', doc)) # Add space after number
+      li.prepend_child(Nokogiri::XML::Text.new(" ", doc)) # Add space after number
     end
 
     doc.to_html
@@ -344,11 +344,11 @@ module HasMarkdownExtensions
     rows = content.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
 
     if rows.empty?
-      return preview ? '<!-- Empty gallery -->' : ''
+      return preview ? "<!-- Empty gallery -->" : ""
     end
 
-    output = [ '' ]
-    output << '{::nomarkdown}'
+    output = [ "" ]
+    output << "{::nomarkdown}"
     output << '<div class="gallery">'
 
     rows.each do |row_content|
@@ -372,16 +372,16 @@ module HasMarkdownExtensions
 
       # Set sizes based on column count
       sizes = case col_count
-      when 1 then '(min-width: 1200px) 1200px, 100vw'  # Featured/full width
-      when 2 then '(min-width: 1024px) 50vw, 100vw'     # 2 columns
-      else '(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw'  # 3 columns
+      when 1 then "(min-width: 1200px) 1200px, 100vw"  # Featured/full width
+      when 2 then "(min-width: 1024px) 50vw, 100vw"     # 2 columns
+      else "(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"  # 3 columns
       end
 
       output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
 
       images.each do |img|
         if img[:caption].present?
-          caption_html = Kramdown::Document.new(img[:caption], input: 'GFM').to_html.strip
+          caption_html = Kramdown::Document.new(img[:caption], input: "GFM").to_html.strip
           caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
 
           output << "    <figure>"
@@ -397,9 +397,9 @@ module HasMarkdownExtensions
       output << "  </div>"
     end
 
-    output << '</div>'
-    output << '{:/nomarkdown}'
-    output << ''
+    output << "</div>"
+    output << "{:/nomarkdown}"
+    output << ""
     output.join("\n")
   end
 
@@ -422,7 +422,7 @@ module HasMarkdownExtensions
     config = {}
     text.split("\n").each do |line|
       next if line.strip.empty?
-      key, value = line.split(':', 2).map(&:strip)
+      key, value = line.split(":", 2).map(&:strip)
       config[key.to_sym] = value if key && value
     end
     config
@@ -432,11 +432,11 @@ module HasMarkdownExtensions
     return collection if tag_string.blank?
 
     # Split by comma and clean up whitespace
-    tags = tag_string.split(',').map(&:strip)
+    tags = tag_string.split(",").map(&:strip)
 
     # Separate positive and negative tags
-    positive_tags = tags.reject { |t| t.start_with?('-') }
-    negative_tags = tags.select { |t| t.start_with?('-') }.map { |t| t[1..-1] } # Remove the '-'
+    positive_tags = tags.reject { |t| t.start_with?("-") }
+    negative_tags = tags.select { |t| t.start_with?("-") }.map { |t| t[1..-1] } # Remove the '-'
 
     # Apply positive tags (OR logic - any of these tags)
     if positive_tags.any?
@@ -464,8 +464,8 @@ module HasMarkdownExtensions
 
   def render_collection(config)
     heading = config[:heading]
-    source = config[:source] || SiteConfig.default('collections', 'default_source') || "posts"
-    order_by = config[:order] || SiteConfig.default('collections', 'default_order') || "date"
+    source = config[:source] || SiteConfig.default("collections", "default_source") || "posts"
+    order_by = config[:order] || SiteConfig.default("collections", "default_order") || "date"
     tags = config[:tags]
     category = config[:category]
     podcast_key = config[:podcast]
@@ -477,17 +477,17 @@ module HasMarkdownExtensions
     # Validate tags in dev — warn about tags that don't exist on the source
     tag_warning = ""
     if Rails.env.development? && tags.present?
-      requested = tags.split(',').map(&:strip)
-                      .reject { |t| t.start_with?('-') }  # ignore exclusions
+      requested = tags.split(",").map(&:strip)
+                      .reject { |t| t.start_with?("-") }  # ignore exclusions
 
       # Get existing tags based on source
       existing = case source
-      when 'products'
+      when "products"
         Product.all_tags
-      when 'documentation'
+      when "documentation"
         # Documentation doesn't have tags yet, skip validation
         []
-      when 'pages'
+      when "pages"
         # Pages don't have tags yet, skip validation
         []
       else
@@ -497,7 +497,7 @@ module HasMarkdownExtensions
 
       unknown = requested.reject { |t| existing.include?(t) }
       if unknown.any?
-        source_name = source == 'products' ? 'product' : 'post'
+        source_name = source == "products" ? "product" : "post"
         return dev_warning(
           "Unknown tag#{'s' if unknown.size > 1}",
           "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any #{source_name}.",
@@ -508,7 +508,7 @@ module HasMarkdownExtensions
     end
 
     # Validate post_type in dev — catches typos like 'articles' instead of 'article'
-    if Rails.env.development? && post_type.present? && source == 'posts'
+    if Rails.env.development? && post_type.present? && source == "posts"
       valid_types = Post.post_type_options
       unless valid_types.include?(post_type)
         return dev_warning(
@@ -521,7 +521,7 @@ module HasMarkdownExtensions
 
     # Get base collection
     items = case source
-    when 'posts'
+    when "posts"
       collection = Post.published.regular_posts
       collection = collection.by_type(post_type) if post_type
       collection = apply_podcast_filter(collection, podcast_key) if podcast_key.present?
@@ -559,8 +559,8 @@ module HasMarkdownExtensions
     # Apply offset and limit
     offset_value = config[:offset].to_i
     limit_value = config[:limit]
-    default_limit = SiteConfig.default('collections', 'default_limit') || 10
-    show_more = config[:show_more] == 'true' || config[:show_more] == true
+    default_limit = SiteConfig.default("collections", "default_limit") || 10
+    show_more = config[:show_more] == "true" || config[:show_more] == true
 
     # Convert to array if needed
     items_array = items.is_a?(Array) ? items : items.to_a
@@ -569,7 +569,7 @@ module HasMarkdownExtensions
     # Apply offset (skip first N items)
     items_array = items_array[offset_value..-1] || [] if offset_value > 0
 
-    if limit_value.to_s.downcase == 'all'
+    if limit_value.to_s.downcase == "all"
       display_items = items_array
     elsif limit_value
       limit_int = limit_value.to_i
@@ -579,7 +579,7 @@ module HasMarkdownExtensions
     end
 
     # Render based on template, default to 'grid' for products, otherwise use configured default
-    default_template = source == 'products' ? 'grid' : (SiteConfig.default('collections', 'default_template') || 'list')
+    default_template = source == "products" ? "grid" : (SiteConfig.default("collections", "default_template") || "list")
     template = config[:template] || default_template
     list_markdown = render_template(display_items, template, config)
 
@@ -596,7 +596,7 @@ module HasMarkdownExtensions
     output << list_markdown
 
     # Add "View More" link ONLY for posts source
-    if show_more && total_count > display_items.count && source == 'posts'
+    if show_more && total_count > display_items.count && source == "posts"
       show_more_text = config[:show_more_text] || "View all"
       collection_url = generate_collection_url(config)
 
@@ -606,17 +606,17 @@ module HasMarkdownExtensions
     end
 
     output << ""
-    output << '</div>'
+    output << "</div>"
 
     tag_warning + output.join("\n")
   end
 
   def apply_collection_order(items, order_by)
     case order_by
-    when 'filename'
+    when "filename"
       # Convert to array for filename sorting
       items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, '.md')
+        filename = File.basename(item.file_path, ".md")
         # Extract leading number if present
         if filename =~ /^(\d+)/
           [ $1.to_i, filename ]
@@ -624,13 +624,13 @@ module HasMarkdownExtensions
           [ Float::INFINITY, filename ]
         end
       end
-    when 'title'
+    when "title"
       # Alphabetical by title
       items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
-    when 'date'
+    when "date"
       # Newest first (default)
       items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
-    when 'date-asc'
+    when "date-asc"
       # Oldest first
       items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
     else
@@ -641,15 +641,15 @@ module HasMarkdownExtensions
 
   def render_template(items, template, config)
     case template
-    when 'grid'
+    when "grid"
       render_product_grid(items, config)
-    when 'compact'
+    when "compact"
       render_compact(items)
-    when 'links'
+    when "links"
       render_links(items)
-    when 'full'
+    when "full"
       render_full(items, config)
-    when 'list'
+    when "list"
       render_list(items, config)
     else
       render_list(items, config)
@@ -685,7 +685,7 @@ module HasMarkdownExtensions
         output << ""
       end
 
-      output << '</div>'
+      output << "</div>"
       output << ""
 
       output.join("\n")
@@ -707,7 +707,7 @@ module HasMarkdownExtensions
     items.map do |item|
       image_url = item.respond_to?(:image) ? item.image : nil
       has_image = image_url.present?
-      alt = (item.title || '').to_s.gsub('"', '&quot;')
+      alt = (item.title || "").to_s.gsub('"', "&quot;")
 
       output = []
       output << '<div class="collection-item full">'
@@ -743,10 +743,10 @@ module HasMarkdownExtensions
       if has_image
         output << %Q(  <a class="item-image" href="#{item_path(item)}">)
         output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}"
-        output << '  </a>'
+        output << "  </a>"
       end
 
-      output << '</div>'
+      output << "</div>"
       output << ""
 
       output.join("\n")
@@ -806,16 +806,16 @@ module HasMarkdownExtensions
           date = nil
         end
       end
-      parts << date.strftime('%B %d, %Y') if date
+      parts << date.strftime("%B %d, %Y") if date
     end
 
     if show_author
-      author = item.metadata['author'].to_s.strip
-      author = SiteConfig.get('author').to_s.strip if author.blank?
+      author = item.metadata["author"].to_s.strip
+      author = SiteConfig.get("author").to_s.strip if author.blank?
       parts << author if author.present?
     end
 
-    parts.join(' • ')
+    parts.join(" • ")
   end
 
   # Collection-block options arrive as strings ("true"/"false") or as
@@ -823,7 +823,7 @@ module HasMarkdownExtensions
   # use `default:` to set what `nil` means.
   def collection_truthy?(val, default: false)
     return default if val.nil?
-    val == true || val.to_s.downcase == 'true'
+    val == true || val.to_s.downcase == "true"
   end
 
   def render_compact(items)
@@ -853,7 +853,7 @@ module HasMarkdownExtensions
         output << ""
       end
 
-      output << '</div>'
+      output << "</div>"
       output << ""
 
       output.join("\n")
@@ -865,20 +865,20 @@ module HasMarkdownExtensions
     currency_symbol = get_currency_symbol
 
     # Check if description should be shown
-    show_description = config[:show_description] == 'true' || config[:show_description] == true
+    show_description = config[:show_description] == "true" || config[:show_description] == true
 
     # Check if grouping is enabled
-    groups_enabled = config[:groups] == 'enabled' || config[:groups] == true
+    groups_enabled = config[:groups] == "enabled" || config[:groups] == true
 
     # Get aspect ratio setting (default to 'auto')
-    aspect_ratio = config[:aspect_ratio] || 'auto'
+    aspect_ratio = config[:aspect_ratio] || "auto"
     image_class = "img-#{aspect_ratio}"
 
     # Get grouped product settings
-    grouped_config = SiteConfig.feature('store', 'grouped_products') || {}
-    grouped_button_text = grouped_config['button_text'].presence
-    price_display_mode = grouped_config['price_display'] || 'range'
-    price_separator = grouped_config['price_separator'].presence || '-'
+    grouped_config = SiteConfig.feature("store", "grouped_products") || {}
+    grouped_button_text = grouped_config["button_text"].presence
+    price_display_mode = grouped_config["price_display"] || "range"
+    price_separator = grouped_config["price_separator"].presence || "-"
 
     # Group items by their group field if groups enabled, otherwise show all
     if groups_enabled
@@ -888,7 +888,7 @@ module HasMarkdownExtensions
       end
     else
       # No grouping - each item is its own group
-      grouped_items = items.map { |item| [item.id, [item]] }.to_h
+      grouped_items = items.map { |item| [ item.id, [ item ] ] }.to_h
     end
 
     output = []
@@ -906,7 +906,7 @@ module HasMarkdownExtensions
 
       # Product image
       image_url = display_product.respond_to?(:image) ? display_product.image : nil
-      image_url = '/media/images/404.png' if image_url.blank?
+      image_url = "/media/images/404.png" if image_url.blank?
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(display_product)}">)
@@ -921,14 +921,14 @@ module HasMarkdownExtensions
 
       # Show variants if grouped
       if is_grouped
-        variants = group_products.map { |p| p.variant || 'Standard' }.compact.join(', ')
+        variants = group_products.map { |p| p.variant || "Standard" }.compact.join(", ")
         output << %Q(    <div class="grid-item-variants">(#{variants})</div>)
       end
 
       # Optional description
       if show_description && display_product.respond_to?(:description) && display_product.description.present?
         # Truncate to ~100 characters
-        desc = display_product.description.length > 100 ? display_product.description[0..97] + '...' : display_product.description
+        desc = display_product.description.length > 100 ? display_product.description[0..97] + "..." : display_product.description
         output << %Q(    <div class="grid-item-description">#{desc}</div>)
       end
 
@@ -940,9 +940,9 @@ module HasMarkdownExtensions
         prices = group_products.map { |p| p.price.to_f }.compact
         if prices.any?
           formatted_price = case price_display_mode
-          when 'lowest'
+          when "lowest"
             "#{currency_symbol}#{sprintf('%.2f', prices.min)}"
-          when 'highest'
+          when "highest"
             "#{currency_symbol}#{sprintf('%.2f', prices.max)}"
           else # 'range' or default
             if prices.min == prices.max
@@ -969,7 +969,7 @@ module HasMarkdownExtensions
         # Add to Cart button (if product has SKU)
         if display_product.respond_to?(:sku) && display_product.sku.present?
           product_url = item_path(display_product)
-          domain = SiteConfig.feature('store', 'default_domain')
+          domain = SiteConfig.feature("store", "default_domain")
           validation_url = domain ? "https://#{domain}#{product_url}" : product_url
 
           output << %Q(      <button class="snipcart-add-item btn-primary btn--grid")
@@ -988,11 +988,11 @@ module HasMarkdownExtensions
         end
       end
 
-      output << '    </div>' # Close grid-item-footer
-      output << '  </div>' # Close grid-item
+      output << "    </div>" # Close grid-item-footer
+      output << "  </div>" # Close grid-item
     end
 
-    output << '</div>' # Close product-grid
+    output << "</div>" # Close product-grid
     output.join("\n")
   end
 
@@ -1019,14 +1019,14 @@ module HasMarkdownExtensions
   end
 
   def get_currency_symbol
-    currency = SiteConfig.feature('store', 'currency') || 'usd'
+    currency = SiteConfig.feature("store", "currency") || "usd"
     case currency.downcase
-    when 'usd' then '$'
-    when 'eur' then '€'
-    when 'gbp' then '£'
-    when 'cad' then 'CA$'
-    when 'aud' then 'A$'
-    when 'jpy' then '¥'
+    when "usd" then "$"
+    when "eur" then "€"
+    when "gbp" then "£"
+    when "cad" then "CA$"
+    when "aud" then "A$"
+    when "jpy" then "¥"
     else currency.upcase
     end
   end
@@ -1052,9 +1052,9 @@ module HasMarkdownExtensions
   def generate_collection_url(config)
     heading = config[:heading]
     tags = config[:tags]
-    post_type = config[:post_type] unless config[:post_type] == 'all'
+    post_type = config[:post_type] unless config[:post_type] == "all"
     order = config[:order]
-    source = config[:source] || 'posts'  # ← ADD THIS
+    source = config[:source] || "posts"  # ← ADD THIS
     podcast_key = config[:podcast]
 
     # Build base URL
@@ -1067,35 +1067,35 @@ module HasMarkdownExtensions
       segments << "type-#{post_type.parameterize}" if post_type
 
       if tags.present?
-        positive_tags = tags.split(',').map(&:strip).reject { |t| t.start_with?('-') }
-        segments << positive_tags.map(&:parameterize).join(',') if positive_tags.any?
+        positive_tags = tags.split(",").map(&:strip).reject { |t| t.start_with?("-") }
+        segments << positive_tags.map(&:parameterize).join(",") if positive_tags.any?
       end
 
       "/collections/#{segments.join('/')}"
     else
       # No filters, no heading = general archive
-      archive_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'archive')
-      archive_page ? '/archive' : '/posts'
+      archive_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "archive")
+      archive_page ? "/archive" : "/posts"
     end
 
     # Build query params (NEW)
     query_params = []
 
     # Always pass source if non-default
-    query_params << "source=#{source}" if source != 'posts'
+    query_params << "source=#{source}" if source != "posts"
 
     # Pass heading if it's a heading-based collection (so controller knows it's not a tag)
     query_params << "heading=#{CGI.escape(heading)}" if heading.present?
 
     # Add order if non-default
-    query_params << "order=#{order}" if order.present? && order != 'date'
+    query_params << "order=#{order}" if order.present? && order != "date"
 
     # Add podcast key if present
     query_params << "podcast=#{CGI.escape(podcast_key)}" if podcast_key.present?
 
     # Add exclude tags if present
     if tags.present?
-      exclude_tags = tags.split(',').map(&:strip).select { |t| t.start_with?('-') }.map { |t| t.sub('-', '') }
+      exclude_tags = tags.split(",").map(&:strip).select { |t| t.start_with?("-") }.map { |t| t.sub("-", "") }
       query_params << "exclude=#{exclude_tags.join(',')}" if exclude_tags.any?
     end
 
@@ -1112,8 +1112,8 @@ module HasMarkdownExtensions
     # session there's no upgrade flow to drive viewers toward, so the
     # icon is just visual noise.
     return false if @rendering_static
-    return false unless item.metadata['audience'] == 'paid'
-    return false unless SiteConfig.feature_enabled?('members')
+    return false unless item.metadata["audience"] == "paid"
+    return false unless SiteConfig.feature_enabled?("members")
 
     # Always show indicator for paid content
     true
@@ -1132,8 +1132,8 @@ module HasMarkdownExtensions
     # Collapse any newlines/extra whitespace — the :play SVG is multi-line
     # in the source, and Kramdown breaks markdown links when their text
     # contains a literal newline.
-    svg = svg.gsub(/\s+/, ' ').strip
-    svg.sub('<svg ', '<svg class="title-media-icon" width="18" height="18" ')
+    svg = svg.gsub(/\s+/, " ").strip
+    svg.sub("<svg ", '<svg class="title-media-icon" width="18" height="18" ')
   end
 
   # Decorate a collection item's title with any applicable indicators:
@@ -1142,7 +1142,7 @@ module HasMarkdownExtensions
   # neither applies. The last word + icons share a nowrap span so they
   # don't break across lines.
   def decorate_title(item)
-    title = item.title || 'Untitled'
+    title = item.title || "Untitled"
     icons = []
 
     media_type = collection_media_icon(item)
@@ -1152,8 +1152,8 @@ module HasMarkdownExtensions
 
     return title if icons.empty?
 
-    words = title.split(' ')
-    last_word = words.pop || ''
+    words = title.split(" ")
+    last_word = words.pop || ""
     icon_html = icons.compact.join
     nowrap = %(<span style="white-space:nowrap">#{last_word}&nbsp;#{icon_html}</span>)
     words.empty? ? nowrap : "#{words.join(' ')} #{nowrap}"
@@ -1162,7 +1162,7 @@ module HasMarkdownExtensions
   # Kept for back-compat with any external callers; new code should use
   # decorate_title which handles paid + media in one pass.
   def title_with_paid_icon(title)
-    words = title.split(' ')
+    words = title.split(" ")
     last_word = words.pop
     icon = paid_lock_icon
     nowrap = %(<span style="white-space:nowrap">#{last_word}&nbsp;#{icon}</span>)
@@ -1183,14 +1183,14 @@ module HasMarkdownExtensions
     config = {}
     text.split("\n").each do |line|
       next if line.strip.empty?
-      key, value = line.split(':', 2).map(&:strip)
+      key, value = line.split(":", 2).map(&:strip)
       config[key.to_sym] = value if key && value
     end
     config
   end
 
   def render_card(config, preview: false)
-    type = config[:type] || 'pullquote'
+    type = config[:type] || "pullquote"
 
     case type
     when "pullquote"
@@ -1200,16 +1200,16 @@ module HasMarkdownExtensions
     when "post-link"
       render_post_link(config, preview: preview)
     else
-      preview ? '<!-- Unknown card type -->' : ''
+      preview ? "<!-- Unknown card type -->" : ""
     end
   end
 
   ### PULLQUOTE
 
   def render_pullquote(config)
-    text = config[:text] || ''
-    attribution = config[:attribution] || ''
-    position = config[:position] || SiteConfig.default("cards", "pullquote")&.[]('default_position') || 'center'
+    text = config[:text] || ""
+    attribution = config[:attribution] || ""
+    position = config[:position] || SiteConfig.default("cards", "pullquote")&.[]("default_position") || "center"
 
     # Build CSS classes
     pullquote_classes = [ "card", "card-pullquote", "pullquote-#{position}" ]
@@ -1227,7 +1227,7 @@ module HasMarkdownExtensions
     end
 
     output << ""
-    output << '</div>'
+    output << "</div>"
 
     output.join("\n")
   end
@@ -1236,21 +1236,21 @@ module HasMarkdownExtensions
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
     # Find all floated pullquotes (left or right position)
-    floated_pullquotes = doc.css('.pullquote-left, .pullquote-right')
+    floated_pullquotes = doc.css(".pullquote-left, .pullquote-right")
 
     floated_pullquotes.each do |pullquote|
       # Get the next sibling element
       next_element = pullquote.next_element
 
       # Check if it's a paragraph
-      if next_element && next_element.name == 'p'
+      if next_element && next_element.name == "p"
         # Get the paragraph HTML
         para_html = next_element.inner_html
 
         # Check for manual split marker
-        if para_html.include?('||')
+        if para_html.include?("||")
           # Manual split - use the || marker
-          parts = para_html.split('||', 2)
+          parts = para_html.split("||", 2)
           first_half = parts[0].strip
           second_half = parts[1].strip
         else
@@ -1261,15 +1261,15 @@ module HasMarkdownExtensions
         end
 
         # Create a wrapper div to hold all three parts
-        wrapper = Nokogiri::XML::Node.new('div', doc)
-        wrapper['class'] = 'pullquote-merge'
+        wrapper = Nokogiri::XML::Node.new("div", doc)
+        wrapper["class"] = "pullquote-merge"
 
         # Create first paragraph
-        first_p = Nokogiri::XML::Node.new('p', doc)
+        first_p = Nokogiri::XML::Node.new("p", doc)
         first_p.inner_html = first_half
 
         # Create second paragraph
-        second_p = Nokogiri::XML::Node.new('p', doc)
+        second_p = Nokogiri::XML::Node.new("p", doc)
         second_p.inner_html = second_half
 
         # Build the structure
@@ -1298,14 +1298,14 @@ module HasMarkdownExtensions
     search_start = [ (middle * 0.7).to_i, 0 ].max
     search_end = [ (middle * 1.3).to_i, plain_text.length ].min
 
-    sentence_end = plain_text[search_start..search_end]&.index('. ')
+    sentence_end = plain_text[search_start..search_end]&.index(". ")
 
     if sentence_end
       # Find this position in the original HTML text
       search_start + sentence_end + 2
     else
       # Fallback: try to split at a space near middle
-      space_pos = plain_text[middle..-1]&.index(' ')
+      space_pos = plain_text[middle..-1]&.index(" ")
       space_pos ? middle + space_pos : middle
     end
   end
@@ -1320,11 +1320,11 @@ module HasMarkdownExtensions
       if referenced_post
         # Start with post's actual data - only include image if it exists
         post_data = {
-          title: referenced_post.title || 'Untitled',
-          author: referenced_post.author || '',  # Will be further processed below
+          title: referenced_post.title || "Untitled",
+          author: referenced_post.author || "",  # Will be further processed below
           date: referenced_post.date,
-          subtitle: referenced_post.metadata['subtitle'] || '',
-          excerpt: referenced_post.metadata['excerpt'] || '',
+          subtitle: referenced_post.metadata["subtitle"] || "",
+          excerpt: referenced_post.metadata["excerpt"] || "",
           url: "/posts/#{referenced_post.url_name}"
         }
 
@@ -1342,13 +1342,13 @@ module HasMarkdownExtensions
       end
     end
 
-    style = config[:style] || 'small'
-    title = config[:title] || 'Untitled'
-    date_raw = config[:date] || ''
-    subtitle = config[:subtitle] || ''
-    excerpt = config[:excerpt] || ''
-    url = config[:url] || '#'
-    link_text = config[:link_text] || SiteConfig.default('cards', 'post-link')&.[]('default_link_text') || 'Read full story →'
+    style = config[:style] || "small"
+    title = config[:title] || "Untitled"
+    date_raw = config[:date] || ""
+    subtitle = config[:subtitle] || ""
+    excerpt = config[:excerpt] || ""
+    url = config[:url] || "#"
+    link_text = config[:link_text] || SiteConfig.default("cards", "post-link")&.[]("default_link_text") || "Read full story →"
 
     # Author fallback chain: card config -> post metadata -> site config -> blank
     author = if config[:author].present?
@@ -1359,13 +1359,13 @@ module HasMarkdownExtensions
     else
       nil
     end
-    author ||= SiteConfig.get('author')  # 3. From site config (FIXED)
-    author ||= ''  # 4. Blank if none found
+    author ||= SiteConfig.get("author")  # 3. From site config (FIXED)
+    author ||= ""  # 4. Blank if none found
 
     # Handle image with priority: explicit > post metadata > default
     image = if config.key?(:image)
       # Image key exists in config
-      if config[:image] == 'none'
+      if config[:image] == "none"
         nil  # Explicitly no image
       elsif config[:image].blank?
         # Empty image value - warn in preview
@@ -1376,16 +1376,16 @@ module HasMarkdownExtensions
       end
     else
       # No image key - use default
-      SiteConfig.default('cards', 'post-link')&.[]('default_image')
+      SiteConfig.default("cards", "post-link")&.[]("default_image")
     end
 
     # Format date
-    date = ''
+    date = ""
     if date_raw.present?
       begin
         # Handle both Date objects and strings
         parsed_date = date_raw.is_a?(Date) ? date_raw : Date.parse(date_raw.to_s)
-        date = parsed_date.strftime('%b %d, %Y')
+        date = parsed_date.strftime("%b %d, %Y")
       rescue
         date = date_raw.to_s  # Fallback to original if parsing fails
       end
@@ -1393,22 +1393,22 @@ module HasMarkdownExtensions
 
     # Build metadata line (author • date)
     metadata_parts = [ author, date ].reject(&:blank?)
-    metadata = metadata_parts.join(' • ')
+    metadata = metadata_parts.join(" • ")
 
     # For large style: show subtitle if available, fallback to excerpt, otherwise nothing
-    body_html = ''
-    if style == 'large' || style == 'medium'
+    body_html = ""
+    if style == "large" || style == "medium"
       body_text = subtitle.present? ? subtitle : excerpt
       if body_text.present?
         # Medium gets shorter excerpt than large
-        max_length = style == 'large' ? 200 : 120
-        truncated = body_text.length > max_length ? body_text[0..max_length-3] + '...' : body_text
+        max_length = style == "large" ? 200 : 120
+        truncated = body_text.length > max_length ? body_text[0..max_length-3] + "..." : body_text
         body_html = "<p class=\"card-body\">#{truncated}</p>"
       end
     end
 
     # Build HTML based on style
-    if style == 'large'
+    if style == "large"
       # Large style: title, metadata, image, body, link
       <<~HTML
         <div class="card post-link-#{style}">
@@ -1423,7 +1423,7 @@ module HasMarkdownExtensions
           </div>
         </div>
       HTML
-    elsif style == 'medium'
+    elsif style == "medium"
       # Medium style: image, title, metadata, excerpt, link (smaller than large)
       <<~HTML
         <div class="card post-link-#{style}">
@@ -1454,11 +1454,11 @@ module HasMarkdownExtensions
   ### ASIDES
 
   def render_aside(config, preview: false)
-    text = config[:text] || ''
-    image = config[:image] || ''
-    link = config[:link] || ''
-    link_text = config[:link_text] || ''
-    default_link_text = SiteConfig.default('cards', 'aside')&.[]('default_link_text') || '→'
+    text = config[:text] || ""
+    image = config[:image] || ""
+    link = config[:link] || ""
+    link_text = config[:link_text] || ""
+    default_link_text = SiteConfig.default("cards", "aside")&.[]("default_link_text") || "→"
 
     # Build the content
     content = []
@@ -1516,26 +1516,26 @@ module HasMarkdownExtensions
   end
 
   def render_form(config)
-    form_type = config['for']
-    button_text = config['button-text'] || config['button_text'] || default_button_text(form_type)
+    form_type = config["for"]
+    button_text = config["button-text"] || config["button_text"] || default_button_text(form_type)
 
     case form_type
-    when 'paid_content'
-      text = config['text'] || 'This is premium content. Upgrade to continue reading.'
-      button_text = config['button-text'] || config['button_text'] || 'Become a paid member'
+    when "paid_content"
+      text = config["text"] || "This is premium content. Upgrade to continue reading."
+      button_text = config["button-text"] || config["button_text"] || "Become a paid member"
       render_paid_content_form(text, button_text)
-    when 'signup'
-      upgrade_text = config['upgrade-button-text'] || config['upgrade_button_text']
+    when "signup"
+      upgrade_text = config["upgrade-button-text"] || config["upgrade_button_text"]
       render_signup_form(button_text, upgrade_text)
-    when 'signin'
+    when "signin"
       render_signin_form(button_text)
-    when 'checkout'
-      member_text = config['member-button-text'] || config['member_button_text'] || button_text
-      non_member_text = config['non-member-button-text'] || config['non_member_button_text']
+    when "checkout"
+      member_text = config["member-button-text"] || config["member_button_text"] || button_text
+      non_member_text = config["non-member-button-text"] || config["non_member_button_text"]
       render_checkout_form(member_text, non_member_text)
-    when 'unsubscribe'  # ADD THIS
+    when "unsubscribe"  # ADD THIS
       render_unsubscribe_form(button_text)
-    when 'donate'
+    when "donate"
       render_donate_form(button_text)
     else
       dev_warning("Unknown form type", "'#{form_type}' is not a recognised form type.",
@@ -1548,11 +1548,11 @@ module HasMarkdownExtensions
 
   def default_button_text(form_type)
     {
-      'signup' => 'Sign Up',
-      'signin' => 'Sign In',
-      'checkout' => 'Upgrade',
-      'donate' => 'Donate'
-    }[form_type] || 'Submit'
+      "signup" => "Sign Up",
+      "signin" => "Sign In",
+      "checkout" => "Upgrade",
+      "donate" => "Donate"
+    }[form_type] || "Submit"
   end
 
   def render_donate_form(button_text)
@@ -1637,8 +1637,8 @@ module HasMarkdownExtensions
 
   def render_signup_form(button_text, upgrade_button_text = nil)
     # Check if payments are actually enabled
-    payments_enabled = SiteConfig.feature('members', 'payments.enabled')
-    payments_enabled = (payments_enabled == true || payments_enabled == 'true')
+    payments_enabled = SiteConfig.feature("members", "payments.enabled")
+    payments_enabled = (payments_enabled == true || payments_enabled == "true")
 
     # Only show upgrade button if payments are enabled AND text is provided
     upgrade_button = if upgrade_button_text.present? && payments_enabled
@@ -1691,7 +1691,7 @@ module HasMarkdownExtensions
     HTML
   end
 
-  def render_signin_form(button_text = 'Send Magic Link')
+  def render_signin_form(button_text = "Send Magic Link")
     <<~HTML
       <form action="/signin" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
@@ -1737,7 +1737,7 @@ module HasMarkdownExtensions
   end
 
   def find_post_by_slug(slug_or_path)
-    slug = slug_or_path.to_s.sub(%r{^/posts/}, '').sub(%r{^/}, '')
+    slug = slug_or_path.to_s.sub(%r{^/posts/}, "").sub(%r{^/}, "")
     Post.where("json_extract(metadata, '$.url_name') = ?", slug).first
   end
 
@@ -1791,7 +1791,7 @@ module HasMarkdownExtensions
 
     # Group consecutive buttons (no blank lines between)
     groups = []
-    current_group = [buttons.first]
+    current_group = [ buttons.first ]
 
     buttons.each_cons(2) do |prev, curr|
       # Check if there's a blank line between these buttons
@@ -1800,7 +1800,7 @@ module HasMarkdownExtensions
       if text_between =~ /\n\s*\n/
         # Blank line found - start new group
         groups << current_group
-        current_group = [curr]
+        current_group = [ curr ]
       else
         # No blank line - same group
         current_group << curr
@@ -1830,9 +1830,9 @@ module HasMarkdownExtensions
         end.join("\n")
       elsif group.length > 1
         # Multiple consecutive buttons - render as variant list
-        skus = group.map { |b| b[:config]['sku'] }.compact
+        skus = group.map { |b| b[:config]["sku"] }.compact
         if skus.length > 1
-          renderer = ProductButtonRenderer.new({'skus' => skus}, context)
+          renderer = ProductButtonRenderer.new({ "skus" => skus }, context)
           rendered = renderer.render_variant_list
         else
           # Fall back to individual rendering if no SKUs

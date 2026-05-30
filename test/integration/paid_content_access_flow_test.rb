@@ -3,28 +3,28 @@ require "test_helper"
 class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   def setup
     super
-    
+
     @free_member = create(:member,
       name: "Free Member",
       email: "free@example.com",
       tier: :free,
       status: :active
     )
-    
+
     @paid_member = create(:member,
       name: "Paid Member",
       email: "paid@example.com",
       tier: :paid,
       status: :active
     )
-    
+
     @cancelled_member = create(:member,
       name: "Cancelled Member",
       email: "cancelled@example.com",
       tier: :paid,
       status: :cancelled
     )
-    
+
     @public_post = create(:post,
       metadata: {
         "title" => "Public Post",
@@ -34,7 +34,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Public Post\n\nThis is free content."
     )
-    
+
     @paid_post = create(:post,
       metadata: {
         "title" => "Premium Post",
@@ -44,7 +44,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Premium Post\n\nThis is exclusive paid content."
     )
-    
+
     @paid_post_with_teaser = create(:post,
       metadata: {
         "title" => "Premium with Teaser",
@@ -54,10 +54,10 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Teaser Content\n\nThis is the free preview.\n\n```form for: paid_content\nUpgrade to read more!\n```\n\n# Premium Section\n\nThis is the paid-only content."
     )
-    
+
     # Enable members feature
     SiteFeature.stubs(:members_enabled?).returns(true)
-    
+
     # Create required pages
     create(:page,
       metadata: {
@@ -75,7 +75,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
 
   test "guest can access public content" do
     get post_path(@public_post.url_name)
-    
+
     assert_response :success
     assert_includes response.body, "Public Post"
     assert_includes response.body, "This is free content"
@@ -84,7 +84,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "free member can access public content" do
     sign_in_member(@free_member)
     get post_path(@public_post.url_name)
-    
+
     assert_response :success
     assert_includes response.body, "Public Post"
   end
@@ -92,7 +92,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "paid member can access public content" do
     sign_in_member(@paid_member)
     get post_path(@public_post.url_name)
-    
+
     assert_response :success
     assert_includes response.body, "Public Post"
   end
@@ -103,7 +103,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
 
   test "guest is redirected to upgrade for paid content without form" do
     get post_path(@paid_post.url_name)
-    
+
     assert_redirected_to "/upgrade"
     assert_equal "This content requires a paid membership", flash[:alert]
   end
@@ -111,7 +111,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "free member is redirected to upgrade for paid content without form" do
     sign_in_member(@free_member)
     get post_path(@paid_post.url_name)
-    
+
     assert_redirected_to "/upgrade"
     assert_equal "This content requires a paid membership", flash[:alert]
   end
@@ -119,7 +119,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "cancelled member is redirected to upgrade for paid content" do
     sign_in_member(@cancelled_member)
     get post_path(@paid_post.url_name)
-    
+
     assert_redirected_to "/upgrade"
     assert_equal "This content requires a paid membership", flash[:alert]
   end
@@ -127,7 +127,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "active paid member can access paid content without form" do
     sign_in_member(@paid_member)
     get post_path(@paid_post.url_name)
-    
+
     assert_response :success
     assert_includes response.body, "Premium Post"
     assert_includes response.body, "This is exclusive paid content"
@@ -139,7 +139,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
 
   test "guest sees teaser for paid content with paywall form" do
     get post_path(@paid_post_with_teaser.url_name)
-    
+
     # Page loads but shows only teaser
     assert_response :success
     assert_includes response.body, "Teaser Content"
@@ -149,7 +149,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "free member sees teaser for paid content with paywall form" do
     sign_in_member(@free_member)
     get post_path(@paid_post_with_teaser.url_name)
-    
+
     assert_response :success
     assert_includes response.body, "Teaser Content"
     assert_includes response.body, "This is the free preview"
@@ -158,7 +158,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "paid member sees full content with paywall form" do
     sign_in_member(@paid_member)
     get post_path(@paid_post_with_teaser.url_name)
-    
+
     assert_response :success
     assert_includes response.body, "Teaser Content"
     assert_includes response.body, "Premium Section"
@@ -171,7 +171,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
 
   test "collection excludes paid posts for guests when members enabled" do
     get "/posts"
-    
+
     assert_response :success
     assert_includes response.body, "Public Post"
     # Should not show paid post in collection
@@ -181,7 +181,7 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "collection shows paid posts to paid members" do
     sign_in_member(@paid_member)
     get "/posts"
-    
+
     assert_response :success
     assert_includes response.body, "Public Post"
     assert_includes response.body, "Premium Post"
@@ -194,9 +194,9 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "guest cannot bypass paywall via direct URL" do
     # Try to access paid post directly
     get "/posts/#{@paid_post.url_name}"
-    
+
     assert_redirected_to "/upgrade"
-    
+
     # Even with format parameter
     get "/posts/#{@paid_post.url_name}?format=html"
     assert_redirected_to "/upgrade"
@@ -211,10 +211,10 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Draft\n\nNot published yet."
     )
-    
+
     sign_in_member(@paid_member)
     get post_path(draft_post.url_name)
-    
+
     assert_response :not_found
   end
 
@@ -225,12 +225,12 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
   test "admin can access all content without membership" do
     admin = create(:user)
     sign_in_as(admin)
-    
+
     # Can access paid content
     get post_path(@paid_post.url_name)
     assert_response :success
     assert_includes response.body, "Premium Post"
-    
+
     # Can access draft content
     draft_post = create(:post,
       metadata: {

@@ -3,7 +3,7 @@ require "test_helper"
 class CollectionMembersFilterTest < ActiveSupport::TestCase
   def setup
     super
-    
+
     @public_post = create(:post,
       metadata: {
         "title" => "Public Post",
@@ -37,7 +37,7 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   # ============================================================================
 
   test "returns all posts when members feature is disabled" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(false)
 
     items = Post.published
     result = CollectionMembersFilter.filter(items)
@@ -52,8 +52,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   # ============================================================================
 
   test "shows all posts when show_paid is true" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(true)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(true)
 
     items = Post.published
     result = CollectionMembersFilter.filter(items)
@@ -64,11 +64,11 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "shows all posts when show_paid config is overridden to true" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     items = Post.published
-    result = CollectionMembersFilter.filter(items, show_paid: 'true')
+    result = CollectionMembersFilter.filter(items, show_paid: "true")
 
     assert_includes result, @public_post
     assert_includes result, @paid_post
@@ -80,8 +80,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   # ============================================================================
 
   test "hides paid posts when show_paid is false" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     items = Post.published
     result = CollectionMembersFilter.filter(items)
@@ -92,8 +92,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "hides paid posts when show_paid config is not set" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(nil)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(nil)
 
     items = Post.published
     result = CollectionMembersFilter.filter(items)
@@ -104,8 +104,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "shows paid posts to paid members regardless of settings" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     paid_member = create(:member, tier: :paid, status: :active)
 
@@ -119,8 +119,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "hides paid posts from free members" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     free_member = create(:member, tier: :free, status: :active)
 
@@ -138,8 +138,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   # ============================================================================
 
   test "handles empty collection" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     empty_posts = Post.where(id: [])
     result = CollectionMembersFilter.filter(empty_posts)
@@ -148,8 +148,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "handles array input (returns as-is)" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     posts_array = [ @public_post, @paid_post ]
     result = CollectionMembersFilter.filter(posts_array)
@@ -160,8 +160,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "handles posts with nil audience" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     items = Post.published
     result = CollectionMembersFilter.filter(items)
@@ -171,8 +171,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "class method works the same as instance method" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     items = Post.published
 
@@ -186,8 +186,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "filter preserves relation chainability" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     items = Post.published
     result = CollectionMembersFilter.filter(items)
@@ -198,8 +198,8 @@ class CollectionMembersFilterTest < ActiveSupport::TestCase
   end
 
   test "does not modify original relation" do
-    SiteConfig.stubs(:feature_enabled?).with('members').returns(true)
-    SiteConfig.stubs(:feature).with('members', 'everyone.show_paid_content').returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
 
     original_count = Post.published.count
 

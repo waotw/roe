@@ -92,9 +92,9 @@ class ImportPublishJob < ApplicationJob
       result = SiteSync::Exchange.publish_members(serialize_members(batch))
       raise "publish_members batch failed (network/auth/peer error)" unless result
 
-      @counts[:members_inserted] += result['inserted'].to_i
-      @counts[:members_skipped]  += result['skipped'].to_i
-      @errors.concat(Array(result['errors']))
+      @counts[:members_inserted] += result["inserted"].to_i
+      @counts[:members_skipped]  += result["skipped"].to_i
+      @errors.concat(Array(result["errors"]))
 
       update_step(:publishing_members)
     end
@@ -114,11 +114,11 @@ class ImportPublishJob < ApplicationJob
       result = SiteSync::Exchange.publish_newsletter_sends(payload)
       raise "publish_newsletter_sends batch failed (network/auth/peer error)" unless result
 
-      @counts[:sends_inserted]  += result['inserted'].to_i
-      @counts[:sends_skipped]   += result['skipped'].to_i
-      @counts[:sends_no_post]   += result['no_post'].to_i
-      @counts[:sends_no_member] += result['no_member'].to_i
-      @errors.concat(Array(result['errors']))
+      @counts[:sends_inserted]  += result["inserted"].to_i
+      @counts[:sends_skipped]   += result["skipped"].to_i
+      @counts[:sends_no_post]   += result["no_post"].to_i
+      @counts[:sends_no_member] += result["no_member"].to_i
+      @errors.concat(Array(result["errors"]))
 
       update_step(:publishing_sends)
     end

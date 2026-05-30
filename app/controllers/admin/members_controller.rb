@@ -1,9 +1,8 @@
 module Admin
   class MembersController < Admin::BaseController
-
-    before_action :set_member, only: [:show, :edit, :update, :destroy,
+    before_action :set_member, only: [ :show, :edit, :update, :destroy,
                                        :upgrade_to_paid, :downgrade_to_free,
-                                       :cancel_membership, :reactivate_membership]
+                                       :cancel_membership, :reactivate_membership ]
 
     def index
       @members = Member.order(created_at: :desc)

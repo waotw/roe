@@ -4,18 +4,18 @@ module Admin::MediumHelper
 
     # Count pending variant generation jobs
     pending_jobs = SolidQueue::Job
-      .where(class_name: 'GenerateImageVariantsJob')
+      .where(class_name: "GenerateImageVariantsJob")
       .where(finished_at: nil)
       .count
 
     # Check if worker is alive
     worker_alive = SolidQueue::Process
-      .where('last_heartbeat_at > ?', 30.seconds.ago)
+      .where("last_heartbeat_at > ?", 30.seconds.ago)
       .exists?
 
     # Only consider worker "dead" if it's been dead AND jobs are old
     oldest_pending_job = SolidQueue::Job
-      .where(class_name: 'GenerateImageVariantsJob')
+      .where(class_name: "GenerateImageVariantsJob")
       .where(finished_at: nil)
       .order(:created_at)
       .first
@@ -26,7 +26,7 @@ module Admin::MediumHelper
     # Count claimed (in-progress) jobs
     claimed_jobs = SolidQueue::ClaimedExecution
       .joins("INNER JOIN solid_queue_jobs ON solid_queue_jobs.id = solid_queue_claimed_executions.job_id")
-      .where("solid_queue_jobs.class_name = ?", 'GenerateImageVariantsJob')
+      .where("solid_queue_jobs.class_name = ?", "GenerateImageVariantsJob")
       .count
 
     # Count failed jobs (development only)
@@ -35,7 +35,7 @@ module Admin::MediumHelper
       # Only show ACTUALLY failed jobs (not ones that succeeded after retry)
       failed_executions = SolidQueue::FailedExecution
         .joins("INNER JOIN solid_queue_jobs ON solid_queue_jobs.id = solid_queue_failed_executions.job_id")
-        .where("solid_queue_jobs.class_name = ?", 'GenerateImageVariantsJob')
+        .where("solid_queue_jobs.class_name = ?", "GenerateImageVariantsJob")
         .where("solid_queue_jobs.finished_at IS NULL")  # Add this - only show jobs that never finished
         .limit(5)
 

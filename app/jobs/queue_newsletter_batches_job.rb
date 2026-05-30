@@ -33,7 +33,7 @@ class QueueNewsletterBatchesJob < ApplicationJob
 
     # Filter by audience
     members = case post.audience
-    when 'paid'
+    when "paid"
       members.paid_tier
     else
       members  # Everyone gets it
@@ -43,7 +43,7 @@ class QueueNewsletterBatchesJob < ApplicationJob
     # even on a fresh publish. NewsletterSend records (from the deliveries
     # importer) are the primary protection, but they only exist when the
     # deliveries import was run. The metadata flag is the durable backup.
-    if post.metadata['substack_post_id'].present?
+    if post.metadata["substack_post_id"].present?
       members = members.where(import_id: nil).not_substack_imported
     end
 

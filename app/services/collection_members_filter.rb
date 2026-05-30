@@ -17,14 +17,14 @@ class CollectionMembersFilter
   private
 
   def apply_paid_content_filter
-    return unless SiteConfig.feature_enabled?('members')
+    return unless SiteConfig.feature_enabled?("members")
     return if should_show_paid?
 
     # Return early if items is an array (empty collection or already filtered)
     return @items if @items.is_a?(Array)
 
     # Hide paid posts
-    @items = @items.where("json_extract(metadata, '$.audience') IS NULL OR json_extract(metadata, '$.audience') != ?", 'paid')
+    @items = @items.where("json_extract(metadata, '$.audience') IS NULL OR json_extract(metadata, '$.audience') != ?", "paid")
   end
 
   def should_show_paid?
@@ -32,9 +32,9 @@ class CollectionMembersFilter
     return true if @config[:current_member]&.paid?
 
     # Per-collection override
-    return @config[:show_paid] == 'true' if @config.key?(:show_paid)
+    return @config[:show_paid] == "true" if @config.key?(:show_paid)
 
     # Global default from members.yml (shows to everyone with lock icon)
-    SiteConfig.feature('members', 'everyone.show_paid_content') || false
+    SiteConfig.feature("members", "everyone.show_paid_content") || false
   end
 end

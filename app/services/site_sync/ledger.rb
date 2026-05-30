@@ -7,7 +7,7 @@ module SiteSync
   # Size + mtime is what rsync uses by default — so what we report as
   # "changed" matches what an actual rsync would push.
   class Ledger
-    LEDGER_FILENAME = '.sync-state.json'
+    LEDGER_FILENAME = ".sync-state.json"
 
     # Top-level subdirs of /site we never include in the ledger or backups:
     #   - db/        managed by RoeUpdater::BackupManager (own backup system)
@@ -50,7 +50,7 @@ module SiteSync
         modified = common.select do |path|
           c = current_files[path]
           r = recorded_files[path]
-          c['size'] != r['size'] || c['mtime'] != r['mtime']
+          c["size"] != r["size"] || c["mtime"] != r["mtime"]
         end
 
         { modified: modified.sort, added: added.sort, deleted: deleted.sort }
@@ -94,13 +94,13 @@ module SiteSync
       return {} unless Dir.exist?(@site_path)
 
       manifest = {}
-      prefix = @site_path.end_with?('/') ? @site_path : "#{@site_path}/"
+      prefix = @site_path.end_with?("/") ? @site_path : "#{@site_path}/"
 
-      Dir.glob(File.join(@site_path, '**', '*'), File::FNM_DOTMATCH).each do |path|
+      Dir.glob(File.join(@site_path, "**", "*"), File::FNM_DOTMATCH).each do |path|
         next if File.directory?(path)
         next if File.symlink?(path)
 
-        relative = path.sub(/\A#{Regexp.escape(prefix)}/, '')
+        relative = path.sub(/\A#{Regexp.escape(prefix)}/, "")
         next if excluded?(relative)
 
         # File can vanish between Dir.glob enumerating it and us
@@ -115,8 +115,8 @@ module SiteSync
         end
 
         manifest[relative] = {
-          'size'  => stat.size,
-          'mtime' => stat.mtime.to_i
+          "size"  => stat.size,
+          "mtime" => stat.mtime.to_i
         }
       end
 
@@ -141,10 +141,10 @@ module SiteSync
     # walk /site twice in a row.
     def write_manifest!(manifest)
       data = {
-        'version'     => Time.now.utc.iso8601,
-        'fingerprint' => self.class.fingerprint_of(manifest),
-        'env'         => Rails.env,
-        'files'       => manifest
+        "version"     => Time.now.utc.iso8601,
+        "fingerprint" => self.class.fingerprint_of(manifest),
+        "env"         => Rails.env,
+        "files"       => manifest
       }
       File.write(ledger_path, JSON.pretty_generate(data))
       data
@@ -153,7 +153,7 @@ module SiteSync
     private
 
     def excluded?(relative_path)
-      parts = relative_path.split('/')
+      parts = relative_path.split("/")
       return true if EXCLUDED_DIRS.include?(parts.first)
       return true if EXCLUDED_FILES.include?(parts.last)
       false

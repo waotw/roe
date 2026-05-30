@@ -1,5 +1,5 @@
 class Documentation < ApplicationRecord
-  self.table_name = 'documentation'
+  self.table_name = "documentation"
 
   include HasAudience
   include HasMetadata
@@ -34,9 +34,9 @@ class Documentation < ApplicationRecord
       doc = existing_docs.first_or_initialize
     end
 
-    if parsed.front_matter['tags'].is_a?(String)
-      parsed.front_matter['tags'] = parsed.front_matter['tags']
-        .split(',')
+    if parsed.front_matter["tags"].is_a?(String)
+      parsed.front_matter["tags"] = parsed.front_matter["tags"]
+        .split(",")
         .map(&:strip)
         .reject(&:blank?)
     end

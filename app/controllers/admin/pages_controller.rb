@@ -59,7 +59,7 @@ class Admin::PagesController < Admin::BaseController
     parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
 
     # Convert hash to YAML without document separator
-    @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
+    @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, "")
     @content = parsed.content
     @preview_path = preview_admin_page_path(@page)
   end
@@ -80,14 +80,14 @@ class Admin::PagesController < Admin::BaseController
       # Handle tags (defensive — pages don't surface tags in the editor
       # by default, but a user could add the field via the Add Field menu
       # or in RAW YAML).
-      if metadata['tags'].is_a?(String)
-        if metadata['tags'].strip.empty? || metadata['tags'] == '[]'
-          metadata['tags'] = []
+      if metadata["tags"].is_a?(String)
+        if metadata["tags"].strip.empty? || metadata["tags"] == "[]"
+          metadata["tags"] = []
         else
-          metadata['tags'] = metadata['tags'].split(',').map(&:strip).reject(&:empty?)
+          metadata["tags"] = metadata["tags"].split(",").map(&:strip).reject(&:empty?)
         end
-      elsif metadata['tags'].nil?
-        metadata['tags'] = []
+      elsif metadata["tags"].nil?
+        metadata["tags"] = []
       end
 
       # Re-serialize via Page.format_metadata_yaml so pages produce the
@@ -162,16 +162,16 @@ class Admin::PagesController < Admin::BaseController
     end
 
     @missing_requirements = build_publish_requirements(@page)
-    @resource_label = 'Page'
+    @resource_label = "Page"
     @show_postmark_warning = false  # pages don't go to newsletter
     @paired_duration_for = nil       # no audio/video pairing for pages
 
-    render partial: 'admin/posts/publish_modal', layout: false
+    render partial: "admin/posts/publish_modal", layout: false
   end
 
   def unpublish
     @page = Page.find(params[:id])
-    update_page_status(@page, 'draft')
+    update_page_status(@page, "draft")
     flash[:notice] = "Page unpublished"
     redirect_to edit_admin_page_path(@page)
   end
@@ -210,7 +210,7 @@ class Admin::PagesController < Admin::BaseController
       end
 
       # Preserve url_name from database if not in submitted metadata
-      metadata['url_name'] ||= @page.metadata['url_name']
+      metadata["url_name"] ||= @page.metadata["url_name"]
 
       @page.metadata = metadata
       @page.content = content
@@ -221,7 +221,7 @@ class Admin::PagesController < Admin::BaseController
     @preview_mode = true
     @preview_id = "page-#{@page.id}"
 
-    render template: 'pages/show', layout: 'site'
+    render template: "pages/show", layout: "site"
   end
 
   # def preview
@@ -261,16 +261,16 @@ class Admin::PagesController < Admin::BaseController
 
     if helpers.requires_audience_on_publish?
       requirements << {
-        name: 'audience',
+        name: "audience",
         type: :radio,
-        label: 'Audience',
-        hint: 'Who should be able to see this page?',
+        label: "Audience",
+        hint: "Who should be able to see this page?",
         options: [
-          [ 'everyone', 'Everyone', 'Public content visible to all visitors' ],
-          [ 'paid', 'Paid Members Only', 'Only accessible to paid members' ]
+          [ "everyone", "Everyone", "Public content visible to all visitors" ],
+          [ "paid", "Paid Members Only", "Only accessible to paid members" ]
         ],
-        default: 'everyone',
-        current: page.metadata['audience']
+        default: "everyone",
+        current: page.metadata["audience"]
       }
     end
 
@@ -290,16 +290,16 @@ class Admin::PagesController < Admin::BaseController
 
   def member_page?(page)
     # Check if the parent directory is 'members'
-    Pathname.new(page.file_path).parent.basename.to_s == 'members'
+    Pathname.new(page.file_path).parent.basename.to_s == "members"
   end
 
   def sanitize_filename(filename)
-    filename = filename.to_s.sub(/\.md$/, '')
+    filename = filename.to_s.sub(/\.md$/, "")
     filename = File.basename(filename)
-    filename.gsub(/[^a-zA-Z0-9\-_]/, '-')
-            .gsub(/-+/, '-')
+    filename.gsub(/[^a-zA-Z0-9\-_]/, "-")
+            .gsub(/-+/, "-")
             .strip
-            .gsub(/^-|-$/, '')
+            .gsub(/^-|-$/, "")
   end
 
   def load_page_template
@@ -327,14 +327,14 @@ class Admin::PagesController < Admin::BaseController
     name = filename.sub(/\.md$/, "")
 
     if name.match?(/[-_]/)
-      name.split(/[-_]/).map(&:capitalize).join(' ')
+      name.split(/[-_]/).map(&:capitalize).join(" ")
     else
       name
     end
   end
 
   def sanitize_filename(filename)
-    filename = filename.sub(/\.md$/, '')
+    filename = filename.sub(/\.md$/, "")
     File.basename(filename)
   end
 
@@ -343,7 +343,7 @@ class Admin::PagesController < Admin::BaseController
     parsed = FrontMatterParser::Parser.new(:md).call(content)
 
     metadata = parsed.front_matter.merge("status" => new_status)
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '').strip
+    yaml_content = metadata.to_yaml.sub(/\A---\n/, "").strip
     new_content = "---\n#{yaml_content}\n---\n#{parsed.content}"
 
     normalize_and_write(page.file_path, new_content)

@@ -20,14 +20,14 @@ module Api
       # Returns: { inserted, skipped, errors: [...] }
       def publish_members
         payload = JSON.parse(request.body.read)
-        members = Array(payload['members'])
+        members = Array(payload["members"])
 
         inserted = 0
         skipped  = 0
         errors   = []
 
         members.each do |attrs|
-          email = attrs['email'].to_s.strip
+          email = attrs["email"].to_s.strip
           if email.blank?
             errors << "blank email skipped"
             next
@@ -67,7 +67,7 @@ module Api
       #                 (likely: publish_members hasn't run yet for them)
       def publish_newsletter_sends
         payload = JSON.parse(request.body.read)
-        sends   = Array(payload['sends'])
+        sends   = Array(payload["sends"])
 
         inserted  = 0
         skipped   = 0
@@ -82,7 +82,7 @@ module Api
             next
           end
 
-          member = Member.find_by(email: attrs['member_email'].to_s.strip)
+          member = Member.find_by(email: attrs["member_email"].to_s.strip)
           if member.nil?
             no_member += 1
             next
@@ -97,10 +97,10 @@ module Api
             NewsletterSend.create!(
               post_id:    post.id,
               member_id:  member.id,
-              message_id: attrs['message_id'],
-              sent_at:    attrs['sent_at'],
-              created_at: attrs['created_at'],
-              updated_at: attrs['updated_at']
+              message_id: attrs["message_id"],
+              sent_at:    attrs["sent_at"],
+              created_at: attrs["created_at"],
+              updated_at: attrs["updated_at"]
             )
             inserted += 1
           rescue => e
@@ -133,24 +133,24 @@ module Api
       #     test Stripe customers — meaningless on live)
       def member_attrs_from(attrs)
         {
-          email:                       attrs['email'].to_s.strip,
-          name:                        attrs['name'],
-          metadata:                    attrs['metadata'] || {},
-          status:                      attrs['status'],
-          tier:                        attrs['tier'],
-          newsletter_status:           attrs['newsletter_status'],
-          created_at:                  attrs['created_at'],
-          updated_at:                  attrs['updated_at'],
-          subscribed_at:               attrs['subscribed_at'],
-          cancelled_at:                attrs['cancelled_at'],
-          paid_at:                     attrs['paid_at'],
-          paid_amount_cents:           attrs['paid_amount_cents'],
-          paid_currency:               attrs['paid_currency'],
-          refunded_at:                 attrs['refunded_at'],
-          refunded_amount_cents:       attrs['refunded_amount_cents'],
-          refunded_currency:           attrs['refunded_currency'],
-          email_confirmation_sent_at:  attrs['email_confirmation_sent_at'],
-          pending_email:               attrs['pending_email']
+          email:                       attrs["email"].to_s.strip,
+          name:                        attrs["name"],
+          metadata:                    attrs["metadata"] || {},
+          status:                      attrs["status"],
+          tier:                        attrs["tier"],
+          newsletter_status:           attrs["newsletter_status"],
+          created_at:                  attrs["created_at"],
+          updated_at:                  attrs["updated_at"],
+          subscribed_at:               attrs["subscribed_at"],
+          cancelled_at:                attrs["cancelled_at"],
+          paid_at:                     attrs["paid_at"],
+          paid_amount_cents:           attrs["paid_amount_cents"],
+          paid_currency:               attrs["paid_currency"],
+          refunded_at:                 attrs["refunded_at"],
+          refunded_amount_cents:       attrs["refunded_amount_cents"],
+          refunded_currency:           attrs["refunded_currency"],
+          email_confirmation_sent_at:  attrs["email_confirmation_sent_at"],
+          pending_email:               attrs["pending_email"]
         }
       end
 
@@ -158,18 +158,18 @@ module Api
       # — comes straight from Substack and is preserved in metadata),
       # then falls back to url_name for posts that weren't Substack-imported.
       def resolve_post(attrs)
-        if attrs['substack_post_id'].present?
+        if attrs["substack_post_id"].present?
           post = Post.where(
             "json_extract(metadata, '$.substack_post_id') = ?",
-            attrs['substack_post_id'].to_s
+            attrs["substack_post_id"].to_s
           ).first
           return post if post
         end
 
-        if attrs['url_name'].present?
+        if attrs["url_name"].present?
           Post.where(
             "json_extract(metadata, '$.url_name') = ?",
-            attrs['url_name'].to_s
+            attrs["url_name"].to_s
           ).first
         end
       end

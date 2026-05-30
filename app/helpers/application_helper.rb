@@ -69,51 +69,51 @@ module ApplicationHelper
   end
 
   def store_currency_symbol
-    currency = SiteConfig.feature('store', 'currency') || 'usd'
+    currency = SiteConfig.feature("store", "currency") || "usd"
     case currency.downcase
-    when 'usd' then '$'
-    when 'eur' then '€'
-    when 'gbp' then '£'
-    when 'cad' then 'CA$'
-    when 'aud' then 'A$'
-    when 'jpy' then '¥'
+    when "usd" then "$"
+    when "eur" then "€"
+    when "gbp" then "£"
+    when "cad" then "CA$"
+    when "aud" then "A$"
+    when "jpy" then "¥"
     else currency.upcase
     end
   end
 
   def product_breadcrumbs(product)
-    return '' unless product
-    return '' if product.metadata['breadcrumbs'] == false
+    return "" unless product
+    return "" if product.metadata["breadcrumbs"] == false
 
     crumbs = []
 
     # Home
-    crumbs << link_to('Home', '/', class: 'breadcrumb-link')
+    crumbs << link_to("Home", "/", class: "breadcrumb-link")
 
     # Store
-    store_page = Page.find_by("metadata->>'url_name' = ?", 'store')
+    store_page = Page.find_by("metadata->>'url_name' = ?", "store")
     if store_page
-      crumbs << link_to('Store', '/store', class: 'breadcrumb-link')
+      crumbs << link_to("Store", "/store", class: "breadcrumb-link")
     else
-      crumbs << content_tag(:span, 'Store', class: 'breadcrumb-text')
+      crumbs << content_tag(:span, "Store", class: "breadcrumb-text")
     end
 
     # Category (if exists)
-    if product.metadata['category'].present?
-      category = product.metadata['category']
+    if product.metadata["category"].present?
+      category = product.metadata["category"]
       category_page = Page.find_by("metadata->>'url_name' = ?", "store/#{category.parameterize}")
 
       if category_page
-        crumbs << link_to(category.titleize, "/store/#{category.parameterize}", class: 'breadcrumb-link')
+        crumbs << link_to(category.titleize, "/store/#{category.parameterize}", class: "breadcrumb-link")
       else
-        crumbs << content_tag(:span, category.titleize, class: 'breadcrumb-text')
+        crumbs << content_tag(:span, category.titleize, class: "breadcrumb-text")
       end
     end
 
     # Current product (not linked)
-    crumbs << content_tag(:span, product.title, class: 'breadcrumb-current')
+    crumbs << content_tag(:span, product.title, class: "breadcrumb-current")
 
-    content_tag(:nav, crumbs.join(' › ').html_safe, class: 'breadcrumbs', 'aria-label': 'Breadcrumb')
+    content_tag(:nav, crumbs.join(" › ").html_safe, class: "breadcrumbs", 'aria-label': "Breadcrumb")
   end
 
   def duplicate_sku_warning
@@ -142,20 +142,20 @@ module ApplicationHelper
 
   # Render an SVG icon from app/assets/images/icons/
   def icon_svg(name, options = {})
-    file_path = Rails.root.join('app', 'assets', 'images', 'icons', "#{name}.svg")
+    file_path = Rails.root.join("app", "assets", "images", "icons", "#{name}.svg")
 
-    return '' unless File.exist?(file_path)
+    return "" unless File.exist?(file_path)
 
     svg_content = File.read(file_path)
-    css_class = options[:class] || 'w-5 h-5'
+    css_class = options[:class] || "w-5 h-5"
 
     # Parse the SVG and add the class to the svg element
     doc = Nokogiri::HTML::DocumentFragment.parse(svg_content)
-    svg = doc.at_css('svg')
+    svg = doc.at_css("svg")
 
     if svg
-      existing_class = svg['class']
-      svg['class'] = existing_class ? "#{existing_class} #{css_class}" : css_class
+      existing_class = svg["class"]
+      svg["class"] = existing_class ? "#{existing_class} #{css_class}" : css_class
       doc.to_html.html_safe
     else
       svg_content.html_safe

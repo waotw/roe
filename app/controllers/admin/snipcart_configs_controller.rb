@@ -9,7 +9,7 @@ class Admin::SnipcartConfigsController < Admin::BaseController
 
     # Save test API key to file (all environments)
     api_key_test = params[:snipcart_config][:api_key_test]
-    SnipcartConfig.save_test_config({ 'api_key' => api_key_test }) if api_key_test.present?
+    SnipcartConfig.save_test_config({ "api_key" => api_key_test }) if api_key_test.present?
 
     # Save live API key to DB — production only
     if params[:snipcart_config][:api_key_live].present?

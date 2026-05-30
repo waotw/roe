@@ -16,8 +16,8 @@ class Admin::DocumentationController < Admin::BaseController
   end
 
   def create
-    file_name = params[:file_name].parameterize + '.md'
-    file_path = File.join(RoeSitePaths::SITE_PATH, 'docs', file_name)
+    file_name = params[:file_name].parameterize + ".md"
+    file_path = File.join(RoeSitePaths::SITE_PATH, "docs", file_name)
 
     # Build full content
     full_content = params[:metadata] + "\n---\n\n" + params[:content]
@@ -28,9 +28,9 @@ class Admin::DocumentationController < Admin::BaseController
     @doc = Post.create_or_update_from_file(file_path)
 
     if @doc
-      redirect_to admin_documentation_index_path, notice: 'Documentation created successfully.'
+      redirect_to admin_documentation_index_path, notice: "Documentation created successfully."
     else
-      redirect_to new_admin_documentation_path, alert: 'Failed to create documentation.'
+      redirect_to new_admin_documentation_path, alert: "Failed to create documentation."
     end
   end
 
@@ -40,7 +40,7 @@ class Admin::DocumentationController < Admin::BaseController
 
     parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
 
-    @metadata = parsed.front_matter.to_yaml.gsub(/^---\n/, '')
+    @metadata = parsed.front_matter.to_yaml.gsub(/^---\n/, "")
     @content = parsed.content
   end
 
@@ -55,7 +55,7 @@ class Admin::DocumentationController < Admin::BaseController
     # Re-sync from file
     Post.create_or_update_from_file(@doc.file_path)
 
-    redirect_to admin_documentation_index_path, notice: 'Documentation updated successfully.'
+    redirect_to admin_documentation_index_path, notice: "Documentation updated successfully."
   end
 
   def destroy
@@ -63,6 +63,6 @@ class Admin::DocumentationController < Admin::BaseController
     File.delete(@doc.file_path) if File.exist?(@doc.file_path)
     @doc.destroy
 
-    redirect_to admin_documentation_index_path, notice: 'Documentation deleted successfully.'
+    redirect_to admin_documentation_index_path, notice: "Documentation deleted successfully."
   end
 end

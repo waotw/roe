@@ -6,7 +6,7 @@ class CreateMediaReferences < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :media_references, [:post_id, :medium_id], unique: true
+    add_index :media_references, [ :post_id, :medium_id ], unique: true
     # Removed: add_index :media_references, :medium_id (redundant)
   end
 end

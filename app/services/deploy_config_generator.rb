@@ -21,18 +21,18 @@ class DeployConfigGenerator
   # to change them can edit config/deploy.yml or fly.toml directly.
 
   # Fly volume source — created by Roe's provisioning scripts.
-  FLY_VOLUME_SOURCE = 'data'.freeze
+  FLY_VOLUME_SOURCE = "data".freeze
 
   # Docker registry — docker.io covers the vast majority of Roe users.
   # Anyone using GHCR or a private registry edits config/deploy.yml directly.
-  KAMAL_REGISTRY_SERVER = 'docker.io'.freeze
+  KAMAL_REGISTRY_SERVER = "docker.io".freeze
 
   # Host filesystem path where /site lives on the Kamal server.
   # Must stay stable — SiteSync::KamalRsync rsyncs here.
-  KAMAL_HOST_VOLUME_PATH = '/var/lib/roe/site'.freeze
+  KAMAL_HOST_VOLUME_PATH = "/var/lib/roe/site".freeze
 
   # Container-side mount point — matches KamalRsync::REMOTE_SITE_CONTAINER_PATH.
-  CONTAINER_MOUNT_PATH = '/data/site'.freeze
+  CONTAINER_MOUNT_PATH = "/data/site".freeze
 
   # SQLite requires single-container deploys; 1 CPU is the right default.
   FLY_VM_CPUS = 1
@@ -45,7 +45,7 @@ class DeployConfigGenerator
   # and the Rails master key at config/master.key.
   # Raises GenerationError with a clear message if either is missing.
   def self.generate_secrets!
-    master_key_path = Rails.root.join('config', 'master.key')
+    master_key_path = Rails.root.join("config", "master.key")
 
     raise GenerationError, "config/master.key not found — this file must exist to deploy" unless File.exist?(master_key_path)
 
@@ -55,7 +55,7 @@ class DeployConfigGenerator
     secrets = DeploySecrets.current
     raise GenerationError, "Registry password not set — add it in Deploy Configuration" unless secrets.registry_password.present?
 
-    secrets_path = Rails.root.join('.kamal', 'secrets')
+    secrets_path = Rails.root.join(".kamal", "secrets")
     FileUtils.mkdir_p(File.dirname(secrets_path))
 
     File.write(secrets_path, <<~SECRETS)
@@ -63,7 +63,7 @@ class DeployConfigGenerator
       RAILS_MASTER_KEY=#{master_key}
     SECRETS
 
-    { file: '.kamal/secrets' }
+    { file: ".kamal/secrets" }
   rescue GenerationError
     raise
   rescue => e
@@ -72,7 +72,7 @@ class DeployConfigGenerator
 
   # Returns true if config/master.key exists and has content.
   def self.master_key_present?
-    path = Rails.root.join('config', 'master.key')
+    path = Rails.root.join("config", "master.key")
     File.exist?(path) && File.read(path).strip.present?
   rescue
     false
@@ -82,14 +82,14 @@ class DeployConfigGenerator
   # Used by the deploy config form and the future Updates & Deploy page
   # to show installation guidance before the user tries to deploy.
   def self.fly_cli_available?
-    system('which fly > /dev/null 2>&1')
+    system("which fly > /dev/null 2>&1")
   end
 
   # Returns true if `bundle exec kamal` is available.
   # Kamal is in the Gemfile so this should always be true in a
   # properly set-up Roe install, but worth checking defensively.
   def self.kamal_cli_available?
-    system('bundle exec kamal version > /dev/null 2>&1')
+    system("bundle exec kamal version > /dev/null 2>&1")
   end
 
   # Returns an array of { file:, target: } hashes for each file written,
@@ -117,11 +117,11 @@ class DeployConfigGenerator
   # ── Paths ────────────────────────────────────────────────────────────────
 
   def kamal_dest
-    Rails.root.join('config', 'deploy.yml')
+    Rails.root.join("config", "deploy.yml")
   end
 
   def fly_dest
-    Rails.root.join('fly.toml')
+    Rails.root.join("fly.toml")
   end
 
   # ── Kamal config/deploy.yml ──────────────────────────────────────────────
@@ -129,7 +129,7 @@ class DeployConfigGenerator
   def write_kamal_config(config)
     FileUtils.mkdir_p(File.dirname(kamal_dest))
     File.write(kamal_dest, kamal_content(config))
-    { file: 'config/deploy.yml', target: :kamal }
+    { file: "config/deploy.yml", target: :kamal }
   rescue GenerationError
     raise
   rescue => e
@@ -137,13 +137,13 @@ class DeployConfigGenerator
   end
 
   def kamal_content(config)
-    default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
-    app_name     = config['app_name'].presence || default_app_name
-    reg_username = config.dig('kamal', 'registry_username').to_s.strip
-    image_name   = config.dig('kamal', 'image_name').presence || app_name
-    servers      = Array(config.dig('kamal', 'servers')).map(&:to_s).reject(&:blank?)
-    ssl          = config['ssl'] != false
-    first_server = servers.first.presence || 'YOUR_SERVER_IP'
+    default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || "roe"
+    app_name     = config["app_name"].presence || default_app_name
+    reg_username = config.dig("kamal", "registry_username").to_s.strip
+    image_name   = config.dig("kamal", "image_name").presence || app_name
+    servers      = Array(config.dig("kamal", "servers")).map(&:to_s).reject(&:blank?)
+    ssl          = config["ssl"] != false
+    first_server = servers.first.presence || "YOUR_SERVER_IP"
     image        = reg_username.present? ? "#{reg_username}/#{image_name}" : image_name
 
     servers_yaml = if servers.any?
@@ -157,7 +157,7 @@ class DeployConfigGenerator
     #   1. Point their domain's A record at the server
     #   2. Uncomment and fill in the proxy block below
     #   3. Run: kamal proxy reboot
-    ssl_value    = ssl ? 'true' : 'false'
+    ssl_value    = ssl ? "true" : "false"
     proxy_block  = "# To enable SSL with a custom domain:\n" \
                    "# 1. Point your domain's A record at the server\n" \
                    "# 2. Uncomment the proxy block below and set your domain\n" \
@@ -222,7 +222,7 @@ class DeployConfigGenerator
   def write_fly_toml(config)
     FileUtils.mkdir_p(File.dirname(fly_dest))
     File.write(fly_dest, fly_content(config))
-    { file: 'fly.toml', target: :fly }
+    { file: "fly.toml", target: :fly }
   rescue GenerationError
     raise
   rescue => e
@@ -230,11 +230,11 @@ class DeployConfigGenerator
   end
 
   def fly_content(config)
-    default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || 'roe'
-    app_name  = config['app_name'].presence || default_app_name
-    region    = config.dig('fly', 'region').to_s.strip.presence || 'iad'
-    vm_memory = config.dig('fly', 'vm_memory').presence || '1gb'
-    ssl       = config['ssl'] != false
+    default_app_name = File.basename(RoeSitePaths::ROE_ROOT).presence || "roe"
+    app_name  = config["app_name"].presence || default_app_name
+    region    = config.dig("fly", "region").to_s.strip.presence || "iad"
+    vm_memory = config.dig("fly", "vm_memory").presence || "1gb"
+    ssl       = config["ssl"] != false
 
     vol_dest  = File.dirname(CONTAINER_MOUNT_PATH)
     memory_mb = parse_memory_mb(vm_memory)

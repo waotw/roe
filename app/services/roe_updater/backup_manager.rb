@@ -24,7 +24,7 @@ module RoeUpdater
         created_dirs = []
 
         databases_by_env.each do |env_dir, db_files|
-          backup_dir = File.join(env_dir, 'backup', timestamp)
+          backup_dir = File.join(env_dir, "backup", timestamp)
           FileUtils.mkdir_p(backup_dir)
           created_dirs << backup_dir
 
@@ -48,7 +48,7 @@ module RoeUpdater
         if created_dirs.empty?
           status_record.update!(log: (status_record.log || "") + "⊘ No databases found to back up\n")
         else
-          file_count = created_dirs.sum { |d| Dir.glob(File.join(d, '*.sqlite3')).size }
+          file_count = created_dirs.sum { |d| Dir.glob(File.join(d, "*.sqlite3")).size }
           status_record.update!(
             log: (status_record.log || "") + "✓ Database backup created (#{file_count} file(s) at #{timestamp})\n"
           )
@@ -82,7 +82,7 @@ module RoeUpdater
         end
 
         databases_by_env.each do |env_dir, db_files|
-          backup_dir = File.join(env_dir, 'backup', timestamp)
+          backup_dir = File.join(env_dir, "backup", timestamp)
           next unless Dir.exist?(backup_dir)
 
           db_files.each do |original|
@@ -107,7 +107,7 @@ module RoeUpdater
       # backup in place for inspection and as the rollback source.
       def prune_old_backups
         databases_by_env.each_key do |env_dir|
-          backup_root = File.join(env_dir, 'backup')
+          backup_root = File.join(env_dir, "backup")
           next unless Dir.exist?(backup_root)
 
           # Timestamped subdirs are sortable by name (YYYYMMDD_HHMMSS).
@@ -136,11 +136,11 @@ module RoeUpdater
       # dir is one of site/db/development, site/db/production, etc.
       # Skips backup/ subdirs and the SQLite -wal/-shm sidecars.
       def databases_by_env
-        envs = Dir.glob(File.join(RoeSitePaths::SITE_DB_PATH, '*'))
-                  .select { |p| File.directory?(p) && File.basename(p) != 'backup' }
+        envs = Dir.glob(File.join(RoeSitePaths::SITE_DB_PATH, "*"))
+                  .select { |p| File.directory?(p) && File.basename(p) != "backup" }
 
         envs.each_with_object({}) do |env_dir, acc|
-          dbs = Dir.glob(File.join(env_dir, '*.sqlite3'))
+          dbs = Dir.glob(File.join(env_dir, "*.sqlite3"))
                    .reject { |p| p =~ /-(?:shm|wal)\z/ }
           acc[env_dir] = dbs unless dbs.empty?
         end
@@ -148,7 +148,7 @@ module RoeUpdater
 
       def most_recent_backup_timestamp
         all_timestamps = databases_by_env.keys.flat_map do |env_dir|
-          backup_root = File.join(env_dir, 'backup')
+          backup_root = File.join(env_dir, "backup")
           next [] unless Dir.exist?(backup_root)
           Dir.children(backup_root)
         end

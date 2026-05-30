@@ -1,9 +1,9 @@
 # config/initializers/content_management.rb
 
 # Detect if we're running console, runner, or rake commands
-is_console = $PROGRAM_NAME.include?('console') || defined?(Rails::Console)
-is_runner = caller.any? { |line| line.include?('runner_command.rb') }
-is_rake = $PROGRAM_NAME.include?('rake')
+is_console = $PROGRAM_NAME.include?("console") || defined?(Rails::Console)
+is_runner = caller.any? { |line| line.include?("runner_command.rb") }
+is_rake = $PROGRAM_NAME.include?("rake")
 
 should_run = case Rails.env.to_sym
 when :production
@@ -11,7 +11,7 @@ when :production
   !is_console && !is_runner && !is_rake
 when :development
   # In dev, only run for server
-  (defined?(Rails::Server) || ENV['OVERMIND_SOCKET'].present?) && !is_console && !is_runner && !is_rake
+  (defined?(Rails::Server) || ENV["OVERMIND_SOCKET"].present?) && !is_console && !is_runner && !is_rake
 else
   false
 end
@@ -23,7 +23,7 @@ puts "   PROGRAM_NAME: #{$PROGRAM_NAME}"
 if should_run
   Rails.application.config.after_initialize do
     begin
-      if ActiveRecord::Base.connection.table_exists?('posts')
+      if ActiveRecord::Base.connection.table_exists?("posts")
         puts "\n" + "=" * 60
         puts "🚀 Initializing Content Management System"
         puts "=" * 60

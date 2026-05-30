@@ -1,9 +1,9 @@
 class Admin::SiteSyncController < Admin::BaseController
   LAST_RESTORE_CACHE_KEY = "site_sync:last_restore".freeze
   LAST_RESTORE_TTL       = 7.days  # outlives the user's work session;
-                                   # the panel itself only renders if
-                                   # the restore was within the last
-                                   # hour (see view).
+  # the panel itself only renders if
+  # the restore was within the last
+  # hour (see view).
 
   def index
     @status             = SiteSync::Checker.status

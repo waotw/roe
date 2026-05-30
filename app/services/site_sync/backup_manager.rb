@@ -1,4 +1,4 @@
-require 'shellwords'
+require "shellwords"
 
 module SiteSync
   # rsync-mirror snapshot backups of /site, stored at
@@ -21,24 +21,24 @@ module SiteSync
     class BackupError < StandardError; end
 
     BACKUP_RETENTION = 15
-    BACKUP_ROOT      = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'local')
+    BACKUP_ROOT      = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "local")
 
     # Per-snapshot metadata file (fingerprint, etc.) lives at the
     # root of the snapshot dir. Excluded from rsync in both directions
     # so it never escapes into /site on restore.
-    SNAPSHOT_META_FILENAME = '.snapshot_meta.json'
+    SNAPSHOT_META_FILENAME = ".snapshot_meta.json"
 
     # rsync excludes mirror SiteSync::Ledger's exclusion lists, plus
     # the snapshot meta file. Paths are relative to /site (the rsync
     # source root) — leading "/" pins them to that root.
     RSYNC_EXCLUDES = [
-      '/db',                        # has its own backup system
-      '/.git',                      # user's optional /site git repo
-      '/.sync-state.json',          # the ledger
-      '/.sync-backups',             # legacy/defensive
-      '/media/images/variants',     # generated files, can be rebuilt from originals
-      '/' + SNAPSHOT_META_FILENAME, # never let this escape into /site
-      '.DS_Store'                   # match anywhere
+      "/db",                        # has its own backup system
+      "/.git",                      # user's optional /site git repo
+      "/.sync-state.json",          # the ledger
+      "/.sync-backups",             # legacy/defensive
+      "/media/images/variants",     # generated files, can be rebuilt from originals
+      "/" + SNAPSHOT_META_FILENAME, # never let this escape into /site
+      ".DS_Store"                   # match anywhere
     ].freeze
 
     # Match the `YYYY-MM-DD-HHMMSS` directory naming used by both
@@ -60,7 +60,7 @@ module SiteSync
         backup_dir = File.join(BACKUP_ROOT, timestamp)
 
         link_dest_arg = previous_snapshot ? "--link-dest=#{Shellwords.escape(previous_snapshot)}" : ""
-        excludes_arg  = RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" }.join(' ')
+        excludes_arg  = RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" }.join(" ")
 
         FileUtils.mkdir_p(backup_dir)
 
@@ -124,7 +124,7 @@ module SiteSync
       # which pulls from fly via fly-rsync). Read-only here — the
       # rake task owns lifecycle.
       def list_production
-        prod_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+        prod_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
         return [] unless Dir.exist?(prod_root)
 
         Dir.children(prod_root)
@@ -147,7 +147,7 @@ module SiteSync
         # means the user just sees one chronological list.
         safety_path = create
 
-        excludes_arg = RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" }.join(' ')
+        excludes_arg = RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" }.join(" ")
 
         # --delete so files removed since the backup actually disappear
         # on restore. Without it, restoring an "older" state would
@@ -209,15 +209,15 @@ module SiteSync
       end
 
       def update_latest_symlink(timestamp)
-        latest = File.join(BACKUP_ROOT, 'latest')
+        latest = File.join(BACKUP_ROOT, "latest")
         FileUtils.rm_f(latest) if File.symlink?(latest) || File.exist?(latest)
         FileUtils.ln_s(timestamp, latest)
       end
 
       def write_snapshot_meta(snapshot_dir)
         meta = {
-          'fingerprint' => SiteSync::Ledger.fingerprint_for(snapshot_dir),
-          'created_at'  => Time.now.utc.iso8601
+          "fingerprint" => SiteSync::Ledger.fingerprint_for(snapshot_dir),
+          "created_at"  => Time.now.utc.iso8601
         }
         File.write(File.join(snapshot_dir, SNAPSHOT_META_FILENAME), JSON.pretty_generate(meta))
       end
@@ -225,7 +225,7 @@ module SiteSync
       def read_snapshot_fingerprint(snapshot_dir)
         meta_path = File.join(snapshot_dir, SNAPSHOT_META_FILENAME)
         return nil unless File.exist?(meta_path)
-        JSON.parse(File.read(meta_path))['fingerprint']
+        JSON.parse(File.read(meta_path))["fingerprint"]
       rescue JSON::ParserError, Errno::ENOENT
         nil
       end
@@ -247,7 +247,7 @@ module SiteSync
 
         # Defense in depth: even though this is admin-gated, refuse
         # any name that escapes BACKUP_ROOT (e.g. "../../etc/...").
-        unless path.start_with?(File.expand_path(BACKUP_ROOT) + '/')
+        unless path.start_with?(File.expand_path(BACKUP_ROOT) + "/")
           raise BackupError, "Invalid snapshot name: #{name}"
         end
 
@@ -286,7 +286,7 @@ module SiteSync
       end
 
       def count_files(path)
-        Dir.glob(File.join(path, '**', '*'), File::FNM_DOTMATCH).count do |f|
+        Dir.glob(File.join(path, "**", "*"), File::FNM_DOTMATCH).count do |f|
           File.file?(f) && !File.symlink?(f)
         end
       end

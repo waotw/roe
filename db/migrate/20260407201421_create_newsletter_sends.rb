@@ -11,7 +11,7 @@ class CreateNewsletterSends < ActiveRecord::Migration[8.1]
 
     add_index :newsletter_sends, :post_id
     add_index :newsletter_sends, :member_id
-    add_index :newsletter_sends, [:post_id, :member_id], unique: true
+    add_index :newsletter_sends, [ :post_id, :member_id ], unique: true
     add_index :newsletter_sends, :mailjet_message_id
   end
 end

@@ -10,24 +10,24 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
   # POST /checkout (create)
   test "redirects to Stripe checkout when member is free and Stripe is configured" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
 
     # Sign in the member by setting session directly
     sign_in_member(@member)
 
     mock_session = OpenStruct.new(
-      id: 'cs_test_123',
-      url: 'https://checkout.stripe.com/test'
+      id: "cs_test_123",
+      url: "https://checkout.stripe.com/test"
     )
 
     Stripe::Checkout::Session.expects(:create).returns(mock_session)
 
     post "/checkout"
 
-    assert_redirected_to 'https://checkout.stripe.com/test'
+    assert_redirected_to "https://checkout.stripe.com/test"
   end
 
   test "redirects to root with alert when member already paid" do
@@ -51,8 +51,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   test "redirects to root when price_id not set" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123"
     )
     sign_in_member(@member)
 
@@ -71,9 +71,9 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   test "handles Stripe API errors gracefully" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
     sign_in_member(@member)
 
@@ -88,9 +88,9 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   test "handles Stripe rate limit errors" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
     sign_in_member(@member)
 
@@ -105,7 +105,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   # GET /checkout/success
   test "success page renders with session_id" do
-    get "/checkout/success", params: { session_id: 'cs_test_123' }
+    get "/checkout/success", params: { session_id: "cs_test_123" }
 
     assert_response :success
   end
@@ -126,13 +126,13 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
   # Metadata tests
   test "includes member_id in checkout session metadata" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
     sign_in_member(@member)
 
-    mock_session = OpenStruct.new(id: 'cs_test_123', url: 'https://checkout.stripe.com/test')
+    mock_session = OpenStruct.new(id: "cs_test_123", url: "https://checkout.stripe.com/test")
 
     Stripe::Checkout::Session.expects(:create).with(
       has_entry(:metadata, { member_id: @member.id }),
@@ -144,13 +144,13 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   test "uses member email in customer_email" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
     sign_in_member(@member)
 
-    mock_session = OpenStruct.new(id: 'cs_test_123', url: 'https://checkout.stripe.com/test')
+    mock_session = OpenStruct.new(id: "cs_test_123", url: "https://checkout.stripe.com/test")
 
     Stripe::Checkout::Session.expects(:create).with(
       has_entry(:customer_email, @member.email),
@@ -167,9 +167,9 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     cancelled_member = create(:member, tier: :free, status: :cancelled)
 
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
 
     # Try to sign in with cancelled member token
@@ -182,19 +182,19 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   test "line_items includes correct price and quantity" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_abc123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_abc123"
     )
     sign_in_member(@member)
 
-    mock_session = OpenStruct.new(id: 'cs_test_123', url: 'https://checkout.stripe.com/test')
+    mock_session = OpenStruct.new(id: "cs_test_123", url: "https://checkout.stripe.com/test")
 
     Stripe::Checkout::Session.expects(:create).with(
-      has_entry(:line_items, [{
-        price: 'price_abc123',
+      has_entry(:line_items, [ {
+        price: "price_abc123",
         quantity: 1
-      }]),
+      } ]),
       anything
     ).returns(mock_session)
 
@@ -203,16 +203,16 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
   test "uses payment mode for checkout session" do
     @stripe_config.update!(
-      publishable_key_test: 'pk_test_123',
-      secret_key_test: 'sk_test_123',
-      price_id: 'price_123'
+      publishable_key_test: "pk_test_123",
+      secret_key_test: "sk_test_123",
+      price_id: "price_123"
     )
     sign_in_member(@member)
 
-    mock_session = OpenStruct.new(id: 'cs_test_123', url: 'https://checkout.stripe.com/test')
+    mock_session = OpenStruct.new(id: "cs_test_123", url: "https://checkout.stripe.com/test")
 
     Stripe::Checkout::Session.expects(:create).with(
-      has_entry(:mode, 'payment'),
+      has_entry(:mode, "payment"),
       anything
     ).returns(mock_session)
 

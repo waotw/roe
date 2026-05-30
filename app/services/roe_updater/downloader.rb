@@ -2,14 +2,14 @@ module RoeUpdater
   class Downloader
     class DownloadError < StandardError; end
 
-    STAGING_PATH = File.join(RoeSitePaths::ROE_ROOT, 'staging')
+    STAGING_PATH = File.join(RoeSitePaths::ROE_ROOT, "staging")
 
     class << self
       def download_version(version, status_record)
         cleanup_staging
-        
+
         git_url = "https://git.sr.ht/~benjaminwelch/roe"
-        
+
         status_record.update!(
           current_step: "Downloading Roe #{version}...",
           log: (status_record.log || "") + "→ Downloading version #{version}...\n"
@@ -17,7 +17,7 @@ module RoeUpdater
 
         clone_cmd = "git clone --depth 1 --branch v#{version} #{git_url} '#{STAGING_PATH}' 2>&1"
         output = `#{clone_cmd}`
-        
+
         unless $?.success?
           raise DownloadError, "Git clone failed: #{output}"
         end
@@ -41,8 +41,8 @@ module RoeUpdater
       private
 
       def verify_download
-        required_files = ['Gemfile', 'config.ru', 'app']
-        
+        required_files = [ "Gemfile", "config.ru", "app" ]
+
         required_files.each do |file|
           path = File.join(STAGING_PATH, file)
           unless File.exist?(path)

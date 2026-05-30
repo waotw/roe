@@ -32,9 +32,9 @@ class Page < ApplicationRecord
       page = existing_pages.first_or_initialize
     end
 
-    if parsed.front_matter['tags'].is_a?(String)
-      parsed.front_matter['tags'] = parsed.front_matter['tags']
-        .split(',')
+    if parsed.front_matter["tags"].is_a?(String)
+      parsed.front_matter["tags"] = parsed.front_matter["tags"]
+        .split(",")
         .map(&:strip)
         .reject(&:blank?)
     end
@@ -65,14 +65,14 @@ class Page < ApplicationRecord
   end
 
   def filename
-    File.basename(file_path, '.md') if file_path.present?
+    File.basename(file_path, ".md") if file_path.present?
   end
 
   # True for pages stored under site/pages/members/ — used by the public
   # page view to add a `member-page` CSS class so theme styles can target
   # signup / signin / upgrade / donate / etc. distinctly from regular pages.
   def member_page?
-    file_path.to_s.include?('/site/pages/members/')
+    file_path.to_s.include?("/site/pages/members/")
   end
 
   # Metadata fields that point at files under site/media/...
@@ -83,7 +83,7 @@ class Page < ApplicationRecord
   # newsletter delivery, so we only check audience here.
   def missing_site_gated_fields
     return [] unless SiteFeature.memberships_enabled?
-    metadata['audience'].to_s.strip.blank? ? [ 'audience' ] : []
+    metadata["audience"].to_s.strip.blank? ? [ "audience" ] : []
   end
 
   def media_refs
@@ -91,11 +91,11 @@ class Page < ApplicationRecord
       path = metadata[field].to_s.strip
       next if path.empty?
 
-      exists = if path.start_with?('/media/')
+      exists = if path.start_with?("/media/")
                  Post.media_file_set.include?(path)
-               else
+      else
                  true
-               end
+      end
       { field: field, path: path, exists: exists }
     end
   end

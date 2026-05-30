@@ -32,7 +32,7 @@ module SessionTestHelper
     get "/signin/#{member.access_token}"
     follow_redirect! if response.redirect?
   end
-  
+
   def current_member
     Member.find_by(id: session[:member_id])
   end

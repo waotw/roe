@@ -37,21 +37,21 @@ module HasAudience
   # rest of the app treats blank-audience posts as publicly accessible
   # (matching the default behavior when the field is omitted entirely).
   def audience
-    value = metadata['audience'].to_s.strip
-    value.empty? ? 'everyone' : value
+    value = metadata["audience"].to_s.strip
+    value.empty? ? "everyone" : value
   end
 
   # Write audience to metadata
   def audience=(value)
-    metadata['audience'] = value
+    metadata["audience"] = value
   end
 
   def publicly_accessible?
-    audience == 'everyone'
+    audience == "everyone"
   end
 
   def premium?
-    audience == 'paid'
+    audience == "paid"
   end
 
   def accessible_to?(member)
@@ -61,6 +61,6 @@ module HasAudience
   end
 
   def newsletter_audience
-    premium? ? 'paid' : 'everyone'
+    premium? ? "paid" : "everyone"
   end
 end

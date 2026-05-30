@@ -1,16 +1,16 @@
 class SiteConfig < ApplicationRecord
-  SYSTEM_PATH = File.join(RoeSitePaths::SITE_PATH, 'system')
-  SITE_PATH = File.join(SYSTEM_PATH, 'global')
-  FEATURES_PATH = Pathname.new(File.join(SYSTEM_PATH, 'features'))
-  DEFAULTS_PATH = Pathname.new(File.join(SYSTEM_PATH, 'defaults'))
-  INTEGRATIONS_PATH = Pathname.new(File.join(SYSTEM_PATH, 'integrations'))
+  SYSTEM_PATH = File.join(RoeSitePaths::SITE_PATH, "system")
+  SITE_PATH = File.join(SYSTEM_PATH, "global")
+  FEATURES_PATH = Pathname.new(File.join(SYSTEM_PATH, "features"))
+  DEFAULTS_PATH = Pathname.new(File.join(SYSTEM_PATH, "defaults"))
+  INTEGRATIONS_PATH = Pathname.new(File.join(SYSTEM_PATH, "integrations"))
 
-  SITE_FILE = File.join(SITE_PATH, 'site.yml')
-  FONTS_FILE = File.join(SITE_PATH, 'fonts.yml')
-  DEVELOPMENT_FILE = File.join(SITE_PATH, 'development.yml')
-  DEPLOY_FILE = File.join(SITE_PATH, 'deploy.yml')
+  SITE_FILE = File.join(SITE_PATH, "site.yml")
+  FONTS_FILE = File.join(SITE_PATH, "fonts.yml")
+  DEVELOPMENT_FILE = File.join(SITE_PATH, "development.yml")
+  DEPLOY_FILE = File.join(SITE_PATH, "deploy.yml")
 
-  CACHE_KEY_PREFIX = 'site_config'
+  CACHE_KEY_PREFIX = "site_config"
 
   # Get site-level config
   def self.get(key)
@@ -18,7 +18,7 @@ class SiteConfig < ApplicationRecord
     config_data = YAML.load_file(SITE_FILE)
 
     # Handle nested keys like 'theme.active'
-    keys = key.to_s.split('.')
+    keys = key.to_s.split(".")
     config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.get error: #{e.message}"
@@ -32,7 +32,7 @@ class SiteConfig < ApplicationRecord
 
     return config_data unless key
 
-    keys = key.to_s.split('.')
+    keys = key.to_s.split(".")
     config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.fonts error: #{e.message}"
@@ -46,7 +46,7 @@ class SiteConfig < ApplicationRecord
 
     return config_data unless key
 
-    keys = key.to_s.split('.')
+    keys = key.to_s.split(".")
     config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.development error: #{e.message}"
@@ -63,7 +63,7 @@ class SiteConfig < ApplicationRecord
     config = current("integrations/#{type}")&.config
     return config unless key
 
-    keys = key.to_s.split('.')
+    keys = key.to_s.split(".")
     config&.dig(*keys)
   end
 
@@ -72,7 +72,7 @@ class SiteConfig < ApplicationRecord
     config = current("features/#{type}")&.config
     return config unless key
 
-    keys = key.to_s.split('.')
+    keys = key.to_s.split(".")
     config&.dig(*keys)
   end
 
@@ -82,7 +82,7 @@ class SiteConfig < ApplicationRecord
   end
 
   # Get current config by type
-  def self.current(type = 'site')
+  def self.current(type = "site")
     cache_key = "#{CACHE_KEY_PREFIX}_#{type}"
 
     Rails.cache.fetch(cache_key) do
@@ -97,13 +97,13 @@ class SiteConfig < ApplicationRecord
     else
       # Clear all config caches
       [
-        'site',
-        'fonts',
-        'defaults/collections',
-        'defaults/cards',
-        'features/members',
-        'features/podcast',
-        'features/store'
+        "site",
+        "fonts",
+        "defaults/collections",
+        "defaults/cards",
+        "features/members",
+        "features/podcast",
+        "features/store"
       ].each do |config_type|
         Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{config_type}")
       end
@@ -128,42 +128,42 @@ class SiteConfig < ApplicationRecord
 
   def self.sync_all
     # Sync site configs
-    sync_from_file('site') if File.exist?(SITE_FILE)
-    sync_from_file('fonts') if File.exist?(FONTS_FILE)
-    sync_from_file('deploy') if File.exist?(DEPLOY_FILE)
+    sync_from_file("site") if File.exist?(SITE_FILE)
+    sync_from_file("fonts") if File.exist?(FONTS_FILE)
+    sync_from_file("deploy") if File.exist?(DEPLOY_FILE)
 
     # Sync all defaults
-    Dir.glob(DEFAULTS_PATH.join('*.yml')).each do |file|
+    Dir.glob(DEFAULTS_PATH.join("*.yml")).each do |file|
       type = "defaults/#{File.basename(file, '.yml')}"
       sync_from_file(type)
     end
 
     # Sync all features
-    Dir.glob(FEATURES_PATH.join('*.yml')).each do |file|
+    Dir.glob(FEATURES_PATH.join("*.yml")).each do |file|
       type = "features/#{File.basename(file, '.yml')}"
       sync_from_file(type)
     end
   end
 
   def static_generation_enabled
-    config.dig('static_generation_enabled') || false
+    config.dig("static_generation_enabled") || false
   end
 
   private
 
   def self.file_path_for(type)
     case type
-    when 'site'
+    when "site"
       SITE_FILE
-    when 'fonts'
+    when "fonts"
       FONTS_FILE
-    when 'deploy'
+    when "deploy"
       DEPLOY_FILE
     when /^features\//
-      filename = type.split('/').last
+      filename = type.split("/").last
       FEATURES_PATH.join("#{filename}.yml")
     when /^defaults\//
-      filename = type.split('/').last
+      filename = type.split("/").last
       DEFAULTS_PATH.join("#{filename}.yml")
     else
       SITE_FILE
@@ -185,16 +185,16 @@ class SiteConfig < ApplicationRecord
   end
 
   def self.site_url
-    domain = current('site')&.config&.dig('url') || 'localhost:3000'
+    domain = current("site")&.config&.dig("url") || "localhost:3000"
 
     # Remove any trailing slashes
-    domain = domain.sub(/\/$/, '')
+    domain = domain.sub(/\/$/, "")
 
     # If it already has a protocol, use it as-is
     return domain if domain.match?(/^https?:\/\//)
 
     # Otherwise, add the appropriate protocol
-    if domain.include?('localhost') || domain.match?(/^127\.0\.0\.1/)
+    if domain.include?("localhost") || domain.match?(/^127\.0\.0\.1/)
       "http://#{domain}"
     else
       "https://#{domain}"

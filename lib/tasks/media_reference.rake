@@ -43,9 +43,9 @@ namespace :media do
     puts "Unused media files: #{Medium.unused.count}"
     puts "\nTop posts by media count:"
     Post.joins(:media_references)
-        .select('posts.*, COUNT(media_references.id) as media_count')
-        .group('posts.id')
-        .order('media_count DESC')
+        .select("posts.*, COUNT(media_references.id) as media_count")
+        .group("posts.id")
+        .order("media_count DESC")
         .limit(5)
         .each do |post|
           puts "  - #{post.title}: #{post.media_count} files"

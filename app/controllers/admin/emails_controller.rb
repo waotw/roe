@@ -2,51 +2,51 @@ class Admin::EmailsController < Admin::BaseController
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   TEMPLATES = {
-    'magic_link' => {
-      name: 'Send Sign In Link',
-      variables: [ '@member_name', '@member_email', '@magic_link', '@site_name' ]
+    "magic_link" => {
+      name: "Send Sign In Link",
+      variables: [ "@member_name", "@member_email", "@magic_link", "@site_name" ]
     },
-    'welcome' => {
-      name: 'Welcome New Member',
-      variables: [ '@member_name', '@member_email', '@site_name' ]
+    "welcome" => {
+      name: "Welcome New Member",
+      variables: [ "@member_name", "@member_email", "@site_name" ]
     },
-    'upgrade_success' => {
-      name: 'Confirm Paid Upgrade',
-      variables: [ '@member_name', '@member_email', '@password', '@site_name', '@account_url' ]
+    "upgrade_success" => {
+      name: "Confirm Paid Upgrade",
+      variables: [ "@member_name", "@member_email", "@password", "@site_name", "@account_url" ]
     },
-    'email_changed' => {
-      name: 'Confirm Email Change',
-      variables: [ '@member_name', '@new_email', '@old_email', '@site_name' ]
+    "email_changed" => {
+      name: "Confirm Email Change",
+      variables: [ "@member_name", "@new_email", "@old_email", "@site_name" ]
     },
-    'membership_cancelled' => {
-      name: 'Membership Cancelled',
-      variables: [ '@member_name', '@member_email', '@site_name' ]
+    "membership_cancelled" => {
+      name: "Membership Cancelled",
+      variables: [ "@member_name", "@member_email", "@site_name" ]
     },
-    'email_confirmation' => {
-      name: 'Confirm Email Address',
-      variables: [ '@member_name', '@confirmation_link', '@site_name' ]
+    "email_confirmation" => {
+      name: "Confirm Email Address",
+      variables: [ "@member_name", "@confirmation_link", "@site_name" ]
     },
-    'payment_failed' => {
-      name: 'Payment Failed',
-      variables: [ '@member_name', '@member_email', '@update_payment_url', '@site_name' ]
+    "payment_failed" => {
+      name: "Payment Failed",
+      variables: [ "@member_name", "@member_email", "@update_payment_url", "@site_name" ]
     },
-    'account_deletion' => {
-      name: 'Account Deleted',
-      variables: [ '@member_name', '@member_email', '@site_name' ]
+    "account_deletion" => {
+      name: "Account Deleted",
+      variables: [ "@member_name", "@member_email", "@site_name" ]
     }
   }.freeze
 
   def index
-    emails_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, 'emails'))
+    emails_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "emails"))
 
     @emails = if Dir.exist?(emails_dir)
-      Dir.glob(emails_dir.join('*.md')).map do |file_path|
-        filename = File.basename(file_path, '.md')
+      Dir.glob(emails_dir.join("*.md")).map do |file_path|
+        filename = File.basename(file_path, ".md")
         template_info = TEMPLATES[filename]
 
         {
           filename: filename,
-          name: template_info ? template_info[:name] : filename.split(/[-_]/).map(&:capitalize).join(' '),
+          name: template_info ? template_info[:name] : filename.split(/[-_]/).map(&:capitalize).join(" "),
           path: file_path
         }
       end.sort_by { |e| e[:filename] }
@@ -60,7 +60,7 @@ class Admin::EmailsController < Admin::BaseController
 
   def edit
     @filename = params[:id]
-    @file_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{@filename}.md")
+    @file_path = File.join(RoeSitePaths::SITE_PATH, "emails", "#{@filename}.md")
 
     unless File.exist?(@file_path)
       flash[:error] = "Email template not found"
@@ -70,7 +70,7 @@ class Admin::EmailsController < Admin::BaseController
     @content = File.read(@file_path)
 
     template_info = TEMPLATES[@filename]
-    @template_name = template_info ? template_info[:name] : @filename.split('-').map(&:capitalize).join(' ')
+    @template_name = template_info ? template_info[:name] : @filename.split("-").map(&:capitalize).join(" ")
     @available_variables = template_info ? template_info[:variables] : []
 
     @preview_path = preview_admin_email_path(@filename)
@@ -78,7 +78,7 @@ class Admin::EmailsController < Admin::BaseController
 
   def update
     @filename = params[:id]
-    @file_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{@filename}.md")
+    @file_path = File.join(RoeSitePaths::SITE_PATH, "emails", "#{@filename}.md")
 
     unless File.exist?(@file_path)
       flash[:error] = "Email template not found"
@@ -96,7 +96,7 @@ class Admin::EmailsController < Admin::BaseController
 
   def preview
     @filename = params[:id]
-    @file_path = File.join(RoeSitePaths::SITE_PATH, 'emails', "#{@filename}.md")
+    @file_path = File.join(RoeSitePaths::SITE_PATH, "emails", "#{@filename}.md")
 
     # Use submitted content for POST, saved content for GET
     content = if request.post?
@@ -107,16 +107,16 @@ class Admin::EmailsController < Admin::BaseController
 
     # Replace variables with example data
     preview_variables = {
-      'member_name' => 'Jane Doe',
-      'member_email' => 'jane@example.com',
-      'magic_link' => 'https://yoursite.com/auth/verify/zen-mountain-haiku-42',
-      'confirmation_url' => 'https://yoursite.com/confirm-email/crystal-river-sunset-73',
-      'site_name' => SiteConfig.get('title') || 'Your Site',
-      'password' => 'smooth-river-dawn-17',
-      'account_url' => "#{request.base_url}/account",
-      'update_payment_url' => "#{request.base_url}/account/payment",
-      'new_email' => 'jane.new@example.com',
-      'old_email' => 'jane.old@example.com'
+      "member_name" => "Jane Doe",
+      "member_email" => "jane@example.com",
+      "magic_link" => "https://yoursite.com/auth/verify/zen-mountain-haiku-42",
+      "confirmation_url" => "https://yoursite.com/confirm-email/crystal-river-sunset-73",
+      "site_name" => SiteConfig.get("title") || "Your Site",
+      "password" => "smooth-river-dawn-17",
+      "account_url" => "#{request.base_url}/account",
+      "update_payment_url" => "#{request.base_url}/account/payment",
+      "new_email" => "jane.new@example.com",
+      "old_email" => "jane.old@example.com"
     }
 
     preview_variables.each do |key, value|

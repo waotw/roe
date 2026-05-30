@@ -1,5 +1,5 @@
 class PostmarkConfig < ApplicationRecord
-  TEST_CONFIG_PATH = File.join(RoeSitePaths::SITE_PATH, 'system', 'integrations', 'postmark.yml')
+  TEST_CONFIG_PATH = File.join(RoeSitePaths::SITE_PATH, "system", "integrations", "postmark.yml")
 
   enum :mode, { test: 0, live: 1 }, prefix: true
 
@@ -24,7 +24,7 @@ class PostmarkConfig < ApplicationRecord
 
   # Test token from file (all environments)
   def test_server_token
-    test_config['server_token']
+    test_config["server_token"]
   end
 
   # Live token from DB
@@ -95,7 +95,7 @@ class PostmarkConfig < ApplicationRecord
 
   def self.test_config
     return {} unless File.exist?(TEST_CONFIG_PATH)
-    YAML.load_file(TEST_CONFIG_PATH)['test'] || {}
+    YAML.load_file(TEST_CONFIG_PATH)["test"] || {}
   rescue => e
     Rails.logger.error "Failed to load Postmark test config: #{e.message}"
     {}
@@ -103,7 +103,7 @@ class PostmarkConfig < ApplicationRecord
 
   def self.save_test_config(config_data)
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
-    File.write(TEST_CONFIG_PATH, { 'test' => config_data }.to_yaml)
+    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml)
   end
 
   def self.clear_test_config
@@ -122,6 +122,6 @@ class PostmarkConfig < ApplicationRecord
 
   def set_connected_at
     # Fire for both test (file) and live (DB) tokens
-    self.connected_at ||= Time.current if test_config['server_token'].present? || self[:server_token].present?
+    self.connected_at ||= Time.current if test_config["server_token"].present? || self[:server_token].present?
   end
 end

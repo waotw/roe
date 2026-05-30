@@ -125,11 +125,11 @@ class ContentSync
     media_files.each do |file_path|
       # Handle symlinks - resolve to real path before substitution
       real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-      web_path = File.realpath(file_path).sub(real_site_path, '')
+      web_path = File.realpath(file_path).sub(real_site_path, "")
 
       begin
         unless Medium.exists?(file_path: web_path)
-          media_type = File.extname(file_path).delete('.').downcase
+          media_type = File.extname(file_path).delete(".").downcase
 
           medium = Medium.create!(
             file_path: web_path,
@@ -289,7 +289,7 @@ class ContentSync
 
     orphans.each do |orphan|
       old_path = orphan.file_path
-      old_basename = File.basename(old_path, '.md')
+      old_basename = File.basename(old_path, ".md")
 
       # Try to find a renamed file by matching content or metadata
       possible_rename = current_files.find do |file_path|
@@ -297,10 +297,10 @@ class ContentSync
         next if Post.exists?(file_path: file_path)
 
         # Check if the new filename is similar (could be just adding a number prefix)
-        new_basename = File.basename(file_path, '.md')
+        new_basename = File.basename(file_path, ".md")
 
         # Match if the old name is contained in the new name (handles 01-old-name.md)
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ''))
+        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
       end
 
       if possible_rename
@@ -320,13 +320,13 @@ class ContentSync
 
     orphans.each do |orphan|
       old_path = orphan.file_path
-      old_basename = File.basename(old_path, '.md')
+      old_basename = File.basename(old_path, ".md")
 
       possible_rename = current_files.find do |file_path|
         next if Page.exists?(file_path: file_path)
 
-        new_basename = File.basename(file_path, '.md')
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ''))
+        new_basename = File.basename(file_path, ".md")
+        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
       end
 
       if possible_rename
@@ -346,13 +346,13 @@ class ContentSync
 
     orphans.each do |orphan|
       old_path = orphan.file_path
-      old_basename = File.basename(old_path, '.md')
+      old_basename = File.basename(old_path, ".md")
 
       possible_rename = current_files.find do |file_path|
         next if Documentation.exists?(file_path: file_path)
 
-        new_basename = File.basename(file_path, '.md')
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ''))
+        new_basename = File.basename(file_path, ".md")
+        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
       end
 
       if possible_rename
@@ -369,7 +369,7 @@ class ContentSync
     # Convert to web paths for comparison
     # Handle symlinks - resolve to real path before substitution
     real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, '') }
+    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, "") }
 
     orphans = Medium.where.not(file_path: current_web_paths)
 
@@ -382,11 +382,11 @@ class ContentSync
   end
 
   def self.sync_file(file_path)
-    result = if file_path.to_s.include?('/posts/')
+    result = if file_path.to_s.include?("/posts/")
       Post.create_or_update_from_file(file_path)
-    elsif file_path.to_s.include?('/pages/')
+    elsif file_path.to_s.include?("/pages/")
       Page.create_or_update_from_file(file_path)
-    elsif file_path.to_s.include?('/products/')
+    elsif file_path.to_s.include?("/products/")
       Product.create_or_update_from_file(file_path)
     end
 
@@ -442,8 +442,8 @@ class ContentSync
     puts "\n⚙️  Syncing default configurations"
     puts "=" * 60
 
-    Dir.glob(defaults_path.join('*.yml')).each do |file|
-      type = File.basename(file, '.yml')
+    Dir.glob(defaults_path.join("*.yml")).each do |file|
+      type = File.basename(file, ".yml")
       result = SiteConfig.sync_from_file("defaults/#{type}")
 
       if result
@@ -462,7 +462,7 @@ class ContentSync
     puts "\n⚙️  Syncing site configuration"
     puts "=" * 60
 
-    result = SiteConfig.sync_from_file('site')  # Added 'site' argument
+    result = SiteConfig.sync_from_file("site")  # Added 'site' argument
 
     if result
       puts "  ✓ Site config synced"

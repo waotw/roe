@@ -30,22 +30,22 @@ class NewsletterRenderer
     doc = Nokogiri::HTML.fragment(html)
 
     doc.css('action-text-attachment[content-type="image"]').each do |attachment|
-      url = attachment['url']
-      caption = attachment['caption']
+      url = attachment["url"]
+      caption = attachment["caption"]
 
       # Create img tag
-      img = doc.document.create_element('img')
-      img['src'] = url
-      img['alt'] = caption if caption.present?
-      img['style'] = 'max-width: 100%; height: auto;'
+      img = doc.document.create_element("img")
+      img["src"] = url
+      img["alt"] = caption if caption.present?
+      img["style"] = "max-width: 100%; height: auto;"
 
       # Add caption if present
       if caption.present?
-        figure = doc.document.create_element('figure')
-        figure['style'] = 'margin: 1.5rem 0;'
+        figure = doc.document.create_element("figure")
+        figure["style"] = "margin: 1.5rem 0;"
 
-        figcaption = doc.document.create_element('figcaption')
-        figcaption['style'] = 'font-size: 0.875rem; color: #666; margin-top: 0.5rem; text-align: center;'
+        figcaption = doc.document.create_element("figcaption")
+        figcaption["style"] = "font-size: 0.875rem; color: #666; margin-top: 0.5rem; text-align: center;"
         figcaption.content = caption
 
         figure.add_child(img)
@@ -62,24 +62,24 @@ class NewsletterRenderer
   def convert_relative_urls(html)
     return html if html.blank?
 
-    site_url = SiteConfig.current('site')&.config&.dig('url')
+    site_url = SiteConfig.current("site")&.config&.dig("url")
 
     # Fallback to localhost for dev if not set
-    site_url ||= 'http://localhost:3000'
+    site_url ||= "http://localhost:3000"
 
     # Remove trailing slash
-    site_url = site_url.sub(/\/$/, '')
+    site_url = site_url.sub(/\/$/, "")
 
     doc = Nokogiri::HTML.fragment(html)
 
     # Convert image src
     doc.css('img[src^="/"]').each do |img|
-      img['src'] = "#{site_url}#{img['src']}"
+      img["src"] = "#{site_url}#{img['src']}"
     end
 
     # Convert link href
     doc.css('a[href^="/"]').each do |link|
-      link['href'] = "#{site_url}#{link['href']}"
+      link["href"] = "#{site_url}#{link['href']}"
     end
 
     doc.to_html
@@ -131,7 +131,7 @@ class NewsletterRenderer
   # Get CSS from active theme
   def theme_css
     theme_name = active_theme
-    theme_css_path = File.join(RoeSitePaths::SITE_PATH, 'themes', theme_name, "#{theme_name}.css")
+    theme_css_path = File.join(RoeSitePaths::SITE_PATH, "themes", theme_name, "#{theme_name}.css")
 
     if File.exist?(theme_css_path)
       File.read(theme_css_path)
@@ -146,7 +146,7 @@ class NewsletterRenderer
       html,
       with_html_string: true,
       adapter: :nokogiri,
-      input_encoding: 'UTF-8'
+      input_encoding: "UTF-8"
     )
 
     premailer.to_inline_css
@@ -188,8 +188,8 @@ class NewsletterRenderer
   def post_metadata_html
     parts = []
 
-    parts << "By #{post.metadata['author']}" if post.metadata['author'].present?
-    parts << format_date(post.metadata['date']) if post.metadata['date'].present?
+    parts << "By #{post.metadata['author']}" if post.metadata["author"].present?
+    parts << format_date(post.metadata["date"]) if post.metadata["date"].present?
 
     return "" if parts.empty?
 
@@ -202,15 +202,15 @@ class NewsletterRenderer
 
   # Helper methods to get data from metadata
   def post_title
-    post.metadata['title'] || 'Untitled'
+    post.metadata["title"] || "Untitled"
   end
 
   def site_title
-    SiteConfig.get('title') || 'Newsletter'
+    SiteConfig.get("title") || "Newsletter"
   end
 
   def active_theme
-    SiteConfig.get('theme.active') || 'default'
+    SiteConfig.get("theme.active") || "default"
   end
 
   def format_date(date_value)

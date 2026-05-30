@@ -3,7 +3,7 @@ require "test_helper"
 class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
   def setup
     super
-    
+
     @member = create(:member,
       name: "Newsletter Subscriber",
       email: "subscriber@example.com",
@@ -11,7 +11,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       status: :active,
       newsletter_status: :subscribed
     )
-    
+
     @unsubscribed_member = create(:member,
       name: "Unsubscribed User",
       email: "unsubscribed@example.com",
@@ -19,7 +19,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       status: :active,
       newsletter_status: :unsubscribed
     )
-    
+
     @post = create(:post,
       metadata: {
         "title" => "Newsletter Test Post",
@@ -29,7 +29,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Newsletter Content\n\nThis post was sent as a newsletter."
     )
-    
+
     # Create required pages
     create(:page,
       metadata: {
@@ -39,7 +39,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Unsubscribe\n\nUnsubscribe from our newsletter."
     )
-    
+
     create(:page,
       metadata: {
         "title" => "Unsubscribed",
@@ -57,7 +57,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
   test "member can view account page" do
     sign_in_member(@member)
     get "/account"
-    
+
     assert_response :success
     # Should show member details
     assert_includes response.body, @member.name
@@ -82,23 +82,23 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
 
   test "member can unsubscribe via link with token" do
     token = @member.access_token
-    
+
     # Use unsubscribe link (with token)
     get "/unsubscribe/#{token}"
-    
+
     # Should show unsubscribe confirmation page
     assert_response :success
-    
+
     # Actually unsubscribe
     post "/unsubscribe/#{token}"
-    
+
     @member.reload
     assert @member.newsletter_unsubscribed?
   end
 
   test "unsubscribe with invalid token fails" do
     get "/unsubscribe/invalid-token"
-    
+
     # Should not unsubscribe anyone
     @member.reload
     assert @member.newsletter_subscribed?
@@ -111,13 +111,13 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
   test "member can resubscribe after unsubscribing" do
     # First unsubscribe
     @member.update!(newsletter_status: :unsubscribed)
-    
+
     # Sign in
     sign_in_member(@member)
-    
+
     # Resubscribe (this would be via account page or resubscribe link)
     @member.resubscribe_to_newsletter!
-    
+
     assert @member.newsletter_subscribed?
   end
 
@@ -133,7 +133,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       status: :cancelled,
       newsletter_status: :subscribed
     )
-    
+
     bounced_member = create(:member,
       name: "Bounced",
       email: "bounced@example.com",
@@ -141,10 +141,10 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       status: :active,
       newsletter_status: :bounced
     )
-    
+
     # Only active subscribed members should be in the audience
     audience = Member.newsletter_active
-    
+
     assert_includes audience, @member
     assert_not_includes audience, @unsubscribed_member
     assert_not_includes audience, cancelled_member
@@ -169,7 +169,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Site Only"
     )
-    
+
     refute site_only_post.send_as_newsletter?
   end
 
@@ -184,7 +184,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       member: @member,
       sent_at: Time.current
     )
-    
+
     assert_equal @post, newsletter_send.post
     assert_equal @member, newsletter_send.member
     assert_not_nil newsletter_send.sent_at
@@ -197,11 +197,11 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       member: @member,
       sent_at: 1.day.ago
     )
-    
+
     assert_equal @post, newsletter_send.post
     assert_equal @member, newsletter_send.member
     assert_not_nil newsletter_send.sent_at
-    
+
     # Verify we can query sends for a member
     assert_includes NewsletterSend.where(member: @member), newsletter_send
   end
@@ -221,7 +221,7 @@ class NewsletterSubscriptionFlowTest < ActionDispatch::IntegrationTest
       },
       content: "# Premium Newsletter Content"
     )
-    
+
     # Free member should see teaser or upgrade prompt in email
     # Paid member should see full content
     assert paid_post.send_as_newsletter?

@@ -1,13 +1,13 @@
 module MarkdownFixture
   SIMPLE_CONTENT = <<~MARKDOWN
     # Simple Post
-    
+
     This is a simple post with basic markdown.
-    
+
     ## Section
-    
+
     Some text with **bold** and *italic* text.
-    
+
     [A link](https://example.com)
   MARKDOWN
 
@@ -30,7 +30,7 @@ module MarkdownFixture
   CODE_BLOCK_FOUR_BACKTICKS = <<~MARKDOWN
     ````markdown
     # Code with four backticks
-    
+
     This should be preserved.
     ````
   MARKDOWN
@@ -54,9 +54,9 @@ module MarkdownFixture
     ![Photo 1](photo1.jpg)
     ![Photo 2](photo2.jpg)
     ![Photo 3](photo3.jpg)
-    
+
     Some text between.
-    
+
     ![Photo 4](photo4.jpg)
     ![Photo 5](photo5.jpg)
   MARKDOWN
@@ -189,7 +189,7 @@ module MarkdownFixture
 
   FOOTNOTE_AUTO_NUMBERED = <<~MARKDOWN
     This is text with a footnote(*This is the footnote*).
-    
+
     And another(*Second footnote here*).
   MARKDOWN
 
@@ -200,9 +200,9 @@ module MarkdownFixture
 
   FOOTNOTE_MIXED = <<~MARKDOWN
     First statement(*Auto numbered footnote*).
-    
+
     Second statement(*[cite] Custom citation*).
-    
+
     Third statement(*Another auto footnote*).
   MARKDOWN
 
@@ -212,31 +212,31 @@ module MarkdownFixture
 
   COMPLEX_CONTENT = <<~MARKDOWN
     # Complex Post
-    
+
     Some introductory text.
-    
+
     ```collection
     heading: Related Posts
     limit: 3
     ```
-    
+
     A paragraph between.
-    
+
     ```card
     type: pullquote
     text: "Important quote here."
     position: center
     ```
-    
+
     More content.
-    
+
     ```gallery
     ![Image 1](img1.jpg)
     ![Image 2](img2.jpg)
     ```
-    
+
     ## Code Example
-    
+
     ```ruby
     def test
       puts "Hello"
@@ -249,7 +249,7 @@ module MarkdownFixture
     heading: Featured
     limit: 2
     ```
-    
+
     ```collection
     heading: Recent
     limit: 3

@@ -1,6 +1,6 @@
 module Members
   class SubscriptionsController < BaseController
-    skip_before_action :set_current_member, only: [:unsubscribe, :confirm_unsubscribe]
+    skip_before_action :set_current_member, only: [ :unsubscribe, :confirm_unsubscribe ]
 
     def unsubscribe
       @member = Member.find_by(access_token: params[:token])
@@ -11,10 +11,10 @@ module Members
       end
 
       # Query JSON metadata for url_name
-      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", 'unsubscribe')
+      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "unsubscribe")
 
       if @page
-        render template: 'pages/show', layout: 'site'
+        render template: "pages/show", layout: "site"
       else
         render plain: "Unsubscribe page not found", status: :not_found
       end

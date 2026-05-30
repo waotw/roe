@@ -271,13 +271,13 @@ module SubstackImporter
       options = @import.options || {}
 
       base_tier = case plan
-                  when "lifetime"
+      when "lifetime"
                     options["auto_gift_lifetime"] ? :paid : :free
-                  when "monthly", "quarterly", "semiannually", "yearly", "ios_app"
+      when "monthly", "quarterly", "semiannually", "yearly", "ios_app"
                     options["auto_gift_paid"] ? :paid : :free
-                  else  # comp, other, unknown
+      else  # comp, other, unknown
                     :free
-                  end
+      end
 
       # Only honor a paid grant if the Substack subscription is actually
       # effective right now. Without this, a lapsed monthly subscriber

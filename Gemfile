@@ -37,7 +37,7 @@ gem "image_processing", "~> 1.2"
 gem "ruby-vips", "~> 2.3", require: false
 
 # listen gem to watch directory for changes
-gem 'listen', "~> 3.8"
+gem "listen", "~> 3.8"
 
 # Markdown
 gem "kramdown", "~> 2.4"
@@ -56,9 +56,9 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 
-  gem 'letter_opener'
+  gem "letter_opener"
 
-  gem 'mocha'
+  gem "mocha"
 end
 
 group :development do

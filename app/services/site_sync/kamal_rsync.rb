@@ -1,6 +1,6 @@
-require 'shellwords'
-require 'tempfile'
-require 'yaml'
+require "shellwords"
+require "tempfile"
+require "yaml"
 
 module SiteSync
   # Kamal-specific transport for site sync. Mirrors the public
@@ -34,28 +34,28 @@ module SiteSync
     # Container path Roe's Dockerfile mounts the site volume at.
     # The HOST path is derived from config/deploy.yml's volume
     # mapping at runtime.
-    REMOTE_SITE_CONTAINER_PATH = '/data/site'.freeze
+    REMOTE_SITE_CONTAINER_PATH = "/data/site".freeze
 
     COMMON_EXCLUDES = [
-      '--exclude=.sync-state.json',
-      '--exclude=.git',
-      '--exclude=.sync-backups',
-      '--exclude=.DS_Store',
-      '--exclude=system/global/.last_deploy.yml'
+      "--exclude=.sync-state.json",
+      "--exclude=.git",
+      "--exclude=.sync-backups",
+      "--exclude=.DS_Store",
+      "--exclude=system/global/.last_deploy.yml"
     ].freeze
 
     PUSH_EXCLUDES = (COMMON_EXCLUDES + [
-      '--exclude=db/production/',
-      '--exclude=db/development/.gitkeep'
+      "--exclude=db/production/",
+      "--exclude=db/development/.gitkeep"
     ]).freeze
 
     PULL_EXCLUDES = (COMMON_EXCLUDES + [
-      '--exclude=db/development/',
-      '--exclude=db/production/.gitkeep'
+      "--exclude=db/development/",
+      "--exclude=db/production/.gitkeep"
     ]).freeze
 
     BACKUP_EXCLUDES = (COMMON_EXCLUDES + [
-      '--exclude=db/'
+      "--exclude=db/"
     ]).freeze
 
     REMOTE_DELETE_BATCH = 50
@@ -199,7 +199,7 @@ module SiteSync
 
       def kamal_config
         @kamal_config ||= begin
-          path = Rails.root.join('config', 'deploy.yml')
+          path = Rails.root.join("config", "deploy.yml")
           unless File.exist?(path)
             raise KamalRsyncError, "config/deploy.yml not found — Kamal deploy isn't configured."
           end
@@ -209,19 +209,19 @@ module SiteSync
 
       def host
         @host ||= begin
-          servers = kamal_config['servers']
+          servers = kamal_config["servers"]
           host_value = case servers
-                       when Hash
+          when Hash
                          # Kamal supports roles. Use the 'web' role
                          # first (most common), falling back to first
                          # role defined.
-                         role = servers['web'] || servers.values.first
+                         role = servers["web"] || servers.values.first
                          Array(role).first
-                       when Array
+          when Array
                          servers.first
-                       end
+          end
 
-          unless host_value && host_value.to_s != '192.168.0.1'
+          unless host_value && host_value.to_s != "192.168.0.1"
             raise KamalRsyncError, "config/deploy.yml has no real server configured " \
                                    "(found #{host_value.inspect}). Set servers.web to your actual host."
           end
@@ -230,7 +230,7 @@ module SiteSync
       end
 
       def ssh_user
-        kamal_config.dig('ssh', 'user') || 'root'
+        kamal_config.dig("ssh", "user") || "root"
       end
 
       def ssh_destination
@@ -242,8 +242,8 @@ module SiteSync
       # sees the same content via bind mount).
       def remote_site_path
         @remote_site_path ||= begin
-          volumes = Array(kamal_config['volumes'])
-          site_volume = volumes.find { |v| v.to_s.split(':').last.to_s.start_with?(REMOTE_SITE_CONTAINER_PATH) }
+          volumes = Array(kamal_config["volumes"])
+          site_volume = volumes.find { |v| v.to_s.split(":").last.to_s.start_with?(REMOTE_SITE_CONTAINER_PATH) }
 
           unless site_volume
             raise KamalRsyncError, <<~MSG
@@ -255,8 +255,8 @@ module SiteSync
             MSG
           end
 
-          host_path = site_volume.split(':').first
-          host_path.end_with?('/') ? host_path : "#{host_path}/"
+          host_path = site_volume.split(":").first
+          host_path.end_with?("/") ? host_path : "#{host_path}/"
         end
       end
 
@@ -277,7 +277,7 @@ module SiteSync
         files = Array(files).uniq
         return if files.empty?
 
-        list = Tempfile.create([ 'site-sync-files', '.txt' ])
+        list = Tempfile.create([ "site-sync-files", ".txt" ])
         begin
           list.write(files.join("\n"))
           list.close
@@ -305,7 +305,7 @@ module SiteSync
       # to use a relative path for -e (the path-with-spaces issue is
       # specific to fly's wrapper).
       def build_cmd(source:, dest:, flags:, excludes:)
-        excludes_str = excludes.join(' ')
+        excludes_str = excludes.join(" ")
         "rsync #{flags} #{excludes_str} -e ssh " \
           "#{Shellwords.escape(source)} #{Shellwords.escape(dest)} 2>&1"
       end
@@ -340,7 +340,7 @@ module SiteSync
 
         paths.each_slice(REMOTE_DELETE_BATCH) do |chunk|
           remote_paths = chunk.map { |p| File.join(remote_site_path, p) }
-          rm_arg = remote_paths.map { |p| Shellwords.escape(p) }.join(' ')
+          rm_arg = remote_paths.map { |p| Shellwords.escape(p) }.join(" ")
           # Plain ssh — much simpler than fly's machine-id lookup.
           remote_cmd = "rm -f #{rm_arg}"
           cmd = "ssh #{Shellwords.escape(ssh_destination)} #{Shellwords.escape(remote_cmd)} 2>&1"
@@ -356,10 +356,10 @@ module SiteSync
         site_root = File.expand_path(RoeSitePaths::SITE_PATH)
         paths.each do |p|
           # Defense in depth: refuse paths that try to escape /site.
-          next if p.to_s.include?('..') || p.to_s.start_with?('/')
+          next if p.to_s.include?("..") || p.to_s.start_with?("/")
 
           full = File.expand_path(File.join(RoeSitePaths::SITE_PATH, p))
-          next unless full.start_with?(site_root + '/')
+          next unless full.start_with?(site_root + "/")
 
           File.delete(full) if File.exist?(full)
         rescue => e
@@ -371,7 +371,7 @@ module SiteSync
 
       def new_backup_dir
         timestamp   = Time.now.strftime("%Y-%m-%d-%H%M%S")
-        backup_root = File.join(RoeSitePaths::ROE_ROOT, 'site_backups', 'production')
+        backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
         FileUtils.mkdir_p(backup_root)
         backup_dir  = File.join(backup_root, timestamp)
         [ backup_dir, backup_root, timestamp ]
@@ -385,7 +385,7 @@ module SiteSync
       end
 
       def update_latest_symlink(backup_root, timestamp)
-        latest = File.join(backup_root, 'latest')
+        latest = File.join(backup_root, "latest")
         FileUtils.rm_f(latest) if File.symlink?(latest) || File.exist?(latest)
         FileUtils.ln_s(timestamp, latest)
       end

@@ -4,13 +4,13 @@ class ContentSyncTest < ActiveSupport::TestCase
   def setup
     @temp_dir = Dir.mktmpdir("content_sync_test")
     @original_root = Rails.root
-    
+
     @posts_dir = File.join(@temp_dir, "posts")
     @pages_dir = File.join(@temp_dir, "pages")
     @docs_dir = File.join(@temp_dir, "documentation")
-    
-    FileUtils.mkdir_p([@posts_dir, @pages_dir, @docs_dir])
-    
+
+    FileUtils.mkdir_p([ @posts_dir, @pages_dir, @docs_dir ])
+
     ContentSync.any_instance.stubs(:sync_all) # Skip full sync in setup
   end
 
@@ -34,16 +34,16 @@ class ContentSyncTest < ActiveSupport::TestCase
       tags:
         - test
       ---
-      
+
       # Test Post
-      
+
       This is test content.
     YAML
-    
+
     file_path = write_test_file("posts/test-post.md", content)
-    
+
     result = Post.create_or_update_from_file(file_path)
-    
+
     assert result.persisted?
     assert_equal "Test Post", result.title
     assert_equal "published", result.status
@@ -56,19 +56,19 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Original Title
     YAML
-    
+
     file_path = write_test_file("posts/test-post.md", content)
     post = Post.create_or_update_from_file(file_path)
     original_id = post.id
-    
+
     updated_content = content.gsub("Original Title", "Updated Title")
     File.write(file_path, updated_content)
-    
+
     updated_post = Post.create_or_update_from_file(file_path)
-    
+
     assert_equal original_id, updated_post.id
     assert_equal "Updated Title", updated_post.title
   end
@@ -80,18 +80,18 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Orphan Post
     YAML
-    
+
     file_path = write_test_file("posts/orphan-post.md", content)
     post = Post.create_or_update_from_file(file_path)
     orphan_id = post.id
-    
+
     File.delete(file_path)
-    
+
     ContentSync.new.send(:handle_orphaned_posts, [])
-    
+
     assert_nil Post.find_by(id: orphan_id)
   end
 
@@ -102,19 +102,19 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Article Title
     YAML
-    
+
     old_path = write_test_file("posts/article.md", content)
     post = Post.create_or_update_from_file(old_path)
     original_id = post.id
-    
+
     new_content = content.gsub("Article Title", "Updated Article Title")
     new_path = write_test_file("posts/updated-article.md", new_content)
-    
-    ContentSync.new.send(:handle_orphaned_posts, [new_path])
-    
+
+    ContentSync.new.send(:handle_orphaned_posts, [ new_path ])
+
     post.reload
     assert_equal new_path, post.file_path
     assert_equal original_id, post.id
@@ -127,19 +127,19 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Post
     YAML
-    
+
     old_path = write_test_file("posts/post.md", content)
     post = Post.create_or_update_from_file(old_path)
     original_id = post.id
-    
+
     new_content = content.gsub("# Post", "# Renamed Post")
     new_path = write_test_file("posts/2024-01-15-post.md", new_content)
-    
-    ContentSync.new.send(:handle_orphaned_posts, [new_path])
-    
+
+    ContentSync.new.send(:handle_orphaned_posts, [ new_path ])
+
     post.reload
     assert_equal new_path, post.file_path
     assert_equal original_id, post.id
@@ -152,14 +152,14 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: not-a-date
       status: published
       ---
-      
+
       # Bad Date Post
     YAML
-    
+
     file_path = write_test_file("posts/bad-date.md", content)
-    
+
     result = Post.create_or_update_from_file(file_path)
-    
+
     assert_nil result
   end
 
@@ -169,14 +169,14 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # No Title
     YAML
-    
+
     file_path = write_test_file("posts/no-title.md", content)
-    
+
     result = Post.create_or_update_from_file(file_path)
-    
+
     assert result.is_a?(Symbol) && result == :warning
   end
 
@@ -186,14 +186,14 @@ class ContentSyncTest < ActiveSupport::TestCase
       title: No Date Post
       status: published
       ---
-      
+
       # No Date Post
     YAML
-    
+
     file_path = write_test_file("posts/no-date.md", content)
-    
+
     result = Post.create_or_update_from_file(file_path)
-    
+
     assert result.is_a?(Symbol) && result == :warning
   end
 
@@ -204,16 +204,16 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Duplicate Test
     YAML
-    
+
     file_path = write_test_file("posts/duplicate.md", content)
-    
+
     Post.create_or_update_from_file(file_path)
     Post.create_or_update_from_file(file_path)
     Post.create_or_update_from_file(file_path)
-    
+
     assert_equal 1, Post.where(file_path: RoeSitePaths.normalize(file_path)).count
   end
 
@@ -225,14 +225,14 @@ class ContentSyncTest < ActiveSupport::TestCase
       status: published
       tags: ruby, rails, tutorial
       ---
-      
+
       # Tags Test
     YAML
-    
+
     file_path = write_test_file("posts/tags-test.md", content)
     post = Post.create_or_update_from_file(file_path)
-    
-    assert_equal ["ruby", "rails", "tutorial"], post.tags
+
+    assert_equal [ "ruby", "rails", "tutorial" ], post.tags
   end
 
   test "pages sync works" do
@@ -240,13 +240,13 @@ class ContentSyncTest < ActiveSupport::TestCase
       ---
       title: Test Page
       ---
-      
+
       # Test Page
     YAML
-    
+
     file_path = write_test_file("pages/test-page.md", content)
     result = Page.create_or_update_from_file(file_path)
-    
+
     assert result.persisted?
     assert_equal "Test Page", result.title
   end
@@ -256,13 +256,13 @@ class ContentSyncTest < ActiveSupport::TestCase
       ---
       title: Test Doc
       ---
-      
+
       # Test Documentation
     YAML
-    
+
     file_path = write_test_file("documentation/test-doc.md", content)
     result = Documentation.create_or_update_from_file(file_path)
-    
+
     assert result.persisted?
     assert_equal "Test Doc", result.title
   end
@@ -274,13 +274,13 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Route Test
     YAML
-    
+
     file_path = write_test_file("posts/route-test.md", content)
     result = ContentSync.sync_file(file_path)
-    
+
     assert_equal :success, result
     assert Post.exists?(file_path: RoeSitePaths.normalize(file_path))
   end
@@ -290,13 +290,13 @@ class ContentSyncTest < ActiveSupport::TestCase
       ---
       title: Page Route Test
       ---
-      
+
       # Page Route Test
     YAML
-    
+
     file_path = write_test_file("pages/page-route-test.md", content)
     result = ContentSync.sync_file(file_path)
-    
+
     assert_equal :success, result
     assert Page.exists?(file_path: RoeSitePaths.normalize(file_path))
   end
@@ -308,13 +308,13 @@ class ContentSyncTest < ActiveSupport::TestCase
       date: 2024-01-15
       status: published
       ---
-      
+
       # Remove Test
     YAML
-    
+
     file_path = write_test_file("posts/remove-test.md", content)
     Post.create_or_update_from_file(file_path)
-    
+
     assert_difference "Post.count", -1 do
       Post.remove_by_file_path(file_path)
     end
@@ -325,13 +325,13 @@ class ContentSyncTest < ActiveSupport::TestCase
       ---
       invalid yaml: [
       ---
-      
+
       # Content
     YAML
-    
+
     file_path = write_test_file("posts/broken.md", content)
     result = ContentSync.sync_file(file_path)
-    
+
     assert_equal :error, result
   end
 end

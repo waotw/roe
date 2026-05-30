@@ -42,7 +42,7 @@ module HasMetadata
         [ "%\"#{tag}\"%", "%[\"#{tag}\"]%", "%,\"#{tag}\"%" ]
       }
 
-      where(conditions.join(' OR '), *params)
+      where(conditions.join(" OR "), *params)
     }
 
     scope :with_post_type, ->(type) {
@@ -62,7 +62,7 @@ module HasMetadata
   class_methods do
     def format_metadata_yaml(metadata)
       # Extract guid to place at the end (and deduplicate if needed)
-      guid_value = metadata.delete('guid')
+      guid_value = metadata.delete("guid")
 
       yaml_lines = []
 
@@ -103,7 +103,7 @@ module HasMetadata
 
   def raw_frontmatter
     full_path = File.join(RoeSitePaths::SITE_PATH, file_path)
-    return '' unless File.exist?(full_path)
+    return "" unless File.exist?(full_path)
 
     content = File.read(full_path)
 
@@ -111,7 +111,7 @@ module HasMetadata
     if content =~ /\A---\s*\n(.*?)\n---\s*\n/m
       $1
     else
-      ''
+      ""
     end
   end
 
@@ -141,13 +141,13 @@ module HasMetadata
 
   # Tags accessor - handle both string and array formats
   def tags
-    tags_value = metadata['tags']
+    tags_value = metadata["tags"]
 
     case tags_value
     when Array
       tags_value
     when String
-      tags_value.split(',').map(&:strip)
+      tags_value.split(",").map(&:strip)
     else
       []
     end
@@ -193,7 +193,7 @@ module HasMetadata
     if metadata["title"].present?
       metadata["title"].parameterize
     else
-      File.basename(file_path, '.md')
+      File.basename(file_path, ".md")
     end
   end
 

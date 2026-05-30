@@ -37,7 +37,7 @@ class Admin::ProductsController < Admin::BaseController
       "url_name" => filename
     )
 
-    yaml_content = metadata.to_yaml.sub(/\A---\n/, '')
+    yaml_content = metadata.to_yaml.sub(/\A---\n/, "")
     content = "---\n#{yaml_content}\n---\n#{parsed.content}"
 
     File.write(file_path, content)
@@ -59,7 +59,7 @@ class Admin::ProductsController < Admin::BaseController
 
     begin
       parsed = FrontMatterParser::Parser.new(:md).call(raw_content)
-      @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, '')
+      @metadata = parsed.front_matter.to_yaml.sub(/\A---\n/, "")
       @content = parsed.content
     rescue => e
       flash.now[:error] = "Error parsing product file: #{e.message}"
@@ -81,14 +81,14 @@ class Admin::ProductsController < Admin::BaseController
       end
 
       # Handle tags
-      if metadata['tags'].is_a?(String)
-        if metadata['tags'].strip.empty? || metadata['tags'] == '[]'
-          metadata['tags'] = []
+      if metadata["tags"].is_a?(String)
+        if metadata["tags"].strip.empty? || metadata["tags"] == "[]"
+          metadata["tags"] = []
         else
-          metadata['tags'] = metadata['tags'].split(',').map(&:strip).reject(&:empty?)
+          metadata["tags"] = metadata["tags"].split(",").map(&:strip).reject(&:empty?)
         end
-      elsif metadata['tags'].nil?
-        metadata['tags'] = []
+      elsif metadata["tags"].nil?
+        metadata["tags"] = []
       end
 
       yaml_content = Product.format_metadata_yaml(metadata)
@@ -102,7 +102,7 @@ class Admin::ProductsController < Admin::BaseController
     end
 
     # Capture pre-save state to detect a publishing transition for flash text.
-    was_published = @product.status == 'published'
+    was_published = @product.status == "published"
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
@@ -110,7 +110,7 @@ class Admin::ProductsController < Admin::BaseController
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     @product.reload
 
-    flash[:notice] = (!was_published && @product.status == 'published') ? "Product published" : "Product saved"
+    flash[:notice] = (!was_published && @product.status == "published") ? "Product published" : "Product saved"
     redirect_to edit_admin_product_path(@product)
   end
 
@@ -180,7 +180,7 @@ class Admin::ProductsController < Admin::BaseController
       end
 
       # Preserve url_name from database if not in submitted metadata
-      metadata['url_name'] ||= @product.metadata['url_name']
+      metadata["url_name"] ||= @product.metadata["url_name"]
 
       @product.metadata = metadata
       @product.content = content
@@ -191,7 +191,7 @@ class Admin::ProductsController < Admin::BaseController
     @preview_mode = true
     @preview_id = "product-#{@product.id}"
 
-    render template: 'products/show', layout: 'site'
+    render template: "products/show", layout: "site"
   end
 
   def publish_modal
@@ -209,20 +209,20 @@ class Admin::ProductsController < Admin::BaseController
     end
 
     @missing_requirements = build_publish_requirements(@product)
-    @resource_label = 'Product'
+    @resource_label = "Product"
     @show_postmark_warning = false  # products don't go to newsletter
     @paired_duration_for = nil       # no audio/video pairing for products
     @sku_generator_path = sku_generator_admin_product_path(@product)
 
-    render partial: 'admin/posts/publish_modal', layout: false
+    render partial: "admin/posts/publish_modal", layout: false
   end
 
   def unpublish
     @product = Product.find(params[:id])
-    @product.metadata['status'] = 'draft'
+    @product.metadata["status"] = "draft"
     save_product_to_file(@product)
 
-    flash[:notice] = 'Product unpublished'
+    flash[:notice] = "Product unpublished"
     redirect_to edit_admin_product_path(@product)
   end
 
@@ -231,13 +231,13 @@ class Admin::ProductsController < Admin::BaseController
 
     # Get current metadata values
     @title = @product.title
-    @category = @product.metadata['category']
+    @category = @product.metadata["category"]
 
-    render partial: 'sku_generator_modal', locals: { product: @product }
+    render partial: "sku_generator_modal", locals: { product: @product }
   end
 
   def next_sku_number
-    category = params[:category] || 'PROD'
+    category = params[:category] || "PROD"
     next_number = Product.next_number_for_category(category)
     render json: { next_number: next_number }
   end
@@ -259,14 +259,14 @@ class Admin::ProductsController < Admin::BaseController
   # broken media path.
   def build_publish_requirements(product)
     hints = {
-      'title'    => 'Product title',
-      'category' => begin
+      "title"    => "Product title",
+      "category" => begin
         cats = ProductCategory.all rescue []
-        cats.any? ? "e.g., #{cats.first(3).join(', ')}" : 'e.g., book, ebook, poster'
+        cats.any? ? "e.g., #{cats.first(3).join(', ')}" : "e.g., book, ebook, poster"
       end,
-      'price'    => 'Price in dollars (e.g., 29.99)',
-      'sku'      => 'Stock Keeping Unit (e.g., BOOK-001-TITLE)',
-      'image'    => 'Path to product image: /media/images/file.jpg'
+      "price"    => "Price in dollars (e.g., 29.99)",
+      "sku"      => "Stock Keeping Unit (e.g., BOOK-001-TITLE)",
+      "image"    => "Path to product image: /media/images/file.jpg"
     }
 
     requirements = product.missing_required_fields.map do |name|
@@ -288,7 +288,7 @@ class Admin::ProductsController < Admin::BaseController
         name: ref[:field],
         type: :text,
         label: ref[:field].humanize,
-        hint: 'File not found on disk — fix the path or upload the file.',
+        hint: "File not found on disk — fix the path or upload the file.",
         current: ref[:path],
         missing_file: true
       }
@@ -298,7 +298,7 @@ class Admin::ProductsController < Admin::BaseController
   end
 
   def save_product_to_file(product)
-    yaml_content = product.metadata.to_yaml.sub(/\A---\n/, '')
+    yaml_content = product.metadata.to_yaml.sub(/\A---\n/, "")
     full_content = "---\n#{yaml_content}\n---\n#{product.content}"
     File.write(File.join(RoeSitePaths::SITE_PATH, product.file_path), full_content)
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, product.file_path))
@@ -313,11 +313,11 @@ class Admin::ProductsController < Admin::BaseController
   end
 
   def filename_to_title(filename)
-    filename.gsub('-', ' ').titleize
+    filename.gsub("-", " ").titleize
   end
 
   def load_product_template
-    template_path = File.join(RoeSitePaths::SITE_PATH, 'system', 'templates', 'product_template.md')
+    template_path = File.join(RoeSitePaths::SITE_PATH, "system", "templates", "product_template.md")
 
     if File.exist?(template_path)
       File.read(template_path)

@@ -12,47 +12,47 @@
 module SiteFeature
   module_function
 
-  INTEGRATIONS_PATH = File.join(RoeSitePaths::SITE_PATH, 'system', 'integrations')
-  FEATURES_PATH     = File.join(RoeSitePaths::SITE_PATH, 'system', 'features')
+  INTEGRATIONS_PATH = File.join(RoeSitePaths::SITE_PATH, "system", "integrations")
+  FEATURES_PATH     = File.join(RoeSitePaths::SITE_PATH, "system", "features")
 
   # ── Feature enabled (file presence) ────────────────────────────────────
 
   def members_enabled?
-    File.exist?(File.join(FEATURES_PATH, 'members.yml'))
+    File.exist?(File.join(FEATURES_PATH, "members.yml"))
   end
 
   def store_enabled?
-    File.exist?(File.join(FEATURES_PATH, 'store.yml'))
+    File.exist?(File.join(FEATURES_PATH, "store.yml"))
   end
 
   def podcast_enabled?
-    File.exist?(File.join(FEATURES_PATH, 'podcast.yml'))
+    File.exist?(File.join(FEATURES_PATH, "podcast.yml"))
   end
 
   # Payments enabled = members enabled AND payments.enabled in members.yml
   def payments_feature_enabled?
     return false unless members_enabled?
-    SiteConfig.feature('members', 'payments.enabled') == true
+    SiteConfig.feature("members", "payments.enabled") == true
   end
 
   # Newsletters enabled = members enabled AND newsletter.enabled in members.yml
   def newsletters_feature_enabled?
     return false unless members_enabled?
-    SiteConfig.feature('members', 'newsletter & email.enabled') == true
+    SiteConfig.feature("members", "newsletter & email.enabled") == true
   end
 
   # ── Integration files present ───────────────────────────────────────────
 
   def payments_integration_file?
-    File.exist?(File.join(INTEGRATIONS_PATH, 'payments.yml'))
+    File.exist?(File.join(INTEGRATIONS_PATH, "payments.yml"))
   end
 
   def newsletters_integration_file?
-    File.exist?(File.join(INTEGRATIONS_PATH, 'newsletters.yml'))
+    File.exist?(File.join(INTEGRATIONS_PATH, "newsletters.yml"))
   end
 
   def snipcart_integration_file?
-    File.exist?(File.join(INTEGRATIONS_PATH, 'snipcart.yml'))
+    File.exist?(File.join(INTEGRATIONS_PATH, "snipcart.yml"))
   end
 
   # ── Keys present (integration file has keys) ────────────────────────────
@@ -102,7 +102,7 @@ module SiteFeature
 
   def payments_mode
     return nil unless payments_feature_enabled?
-    SiteConfig.feature('members', 'payments.mode').presence || 'memberships'
+    SiteConfig.feature("members", "payments.mode").presence || "memberships"
   end
 
   def memberships_enabled?
@@ -114,19 +114,19 @@ module SiteFeature
   end
 
   def donation_amounts
-    raw = SiteConfig.feature('members', 'payments.donation_amounts')
+    raw = SiteConfig.feature("members", "payments.donation_amounts")
 
     parsed = case raw
-             when Array
+    when Array
                raw
-             when String
+    when String
                raw.delete("[]").split(",").map(&:strip).reject(&:empty?)
-             else
+    else
                []
-             end
+    end
 
     nums = parsed.map { |v| Integer(v.to_s, exception: false) || Float(v.to_s, exception: false) }.compact
-    nums.presence || [5, 10, 20, 50]
+    nums.presence || [ 5, 10, 20, 50 ]
   end
 
   # ── Legacy / convenience ─────────────────────────────────────────────────
