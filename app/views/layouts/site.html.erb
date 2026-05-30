@@ -51,11 +51,6 @@
     <header class="site-nav <%= logo_classes %>">
       <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
-    <% if show_sidebar? %>
-      <aside class="site-sidebar sidebar-<%= sidebar_position %>">
-        <%= render_sidebar %>
-      </aside>
-    <% end %>
     <main data-controller="footnote-tooltip">
       <% flash.each do |type, message| %>
         <div class="flash flash-<%= type %>">
@@ -64,6 +59,11 @@
       <% end %>
       <%= yield %>
     </main>
+    <% if show_sidebar? %>
+      <aside class="site-sidebar sidebar-<%= sidebar_position %>">
+        <%= render_sidebar %>
+      </aside>
+    <% end %>
     <footer class="site-footer">
       <%= render_layout_file('footer') %>
     </footer>
@@ -95,7 +95,7 @@
       </script>
     <% end %>
     <script src="/theme/checkout.js"></script>
-    <% if current_member %>
+    <% if current_member && !@static_generation %>
       <%= link_to account_path, class: "member-account-icon", title: "My Account" do %>
         <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16.1328 15.7715">
          <g>

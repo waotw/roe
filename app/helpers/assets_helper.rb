@@ -37,12 +37,18 @@ module AssetsHelper
       end
     end
 
-    # Generate CSS variables for fixed roles
+    # Generate CSS variables for fixed roles — only when fonts.yml has
+    # a family configured for that role. Otherwise the helper would
+    # emit a fallback stack that overrides whatever the theme defines
+    # in its own :root (the helper's <style> sits after the theme link
+    # in the cascade), and themes like default.css that point
+    # --font-heading at var(--font-body) would silently get clobbered
+    # by Georgia, serif.
     css << "\n:root {"
-    css << "  --font-heading: #{font_stack('heading', fonts_config)};"
-    css << "  --font-body: #{font_stack('body', fonts_config)};"
-    css << "  --font-mono: #{font_stack('mono', fonts_config)};"
-    css << "  --font-accent: #{font_stack('accent', fonts_config)};"
+    %w[heading body mono accent].each do |role|
+      next unless fonts_config && fonts_config[role].is_a?(Hash) && fonts_config[role]['family'].present?
+      css << "  --font-#{role}: #{font_stack(role, fonts_config)};"
+    end
 
     # Generate CSS variables for custom families (any key outside the fixed four)
     if fonts_config

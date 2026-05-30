@@ -1,16 +1,32 @@
 module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
-  def to_html(preview: false, context: nil)
+  def to_html(preview: false, context: nil, static: false)
     # Store context for use by form renderers
     @render_context = context
+
+    # Store the static flag so downstream helpers (e.g. show_paid_indicator?)
+    # can suppress dynamic-only affordances without threading the flag
+    # through every render_* method signature.
+    @rendering_static = static
+
+    # In static-site mode, strip dynamic blocks that require a Rails
+    # backend (forms, paywalls, product buttons). Done before any other
+    # processing so downstream renderers never see them.
+    source = if static
+      content.to_s
+             .gsub(/```form\r?\n.*?```/m, '')
+             .gsub(/```button\r?\n.*?```/m, '')
+    else
+      content
+    end
 
     # Step 1: Convert backtick fenced code blocks to HTML
     code_blocks = {}
     counter = 0
 
     # Handle 4+ backticks first (allow optional whitespace after language)
-    processed_content = content.gsub(/````+(\w*)\s*\r?\n(.*?)````+/m) do
+    processed_content = source.gsub(/````+(\w*)\s*\r?\n(.*?)````+/m) do
       lang = $1.empty? ? 'text' : $1
       code = $2
       token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
@@ -88,6 +104,7 @@ module HasMarkdownExtensions
   ensure
     # Clear render context to prevent data leaking between requests
     @render_context = nil
+    @rendering_static = nil
   end
 
   def process_responsive_images(html)
@@ -648,7 +665,7 @@ module HasMarkdownExtensions
       output << ""
 
       # Title (linked) with optional lock icon
-      title_html = show_paid_indicator?(item) ? title_with_paid_icon(item.title || 'Untitled') : (item.title || 'Untitled')
+      title_html = decorate_title(item)
       output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
@@ -680,12 +697,9 @@ module HasMarkdownExtensions
   # template (opposite of list); pass `show_author: false` to suppress.
   # show_excerpt also defaults to true.
   #
-  # Media column rendering:
-  # - Image present: `<img>` rendered; the CSS flex layout puts it on the right.
-  # - post_type video/podcast/audio: a play (video) or headphones (audio-only)
-  #   icon overlays the image. Without an image, the icon stands alone in the
-  #   media column with no background.
-  # - No image and not a media post: media column omitted, body flows full width.
+  # Media indicators (play / headphones for video / audio / podcast posts)
+  # are added next to the title by decorate_title — same as every other
+  # collection template. No icon overlay on the image.
   def render_full(items, config = {})
     show_author = collection_truthy?(config[:show_author], default: true)
     show_excerpt = collection_truthy?(config[:show_excerpt], default: true)
@@ -693,8 +707,6 @@ module HasMarkdownExtensions
     items.map do |item|
       image_url = item.respond_to?(:image) ? item.image : nil
       has_image = image_url.present?
-      icon_type = collection_media_icon(item)
-      has_media_column = has_image || !icon_type.nil?
       alt = (item.title || '').to_s.gsub('"', '&quot;')
 
       output = []
@@ -702,7 +714,7 @@ module HasMarkdownExtensions
       output << '  <div class="item-body" markdown="1">'
       output << ""
 
-      title_html = show_paid_indicator?(item) ? title_with_paid_icon(item.title || 'Untitled') : (item.title || 'Untitled')
+      title_html = decorate_title(item)
       output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
@@ -728,14 +740,9 @@ module HasMarkdownExtensions
 
       output << "  </div>"
 
-      if has_media_column
-        col_classes = [ 'item-image' ]
-        col_classes << 'item-image--icon-only' unless has_image
-        output << %Q(  <a class="#{col_classes.join(' ')}" href="#{item_path(item)}">)
-        output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}" if has_image
-        if icon_type
-          output << %Q(    <span class="item-media-icon">#{render_media_icon(icon_type)}</span>)
-        end
+      if has_image
+        output << %Q(  <a class="item-image" href="#{item_path(item)}">)
+        output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}"
         output << '  </a>'
       end
 
@@ -768,10 +775,18 @@ module HasMarkdownExtensions
   def render_media_icon(type)
     case type
     when :play
-      %Q(<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16.1328 15.7715"><rect height="15.7715" opacity="0" width="16.1328" x="0" y="0"/>
-        <path d="M15.7715 7.88086C15.7715 12.2266 12.2363 15.7617 7.88086 15.7617C3.53516 15.7617 0 12.2266 0 7.88086C0 3.53516 3.53516 0 7.88086 0C12.2363 0 15.7715 3.53516 15.7715 7.88086ZM5.5957 5.14648L5.5957 10.625C5.5957 11.0254 6.04492 11.2207 6.43555 10.9766L10.9473 8.33008C11.2988 8.13477 11.2891 7.64648 10.9473 7.44141L6.43555 4.79492C6.08398 4.58008 5.5957 4.74609 5.5957 5.14648Z" fill="currentColor" fill-opacity="0.85"/></svg>)
+      %Q(<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16.1328 15.7715"><g><rect height="15.7715" opacity="0" width="16.1328" x="0" y="0"/>
+        <path d="M7.88086 15.7617C12.2363 15.7617 15.7715 12.2363 15.7715 7.88086C15.7715 3.52539 12.2363 0 7.88086 0C3.53516 0 0 3.52539 0 7.88086C0 12.2363 3.53516 15.7617 7.88086 15.7617ZM7.88086 14.2773C4.3457 14.2773 1.49414 11.416 1.49414 7.88086C1.49414 4.3457 4.3457 1.48438 7.88086 1.48438C11.416 1.48438 14.2773 4.3457 14.2773 7.88086C14.2773 11.416 11.416 14.2773 7.88086 14.2773Z" fill="currentColor" fill-opacity="0.85"/>
+        <path d="M6.46484 10.8691L10.8105 8.31055C11.1523 8.125 11.1426 7.64648 10.8105 7.46094L6.46484 4.90234C6.12305 4.69727 5.6543 4.85352 5.6543 5.24414L5.6543 10.5273C5.6543 10.918 6.08398 11.1035 6.46484 10.8691Z" fill="currentColor" fill-opacity="0.85"/>
+       </g></svg>)
     when :headphones
-      %Q(<svg viewBox="0 0 16.1328 15.7715" fill="currentColor" aria-hidden="true"><path d="M15.7715 7.89062C15.7715 12.2363 12.2363 15.7715 7.88086 15.7715C3.53516 15.7715 0 12.2363 0 7.89062C0 3.54492 3.53516 0.00976562 7.88086 0.00976562C12.2363 0.00976562 15.7715 3.54492 15.7715 7.89062ZM3.56445 7.89062C3.56445 9.43359 3.92578 10.5273 4.54102 11.582C4.69727 11.8652 5.01953 11.9727 5.32227 11.8359C5.54688 12.0801 5.89844 12.1875 6.26953 12.0605C6.82617 11.9141 7.08984 11.4355 6.93359 10.8887L6.38672 8.93555C6.23047 8.37891 5.75195 8.10547 5.19531 8.26172C5.03906 8.31055 4.90234 8.37891 4.80469 8.4668C4.78516 8.28125 4.77539 8.0957 4.77539 7.89062C4.77539 5.82031 6.02539 4.46289 7.89062 4.46289C9.77539 4.46289 11.0254 5.83008 11.0254 7.89062C11.0254 8.0957 11.0156 8.29102 11.0059 8.48633C10.8887 8.38867 10.7617 8.31055 10.5859 8.26172C10.0488 8.10547 9.57031 8.37891 9.41406 8.93555L8.85742 10.8984C8.70117 11.4453 8.95508 11.9141 9.51172 12.0605C9.89258 12.1777 10.2344 12.0801 10.4688 11.8359C10.7715 11.9727 11.084 11.8652 11.2598 11.582C11.8848 10.4883 12.2363 9.4043 12.2363 7.89062C12.2363 5.12695 10.4883 3.25195 7.89062 3.25195C5.30273 3.25195 3.56445 5.11719 3.56445 7.89062Z"/></svg>)
+      %Q(<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16.1328 15.7715">
+       <g>
+        <rect height="15.7715" opacity="0" width="16.1328" x="0" y="0"/>
+        <path d="M7.88086 15.7617C12.2363 15.7617 15.7715 12.2363 15.7715 7.88086C15.7715 3.52539 12.2363 0 7.88086 0C3.53516 0 0 3.52539 0 7.88086C0 12.2363 3.53516 15.7617 7.88086 15.7617ZM7.88086 14.2773C4.3457 14.2773 1.49414 11.416 1.49414 7.88086C1.49414 4.3457 4.3457 1.48438 7.88086 1.48438C11.416 1.48438 14.2773 4.3457 14.2773 7.88086C14.2773 11.416 11.416 14.2773 7.88086 14.2773Z" fill="currentColor" fill-opacity="0.85"/>
+        <path d="M3.71094 7.87109C3.71094 9.35547 4.0625 10.4199 4.64844 11.4355C4.82422 11.7188 5.14648 11.8066 5.44922 11.6406C5.73242 11.5039 5.82031 11.1523 5.6543 10.8398C5.16602 9.93164 4.88281 9.14062 4.88281 7.87109C4.88281 5.87891 6.07422 4.57031 7.88086 4.57031C9.69727 4.57031 10.9082 5.88867 10.9082 7.87109C10.9082 9.14062 10.625 9.94141 10.1074 10.8398C9.95117 11.1426 10.0391 11.4941 10.3223 11.6406C10.6152 11.8066 10.957 11.7188 11.123 11.4355C11.7188 10.3809 12.0703 9.32617 12.0703 7.87109C12.0703 5.20508 10.3906 3.4082 7.88086 3.4082C5.39062 3.4082 3.71094 5.19531 3.71094 7.87109ZM5.17578 11.2598C5.32227 11.7871 5.80078 12.0605 6.31836 11.8945C6.85547 11.748 7.11914 11.2891 6.96289 10.7617L6.42578 8.87695C6.26953 8.33984 5.81055 8.08594 5.2832 8.23242C4.75586 8.37891 4.48242 8.84766 4.63867 9.375ZM10.5957 11.2598L11.123 9.375C11.2793 8.83789 11.0254 8.37891 10.4883 8.23242C9.96094 8.08594 9.50195 8.33984 9.3457 8.87695L8.80859 10.7715C8.65234 11.2988 8.90625 11.748 9.45312 11.8945C9.98047 12.0508 10.4492 11.7871 10.5957 11.2598Z" fill="currentColor" fill-opacity="0.85"/>
+       </g>
+      </svg>)
     end
   end
 
@@ -814,7 +829,7 @@ module HasMarkdownExtensions
   def render_compact(items)
     items.map do |item|
       date_str = item.respond_to?(:date) && item.date ? " • #{item.date.strftime('%b %d, %Y')}" : ""
-      title_html = show_paid_indicator?(item) ? title_with_paid_icon(item.title || 'Untitled') : (item.title || 'Untitled')
+      title_html = decorate_title(item)
       "- [#{title_html}](#{item_path(item)})#{date_str}"
     end.join("\n")
   end
@@ -826,7 +841,7 @@ module HasMarkdownExtensions
       output << ""
 
       # Title (linked) with optional lock icon
-      title_html = show_paid_indicator?(item) ? title_with_paid_icon(item.title || 'Untitled') : (item.title || 'Untitled')
+      title_html = decorate_title(item)
       output << "### [#{title_html}](#{item_path(item)})"
       output << "{: .item-title}"
       output << ""
@@ -1093,6 +1108,10 @@ module HasMarkdownExtensions
   end
 
   def show_paid_indicator?(item)
+    # Suppress the paid lock in static-site builds — without a member
+    # session there's no upgrade flow to drive viewers toward, so the
+    # icon is just visual noise.
+    return false if @rendering_static
     return false unless item.metadata['audience'] == 'paid'
     return false unless SiteConfig.feature_enabled?('members')
 
@@ -1104,8 +1123,44 @@ module HasMarkdownExtensions
     '<svg class="paid-lock-icon" viewBox="0 0 16 16" fill="currentColor" width="18" height="18"><path d="M7.88 15.76c4.36 0 7.89-3.53 7.89-7.88 0-4.36-3.53-7.88-7.89-7.88C3.54 0 0 3.52 0 7.88c0 4.35 3.54 7.88 7.88 7.88zm0-1.48c-3.54 0-6.39-2.86-6.39-6.4 0-3.54 2.85-6.4 6.39-6.4 3.54 0 6.4 2.86 6.4 6.4 0 3.54-2.86 6.4-6.4 6.4z"/><path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/></svg>'
   end
 
-  # Appends the paid lock icon to a title string, wrapping the last word
-  # and the icon together in a nowrap span so they never split across lines.
+  # Inline media indicator (play / headphones) sized to sit alongside a
+  # title. Reuses render_media_icon's SVG paths but injects width/height
+  # and a stable class so themes can style consistently with .paid-lock-icon.
+  def title_media_icon(type)
+    svg = render_media_icon(type)
+    return nil unless svg
+    # Collapse any newlines/extra whitespace — the :play SVG is multi-line
+    # in the source, and Kramdown breaks markdown links when their text
+    # contains a literal newline.
+    svg = svg.gsub(/\s+/, ' ').strip
+    svg.sub('<svg ', '<svg class="title-media-icon" width="18" height="18" ')
+  end
+
+  # Decorate a collection item's title with any applicable indicators:
+  # paid lock first (if shown), then a media-type icon (headphones for
+  # audio, play for video/podcast-with-video). Returns plain title when
+  # neither applies. The last word + icons share a nowrap span so they
+  # don't break across lines.
+  def decorate_title(item)
+    title = item.title || 'Untitled'
+    icons = []
+
+    media_type = collection_media_icon(item)
+    icons << title_media_icon(media_type) if media_type
+
+    icons << paid_lock_icon if show_paid_indicator?(item)
+
+    return title if icons.empty?
+
+    words = title.split(' ')
+    last_word = words.pop || ''
+    icon_html = icons.compact.join
+    nowrap = %(<span style="white-space:nowrap">#{last_word}&nbsp;#{icon_html}</span>)
+    words.empty? ? nowrap : "#{words.join(' ')} #{nowrap}"
+  end
+
+  # Kept for back-compat with any external callers; new code should use
+  # decorate_title which handles paid + media in one pass.
   def title_with_paid_icon(title)
     words = title.split(' ')
     last_word = words.pop
@@ -1526,7 +1581,6 @@ module HasMarkdownExtensions
     presets = SiteFeature.donation_amounts.map do |amt|
       <<~HTML.strip
         <button type="button"
-                class="donate-preset"
                 data-donate-form-target="preset"
                 data-action="click->donate-form#select"
                 data-amount="#{amt}">#{amt}</button>
@@ -1555,7 +1609,7 @@ module HasMarkdownExtensions
                  required
                  pattern="\\d+(\\.\\d{1,3})?">
         </div>
-        <button type="submit" class="donate-button btn-primary">#{button_text}</button>
+        <button type="submit" class="btn-primary">#{button_text}</button>
       </form>
     HTML
   end
@@ -1563,9 +1617,9 @@ module HasMarkdownExtensions
   def render_unsubscribe_form(button_text)
     # Token will be in URL, form will POST to same path
     <<~HTML
-      <form action="" method="post" class="unsubscribe-form">
+      <form action="" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
-        <button type="submit" class="unsubscribe-button btn-destructive">#{button_text}</button>
+        <button type="submit" class="btn-destructive">#{button_text}</button>
       </form>
     HTML
   end
@@ -1575,8 +1629,8 @@ module HasMarkdownExtensions
     <<~HTML
       <!-- PAID_CONTENT_GATE -->
       <div class="paid-content-gate">
-        <p class="paywall-message">#{text}</p>
-        <a href="/upgrade" class="upgrade-button">#{button_text}</a>
+        <p>#{text}</p>
+        <a href="/upgrade" class="btn-primary">#{button_text}</a>
       </div>
     HTML
   end
@@ -1589,7 +1643,7 @@ module HasMarkdownExtensions
     # Only show upgrade button if payments are enabled AND text is provided
     upgrade_button = if upgrade_button_text.present? && payments_enabled
       <<~HTML
-        <button type="submit" formaction="/signup_and_checkout" class="signup-button signup-button-upgrade btn-primary">#{upgrade_button_text}</button>
+        <button type="submit" formaction="/signup_and_checkout" class="btn-primary">#{upgrade_button_text}</button>
       HTML
     else
       ""
@@ -1616,7 +1670,7 @@ module HasMarkdownExtensions
     email_value = member ? CGI.escape_html(member.email.to_s) : ""
 
     <<~HTML
-      <form action="/signup" method="post" class="signup-form">
+      <form action="/signup" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
 
         #{error_html}
@@ -1631,7 +1685,7 @@ module HasMarkdownExtensions
           <input type="email" name="member[email]" id="member_email" value="#{email_value}" required>
         </div>
 
-        <button type="submit" class="signup-button btn-outline">#{button_text}</button>
+        <button type="submit" class="btn-outline">#{button_text}</button>
         #{upgrade_button}
       </form>
     HTML
@@ -1639,7 +1693,7 @@ module HasMarkdownExtensions
 
   def render_signin_form(button_text = 'Send Magic Link')
     <<~HTML
-      <form action="/signin" method="post" class="signin-form">
+      <form action="/signin" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
 
         <div class="form-field">
@@ -1647,7 +1701,7 @@ module HasMarkdownExtensions
           <input type="email" name="member[email]" id="member_email" required>
         </div>
 
-        <button type="submit" class="signin-button">#{button_text}</button>
+        <button type="submit" class="btn-outline">#{button_text}</button>
       </form>
     HTML
   end
@@ -1655,22 +1709,22 @@ module HasMarkdownExtensions
   def render_checkout_form(member_button_text, non_member_button_text = nil)
     if non_member_button_text.blank?
       return <<~HTML
-        <form action="/checkout" method="post" class="upgrade-form checkout-form" data-turbo="false">
+        <form action="/checkout" method="post" class="checkout-form" data-turbo="false">
           <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
-          <button type="submit" class="upgrade-button btn-primary">#{member_button_text}</button>
+          <button type="submit" class="btn-primary">#{member_button_text}</button>
         </form>
       HTML
     end
 
     <<~HTML
       <div class="checkout-form-wrapper MEMBER_STATUS_PLACEHOLDER">
-        <form action="/checkout" method="post" class="upgrade-form member-checkout checkout-form" data-turbo="false">
+        <form action="/checkout" method="post" class="checkout-form member-checkout" data-turbo="false">
           <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
-          <button type="submit" class="upgrade-button btn-primary">#{member_button_text}</button>
+          <button type="submit" class="btn-primary">#{member_button_text}</button>
         </form>
 
         <div class="non-member-checkout">
-          <a href="/sign-up" class="upgrade-button btn-primary" data-turbo="false">#{non_member_button_text}</a>
+          <a href="/sign-up" class="btn-primary" data-turbo="false">#{non_member_button_text}</a>
         </div>
       </div>
     HTML

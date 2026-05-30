@@ -14,6 +14,7 @@ module Authentication
 
   private
     def authenticated?
+      return false if Current.static_generation
       resume_session
     end
 

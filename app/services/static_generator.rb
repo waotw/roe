@@ -128,6 +128,8 @@ class StaticGenerator
     copy_media if changes[:media]
 
     generate_404 if changes[:config]
+    generate_sitemap
+    generate_robots
 
     save_manifest
     @stats[:end_time] = Time.current
@@ -176,13 +178,13 @@ class StaticGenerator
     manifest = {
       generated_at: Time.current.iso8601(6),
       posts: build_content_manifest(Post),
-      pages: build_content_manifest(Page),
+      pages: build_content_manifest(static_pages_scope),
       documentation: build_content_manifest(Documentation),
       configs: {
         'site' => SiteConfig.find_by("file_path LIKE ?", "%site.yml")&.updated_at&.iso8601(6),
         'defaults/collections' => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
         'defaults/cards' => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
-        'defaults/podcast' => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
+        'features/podcast' => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
         'defaults/members' => SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.updated_at&.iso8601(6)
       },
       layouts: layout_checksums,
@@ -199,7 +201,7 @@ class StaticGenerator
 
   def detect_changes
     posts = changed_items(Post.not_draft, 'posts')
-    pages = changed_items(Page.not_draft, 'pages')
+    pages = changed_items(static_pages_scope, 'pages')
     docs = changed_items(Documentation.not_draft, 'documentation')
 
     podcast_posts = posts.select { |p| p.metadata['post_type'] == 'podcast' }
@@ -208,7 +210,7 @@ class StaticGenerator
     site_config_changed = config_file_changed?('site')
     collections_config_changed = config_file_changed?('defaults/collections')
     cards_config_changed = config_file_changed?('defaults/cards')
-    podcast_config_changed = config_file_changed?('defaults/podcast')
+    podcast_config_changed = config_file_changed?('features/podcast')
     members_config_changed = config_file_changed?('defaults/members')
 
     global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed?
@@ -216,7 +218,7 @@ class StaticGenerator
     {
       home: home_changed? || site_config_changed || collections_config_changed || members_config_changed || layouts_changed?,
       posts: global_changed ? Post.not_draft.to_a : posts,
-      pages: global_changed ? Page.not_draft.to_a : pages,
+      pages: global_changed ? static_pages_scope.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
       collections: collections_config_changed || members_config_changed || posts.any? || pages.any? || @manifest['generated_at'].nil?,
       feeds: site_config_changed || posts.any? || @manifest['generated_at'].nil?,
@@ -320,12 +322,13 @@ class StaticGenerator
     files.map { |f| [ f, File.mtime(f).to_i ] }.to_h
   end
 
-  def build_content_manifest(model)
-    items = model.pluck(:id, :updated_at, Arel.sql("json_extract(metadata, '$.url_name')"))
+  def build_content_manifest(scope)
+    klass_name = scope.respond_to?(:klass) ? scope.klass.name : scope.name
+    items = scope.pluck(:id, :updated_at, Arel.sql("json_extract(metadata, '$.url_name')"))
     items.map do |id, updated_at, url_name|
       [ id.to_s, {
         updated_at: updated_at.iso8601(6),
-        html_file: html_filename_for_type(model.name, url_name)
+        html_file: html_filename_for_type(klass_name, url_name)
       } ]
     end.to_h
   end
@@ -340,6 +343,8 @@ class StaticGenerator
 
   def cleanup_deleted_files
     deleted = 0
+
+    # Records that have been removed from the database entirely.
     %w[posts pages documentation].each do |type|
       @manifest.fetch(type, {}).each do |id, data|
         model = type.singularize.capitalize.constantize
@@ -355,6 +360,23 @@ class StaticGenerator
         end
       end
     end
+
+    # Pages that still exist as records but are no longer eligible for
+    # static generation (e.g. member pages added to the exclusion list
+    # after a previous run). Without this, stale signin/signup/donate
+    # html files would linger in the output.
+    eligible_ids = static_pages_scope.pluck(:id).map(&:to_s).to_set
+    @manifest.fetch('pages', {}).each do |id, data|
+      next if eligible_ids.include?(id)
+      html_file = data.is_a?(Hash) ? data['html_file'] : nil
+      next unless html_file
+      file_to_delete = @output_dir.join(html_file)
+      if file_to_delete.exist?
+        File.delete(file_to_delete)
+        deleted += 1
+      end
+    end
+
     puts "🗑️  Deleted #{deleted} orphaned files" if deleted > 0
   end
 
@@ -752,7 +774,25 @@ class StaticGenerator
     sync_directory(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'fonts'), @output_dir.join('system', 'fonts'))
     sync_directory(File.join(RoeSitePaths::SITE_PATH, 'system', 'assets', 'images'), @output_dir.join('system', 'images'))
     sync_directory(File.join(RoeSitePaths::SITE_PATH, 'theme'), @output_dir.join('theme'))
+    copy_bundled_themes
     puts "  ✓ Assets synced"
+  end
+
+  # If the active theme isn't installed under site/theme/, fall back to
+  # the bundled copy in app/themes/. Without this, sites running the
+  # out-of-box default theme would publish with no stylesheet.
+  def copy_bundled_themes
+    theme_name = SiteConfig.get('theme.active') || 'default'
+    %W[#{theme_name}.css checkout.js].each do |filename|
+      dest = @output_dir.join('theme', filename)
+      next if dest.exist? # site/theme/<file> already won the copy
+
+      bundled = Rails.root.join('app', 'themes', filename)
+      next unless bundled.exist?
+
+      FileUtils.mkdir_p(dest.dirname)
+      FileUtils.cp(bundled, dest)
+    end
   end
 
   # Pattern for image originals at the top of media/images/ (NOT inside
@@ -842,10 +882,85 @@ class StaticGenerator
   end
 
   # ============================================================================
+  # PAGES SCOPE
+  # ============================================================================
+
+  # Pages eligible for static generation. Excludes member-only pages
+  # (signup, signin, donate, checkout flows) which depend on Rails
+  # endpoints that don't exist in a static build.
+  def static_pages_scope
+    Page.not_draft.where.not("file_path LIKE ?", "%/pages/members/%")
+  end
+
+  # ============================================================================
+  # SITEMAP + ROBOTS
+  # ============================================================================
+
+  def generate_sitemap
+    puts "🗺️  Generating sitemap.xml..."
+    host = site_url_base
+    urls = []
+
+    home = Page.find_by("file_path LIKE ?", "%/home.md")
+    urls << [ "#{host}/", home&.updated_at ] if home
+
+    static_pages_scope.each do |page|
+      next if page == home
+      urls << [ "#{host}/#{page.url_name}", page.updated_at ]
+    end
+
+    Post.not_draft.each do |post|
+      urls << [ "#{host}/posts/#{post.url_name}", post.updated_at ]
+    end
+
+    Documentation.not_draft.each do |doc|
+      urls << [ "#{host}/documentation/#{doc.url_name}", doc.updated_at ]
+    end
+
+    xml = +%(<?xml version="1.0" encoding="UTF-8"?>\n)
+    xml << %(<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n)
+    urls.each do |loc, lastmod|
+      xml << "  <url>\n"
+      xml << "    <loc>#{loc}</loc>\n"
+      xml << "    <lastmod>#{lastmod.iso8601}</lastmod>\n" if lastmod
+      xml << "  </url>\n"
+    end
+    xml << "</urlset>\n"
+
+    write_file('sitemap.xml', xml)
+    puts "  ✓ sitemap.xml (#{urls.size} urls)"
+  end
+
+  def generate_robots
+    puts "🤖 Generating robots.txt..."
+    host = site_url_base
+    body = "User-agent: *\nAllow: /\n\nSitemap: #{host}/sitemap.xml\n"
+    write_file('robots.txt', body)
+    puts "  ✓ robots.txt"
+  end
+
+  def site_url_base
+    raw = SiteConfig.get('url').to_s.strip
+    return "https://#{site_host}" if raw.empty?
+    raw.match?(/\Ahttps?:\/\//) ? raw.sub(/\/+\z/, '') : "https://#{raw.sub(/\/+\z/, '')}"
+  end
+
+  # ============================================================================
   # RENDERING & FILE OPERATIONS
   # ============================================================================
 
   def render_with_layout(template:, assigns: {})
+    # Force anonymous-visitor state for the duration of this render.
+    # Without this, auth helpers see whatever Current.member /
+    # Current.user were set to by the admin request that triggered
+    # the build and bake admin-only markup into the static HTML.
+    prior_static = Current.static_generation
+    prior_member = Current.member
+    prior_user   = Current.user
+    Current.static_generation = true
+    Current.member = nil
+    Current.user   = nil
+
     ApplicationController.render(
       template: template,
       assigns: assigns.merge(static_generation: true),
@@ -894,6 +1009,10 @@ class StaticGenerator
     puts "=" * 70 + "\n"
 
     raise e
+  ensure
+    Current.static_generation = prior_static
+    Current.member            = prior_member
+    Current.user              = prior_user
   end
 
   def site_host

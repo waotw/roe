@@ -818,6 +818,12 @@ p.collection-more a:hover {
   border: 1px solid var(--color-border);
 }
 
+.title-media-icon {
+  padding-left: var(--space-1);
+  vertical-align: -4px;
+  opacity: 0.5;
+}
+
 /* Media icon overlay (play / headphones) */
 .item-media-icon {
   position: absolute;
@@ -2134,32 +2140,6 @@ a.member-account-icon svg {
   outline-offset: -1px;
 }
 
-/* Member buttons */
-.member-page .signup-button,
-.member-page .signin-button,
-.member-page .donate-button,
-.member-page .upgrade-button,
-.member-page .unsubscribe-button {
-  display: inline-block;
-  padding: var(--space-2) var(--space-4);
-  margin: 0 var(--space-2) 0 0;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  font-family: inherit;
-  font-size: var(--text-base);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.member-page .signup-button:hover,
-.member-page .signin-button:hover,
-.member-page .donate-button:hover,
-.member-page .upgrade-button:hover,
-.member-page .unsubscribe-button:hover {
-  background-color: var(--color-bg-dim);
-}
-
 .member-page .btn-primary {
   background-color: var(--color-link);
   color: var(--color-bg);
@@ -2210,6 +2190,10 @@ a.member-account-icon svg {
 .checkout-form-wrapper.is-guest .member-checkout,
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
+}
+
+.member-page a.btn-primary:visited {
+  color: var(--color-bg);
 }
 
 /* Alerts */
@@ -2325,7 +2309,7 @@ a.member-account-icon svg {
   margin-bottom: var(--space-4);
 }
 
-.member-page .donate-preset {
+.member-page .donate-presets button {
   flex: 1 1 auto;
   min-width: 4rem;
   padding: var(--space-2) var(--space-4);
@@ -2337,11 +2321,11 @@ a.member-account-icon svg {
   cursor: pointer;
 }
 
-.member-page .donate-preset:hover {
+.member-page .donate-presets button:hover {
   background-color: var(--color-bg-dim);
 }
 
-.member-page .donate-preset.is-selected {
+.member-page .donate-presets button.is-selected {
   background-color: var(--color-link);
   color: var(--color-bg);
   border-color: var(--color-link);
@@ -2349,6 +2333,8 @@ a.member-account-icon svg {
 
 /* Paid-content gate */
 .paid-lock-icon {
+  padding-left: var(--space-1);
+  vertical-align: -4px;
   opacity: 30%;
 }
 
@@ -2600,8 +2586,6 @@ article.page--store h2 {
   cursor: pointer;
   font-family: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   text-decoration: none;
 }

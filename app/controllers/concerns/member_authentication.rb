@@ -15,6 +15,11 @@ module MemberAuthentication
   end
 
   def current_member
+    # During static site generation, render everything as the anonymous
+    # visitor regardless of whose session triggered the build. Otherwise
+    # the admin's session leaks into the baked HTML (member-account icon,
+    # paywall bypass, etc.) and ships to every viewer.
+    return nil if Current.static_generation
     Current.member
   end
 

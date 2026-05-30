@@ -1,54 +1,51 @@
-<div class="auth-container">
-  <div class="auth-form">
-    <h1>Account</h1>
+<div class="member-page">
+  <h1>Account</h1>
 
-    <div class="account-details">
-      <div class="detail-row">
-        <strong>Name:</strong>
-        <span><%= @member.name %></span>
-      </div>
-
-      <div class="detail-row">
-        <strong>Email:</strong>
-        <span><%= @member.email %></span>
-      </div>
-
-      <div class="detail-row">
-        <strong>Membership:</strong>
-        <span><%= @member.tier.titleize %></span>
-      </div>
-
-      <div class="detail-row">
-        <strong>Status:</strong>
-        <span><%= @member.status.titleize %></span>
-      </div>
-
-      <% if @member.paid? && @member.paid_at %>
-        <div class="detail-row">
-          <strong>Upgraded:</strong>
-          <span><%= @member.paid_at.strftime("%B %d, %Y") %></span>
-        </div>
-      <% end %>
-
-      <div class="detail-row">
-        <strong>Member since:</strong>
-        <span><%= @member.subscribed_at.strftime("%B %d, %Y") %></span>
-      </div>
+  <div class="account-details">
+    <div class="detail-row">
+      <strong>Name:</strong>
+      <span><%= @member.name %></span>
     </div>
 
-    <div class="account-actions">
-      <%= link_to "Edit Account", account_edit_path, class: "btn-secondary" %>
-      <% if @member.free? %>
-        <%= button_to "Upgrade to Paid", create_checkout_path,
-            class: "btn-primary",
-            form_class: "checkout-form",
-            data: { turbo: false } %>
-      <% end %>
-      <%= button_to "Sign Out", signout_path, method: :delete, class: "btn-outline" %>
+    <div class="detail-row">
+      <strong>Email:</strong>
+      <span><%= @member.email %></span>
+    </div>
 
-      <% if @member.free? %>
-        <p class="upgrade-link">Find out about <a href="/upgrade">paid membership</a></p>
-      <% end %>
+    <div class="detail-row">
+      <strong>Membership:</strong>
+      <span><%= @member.tier.titleize %></span>
+    </div>
+
+    <div class="detail-row">
+      <strong>Status:</strong>
+      <span><%= @member.status.titleize %></span>
+    </div>
+
+    <% if @member.paid? && @member.paid_at %>
+      <div class="detail-row">
+        <strong>Upgraded:</strong>
+        <span><%= @member.paid_at.strftime("%B %d, %Y") %></span>
+      </div>
+    <% end %>
+
+    <div class="detail-row">
+      <strong>Member since:</strong>
+      <span><%= @member.subscribed_at.strftime("%B %d, %Y") %></span>
     </div>
   </div>
+
+  <div class="account-actions">
+    <%= link_to "Edit Account", account_edit_path, class: "btn-outline" %>
+    <% if @member.free? %>
+      <%= button_to "Upgrade to Paid", create_checkout_path,
+          class: "btn-primary",
+          form_class: "checkout-form",
+          data: { turbo: false } %>
+    <% end %>
+    <%= button_to "Sign Out", signout_path, method: :delete, class: "btn-secondary" %>
+  </div>
+    <% if @member.free? %>
+      <p class="upgrade-link">Find out about <a href="/upgrade">paid membership</a></p>
+    <% end %>
 </div>

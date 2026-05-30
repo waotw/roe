@@ -44,23 +44,29 @@ class Admin::ThemesController < Admin::BaseController
   end
 
   def activate
-    theme_name = params[:id]  # Changed from params[:name]
+    theme_name = params[:id]
     source_file = THEMES_DIR.join("#{theme_name}.css")
+    dest_file = USER_THEME_DIR.join("#{theme_name}.css")
 
-    unless source_file.exist?
-      flash[:error] = "Theme '#{theme_name}' not found in app/themes/"
+    # Theme must exist in at least one location to be activatable.
+    unless source_file.exist? || dest_file.exist?
+      flash[:error] = "Theme '#{theme_name}' not found in app/themes/ or /site/theme/"
       redirect_to admin_themes_path and return
     end
 
-    # Copy theme to user's theme folder
-    FileUtils.mkdir_p(USER_THEME_DIR)
-    dest_file = USER_THEME_DIR.join("#{theme_name}.css")
-    FileUtils.cp(source_file, dest_file)
+    # First-time activation: install the bundled copy into the user's
+    # theme folder so it's editable. If the theme is already there (was
+    # edited, copied, or hand-created), leave it untouched.
+    message = if dest_file.exist?
+      "#{theme_name.capitalize} theme activated"
+    else
+      FileUtils.mkdir_p(USER_THEME_DIR)
+      FileUtils.cp(source_file, dest_file)
+      "#{theme_name.capitalize} theme installed and activated"
+    end
 
-    # Update site config
     update_active_theme(theme_name)
-
-    flash[:notice] = "#{theme_name.capitalize} theme activated and copied to /site/theme/"
+    flash[:notice] = message
     redirect_to admin_themes_path
   end
 
