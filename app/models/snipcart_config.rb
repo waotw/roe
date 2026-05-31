@@ -20,11 +20,11 @@ class SnipcartConfig < ApplicationRecord
   # ── Key accessors ─────────────────────────────────────────────────────────
 
   def api_key_test
-    test_config["api_key"].presence || self[:api_key_test]
+    test_config["api_key"].presence || safe_encrypted_read(:api_key_test)
   end
 
   def api_key_live
-    self[:api_key_live]
+    safe_encrypted_read(:api_key_live)
   end
 
   # Active key based on mode
@@ -120,17 +120,40 @@ class SnipcartConfig < ApplicationRecord
 
   def self.save_test_config(config_data)
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
-    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml)
+    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   def self.clear_test_config
     File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
   end
 
+  # ── Decryption-failure tracking ──────────────────────────────────────────
+  # Populated by safe_encrypted_read when an encrypted column can't be
+  # decrypted (wrong master key, rotated credentials, corrupted ciphertext).
+  # The admin integration view surfaces this so the operator knows to
+  # re-save their keys instead of believing the integration is silently
+  # disconnected.
+
+  def decryption_errors
+    @decryption_errors ||= Set.new
+  end
+
+  def decryption_failed?
+    decryption_errors.any?
+  end
+
   private
 
   def test_config
     self.class.test_config
+  end
+
+  def safe_encrypted_read(attr)
+    self[attr]
+  rescue ActiveRecord::Encryption::Errors::Decryption => e
+    Rails.logger.warn "#{self.class.name}##{attr} decryption failed: #{e.message}"
+    decryption_errors << attr
+    nil
   end
 
   def set_connected_at

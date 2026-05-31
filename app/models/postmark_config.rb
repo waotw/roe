@@ -29,7 +29,7 @@ class PostmarkConfig < ApplicationRecord
 
   # Live token from DB
   def live_server_token
-    self[:server_token]
+    safe_encrypted_read(:server_token)
   end
 
   # Active token based on mode — live wins in production when live token present
@@ -103,11 +103,21 @@ class PostmarkConfig < ApplicationRecord
 
   def self.save_test_config(config_data)
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
-    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml)
+    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   def self.clear_test_config
     File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
+  end
+
+  # ── Decryption-failure tracking ──────────────────────────────────────────
+
+  def decryption_errors
+    @decryption_errors ||= Set.new
+  end
+
+  def decryption_failed?
+    decryption_errors.any?
   end
 
   private
@@ -116,12 +126,21 @@ class PostmarkConfig < ApplicationRecord
     self.class.test_config
   end
 
+  def safe_encrypted_read(attr)
+    self[attr]
+  rescue ActiveRecord::Encryption::Errors::Decryption => e
+    Rails.logger.warn "#{self.class.name}##{attr} decryption failed: #{e.message}"
+    decryption_errors << attr
+    nil
+  end
+
   def generate_webhook_token
-    self.webhook_token ||= SecureRandom.hex(32)
+    return if safe_encrypted_read(:webhook_token).present?
+    self.webhook_token = SecureRandom.hex(32)
   end
 
   def set_connected_at
     # Fire for both test (file) and live (DB) tokens
-    self.connected_at ||= Time.current if test_config["server_token"].present? || self[:server_token].present?
+    self.connected_at ||= Time.current if test_config["server_token"].present? || safe_encrypted_read(:server_token).present?
   end
 end

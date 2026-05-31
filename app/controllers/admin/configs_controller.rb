@@ -134,6 +134,14 @@ class Admin::ConfigsController < Admin::BaseController
         "secret_key"      => { type: :password, label: "Secret Key (Test)",      hint: "Starts with sk_test_" },
         "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Test)", hint: "Starts with whsec_" }
       }
+    },
+    live_keys: {
+      label: "Stripe Live Keys",
+      fields: {
+        "publishable_key" => { type: :text,     label: "Publishable Key (Live)", hint: "Starts with pk_live_" },
+        "secret_key"      => { type: :password, label: "Secret Key (Live)",      hint: "Starts with sk_live_" },
+        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Live)", hint: "Starts with whsec_" }
+      }
     }
   }.freeze
 
@@ -143,6 +151,12 @@ class Admin::ConfigsController < Admin::BaseController
       fields: {
         "server_token" => { type: :password, label: "Server Token (Test)", hint: "Your Postmark server API token for testing" }
       }
+    },
+    live_keys: {
+      label: "Postmark Live Token",
+      fields: {
+        "server_token" => { type: :password, label: "Server Token (Live)", hint: "Your Postmark production server API token" }
+      }
     }
   }.freeze
 
@@ -151,6 +165,12 @@ class Admin::ConfigsController < Admin::BaseController
       label: "Snipcart Test API Key",
       fields: {
         "api_key" => { type: :text, label: "Public API Key (Test)", hint: "Your Snipcart test public API key" }
+      }
+    },
+    live_keys: {
+      label: "Snipcart Live API Key",
+      fields: {
+        "api_key" => { type: :text, label: "Public API Key (Live)", hint: "Your Snipcart live public API key" }
       }
     }
   }.freeze
@@ -305,7 +325,7 @@ class Admin::ConfigsController < Admin::BaseController
       integration_files << {
         name: "snipcart.yml",
         path: "integrations/snipcart.yml",
-        description: "Snipcart API keys",
+        description: "Snipcart (store) API keys",
         edit_path: admin_edit_snipcart_integration_config_path,
         unconfigured: SiteFeature.snipcart_unconfigured?
       }
@@ -574,7 +594,7 @@ class Admin::ConfigsController < Admin::BaseController
     SiteConfig.sync_from_file("features/store")
 
     flash[:notice] = "Store feature enabled! Now configure your Snipcart API keys."
-    redirect_to edit_admin_snipcart_config_path
+    redirect_to admin_edit_snipcart_integration_config_path
   end
 
   def edit_store
@@ -641,7 +661,7 @@ class Admin::ConfigsController < Admin::BaseController
     }
 
     FileUtils.mkdir_p(File.dirname(SiteConfig::DEPLOY_FILE))
-    File.write(SiteConfig::DEPLOY_FILE, config.to_yaml)
+    write_yaml(SiteConfig::DEPLOY_FILE, config)
     SiteConfig.sync_from_file("deploy")
 
     # Save registry password if a new one was provided (blank = keep existing).
@@ -792,7 +812,7 @@ class Admin::ConfigsController < Admin::BaseController
     # Skip masked placeholder values — user didn't change those fields
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
-    File.write(path, existing.to_yaml)
+    write_yaml(path, existing)
     SiteConfig.sync_from_file("integrations/payments")
 
     # Save to StripeConfig and verify
@@ -812,6 +832,35 @@ class Admin::ConfigsController < Admin::BaseController
       verified_at: success ? stripe.verified_at.iso8601 : nil,
       error:       success ? nil : "Could not connect to Stripe. Check your test keys."
     }
+  end
+
+  def update_payments_live
+    unless Rails.env.production?
+      flash[:notice] = "Live keys are only saved in production."
+      redirect_to admin_edit_payments_config_path and return
+    end
+
+    stripe = StripeConfig.current
+    apply_live_keys(stripe, params[:live] || {}, %w[publishable_key secret_key webhook_signing_secret])
+
+    if stripe.save
+      stripe.verify!
+      flash[:notice] = "Stripe live keys saved"
+    else
+      flash[:error] = "Failed to save Stripe live keys"
+    end
+    redirect_to admin_edit_payments_config_path
+  end
+
+  def update_payments_mode
+    update_integration_mode(StripeConfig.current, "Payments")
+    redirect_to admin_edit_payments_config_path
+  end
+
+  def disconnect_payments
+    StripeConfig.current.disconnect!
+    flash[:notice] = "Stripe disconnected. All keys cleared."
+    redirect_to admin_edit_payments_config_path
   end
 
   def edit_newsletters
@@ -835,7 +884,7 @@ class Admin::ConfigsController < Admin::BaseController
     existing["test"] ||= {}
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
-    File.write(path, existing.to_yaml)
+    write_yaml(path, existing)
     SiteConfig.sync_from_file("integrations/newsletters")
 
     PostmarkConfig.save_test_config(existing["test"])
@@ -853,6 +902,41 @@ class Admin::ConfigsController < Admin::BaseController
       verified_at: success ? postmark.verified_at.iso8601 : nil,
       error:       success ? nil : "Could not connect to Postmark. Check your server token."
     }
+  end
+
+  def update_newsletters_live
+    unless Rails.env.production?
+      flash[:notice] = "Live keys are only saved in production."
+      redirect_to admin_edit_newsletters_config_path and return
+    end
+
+    postmark = PostmarkConfig.current
+    apply_live_keys(postmark, params[:live] || {}, %w[server_token])
+
+    if postmark.save
+      postmark.verify!
+      flash[:notice] = "Postmark live token saved"
+    else
+      flash[:error] = "Failed to save Postmark live token"
+    end
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  def update_newsletters_mode
+    update_integration_mode(PostmarkConfig.current, "Newsletters")
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  def disconnect_newsletters
+    PostmarkConfig.current.disconnect!
+    flash[:notice] = "Postmark disconnected. All tokens cleared."
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  def regenerate_postmark_webhook_token
+    PostmarkConfig.current.regenerate_webhook_token!
+    flash[:notice] = "Webhook token regenerated. Update the URL in Postmark!"
+    redirect_to admin_edit_newsletters_config_path
   end
 
   def edit_snipcart
@@ -876,13 +960,42 @@ class Admin::ConfigsController < Admin::BaseController
     existing["test"] ||= {}
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
-    File.write(path, existing.to_yaml)
+    write_yaml(path, existing)
     SiteConfig.sync_from_file("integrations/snipcart")
 
     SnipcartConfig.save_test_config(existing["test"])
     SnipcartConfig.current.verify!
 
     flash[:notice] = "Store (Snipcart) configuration saved"
+    redirect_to admin_edit_snipcart_integration_config_path
+  end
+
+  def update_snipcart_live
+    unless Rails.env.production?
+      flash[:notice] = "Live keys are only saved in production."
+      redirect_to admin_edit_snipcart_integration_config_path and return
+    end
+
+    snipcart = SnipcartConfig.current
+    apply_live_keys(snipcart, params[:live] || {}, %w[api_key])
+
+    if snipcart.save
+      snipcart.verify!
+      flash[:notice] = "Snipcart live key saved"
+    else
+      flash[:error] = "Failed to save Snipcart live key"
+    end
+    redirect_to admin_edit_snipcart_integration_config_path
+  end
+
+  def update_snipcart_mode
+    update_integration_mode(SnipcartConfig.current, "Store")
+    redirect_to admin_edit_snipcart_integration_config_path
+  end
+
+  def disconnect_snipcart
+    SnipcartConfig.current.disconnect!
+    flash[:notice] = "Snipcart disconnected. All keys cleared."
     redirect_to admin_edit_snipcart_integration_config_path
   end
 
@@ -897,6 +1010,48 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   private
+
+  # Write a Ruby hash to YAML at `path` without the leading `---`
+  # document separator. Hand-authored Roe config files don't use it,
+  # so generated ones shouldn't either — purely stylistic, but keeps
+  # diffs clean across the codebase.
+  def write_yaml(path, data)
+    File.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
+  end
+
+  # Apply live-key params to an integration record. Param names are
+  # the bare field (e.g. "publishable_key"); the model attribute gets
+  # "_live" appended. Skip masked placeholders so the user can save
+  # the form without re-entering already-stored secrets.
+  def apply_live_keys(record, params_hash, fields)
+    fields.each do |field|
+      value = params_hash[field]
+      next if value.blank? || value == "•" * 16
+      record.public_send("#{field}_live=", value)
+    end
+  end
+
+  # Update the active mode (test/live) on an integration record and
+  # set a flash. Caller handles the redirect.
+  def update_integration_mode(record, label)
+    new_mode = params[:mode].to_s
+    unless %w[test live].include?(new_mode)
+      flash[:error] = "Invalid mode: #{new_mode.inspect}"
+      return
+    end
+
+    if new_mode == "live" && record.respond_to?(:live_mode_ready?) && !record.live_mode_ready?
+      flash[:error] = "Add live keys before switching to Live mode"
+      return
+    end
+
+    record.mode = new_mode
+    if record.save
+      flash[:notice] = "#{label} mode set to #{new_mode.capitalize}"
+    else
+      flash[:error] = "Failed to update #{label.downcase} mode"
+    end
+  end
 
   def sync_stripe_payments(members_config)
     payments_config = members_config&.dig("payments")

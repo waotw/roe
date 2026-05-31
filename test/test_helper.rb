@@ -27,6 +27,7 @@ module ActiveSupport
       Documentation.delete_all
       Medium.delete_all
       SiteConfig.delete_all
+      PostmarkConfig.delete_all
 
       # Ensure static site mode is disabled for tests
       # This forces requests to go through Rails controllers

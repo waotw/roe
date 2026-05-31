@@ -27,29 +27,29 @@ class StripeConfig < ApplicationRecord
   # ── Test key accessors (file first, DB fallback) ─────────────────────────
 
   def publishable_key_test
-    test_config["publishable_key"].presence || self[:publishable_key_test]
+    test_config["publishable_key"].presence || safe_encrypted_read(:publishable_key_test)
   end
 
   def secret_key_test
-    test_config["secret_key"].presence || self[:secret_key_test]
+    test_config["secret_key"].presence || safe_encrypted_read(:secret_key_test)
   end
 
   def webhook_signing_secret_test
-    test_config["webhook_signing_secret"].presence || self[:webhook_signing_secret_test]
+    test_config["webhook_signing_secret"].presence || safe_encrypted_read(:webhook_signing_secret_test)
   end
 
   # ── Live key accessors (DB only) ─────────────────────────────────────────
 
   def publishable_key_live
-    self[:publishable_key_live]
+    safe_encrypted_read(:publishable_key_live)
   end
 
   def secret_key_live
-    self[:secret_key_live]
+    safe_encrypted_read(:secret_key_live)
   end
 
   def webhook_signing_secret_live
-    self[:webhook_signing_secret_live]
+    safe_encrypted_read(:webhook_signing_secret_live)
   end
 
   # ── Active key based on mode ─────────────────────────────────────────────
@@ -156,17 +156,35 @@ class StripeConfig < ApplicationRecord
 
   def self.save_test_config(config_data)
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
-    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml)
+    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   def self.clear_test_config
     File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
   end
 
+  # ── Decryption-failure tracking ──────────────────────────────────────────
+
+  def decryption_errors
+    @decryption_errors ||= Set.new
+  end
+
+  def decryption_failed?
+    decryption_errors.any?
+  end
+
   private
 
   def test_config
     self.class.test_config
+  end
+
+  def safe_encrypted_read(attr)
+    self[attr]
+  rescue ActiveRecord::Encryption::Errors::Decryption => e
+    Rails.logger.warn "#{self.class.name}##{attr} decryption failed: #{e.message}"
+    decryption_errors << attr
+    nil
   end
 
   def set_connected_at

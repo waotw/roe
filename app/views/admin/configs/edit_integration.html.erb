@@ -18,6 +18,24 @@
     when 'snipcart'    then admin_snipcart_integration_config_path
   end
 
+  live_update_path = case @config_type
+    when 'payments'    then admin_live_payments_config_path
+    when 'newsletters' then admin_live_newsletters_config_path
+    when 'snipcart'    then admin_live_snipcart_integration_config_path
+  end
+
+  mode_update_path = case @config_type
+    when 'payments'    then admin_mode_payments_config_path
+    when 'newsletters' then admin_mode_newsletters_config_path
+    when 'snipcart'    then admin_mode_snipcart_integration_config_path
+  end
+
+  disconnect_path = case @config_type
+    when 'payments'    then admin_disconnect_payments_config_path
+    when 'newsletters' then admin_disconnect_newsletters_config_path
+    when 'snipcart'    then admin_disconnect_snipcart_integration_config_path
+  end
+
   title = case @config_type
     when 'payments'    then 'Payments (Stripe)'
     when 'newsletters' then 'Newsletters (Postmark)'
@@ -25,6 +43,8 @@
   end
 
   is_production = Rails.env.production?
+  has_mode      = integration_record&.respond_to?(:mode)
+  live_ready    = integration_record&.respond_to?(:live_mode_ready?) && integration_record.live_mode_ready?
 %>
 
 <div class="max-w-3xl mx-auto p-8 bg-white">
@@ -38,6 +58,28 @@
           class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
     </div>
   </div>
+
+  <%# Decryption-failure banner. Surfaces when the integration record
+      holds encrypted ciphertext that can't be decrypted with the
+      current master key — usually because keys were rotated or
+      because the dev DB is being opened with RAILS_ENV=production.
+      The page no longer 500s in this state, but the integration is
+      effectively disconnected until the operator re-saves the
+      affected fields, so we make that explicit. %>
+  <% if integration_record&.respond_to?(:decryption_failed?) && integration_record.decryption_failed? %>
+    <div class="p-4 mb-4 border border-amber-300 bg-amber-50">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">
+        ⚠ Some keys couldn't be decrypted
+      </h3>
+      <p class="text-sm text-amber-800">
+        The following fields hold ciphertext that doesn't match the current
+        master key:
+        <code class="font-mono text-xs"><%= integration_record.decryption_errors.to_a.join(', ') %></code>.
+        This usually means master credentials were rotated. Re-enter the
+        affected keys below to repair the integration.
+      </p>
+    </div>
+  <% end %>
 
   <%# Connection status — async Stimulus verify %>
   <div class="p-4 border border-gray-200 bg-gray-50 mb-6"
@@ -58,31 +100,105 @@
     </div>
   </div>
 
-  <%# Tabs %>
-  <div class="border-b border-gray-200 mb-6" data-controller="tabs">
-    <nav class="flex gap-4">
-      <button type="button"
-              data-tabs-target="tab"
-              data-action="click->tabs#show"
-              data-tabs-panel="test"
-              class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
-        Test
-      </button>
-      <button type="button"
-              data-tabs-target="tab"
-              data-action="click->tabs#show"
-              data-tabs-panel="live"
-              class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 <%= 'opacity-50 cursor-not-allowed' unless is_production %>"
-              <%= 'disabled' unless is_production %>>
-        Live <%= '(production only)' unless is_production %>
-      </button>
-    </nav>
-  </div>
+  <%# Active mode (production only). Sits above the tabs because it's
+      a global state for the integration, not specific to test/live
+      input. Live radio is disabled until live keys are saved. %>
+  <% if is_production && has_mode %>
+    <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
+      <h3 class="text-base font-semibold text-gray-900 mb-3">Active Mode</h3>
+      <%= form_with url: mode_update_path, method: :patch, class: "flex items-center gap-6" do |f| %>
+        <label class="flex items-center gap-2">
+          <%= f.radio_button :mode, "test", checked: integration_record.mode_test?, class: "form-radio" %>
+          <span class="text-sm">Test Mode (no real charges)</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <%= f.radio_button :mode, "live", checked: integration_record.mode_live?, disabled: !live_ready, class: "form-radio" %>
+          <span class="text-sm <%= live_ready ? 'font-semibold text-red-600' : 'text-gray-400' %>">
+            Live Mode <%= live_ready ? '(real charges!)' : '(add live keys to enable)' %>
+          </span>
+        </label>
+        <%= f.submit "Update Mode",
+                    class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer ml-auto" %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Webhook endpoint. Postmark embeds a per-install token in the path
+      and verifies it server-side (webhooks/postmark_controller.rb).
+      Stripe uses one URL and authenticates via signing_secret. Snipcart
+      isn't webhook-driven in Roe so we skip the section. %>
+  <%
+    webhook_url = case @config_type
+      when 'payments'
+        "#{request.base_url}/webhooks/stripe"
+      when 'newsletters'
+        token = integration_record&.respond_to?(:webhook_token) ? integration_record.webhook_token : nil
+        token.present? ? "#{request.base_url}/webhooks/postmark/#{token}" : nil
+      end
+  %>
+  <% if webhook_url %>
+    <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
+      <h3 class="text-base font-semibold text-gray-900 mb-2">Webhook Endpoint</h3>
+      <p class="text-sm text-gray-600 mb-3">
+        <% if @config_type == 'newsletters' %>
+          Add this URL as a webhook in your Postmark server's settings so delivery
+          events (opens, clicks, bounces) reach Roe. The token at the end is unique
+          to this install — keep it secret. Regenerable in the Danger Zone below.
+        <% elsif @config_type == 'payments' %>
+          Add this URL as a webhook endpoint in your Stripe dashboard. Stripe will
+          give you a signing secret in return — paste that into the
+          <em>Webhook Signing Secret</em> field in the appropriate tab below.
+          Test and Live modes use the same URL but separate endpoints / signing secrets.
+        <% end %>
+      </p>
+      <input type="text"
+             value="<%= webhook_url %>"
+             readonly
+             onclick="this.select()"
+             class="w-full font-mono text-xs p-2 border border-gray-300 bg-white">
+    </div>
+  <% end %>
+
+  <%# Tabs — the controller wraps BOTH the nav and the panels below so
+      Stimulus target lookups (this.panelTargets) actually find them.
+      Without this wrapping, panelTargets is empty and clicking Live
+      only restyles the buttons; the visible form never changes. %>
+  <div data-controller="tabs">
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex gap-4">
+        <button type="button"
+                data-tabs-target="tab"
+                data-action="click->tabs#show"
+                data-tabs-panel="test"
+                class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+          Test
+        </button>
+        <button type="button"
+                data-tabs-target="tab"
+                data-action="click->tabs#show"
+                data-tabs-panel="live"
+                class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 <%= 'opacity-50 cursor-not-allowed pointer-events-auto' unless is_production %>"
+                <%= 'disabled' unless is_production %>
+                <%= 'title="Live mode is only available in production"'.html_safe unless is_production %>>
+          Live <%= '(production only)' unless is_production %>
+        </button>
+      </nav>
+    </div>
+
+    <%# Dev-only note explaining the test/live split so an admin doesn't
+        wonder why the Live tab is greyed out. Skipped in production
+        where the tab is interactive. %>
+    <% unless is_production %>
+      <p class="text-xs text-gray-500 italic mb-4">
+        Live keys are stored encrypted in the database and can only be saved on the production server.
+        Test keys are stored as plain text in <code class="font-mono">site/system/integrations/<%= @config_type %>.yml</code>.
+      </p>
+    <% end %>
 
   <%# Test tab %>
   <div data-tabs-target="panel" data-tabs-panel="test">
     <%= form_with url: update_path, method: :patch, class: "space-y-6" do |f| %>
-      <% @schema.each do |section_key, section| %>
+      <% [ @schema[:test_keys] ].compact.each do |section| %>
         <div class="config-section">
           <h3 class="text-base font-semibold text-gray-900 mb-1"><%= section[:label] %></h3>
           <div class="space-y-4 pl-4 border-l-2 border-gray-200">
@@ -123,21 +239,47 @@
     <% end %>
   </div>
 
-  <%# Live tab %>
+  <%# Live tab — production-only form. In dev we show a notice instead
+      of inputs since the controller refuses to persist live keys
+      outside production anyway. %>
   <div data-tabs-target="panel" data-tabs-panel="live" class="hidden">
     <% if is_production %>
-      <%# Redirect to the existing dedicated config page for live keys %>
-      <% live_path = case @config_type
-           when 'payments'    then edit_admin_stripe_config_path
-           when 'newsletters' then edit_admin_postmark_config_path
-           when 'snipcart'    then edit_admin_snipcart_config_path
-         end %>
-      <div class="p-4 bg-blue-50 border border-blue-200 mb-4">
-        <p class="text-sm text-blue-800">
-          Live keys are stored encrypted in the database.
-          <%= link_to "Edit live keys →", live_path, class: "underline font-medium" %>
-        </p>
-      </div>
+      <%= form_with url: live_update_path, method: :patch, class: "space-y-6" do |f| %>
+        <% live_section = @schema[:live_keys] %>
+        <% if live_section %>
+          <div class="config-section">
+            <h3 class="text-base font-semibold text-gray-900 mb-1"><%= live_section[:label] %></h3>
+            <p class="text-xs text-gray-600 mb-3">
+              Live keys are stored encrypted in the database. Fields are masked when already set.
+            </p>
+            <div class="space-y-4 pl-4 border-l-2 border-gray-200">
+              <% live_section[:fields].each do |field_name, field_config| %>
+                <% current_value = integration_record&.public_send("#{field_name}_live").to_s rescue '' %>
+                <% masked = current_value.present? %>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <%= field_config[:label] %>
+                  </label>
+                  <input type="<%= field_config[:type] == :password ? 'password' : 'text' %>"
+                         name="live[<%= field_name %>]"
+                         value="<%= masked ? '••••••••••••••••' : '' %>"
+                         placeholder="<%= field_config[:hint] %>"
+                         class="w-full font-mono text-sm p-2 border border-gray-300"
+                         autocomplete="off">
+                  <% if field_config[:hint] %>
+                    <p class="text-xs text-gray-500 mt-1"><%= field_config[:hint] %></p>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+          <input type="submit" value="Save Live Keys"
+                 class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+        </div>
+      <% end %>
     <% else %>
       <div class="p-4 bg-gray-50 border border-gray-200">
         <p class="text-sm text-gray-600">
@@ -145,5 +287,28 @@
         </p>
       </div>
     <% end %>
+  </div>
+  </div><%# /data-controller="tabs" %>
+
+  <%# Danger zone — disconnect clears all keys for this integration
+      across both modes. Postmark also exposes a webhook-token rotate
+      action here since it's destructive (invalidates old endpoints). %>
+  <div class="mt-12 pt-6 border-t border-red-200">
+    <h3 class="text-sm font-semibold text-red-900 mb-3">Danger Zone</h3>
+    <div class="flex items-center gap-3 flex-wrap">
+      <%= button_to "Disconnect #{title.split(' ').first}",
+                    disconnect_path,
+                    method: :delete,
+                    data: { turbo_confirm: "Are you sure? This will clear ALL keys (test and live) for this integration." },
+                    class: "uppercase text-sm px-3 py-2 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
+
+      <% if @config_type == 'newsletters' %>
+        <%= button_to "Regenerate Webhook Token",
+                      admin_regenerate_webhook_token_newsletters_config_path,
+                      method: :post,
+                      data: { turbo_confirm: "Regenerate the webhook token? You'll need to update the URL in your Postmark dashboard." },
+                      class: "uppercase text-sm px-3 py-2 border border-amber-600 bg-amber-50 hover:bg-amber-100 text-amber-800 font-mono rounded-xs" %>
+      <% end %>
+    </div>
   </div>
 </div>

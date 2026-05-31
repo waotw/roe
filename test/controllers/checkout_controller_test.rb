@@ -12,7 +12,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
 
     # Sign in the member by setting session directly
@@ -52,7 +53,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
   test "redirects to root when price_id not set" do
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
-      secret_key_test: "sk_test_123"
+      secret_key_test: "sk_test_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 
@@ -73,7 +75,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 
@@ -90,7 +93,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 
@@ -128,7 +132,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 
@@ -146,7 +151,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 
@@ -169,7 +175,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
 
     # Try to sign in with cancelled member token
@@ -184,7 +191,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_abc123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 
@@ -205,7 +213,8 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123"
+      price_id: "price_123",
+      verified_at: Time.current
     )
     sign_in_member(@member)
 

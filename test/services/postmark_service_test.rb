@@ -2,8 +2,10 @@ require "test_helper"
 
 class PostmarkServiceTest < ActiveSupport::TestCase
   def setup
+    super
+    PostmarkConfig.delete_all
     @config = PostmarkConfig.current
-    @config.update!(server_token: "test-server-token")
+    @config.update!(server_token: "test-server-token", verified_at: Time.current)
   end
 
   test "configured? returns true when server_token is set" do

@@ -139,34 +139,28 @@ Rails.application.routes.draw do
       end
     end
 
-    # Stripe Configuration
-    resource :stripe_config, only: [ :edit, :update, :destroy ] do
-      post :verify, on: :member
-    end
-
-    # Postmark Configuration
-    resource :postmark_config, only: [ :edit, :update, :destroy ] do
-      post :regenerate_webhook_token, on: :member
-      post :verify, on: :member
-    end
-
-    # Snipcart Configuration
-    resource :snipcart_config, only: [ :edit, :update, :destroy ] do
-      post :verify, on: :member
-    end
-
     # Integration config pages (Settings → Integrations)
-    get "configs/payments/edit",     to: "configs#edit_payments",     as: "edit_payments_config"
-    patch "configs/payments",         to: "configs#update_payments",   as: "payments_config"
-    post  "configs/payments/verify",  to: "configs#verify_payments",   as: "verify_payments_config"
+    get    "configs/payments/edit",       to: "configs#edit_payments",          as: "edit_payments_config"
+    patch  "configs/payments",            to: "configs#update_payments",        as: "payments_config"
+    patch  "configs/payments/live",       to: "configs#update_payments_live",   as: "live_payments_config"
+    patch  "configs/payments/mode",       to: "configs#update_payments_mode",   as: "mode_payments_config"
+    post   "configs/payments/verify",     to: "configs#verify_payments",        as: "verify_payments_config"
+    delete "configs/payments/disconnect", to: "configs#disconnect_payments",    as: "disconnect_payments_config"
 
-    get "configs/newsletters/edit",     to: "configs#edit_newsletters",     as: "edit_newsletters_config"
-    patch "configs/newsletters",         to: "configs#update_newsletters",   as: "newsletters_config"
-    post  "configs/newsletters/verify",  to: "configs#verify_newsletters",   as: "verify_newsletters_config"
+    get    "configs/newsletters/edit",                      to: "configs#edit_newsletters",                  as: "edit_newsletters_config"
+    patch  "configs/newsletters",                           to: "configs#update_newsletters",                as: "newsletters_config"
+    patch  "configs/newsletters/live",                      to: "configs#update_newsletters_live",           as: "live_newsletters_config"
+    patch  "configs/newsletters/mode",                      to: "configs#update_newsletters_mode",           as: "mode_newsletters_config"
+    post   "configs/newsletters/verify",                    to: "configs#verify_newsletters",                as: "verify_newsletters_config"
+    delete "configs/newsletters/disconnect",                to: "configs#disconnect_newsletters",            as: "disconnect_newsletters_config"
+    post   "configs/newsletters/regenerate_webhook_token",  to: "configs#regenerate_postmark_webhook_token", as: "regenerate_webhook_token_newsletters_config"
 
-    get "configs/snipcart/edit",     to: "configs#edit_snipcart",     as: "edit_snipcart_integration_config"
-    patch "configs/snipcart",         to: "configs#update_snipcart",   as: "snipcart_integration_config"
-    post  "configs/snipcart/verify",  to: "configs#verify_snipcart",   as: "verify_snipcart_integration_config"
+    get    "configs/snipcart/edit",       to: "configs#edit_snipcart",          as: "edit_snipcart_integration_config"
+    patch  "configs/snipcart",            to: "configs#update_snipcart",        as: "snipcart_integration_config"
+    patch  "configs/snipcart/live",       to: "configs#update_snipcart_live",   as: "live_snipcart_integration_config"
+    patch  "configs/snipcart/mode",       to: "configs#update_snipcart_mode",   as: "mode_snipcart_integration_config"
+    post   "configs/snipcart/verify",     to: "configs#verify_snipcart",        as: "verify_snipcart_integration_config"
+    delete "configs/snipcart/disconnect", to: "configs#disconnect_snipcart",    as: "disconnect_snipcart_integration_config"
 
     resources :themes, only: [ :index, :destroy ] do
       member do

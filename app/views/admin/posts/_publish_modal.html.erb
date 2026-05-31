@@ -21,7 +21,7 @@
           <strong class="text-yellow-800">⚠ Postmark isn't configured.</strong>
           <span class="text-yellow-800">
             You can still publish, but if Distribution is set to <em>Newsletter</em> or <em>Site &amp; Newsletter</em>, no email will actually go out until you
-            <%= link_to "configure Postmark", edit_admin_postmark_config_path, class: "underline hover:text-yellow-900" %>.
+            <%= link_to "configure Postmark", admin_edit_newsletters_config_path, class: "underline hover:text-yellow-900" %>.
           </span>
         </div>
       <% end %>

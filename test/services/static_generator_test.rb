@@ -65,6 +65,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
     generator.instance_variable_set(:@manifest, generator.send(:load_manifest))
 
     # Create a site config that's newer than manifest
+    SiteConfig.where(file_path: "site/system/global/site.yml").destroy_all
     site_config = create(:site_config,
       file_path: "site/system/global/site.yml",
       config: { "title" => "Updated" }
@@ -89,6 +90,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
     generator.instance_variable_set(:@manifest, generator.send(:load_manifest))
 
     # Create old config
+    SiteConfig.where(file_path: "site/system/global/site.yml").destroy_all
     site_config = create(:site_config,
       file_path: "site/system/global/site.yml",
       config: { "title" => "Old" }

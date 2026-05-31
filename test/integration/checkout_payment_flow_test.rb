@@ -17,7 +17,8 @@ class CheckoutPaymentFlowTest < ActionDispatch::IntegrationTest
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
       price_id: "price_test_123",
-      mode: :test
+      mode: :test,
+      verified_at: Time.current
     )
 
     # Create required pages

@@ -2,6 +2,7 @@ require "test_helper"
 
 class SendNewsletterJobTest < ActiveJob::TestCase
   def setup
+    super
     @post = create(:post, metadata: { "title" => "Test Newsletter", "status" => "published", "audience" => "public", "date" => "2024-01-01" })
     @member = create(:member, email: "test@example.com", name: "Test User")
     @job = SendNewsletterJob.new
@@ -17,6 +18,7 @@ class SendNewsletterJobTest < ActiveJob::TestCase
     )
 
     # Configure Postmark
+    PostmarkConfig.delete_all
     PostmarkConfig.current.update!(server_token: "test-token")
   end
 
