@@ -44,11 +44,11 @@ module SiteFeature
   # ── Integration files present ───────────────────────────────────────────
 
   def payments_integration_file?
-    File.exist?(File.join(INTEGRATIONS_PATH, "payments.yml"))
+    File.exist?(File.join(INTEGRATIONS_PATH, "stripe.yml"))
   end
 
   def newsletters_integration_file?
-    File.exist?(File.join(INTEGRATIONS_PATH, "newsletters.yml"))
+    File.exist?(File.join(INTEGRATIONS_PATH, "postmark.yml"))
   end
 
   def snipcart_integration_file?

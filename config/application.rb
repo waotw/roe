@@ -65,7 +65,14 @@ module RoeSitePaths
   # update system's MigrationTester can boot a Rails subprocess pointed
   # at a copy of the production site (under staging/test_site/) and run
   # `db:migrate` against the copy without ever touching the real DB.
-  SITE_PATH = ENV["ROE_SITE_PATH"].presence || File.join(ROE_ROOT, "site")
+  #
+  # In RAILS_ENV=test we route everything to <ROE_ROOT>/tmp/test_site/
+  # so test runs can write integration configs, sync fixtures, etc.
+  # without ever touching the developer's real /site directory. The
+  # tmp/ tree is gitignored by Rails default.
+  SITE_PATH = ENV["ROE_SITE_PATH"].presence ||
+              (ENV["RAILS_ENV"] == "test" ? File.join(ROE_ROOT, "tmp", "test_site")
+                                          : File.join(ROE_ROOT, "site"))
 
   # STATIC_SITE_PATH is where static site output goes (outside versioned directory)
   STATIC_SITE_PATH = File.join(ROE_ROOT, "static_site")

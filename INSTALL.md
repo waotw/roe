@@ -192,8 +192,8 @@ and are only saved in production.
 
 | Integration | Feature | Test config file |
 |---|---|---|
-| Stripe | Payments | `site/system/integrations/payments.yml` |
-| Postmark | Newsletters/email | `site/system/integrations/newsletters.yml` |
+| Stripe | Payments | `site/system/integrations/stripe.yml` |
+| Postmark | Newsletters/email | `site/system/integrations/postmark.yml` |
 | Snipcart | Store | `site/system/integrations/snipcart.yml` |
 
 ### 3. Customize your theme

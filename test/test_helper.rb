@@ -11,6 +11,42 @@ FactoryBot.find_definitions
 # Use memory store for caching in tests
 Rails.cache = ActiveSupport::Cache::MemoryStore.new
 
+# ── Test site skeleton ───────────────────────────────────────────────────────
+# Under RAILS_ENV=test, RoeSitePaths::SITE_PATH resolves to
+# <ROE_ROOT>/tmp/test_site/ (see config/application.rb). Wipe and recreate
+# the structure once at suite start so every test run begins from a known
+# blank slate. The real /site directory is never touched.
+TEST_SITE_PATH = RoeSitePaths::SITE_PATH
+FileUtils.rm_rf(TEST_SITE_PATH)
+%w[
+  system/integrations
+  system/features
+  system/global
+  system/defaults
+  system/assets/fonts
+  system/assets/images
+  posts
+  pages
+  documentation
+  media
+  theme
+  layout
+  emails
+].each { |sub| FileUtils.mkdir_p(File.join(TEST_SITE_PATH, sub)) }
+
+# Seed the default email templates that EmailRenderer expects to find.
+# ConfigGenerator is idempotent — it skips files that already exist.
+ConfigGenerator.new.generate_member_emails
+
+# Seed a minimal site.yml so SiteConfig.current("site") resolves through
+# the same find_by(file_path:) → create_from_file path it uses in
+# production. Disabling static_generation_enabled forces requests
+# through Rails controllers (instead of the StaticSiteMiddleware).
+File.write(
+  SiteConfig::SITE_FILE,
+  { "static_generation_enabled" => false }.to_yaml.sub(/\A---\s*\n/, "")
+)
+
 module ActiveSupport
   class TestCase
     parallelize(workers: 0)
@@ -29,14 +65,16 @@ module ActiveSupport
       SiteConfig.delete_all
       PostmarkConfig.delete_all
 
-      # Ensure static site mode is disabled for tests
-      # This forces requests to go through Rails controllers
-      SiteConfig.create!(
-        file_path: "site/system/global/site.yml",
-        config: { "static_generation_enabled" => false }
-      )
+      # Each test starts with no integration config files so writes are
+      # observable from a known empty state. Cheap — these are tiny yml.
+      Dir.glob(File.join(RoeSitePaths::SITE_PATH, "system/integrations", "*.yml")).each do |f|
+        File.delete(f)
+      end
 
-      # Reload the SiteConfig cache to pick up the new record
+      # Sync the seeded site.yml into a SiteConfig record. Uses the same
+      # path production does (find_by(file_path:) → create_from_file)
+      # rather than constructing a record by hand.
+      SiteConfig.sync_from_file("site")
       SiteConfig.reload!("site")
     end
   end

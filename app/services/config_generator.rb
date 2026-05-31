@@ -150,7 +150,7 @@ class ConfigGenerator
   end
 
   def generate_payments_config
-    path = File.join(INTEGRATIONS_PATH, "payments.yml")
+    path = File.join(INTEGRATIONS_PATH, "stripe.yml")
     return if File.exist?(path)
 
     content = <<~YAML
@@ -165,11 +165,11 @@ class ConfigGenerator
 
     FileUtils.mkdir_p(INTEGRATIONS_PATH)
     File.write(path, content)
-    puts "✓ Generated integrations/payments.yml"
+    puts "✓ Generated integrations/stripe.yml"
   end
 
   def generate_newsletters_config
-    path = File.join(INTEGRATIONS_PATH, "newsletters.yml")
+    path = File.join(INTEGRATIONS_PATH, "postmark.yml")
     return if File.exist?(path)
 
     content = <<~YAML
@@ -182,7 +182,7 @@ class ConfigGenerator
 
     FileUtils.mkdir_p(INTEGRATIONS_PATH)
     File.write(path, content)
-    puts "✓ Generated integrations/newsletters.yml"
+    puts "✓ Generated integrations/postmark.yml"
   end
 
   def generate_snipcart_config

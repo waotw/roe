@@ -172,7 +172,7 @@ class ContentWatcher
       SiteConfig.sync_from_file("defaults/#{type}")
       puts "\n   ✓ #{type.capitalize} defaults reloaded\n"
 
-    # Handle integration configs (payments.yml, newsletters.yml, snipcart.yml)
+    # Handle integration configs (stripe.yml, postmark.yml, snipcart.yml)
     elsif absolute_file.include?("site/system/integrations/")
       type = File.basename(file, ".yml")
       SiteConfig.sync_from_file("integrations/#{type}")

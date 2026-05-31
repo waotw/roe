@@ -143,7 +143,7 @@
         <% if @config_type == 'newsletters' %>
           Add this URL as a webhook in your Postmark server's settings so delivery
           events (opens, clicks, bounces) reach Roe. The token at the end is unique
-          to this install — keep it secret. Regenerable in the Danger Zone below.
+          to this install — keep it secret. You can regenerate a new token in the Danger Zone below.
         <% elsif @config_type == 'payments' %>
           Add this URL as a webhook endpoint in your Stripe dashboard. Stripe will
           give you a signing secret in return — paste that into the

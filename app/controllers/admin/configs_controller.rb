@@ -303,8 +303,8 @@ class Admin::ConfigsController < Admin::BaseController
 
     if SiteFeature.payments_feature_enabled?
       integration_files << {
-        name: "payments.yml",
-        path: "integrations/payments.yml",
+        name: "stripe.yml",
+        path: "integrations/stripe.yml",
         description: "Stripe test keys",
         edit_path: admin_edit_payments_config_path,
         unconfigured: SiteFeature.payments_unconfigured?
@@ -313,8 +313,8 @@ class Admin::ConfigsController < Admin::BaseController
 
     if SiteFeature.newsletters_feature_enabled?
       integration_files << {
-        name: "newsletters.yml",
-        path: "integrations/newsletters.yml",
+        name: "postmark.yml",
+        path: "integrations/postmark.yml",
         description: "Postmark test token",
         edit_path: admin_edit_newsletters_config_path,
         unconfigured: SiteFeature.newsletters_unconfigured?
@@ -791,7 +791,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_payments
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml")
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml")
     unless File.exist?(path)
       ConfigGenerator.new.generate_payments_config
     end
@@ -799,12 +799,17 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = File.read(path)
     @config_hash    = (YAML.load(@config_content) || {})["test"] || {}
     @stripe_config  = StripeConfig.current
+    # Auto-verify if the file holds keys but the model hasn't checked them
+    # yet. Lets an admin drop stripe.yml in place and have the connection
+    # status reflect reality on first page load, without having to click
+    # "Save Test Keys" purely to trigger verification.
+    @stripe_config.verify! if @stripe_config.keys_present? && @stripe_config.verified_at.nil?
     @schema         = PAYMENTS_CONFIG_SCHEMA
     render :edit_integration
   end
 
   def update_payments
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml")
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml")
     test_data = params[:test] || {}
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
@@ -813,14 +818,14 @@ class Admin::ConfigsController < Admin::BaseController
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
     write_yaml(path, existing)
-    SiteConfig.sync_from_file("integrations/payments")
+    SiteConfig.sync_from_file("integrations/stripe")
 
     # Save to StripeConfig and verify
     stripe = StripeConfig.current
     StripeConfig.save_test_config(existing["test"])
     stripe.verify!
 
-    flash[:notice] = "Payments configuration saved"
+    flash[:notice] = "Stripe configuration saved"
     redirect_to admin_edit_payments_config_path
   end
 
@@ -864,7 +869,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_newsletters
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, "newsletters.yml")
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
     unless File.exist?(path)
       ConfigGenerator.new.generate_newsletters_config
     end
@@ -872,12 +877,13 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content   = File.read(path)
     @config_hash      = (YAML.load(@config_content) || {})["test"] || {}
     @postmark_config  = PostmarkConfig.current
+    @postmark_config.verify! if @postmark_config.keys_present? && @postmark_config.verified_at.nil?
     @schema           = NEWSLETTERS_CONFIG_SCHEMA
     render :edit_integration
   end
 
   def update_newsletters
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, "newsletters.yml")
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
     test_data = params[:test] || {}
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
@@ -885,12 +891,12 @@ class Admin::ConfigsController < Admin::BaseController
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
     write_yaml(path, existing)
-    SiteConfig.sync_from_file("integrations/newsletters")
+    SiteConfig.sync_from_file("integrations/postmark")
 
     PostmarkConfig.save_test_config(existing["test"])
     PostmarkConfig.current.verify!
 
-    flash[:notice] = "Newsletters configuration saved"
+    flash[:notice] = "Postmark configuration saved"
     redirect_to admin_edit_newsletters_config_path
   end
 
@@ -948,6 +954,7 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content   = File.read(path)
     @config_hash      = (YAML.load(@config_content) || {})["test"] || {}
     @snipcart_config  = SnipcartConfig.current
+    @snipcart_config.verify! if @snipcart_config.keys_present? && @snipcart_config.verified_at.nil?
     @schema           = SNIPCART_CONFIG_SCHEMA
     render :edit_integration
   end

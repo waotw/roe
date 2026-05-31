@@ -6,24 +6,16 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     @user = User.take
     sign_in_as(@user)
 
-    # Clean slate for integration records and files
+    # Clean slate for integration records
     StripeConfig.delete_all
     PostmarkConfig.delete_all
     SnipcartConfig.delete_all
 
-    StripeConfig.clear_test_config
-    PostmarkConfig.clear_test_config
-    SnipcartConfig.clear_test_config
-
-    # Ensure feature config files exist so integrations show up
+    # Ensure feature config files exist so integrations show up.
+    # Safe — paths route to tmp/test_site/ under RAILS_ENV=test
+    # (see config/application.rb), not the real /site directory.
     ensure_feature_file("members.yml")
     ensure_feature_file("store.yml")
-  end
-
-  teardown do
-    StripeConfig.clear_test_config
-    PostmarkConfig.clear_test_config
-    SnipcartConfig.clear_test_config
   end
 
   # ── Index ──────────────────────────────────────────────────────────────────
@@ -54,10 +46,10 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_redirected_to admin_edit_payments_config_path
-    assert_equal "Payments configuration saved", flash[:notice]
+    assert_equal "Stripe configuration saved", flash[:notice]
 
     # Verify YAML file was written
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml")
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml")
     assert File.exist?(path)
     yaml = YAML.load_file(path)
     assert_equal "pk_test_123", yaml["test"]["publishable_key"]
@@ -70,10 +62,10 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "update_payments skips masked placeholder values" do
-    # Pre-seed payments.yml with existing values (stripe.yml will be created by controller)
+    # Pre-seed stripe.yml with existing values
     FileUtils.mkdir_p(SiteConfig::INTEGRATIONS_PATH)
     File.write(
-      File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml"),
+      File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml"),
       { "test" => { "publishable_key" => "pk_test_existing", "secret_key" => "sk_test_old" } }.to_yaml
     )
 
@@ -87,10 +79,10 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to admin_edit_payments_config_path
 
-    # Verify payments.yml preserves old publishable_key and updates secret_key
-    payments_yaml = YAML.load_file(File.join(SiteConfig::INTEGRATIONS_PATH, "payments.yml"))
-    assert_equal "pk_test_existing", payments_yaml["test"]["publishable_key"]
-    assert_equal "sk_test_new",      payments_yaml["test"]["secret_key"]
+    # Verify stripe.yml preserves old publishable_key and updates secret_key
+    stripe_yaml = YAML.load_file(File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml"))
+    assert_equal "pk_test_existing", stripe_yaml["test"]["publishable_key"]
+    assert_equal "sk_test_new",      stripe_yaml["test"]["secret_key"]
   end
 
   test "update_payments_live redirects in non-production" do
@@ -179,9 +171,9 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_redirected_to admin_edit_newsletters_config_path
-    assert_equal "Newsletters configuration saved", flash[:notice]
+    assert_equal "Postmark configuration saved", flash[:notice]
 
-    path = File.join(SiteConfig::INTEGRATIONS_PATH, "newsletters.yml")
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
     assert File.exist?(path)
     yaml = YAML.load_file(path)
     assert_equal "test-server-token", yaml["test"]["server_token"]
@@ -365,6 +357,18 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     features_path = SiteConfig::FEATURES_PATH
     FileUtils.mkdir_p(features_path)
     path = features_path.join(filename)
-    File.write(path, "{}") unless File.exist?(path)
+    return if File.exist?(path)
+
+    case filename
+    when "members.yml"
+      File.write(path, <<~YAML)
+        payments:
+          enabled: true
+        newsletter & email:
+          enabled: true
+      YAML
+    else
+      File.write(path, "{}")
+    end
   end
 end
