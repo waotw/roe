@@ -249,10 +249,24 @@
       </div>
     </div>
 
+    <%# ── Target-specific sections (kamal + fly always rendered) ────────
+        Both blocks are always in the DOM so their form data survives
+        when you toggle. The active one floats to the top at full opacity,
+        the inactive one drops below and dims. Tailwind's `order-*` makes
+        the swap CSS-only — no DOM reshuffling needed. %>
+    <div id="target-sections" class="flex flex-col gap-6">
+
     <%# ── Kamal section ──────────────────────────────────────────────── %>
-    <div id="kamal-section" class="bg-white border border-gray-200 <%= 'hidden' if target != 'kamal' %>">
+    <div id="kamal-section"
+         class="bg-white border border-gray-200 transition-opacity <%= target == 'kamal' ? 'order-1 opacity-100' : 'order-2 opacity-50' %>">
       <div class="px-6 py-4 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">Kamal Settings</h3>
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-medium text-gray-900">Kamal Settings</h3>
+          <span id="kamal-status-badge"
+                class="text-xs font-mono uppercase px-2 py-0.5 rounded-xs <%= target == 'kamal' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-500 border border-gray-300' %>">
+            <%= target == 'kamal' ? 'Active' : 'Inactive' %>
+          </span>
+        </div>
         <p class="text-sm text-gray-500 mt-1">
           Configuration for
           <a href="https://kamal-deploy.org" target="_blank" class="underline">Kamal</a>
@@ -321,9 +335,16 @@
     </div>
 
     <%# ── Fly section ─────────────────────────────────────────────────── %>
-    <div id="fly-section" class="bg-white border border-gray-200 <%= 'hidden' if target != 'fly' %>">
+    <div id="fly-section"
+         class="bg-white border border-gray-200 transition-opacity <%= target == 'fly' ? 'order-1 opacity-100' : 'order-2 opacity-50' %>">
       <div class="px-6 py-4 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">Fly.io Settings</h3>
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-medium text-gray-900">Fly.io Settings</h3>
+          <span id="fly-status-badge"
+                class="text-xs font-mono uppercase px-2 py-0.5 rounded-xs <%= target == 'fly' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-500 border border-gray-300' %>">
+            <%= target == 'fly' ? 'Active' : 'Inactive' %>
+          </span>
+        </div>
         <p class="text-sm text-gray-500 mt-1">
           Configuration for
           <a href="https://fly.io" target="_blank" class="underline">Fly.io</a>
@@ -364,6 +385,8 @@
       </div>
     </div>
 
+    </div><%# /#target-sections wrapper %>
+
     <div class="h-12"></div>
 
     <%# ── Actions ─────────────────────────────────────────────────────── %>
@@ -385,27 +408,67 @@
 </div>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
+  // turbo:load fires on initial page load AND every Turbo navigation —
+  // DOMContentLoaded only fires the first time, which is why the toggle
+  // previously did nothing after navigating into the page via the admin.
+  document.addEventListener('turbo:load', function () {
 
     // ── Target toggle ────────────────────────────────────────────
-    const kamalSection        = document.getElementById('kamal-section');
-    const flySection          = document.getElementById('fly-section');
-    const flyCliWarning       = document.getElementById('fly-cli-warning');
-    const kamalCliWarning     = document.getElementById('kamal-cli-warning');
+    const kamalSection         = document.getElementById('kamal-section');
+    const flySection           = document.getElementById('fly-section');
+    const kamalStatusBadge     = document.getElementById('kamal-status-badge');
+    const flyStatusBadge       = document.getElementById('fly-status-badge');
+    const flyCliWarning        = document.getElementById('fly-cli-warning');
+    const kamalCliWarning      = document.getElementById('kamal-cli-warning');
     const kamalRegistrySection = document.getElementById('kamal-registry-section');
-    const flySecretsNote      = document.getElementById('fly-secrets-note');
-    const kamalSecretsBadge   = document.getElementById('kamal-secrets-badge');
+    const flySecretsNote       = document.getElementById('fly-secrets-note');
+    const kamalSecretsBadge    = document.getElementById('kamal-secrets-badge');
+
+    // Bail if we're not on the deploy page (turbo:load fires globally).
+    if (!kamalSection || !flySection) return;
+
+    const ACTIVE_BADGE_CLASSES   = ['bg-green-100', 'text-green-800', 'border-green-300'];
+    const INACTIVE_BADGE_CLASSES = ['bg-gray-100',  'text-gray-500',  'border-gray-300'];
+
+    function setActiveTarget(target) {
+      const isKamal = target === 'kamal';
+
+      // Section ordering + dimming. The active one floats to the top
+      // at full opacity, inactive drops below at half opacity. Inputs
+      // in both sections stay editable so toggling doesn't lose data.
+      kamalSection.classList.toggle('order-1', isKamal);
+      kamalSection.classList.toggle('order-2', !isKamal);
+      kamalSection.classList.toggle('opacity-100', isKamal);
+      kamalSection.classList.toggle('opacity-50', !isKamal);
+
+      flySection.classList.toggle('order-1', !isKamal);
+      flySection.classList.toggle('order-2', isKamal);
+      flySection.classList.toggle('opacity-100', !isKamal);
+      flySection.classList.toggle('opacity-50', isKamal);
+
+      // Active/Inactive badges in each header
+      if (kamalStatusBadge) {
+        kamalStatusBadge.textContent = isKamal ? 'Active' : 'Inactive';
+        kamalStatusBadge.classList.remove(...ACTIVE_BADGE_CLASSES, ...INACTIVE_BADGE_CLASSES);
+        kamalStatusBadge.classList.add(...(isKamal ? ACTIVE_BADGE_CLASSES : INACTIVE_BADGE_CLASSES));
+      }
+      if (flyStatusBadge) {
+        flyStatusBadge.textContent = isKamal ? 'Inactive' : 'Active';
+        flyStatusBadge.classList.remove(...ACTIVE_BADGE_CLASSES, ...INACTIVE_BADGE_CLASSES);
+        flyStatusBadge.classList.add(...(isKamal ? INACTIVE_BADGE_CLASSES : ACTIVE_BADGE_CLASSES));
+      }
+
+      // CLI warnings + secrets badges only show for the active target
+      if (flyCliWarning)        flyCliWarning.classList.toggle('hidden', isKamal);
+      if (kamalCliWarning)      kamalCliWarning.classList.toggle('hidden', !isKamal);
+      if (kamalRegistrySection) kamalRegistrySection.classList.toggle('hidden', !isKamal);
+      if (flySecretsNote)       flySecretsNote.classList.toggle('hidden', isKamal);
+      if (kamalSecretsBadge)    kamalSecretsBadge.classList.toggle('hidden', !isKamal);
+    }
 
     document.querySelectorAll('.target-radio').forEach(function (radio) {
       radio.addEventListener('change', function () {
-        const isKamal = this.value === 'kamal';
-        kamalSection.classList.toggle('hidden', !isKamal);
-        flySection.classList.toggle('hidden', isKamal);
-        if (flyCliWarning)        flyCliWarning.classList.toggle('hidden', isKamal);
-        if (kamalCliWarning)      kamalCliWarning.classList.toggle('hidden', !isKamal);
-        if (kamalRegistrySection) kamalRegistrySection.classList.toggle('hidden', !isKamal);
-        if (flySecretsNote)       flySecretsNote.classList.toggle('hidden', isKamal);
-        if (kamalSecretsBadge)    kamalSecretsBadge.classList.toggle('hidden', !isKamal);
+        setActiveTarget(this.value);
       });
     });
 

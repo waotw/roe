@@ -31,7 +31,7 @@ class Admin::LayoutsController < Admin::BaseController
       <<~MD
         ---
         position: left
-        scope: all
+        scope: pages
         ---
 
         ## Sidebar
@@ -99,6 +99,21 @@ class Admin::LayoutsController < Admin::BaseController
     flash[:notice] = "Sidebar updated"
     flash[:trigger_refresh] = true
     redirect_to admin_layout_sidebar_edit_path
+  end
+
+  # Only the sidebar is optional. Navigation and footer ship with every
+  # site so they have no destroy action — re-enable here only if that
+  # ever changes.
+  def destroy_sidebar
+    file_path = LAYOUT_FILES["sidebar"]
+    if File.exist?(file_path)
+      File.delete(file_path)
+      flash[:notice] = "Sidebar deleted"
+      flash[:trigger_refresh] = true
+    else
+      flash[:alert] = "Sidebar file was already gone"
+    end
+    redirect_to admin_layouts_path
   end
 
   def generate_missing

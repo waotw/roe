@@ -58,6 +58,7 @@ Rails.application.routes.draw do
     patch "layout/footer", to: "layouts#update_footer"
     get "layout/sidebar/edit", to: "layouts#edit_sidebar"
     patch "layout/sidebar", to: "layouts#update_sidebar"
+    delete "layout/sidebar", to: "layouts#destroy_sidebar", as: "destroy_layout_sidebar"
     get "layouts", to: "layouts#index"
     post "layouts/generate_missing", to: "layouts#generate_missing", as: "generate_missing_admin_layouts"
 

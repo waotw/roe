@@ -213,6 +213,14 @@ class ConfigGenerator
     generate_unsubscribe_page(pages_path)
     generate_unsubscribed_page(pages_path)
 
+    # Stripe return-URL targets. Required when payments or donations are
+    # enabled — without them the redirect after a completed/cancelled
+    # checkout hits a 404.
+    generate_checkout_success_page(pages_path)
+    generate_checkout_cancel_page(pages_path)
+    generate_donation_success_page(pages_path)
+    generate_donation_cancel_page(pages_path)
+
     # Generate email templates
     generate_member_emails
   end
@@ -432,6 +440,97 @@ class ConfigGenerator
 
     File.write(File.join(pages_path, "unsubscribed.md"), unsubscribed_content)
     puts "✓ Generated members/unsubscribed.md page"
+  end
+
+  # ── Stripe return-URL pages ──────────────────────────────────────────────
+  # These four pages are the success_url / cancel_url targets configured
+  # on Stripe Checkout Sessions. Without them, the redirect after a
+  # completed or cancelled checkout hits a 404. Every install with
+  # payments or donations enabled needs all four.
+
+  def generate_checkout_success_page(pages_path)
+    return if File.exist?(File.join(pages_path, "checkout-success.md"))
+
+    content = <<~MARKDOWN
+      ---
+      title: "Checkout - Success"
+      url_name: "checkout-success"
+      status: published
+      audience: "everyone"
+      ---
+      # Thank You!
+
+      Your payment was successful. You now have access to all content.
+
+      [← Back to the site](/)
+    MARKDOWN
+
+    File.write(File.join(pages_path, "checkout-success.md"), content)
+    puts "✓ Generated members/checkout-success.md page"
+  end
+
+  def generate_checkout_cancel_page(pages_path)
+    return if File.exist?(File.join(pages_path, "checkout-cancel.md"))
+
+    content = <<~MARKDOWN
+      ---
+      title: "Checkout - Cancel"
+      url_name: "checkout-cancel"
+      status: published
+      audience: "everyone"
+      ---
+      # Payment Cancelled
+
+      You cancelled the checkout process. No charges were made.
+
+      [Try Again](/upgrade)
+      [← Back to Home](/)
+    MARKDOWN
+
+    File.write(File.join(pages_path, "checkout-cancel.md"), content)
+    puts "✓ Generated members/checkout-cancel.md page"
+  end
+
+  def generate_donation_success_page(pages_path)
+    return if File.exist?(File.join(pages_path, "donation-success.md"))
+
+    content = <<~MARKDOWN
+      ---
+      title: "Donation - Success"
+      url_name: "donation-success"
+      status: published
+      audience: "everyone"
+      ---
+      # Thank You!
+
+      Your contribution makes this work possible. A receipt has been sent to your email.
+
+      [← Back to the site](/)
+    MARKDOWN
+
+    File.write(File.join(pages_path, "donation-success.md"), content)
+    puts "✓ Generated members/donation-success.md page"
+  end
+
+  def generate_donation_cancel_page(pages_path)
+    return if File.exist?(File.join(pages_path, "donation-cancel.md"))
+
+    content = <<~MARKDOWN
+      ---
+      title: "Donation Cancel"
+      url_name: "donation-cancel"
+      status: published
+      audience: "everyone"
+      ---
+      # Donation Cancelled
+
+      No charge was made. You can try again any time.
+
+      [← Back to Home](/)
+    MARKDOWN
+
+    File.write(File.join(pages_path, "donation-cancel.md"), content)
+    puts "✓ Generated members/donation-cancel.md page"
   end
 
   def generate_member_emails
@@ -734,8 +833,8 @@ class ConfigGenerator
       title: Welcome to Roe
       description: Your file-backed CMS is ready to go
       date: #{Date.today}
+      post_type: article
       status: published
-      type: article
       ---
 
       # Welcome to Roe! 🚀

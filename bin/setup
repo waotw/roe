@@ -99,27 +99,14 @@ FileUtils.chdir APP_ROOT do
   puts "✅ Site structure ready"
 
   puts "\n== Preparing database =="
-  if ARGV.include?("--reset")
-    system! "bin/rails db:drop"
-    system! "bin/rails db:create"
-  else
-    system! "bin/rails db:create"
-  end
+  system! "bin/rails db:drop" if ARGV.include?("--reset")
 
-  system! "bin/rails db:migrate"
-
-  # Solid Cache / Queue schemas — only run if the tables don't exist yet
-  begin
-    system! "bin/rails db:migrate:cache"
-  rescue => e
-    puts "⚠️  Cache DB migration skipped: #{e.message}"
-  end
-
-  begin
-    system! "bin/rails db:migrate:queue"
-  rescue => e
-    puts "⚠️  Queue DB migration skipped: #{e.message}"
-  end
+  # db:prepare walks every configured database (primary, cache, queue,
+  # plus any others if added later): creates missing ones, loads
+  # schema files where present (Solid Cache / Queue ship cache_schema.rb
+  # and queue_schema.rb instead of migrations), runs pending migrations
+  # otherwise. Idempotent — safe on first install and on re-runs.
+  system! "bin/rails db:prepare"
 
   puts "\n== Generating default configuration =="
   ConfigGenerator.generate_all

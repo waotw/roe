@@ -1,8 +1,19 @@
+<%
+  # Optional overrides for callers that don't fit the post/page pattern.
+  # delete_path: custom URL to POST the delete to (defaults to the
+  #   admin_post_path / admin_page_path resolved from resource_type).
+  # delete_message: replaces the "permanently delete the file from
+  #   content/<type>s/" sentence — useful for layouts, configs, etc.
+  delete_path    = local_assigns[:delete_path] ||
+                   (resource_type == 'post' ? admin_post_path(resource) : admin_page_path(resource))
+  delete_message = local_assigns[:delete_message] ||
+                   "This will permanently delete the file from <code class=\"bg-gray-100 px-1\">content/#{resource_type}s/</code>.".html_safe
+%>
 <div id="delete-modal-<%= resource_type %>" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="bg-white p-6  shadow-xl max-w-md w-full mx-4">
     <h3 class="text-lg font-bold text-gray-900 mb-2">Delete "<span id="delete-item-title-<%= resource_type %>"></span>"?</h3>
     <p class="text-sm text-gray-600 mb-4">
-      This will permanently delete the file from <code class="bg-gray-100 px-1">content/<%= resource_type %>s/</code>.
+      <%= delete_message %>
       This action cannot be undone.
     </p>
     <div class="mb-4">
@@ -22,7 +33,7 @@
         Cancel
       </button>
       <%= button_to "Delete Permanently",
-          resource_type == 'post' ? admin_post_path(resource) : admin_page_path(resource),
+          delete_path,
           method: :delete,
           id: "delete-confirm-btn-#{resource_type}",
           disabled: true,

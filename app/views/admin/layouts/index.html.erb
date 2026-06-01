@@ -20,7 +20,21 @@
             </td>
             <td class="py-4 pl-3 pr-4 text-right text-sm">
               <% if layout[:exists] %>
-                <%= link_to "Edit", layout[:path], class: "text-blue-600 hover:text-blue-900" %>
+                <div class="inline-flex items-center gap-4">
+                  <% if layout[:file] == "sidebar" %>
+                    <%# Sidebar is the only layout file that's optional.
+                        Navigation and footer ship with every site. %>
+                    <button type="button"
+                            data-action="delete"
+                            data-resource-id="<%= layout[:file] %>"
+                            data-resource-title="<%= layout[:name] %>"
+                            data-resource-type="sidebar"
+                            class="text-red-600 hover:text-red-900">
+                      Delete
+                    </button>
+                  <% end %>
+                  <%= link_to "Edit", layout[:path], class: "text-blue-600 hover:text-blue-900" %>
+                </div>
               <% else %>
                 <%= button_to "Create",
                               admin_generate_missing_admin_layouts_path(file_key: layout[:file]),
@@ -33,4 +47,13 @@
       </tbody>
     </table>
   </div>
+
+  <%# Delete-confirmation modal for the sidebar. Uses the shared
+      "type DELETE to confirm" pattern from posts/pages, with a custom
+      delete_path so it POSTs to layouts#destroy_sidebar. %>
+  <%= render 'shared/delete_file_modal',
+             resource: nil,
+             resource_type: 'sidebar',
+             delete_path: admin_destroy_layout_sidebar_path,
+             delete_message: "This will permanently delete <code class=\"bg-gray-100 px-1\">site/layout/sidebar.md</code>. The sidebar will stop rendering on every page until you recreate it.".html_safe %>
 </div>
