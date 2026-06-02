@@ -126,17 +126,17 @@ class SiteSyncTransferJob < ApplicationJob
       # delete on prod, then push only the changed files.
       files_to_back_up = diff[:modified] + diff[:deleted]
       update_step(:backing_up_live)
-      SiteSync.transport.backup_live_to_local!(files: files_to_back_up)
+      SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
 
       update_step(:pushing_to_live)
-      SiteSync.transport.push_local_to_live!(diff: diff)
+      SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
     else
       # Fallback: full-tree backup + push.
       update_step(:backing_up_live_full)
-      SiteSync.transport.backup_live_to_local!
+      SiteSync.transport.backup_live_to_local!(on_progress: progress_proc)
 
       update_step(:pushing_to_live_full)
-      SiteSync.transport.push_local_to_live!
+      SiteSync.transport.push_local_to_live!(on_progress: progress_proc)
     end
   end
 
@@ -157,10 +157,10 @@ class SiteSyncTransferJob < ApplicationJob
 
     if diff
       update_step(:pulling_from_live)
-      SiteSync.transport.pull_live_to_local!(diff: diff)
+      SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
     else
       update_step(:pulling_from_live_full)
-      SiteSync.transport.pull_live_to_local!
+      SiteSync.transport.pull_live_to_local!(on_progress: progress_proc)
     end
   end
 
@@ -376,15 +376,37 @@ class SiteSyncTransferJob < ApplicationJob
   # the transition so you can correlate the status panel with what
   # the Rails log shows. Also remembers the most recent step so a
   # failure can report "failed during X".
+  #
+  # Resets @progress — progress is per-rsync-step. When the step
+  # changes (e.g. from :pushing_to_live to :refreshing_baseline), the
+  # old file counter is no longer meaningful.
   def update_step(step)
     @last_step = step
+    @progress  = nil
     Rails.logger.info "[SiteSyncTransferJob #{@kind}] step: #{step}"
-    write_status(
+    write_running_status
+  end
+
+  # Callable handed to FlyRsync (or any transport) so it can report
+  # live file-count progress as rsync churns through the transfer.
+  # Each call updates the cache so the next admin poll sees fresh
+  # numbers.
+  def progress_proc
+    @progress_proc ||= ->(completed:, total:) {
+      @progress = { completed: completed, total: total }
+      write_running_status
+    }
+  end
+
+  def write_running_status
+    payload = {
       state:      :running,
       kind:       @kind,
-      step:       step,
+      step:       @last_step,
       started_at: @started_at
-    )
+    }
+    payload[:progress] = @progress if @progress
+    write_status(payload)
   end
 
   def write_status(data)

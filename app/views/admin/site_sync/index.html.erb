@@ -50,18 +50,33 @@
     <% kind_label = @transfer_status[:kind] == :push ? "Push to live" : "Pull from live" %>
     <% case @transfer_status[:state] %>
     <% when :running %>
+      <% progress = @transfer_status[:progress] %>
+      <% progress_pct = progress && progress[:total].to_i.positive? ? (progress[:completed].to_f / progress[:total] * 100).round : 0 %>
       <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-6"
            data-controller="site-sync">
         <div class="flex items-start justify-between gap-4">
-          <div>
+          <div class="flex-1 min-w-0">
             <h3 class="text-sm font-semibold text-blue-900 mb-2">⏳ <%= kind_label %> in progress</h3>
             <p class="text-sm text-blue-900 font-mono mb-2"
                data-site-sync-target="step">
               <%= SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] || "Starting…" %>
             </p>
+            <%# Progress line — hidden until rsync starts emitting
+                to-chk lines. The Stimulus controller toggles visibility
+                and rewrites label + bar width as new polls arrive. %>
+            <div class="mb-2" data-site-sync-target="progress" <%= "hidden" unless progress %>>
+              <p class="text-sm text-blue-900 font-mono mb-1" data-site-sync-target="progressLabel">
+                <% if progress %><%= progress[:completed] %> of <%= progress[:total] %> files transferred<% end %>
+              </p>
+              <div class="h-1.5 w-full max-w-sm bg-blue-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-600 transition-all"
+                     style="width: <%= progress_pct %>%;"
+                     data-site-sync-target="progressBar"></div>
+              </div>
+            </div>
             <p class="text-sm text-blue-800">
               Started <%= time_ago_in_words(@transfer_status[:started_at]) %> ago.
-              Auto-refreshing to show progress.
+              This page will auto-refresh to show progress.
             </p>
           </div>
           <%# Force-clear the status — useful if the worker died or

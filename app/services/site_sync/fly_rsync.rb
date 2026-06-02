@@ -79,24 +79,29 @@ module SiteSync
     REMOTE_DELETE_BATCH = 50
 
     class << self
-      # Push local /site to live. If `diff` is given, only the listed
-      # modified/added files are rsync'd (via --files-from) and the
-      # listed deleted files are removed remotely via ssh rm. If
-      # `diff` is nil, falls back to a full-tree `rsync --delete`.
-      def push_local_to_live!(diff: nil)
+      # All three public entry points accept an optional `on_progress`
+      # callable invoked as rsync transfers files:
+      #
+      #   on_progress.call(completed: 5, total: 12)
+      #
+      # Parsed from rsync's `--progress` output (the `to-chk=N/M` token
+      # in each per-file summary line). Callers use it to surface live
+      # file-count progress in the admin UI without parsing rsync
+      # themselves.
+
+      def push_local_to_live!(diff: nil, on_progress: nil)
         if diff
-          push_selective(diff)
+          push_selective(diff, on_progress: on_progress)
         else
-          push_full
+          push_full(on_progress: on_progress)
         end
       end
 
-      # Pull live /site over local. Same selective/full split as push.
-      def pull_live_to_local!(diff: nil)
+      def pull_live_to_local!(diff: nil, on_progress: nil)
         if diff
-          pull_selective(diff)
+          pull_selective(diff, on_progress: on_progress)
         else
-          pull_full
+          pull_full(on_progress: on_progress)
         end
       end
 
@@ -105,11 +110,11 @@ module SiteSync
       # callers typically pass the diff's modified+deleted (the files
       # about to be overwritten/removed by a push) so the snapshot
       # captures exactly what's at risk. If nil, full backup.
-      def backup_live_to_local!(files: nil)
+      def backup_live_to_local!(files: nil, on_progress: nil)
         if files
-          backup_selective(files)
+          backup_selective(files, on_progress: on_progress)
         else
-          backup_full
+          backup_full(on_progress: on_progress)
         end
       end
 
@@ -117,7 +122,7 @@ module SiteSync
 
       # ─── Push ─────────────────────────────────────────────────────
 
-      def push_selective(diff)
+      def push_selective(diff, on_progress: nil)
         modified = Array(diff[:modified])
         added    = Array(diff[:added])
         deleted  = Array(diff[:deleted])
@@ -125,28 +130,30 @@ module SiteSync
         files_to_send = modified + added
         if files_to_send.any?
           rsync_files_from(
-            source:   "#{RoeSitePaths::SITE_PATH}/",
-            dest:     "#{machine_id}:#{REMOTE_SITE_PATH}",
-            files:    files_to_send,
-            excludes: PUSH_EXCLUDES
+            source:      "#{RoeSitePaths::SITE_PATH}/",
+            dest:        "#{machine_id}:#{REMOTE_SITE_PATH}",
+            files:       files_to_send,
+            excludes:    PUSH_EXCLUDES,
+            on_progress: on_progress
           )
         end
 
         remove_remote_files(deleted) if deleted.any?
       end
 
-      def push_full
+      def push_full(on_progress: nil)
         rsync(
-          source:   "#{RoeSitePaths::SITE_PATH}/",
-          dest:     "#{machine_id}:#{REMOTE_SITE_PATH}",
-          excludes: PUSH_EXCLUDES,
-          delete:   true
+          source:      "#{RoeSitePaths::SITE_PATH}/",
+          dest:        "#{machine_id}:#{REMOTE_SITE_PATH}",
+          excludes:    PUSH_EXCLUDES,
+          delete:      true,
+          on_progress: on_progress
         )
       end
 
       # ─── Pull ─────────────────────────────────────────────────────
 
-      def pull_selective(diff)
+      def pull_selective(diff, on_progress: nil)
         modified = Array(diff[:modified])
         added    = Array(diff[:added])
         deleted  = Array(diff[:deleted])
@@ -154,28 +161,30 @@ module SiteSync
         files_to_fetch = modified + added
         if files_to_fetch.any?
           rsync_files_from(
-            source:   "#{machine_id}:#{REMOTE_SITE_PATH}",
-            dest:     "#{RoeSitePaths::SITE_PATH}/",
-            files:    files_to_fetch,
-            excludes: PULL_EXCLUDES
+            source:      "#{machine_id}:#{REMOTE_SITE_PATH}",
+            dest:        "#{RoeSitePaths::SITE_PATH}/",
+            files:       files_to_fetch,
+            excludes:    PULL_EXCLUDES,
+            on_progress: on_progress
           )
         end
 
         remove_local_files(deleted) if deleted.any?
       end
 
-      def pull_full
+      def pull_full(on_progress: nil)
         rsync(
-          source:   "#{machine_id}:#{REMOTE_SITE_PATH}",
-          dest:     "#{RoeSitePaths::SITE_PATH}/",
-          excludes: PULL_EXCLUDES,
-          delete:   true
+          source:      "#{machine_id}:#{REMOTE_SITE_PATH}",
+          dest:        "#{RoeSitePaths::SITE_PATH}/",
+          excludes:    PULL_EXCLUDES,
+          delete:      true,
+          on_progress: on_progress
         )
       end
 
       # ─── Backup ───────────────────────────────────────────────────
 
-      def backup_selective(files)
+      def backup_selective(files, on_progress: nil)
         files = Array(files).uniq
         if files.empty?
           Rails.logger.info "[SiteSync::FlyRsync] selective backup: no files in diff, skipping"
@@ -190,7 +199,8 @@ module SiteSync
           dest:        "#{backup_dir}/",
           files:       files,
           excludes:    BACKUP_EXCLUDES,
-          extra_flags: "--ignore-missing-args"
+          extra_flags: "--ignore-missing-args",
+          on_progress: on_progress
         )
 
         if Dir.empty?(backup_dir)
@@ -205,7 +215,7 @@ module SiteSync
         backup_dir
       end
 
-      def backup_full
+      def backup_full(on_progress: nil)
         backup_dir, backup_root, timestamp = new_backup_dir
 
         previous   = previous_backup(backup_root)
@@ -224,7 +234,7 @@ module SiteSync
           excludes: BACKUP_EXCLUDES
         )
 
-        output, success = run(cmd)
+        output, success = run_streaming(cmd, on_progress: on_progress)
 
         unless success
           FileUtils.rm_rf(backup_dir)
@@ -290,12 +300,12 @@ module SiteSync
         machine["id"]
       end
 
-      def rsync(source:, dest:, excludes:, delete:)
+      def rsync(source:, dest:, excludes:, delete:, on_progress: nil)
         flags = "-rltzPi"
         flags += " --delete" if delete
         cmd = build_cmd(source: source, dest: dest, flags: flags, excludes: excludes)
         with_retries(label: "rsync") do
-          output, success = run(cmd)
+          output, success = run_streaming(cmd, on_progress: on_progress)
           raise FlyRsyncError, "rsync failed:\n#{output}" unless success
           return output
         end
@@ -305,7 +315,7 @@ module SiteSync
       # relative to the source root). Skips the full-tree walk on
       # both sides — for a small diff this is dramatically faster
       # than vanilla rsync over fly ssh console.
-      def rsync_files_from(source:, dest:, files:, excludes: [], extra_flags: "")
+      def rsync_files_from(source:, dest:, files:, excludes: [], extra_flags: "", on_progress: nil)
         files = Array(files).uniq
         return if files.empty?
 
@@ -323,7 +333,7 @@ module SiteSync
           )
 
           with_retries(label: "rsync_files_from") do
-            output, success = run(cmd)
+            output, success = run_streaming(cmd, on_progress: on_progress)
             raise FlyRsyncError, "selective rsync failed:\n#{output}" unless success
             return output
           end
@@ -374,6 +384,28 @@ module SiteSync
       def run(cmd)
         Rails.logger.info "[SiteSync::FlyRsync] #{cmd}"
         output = `#{cmd}`
+        [ output, $?.success? ]
+      end
+
+      # Streaming variant of `run`. Reads rsync output line-by-line and
+      # calls on_progress.call(completed:, total:) when it spots a
+      # `to-chk=N/M` token in a per-file progress summary (emitted by
+      # `--progress`, which `-P` enables). N = files remaining, M = total
+      # files in the transfer — so completed = M - N.
+      TO_CHK_RE = /to-chk=(\d+)\/(\d+)/
+
+      def run_streaming(cmd, on_progress: nil)
+        Rails.logger.info "[SiteSync::FlyRsync] #{cmd}"
+        output = +""
+        IO.popen(cmd) do |io|
+          io.each_line do |line|
+            output << line
+            next unless on_progress && line =~ TO_CHK_RE
+            remaining = $1.to_i
+            total     = $2.to_i
+            on_progress.call(completed: total - remaining, total: total)
+          end
+        end
         [ output, $?.success? ]
       end
 

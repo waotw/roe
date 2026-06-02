@@ -165,6 +165,10 @@ class Admin::SiteSyncController < Admin::BaseController
   # polls every 2 s and updates the live "Currently…" line in place,
   # then reloads when the state leaves :running so the server-rendered
   # completed/failed/reassessment card takes over.
+  #
+  # `progress` is populated by SiteSyncTransferJob during rsync steps:
+  # { completed: 5, total: 12 }. Absent for non-rsync steps, in which
+  # case the UI just hides the progress line.
   def transfer_status
     status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
     if status.nil?
