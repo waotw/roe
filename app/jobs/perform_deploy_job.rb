@@ -31,6 +31,14 @@ class PerformDeployJob < ApplicationJob
     # Copy VERSION from root to current/ so Docker can access it during build
     prepare_version_file
 
+    # Fly's release_command runs in an ephemeral VM that can't see the
+    # mounted volume, so Roe doesn't use it for migrations. But the app
+    # itself still needs RAILS_MASTER_KEY available as an env var to
+    # decrypt credentials.yml.enc on boot. Sync the local master.key to
+    # Fly secrets before deploying so users don't have to drop to a
+    # terminal for `fly secrets set`.
+    sync_fly_master_key if target == "fly"
+
     cmd = build_command(target, version_tag)
     Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag})"
     run_with_streaming(cmd, target: target, version_tag: version_tag)
@@ -82,6 +90,60 @@ class PerformDeployJob < ApplicationJob
     version_file = File.join(Rails.root, "VERSION")
     FileUtils.rm_f(version_file)
     Rails.logger.info "[PerformDeployJob] Cleaned up temporary VERSION file"
+  end
+
+  # Sync the local config/master.key to Fly's encrypted secret store
+  # as RAILS_MASTER_KEY. Idempotent — only sets the secret when it
+  # isn't already present on the Fly app. Uses --stage so the secret
+  # is applied together with the next `fly deploy` instead of
+  # triggering a separate machine restart.
+  #
+  # Failure modes surfaced to the deploy log:
+  #   - No local config/master.key file → skip with warning
+  #   - fly CLI not authenticated      → raise with "fly auth login" hint
+  #   - fly secrets set failed         → raise with the CLI's stderr
+  def sync_fly_master_key
+    master_key_path = Rails.root.join("config", "master.key")
+    unless File.exist?(master_key_path)
+      Rails.logger.warn "[PerformDeployJob] No config/master.key found — skipping Fly secret sync. Deploy will likely fail at boot with 'Missing secret_key_base'."
+      return
+    end
+
+    master_key = File.read(master_key_path).strip
+    return if master_key.empty?
+
+    Bundler.with_original_env do
+      # Check what's already on the Fly app. The fly CLI picks up the
+      # app name from fly.toml in the working directory, so chdir to
+      # Rails.root where the generated fly.toml lives.
+      list_out, list_err, list_status = Open3.capture3(
+        "fly", "secrets", "list", chdir: Rails.root.to_s
+      )
+
+      unless list_status.success?
+        # Most common cause is `fly auth login` hasn't been run. Surface
+        # that to the deploy log so the operator knows what to do.
+        if list_err =~ /auth|login|authoriz|token/i
+          raise "Fly authentication is not set up on this machine. Run `fly auth login` from a terminal once, then retry the deploy. (fly secrets list said: #{list_err.strip})"
+        end
+        raise "Could not list Fly secrets: #{list_err.strip.presence || list_out.strip}"
+      end
+
+      if list_out.include?("RAILS_MASTER_KEY")
+        Rails.logger.info "[PerformDeployJob] RAILS_MASTER_KEY already set on Fly — skipping sync"
+        return
+      end
+
+      Rails.logger.info "[PerformDeployJob] Setting RAILS_MASTER_KEY on Fly (staged for next deploy)"
+      set_out, set_err, set_status = Open3.capture3(
+        "fly", "secrets", "set", "--stage", "RAILS_MASTER_KEY=#{master_key}",
+        chdir: Rails.root.to_s
+      )
+
+      unless set_status.success?
+        raise "Failed to set RAILS_MASTER_KEY on Fly: #{set_err.strip.presence || set_out.strip}"
+      end
+    end
   end
 
   def build_command(target, version_tag)

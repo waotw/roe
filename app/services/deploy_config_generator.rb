@@ -255,8 +255,13 @@ class DeployConfigGenerator
         PORT = '8080'
         SOLID_QUEUE_IN_PUMA = 'true'
 
-      [deploy]
-        release_command = '/rails/current/bin/rails db:migrate'
+      # No [deploy] release_command. Fly runs release_command in an
+      # ephemeral VM that does NOT have the persistent volume mounted,
+      # so SQLite migrations there either crash ("no such table") or
+      # silently create a throwaway DB that gets discarded.
+      # bin/docker-entrypoint runs `bin/rails db:prepare` on each app
+      # machine start, after the volume is mounted — which is where
+      # migrations belong for a file-backed-DB app like Roe.
 
       [processes]
         app = '/rails/current/bin/rails server -b 0.0.0.0 -p 8080'
