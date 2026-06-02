@@ -11,13 +11,17 @@ if [ "$(id -u)" = '0' ]; then
       export LD_PRELOAD
   fi
 
-  # If running the rails server then create or migrate existing database
-  # Check for both relative path (./bin/rails) and absolute path (/rails/current/bin/rails)
+  # If running the rails server, prepare all databases on this machine.
+  # Detection: look for "bin/rails server" pattern anywhere in the args,
+  # so launch commands with flags appended (e.g. `bin/rails server -b
+  # 0.0.0.0 -p 8080` as Fly's [processes] block emits) still match.
+  # The previous version only matched when "server" was the literal
+  # last arg, which silently skipped db:prepare on Fly deploys —
+  # crashing Puma at boot because Solid Queue's tables hadn't been
+  # created yet.
   echo "[docker-entrypoint] Checking if should run db:prepare..."
   echo "[docker-entrypoint] Args: $@"
-  echo "[docker-entrypoint] Last arg: ${@: -1:1}"
-  echo "[docker-entrypoint] Second to last: ${@: -2:1}"
-  if [ "${@: -1:1}" == "server" ] && [[ "${@: -2:1}" == *"bin/rails" ]]; then
+  if echo "$@" | grep -qE 'bin/rails[[:space:]]+server\b'; then
     echo "[docker-entrypoint] Conditions met, running db:prepare..."
     gosu rails ./bin/rails db:prepare
     echo "[docker-entrypoint] db:prepare completed"
