@@ -83,11 +83,20 @@ class Admin::SiteSyncController < Admin::BaseController
   end
 
   def regenerate_token
-    SyncConfig.current.regenerate_token!
-    flash[:notice] = "New token generated. Set the same token on the other side."
-  rescue => e
-    flash[:alert] = "Couldn't regenerate token: #{e.message}"
-  ensure
+    # Local is source of truth for the shared token. Production receives it
+    # from the deploy bootstrap (or a manual paste via update_config) — it
+    # should never generate its own. The UI hides the button on production
+    # but we reject here too so direct POSTs can't bypass that.
+    if Rails.env.production?
+      flash[:alert] = "Regenerate is local-only. Use Replace token here to paste a value from local."
+    else
+      begin
+        SyncConfig.current.regenerate_token!
+        flash[:notice] = "New token generated. Deploy to push it to the live site."
+      rescue => e
+        flash[:alert] = "Couldn't regenerate token: #{e.message}"
+      end
+    end
     redirect_to admin_site_sync_path
   end
 

@@ -42,14 +42,24 @@ Rails.application.config.after_initialize do
     end
 
     # ── Site Sync token ────────────────────────────────────────────────────
+    # Local is the source of truth for the shared token. Every deploy
+    # re-stages ROE_BOOTSTRAP with the current local token, and we
+    # overwrite production's value here on each boot to match.
+    #
+    # Don't call SyncConfig.current — it's first_or_create!, and the
+    # before_create :generate_token callback assigns a freshly-generated
+    # token before save, which would race with the bootstrap value on a
+    # fresh DB. Pre-set the token before save so generate_token's ||=
+    # no-ops.
     sync_token = data["sync_token"]
     if sync_token.present?
-      existing = SyncConfig.current
-      if existing.token.present?
-        Rails.logger.info "[RoeBootstrap] SyncConfig.token already present — skipping token sync"
-      else
+      existing = SyncConfig.first
+      if existing.nil?
+        SyncConfig.create! { |c| c.token = sync_token }
+        Rails.logger.info "[RoeBootstrap] Created SyncConfig with token from ROE_BOOTSTRAP"
+      elsif existing.token != sync_token
         existing.update!(token: sync_token)
-        Rails.logger.info "[RoeBootstrap] Set SyncConfig.token from ROE_BOOTSTRAP"
+        Rails.logger.info "[RoeBootstrap] Updated SyncConfig.token from ROE_BOOTSTRAP"
       end
     end
   rescue JSON::ParserError => e

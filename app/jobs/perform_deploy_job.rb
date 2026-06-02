@@ -156,14 +156,14 @@ class PerformDeployJob < ApplicationJob
   # Bootstrap the production instance with admin credentials + Site Sync
   # token, packaged as a single Fly secret called ROE_BOOTSTRAP. The
   # production-side initializer (config/initializers/roe_bootstrap.rb)
-  # reads it on boot and applies it only when the corresponding records
-  # don't already exist — so this is safe to leave set across redeploys.
+  # reads it on boot and:
+  #   - creates the admin user only when no users exist (idempotent —
+  #     password rotations on prod won't get clobbered by redeploys)
+  #   - always syncs SyncConfig.token to match (local is source of truth
+  #     for the shared token; every deploy refreshes it)
   #
-  # Idempotent on the deploy side too: if ROE_BOOTSTRAP is already set
-  # on the Fly app, we don't overwrite it. To re-bootstrap (e.g. after
-  # rotating an admin password), unset the secret manually first:
-  #
-  #   fly secrets unset ROE_BOOTSTRAP -a <app>
+  # We push a fresh ROE_BOOTSTRAP secret on every deploy so the sync
+  # token always reflects current local state.
   def sync_fly_bootstrap_data(admin_user_id:)
     admin = User.find_by(id: admin_user_id)
     unless admin
@@ -181,21 +181,7 @@ class PerformDeployJob < ApplicationJob
     }.compact
 
     Bundler.with_original_env do
-      list_out, list_err, list_status = Open3.capture3(
-        "fly", "secrets", "list", chdir: Rails.root.to_s
-      )
-
-      unless list_status.success?
-        Rails.logger.warn "[PerformDeployJob] Could not list Fly secrets for bootstrap check: #{list_err.strip.presence || list_out.strip}"
-        return
-      end
-
-      if list_out.include?("ROE_BOOTSTRAP")
-        Rails.logger.info "[PerformDeployJob] ROE_BOOTSTRAP already set on Fly — skipping (unset manually to re-bootstrap)"
-        return
-      end
-
-      Rails.logger.info "[PerformDeployJob] Setting ROE_BOOTSTRAP on Fly (admin + sync token, staged for next deploy)"
+      Rails.logger.info "[PerformDeployJob] Staging ROE_BOOTSTRAP on Fly (admin + sync token)"
       set_out, set_err, set_status = Open3.capture3(
         "fly", "secrets", "set", "--stage", "ROE_BOOTSTRAP=#{JSON.generate(payload)}",
         chdir: Rails.root.to_s
