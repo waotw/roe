@@ -1,3 +1,20 @@
+/* ============= THEME INFO =================
+   Roe Theme: Default
+   Version: 1.0.0
+   Bundled with: Roe v0.0.1
+
+   This theme was installed from Roe. Leave this comment
+   in place and the admin will detect when a new version
+   is available and offer to update it.
+
+   Either of these actions will create a custom theme outside of the updates system:
+
+   - Change the "Roe Theme" name to anything else
+   - install and rename css file in /site/theme/
+
+   You can always download a fresh copy of the current version of any built in theme.
+   ========================================== */
+
 /* ==========================================
    DESIGN VARIABLES
    Minimal, readable default theme.
@@ -139,6 +156,13 @@ sup {
   line-height: 1;
 }
 
+hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 0 0 0 0;
+}
+
 /* ==========================================
    LAYOUT — SITE NAV
    ========================================== */
@@ -179,13 +203,6 @@ sup {
 .site-nav a:visited.active {
   color: var(--color-nav-active);
   font-weight: 700;
-}
-
-.site-nav hr {
-  width: 100%;
-  border: 0;
-  border-top: 1px solid var(--color-border);
-  margin: var(--space-3) 0 0;
 }
 
 /* SITE LOGO */
@@ -269,7 +286,8 @@ body.has-sidebar {
     "nav nav"
     "sidebar main"
     "footer footer";
-  gap: var(--space-8);
+  row-gap: var(--space-6);
+  column-gap: var(--space-8);
   max-width: var(--container-width);
 }
 
@@ -316,7 +334,7 @@ body.sidebar-right .site-sidebar {
 
 .site-sidebar h2 {
   font-size: var(--text-lg);
-  margin: var(--space-4) 0 var(--space-2);
+  margin: 0 0 var(--space-2);
 }
 
 .site-sidebar p,
@@ -355,7 +373,6 @@ body.sidebar-right .site-sidebar {
 .site-footer {
   margin-top: var(--space-16);
   padding: var(--space-8) 0;
-  border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
   color: var(--color-muted);
 }
@@ -491,7 +508,7 @@ div.flash {
 
 .content h1 {
   font-size: var(--text-3xl);
-  line-height: 1.25;
+  line-height: 1;
   margin: var(--space-0) 0 var(--space-4) 0;
   font-weight: 700;
   color: var(--color-heading);

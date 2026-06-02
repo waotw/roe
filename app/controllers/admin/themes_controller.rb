@@ -7,9 +7,21 @@ class Admin::ThemesController < Admin::BaseController
     @active_theme = get_active_theme
     @active_theme_exists = File.exist?(USER_THEME_DIR.join("#{@active_theme}.css"))
 
-    # Add installation status to each theme (checks if file exists in user's theme folder)
+    # Enrich each theme entry with version + update status so the view
+    # can show "v1.0.0 (update available)" or "custom" badges per row.
     @available_themes.each do |theme|
-      theme[:installed] = File.exist?(USER_THEME_DIR.join("#{theme[:name]}.css"))
+      installed_path = USER_THEME_DIR.join("#{theme[:name]}.css")
+      bundled_path   = theme[:master] ? theme[:path] : nil
+
+      theme[:installed] = File.exist?(installed_path)
+
+      bundled_header   = bundled_path ? ThemeInspector.parse_header(bundled_path) : nil
+      installed_header = theme[:installed] ? ThemeInspector.parse_header(installed_path) : nil
+
+      theme[:display_name]      = installed_header&.name || bundled_header&.name || theme[:name].to_s.titleize
+      theme[:installed_version] = installed_header&.version
+      theme[:bundled_version]   = bundled_header&.version
+      theme[:status]            = bundled_path ? ThemeInspector.status(bundled_path: bundled_path, installed_path: installed_path) : :custom
     end
   end
 
@@ -82,11 +94,24 @@ class Admin::ThemesController < Admin::BaseController
     end
 
     if reset_type == "overwrite"
-      # Reset to original - overwrite existing file
+      # Overwrite the installed file with the bundled file. This serves
+      # two callers: "reset to original" from the edit page, and "update
+      # to bundled version" from the themes index when a newer bundled
+      # version is detected. Redirect target depends on which one — back
+      # to the index when there's a version-update context, otherwise
+      # back to the edit page so the user can keep editing.
       dest_file = USER_THEME_DIR.join("#{theme_name}.css")
+      old_header = ThemeInspector.parse_header(dest_file) if dest_file.exist?
       FileUtils.cp(source_file, dest_file)
-      flash[:notice] = "#{theme_name.capitalize} theme reset to original. Your customizations have been overwritten."
-      redirect_to edit_admin_theme_path(theme_name)
+      new_header = ThemeInspector.parse_header(dest_file)
+
+      if old_header && new_header && old_header.version != new_header.version
+        flash[:notice] = "#{theme_name.capitalize} theme updated from v#{old_header.version} to v#{new_header.version}."
+        redirect_to admin_themes_path
+      else
+        flash[:notice] = "#{theme_name.capitalize} theme reset to original. Your customizations have been overwritten."
+        redirect_to edit_admin_theme_path(theme_name)
+      end
     elsif reset_type == "fresh"
       # Install fresh copy with custom/new name
       new_name = custom_name.presence || generate_unique_theme_name(theme_name)
