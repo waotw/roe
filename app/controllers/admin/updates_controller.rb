@@ -117,10 +117,14 @@ class Admin::UpdatesController < Admin::BaseController
     # initializer reads it on first boot to seed the admin user + Site
     # Sync token, so the operator can log in to the production admin
     # immediately after deploy without SSH.
+    #
+    # Sourced from Current.session.user_id — Authentication#resume_session
+    # populates Current.session but not Current.user, so Current.user is
+    # always nil here.
     PerformDeployJob.perform_later(
       target: target,
       version_tag: version_tag,
-      admin_user_id: Current.user&.id
+      admin_user_id: Current.session&.user_id
     )
 
     flash[:notice] = "Deploy started. This may take several minutes — the log updates as it runs."
