@@ -247,23 +247,23 @@ module SiteSync
         ENV["FLY_APP_NAME"] || DEFAULT_APP_NAME
       end
 
-      # Cached for the lifetime of the process — machine ID is stable
-      # for an app and looking it up shells out to fly CLI, which adds
-      # 1-2 seconds. Not memoized across requests since this runs in
-      # a job.
+      # Looked up fresh each call. Don't memoize: SolidQueue workers
+      # are long-lived processes that serve many jobs, and Fly destroys
+      # and recreates the machine on every deploy with a new ID — a
+      # cached value goes stale the moment a deploy completes, and the
+      # next sync fails with `--machine=<old-id> not found/started`.
+      # 1-2 seconds of CLI overhead per call is fine next to rsync.
       def machine_id
-        @machine_id ||= begin
-          output = `fly machine list --json -a #{Shellwords.escape(app_name)} 2>&1`
-          unless $?.success?
-            raise FlyRsyncError, "Could not list fly machines for app '#{app_name}':\n#{output}"
-          end
-          machines = JSON.parse(output) rescue []
-          machine = machines.first
-          unless machine && machine["id"]
-            raise FlyRsyncError, "No fly machines found for app '#{app_name}'."
-          end
-          machine["id"]
+        output = `fly machine list --json -a #{Shellwords.escape(app_name)} 2>&1`
+        unless $?.success?
+          raise FlyRsyncError, "Could not list fly machines for app '#{app_name}':\n#{output}"
         end
+        machines = JSON.parse(output) rescue []
+        machine = machines.first
+        unless machine && machine["id"]
+          raise FlyRsyncError, "No fly machines found for app '#{app_name}'."
+        end
+        machine["id"]
       end
 
       def rsync(source:, dest:, excludes:, delete:)
