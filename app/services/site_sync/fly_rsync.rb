@@ -29,7 +29,6 @@ module SiteSync
   class FlyRsync
     class FlyRsyncError < StandardError; end
 
-    DEFAULT_APP_NAME  = "roe".freeze
     REMOTE_SITE_PATH  = "/data/site/".freeze
 
     # Excludes that apply in both directions. These should mirror
@@ -243,8 +242,26 @@ module SiteSync
 
       # ─── Common helpers ───────────────────────────────────────────
 
+      # Resolve the Fly app name the same way DeployConfigGenerator does
+      # when it writes fly.toml: deploy.yml's app_name wins, then ROE_ROOT
+      # basename. This keeps `fly machine list -a <app>` here aligned with
+      # the `app = '<app>'` line in fly.toml that `bin/fly-rsync`'s
+      # `fly ssh` picks up from Rails.root. Hardcoding a default like
+      # "roe" silently mis-targets sibling installations (e.g. an /egg
+      # site would query /roe's machines and rsync against a foreign ID).
       def app_name
-        ENV["FLY_APP_NAME"] || DEFAULT_APP_NAME
+        return ENV["FLY_APP_NAME"] if ENV["FLY_APP_NAME"].present?
+
+        if File.exist?(SiteConfig::DEPLOY_FILE)
+          config = YAML.load_file(SiteConfig::DEPLOY_FILE) || {}
+          name = config["app_name"].to_s.strip
+          return name if name.present?
+        end
+
+        File.basename(RoeSitePaths::ROE_ROOT).presence || "roe"
+      rescue => e
+        Rails.logger.warn "[SiteSync::FlyRsync] Could not resolve app_name from deploy.yml: #{e.message}"
+        File.basename(RoeSitePaths::ROE_ROOT).presence || "roe"
       end
 
       # Looked up fresh each call. Don't memoize: SolidQueue workers
