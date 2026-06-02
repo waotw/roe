@@ -125,22 +125,101 @@ module RoeUpdater
       end
 
       def parse_git_tags_output(tags_output)
-        tags = tags_output.lines.map do |line|
-          match = line.match(/refs\/tags\/(v?(.+))/)
-          match[2] if match
+        # Capture both forms of each tag:
+        #   original — what git knows, with the v prefix if present
+        #              (used for Codeberg API calls and release URLs)
+        #   stripped — the bare version (used for VERSION-file comparison
+        #              and the value the rest of Roe stores/displays)
+        # The regex anchor `$` filters out git's dereferenced-tag lines
+        # like `v0.1.0^{}` automatically.
+        pairs = tags_output.lines.map do |line|
+          match = line.match(/refs\/tags\/(v?(\d+\.\d+(?:\.\d+)?))$/)
+          [ match[1], match[2] ] if match
         end.compact
 
-        version_tags = tags.select { |t| t.match(/^\d+\.\d+(\.\d+)?$/) }
-        return nil if version_tags.empty?
+        return nil if pairs.empty?
 
-        latest_tag = version_tags.sort { |a, b| compare_versions(a, b) }.last
+        latest_original, latest_version =
+          pairs.sort { |a, b| compare_versions(a[1], b[1]) }.last
+
+        # Best-effort: enrich with real release metadata from the Codeberg
+        # API. If the tag has no associated release object, the API is
+        # down, or the network fails, we fall back to the bare tag link
+        # and a generic note — the update flow still works.
+        release = fetch_release_metadata(latest_original) || {}
 
         {
-          version: latest_tag,
-          url: "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{latest_tag}",
-          notes: "View the changelog and commit history on Codeberg.",
-          published_at: Time.now.iso8601
+          version:      latest_version,
+          url:          release[:html_url] || "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{latest_original}",
+          notes:        build_summary(release[:name], release[:body]),
+          published_at: release[:published_at] || Time.now.iso8601
         }
+      end
+
+      # Fetch release metadata for a given tag from the Codeberg (Gitea)
+      # API. Returns a hash with :name, :body, :html_url, :published_at —
+      # or nil if the release doesn't exist (e.g., tag was pushed without
+      # creating a release object) or the request failed for any reason.
+      def fetch_release_metadata(tag)
+        require "net/http"
+        require "json"
+
+        url = URI("https://codeberg.org/api/v1/repos/#{CODEBERG_REPO}/releases/tags/#{tag}")
+
+        response = nil
+        Timeout.timeout(5) do
+          http = Net::HTTP.new(url.host, url.port)
+          http.use_ssl = true
+          http.open_timeout = 3
+          http.read_timeout = 5
+
+          request = Net::HTTP::Get.new(url)
+          request["Accept"] = "application/json"
+          request["User-Agent"] = "Roe-VersionChecker"
+
+          response = http.request(request)
+        end
+
+        return nil unless response&.code == "200"
+
+        data = JSON.parse(response.body)
+        {
+          name:         data["name"],
+          body:         data["body"],
+          html_url:     data["html_url"],
+          published_at: data["published_at"] || data["created_at"]
+        }
+      rescue => e
+        Rails.logger.debug "[VersionChecker] Release metadata fetch failed: #{e.class} - #{e.message}"
+        nil
+      end
+
+      # Compose the short summary the admin Updates page shows. Sourced
+      # from the release title (if any) plus the first paragraph of the
+      # release body. Falls back to a generic message when nothing is
+      # available — covers the "git tag without a Codeberg release" case.
+      def build_summary(name, body)
+        title    = name.to_s.strip.presence
+        lead     = first_paragraph(body)
+        parts    = []
+        parts << title if title
+        parts << lead  if lead.present?
+
+        if parts.empty?
+          "View the changelog and commit history on Codeberg."
+        else
+          parts.join("\n\n")
+        end
+      end
+
+      # First non-empty paragraph of a markdown string. Stops at the
+      # first blank line so headings and lists don't bleed in. Strips
+      # leading markdown markers (#, -, *) defensively.
+      def first_paragraph(text)
+        return nil if text.blank?
+
+        first = text.to_s.split(/\n\s*\n/).first.to_s.strip
+        first.sub(/\A[#\-*]+\s*/, "").presence
       end
 
       def git_available?

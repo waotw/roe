@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <% if SiteConfig.get('favicon').present? %>
+      <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
+    <% end %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <script>
@@ -110,8 +113,11 @@
                when "development" then "local"
                else                    Rails.env
                end %>
+            <%
+              site_title = SiteConfig.get("title").to_s.strip.presence rescue nil
+            %>
             <span class="text-xs px-2 py-0.5 rounded uppercase font-mono border <%= env_classes %>" title="Rails.env: <%= Rails.env %>">
-              <%= env_label %>
+              <%= env_label %>: <%= site_title %>
             </span>
           </div>
           <!-- Right: Settings, Updates & Logout -->
