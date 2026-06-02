@@ -253,15 +253,22 @@ module SiteSync
       # cached value goes stale the moment a deploy completes, and the
       # next sync fails with `--machine=<old-id> not found/started`.
       # 1-2 seconds of CLI overhead per call is fine next to rsync.
+      #
+      # `fly machine list` returns ALL machines including stopped and
+      # recently-destroyed ones (the latter linger briefly after a
+      # deploy). Filter for state == "started" — anything else either
+      # can't accept ssh or is the dead previous-deploy machine.
       def machine_id
         output = `fly machine list --json -a #{Shellwords.escape(app_name)} 2>&1`
         unless $?.success?
           raise FlyRsyncError, "Could not list fly machines for app '#{app_name}':\n#{output}"
         end
         machines = JSON.parse(output) rescue []
-        machine = machines.first
+        started  = machines.select { |m| m["state"] == "started" }
+        machine  = started.first
         unless machine && machine["id"]
-          raise FlyRsyncError, "No fly machines found for app '#{app_name}'."
+          states = machines.map { |m| "#{m['id']}=#{m['state']}" }.join(", ").presence || "none"
+          raise FlyRsyncError, "No started fly machines for app '#{app_name}' (machines: #{states})."
         end
         machine["id"]
       end
