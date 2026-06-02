@@ -112,7 +112,16 @@ class Admin::UpdatesController < Admin::BaseController
       expires_in: PerformDeployJob::STATUS_TTL
     )
 
-    PerformDeployJob.perform_later(target: target, version_tag: version_tag)
+    # admin_user_id flows to the deploy job so it can package the current
+    # admin's credentials into the Fly ROE_BOOTSTRAP secret. The production
+    # initializer reads it on first boot to seed the admin user + Site
+    # Sync token, so the operator can log in to the production admin
+    # immediately after deploy without SSH.
+    PerformDeployJob.perform_later(
+      target: target,
+      version_tag: version_tag,
+      admin_user_id: Current.user&.id
+    )
 
     flash[:notice] = "Deploy started. This may take several minutes — the log updates as it runs."
     redirect_to admin_updates_path
