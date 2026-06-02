@@ -50,18 +50,18 @@
     <% kind_label = @transfer_status[:kind] == :push ? "Push to live" : "Pull from live" %>
     <% case @transfer_status[:state] %>
     <% when :running %>
-      <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-6">
+      <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-6"
+           data-controller="site-sync">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h3 class="text-sm font-semibold text-blue-900 mb-2">⏳ <%= kind_label %> in progress</h3>
-            <% if @transfer_status[:step] %>
-              <p class="text-sm text-blue-900 font-mono mb-2">
-                <%= SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] %>
-              </p>
-            <% end %>
+            <p class="text-sm text-blue-900 font-mono mb-2"
+               data-site-sync-target="step">
+              <%= SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] || "Starting…" %>
+            </p>
             <p class="text-sm text-blue-800">
               Started <%= time_ago_in_words(@transfer_status[:started_at]) %> ago.
-              Refresh this page to check for progress.
+              Auto-refreshing every few seconds.
             </p>
           </div>
           <%# Force-clear the status — useful if the worker died or

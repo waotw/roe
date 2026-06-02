@@ -160,6 +160,23 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # JSON status poll for the Stimulus controller on the Site Sync page.
+  # Mirrors Admin::UpdatesController#deploy_status — the controller
+  # polls every 2 s and updates the live "Currently…" line in place,
+  # then reloads when the state leaves :running so the server-rendered
+  # completed/failed/reassessment card takes over.
+  def transfer_status
+    status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+    if status.nil?
+      render json: { state: nil }
+      return
+    end
+
+    step_key   = status[:step]
+    step_label = step_key.present? ? (SiteSyncTransferJob::STEPS[step_key.to_sym] || step_key.to_s) : nil
+    render json: status.merge(step_label: step_label)
+  end
+
   # Re-run a previously-failed transfer. Uses the kind from the
   # last status payload (push or pull). The new job will compute
   # a fresh diff — if some files made it through last time, that
