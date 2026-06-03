@@ -234,6 +234,14 @@ class DeployConfigGenerator
     app_name  = config["app_name"].presence || default_app_name
     region    = config.dig("fly", "region").to_s.strip.presence || "iad"
     vm_memory = config.dig("fly", "vm_memory").presence || "1gb"
+    # Fly's initial_size only applies when fly deploy CREATES the volume
+    # (first deploy for the app, or after the volume was destroyed). For
+    # existing apps the value is informational — to grow a live volume
+    # the operator runs `fly volumes extend` from a terminal. We still
+    # write it on every regenerate so subsequent fresh deploys (e.g.
+    # cloning the same /site to a new app) get the right size up front.
+    volume_size_gb = config.dig("fly", "volume_size_gb").to_i
+    volume_size_gb = 1 if volume_size_gb < 1
     ssl       = config["ssl"] != false
 
     vol_dest  = File.dirname(CONTAINER_MOUNT_PATH)
@@ -269,6 +277,7 @@ class DeployConfigGenerator
       [[mounts]]
         source = '#{FLY_VOLUME_SOURCE}'
         destination = '#{vol_dest}'
+        initial_size = '#{volume_size_gb}gb'
 
       [http_service]
         internal_port = 8080

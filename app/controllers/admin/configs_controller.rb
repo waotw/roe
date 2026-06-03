@@ -639,6 +639,7 @@ class Admin::ConfigsController < Admin::BaseController
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
+    @site_size_bytes     = site_size_bytes
     render :edit_deploy
   end
 
@@ -655,8 +656,9 @@ class Admin::ConfigsController < Admin::BaseController
         "image_name"        => dp.dig(:kamal, :image_name).to_s.strip
       },
       "fly"      => {
-        "region"    => dp.dig(:fly, :region).to_s.strip,
-        "vm_memory" => dp.dig(:fly, :vm_memory).to_s.strip
+        "region"         => dp.dig(:fly, :region).to_s.strip,
+        "vm_memory"      => dp.dig(:fly, :vm_memory).to_s.strip,
+        "volume_size_gb" => dp.dig(:fly, :volume_size_gb).to_i
       }
     }
 
@@ -707,6 +709,7 @@ class Admin::ConfigsController < Admin::BaseController
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
+    @site_size_bytes     = site_size_bytes
     render :edit_deploy, status: :unprocessable_entity
   end
 
@@ -1024,6 +1027,20 @@ class Admin::ConfigsController < Admin::BaseController
   # diffs clean across the codebase.
   def write_yaml(path, data)
     File.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
+  end
+
+  # Sum of all file sizes the SiteSync ledger would track under /site.
+  # Used by the deploy-config view to suggest a sensible Fly volume
+  # size and to warn when the configured volume is getting tight.
+  # Cached for 5 minutes so a hot reload loop doesn't re-stat thousands
+  # of files — accuracy isn't critical here, this is a suggestion.
+  def site_size_bytes
+    Rails.cache.fetch("admin:deploy:site_size_bytes", expires_in: 5.minutes) do
+      SiteSync::Ledger.current.values.sum { |entry| entry["size"].to_i }
+    end
+  rescue => e
+    Rails.logger.warn "[Admin::ConfigsController] site_size_bytes failed: #{e.message}"
+    0
   end
 
   # Apply live-key params to an integration record. Param names are

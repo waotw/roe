@@ -382,6 +382,82 @@
           <p class="mt-1 text-xs text-gray-500">Default <code class="font-mono text-xs bg-gray-100 px-0.5">1gb</code> is right for most sites. Increase if you see out-of-memory errors (e.g. <code class="font-mono text-xs bg-gray-100 px-0.5">2gb</code>).</p>
         </div>
 
+        <%
+          site_bytes      = (@site_size_bytes || 0).to_i
+          site_gb         = site_bytes / 1024.0 / 1024.0 / 1024.0
+          configured_gb   = fly['volume_size_gb'].to_i
+          # Suggested: 50% headroom over current /site + ~500 MB cushion
+          # for SQLite DBs / WAL / OS overhead. Rounded up to the next
+          # whole GB, min 1 GB (matches Fly's default for empty sites).
+          suggested_gb    = [ ((site_gb * 1.5) + 0.5).ceil, 1 ].max
+          # Form default: previously-saved value, or the suggested size
+          # if the user hasn't set one yet. Either way the user can edit.
+          input_default   = configured_gb.positive? ? configured_gb : suggested_gb
+          # Warn state: configured size is set but smaller than what
+          # we'd suggest for the current /site. The suggestion already
+          # factors in 50% headroom + 1 GB buffer, so any case where
+          # configured < suggested is "getting tight" in practice —
+          # including the obvious >70%-full scenario and the subtler
+          # "you'll run out by next sync at this growth rate" one.
+          getting_tight   = configured_gb.positive? && configured_gb < suggested_gb
+        %>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="fly_volume_size_gb">
+            Volume size (GB)
+          </label>
+          <%= number_field_tag "deploy_config[fly][volume_size_gb]", input_default,
+                id: "fly_volume_size_gb",
+                min: 1,
+                step: 1,
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+
+          <%# ── Status: regular or "we recommend" ────────────────────── %>
+          <% if getting_tight %>
+            <div class="mt-2 p-3 border border-amber-300 bg-amber-50 rounded-xs">
+              <p class="text-sm font-semibold text-amber-900 mb-1">We recommend increasing your volume size.</p>
+              <p class="text-sm text-amber-800">
+                Your <code class="font-mono text-xs bg-amber-100 px-0.5">/site</code> folder is
+                <strong><%= number_to_human_size(site_bytes) %></strong>,
+                which is using
+                <strong><%= configured_gb.positive? ? "#{((site_gb / configured_gb) * 100).round}%" : "—" %></strong>
+                of your configured <strong><%= configured_gb %> GB</strong> volume.
+                Suggested: <strong><%= suggested_gb %> GB</strong> (50% headroom plus room for databases and logs).
+              </p>
+            </div>
+          <% else %>
+            <p class="mt-1 text-xs text-gray-500">
+              Your <code class="font-mono text-xs bg-gray-100 px-0.5">/site</code> folder is currently
+              <strong><%= number_to_human_size(site_bytes) %></strong>.
+              <% if configured_gb.positive? && site_gb.positive? %>
+                Using <strong><%= ((site_gb / configured_gb) * 100).round %>%</strong> of <strong><%= configured_gb %> GB</strong>.
+              <% end %>
+              Applied on first deploy only — to grow an existing volume, see the commands below.
+            </p>
+          <% end %>
+
+          <%# ── Extend instructions (click-to-copy) ─────────────────── %>
+          <details class="mt-3">
+            <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-900">
+              How to extend an existing volume
+            </summary>
+            <div class="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-xs space-y-2">
+              <p class="text-xs text-gray-600">
+                Run these from your terminal in the
+                <code class="font-mono text-xs bg-gray-100 px-0.5">current/</code> directory.
+                Volume extension is <strong>not reversible</strong> on Fly — you can grow a volume but not shrink it.
+              </p>
+              <p class="font-sans text-xs font-semibold text-gray-700 mt-2 mb-1">1. List your volumes to find the ID</p>
+              <p class="font-mono text-xs bg-white border border-gray-200 px-2 py-1.5 select-all">fly volumes list<%= " -a #{@config_hash['app_name']}" if @config_hash['app_name'].present? %></p>
+              <p class="font-sans text-xs font-semibold text-gray-700 mt-2 mb-1">2. Extend it (replace <code class="font-mono bg-gray-100 px-0.5">&lt;volume-id&gt;</code> with the ID from step 1)</p>
+              <p class="font-mono text-xs bg-white border border-gray-200 px-2 py-1.5 select-all">fly volumes extend &lt;volume-id&gt; -s <%= [ configured_gb, suggested_gb ].max %><%= " -a #{@config_hash['app_name']}" if @config_hash['app_name'].present? %></p>
+              <p class="text-xs text-gray-500 mt-2">
+                The machine restarts after the extend completes. No data is lost.
+              </p>
+            </div>
+          </details>
+        </div>
+
       </div>
     </div>
 
