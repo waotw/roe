@@ -406,6 +406,11 @@
               (HTTP <%= @last_exchange_result[:http_code] %>)
             <% end %>
           </p>
+          <% if @last_exchange_result[:error_message].present? %>
+            <p class="text-xs text-amber-700 font-mono mb-3 break-words">
+              <%= @last_exchange_result[:error_message] %>
+            </p>
+          <% end %>
           <p class="text-xs text-amber-600">
             Try clicking "Refresh now" to retry the connection.
           </p>

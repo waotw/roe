@@ -119,7 +119,22 @@ module SiteSync
           when 500..599 then :server_error
           else :request_error
           end
-          save_exchange_result(success: false, error_type: error_type, http_code: response.code)
+          # Pull the peer's error message out of the JSON body when one
+          # was sent (controllers in this app render
+          # { "error": "ClassName: message" } on rescue). Trim because
+          # raw bodies can be HTML pages from Rails' default error
+          # handler — first line is enough for the UI hint.
+          error_message = begin
+            JSON.parse(response.body).then { |h| h["error"] || h["message"] }
+          rescue
+            response.body.to_s.lines.first&.strip&.first(500)
+          end
+          save_exchange_result(
+            success:       false,
+            error_type:    error_type,
+            http_code:     response.code,
+            error_message: error_message
+          )
           return nil
         end
 

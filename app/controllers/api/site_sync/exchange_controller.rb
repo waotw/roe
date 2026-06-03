@@ -12,6 +12,14 @@ module Api
         render json: ::SiteSync::Exchange.handle_inbound(payload)
       rescue JSON::ParserError => e
         render json: { error: "invalid json: #{e.message}" }, status: :bad_request
+      rescue => e
+        # Mirrors the rescue pattern in refresh_ledger / file_states /
+        # manifest below. Without this, any failure in handle_inbound
+        # (Ledger walk error, cache write blip, etc.) returns Rails'
+        # default opaque 500 — the dev-side caller sees `HTTP 500` with
+        # no message and no way to debug short of `fly ssh` into logs.
+        Rails.logger.error "[Api::SiteSync::ExchangeController] exchange FAILED: #{e.class} #{e.message}\n#{e.backtrace.first(10).join("\n")}"
+        render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
       # POST /api/site_sync/refresh_ledger
