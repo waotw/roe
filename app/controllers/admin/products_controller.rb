@@ -43,7 +43,8 @@ class Admin::ProductsController < Admin::BaseController
     File.write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    product = Product.find_by(file_path: file_path.to_s.sub(Rails.root.to_s + "/", ""))
+    relative_path = file_path.to_s.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
+    product = Product.find_by(file_path: relative_path)
 
     if product
       redirect_to edit_admin_product_path(product), notice: "Product created"
