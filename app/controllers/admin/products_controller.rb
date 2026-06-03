@@ -15,7 +15,7 @@ class Admin::ProductsController < Admin::BaseController
     filename = sanitize_filename(params[:filename])
 
     # Ensure products directory exists
-    products_dir = File.join(RoeSitePaths::SITE_PATH, "products")
+    products_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "products"))
     FileUtils.mkdir_p(products_dir) unless Dir.exist?(products_dir)
 
     file_path = products_dir.join("#{filename}.md")
