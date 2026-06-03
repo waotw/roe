@@ -20,6 +20,12 @@ class Post < ApplicationRecord
   after_save :cleanup_podcast_yaml, if: :should_cleanup_yaml?
   after_save :update_media_references
 
+  # Public URL for the post on the live site (matches the `:post` route
+  # in config/routes.rb → `posts/:url_name`).
+  def public_url
+    "/posts/#{url_name}"
+  end
+
   # Post type definitions
   POST_TYPES = {
     article: {

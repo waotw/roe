@@ -35,6 +35,7 @@
   <div data-controller="editor"
        data-editor-resource-type-value="product"
        data-editor-resource-id-value="<%= @product.id %>"
+       data-editor-preview-path-value="<%= @preview_path || preview_admin_product_path(@product) %>"
        data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
        data-editor-currency-symbol-value="<%= store_currency_symbol %>">
 
@@ -50,7 +51,15 @@
           Preview
         </button>
 
-        <%= link_to "View", @product.public_url, target: "_blank", class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
+        <%# View link shows when the product is publicly reachable on the
+            live site — status: published OR status: unlisted. Reading
+            metadata["status"] directly (rather than .published? / .public?)
+            because HasMetadata#status defaults to "published" when the
+            field is absent, which would falsely show View on items that
+            haven't been explicitly published yet. %>
+        <% if %w[published unlisted].include?(@product.metadata["status"].to_s.downcase) %>
+          <%= link_to "View", @product.public_url, target: "_blank", class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.2rem]" %>
+        <% end %>
 
         <div id="publish-button-container">
           <% if @product.status != 'published' %>
@@ -88,12 +97,15 @@
           metadata: @metadata.gsub(/^---\n/, ''),
           content: @content,
           show_metadata: true,
+          preview_path: @preview_path || preview_admin_product_path(@product),
           item: @product %>
 
   </div>
   <!-- End Stimulus controller -->
 
-  <% if flash[:notice] == "Product saved" %>
+  <%# Trigger preview-window refresh for both plain saves AND save-and-
+      publish (controller flashes "Product published" in that case). %>
+  <% if flash[:notice]&.match?(/\AProduct (saved|published)/) %>
     <div id="product-saved-trigger" data-trigger="refresh" style="display: none;"></div>
   <% end %>
 </body>

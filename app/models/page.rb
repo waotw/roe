@@ -4,6 +4,15 @@ class Page < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
 
+  # Public URL for the page on the live site. The `home` page renders
+  # at the root path (per config/routes.rb → root to: "pages#show",
+  # defaults: { url_name: "home" }) so we special-case it; everything
+  # else uses the catch-all `:url_name` route.
+  def public_url
+    return "/" if url_name == "home"
+    "/#{url_name}"
+  end
+
   def self.create_or_update_from_file(file_path)
     # Resolve symlinks (notably /rails/site → /data/site on prod) so
     # this lookup matches records created via other paths into this

@@ -67,6 +67,8 @@ class Admin::ProductsController < Admin::BaseController
       @metadata = ""
       @content = raw_content
     end
+
+    @preview_path = preview_admin_product_path(@product)
   end
 
   def update
