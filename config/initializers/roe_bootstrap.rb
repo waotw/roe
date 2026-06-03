@@ -62,6 +62,29 @@ Rails.application.config.after_initialize do
         Rails.logger.info "[RoeBootstrap] Updated SyncConfig.token from ROE_BOOTSTRAP"
       end
     end
+
+    # ── Recovery codes ─────────────────────────────────────────────────────
+    # Always-overwrite, mirroring sync_token. Local generates codes,
+    # ROE_BOOTSTRAP carries the digests (never plaintext), and prod
+    # replaces its entire set on each deploy. This means a code marked
+    # consumed on prod becomes valid again after the next deploy if the
+    # user hasn't regenerated locally — accepted tradeoff in exchange
+    # for simplicity. (Merge-by-digest preserving consumed_at is a
+    # future-fix flag.)
+    code_entries = data["recovery_codes"]
+    admin_user = admin_data.is_a?(Hash) ? User.find_by(email_address: admin_data["email_address"]) : User.first
+    if code_entries.is_a?(Array) && admin_user
+      admin_user.recovery_codes.delete_all
+      code_entries.each do |entry|
+        next unless entry.is_a?(Hash) && entry["digest"].present?
+        attrs = { code_digest: entry["digest"] }
+        if entry["consumed_at"].present?
+          attrs[:consumed_at] = Time.iso8601(entry["consumed_at"]) rescue nil
+        end
+        admin_user.recovery_codes.create!(attrs)
+      end
+      Rails.logger.info "[RoeBootstrap] Applied #{code_entries.size} recovery code digests from ROE_BOOTSTRAP"
+    end
   rescue JSON::ParserError => e
     Rails.logger.error "[RoeBootstrap] ROE_BOOTSTRAP is not valid JSON — skipping. (#{e.message})"
   rescue => e

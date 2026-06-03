@@ -87,11 +87,30 @@ if user.save
     puts "   You won't be able to see it again."
   end
 
+  # Recovery codes — generated only when the user doesn't already have
+  # a set, so resetting a password in the existing_user branch doesn't
+  # silently invalidate codes the operator may have saved earlier.
+  # They can always regenerate from the admin Account page later.
+  if user.recovery_codes.none?
+    recovery_codes = user.generate_recovery_codes!
+    puts "\n" + "-" * 60
+    puts "🔒 RECOVERY CODES"
+    puts "-" * 60
+    puts "\nSave these somewhere safe (password manager, printed sheet)."
+    puts "Each code can be used once to reset your password if you lose access."
+    puts "They won't be shown again unless you regenerate them from the admin Account page.\n\n"
+    recovery_codes.each { |code| puts "   #{code}" }
+    puts "\nUse one at /recovery/new (link is on the sign-in page)."
+  else
+    puts "\nℹ️  Existing recovery codes left untouched (#{user.recovery_codes.unconsumed.count} of #{user.recovery_codes.count} still usable)."
+    puts "   Regenerate them from Admin → Account if you've lost them."
+  end
+
   puts "\n   🌐 Login at: http://localhost:3000/session/new"
   puts "\n" + "=" * 60
 
-  if show_password
-    print "\nPress enter after you've saved the password..."
+  if show_password || (defined?(recovery_codes) && recovery_codes)
+    print "\nPress enter after you've saved everything shown above..."
     gets
   end
 else

@@ -58,9 +58,18 @@ class DeployConfigGenerator
     secrets_path = Rails.root.join(".kamal", "secrets")
     FileUtils.mkdir_p(File.dirname(secrets_path))
 
+    # ROE_BOOTSTRAP is listed in config/deploy.yml's env.secret block,
+    # so Kamal requires SOME value to be present here or the deploy
+    # fails at boot. The deploy job overwrites this line with the
+    # current admin + sync_token payload via
+    # PerformDeployJob#sync_kamal_bootstrap_data; '{}' is the safe
+    # no-op default the production initializer treats as "nothing to
+    # bootstrap." Single-quoted so the dotenv parser doesn't choke on
+    # the JSON's double quotes.
     File.write(secrets_path, <<~SECRETS)
       KAMAL_REGISTRY_PASSWORD=#{secrets.registry_password}
       RAILS_MASTER_KEY=#{master_key}
+      ROE_BOOTSTRAP='{}'
     SECRETS
 
     { file: ".kamal/secrets" }
@@ -192,6 +201,7 @@ class DeployConfigGenerator
       env:
         secret:
           - RAILS_MASTER_KEY
+          - ROE_BOOTSTRAP
         clear:
           SOLID_QUEUE_IN_PUMA: true
 

@@ -23,8 +23,9 @@
         <%= form.submit "Sign in", class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
       </div>
 
-      <div class="mt-4 text-sm text-gray-500 sm:mt-0">
+      <div class="mt-4 text-sm text-gray-500 sm:mt-0 sm:flex sm:gap-3">
         <%= link_to "Forgot password?", new_password_path, class: "text-gray-700 underline hover:no-underline" %>
+        <%= link_to "Use a recovery code", new_recovery_code_path, class: "text-gray-700 underline hover:no-underline" %>
       </div>
     </div>
   <% end %>

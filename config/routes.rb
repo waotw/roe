@@ -24,6 +24,10 @@ Rails.application.routes.draw do
   # Authentication (specific routes first)
   resource :session, only: [ :new, :create, :destroy ]
   resources :passwords, param: :token
+  # Lockout recovery via recovery codes — no email dependency, unlike
+  # the PasswordsController flow. Used when the admin has lost the
+  # password AND can't (or doesn't want to) rely on email reset.
+  resources :recovery_codes, only: [ :new, :create ], path: "recovery"
 
   # Admin area (specific routes before catch-all)
   namespace :admin do
@@ -52,6 +56,12 @@ Rails.application.routes.draw do
     get  "site_sync/transfer_status",         to: "site_sync#transfer_status",        as: "site_transfer_status"
     post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"
     post "site_sync/transfer_status/retry",   to: "site_sync#retry_transfer",         as: "retry_site_transfer"
+
+    # Account settings — change email/password, regenerate recovery codes.
+    get   "account",                to: "account#show",                       as: "account"
+    patch "account/email",          to: "account#update_email",               as: "update_account_email"
+    patch "account/password",       to: "account#update_password",            as: "update_account_password"
+    post  "account/recovery_codes", to: "account#regenerate_recovery_codes",  as: "regenerate_account_recovery_codes"
 
     get "layout/navigation/edit", to: "layouts#edit_navigation"
     patch "layout/navigation", to: "layouts#update_navigation"

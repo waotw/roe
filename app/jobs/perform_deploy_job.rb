@@ -44,6 +44,13 @@ class PerformDeployJob < ApplicationJob
       # and applies it only when the corresponding records are absent,
       # so re-deploys are no-ops.
       sync_fly_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
+    elsif target == "kamal"
+      # Kamal analog: rewrite the ROE_BOOTSTRAP line in .kamal/secrets
+      # with current admin + sync_token before kamal builds the image.
+      # The default '{}' value from DeployConfigGenerator stays in place
+      # when there's no admin to package (the prod initializer no-ops on
+      # an empty payload).
+      sync_kamal_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
     end
 
     cmd = build_command(target, version_tag)
@@ -153,17 +160,42 @@ class PerformDeployJob < ApplicationJob
     end
   end
 
+  # Build the JSON payload shipped in the ROE_BOOTSTRAP env var. Shared
+  # between Fly (staged via `fly secrets set`) and Kamal (written into
+  # `.kamal/secrets`). The production-side initializer
+  # (config/initializers/roe_bootstrap.rb) decides per-section how to
+  # apply each piece (admin: first-time only; sync_token + recovery
+  # codes: always overwrite to match local).
+  def build_bootstrap_payload(admin)
+    sync_token = SyncConfig.current.token rescue nil
+    recovery_code_digests = admin.recovery_codes.order(:id).map do |rc|
+      { digest: rc.code_digest, consumed_at: rc.consumed_at&.iso8601 }.compact
+    end
+
+    {
+      admin: {
+        email_address:   admin.email_address,
+        password_digest: admin.password_digest
+      },
+      sync_token:     sync_token,
+      recovery_codes: recovery_code_digests.presence
+    }.compact
+  end
+
   # Bootstrap the production instance with admin credentials + Site Sync
-  # token, packaged as a single Fly secret called ROE_BOOTSTRAP. The
-  # production-side initializer (config/initializers/roe_bootstrap.rb)
-  # reads it on boot and:
+  # token + recovery code digests, packaged as a single Fly secret
+  # called ROE_BOOTSTRAP. The production-side initializer reads it on
+  # boot and:
   #   - creates the admin user only when no users exist (idempotent —
   #     password rotations on prod won't get clobbered by redeploys)
   #   - always syncs SyncConfig.token to match (local is source of truth
   #     for the shared token; every deploy refreshes it)
+  #   - replaces the admin's recovery_codes set wholesale (same "local
+  #     is canonical" model — regenerating locally invalidates prod's
+  #     old set on the next deploy)
   #
   # We push a fresh ROE_BOOTSTRAP secret on every deploy so the sync
-  # token always reflects current local state.
+  # token and recovery codes always reflect current local state.
   def sync_fly_bootstrap_data(admin_user_id:)
     admin = User.find_by(id: admin_user_id)
     unless admin
@@ -171,14 +203,7 @@ class PerformDeployJob < ApplicationJob
       return
     end
 
-    sync_token = SyncConfig.current.token rescue nil
-    payload = {
-      admin: {
-        email_address:   admin.email_address,
-        password_digest: admin.password_digest
-      },
-      sync_token: sync_token
-    }.compact
+    payload = build_bootstrap_payload(admin)
 
     Bundler.with_original_env do
       Rails.logger.info "[PerformDeployJob] Staging ROE_BOOTSTRAP on Fly (admin + sync token)"
@@ -191,6 +216,49 @@ class PerformDeployJob < ApplicationJob
         Rails.logger.warn "[PerformDeployJob] Failed to set ROE_BOOTSTRAP on Fly: #{set_err.strip.presence || set_out.strip}"
       end
     end
+  end
+
+  # Kamal analog of sync_fly_bootstrap_data. Builds the same admin +
+  # sync_token payload and rewrites the ROE_BOOTSTRAP line in
+  # .kamal/secrets in place. DeployConfigGenerator.generate_secrets!
+  # seeds that line with '{}' so kamal can always satisfy the
+  # env.secret entry; this method just upgrades it to the real payload
+  # when an admin is known.
+  #
+  # Idempotent: every deploy rewrites with current state, so a rotated
+  # admin password or fresh sync_token propagates on the next deploy
+  # without manual file editing.
+  def sync_kamal_bootstrap_data(admin_user_id:)
+    admin = User.find_by(id: admin_user_id)
+    unless admin
+      Rails.logger.warn "[PerformDeployJob] No admin User found for id=#{admin_user_id.inspect} — skipping Kamal bootstrap sync"
+      return
+    end
+
+    secrets_path = Rails.root.join(".kamal", "secrets")
+    unless File.exist?(secrets_path)
+      Rails.logger.warn "[PerformDeployJob] .kamal/secrets not found — skipping ROE_BOOTSTRAP write (run Deploy Config save first to generate it)"
+      return
+    end
+
+    payload = build_bootstrap_payload(admin)
+
+    # Single-quoted so the JSON's double quotes pass through Kamal's
+    # dotenv parser unchanged. The payload's values (bcrypt hash, hex
+    # token, email) never contain single quotes in practice, so no
+    # internal escaping is needed.
+    new_line = "ROE_BOOTSTRAP='#{JSON.generate(payload)}'"
+
+    content = File.read(secrets_path)
+    if content.lines.any? { |l| l.start_with?("ROE_BOOTSTRAP=") }
+      content = content.lines.map { |l| l.start_with?("ROE_BOOTSTRAP=") ? "#{new_line}\n" : l }.join
+    else
+      content += "\n" unless content.end_with?("\n")
+      content += "#{new_line}\n"
+    end
+
+    File.write(secrets_path, content)
+    Rails.logger.info "[PerformDeployJob] Wrote ROE_BOOTSTRAP to .kamal/secrets (admin: #{admin.email_address})"
   end
 
   def build_command(target, version_tag)

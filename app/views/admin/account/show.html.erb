@@ -1,0 +1,179 @@
+<% content_for :editor_js, false %>
+<div class="px-4 sm:px-0 max-w-3xl">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Account</h1>
+    <p class="mt-2 text-sm text-gray-700">
+      Change your sign-in email, update your password, and manage recovery codes.
+    </p>
+  </div>
+
+  <% if flash[:notice] %>
+    <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-xs">
+      <p class="text-sm text-green-800"><%= flash[:notice] %></p>
+    </div>
+  <% end %>
+  <% if flash[:alert] %>
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xs">
+      <p class="text-sm text-red-800"><%= flash[:alert] %></p>
+    </div>
+  <% end %>
+
+  <%# ─── One-time recovery codes display ──────────────────────────── %>
+  <%# Rendered right after a regenerate — flash[:plaintext_codes]
+      carries the plaintext for a single page render and is then
+      discarded. Once dismissed there's no second chance to view them. %>
+  <% if @plaintext_codes.present? %>
+    <div class="mb-6 p-4 border-2 border-amber-400 bg-amber-50 rounded-xs">
+      <h2 class="text-lg font-semibold text-amber-900 mb-2">Save these recovery codes now</h2>
+      <p class="text-sm text-amber-800 mb-4">
+        These are the only copy. If you lose them, you'll need to regenerate from this page (while logged in) — once you sign out, they're gone.
+        Each code can be used once to reset your password if you're locked out.
+      </p>
+
+      <div class="bg-white border border-amber-300 p-3 mb-3 font-mono text-sm grid grid-cols-2 gap-2"
+           id="recovery-codes-display">
+        <% @plaintext_codes.each do |code| %>
+          <div class="select-all"><%= code %></div>
+        <% end %>
+      </div>
+
+      <div class="flex gap-2 flex-wrap">
+        <button type="button"
+                id="copy-recovery-codes-btn"
+                data-codes="<%= @plaintext_codes.join("\n") %>"
+                class="uppercase inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono text-xs rounded-xs cursor-pointer">
+          Copy all to clipboard
+        </button>
+        <%
+          download_body = "Roe CMS recovery codes\nGenerated: #{Time.current.utc.iso8601}\nAccount: #{@user.email_address}\n\n" + @plaintext_codes.join("\n") + "\n\nEach code can be used once.\nVisit /recovery/new while signed out to use one.\n"
+          download_data = "data:text/plain;charset=utf-8,#{ERB::Util.url_encode(download_body)}"
+        %>
+        <a href="<%= download_data %>"
+           download="roe-recovery-codes-<%= Time.current.strftime("%Y%m%d") %>.txt"
+           class="uppercase inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono text-xs rounded-xs cursor-pointer no-underline">
+          Download as .txt
+        </a>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ─── Email ────────────────────────────────────────────────────── %>
+  <div class="bg-white border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Sign-in email</h2>
+      <p class="text-sm text-gray-600 mt-1">Used to sign in and identify your admin account.</p>
+    </div>
+    <%= form_with url: admin_update_account_email_path, method: :patch, local: true, class: "px-6 py-4 space-y-3" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="account_email">Email</label>
+        <%= email_field_tag :email_address, @user.email_address,
+              id: "account_email",
+              required: true,
+              autocomplete: "username",
+              class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      </div>
+      <div>
+        <%= f.submit "Update email",
+              class: "uppercase text-sm px-3 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ─── Password ────────────────────────────────────────────────── %>
+  <div class="bg-white border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Password</h2>
+      <p class="text-sm text-gray-600 mt-1">
+        Changing your password signs out every other session for safety.
+      </p>
+    </div>
+    <%= form_with url: admin_update_account_password_path, method: :patch, local: true, class: "px-6 py-4 space-y-3" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="current_password">Current password</label>
+        <%= password_field_tag :current_password, nil,
+              id: "current_password",
+              required: true,
+              autocomplete: "current-password",
+              class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="new_password">New password</label>
+        <%= password_field_tag :password, nil,
+              id: "new_password",
+              required: true,
+              autocomplete: "new-password",
+              maxlength: 72,
+              class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="password_confirmation">Confirm new password</label>
+        <%= password_field_tag :password_confirmation, nil,
+              id: "password_confirmation",
+              required: true,
+              autocomplete: "new-password",
+              maxlength: 72,
+              class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      </div>
+      <div>
+        <%= f.submit "Update password",
+              class: "uppercase text-sm px-3 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ─── Recovery codes status + regenerate ────────────────────── %>
+  <div class="bg-white border border-gray-200 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Recovery codes</h2>
+      <p class="text-sm text-gray-600 mt-1">
+        Used to reset your password if you're locked out. Each code works once.
+      </p>
+    </div>
+    <div class="px-6 py-4 space-y-3">
+      <% if @total_code_count.zero? %>
+        <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-xs">
+          No recovery codes exist for this account yet. Generate a set and save them somewhere safe.
+        </p>
+      <% else %>
+        <p class="text-sm text-gray-700">
+          <strong><%= @unconsumed_code_count %></strong> of <strong><%= @total_code_count %></strong> codes still usable.
+          <% if @unconsumed_code_count.zero? %>
+            <span class="text-red-700">All codes have been consumed — regenerate before you need them.</span>
+          <% elsif @unconsumed_code_count < 3 %>
+            <span class="text-amber-700">Running low — consider regenerating.</span>
+          <% end %>
+        </p>
+      <% end %>
+
+      <%= button_to admin_regenerate_account_recovery_codes_path,
+                    method: :post,
+                    form: { style: "display: inline;" },
+                    data: { turbo_confirm: "Regenerate recovery codes? Any existing codes will stop working immediately, including ones you've saved." },
+                    class: "uppercase text-sm px-3 py-1.5 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono rounded-xs cursor-pointer" do %>
+        <%= @total_code_count.zero? ? "Generate recovery codes" : "Regenerate recovery codes" %>
+      <% end %>
+
+      <p class="text-xs text-gray-500">
+        New codes propagate to your live site on the next deploy.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('turbo:load', function () {
+    const copyBtn = document.getElementById('copy-recovery-codes-btn');
+    if (copyBtn) {
+      const original = copyBtn.textContent;
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(copyBtn.dataset.codes || "");
+          copyBtn.textContent = 'Copied!';
+        } catch (e) {
+          copyBtn.textContent = 'Copy failed';
+        }
+        setTimeout(() => { copyBtn.textContent = original; }, 2000);
+      });
+    }
+  });
+</script>
