@@ -177,6 +177,52 @@ module SiteSync
         Rails.cache.delete(LAST_EXCHANGE_CACHE_KEY)
       end
 
+      # Tell the peer to run ContentSync.sync_all so its Post/Page/
+      # Product/Medium tables reconcile against the new on-disk state
+      # after a push. Without this, the peer's admin keeps showing rows
+      # for files that just got deleted on disk (orphans) and doesn't
+      # show rows for files that just landed — ContentSync only runs
+      # at boot via config/initializers/content_management.rb.
+      #
+      # Push-only. Pull side calls ContentSync.sync_all locally and
+      # in-process (no API hop needed for our own DB).
+      #
+      # Best-effort: returns true on success, false on any failure.
+      # Failures are logged but don't bubble out so a partial-success
+      # sync still completes cleanly from the user's perspective.
+      def reconcile_peer_content!
+        unless can_call_peer?
+          Rails.logger.warn "[SiteSync::Exchange] reconcile_peer_content skipped — can_call_peer? is false"
+          return false
+        end
+
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/reconcile_content"))
+        Rails.logger.info "[SiteSync::Exchange] reconcile_peer_content → POST #{uri}"
+
+        # ContentSync.sync_all walks the whole site, so the peer may
+        # need a few seconds (especially with many media files). Use
+        # a longer read timeout for this specific call than the default
+        # 30s in post_to_peer — but cap it so a wedged peer doesn't
+        # block the calling job forever.
+        with_retries(label: "reconcile_peer_content", max_retries: 2) do
+          response = post_to_peer(uri, "{}", read_timeout: 120)
+          if response.nil?
+            raise "no response (network error)"
+          elsif response.is_a?(Net::HTTPSuccess)
+            Rails.logger.info "[SiteSync::Exchange] reconcile_peer_content OK"
+            return true
+          elsif response.code.to_i.between?(500, 599)
+            raise "HTTP #{response.code}: #{response.body}"
+          else
+            Rails.logger.warn "[SiteSync::Exchange] reconcile_peer_content FAILED: HTTP #{response.code} from #{uri} — body: #{response.body}"
+            return false
+          end
+        end
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] reconcile_peer_content ERROR after retries: #{e.class} #{e.message}"
+        false
+      end
+
       # Tell the peer to walk its own /site and rewrite its ledger
       # to match. Called after a push so the peer's drift detection
       # doesn't claim "everything changed" from the rsync touching
@@ -306,11 +352,14 @@ module SiteSync
       end
 
       # Tiny HTTP helper — separated out so the retry loop above can
-      # treat network errors and HTTP responses uniformly.
-      def post_to_peer(uri, body)
+      # treat network errors and HTTP responses uniformly. Per-call
+      # read_timeout lets endpoints that do real server-side work
+      # (e.g. reconcile_content walking the whole /site) raise the
+      # ceiling without globally bumping it for cheap pings.
+      def post_to_peer(uri, body, read_timeout: 30)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl      = (uri.scheme == "https")
-        http.read_timeout = 30
+        http.read_timeout = read_timeout
         http.open_timeout = HTTP_TIMEOUT_SECONDS
 
         request = Net::HTTP::Post.new(uri.request_uri)

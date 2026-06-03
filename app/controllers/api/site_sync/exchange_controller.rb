@@ -82,6 +82,27 @@ module Api
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # POST /api/site_sync/reconcile_content
+      #
+      # Called by the peer right after it pushes content to us, so our
+      # Post/Page/Product/Medium tables reconcile against the new on-
+      # disk state. Without this, the FS gets the new files but rows
+      # for now-gone files linger (orphan records) and rows for new
+      # files don't exist (admin doesn't see them) until the next app
+      # restart kicks ContentSync.sync_all via the boot initializer.
+      #
+      # ContentSync handles both directions — orphan removal via
+      # handle_orphaned_* and new-record creation via the per-type
+      # sync_* loops. Safe to call repeatedly.
+      def reconcile_content
+        Rails.logger.info "[Api::SiteSync::ExchangeController] reconcile_content called from peer"
+        ContentSync.sync_all
+        render json: { ok: true }
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] reconcile_content FAILED: #{e.class} #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+        render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
       # GET /api/site_sync/manifest
       #
       # Returns the full file manifest for the site directory.

@@ -33,6 +33,7 @@ class SiteSyncTransferJob < ApplicationJob
     pulling_from_live:   "Pulling changed files from live…",
     pulling_from_live_full: "Pulling from live (full tree)…",
     refreshing_baseline: "Refreshing sync baseline…",
+    reconciling_content: "Updating the database to match new files…",
     notifying_peer:      "Notifying peer to refresh its ledger…"
   }.freeze
 
@@ -56,6 +57,20 @@ class SiteSyncTransferJob < ApplicationJob
     SiteSync::Ledger.write_current!
     SiteSync::Checker.clear_cache
     Rails.cache.delete("site_sync:current_fingerprint")
+
+    # Reconcile the database against the new on-disk state. rsync only
+    # touches files; Post/Page/Product/Medium rows still reference the
+    # pre-sync state until something runs ContentSync.sync_all. For
+    # push, that something is the peer (called via API); for pull, it's
+    # us, in-process. Without this, the receiving side's admin shows
+    # ghost rows for deleted files and missing rows for new files
+    # until the app restarts.
+    update_step(:reconciling_content)
+    if @kind == :push
+      SiteSync::Exchange.reconcile_peer_content!
+    else
+      ContentSync.sync_all
+    end
 
     # Tell the peer to refresh its ledger too — for both push and
     # pull. The motivations differ slightly:
