@@ -78,6 +78,19 @@ module SiteSync
     # has 5–15 seconds of overhead).
     REMOTE_DELETE_BATCH = 50
 
+    # Files per rsync invocation when transferring via --files-from.
+    # Caps the working set the remote rsync process has to hold per
+    # session. Large image-heavy syncs (variants × hundreds of originals)
+    # were segfaulting the remote ssh shell ("Process exited with status
+    # 11" → broken pipe) when run as a single 8000+ file transfer; the
+    # session memory footprint at that scale exceeded what the fly
+    # default VM could absorb. Each chunk runs in its own fresh ssh
+    # session, so a crash never cascades — with_retries plus rsync's
+    # --partial flag mean even an interrupted chunk resumes cleanly.
+    # 500 trades ~10 s per extra session for substantially better
+    # reliability; adjust upward if VMs are sized for it.
+    RSYNC_FILES_BATCH = 500
+
     class << self
       # All three public entry points accept an optional `on_progress`
       # callable invoked as rsync transfers files:
@@ -315,31 +328,63 @@ module SiteSync
       # relative to the source root). Skips the full-tree walk on
       # both sides — for a small diff this is dramatically faster
       # than vanilla rsync over fly ssh console.
+      #
+      # For large file lists, splits into RSYNC_FILES_BATCH chunks so
+      # each fly ssh session stays within the remote shell's resource
+      # envelope (see RSYNC_FILES_BATCH for rationale). Progress is
+      # reported in cumulative file count across all chunks so the
+      # UI sees one continuous "X of total" counter.
       def rsync_files_from(source:, dest:, files:, excludes: [], extra_flags: "", on_progress: nil)
         files = Array(files).uniq
         return if files.empty?
 
-        list = Tempfile.create([ "site-sync-files", ".txt" ])
-        begin
-          list.write(files.join("\n"))
-          list.close
+        total_files = files.size
+        files_done  = 0
+        combined    = +""
 
-          flags = "-rltzPi --files-from=#{Shellwords.escape(list.path)} #{extra_flags}".strip
-          cmd = build_cmd(
-            source:   source,
-            dest:     dest,
-            flags:    flags,
-            excludes: excludes
-          )
+        files.each_slice(RSYNC_FILES_BATCH) do |chunk|
+          chunk_size = chunk.size
 
-          with_retries(label: "rsync_files_from") do
-            output, success = run_streaming(cmd, on_progress: on_progress)
-            raise FlyRsyncError, "selective rsync failed:\n#{output}" unless success
-            return output
+          # Wrap the caller's on_progress so per-chunk to-chk numbers
+          # roll up into a single cumulative counter. Within a chunk,
+          # rsync reports `to-chk=remaining/chunk_size`; we translate
+          # to `files_done + (chunk_size - remaining)` against the
+          # full total so the UI shows one steady progression instead
+          # of a counter that resets at every chunk boundary.
+          chunk_progress = on_progress && lambda do |completed:, total:|
+            on_progress.call(completed: files_done + completed, total: total_files)
           end
-        ensure
-          File.unlink(list.path) if list && File.exist?(list.path)
+
+          list = Tempfile.create([ "site-sync-files", ".txt" ])
+          begin
+            list.write(chunk.join("\n"))
+            list.close
+
+            flags = "-rltzPi --files-from=#{Shellwords.escape(list.path)} #{extra_flags}".strip
+            cmd = build_cmd(
+              source:   source,
+              dest:     dest,
+              flags:    flags,
+              excludes: excludes
+            )
+
+            with_retries(label: "rsync_files_from") do
+              output, success = run_streaming(cmd, on_progress: chunk_progress)
+              combined << output
+              raise FlyRsyncError, "selective rsync failed:\n#{output}" unless success
+            end
+          ensure
+            File.unlink(list.path) if list && File.exist?(list.path)
+          end
+
+          files_done += chunk_size
+          # Settle the per-chunk counter exactly at the boundary so the
+          # UI's percentage hits each round number cleanly rather than
+          # depending on rsync's last to-chk emission.
+          on_progress&.call(completed: files_done, total: total_files)
         end
+
+        combined
       end
 
       # Generic retry-with-backoff. Yields once + up to `max_retries`

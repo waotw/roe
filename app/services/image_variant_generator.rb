@@ -70,6 +70,18 @@ class ImageVariantGenerator
       source_path = normalize_path(source_path)
       return false unless File.exist?(source_path)
 
+      # Hard boundary: a variant must never be the source of more
+      # variants. variant_path_for derives the output dir from
+      # File.dirname(source_path), so a variant input produces a nested
+      # variants/variants/ directory and the count compounds every run.
+      # Callers (ContentSync, ContentWatcher, the rake tasks) already
+      # filter, but enforcing it here too removes the foot-gun for any
+      # future caller, including ad-hoc console invocations.
+      if variant_path?(source_path)
+        Rails.logger.warn "[ImageVariants] Refusing to generate variants for a variant file: #{source_path}"
+        return false
+      end
+
       Rails.logger.info "[ImageVariants] Processing #{source_path}"
 
       # Ensure variants directory exists
@@ -139,6 +151,12 @@ class ImageVariantGenerator
     # silently swallowed by a stale cache flag from a prior crashed run.
     def queue!(web_path, force: false)
       return false unless available?
+      # Same boundary as #generate_variants: never queue a variant path.
+      # The job would happily process it and produce variants/variants/.
+      if variant_path?(web_path)
+        Rails.logger.warn "[ImageVariants] Refusing to queue a variant file: #{web_path}"
+        return false
+      end
       cache_key = queue_cache_key(web_path)
       return false if !force && Rails.cache.exist?(cache_key)
 
@@ -229,6 +247,14 @@ class ImageVariantGenerator
 
     def image_file?(path)
       IMAGE_EXTENSIONS.include?(File.extname(path).downcase)
+    end
+
+    # Detect any path inside a "variants" directory — file path or web
+    # path, absolute or relative. Used by generate_variants and queue! to
+    # refuse recursion. The check is segment-based so it doesn't false-
+    # match a hypothetical file literally named e.g. "variantsX.jpg".
+    def variant_path?(path)
+      path.to_s.split("/").include?("variants")
     end
 
     private
