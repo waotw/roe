@@ -106,6 +106,24 @@ class ContentSync
     puts "✅ Pages sync complete! #{success_count} synced, #{error_count} errors\n\n"
   end
 
+  # File extension → canonical media_type bucket. Mirrors the case in
+  # Medium#normalize_media_type so the insert_all path below can produce
+  # the same DB rows that single create! would, while skipping the per-
+  # record before_save callback (insert_all is a single SQL statement
+  # and bypasses AR callbacks by design).
+  MEDIA_TYPE_BY_EXTENSION = {
+    "jpg" => "images", "jpeg" => "images", "png" => "images", "gif" => "images",
+    "webp" => "images", "svg" => "images", "bmp" => "images",
+    "heic" => "images", "heif" => "images",
+    "woff" => "fonts", "woff2" => "fonts", "ttf" => "fonts", "otf" => "fonts",
+    "mp3" => "audio", "m4a" => "audio", "wav" => "audio", "ogg" => "audio",
+    "flac" => "audio", "aac" => "audio",
+    "mp4" => "video", "webm" => "video", "ogv" => "video", "mov" => "video",
+    "avi" => "video", "mkv" => "video"
+  }.freeze
+
+  MEDIA_INSERT_BATCH = 200
+
   def sync_media
     # Sync all media types (images, audio, video) - EXCLUDE variants folder
     media_files = Dir.glob(File.join(RoeSitePaths::SITE_MEDIA_PATH, "**", "*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}"))
@@ -118,52 +136,67 @@ class ContentSync
 
     puts "=" * 60
 
-    success_count = 0
-    error_count = 0
-    image_count = 0
+    # Pre-load existing paths in one query, then build a single bulk
+    # INSERT per chunk. Previously this loop did N exists? queries + M
+    # individual Medium.create! calls, each in its own transaction.
+    # Against SQLite that's M write transactions contending with the
+    # web process, SolidQueue (SOLID_QUEUE_IN_PUMA), and SolidCache. On
+    # a fresh production boot that pattern surfaces as runs of
+    # "cannot rollback - no transaction is active" — the original busy
+    # error is swallowed and Rails finds the transaction already gone
+    # by the time it tries to wind down. insert_all is one statement
+    # per chunk, atomic, no per-record transaction loop.
+    existing_paths = Medium.pluck(:file_path).to_set
+    real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+    now = Time.current
+
+    new_records = []
+    image_paths_for_queue = []
 
     media_files.each do |file_path|
-      # Handle symlinks - resolve to real path before substitution
-      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
       web_path = File.realpath(file_path).sub(real_site_path, "")
+      next if existing_paths.include?(web_path)
 
-      begin
-        unless Medium.exists?(file_path: web_path)
-          media_type = File.extname(file_path).delete(".").downcase
+      ext       = File.extname(file_path).delete(".").downcase
+      canonical = MEDIA_TYPE_BY_EXTENSION[ext] || ext
 
-          medium = Medium.create!(
-            file_path: web_path,
-            media_type: media_type,
-            uploaded_at: File.mtime(file_path)
-          )
+      new_records << {
+        file_path:   web_path,
+        media_type:  canonical,
+        uploaded_at: File.mtime(file_path),
+        created_at:  now,
+        updated_at:  now
+      }
+      image_paths_for_queue << web_path if canonical == "images"
+    rescue => e
+      Rails.logger.error "[ContentSync] Failed to inspect #{file_path}: #{e.message}"
+      puts "  ✗ Error: #{File.basename(file_path)} - #{e.message}"
+    end
 
-          puts "  ✓ Added: #{File.basename(file_path)}"
-          success_count += 1
+    inserted = 0
+    new_records.each_slice(MEDIA_INSERT_BATCH) do |batch|
+      Medium.insert_all(batch)
+      inserted += batch.size
+    rescue => e
+      Rails.logger.error "[ContentSync] Bulk insert failed for batch of #{batch.size}: #{e.class} #{e.message}"
+      puts "  ✗ Bulk insert error: #{e.message}"
+    end
 
-          # Queue variant generation for images (development only - production generates on upload).
-          # The Medium#after_create callback will have already attempted to queue;
-          # queue! is idempotent so a second call is a no-op cache hit. We keep
-          # this explicit call as a belt-and-suspenders for cases where the
-          # callback's conditions change.
-          if medium.image? && Rails.env.development?
-            image_count += 1 if ImageVariantGenerator.queue!(web_path)
-          end
-        end
-      rescue => e
-        Rails.logger.error "[ContentSync] Failed to sync #{file_path}: #{e.message}"
-        puts "  ✗ Error: #{File.basename(file_path)} - #{e.message}"
-        error_count += 1
+    puts "  ✓ Added: #{inserted} new media files" if inserted.positive?
+
+    # Variant queueing is dev-only (mirrors Medium#after_create's guard).
+    # Production generates variants on upload and on-demand from the
+    # renderer, not in bulk at boot.
+    if Rails.env.development? && image_paths_for_queue.any?
+      image_count = 0
+      image_paths_for_queue.each do |web_path|
+        image_count += 1 if ImageVariantGenerator.queue!(web_path)
       end
+      puts "🖼️  Queued #{image_count} images for variant generation" if image_count.positive?
     end
 
     puts "=" * 60
-    puts "✅ Media sync complete! #{success_count} new files"
-    puts "❌ #{error_count} errors" if error_count > 0
-
-    # Show queue message
-    if image_count > 0
-      puts "🖼️  Queued #{image_count} images for variant generation"
-    end
+    puts "✅ Media sync complete!"
     puts ""
   end
 
