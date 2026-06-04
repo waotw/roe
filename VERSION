@@ -1,0 +1,5 @@
+---
+version: 0.1.1
+release_date: '2026-05-02'
+channel: stable
+repository: https://codeberg.org/waotw/roe
