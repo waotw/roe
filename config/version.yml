@@ -4,4 +4,4 @@
 version: "0.1.0"
 release_date: "2026-04-30"
 channel: "stable"  # stable, beta, alpha
-repository: "https://git.sr.ht/~benjaminwelch/roe"
+repository: "https://codeberg.org/waotw/roe"

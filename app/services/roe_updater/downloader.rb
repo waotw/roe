@@ -8,7 +8,11 @@ module RoeUpdater
       def download_version(version, status_record)
         cleanup_staging
 
-        git_url = "https://git.sr.ht/~benjaminwelch/roe"
+        # Single source of truth for the repo location lives on
+        # VersionChecker so the download host stays in sync with the
+        # update-check host. If we ever move providers again, one
+        # constant changes and both paths follow.
+        git_url = "https://codeberg.org/#{RoeUpdater::VersionChecker::CODEBERG_REPO}"
 
         status_record.update!(
           current_step: "Downloading Roe #{version}...",

@@ -42,8 +42,8 @@ class UpdatePreflightChecker
     check("staging/ is empty (Bug 3)",    -> { Dir.exist?(staging_path) && Dir.empty?(staging_path) },
           "non-empty staging/ would block validate_prerequisites — clean it up before testing")
 
-    section "Sourcehut connectivity"
-    check_sourcehut_reachable
+    section "Codeberg connectivity"
+    check_codeberg_reachable
     check_update_check
 
     section "Database files"
@@ -141,20 +141,25 @@ class UpdatePreflightChecker
     @failures << "version file unreadable"
   end
 
-  def check_sourcehut_reachable
+  def check_codeberg_reachable
     if ENV["ROE_MOCK_UPDATE"].present?
-      info("ROE_MOCK_UPDATE=#{ENV['ROE_MOCK_UPDATE']}", "skipping live Sourcehut check (mock active)")
+      info("ROE_MOCK_UPDATE=#{ENV['ROE_MOCK_UPDATE']}", "skipping live Codeberg check (mock active)")
       return
     end
 
-    output = `git ls-remote --tags #{RoeUpdater::VersionChecker::GIT_REMOTE_URL} 2>&1`
+    # Build the URL inline from CODEBERG_REPO rather than pulling a
+    # separate GIT_REMOTE_URL constant — VersionChecker only exposes
+    # the repo slug, and tying the preflight to that single source of
+    # truth keeps the two from drifting apart.
+    git_url = "https://codeberg.org/#{RoeUpdater::VersionChecker::CODEBERG_REPO}"
+    output  = `git ls-remote --tags #{git_url} 2>&1`
     if $?.success?
       tag_count = output.lines.count
-      puts "  ✓ git.sr.ht reachable: #{tag_count} tag refs found"
+      puts "  ✓ codeberg.org reachable: #{tag_count} tag refs found"
     else
-      puts "  ✗ Cannot reach git.sr.ht for tag listing"
+      puts "  ✗ Cannot reach codeberg.org for tag listing"
       puts "     #{output.lines.first&.strip}"
-      @failures << "sourcehut unreachable"
+      @failures << "codeberg unreachable"
     end
   end
 

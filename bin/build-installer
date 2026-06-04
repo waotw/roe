@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# build-installer — bundle a user-facing installer zip of Roe.
+#
+# Strictly read-only against the working tree: stages files into a
+# temp directory, copies (never moves), and zips from there. Nothing
+# in /roe, /roe/current, or /roe/site is modified.
+#
+# Output: roe-<VERSION>.zip, named from the root /roe/VERSION file.
+#
+# Usage:
+#   current/bin/build-installer                  # zip → current dir
+#   current/bin/build-installer -o ~/Downloads   # zip → specific dir
+#   current/bin/build-installer --keep-stage     # leave the staging
+#                                                # dir for inspection
+#
+# After first checkout: chmod +x current/bin/build-installer
+
+set -euo pipefail
+
+# ── Path resolution ────────────────────────────────────────────────────
+# SCRIPT_DIR points at current/bin/, RAILS_ROOT at current/, ROE_ROOT at
+# the package root that holds VERSION + roe.sh.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RAILS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROE_ROOT="$(cd "$RAILS_ROOT/.." && pwd)"
+
+# ── Args ───────────────────────────────────────────────────────────────
+OUTPUT_DIR="$(pwd)"
+KEEP_STAGE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o|--output)
+      OUTPUT_DIR="$2"; shift 2 ;;
+    --keep-stage)
+      KEEP_STAGE=1; shift ;;
+    -h|--help)
+      sed -n '/^# build-installer/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Try --help" >&2
+      exit 1 ;;
+  esac
+done
+
+# Resolve absolute path; fail clearly if the dir doesn't exist.
+if [[ ! -d "$OUTPUT_DIR" ]]; then
+  echo "Output directory does not exist: $OUTPUT_DIR" >&2
+  exit 1
+fi
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
+
+# ── Version + zip name ─────────────────────────────────────────────────
+# VERSION is YAML, not a plain version string. Pull just the version:
+# field so the zip filename doesn't end up containing release_date,
+# channel, and the repository URL (yes, that happened). awk because
+# Ruby may not be in PATH for end-user release builds.
+if [[ ! -f "$ROE_ROOT/VERSION" ]]; then
+  echo "Expected VERSION file at $ROE_ROOT/VERSION but it isn't there." >&2
+  exit 1
+fi
+VERSION="$(awk -F: '/^version:/ { gsub(/[[:space:]"\047]/, "", $2); print $2; exit }' "$ROE_ROOT/VERSION")"
+if [[ -z "$VERSION" ]]; then
+  echo "Could not parse a version: field from $ROE_ROOT/VERSION." >&2
+  echo "Expected something like:  version: 0.1.1" >&2
+  exit 1
+fi
+ZIP_NAME="roe-${VERSION}.zip"
+ZIP_PATH="$OUTPUT_DIR/$ZIP_NAME"
+
+# ── Tool checks ────────────────────────────────────────────────────────
+for tool in rsync zip; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "Required tool not found: $tool" >&2
+    exit 1
+  fi
+done
+
+# ── Staging ────────────────────────────────────────────────────────────
+# mktemp -d works on macOS and Linux. Using a project-prefixed template
+# so a stray staging dir is recognisable in /tmp during debug runs.
+STAGE_DIR="$(mktemp -d -t roe-installer-XXXXXXXX)"
+STAGE_ROOT="$STAGE_DIR/roe-${VERSION}"
+
+cleanup() {
+  if [[ "$KEEP_STAGE" -eq 0 ]]; then
+    rm -rf "$STAGE_DIR"
+  else
+    echo "Staging kept at: $STAGE_DIR"
+  fi
+}
+trap cleanup EXIT
+
+mkdir -p "$STAGE_ROOT"
+
+echo "Building installer for Roe ${VERSION}"
+echo "  Source:   $ROE_ROOT"
+echo "  Staging:  $STAGE_DIR"
+echo "  Output:   $ZIP_PATH"
+echo ""
+
+# ── Root-level files ───────────────────────────────────────────────────
+# Everything listed here MUST exist; the loop fails fast if any is
+# missing so a stripped-down checkout doesn't silently ship a broken zip.
+ROOT_FILES=(roe.sh start.command VERSION README.md)
+for f in "${ROOT_FILES[@]}"; do
+  if [[ ! -f "$ROE_ROOT/$f" ]]; then
+    echo "Missing required root file: $f" >&2
+    exit 1
+  fi
+  cp "$ROE_ROOT/$f" "$STAGE_ROOT/$f"
+done
+
+# Preserve exec bits on the two user-facing entry scripts (zip will
+# carry them through on Unix; Windows tools may strip, hence README's
+# chmod fallback note).
+chmod +x "$STAGE_ROOT/roe.sh" "$STAGE_ROOT/start.command"
+
+# ── current/ ───────────────────────────────────────────────────────────
+# rsync rather than cp -r so the exclude list stays the single source of
+# truth. Trailing slashes are intentional — they tell rsync to copy the
+# contents of current/ into the destination, not a nested current/current.
+#
+# Excludes group:
+#   * Runtime/build artefacts (log/, tmp/, storage/, node_modules,
+#     vendor/bundle, public/assets, public/packs)
+#   * Local databases (db/*.sqlite3*, db/development, db/production)
+#   * Per-install secrets that MUST be generated fresh
+#     (config/master.key, config/credentials.yml.enc, .kamal/secrets)
+#   * Per-deploy generated config (fly.toml, config/deploy.yml)
+#   * VCS + dev tooling (.git, .bundle, coverage, .byebug_history,
+#     .rspec_status, .DS_Store)
+#   * This script itself (bin/build-installer) — it has no business
+#     ending up in a user-facing installer
+#   * Inner VERSION (root VERSION is canonical; a stale current/VERSION
+#     would confuse the update checker)
+rsync -a \
+  --exclude='.git/' \
+  --exclude='.bundle/' \
+  --exclude='.byebug_history' \
+  --exclude='.rspec_status' \
+  --exclude='.DS_Store' \
+  --exclude='coverage/' \
+  --exclude='log/' \
+  --exclude='tmp/' \
+  --exclude='storage/' \
+  --exclude='node_modules/' \
+  --exclude='vendor/bundle/' \
+  --exclude='public/assets/' \
+  --exclude='public/packs/' \
+  --exclude='db/*.sqlite3' \
+  --exclude='db/*.sqlite3-wal' \
+  --exclude='db/*.sqlite3-shm' \
+  --exclude='db/development/' \
+  --exclude='db/production/' \
+  --exclude='config/master.key' \
+  --exclude='config/credentials.yml.enc' \
+  --exclude='config/deploy.yml' \
+  --exclude='.kamal/secrets' \
+  --exclude='fly.toml' \
+  --exclude='bin/build-installer' \
+  --exclude='VERSION' \
+  "$RAILS_ROOT/" "$STAGE_ROOT/current/"
+
+# ── Defensive sanity check ─────────────────────────────────────────────
+# Belt-and-suspenders: scan the staging tree for filenames that
+# obviously shouldn't be in a public installer. Fails the build if any
+# survived the rsync excludes (e.g. nested copies of master.key inside
+# a subdir, or a future config file that picked up a similar pattern).
+SECRET_NAMES=(master.key credentials.yml.enc)
+for name in "${SECRET_NAMES[@]}"; do
+  matches="$(find "$STAGE_ROOT" -name "$name" -type f 2>/dev/null || true)"
+  if [[ -n "$matches" ]]; then
+    echo "ERROR: Sensitive file '$name' would be shipped:" >&2
+    echo "$matches" >&2
+    echo "Refusing to build." >&2
+    exit 1
+  fi
+done
+
+# ── Zip ────────────────────────────────────────────────────────────────
+# Remove any existing zip at the SAME path. Scoped tightly: we only
+# delete the file we're about to overwrite, never a directory.
+[[ -f "$ZIP_PATH" ]] && rm -f "$ZIP_PATH"
+
+# Run zip from the staging dir so paths inside the archive are relative
+# to "roe-<version>/...". -q quiet, -r recurse, -y preserve symlinks.
+( cd "$STAGE_DIR" && zip -qry "$ZIP_PATH" "roe-${VERSION}" )
+
+# ── Report ─────────────────────────────────────────────────────────────
+SIZE_HUMAN="$(du -sh "$ZIP_PATH" 2>/dev/null | awk '{print $1}')"
+FILE_COUNT="$(unzip -l "$ZIP_PATH" 2>/dev/null | tail -1 | awk '{print $2}')"
+
+echo "✓ Built ${ZIP_NAME}"
+echo "  Size:   ${SIZE_HUMAN}"
+echo "  Files:  ${FILE_COUNT}"
+echo "  Path:   ${ZIP_PATH}"
