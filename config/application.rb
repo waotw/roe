@@ -44,19 +44,20 @@ module RoeSitePaths
   # In versioned setup: Rails app is in /roe/current/, site is in /roe/site/
   # In standard setup: Rails app is in /roe/, site is in /roe/site/
   ROE_ROOT = begin
-    # Check if site directory exists in parent (versioned structure)
-    parent_dir = File.expand_path("..", Rails.root)
-    parent_site = File.join(parent_dir, "site")
-
-    # Also check if current directory name suggests we're versioned
+    parent_dir       = File.expand_path("..", Rails.root)
     current_dir_name = File.basename(Rails.root)
 
-    if current_dir_name == "current" && File.directory?(parent_site)
-      # Versioned structure: we're in /roe/current/, site is in /roe/site/
-      parent_dir
+    # The Roe installer always names the Rails app directory "current".
+    # That basename is the authoritative signal for the versioned
+    # layout — we deliberately do NOT also require <parent>/site to
+    # already exist, because on a fresh install Rails boots BEFORE
+    # bin/setup creates site/. Requiring it would silently fall through
+    # to "standard" mode and resolve SITE_PATH to current/site, which
+    # ContentSync then walks → File.realpath raises ENOENT → boot fails.
+    if current_dir_name == "current"
+      parent_dir         # Versioned: site lives at /roe/site
     else
-      # Standard structure: site is in Rails.root
-      Rails.root.to_s
+      Rails.root.to_s    # Standard: site lives at /roe/site (and Rails.root IS /roe)
     end
   end
 

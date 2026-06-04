@@ -101,9 +101,15 @@ echo "  Output:   $ZIP_PATH"
 echo ""
 
 # ── Root-level files ───────────────────────────────────────────────────
-# Everything listed here MUST exist; the loop fails fast if any is
-# missing so a stripped-down checkout doesn't silently ship a broken zip.
-ROOT_FILES=(roe.sh start.command VERSION README.md)
+# roe.sh is sourced from current/ rather than the root because current/
+# is the single source of truth — sync_root_files copies it up to the
+# root on every update, so a stale root copy would silently regress.
+# The other root files (start.command, VERSION, README.md) live ONLY at
+# the root, so they come from ROE_ROOT. Each MUST exist; the loop fails
+# fast so a stripped-down checkout doesn't silently ship a broken zip.
+cp "$RAILS_ROOT/roe.sh" "$STAGE_ROOT/roe.sh"
+
+ROOT_FILES=(start.command VERSION README.md)
 for f in "${ROOT_FILES[@]}"; do
   if [[ ! -f "$ROE_ROOT/$f" ]]; then
     echo "Missing required root file: $f" >&2
