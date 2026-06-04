@@ -23,13 +23,23 @@ class PerformDeployJob < ApplicationJob
   LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, "system", "global", ".last_deploy.yml")
 
   def perform(target:, version_tag:, admin_user_id: nil, reset_cache: false)
-    # Kamal builds from git-tracked files only, so uncommitted changes are
-    # silently excluded from the image. Auto-commit anything pending before
-    # building so the deployed image always reflects the current state on disk.
-    auto_commit if target == "kamal"
-
-    # Copy VERSION from root to current/ so Docker can access it during build
+    # Stage VERSION FIRST. Kamal builds from the git tree, not the raw
+    # working directory — anything not committed is silently absent
+    # from the build context. If we auto-commit BEFORE staging VERSION
+    # (the way this method used to read), the file lands on disk as
+    # an untracked file Kamal never sees, and the Dockerfile's
+    # COPY --from=build /rails/VERSION fails downstream with the
+    # cryptic "failed to compute cache key … /rails/VERSION: not found"
+    # error. Staging first means the auto_commit below picks VERSION
+    # up alongside any genuine user changes.
     prepare_version_file
+
+    # Auto-commit any pending changes (now including the just-staged
+    # VERSION) so Kamal's git-based build context picks them up. Fly's
+    # builder works from the working directory directly and doesn't
+    # need this, but it's harmless on that path too — auto_commit
+    # short-circuits when there's nothing to commit.
+    auto_commit if target == "kamal"
 
     # Fly's release_command runs in an ephemeral VM that can't see the
     # mounted volume, so Roe doesn't use it for migrations. But the app
@@ -73,9 +83,6 @@ class PerformDeployJob < ApplicationJob
     extra_env = (reset_cache && target == "kamal") ? { "KAMAL_CACHE_BUST" => Time.current.to_i.to_s } : {}
 
     run_with_streaming(cmd, target: target, version_tag: version_tag, env: extra_env)
-  ensure
-    # Clean up temporary VERSION file
-    cleanup_version_file
   end
 
   private
