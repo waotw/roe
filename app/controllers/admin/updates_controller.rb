@@ -131,6 +131,53 @@ class Admin::UpdatesController < Admin::BaseController
     redirect_to admin_updates_path
   end
 
+  # Same flow as start_deploy but with reset_cache: true so the job
+  # prunes the remote build cache (Kamal SSH prune / Fly --no-cache)
+  # before invoking the deploy command. Exposed as a separate action
+  # so the failed-state UI has a distinct button — users intent
+  # "retry, but force a clean build" rather than "deploy normally."
+  def reset_and_retry_deploy
+    if Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)&.dig(:state) == :running
+      flash[:alert] = "A deploy is already in progress. Wait for it to finish."
+      redirect_to admin_updates_path
+      return
+    end
+
+    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    issues = deploy_prerequisites(config)
+
+    if issues.any?
+      flash[:alert] = "Deploy is not ready: #{issues.to_sentence}."
+      redirect_to admin_updates_path
+      return
+    end
+
+    target      = config["target"].presence || "kamal"
+    version_tag = Time.current.to_i.to_s
+
+    Rails.cache.write(
+      PerformDeployJob::STATUS_CACHE_KEY,
+      {
+        state:       :running,
+        target:      target,
+        version_tag: version_tag,
+        started_at:  Time.current,
+        log:         "Clearing build cache before retry…\n"
+      },
+      expires_in: PerformDeployJob::STATUS_TTL
+    )
+
+    PerformDeployJob.perform_later(
+      target: target,
+      version_tag: version_tag,
+      admin_user_id: Current.session&.user_id,
+      reset_cache: true
+    )
+
+    flash[:notice] = "Cache reset + retry started. Expect a few extra minutes for the first build."
+    redirect_to admin_updates_path
+  end
+
   def deploy_status
     status = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
     render json: (status || { state: nil })

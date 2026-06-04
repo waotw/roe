@@ -301,9 +301,19 @@
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
             <div class="flex gap-2">
-              <%= button_to "Retry",
-                            admin_start_deploy_path,
+              <%# Single retry button — clears the remote build cache,
+                  then re-runs the deploy. For Kamal it SSHes into the
+                  deploy server (same connection Kamal already uses)
+                  and runs docker buildx prune; for Fly it appends
+                  --no-cache to the next deploy. Cache contamination is
+                  the most common recoverable failure here, so making
+                  it the default retry path is the right tradeoff —
+                  costs ~3-5 min of extra build time and bypasses the
+                  whole class of stale-cache errors. %>
+              <%= button_to "Clear deploy cache + retry",
+                            admin_reset_and_retry_deploy_path,
                             method: :post,
+                            data: { turbo_confirm: "This will clear the remote build cache and re-deploy. The first build will take a few extra minutes (no cache hits). Continue?" },
                             class: "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
               <%= button_to "Dismiss",
                             admin_dismiss_deploy_path,

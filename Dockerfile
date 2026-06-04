@@ -74,11 +74,24 @@ RUN apt-get update -qq && \
 # Copy built artifacts: gems, application
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 
-# deploy version file to production
-COPY VERSION /rails/VERSION
-
-# Copy root-level companion files for users
-COPY roe.sh README.md AGENTS.md /rails/
+# Stage VERSION + root companion files from the build stage rather
+# than re-reading them from the build context. The build stage's
+# COPY . . at line 43 already pulled everything in; we just forward
+# from there. Two wins:
+#
+#   1. The build context only has to be readable in ONE place (the
+#      build stage). The final stage's cache-key computation reads
+#      from the build stage's image layers, not from the context —
+#      which sidesteps "ref ... not found" failures from BuildKit
+#      with remote builders that handle context transfer flakily.
+#
+#   2. If VERSION genuinely isn't in the build context (e.g.,
+#      PerformDeployJob#prepare_version_file silently failed), the
+#      build fails LOUDLY at this line with a clear error pointing
+#      at the staging step — instead of failing at a cache-key
+#      check that takes ten minutes to diagnose.
+COPY --from=build /rails/VERSION /rails/VERSION
+COPY --from=build /rails/roe.sh /rails/README.md /rails/AGENTS.md /rails/
 
 # Set up versioned directory structure
 # /rails/current/ - Current Roe version (Rails app)

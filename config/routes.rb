@@ -40,9 +40,10 @@ Rails.application.routes.draw do
     post "updates/start",             to: "updates#start",          as: "start_update"
     post "updates/rollback",          to: "updates#rollback",       as: "rollback_update"
     get  "updates/status",            to: "updates#status",         as: "update_status"
-    post "updates/deploy",            to: "updates#start_deploy",   as: "start_deploy"
-    get  "updates/deploy/status",     to: "updates#deploy_status",  as: "deploy_status"
-    post "updates/deploy/dismiss",    to: "updates#dismiss_deploy", as: "dismiss_deploy"
+    post "updates/deploy",                  to: "updates#start_deploy",          as: "start_deploy"
+    get  "updates/deploy/status",           to: "updates#deploy_status",         as: "deploy_status"
+    post "updates/deploy/dismiss",          to: "updates#dismiss_deploy",        as: "dismiss_deploy"
+    post "updates/deploy/reset_and_retry",  to: "updates#reset_and_retry_deploy", as: "reset_and_retry_deploy"
     get  "updates/git_status",        to: "updates#git_status",     as: "git_status"
 
     # Site Sync

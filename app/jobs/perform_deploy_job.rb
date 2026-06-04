@@ -22,7 +22,7 @@ class PerformDeployJob < ApplicationJob
   STATUS_TTL       = 24.hours
   LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, "system", "global", ".last_deploy.yml")
 
-  def perform(target:, version_tag:, admin_user_id: nil)
+  def perform(target:, version_tag:, admin_user_id: nil, reset_cache: false)
     # Kamal builds from git-tracked files only, so uncommitted changes are
     # silently excluded from the image. Auto-commit anything pending before
     # building so the deployed image always reflects the current state on disk.
@@ -45,6 +45,12 @@ class PerformDeployJob < ApplicationJob
       # so re-deploys are no-ops.
       sync_fly_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
     elsif target == "kamal"
+      # Cache reset before bootstrap + build. Runs over the same SSH
+      # connection Kamal already uses, so no new auth/setup. Failures
+      # are logged but don't abort — a flaky prune shouldn't block a
+      # deploy attempt the user explicitly asked to retry.
+      clear_remote_build_cache if reset_cache
+
       # Kamal analog: rewrite the ROE_BOOTSTRAP line in .kamal/secrets
       # with current admin + sync_token before kamal builds the image.
       # The default '{}' value from DeployConfigGenerator stays in place
@@ -53,8 +59,8 @@ class PerformDeployJob < ApplicationJob
       sync_kamal_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
     end
 
-    cmd = build_command(target, version_tag)
-    Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag})"
+    cmd = build_command(target, version_tag, reset_cache: reset_cache)
+    Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag}#{reset_cache ? ', cache reset requested' : ''})"
     run_with_streaming(cmd, target: target, version_tag: version_tag)
   ensure
     # Clean up temporary VERSION file
@@ -261,16 +267,65 @@ class PerformDeployJob < ApplicationJob
     Rails.logger.info "[PerformDeployJob] Wrote ROE_BOOTSTRAP to .kamal/secrets (admin: #{admin.email_address})"
   end
 
-  def build_command(target, version_tag)
+  def build_command(target, version_tag, reset_cache: false)
     case target
     when "kamal"
       # --version bypasses git SHA versioning so the deploy always uses
-      # the files on disk, no commit required.
+      # the files on disk, no commit required. Cache reset for Kamal
+      # happens out-of-band via clear_remote_build_cache (SSH prune
+      # before kamal runs); the command itself stays unchanged.
       "bundle exec kamal deploy --version=#{version_tag}"
     when "fly"
-      "fly deploy"
+      # Fly's builder cache lives on their infrastructure, not on a
+      # box we can SSH into. --no-cache is the equivalent escape
+      # hatch — one build runs cold, subsequent builds rebuild the
+      # cache normally.
+      reset_cache ? "fly deploy --no-cache" : "fly deploy"
     else
       raise ArgumentError, "Unknown deploy target: #{target.inspect}"
+    end
+  end
+
+  # SSH into the Kamal deploy server and clear BuildKit + builder cache.
+  # Same SSH connection Kamal already uses for deploys, so it inherits
+  # whatever auth (keys, ssh-agent) is already configured — no new setup
+  # required for users.
+  #
+  # Best-effort: failures here are logged but never raise, because the
+  # whole point is to recover from a stuck state and the user is going
+  # to retry the deploy regardless. A failed prune just means the next
+  # build might still hit the cache issue; we don't want to fail the
+  # retry on top of that.
+  def clear_remote_build_cache
+    config  = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    servers = Array(config.dig("kamal", "servers")).map(&:to_s).reject(&:blank?)
+    server  = servers.first
+
+    unless server.present?
+      Rails.logger.warn "[PerformDeployJob] No Kamal server configured — can't clear remote build cache"
+      return
+    end
+
+    Rails.logger.info "[PerformDeployJob] Clearing remote build cache on #{server}"
+
+    Bundler.with_original_env do
+      # StrictHostKeyChecking=accept-new auto-accepts a host key on
+      # first connect (so the job doesn't hang at an interactive
+      # prompt) but refuses if the key changes from a known value
+      # (defends against MITM).
+      output, status = Open3.capture2e(
+        "ssh",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "BatchMode=yes",
+        "root@#{server}",
+        "docker buildx prune --force --all && docker builder prune --force --all"
+      )
+
+      if status.success?
+        Rails.logger.info "[PerformDeployJob] Remote build cache cleared on #{server}"
+      else
+        Rails.logger.warn "[PerformDeployJob] Cache clear failed on #{server}: #{output.lines.first&.strip}"
+      end
     end
   end
 
