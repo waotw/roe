@@ -161,20 +161,25 @@ class DeployConfigGenerator
       "    - YOUR_SERVER_IP"
     end
 
-    # SSL requires a custom domain — always generated as a commented
-    # reference block. When the user is ready to enable SSL:
-    #   1. Point their domain's A record at the server
-    #   2. Uncomment and fill in the proxy block below
-    #   3. Run: kamal proxy reboot
+    host = config.dig("kamal", "host").to_s.strip
+
+    # When both SSL is enabled and a custom domain is provided, write an
+    # active proxy block. Otherwise leave it commented as a reference.
     ssl_value    = ssl ? "true" : "false"
-    proxy_block  = "# To enable SSL with a custom domain:\n" \
-                   "# 1. Point your domain's A record at the server\n" \
-                   "# 2. Uncomment the proxy block below and set your domain\n" \
-                   "# 3. Run: kamal proxy reboot\n" \
-                   "#\n" \
-                   "# proxy:\n" \
-                   "#   ssl: #{ssl_value}\n" \
-                   "#   host: your-domain.com"
+    if ssl && host.present?
+      proxy_block = "proxy:\n" \
+                    "  ssl: #{ssl_value}\n" \
+                    "  host: #{host}"
+    else
+      proxy_block = "# To enable SSL with a custom domain:\n" \
+                    "# 1. Point your domain's A record at the server\n" \
+                    "# 2. Uncomment the proxy block below and set your domain\n" \
+                    "# 3. Run: kamal proxy reboot\n" \
+                    "#\n" \
+                    "# proxy:\n" \
+                    "#   ssl: #{ssl_value}\n" \
+                    "#   host: your-domain.com"
+    end
 
     <<~YAML
       # Kamal deployment config for Roe.

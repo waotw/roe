@@ -653,7 +653,8 @@ class Admin::ConfigsController < Admin::BaseController
       "kamal"    => {
         "servers"           => (dp.dig(:kamal, :servers) || []).reject(&:blank?),
         "registry_username" => dp.dig(:kamal, :registry_username).to_s.strip,
-        "image_name"        => dp.dig(:kamal, :image_name).to_s.strip
+        "image_name"        => dp.dig(:kamal, :image_name).to_s.strip,
+        "host"              => dp.dig(:kamal, :host).to_s.strip
       },
       "fly"      => {
         "region"         => dp.dig(:fly, :region).to_s.strip,

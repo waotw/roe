@@ -298,6 +298,20 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="kamal_host">
+            Custom domain
+          </label>
+          <%= text_field_tag "deploy_config[kamal][host]", kamal['host'],
+                id: "kamal_host",
+                class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+                placeholder: "dev.roecms.com" %>
+          <p class="mt-1 text-xs text-gray-500">
+            The domain you want SSL for. Required for HTTPS — Kamal's proxy uses it to request a Let's Encrypt certificate.
+            Make sure you've pointed this domain's A record at your server before deploying.
+          </p>
+        </div>
+
+        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1" for="kamal_registry_username">
             Registry username
           </label>
