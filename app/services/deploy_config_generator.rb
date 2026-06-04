@@ -219,6 +219,15 @@ class DeployConfigGenerator
       builder:
         arch: amd64
         remote: ssh://root@#{first_server}
+        # Passes the Dockerfile's CACHE_BUST ARG through from a Kamal-
+        # owned env var. PerformDeployJob sets KAMAL_CACHE_BUST to a
+        # fresh timestamp when the user clicks "Clear deploy cache +
+        # retry", which forces BuildKit to invalidate the COPY . .
+        # layer (and everything beneath it) — beating the stale
+        # --cache-from registry layers that otherwise survive a local
+        # buildx prune.
+        args:
+          CACHE_BUST: <%= ENV["KAMAL_CACHE_BUST"] || "stable" %>
 
       boot:
         limit: 1

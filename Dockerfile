@@ -39,6 +39,22 @@ RUN bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
     bundle exec bootsnap precompile --gemfile
 
+# Cache bust point — admin's "Clear deploy cache + retry" passes a
+# unique value here via --build-arg, which forces the COPY . . below
+# (and every layer beneath it) to re-read the build context. Without
+# this, --cache-from registry pulls back a stale COPY . . layer from
+# past builds — e.g. one that ran before PerformDeployJob staged
+# VERSION into current/ — and the build silently inherits a /rails/
+# tree that's missing files we know we just put there. Downstream
+# COPY --from=build steps then fail with "failed to compute cache
+# key … not found" against files that exist on disk locally but
+# aren't in the cached layer the registry just served back.
+#
+# Stays at "stable" for normal deploys so cache works as intended;
+# only the cache-reset retry path passes a fresh value.
+ARG CACHE_BUST=stable
+RUN echo "build context cache rev: ${CACHE_BUST}"
+
 # Copy application code
 COPY . .
 

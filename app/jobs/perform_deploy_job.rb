@@ -61,7 +61,18 @@ class PerformDeployJob < ApplicationJob
 
     cmd = build_command(target, version_tag, reset_cache: reset_cache)
     Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag}#{reset_cache ? ', cache reset requested' : ''})"
-    run_with_streaming(cmd, target: target, version_tag: version_tag)
+
+    # When a cache reset was requested for Kamal, pass a fresh timestamp
+    # via KAMAL_CACHE_BUST so the generated deploy.yml's
+    # `args: CACHE_BUST: <%= ENV["KAMAL_CACHE_BUST"] || "stable" %>`
+    # resolves to a never-seen value. That value flows into the Docker
+    # build as a build-arg, which invalidates the cache point we put
+    # just before `COPY . .` in the Dockerfile — forcing the build
+    # context layer to be re-read from scratch instead of being pulled
+    # back stale from --cache-from registry.
+    extra_env = (reset_cache && target == "kamal") ? { "KAMAL_CACHE_BUST" => Time.current.to_i.to_s } : {}
+
+    run_with_streaming(cmd, target: target, version_tag: version_tag, env: extra_env)
   ensure
     # Clean up temporary VERSION file
     cleanup_version_file
@@ -329,14 +340,17 @@ class PerformDeployJob < ApplicationJob
     end
   end
 
-  def run_with_streaming(cmd, target:, version_tag:)
+  def run_with_streaming(cmd, target:, version_tag:, env: {})
     log         = ""
     last_write  = Time.current
     success     = false
 
     begin
       Bundler.with_original_env do
-        Open3.popen2e(cmd, chdir: Rails.root.to_s) do |stdin, stdout_err, wait_thr|
+        # Pass the explicit env hash as Open3's first arg so it merges
+        # over the inherited ENV without us having to hand-roll the
+        # subprocess setup. Empty hash is a no-op.
+        Open3.popen2e(env, cmd, chdir: Rails.root.to_s) do |stdin, stdout_err, wait_thr|
           stdin.close
 
           stdout_err.each_line do |line|
