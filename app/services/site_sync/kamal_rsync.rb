@@ -60,6 +60,22 @@ module SiteSync
 
     REMOTE_DELETE_BATCH = 50
 
+    # UID/GID of the `rails` user inside the deployed container (per the
+    # Dockerfile's `groupadd --gid 1000 rails && useradd --uid 1000 …`).
+    # Push direction uses `rsync --chown=#{CONTAINER_OWNERSHIP}` so
+    # transferred files land owned by the same uid the Rails process
+    # runs under. Without this, plain SSH-as-root rsync drops files
+    # into the Kamal host's bind-mount directory as root:root, and
+    # because the bind mount preserves host ownership inside the
+    # container, Rails (uid 1000) then can't overwrite anything it
+    # didn't create itself — admin writes to site.yml, theme CSS,
+    # layouts, etc. all silently 500 with EACCES.
+    #
+    # Paired with --numeric-ids so rsync uses the literal number
+    # rather than name-resolving 1000 against the host's /etc/passwd
+    # (which may have a different user at that uid).
+    CONTAINER_OWNERSHIP = "1000:1000".freeze
+
     class << self
       # All three public entry points accept an optional `on_progress`
       # callable invoked as rsync transfers files:
@@ -99,6 +115,7 @@ module SiteSync
             dest:        "#{ssh_destination}:#{remote_site_path}",
             files:       files_to_send,
             excludes:    PUSH_EXCLUDES,
+            chown:       CONTAINER_OWNERSHIP,
             on_progress: on_progress
           )
         end
@@ -112,6 +129,7 @@ module SiteSync
           dest:        "#{ssh_destination}:#{remote_site_path}",
           excludes:    PUSH_EXCLUDES,
           delete:      true,
+          chown:       CONTAINER_OWNERSHIP,
           on_progress: on_progress
         )
       end
@@ -277,9 +295,10 @@ module SiteSync
 
       # ─── rsync invocation ────────────────────────────────────────
 
-      def rsync(source:, dest:, excludes:, delete:, on_progress: nil)
+      def rsync(source:, dest:, excludes:, delete:, chown: nil, on_progress: nil)
         flags = "-rltzPi"
         flags += " --delete" if delete
+        flags += " --chown=#{chown} --numeric-ids" if chown
         cmd = build_cmd(source: source, dest: dest, flags: flags, excludes: excludes)
         with_retries(label: "rsync") do
           output, success = run_streaming(cmd, on_progress: on_progress)
@@ -288,7 +307,7 @@ module SiteSync
         end
       end
 
-      def rsync_files_from(source:, dest:, files:, excludes: [], extra_flags: "", on_progress: nil)
+      def rsync_files_from(source:, dest:, files:, excludes: [], extra_flags: "", chown: nil, on_progress: nil)
         files = Array(files).uniq
         return if files.empty?
 
@@ -298,6 +317,7 @@ module SiteSync
           list.close
 
           flags = "-rltzPi --files-from=#{Shellwords.escape(list.path)} #{extra_flags}".strip
+          flags += " --chown=#{chown} --numeric-ids" if chown
           cmd = build_cmd(
             source:   source,
             dest:     dest,
