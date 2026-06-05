@@ -1,4 +1,4 @@
-/* ============= THEME INFO =================
+/* ============== THEME INFO ================
    Roe Theme: Default
    Version: 1.0.0
    Bundled with: Roe v0.0.1
@@ -12,14 +12,10 @@
    - Change the "Roe Theme" name to anything else
    - install and rename css file in /site/theme/
 
-   You can always download a fresh copy of the current version of any built in theme.
-   ========================================== */
+   You can always download a fresh copy of the newest version of any built in theme.
+*/
 
-/* ==========================================
-   DESIGN VARIABLES
-   Minimal, readable default theme.
-   System fonts, black on white, blue links.
-   ========================================== */
+/* ============ DESIGN VARIABLES ============ */
 
 :root {
   /* Layout */
@@ -71,7 +67,7 @@
   --color-nav-active: #0000ee;
   --color-muted: #666666;
   --color-link: #0000ee;
-  --color-link-visited: #551a8b;
+  --color-visited: #0000ee;
   --color-link-collection: #000000;
   --color-border: #cccccc;
   --color-code-bg: #f5f5f5;
@@ -92,9 +88,7 @@
   --player-chapter-active-bg: rgba(0, 0, 0, 0.05);
 }
 
-/* ==========================================
-   BASE STYLES
-   ========================================== */
+/* ============== BASE STYLES =============== */
 
 body {
   font-family: var(--font-body);
@@ -129,7 +123,7 @@ i {
 
 a,
 a:visited {
-  color: var(--color-link);
+  color: var(--color-visited);
   text-decoration: underline;
 }
 
@@ -163,9 +157,7 @@ hr {
   margin: 0 0 0 0;
 }
 
-/* ==========================================
-   LAYOUT — SITE NAV
-   ========================================== */
+/* =========== LAYOUT — SITE NAV ============ */
 
 .site-nav {
   padding: var(--space-4) 0;
@@ -195,17 +187,12 @@ hr {
   margin-left: 0;
 }
 
-.site-nav a:visited {
-  color: var(--color-link-visited);
-}
-
-.site-nav a.active,
-.site-nav a:visited.active {
+.site-nav a.active {
   color: var(--color-nav-active);
   font-weight: 700;
 }
 
-/* SITE LOGO */
+/* Site Logo */
 
 .site-logo {
   font-size: var(--text-4xl);
@@ -216,7 +203,6 @@ hr {
 }
 
 .site-nav a.site-logo,
-.site-nav a.site-logo:visited,
 .site-nav a.site-logo:hover {
   color: var(--color-logo);
   text-decoration: none;
@@ -224,7 +210,6 @@ hr {
 
 p.site-logo,
 p.site-logo a,
-p.site-logo a:visited,
 p.site-logo a:hover {
   color: var(--color-logo);
   text-decoration: none;
@@ -235,6 +220,7 @@ p:has(.site-logo) {
 }
 
 /* Logo image variants */
+
 .site-nav.logo .site-logo {
   background-image: var(--logo-url);
   background-repeat: no-repeat;
@@ -257,6 +243,7 @@ p:has(.site-logo) {
 }
 
 /* Navigation Cart Link */
+
 .nav-cart-wrapper {
   margin-left: auto;
 }
@@ -275,9 +262,11 @@ p:has(.site-logo) {
   margin-left: var(--space-1);
 }
 
-/* ==========================================
-   LAYOUT — SIDEBAR (opt-in via body.has-sidebar)
-   ========================================== */
+/* ============ LAYOUT — SIDEBAR ============ */
+
+body:not(.has-sidebar) article {
+  margin-top: var(--space-6);
+}
 
 body.has-sidebar {
   display: grid;
@@ -366,9 +355,7 @@ body.sidebar-right .site-sidebar {
   }
 }
 
-/* ==========================================
-   SITE FOOTER
-   ========================================== */
+/* ============== SITE FOOTER =============== */
 
 .site-footer {
   margin-top: var(--space-16);
@@ -381,9 +368,7 @@ body.sidebar-right .site-sidebar {
   text-decoration: underline;
 }
 
-/* ==========================================
-   FLASH MESSAGES
-   ========================================== */
+/* ============ FLASH MESSAGES ============== */
 
 div.flash {
   padding: var(--space-3) var(--space-4);
@@ -393,118 +378,7 @@ div.flash {
   font-size: var(--text-sm);
 }
 
-/* ==========================================
-   POST LIST (collection of posts)
-   ========================================== */
-
-.post-list {
-  list-style: none;
-  padding: 0;
-}
-
-.post-list li {
-  margin-bottom: var(--space-6);
-}
-
-.post-list h2 {
-  font-size: var(--text-xl);
-  margin: 0 0 var(--space-1);
-}
-
-.post-list h2 a {
-  color: var(--color-heading);
-  text-decoration: none;
-}
-
-.post-list h2 a:hover {
-  text-decoration: underline;
-}
-
-.post-list h2 a:visited {
-  color: var(--color-heading);
-}
-
-.post-meta {
-  font-size: var(--text-sm);
-  color: var(--color-muted);
-  margin: 0 0 var(--space-2);
-}
-
-.post-meta time {
-  font-variant-numeric: tabular-nums;
-}
-
-/* ==========================================
-   POST SINGLE
-   ========================================== */
-
-.post-header {
-  margin-bottom: var(--space-8);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.post-header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.page-title,
-.post-header h1 {
-  font-size: var(--text-4xl);
-  line-height: 1.2;
-  margin: 0 0 var(--space-4) 0;
-  font-weight: 700;
-  color: var(--color-heading);
-}
-
-.post-header p {
-  font-size: var(--text-xl);
-  line-height: 1.4;
-  margin: 0 0 var(--space-4) 0;
-  color: var(--color-muted);
-  font-weight: 400;
-}
-
-.post-header picture {
-  display: block;
-  margin: 0 0 var(--space-6);
-}
-
-.post-header picture img {
-  width: 100%;
-  height: auto;
-  display: block;
-  border: 1px solid var(--color-border);
-}
-
-.post-content hr {
-  border: 0;
-  border-top: 1px solid var(--color-border);
-  margin: var(--space-8) 0;
-}
-
-.post-content a {
-  color: var(--color-link);
-}
-
-.post-content h2 a,
-.post-content h3 a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.post mark {
-  background-color: var(--color-highlight-text);
-  color: var(--color-text);
-}
-
-/* ==========================================
-   MARKDOWN CONTENT
-   ========================================== */
+/* ======== POST/PAGE CONTENT GLOBAL ======== */
 
 .content h1 {
   font-size: var(--text-3xl);
@@ -552,10 +426,6 @@ div.flash {
 .content a {
   color: var(--color-link);
   text-decoration: underline;
-}
-
-.content a:visited {
-  color: var(--color-link-visited);
 }
 
 .content strong,
@@ -633,6 +503,7 @@ div.flash {
 }
 
 /* Footnotes */
+
 .content .footnotes,
 .footnotes {
   margin-top: var(--space-12);
@@ -679,6 +550,7 @@ a.footnote-backlink-number:hover {
 }
 
 /* Poetry block (preserves line breaks, no paragraph margins) */
+
 .poetry {
   white-space: pre-wrap;
   font-family: var(--font-body);
@@ -686,9 +558,83 @@ a.footnote-backlink-number:hover {
   margin: var(--space-6) 0;
 }
 
-/* ==========================================
-   COLLECTIONS
-   ========================================== */
+/* ============ POST/PAGE SINGLE ============ */
+
+.post-header {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.post-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.page h1,
+.post-header h1 {
+  font-size: var(--text-4xl);
+  line-height: 1.2;
+  margin: 0 0 var(--space-4) 0;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.post-header p {
+  font-size: var(--text-xl);
+  line-height: 1.4;
+  margin: 0 0 var(--space-4) 0;
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.post-header picture {
+  display: block;
+  margin: 0 0 var(--space-6);
+}
+
+.post-header picture img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--color-border);
+}
+
+.post-meta {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.post-meta time {
+  font-variant-numeric: tabular-nums;
+}
+
+.post-content hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-8) 0;
+}
+
+.post-content a {
+  color: var(--color-link);
+}
+
+.post-content h2 a,
+.post-content h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.post mark {
+  background-color: var(--color-highlight-text);
+  color: var(--color-text);
+}
+
+/* ============== COLLECTIONS =============== */
 
 .collection-page-heading {
   display: flex;
@@ -729,8 +675,6 @@ p.collection-more a:hover {
   margin: 0 var(--space-4);
 }
 
-/* LIST (DEFAULT) */
-
 .collection {
   margin-bottom: var(--space-12);
 }
@@ -743,6 +687,7 @@ p.collection-more a:hover {
 }
 
 .collection h2 {
+  font-size: var(--text-3xl);
   margin: 0 0 var(--space-4) 0;
 }
 
@@ -763,43 +708,68 @@ p.collection-more a:hover {
   color: var(--color-link);
 }
 
-.collection a:visited {
-  color: var(--color-link-visited);
-}
-
 .collection a:hover {
   color: var(--color-text);
 }
 
-.item-title {
+.collection .item-title {
+  color: var(--color-heading);
+}
+
+.collection .item-subtitle {
+  color: var(--color-muted);
+}
+
+.collection p.item-date {
+  color: var(--color-muted);
+}
+
+/* List */
+
+.collection.list .collection-item {
+  margin-bottom: var(--space-4);
+}
+
+.collection.list .item-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+}
+
+.collection.list .item-subtitle {
+  font-size: var(--text-lg);
+  font-style: italic;
+  margin: 0;
+}
+
+.collection.list p.item-date {
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* Full — Image + body when item has media */
+
+.collection.full .collection-item {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.collection.full .item-title {
   font-size: var(--text-lg);
   margin-bottom: var(--space-1);
   font-weight: 700;
 }
 
-.collection .item-subtitle {
-  color: var(--color-muted);
+.collection.full .item-subtitle {
   margin: 0;
 }
 
-.collection p.item-date {
+.collection.full p.item-date {
   font-size: var(--text-sm);
-  color: var(--color-muted);
   margin: 0;
 }
 
-.collection-item {
-  margin-bottom: var(--space-4);
-}
-
-/* FULL — side-by-side image + body when item has media */
-
-.collection-item.full {
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: var(--space-4);
-}
-
-.collection-item.full:has(.item-image) {
+.collection.full .collection-item:has(.item-image) {
   display: flex;
   gap: var(--space-4);
   align-items: flex-start;
@@ -811,18 +781,18 @@ p.collection-more a:hover {
   margin: 0 0 0 0;
 }
 
-.collection-item.full:has(.item-image) .item-body {
+.collection.full .collection-item:has(.item-image) .item-body {
   flex: 1;
   min-width: 0;
 }
 
-.collection-item.full .item-image {
+.collection.full .collection-item .item-image {
   flex-shrink: 0;
   width: 160px;
   position: relative;
 }
 
-.collection-item.full .item-image img {
+.collection.full .collection-item .item-image img {
   width: 100%;
   height: auto;
   display: block;
@@ -838,34 +808,34 @@ p.collection-more a:hover {
 }
 
 @media (max-width: 600px) {
-  .collection-item.full:has(.item-image) {
+  .collection.full .collection-item:has(.item-image) {
     flex-direction: column;
   }
 
-  .collection-item.full .item-image {
+  .collection.full .collection-item .item-image {
     width: 100%;
   }
 }
 
-/* LINKS */
+/* Links */
 
-.collection-item.links {
+.collection.links .collection-item {
   margin-bottom: var(--space-2);
 }
 
-.links .item-title {
+.collection.links .item-title {
   font-size: var(--text-base);
   margin-bottom: 0;
   font-weight: 400;
 }
 
-.links .item-subtitle {
+.collection.links .item-subtitle {
   font-size: var(--text-sm);
   color: var(--color-muted);
   margin-bottom: 0;
 }
 
-/* COLLECTION GRIDS */
+/* Collection Grids */
 
 .collection-grid {
   display: grid;
@@ -892,9 +862,7 @@ p.collection-more a:hover {
   margin: 0;
 }
 
-/* ==========================================
-   GALLERIES
-   ========================================== */
+/* ================ GALLERIES =============== */
 
 .gallery {
   margin-bottom: var(--space-8);
@@ -958,15 +926,13 @@ p.collection-more a:hover {
   text-align: center;
 }
 
-/* ==========================================
-   CARDS
-   ========================================== */
+/* ================= CARDS ================== */
 
 .card {
   position: relative;
 }
 
-/* PULLQUOTE */
+/* Pullquote */
 
 .card-pullquote {
   text-align: center;
@@ -1028,7 +994,7 @@ p.collection-more a:hover {
   }
 }
 
-/* POST LINK CARDS (small / medium / large) */
+/* Post Link Cards (small / medium / large) */
 
 .card.post-link-small,
 .card.post-link-medium,
@@ -1157,7 +1123,7 @@ p.collection-more a:hover {
   color: var(--color-text);
 }
 
-/* ASIDES */
+/* Asides */
 
 .card-aside {
   position: absolute;
@@ -1277,9 +1243,9 @@ article .content:has(.card-aside),
   }
 }
 
-/* ==========================================
-   AUDIO PLAYER (custom-but-neutral)
-   ========================================== */
+/* ============ MEDIA PLAYERS =============== */
+
+/* Audio Player */
 
 .audio-player {
   padding: 1.25rem;
@@ -1341,6 +1307,7 @@ article .content:has(.card-aside),
 }
 
 /* Progress */
+
 .player-progress {
   position: relative;
   height: 6px;
@@ -1388,6 +1355,7 @@ article .content:has(.card-aside),
 }
 
 /* Controls */
+
 .player-controls {
   display: flex;
   align-items: center;
@@ -1476,6 +1444,7 @@ article .content:has(.card-aside),
 }
 
 /* Prev/Next episode in player */
+
 .btn-wrapper {
   flex: 1;
   display: flex;
@@ -1544,6 +1513,7 @@ article .content:has(.card-aside),
 }
 
 /* Chapters */
+
 .player-chapters {
   border-top: 1px solid var(--player-border);
   padding-top: 0.75rem;
@@ -1593,9 +1563,7 @@ article .content:has(.card-aside),
   min-width: 3.5rem;
 }
 
-/* ==========================================
-   VIDEO PLAYER
-   ========================================== */
+/* Video Player */
 
 .video-player-container {
   position: relative;
@@ -1760,9 +1728,7 @@ article .content:has(.card-aside),
   display: block;
 }
 
-/* ==========================================
-   PODCAST
-   ========================================== */
+/* ================ PODCAST ================= */
 
 article.post-podcast {
   margin-left: 0;
@@ -1809,6 +1775,7 @@ article.post-podcast {
 }
 
 /* Episode list */
+
 .episode-list {
   margin-top: var(--space-8);
   border-top: 1px solid var(--color-border);
@@ -1886,13 +1853,14 @@ article.post-podcast {
 }
 
 /* Subscribe / feed */
+
 .podcast-episode .podcast-subscribe {
   margin-top: 1.5rem;
   font-size: 0.85rem;
 }
 
-/* Larger feed-link variant for the in-content podcast subscribe footer.
-   Overrides the small uppercase pill used in post headers. */
+/* Larger feed-link variant */
+
 .podcast-subscribe .feed-link {
   display: inline-flex;
   align-items: center;
@@ -1929,18 +1897,19 @@ article.post-podcast {
   opacity: 0.8;
 }
 
-/* ==========================================
-   DOCUMENTATION
-   ========================================== */
+/* ============ DOCUMENTATION =============== */
 
-mark {
+.documentation mark {
   background-color: var(--color-highlight-text);
   color: var(--color-text);
 }
 
-/* ==========================================
-   UTILITIES
-   ========================================== */
+.documentation .docs-back-link {
+  margin-bottom: var(--space-4);
+  display: inline-block;
+}
+
+/* =============== UTILITIES ================ */
 
 .back-link {
   display: inline-block;
@@ -1959,9 +1928,7 @@ hr.clear-floats {
   border-top: none;
 }
 
-/* ==========================================
-   MEMBERS
-   ========================================== */
+/* ================ MEMBERS ================= */
 
 a.member-account-icon svg {
   height: var(--space-6);
@@ -1971,6 +1938,7 @@ a.member-account-icon svg {
 }
 
 /* Member pages (signup/signin/upgrade/donate/unsubscribe wrapper) */
+
 .member-page {
   max-width: 26rem;
   margin: var(--space-12) auto;
@@ -2014,6 +1982,7 @@ a.member-account-icon svg {
 }
 
 /* Member buttons */
+
 .member-page button,
 .member-page [class*="btn-"] {
   display: inline-block;
@@ -2085,11 +2054,8 @@ a.member-account-icon svg {
   display: none;
 }
 
-.member-page a.btn-primary:visited {
-  color: var(--color-bg);
-}
-
 /* Alerts */
+
 .member-page .alert {
   padding: var(--space-6);
   margin-bottom: var(--space-6);
@@ -2195,6 +2161,7 @@ a.member-account-icon svg {
 }
 
 /* Donation presets */
+
 .member-page .donate-presets {
   display: flex;
   flex-wrap: wrap;
@@ -2225,6 +2192,7 @@ a.member-account-icon svg {
 }
 
 /* Paid-content gate */
+
 .paid-lock-icon {
   padding-left: var(--space-1);
   vertical-align: -4px;
@@ -2245,9 +2213,7 @@ a.member-account-icon svg {
   text-decoration: none;
 }
 
-/* ==========================================
-   STORE — PRODUCT PAGE
-   ========================================== */
+/* ========== STORE — PRODUCT PAGE ========== */
 
 .product .content {
   max-width: var(--container-width);
@@ -2326,9 +2292,7 @@ a.member-account-icon svg {
   }
 }
 
-/* ==========================================
-   STORE — PRODUCT GRID
-   ========================================== */
+/* ==== STORE — PRODUCT COLLECTION GRID ===== */
 
 article.page-store,
 article.page-store .content {
@@ -2405,6 +2369,7 @@ article.page-store h2 {
 }
 
 /* Aspect-ratio containers driven by class on the image */
+
 .grid-item-image:has(.img-square) {
   aspect-ratio: 1 / 1;
 }
@@ -2468,6 +2433,7 @@ article.page-store h2 {
 }
 
 /* Buttons (canonical) */
+
 .btn-primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
@@ -2507,47 +2473,13 @@ article.page-store h2 {
 }
 
 /* Grid button modifier */
+
 .btn--grid {
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
 }
 
-/* DEPRECATED — use .btn-primary / .btn-secondary */
-.grid-item-button {
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-heading);
-  color: var(--color-bg);
-  border: 1px solid var(--color-heading);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.grid-item-button:hover {
-  background: var(--color-bg);
-  color: var(--color-heading);
-}
-
-.button-primary {
-  /* deprecated alias */
-}
-
-.button-secondary {
-  background: transparent;
-  color: var(--color-heading);
-  border: 1px solid var(--color-heading);
-}
-
-.button-secondary:hover {
-  background: var(--color-heading);
-  color: var(--color-bg);
-}
-
-/* ==========================================
-   BREADCRUMBS
-   ========================================== */
+/* ============== BREADCRUMBS =============== */
 
 .breadcrumbs {
   margin-top: calc(var(--space-4) * -1);
