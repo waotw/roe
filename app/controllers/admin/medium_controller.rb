@@ -46,6 +46,18 @@ class Admin::MediumController < Admin::BaseController
         return
       end
 
+      # Resolve the batch's media type early. determine_media_type now
+      # raises on unsupported extensions instead of misclassifying as
+      # "images" — catch that here so the user gets a clear flash
+      # instead of a stack trace, and so we abort before writing any
+      # temp files or queueing a job for files we can't actually use.
+      begin
+        batch_media_type = determine_media_type_from_files(uploaded_files)
+      rescue => e
+        redirect_to browse_admin_medium_index_path, alert: "Upload failed: #{e.message}"
+        return
+      end
+
       # Create batch and save files to temp directory
       batch_id = SecureRandom.uuid
       temp_dir = Rails.root.join("tmp", "uploads", batch_id)
@@ -68,7 +80,7 @@ class Admin::MediumController < Admin::BaseController
         id: batch_id,
         files: temp_files.map { |f| { filename: f[:original_filename], size: f[:size] } },
         total: uploaded_files.length,
-        media_type: determine_media_type_from_files(uploaded_files)
+        media_type: batch_media_type
       }
 
       # Queue the uploads with temp file paths
@@ -415,7 +427,12 @@ class Admin::MediumController < Admin::BaseController
     when "woff", "woff2", "ttf", "otf"
       "fonts"
     else
-      "images"  # default fallback
+      # Fail loudly rather than silently misclassifying. Previously this
+      # returned "images" so a .pdf upload would land at /media/images/
+      # with media_type: "images" — wrong data quietly persisted to the
+      # DB and exposed in the picker. Better to surface the gap to the
+      # user. Tracked for 0.0.2: see "other" bucket scope discussion.
+      raise "Unsupported file type: .#{ext}. Roe currently supports images (jpg/png/gif/webp/svg/bmp), audio (mp3/m4a/wav/ogg/flac/aac), video (mp4/webm/ogv/mov/avi/mkv), and fonts (woff/woff2/ttf/otf)."
     end
   end
 
