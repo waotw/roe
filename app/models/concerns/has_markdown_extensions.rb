@@ -585,7 +585,7 @@ module HasMarkdownExtensions
 
     # Build output with proper spacing
     output = []
-    output << '<div class="collection" markdown="1">'
+    output << "<div class=\"collection #{template}\" markdown=\"1\">"
     output << ""
 
     if heading.present?
@@ -661,7 +661,7 @@ module HasMarkdownExtensions
 
     items.map do |item|
       output = []
-      output << '<div class="collection-item list" markdown="1">'
+      output << '<div class="collection-item" markdown="1">'
       output << ""
 
       # Title (linked) with optional lock icon
@@ -672,7 +672,7 @@ module HasMarkdownExtensions
 
       # Subtitle
       if item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "*#{item.subtitle}*"
+        output << "#{item.subtitle}"
         output << "{: .item-subtitle}"
         output << ""
       end
@@ -680,7 +680,7 @@ module HasMarkdownExtensions
       # Meta row: date, optionally with " • author" appended
       meta = collection_item_meta(item, show_author: show_author)
       if meta.present?
-        output << "*#{meta}*"
+        output << "#{meta}"
         output << "{: .item-date}"
         output << ""
       end
@@ -710,7 +710,7 @@ module HasMarkdownExtensions
       alt = (item.title || "").to_s.gsub('"', "&quot;")
 
       output = []
-      output << '<div class="collection-item full">'
+      output << '<div class="collection-item">'
       output << '  <div class="item-body" markdown="1">'
       output << ""
 
@@ -720,7 +720,7 @@ module HasMarkdownExtensions
       output << ""
 
       if item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "*#{item.subtitle}*"
+        output << "#{item.subtitle}"
         output << "{: .item-subtitle}"
         output << ""
       end
@@ -733,7 +733,7 @@ module HasMarkdownExtensions
 
       meta = collection_item_meta(item, show_author: show_author)
       if meta.present?
-        output << "*#{meta}*"
+        output << "#{meta}"
         output << "{: .item-date}"
         output << ""
       end
@@ -837,7 +837,7 @@ module HasMarkdownExtensions
   def render_links(items)
     items.map do |item|
       output = []
-      output << '<div class="collection-item links" markdown="1">'
+      output << '<div class="collection-item" markdown="1">'
       output << ""
 
       # Title (linked) with optional lock icon
@@ -848,7 +848,7 @@ module HasMarkdownExtensions
 
       # Subtitle
       if item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "*#{item.subtitle}*"
+        output << "#{item.subtitle}"
         output << "{: .item-subtitle}"
         output << ""
       end

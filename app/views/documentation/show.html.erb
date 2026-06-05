@@ -1,5 +1,5 @@
-<article>
 <%= link_to "← Back to Documentation", page_path('documentation'), class: "docs-back-link" %>
+<article class="content documentation">
   <div class="content">
     <%= raw @doc.to_html(static: @static_generation) %>
   </div>
