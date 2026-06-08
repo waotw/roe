@@ -21,6 +21,19 @@ else
     SITE_DIR="$ROE_ROOT/site"
 fi
 
+# Put Homebrew on PATH for this script process if it's installed at a
+# standard location but the user's shell hasn't yet picked it up. This
+# makes ./roe.sh self-sufficient on the second invocation after a fresh
+# Homebrew install — the user shouldn't have to open a new terminal tab
+# just so the script can see `brew` again.
+if ! command -v brew >/dev/null 2>&1; then
+    if [ -x /opt/homebrew/bin/brew ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -x /usr/local/bin/brew ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+fi
+
 # Activate the correct Ruby version from APP_DIR/.ruby-version
 # Works whether the script is run from /roe or /roe/current
 if [ -f "$APP_DIR/.ruby-version" ]; then
@@ -70,23 +83,56 @@ wait_for_enter() {
 }
 
 # Source the user's shell profile so newly installed tools are found
-# without opening a new shell. Tries zsh first, then bash.
+# without opening a new shell. We're running under bash here, but the
+# user's interactive shell may be zsh — so we source the rc files that
+# match $SHELL, then fall back to directly putting brew and rbenv onto
+# PATH for the cases where bash can't fully evaluate a zsh rc (the
+# Homebrew shellenv line in ~/.zprofile is the one that bit us).
 source_profile() {
-    if [ -f "$HOME/.zshrc" ]; then
-        # shellcheck disable=SC1091
-        source "$HOME/.zshrc" 2>/dev/null || true
+    local shell_name
+    shell_name="$(basename "${SHELL:-}")"
+
+    case "$shell_name" in
+        zsh)
+            # ~/.zprofile is where Homebrew writes its shellenv (login
+            # shell rc); ~/.zshrc is where rbenv init lands (interactive
+            # shell rc). Source both so we pick up whichever the just-
+            # finished step touched.
+            # shellcheck disable=SC1091
+            [ -f "$HOME/.zprofile" ] && source "$HOME/.zprofile" 2>/dev/null || true
+            # shellcheck disable=SC1091
+            [ -f "$HOME/.zshrc" ]    && source "$HOME/.zshrc"    2>/dev/null || true
+            ;;
+        bash)
+            # shellcheck disable=SC1091
+            [ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" 2>/dev/null || true
+            # shellcheck disable=SC1091
+            [ -f "$HOME/.bashrc" ]       && source "$HOME/.bashrc"       2>/dev/null || true
+            ;;
+        *)
+            # shellcheck disable=SC1091
+            [ -f "$HOME/.profile" ] && source "$HOME/.profile" 2>/dev/null || true
+            ;;
+    esac
+
+    # Belt-and-suspenders: bash can't perfectly evaluate a zsh rc, so
+    # the brew shellenv line in ~/.zprofile may not have taken effect
+    # in this process. Add brew to PATH directly if it's at one of the
+    # standard install locations. This is what makes the "I just
+    # installed Homebrew, press [c] to continue" flow actually detect
+    # brew on the next step.
+    if ! command -v brew >/dev/null 2>&1; then
+        if [ -x /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [ -x /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
     fi
-    if [ -f "$HOME/.bash_profile" ]; then
-        # shellcheck disable=SC1091
-        source "$HOME/.bash_profile" 2>/dev/null || true
-    fi
-    if [ -f "$HOME/.bashrc" ]; then
-        # shellcheck disable=SC1091
-        source "$HOME/.bashrc" 2>/dev/null || true
-    fi
-    # Re-init rbenv if available so newly installed rubies are found
+
+    # Re-init rbenv against THIS bash process (not the user's shell) so
+    # newly installed rubies are visible without opening a new terminal.
     if command -v rbenv >/dev/null 2>&1; then
-        eval "$(rbenv init -)" 2>/dev/null || true
+        eval "$(rbenv init - bash)" 2>/dev/null || true
     fi
 }
 
@@ -119,6 +165,61 @@ install_prompt() {
     # Source profile so the newly installed tool is visible in this shell
     source_profile
     return 0
+}
+
+# After install_prompt completes, the just-installed tool may still not
+# be detectable in this process — common causes are PATH changes that
+# haven't propagated, the install still running in the other terminal,
+# or rbenv shims that need rehashing. Rather than exiting on the first
+# miss (which forced the user to re-run roe.sh from the top), loop with
+# retry / re-install / quit options so they stay in the flow.
+#
+# Args:
+#   $1 — check function (name), e.g. "check_ruby". Must return 0 when
+#        the tool is found.
+#   $2 — human description used in messages, e.g. "Ruby 3.4.1"
+#   $3 — install command, re-shown if the user picks [i]
+#   $4 — optional note for the install prompt
+#
+# Returns when the check passes. Exits 0 if the user picks [q].
+ensure_installed() {
+    local check_fn="$1"
+    local description="$2"
+    local cmd="$3"
+    local note="${4:-}"
+
+    while ! "$check_fn"; do
+        echo ""
+        log_warning "${description} not detected on PATH yet"
+        echo "  Common causes:"
+        echo "    • The install in the other terminal hasn't finished"
+        echo "    • PATH changes from the install haven't reached this terminal"
+        echo "    • Newly compiled rbenv shims need a rehash"
+        echo ""
+        echo "  Choose:"
+        echo "    [r] re-source shell + check again  (default — try this first)"
+        echo "    [i] show the install command again"
+        echo "    [q] quit setup — re-run ./roe.sh check later"
+        echo ""
+        read -rp "  Choice [R/i/q]: " REPLY
+        echo ""
+        case "${REPLY:-r}" in
+            [Ii]*)
+                install_prompt "$description" "$cmd" "$note"
+                ;;
+            [Qq]*)
+                echo "Exiting. Run ./roe.sh check when ready."
+                exit 0
+                ;;
+            *)
+                log_info "Re-sourcing shell profile and rehashing rbenv..."
+                source_profile
+                # rbenv may have just installed a new Ruby; rehash so
+                # the new shims are visible without a fresh terminal.
+                command -v rbenv >/dev/null 2>&1 && rbenv rehash 2>/dev/null || true
+                ;;
+        esac
+    done
 }
 
 # Detect the user's login shell from $SHELL, pick the right rc file, and
@@ -324,14 +425,11 @@ cmd_check() {
             source_profile
         fi
 
-        if check_ruby; then
-            log_success "Ruby is now installed!"
-            all_good=true
-        else
-            log_error "Ruby ${required_ruby}+ still not found"
-            echo "Please complete installation and run: ./roe.sh check"
-            exit 1
-        fi
+        ensure_installed check_ruby "Ruby ${required_ruby}" \
+            "rbenv install ${required_ruby} && rbenv global ${required_ruby}" \
+            "This takes 5–10 minutes (compiles from source)"
+        log_success "Ruby is now installed!"
+        all_good=true
     fi
 
     # ── Git ───────────────────────────────────────────────────────────────────
@@ -341,19 +439,17 @@ cmd_check() {
     else
         log_error "Git is not installed"
         all_good=false
+        local git_desc git_cmd
         if is_macos && check_brew; then
-            install_prompt "Git" "brew install git"
+            git_desc="Git"; git_cmd="brew install git"
         elif is_macos; then
-            install_prompt "Git (Xcode tools)" "xcode-select --install"
+            git_desc="Git (Xcode tools)"; git_cmd="xcode-select --install"
         else
-            install_prompt "Git" "sudo apt-get install git   # or: sudo dnf install git"
+            git_desc="Git"; git_cmd="sudo apt-get install git   # or: sudo dnf install git"
         fi
-        if check_git; then
-            log_success "Git is now installed!"
-        else
-            log_error "Git still not found. Please install and run: ./roe.sh check"
-            exit 1
-        fi
+        install_prompt "$git_desc" "$git_cmd"
+        ensure_installed check_git "$git_desc" "$git_cmd"
+        log_success "Git is now installed!"
     fi
 
     # ── Bundler ───────────────────────────────────────────────────────────────
@@ -378,20 +474,18 @@ cmd_check() {
     else
         log_error "SQLite3 is not installed"
         all_good=false
+        local sqlite_cmd
         if is_macos && check_brew; then
-            install_prompt "SQLite3" "brew install sqlite3"
+            sqlite_cmd="brew install sqlite3"
         elif is_macos; then
             echo -e "  SQLite3 is usually pre-installed on macOS. Install Homebrew first:"
-            install_prompt "SQLite3" '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install sqlite3'
+            sqlite_cmd='/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install sqlite3'
         else
-            install_prompt "SQLite3" "sudo apt-get install sqlite3 libsqlite3-dev   # or: sudo dnf install sqlite sqlite-devel"
+            sqlite_cmd="sudo apt-get install sqlite3 libsqlite3-dev   # or: sudo dnf install sqlite sqlite-devel"
         fi
-        if check_sqlite; then
-            log_success "SQLite3 is now installed!"
-        else
-            log_error "SQLite3 still not found. Please install and run: ./roe.sh check"
-            exit 1
-        fi
+        install_prompt "SQLite3" "$sqlite_cmd"
+        ensure_installed check_sqlite "SQLite3" "$sqlite_cmd"
+        log_success "SQLite3 is now installed!"
     fi
 
     # ── libvips (optional) ────────────────────────────────────────────────────

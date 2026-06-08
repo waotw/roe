@@ -1,7 +1,0 @@
-# Roe CMS Version
-# This file tracks the current version of Roe
-
-version: "0.1.0"
-release_date: "2026-04-30"
-channel: "stable"  # stable, beta, alpha
-repository: "https://codeberg.org/waotw/roe"
