@@ -644,7 +644,7 @@ module HasMarkdownExtensions
     when "grid"
       render_product_grid(items, config)
     when "compact"
-      render_compact(items)
+      render_compact(items, config)
     when "links"
       render_links(items)
     when "full"
@@ -678,10 +678,14 @@ module HasMarkdownExtensions
       end
 
       # Meta row: date, optionally with " • author" appended
-      meta = collection_item_meta(item, show_author: show_author)
-      if meta.present?
-        output << "#{meta}"
-        output << "{: .item-date}"
+      date_str = item_date(item)
+      author_str = show_author ? item_author(item) : nil
+      if date_str || author_str
+        parts = []
+        parts << "<span class=\"item-date\">#{date_str}</span>" if date_str
+        parts << "<span class=\"item-author\">#{author_str}</span>" if author_str
+        output << parts.join(" • ")
+        output << "{: .item-meta}"
         output << ""
       end
 
@@ -711,6 +715,13 @@ module HasMarkdownExtensions
 
       output = []
       output << '<div class="collection-item">'
+
+      if has_image
+        output << %Q(  <a class="item-image" href="#{item_path(item)}">)
+        output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}"
+        output << "  </a>"
+      end
+
       output << '  <div class="item-body" markdown="1">'
       output << ""
 
@@ -731,21 +742,18 @@ module HasMarkdownExtensions
         output << ""
       end
 
-      meta = collection_item_meta(item, show_author: show_author)
-      if meta.present?
-        output << "#{meta}"
-        output << "{: .item-date}"
+      date_str = item_date(item)
+      author_str = show_author ? item_author(item) : nil
+      if date_str || author_str
+        parts = []
+        parts << "<span class=\"item-date\">#{date_str}</span>" if date_str
+        parts << "<span class=\"item-author\">#{author_str}</span>" if author_str
+        output << "  #{parts.join(" • ")}"
+        output << "  {: .item-meta}"
         output << ""
       end
 
       output << "  </div>"
-
-      if has_image
-        output << %Q(  <a class="item-image" href="#{item_path(item)}">)
-        output << "    #{ResponsiveImageRenderer.render(image_url, alt: alt)}"
-        output << "  </a>"
-      end
-
       output << "</div>"
       output << ""
 
@@ -818,6 +826,26 @@ module HasMarkdownExtensions
     parts.join(" • ")
   end
 
+  def item_date(item)
+    return nil unless item.respond_to?(:date) && item.date
+
+    date = item.date
+    if date.is_a?(String)
+      begin
+        date = Date.parse(date)
+      rescue
+        date = nil
+      end
+    end
+    date&.strftime("%B %d, %Y")
+  end
+
+  def item_author(item)
+    author = item.metadata["author"].to_s.strip
+    author = SiteConfig.get("author").to_s.strip if author.blank?
+    author.presence
+  end
+
   # Collection-block options arrive as strings ("true"/"false") or as
   # parsed booleans depending on caller. Returns the boolean intent;
   # use `default:` to set what `nil` means.
@@ -826,11 +854,23 @@ module HasMarkdownExtensions
     val == true || val.to_s.downcase == "true"
   end
 
-  def render_compact(items)
+  def render_compact(items, config = {})
+    show_author = collection_truthy?(config[:show_author])
+
     items.map do |item|
-      date_str = item.respond_to?(:date) && item.date ? " • #{item.date.strftime('%b %d, %Y')}" : ""
+      date_str = item_date(item)
+      author_str = show_author ? item_author(item) : nil
+
+      meta_html = ""
+      if date_str || author_str
+        parts = []
+        parts << "<span class=\"item-date\">#{date_str}</span>" if date_str
+        parts << "<span class=\"item-author\">#{author_str}</span>" if author_str
+        meta_html = " • #{parts.join(" • ")}"
+      end
+
       title_html = decorate_title(item)
-      "- [#{title_html}](#{item_path(item)})#{date_str}"
+      "- [#{title_html}](#{item_path(item)})#{meta_html}"
     end.join("\n")
   end
 
@@ -1464,37 +1504,34 @@ module HasMarkdownExtensions
     content = []
     content << "<img src=\"#{image}\" alt=\"\" class=\"aside-image\">" if image.present?
 
-    # Wrap text and link in a container for mobile layout
-    text_content = []
+    # Collect text + link as a group so they can be wrapped in
+    # `.aside-body`.
+    body_parts = []
 
     if text.present?
       if link.present?
         if link_text.present?
           # Case 3: Link with custom link text - text separate from link
-          text_content << "<div class=\"aside-text\">#{text}</div>"
-          text_content << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
+          body_parts << "<div class=\"aside-text\">#{text}</div>"
+          body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
         else
           # Case 2: Link without link text - arrow inline with text
-          text_content << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} #{default_link_text}</a></div>"
+          body_parts << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} #{default_link_text}</a></div>"
         end
       else
         # Case 1: No link - just text
-        text_content << "<div class=\"aside-text\">#{text}</div>"
+        body_parts << "<div class=\"aside-text\">#{text}</div>"
       end
     end
 
-    # Wrap text content in a container for flex layout
-    content << "<div class=\"aside-text-wrapper\">#{text_content.join("\n")}</div>" if text_content.any?
+    content << "<div class=\"aside-body\">\n#{body_parts.join("\n")}\n</div>" if body_parts.any?
 
     # Determine if this is image-only
     aside_class = (image.present? && text.blank? && link_text.blank?) ? "card card-aside image-only" : "card card-aside"
 
-    # Wrap in container
     <<~HTML
-      <div class="aside-container">
-        <div class="#{aside_class}">
-          #{content.join("\n")}
-        </div>
+      <div class="#{aside_class}">
+        #{content.join("\n")}
       </div>
     HTML
   end

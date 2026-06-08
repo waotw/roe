@@ -1,6 +1,6 @@
 <header class="post-header">
   <div class="post-header-top">
-    <h1><%= post.title %></h1>
+    <h1 class="post-title"><%= post.title %></h1>
     <div>
       <%# Feed links %>
       <% if post.post_type == 'podcast' && post.metadata['podcast'].present? %>
@@ -18,21 +18,21 @@
     </div>
   </div>
   <% if post.subtitle %>
-    <p><%= post.subtitle %></p>
+    <p class="post-subtitle"><%= post.subtitle %></p>
   <% end %>
 
   <div class="post-meta">
     <% if post.date %>
-      <time datetime="<%= post.date %>">
+      <time class="post-date" datetime="<%= post.date %>">
         <%= post.date.strftime("%B %d, %Y") %>
       </time>
     <% end %>
     <% display_author = post.author.presence || @podcast_config&.dig('author') %>
     <% if display_author %>
-      <span>• <%= display_author %></span>
+      <span class="post-author"> • <%= display_author %></span>
     <% end %>
   </div>
   <% if post.image && post.metadata['image_in_header'].to_s == 'true' %>
-    <%= raw ResponsiveImageRenderer.render(post.image, alt: post.title, sizes: "(min-width: 1020px) 8rem, 100vw") %>
+    <%= raw ResponsiveImageRenderer.render(post.image, alt: post.title, class: "post-image", sizes: "(min-width: 1020px) 8rem, 100vw") %>
   <% end %>
 </header>
