@@ -1,4 +1,8 @@
 module ApplicationHelper
+  def site_title
+    SiteConfig.get("title").presence || "(set site title in Settings → site)"
+  end
+
   def safe_system_image_path(filename, **options)
     return nil if filename.blank?
     system_image_path(filename, **options)

@@ -1,4 +1,14 @@
 class Admin::UpdatesController < Admin::BaseController
+  # Updates and deploys happen from the user's LOCAL Roe install, not from
+  # the live admin. The in-app updater swaps files in current/, which a
+  # production container's immutable image layer can't honour (and even if
+  # it did, there's no git in the production image to clone from). And
+  # deploys obviously can't be triggered from inside the deployed instance.
+  # Block every action here in production so anyone who lands on this
+  # route (typed URL, stale bookmark, old link) gets a clear redirect
+  # back to the dashboard instead of a stale or broken page.
+  before_action :block_in_production
+
   def index
     @current_version = RoeUpdater::VersionChecker.current_version
     @update_info     = RoeUpdater::VersionChecker.check_for_updates
@@ -229,6 +239,20 @@ class Admin::UpdatesController < Admin::BaseController
   end
 
   private
+
+  # In production (the live deployed site), the entire Updates & Deploy
+  # surface is irrelevant — updates and deploys originate from the user's
+  # local Roe install. Redirect anyone landing here on a typed URL or
+  # stale bookmark back to the dashboard, with a flash explaining where
+  # to go. Status: :see_other so the redirect works for POST routes
+  # (Deploy / Dismiss / Reset-and-retry) as well as GET ones, in case
+  # the user triggers a form submission.
+  def block_in_production
+    return unless Rails.env.production?
+    redirect_to admin_root_path,
+                alert: "Updates and deploys happen from your local Roe install, not from the live site. Open your local admin's Updates & Deploy page instead.",
+                status: :see_other
+  end
 
   def license_valid?
     true

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Roe CMS - Admin</title>
+    <title><%= content_for?(:title) ? yield(:title) : "Roe CMS - Admin" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -138,7 +138,14 @@
                 <% end %>
               <% end %>
             </div>
-            <%= link_to Rails.env.production? ? "Updates" : "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%# Updates & Deploy is local-only. The in-app updater swaps files
+                in current/ which can't work inside the production container's
+                immutable image layer; deploys are triggered from the user's
+                local Roe install, not from the live admin. The controller
+                also blocks the route in production as a backstop. %>
+            <% unless Rails.env.production? %>
+              <%= link_to "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <% end %>
             <div class="relative inline-flex items-center">
               <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
               <% if any_integration_unconfigured? %>

@@ -2,7 +2,7 @@
 <!-- Site Mode: <%= @static_generation ? 'Static (Generated)' : 'Dynamic (Rails)' %> -->
 <html>
   <head>
-    <title><%= SiteConfig.get('title').presence || 'Roe CMS' %></title>
+    <title><%= site_title %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -41,7 +41,7 @@
     <% end %>
     <!-- Apple touch icon -->
     <% if SiteConfig.get('logo').present? %>
-      <%= image_tag safe_system_image_path(SiteConfig.get('logo')), alt: site_title %>
+      <link rel="apple-touch-icon" href="<%= system_image_path(SiteConfig.get('logo')) %>">
     <% end %>
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>

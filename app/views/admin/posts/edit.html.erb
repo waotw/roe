@@ -25,10 +25,10 @@
   <% end %>
 
   <!-- HEADER SECTION -->
-  <div class="flex justify-between items-center pb-2.5 relative ">
+  <div class="flex justify-between gap-3 items-start pb-2.5 relative">
     <h1 class="text-xl font-bold">Edit Post: <%= @post.title %></h1>
     <div class="flex items-center gap-2">
-    <%= link_to "← Back to Posts", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-1.5 pt-1 pb-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+    <%= link_to "← Back to Posts", admin_posts_path, class: "inline-flex items-center uppercase text-sm px-1.5 pt-1 pb-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs text-nowrap" %>
     </div>
   </div>
 
