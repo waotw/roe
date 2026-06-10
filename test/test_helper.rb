@@ -62,8 +62,7 @@ module ActiveSupport
     fixtures :all
     include FactoryBot::Syntax::Methods
 
-    def setup
-      super
+    setup do
       # Clear cache first to remove any cached SiteConfig
       Rails.cache.clear
 
@@ -73,6 +72,8 @@ module ActiveSupport
       Medium.delete_all
       SiteConfig.delete_all
       PostmarkConfig.delete_all
+      StripeConfig.delete_all
+      Member.delete_all
 
       # Each test starts with no integration config files so writes are
       # observable from a known empty state. Cheap — these are tiny yml.

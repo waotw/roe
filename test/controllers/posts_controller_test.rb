@@ -129,11 +129,8 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
 
   test "redirects guest to upgrade when accessing paid content without form" do
-    # Enable members feature
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     get post_path(@paid_post_no_form.url_name)
     assert_redirected_to "/upgrade"
@@ -141,10 +138,8 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "redirects free member to upgrade when accessing paid content without form" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_member(@free_member)
     get post_path(@paid_post_no_form.url_name)
@@ -153,10 +148,8 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows paid content to paid active member" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_member(@paid_member)
     get post_path(@paid_post_no_form.url_name)
@@ -165,10 +158,8 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "redirects cancelled paid member to upgrade" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_member(@cancelled_member)
     get post_path(@paid_post_no_form.url_name)

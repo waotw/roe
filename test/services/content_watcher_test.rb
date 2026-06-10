@@ -85,12 +85,12 @@ class ContentWatcherTest < ActiveSupport::TestCase
   test "WATCH_PATHS includes all content directories" do
     paths = ContentWatcher::WATCH_PATHS
 
-    assert_includes paths, "site/posts"
-    assert_includes paths, "site/pages"
-    assert_includes paths, "site/documentation"
-    assert_includes paths, "site/products"
-    assert_includes paths, "site/system"
-    assert_includes paths, "site/media"
+    assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "posts")
+    assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "pages")
+    assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "documentation")
+    assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "products")
+    assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "system")
+    assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "media")
   end
 
   # Detect renames functionality
@@ -180,7 +180,7 @@ class ContentWatcherTest < ActiveSupport::TestCase
   end
 
   test "static_generation_enabled? returns true when enabled" do
-    create(:site_config, config: { "static_generation_enabled" => true })
+    SiteConfig.first.update!(config: { "static_generation_enabled" => true })
 
     assert ContentWatcher.send(:static_generation_enabled?)
   end
@@ -279,31 +279,35 @@ class ContentWatcherTest < ActiveSupport::TestCase
   # Remove file functionality
   test "remove_file handles post files" do
     post_file = write_test_file("posts/delete-me.md", "---\ntitle: Delete Me\n---\n\nContent")
+    normalized_post_file = RoeSitePaths.normalize(post_file)
 
     # Create the post first
     Post.create_or_update_from_file(post_file)
-    assert Post.exists?(file_path: post_file)
+    assert Post.exists?(file_path: normalized_post_file)
 
     # Now remove it
     ContentWatcher.send(:remove_file, post_file)
 
-    assert_not Post.exists?(file_path: post_file)
+    assert_not Post.exists?(file_path: normalized_post_file)
   end
 
   test "remove_file handles page files" do
     page_file = write_test_file("pages/delete-me.md", "---\ntitle: Delete Me\n---\n\nContent")
+    normalized_page_file = RoeSitePaths.normalize(page_file)
 
     Page.create_or_update_from_file(page_file)
-    assert Page.exists?(file_path: page_file)
+    assert Page.exists?(file_path: normalized_page_file)
 
     ContentWatcher.send(:remove_file, page_file)
 
-    assert_not Page.exists?(file_path: page_file)
+    assert_not Page.exists?(file_path: normalized_page_file)
   end
 
   test "remove_file handles media files with web paths" do
-    media_file = write_test_file("media/images/delete-me.jpg", "fake image data")
-    web_path = media_file.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    media_file = File.join(RoeSitePaths::SITE_PATH, "media", "images", "delete-me.jpg")
+    FileUtils.mkdir_p(File.dirname(media_file))
+    File.write(media_file, "fake image data")
+    web_path = "/media/images/delete-me.jpg"
 
     Medium.create!(file_path: web_path, media_type: "jpg", uploaded_at: Time.current)
     assert Medium.exists?(file_path: web_path)
@@ -311,6 +315,8 @@ class ContentWatcherTest < ActiveSupport::TestCase
     ContentWatcher.send(:remove_file, media_file)
 
     assert_not Medium.exists?(file_path: web_path)
+  ensure
+    FileUtils.rm_f(media_file)
   end
 
   # Config removal handling
@@ -353,10 +359,12 @@ class ContentWatcherTest < ActiveSupport::TestCase
   test "handle_rename updates post file paths" do
     old_file = write_test_file("posts/old-slug.md", "---\ntitle: Old Title\n---\n\nContent")
     new_file = write_test_file("posts/new-slug.md", "---\ntitle: New Title\n---\n\nContent")
+    normalized_old = RoeSitePaths.normalize(old_file)
+    normalized_new = RoeSitePaths.normalize(new_file)
 
     # Create initial post
     Post.create_or_update_from_file(old_file)
-    post = Post.find_by(file_path: old_file)
+    post = Post.find_by(file_path: normalized_old)
     assert post
 
     # Perform rename
@@ -364,29 +372,35 @@ class ContentWatcherTest < ActiveSupport::TestCase
 
     # Verify path was updated
     post.reload
-    assert_equal new_file, post.file_path
+    assert_equal normalized_new, post.file_path
   end
 
   test "handle_rename updates page file paths" do
     old_file = write_test_file("pages/old-page.md", "---\ntitle: Old Page\n---\n\nContent")
     new_file = write_test_file("pages/new-page.md", "---\ntitle: New Page\n---\n\nContent")
+    normalized_old = RoeSitePaths.normalize(old_file)
+    normalized_new = RoeSitePaths.normalize(new_file)
 
     Page.create_or_update_from_file(old_file)
-    page = Page.find_by(file_path: old_file)
+    page = Page.find_by(file_path: normalized_old)
     assert page
 
     ContentWatcher.send(:handle_rename, old_file, new_file)
 
     page.reload
-    assert_equal new_file, page.file_path
+    assert_equal normalized_new, page.file_path
   end
 
   test "handle_rename updates media file paths" do
-    old_file = write_test_file("media/images/old-photo.jpg", "fake")
-    new_file = write_test_file("media/images/new-photo.jpg", "fake")
+    old_file = File.join(RoeSitePaths::SITE_PATH, "media", "images", "old-photo.jpg")
+    new_file = File.join(RoeSitePaths::SITE_PATH, "media", "images", "new-photo.jpg")
+    FileUtils.mkdir_p(File.dirname(old_file))
+    FileUtils.mkdir_p(File.dirname(new_file))
+    File.write(old_file, "fake")
+    File.write(new_file, "fake")
 
-    old_web_path = old_file.sub(RoeSitePaths::SITE_PATH.to_s, "")
-    new_web_path = new_file.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    old_web_path = "/media/images/old-photo.jpg"
+    new_web_path = "/media/images/new-photo.jpg"
 
     Medium.create!(file_path: old_web_path, media_type: "jpg", uploaded_at: Time.current)
 
@@ -394,5 +408,8 @@ class ContentWatcherTest < ActiveSupport::TestCase
 
     assert_not Medium.exists?(file_path: old_web_path)
     assert Medium.exists?(file_path: new_web_path)
+  ensure
+    FileUtils.rm_f(old_file)
+    FileUtils.rm_f(new_file)
   end
 end

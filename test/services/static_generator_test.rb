@@ -90,7 +90,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
     generator.instance_variable_set(:@manifest, generator.send(:load_manifest))
 
     # Create old config
-    SiteConfig.where(file_path: "site/system/global/site.yml").destroy_all
+    SiteConfig.where("file_path LIKE ?", "%site.yml").destroy_all
     site_config = create(:site_config,
       file_path: "site/system/global/site.yml",
       config: { "title" => "Old" }
@@ -191,7 +191,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
 
   test "layout_checksums returns hash of layout files" do
     # Create a test layout file
-    layout_dir = File.join(Rails.root, "site", "layout")
+    layout_dir = File.join(RoeSitePaths::SITE_PATH, "layout")
     FileUtils.mkdir_p(layout_dir)
     layout_file = File.join(layout_dir, "navigation.md")
     File.write(layout_file, "# Navigation")
@@ -208,7 +208,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
 
   test "asset_checksums returns hash of asset directories" do
     # Create test font file
-    fonts_dir = File.join(Rails.root, "site", "system", "assets", "fonts")
+    fonts_dir = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "fonts")
     FileUtils.mkdir_p(fonts_dir)
     test_font = File.join(fonts_dir, "TestFont.ttf")
     File.write(test_font, "fake font data")
@@ -230,7 +230,7 @@ class StaticGeneratorTest < ActiveSupport::TestCase
     create_manifest({ "generated_at" => Time.current.iso8601, "layouts" => {} })
 
     # Create a layout file
-    layout_dir = File.join(Rails.root, "site", "layout")
+    layout_dir = File.join(RoeSitePaths::SITE_PATH, "layout")
     FileUtils.mkdir_p(layout_dir)
     layout_file = File.join(layout_dir, "footer.md")
     File.write(layout_file, "# Footer")

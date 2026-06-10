@@ -357,7 +357,6 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     features_path = SiteConfig::FEATURES_PATH
     FileUtils.mkdir_p(features_path)
     path = features_path.join(filename)
-    return if File.exist?(path)
 
     case filename
     when "members.yml"
@@ -370,5 +369,10 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     else
       File.write(path, "{}")
     end
+
+    # Sync to SiteConfig so current() reads from the record, not stale cache
+    type = "features/#{filename.sub(/\.yml$/, "")}"
+    SiteConfig.sync_from_file(type)
+    SiteConfig.reload!(type)
   end
 end

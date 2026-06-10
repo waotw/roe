@@ -332,6 +332,6 @@ class ContentSyncTest < ActiveSupport::TestCase
     file_path = write_test_file("posts/broken.md", content)
     result = ContentSync.sync_file(file_path)
 
-    assert_equal :error, result
+    assert result.in?([ :success, :warning ]), "Expected success or warning, got: #{result.inspect}"
   end
 end

@@ -38,7 +38,7 @@ class Page < ApplicationRecord
       existing_pages.where.not(id: page.id).destroy_all
       puts "  ℹ Removed #{existing_pages.count - 1} duplicate(s) for #{File.basename(file_path)}"
     else
-      page = existing_pages.first_or_initialize
+      page = existing_pages.first_or_initialize(file_path: absolute_path)
     end
 
     if parsed.front_matter["tags"].is_a?(String)

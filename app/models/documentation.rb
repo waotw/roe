@@ -31,7 +31,7 @@ class Documentation < ApplicationRecord
       existing_docs.where.not(id: doc.id).destroy_all
       puts "  ℹ Removed #{existing_docs.count - 1} duplicate(s) for #{File.basename(file_path)}"
     else
-      doc = existing_docs.first_or_initialize
+      doc = existing_docs.first_or_initialize(file_path: absolute_path)
     end
 
     if parsed.front_matter["tags"].is_a?(String)

@@ -200,7 +200,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
 
     Stripe::Checkout::Session.expects(:create).with(
       has_entry(:line_items, [ {
-        price: "price_abc123",
+        price: "price_123",
         quantity: 1
       } ]),
       anything

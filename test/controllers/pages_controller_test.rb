@@ -128,10 +128,8 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
 
   test "redirects guest to upgrade when accessing paid page without form" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     get page_path(@paid_page_no_form.url_name)
     assert_redirected_to "/upgrade"
@@ -139,10 +137,8 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "redirects free member to upgrade when accessing paid page without form" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_member(@free_member)
     get page_path(@paid_page_no_form.url_name)
@@ -151,10 +147,8 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows paid page to paid active member" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_member(@paid_member)
     get page_path(@paid_page_no_form.url_name)
@@ -163,10 +157,8 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "redirects cancelled paid member to upgrade" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_member(@cancelled_member)
     get page_path(@paid_page_no_form.url_name)
@@ -175,10 +167,8 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "shows paid page to admin even without membership" do
-    SiteConfig.current.update!(
-      file_path: "site/system/features/members.yml",
-      config: { "enabled" => true }
-    )
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     sign_in_as(@admin)
     get page_path(@paid_page_no_form.url_name)

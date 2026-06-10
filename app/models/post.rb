@@ -1,3 +1,5 @@
+require "ostruct"
+
 class Post < ApplicationRecord
   include HasAudience
   include HasMetadata
@@ -302,7 +304,7 @@ class Post < ApplicationRecord
       existing_posts.where.not(id: post.id).destroy_all
       puts "  ℹ Removed #{existing_posts.count - 1} duplicate(s) for #{File.basename(file_path)}"
     else
-      post = existing_posts.first_or_initialize
+      post = existing_posts.first_or_initialize(file_path: absolute_path)
     end
 
     # Convert comma-separated tags to array (preserves -tag syntax)
@@ -629,13 +631,13 @@ class Post < ApplicationRecord
       end
 
       # Create a parsed-like object
-      OpenStruct.new(
+      ::OpenStruct.new(
         front_matter: metadata,
         content: body
       )
     else
       # No frontmatter found
-      OpenStruct.new(
+      ::OpenStruct.new(
         front_matter: { "title" => File.basename(file_path, ".md") },
         content: content
       )

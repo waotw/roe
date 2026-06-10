@@ -55,8 +55,8 @@ class PaidContentAccessFlowTest < ActionDispatch::IntegrationTest
       content: "# Teaser Content\n\nThis is the free preview.\n\n```form for: paid_content\nUpgrade to read more!\n```\n\n# Premium Section\n\nThis is the paid-only content."
     )
 
-    # Enable members feature
-    SiteFeature.stubs(:members_enabled?).returns(true)
+    # Enable members feature by creating the feature file
+    File.write(File.join(RoeSitePaths::SITE_PATH, "system", "features", "members.yml"), { "enabled" => true }.to_yaml)
 
     # Create required pages
     create(:page,

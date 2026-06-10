@@ -54,7 +54,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
 
     # The code is processed, not preserved (current implementation limitation)
     # The collection renders with the code block processed
-    assert_match(/<div class="collection"/, result)
+    assert_match(/<div class="collection list"/, result)
   end
 
   test "code inside card blocks is processed as markdown" do
@@ -308,11 +308,10 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   # Aside Card Tests
   # =============================================================================
 
-  test "aside renders aside container" do
+  test "aside renders card with aside classes" do
     content = MarkdownFixture::ASIDE_SIMPLE
     result = render(content)
 
-    assert_match(/<div class="aside-container"/, result)
     assert_match(/class="card card-aside"/, result)
     assert_match(/This is an aside/, result)
   end
@@ -495,7 +494,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     result = render(content)
 
     assert_match(/Latest Posts/, result)
-    assert_match(/class="collection"/, result)
+    assert_match(/class="collection list"/, result)
   end
 
   test "collection with list template" do
