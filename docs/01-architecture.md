@@ -43,7 +43,7 @@ Roe is a file-first CMS where the file system is the source of truth. Content li
 
 ### 2. Two Rendering Paths
 - **Dynamic**: Rails renders markdown on-demand using `HasMarkdownExtensions#to_html`
-- **Static**: `StaticGenerator` pre-renders all pages to `/public`
+- **Static**: `StaticGenerator` pre-renders all pages to `/static_site`
 
 ### 3. Sync on Startup, Watch in Dev
 - `ContentSync.sync_all` runs on server boot (`config/initializers/content_management.rb`)

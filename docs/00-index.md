@@ -103,7 +103,7 @@ New to Roe? Start here:
 - Content gating by membership level
 
 ### Static Generation
-- Pre-render entire site to `/public`
+- Pre-render entire site to `/static_site`
 - Incremental regeneration on changes
 - Perfect for CDN deployment
 
