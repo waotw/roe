@@ -5,13 +5,19 @@
 # temp directory, copies (never moves), and zips from there. Nothing
 # in /roe, /roe/current, or /roe/site is modified.
 #
-# Output: roe-<VERSION>.zip, named from the root /roe/VERSION file.
+# Output: roe-<VERSION>.zip by default. With --with-dev-docs the zip is
+# named roe-<VERSION>-dev.zip and includes /current/docs/ (developer
+# reference material). Version comes from the root /roe/VERSION file.
 #
 # Usage:
-#   current/bin/build-installer                  # zip → current dir
-#   current/bin/build-installer -o ~/Downloads   # zip → specific dir
-#   current/bin/build-installer --keep-stage     # leave the staging
-#                                                # dir for inspection
+#   current/bin/build-installer                   # zip → current dir
+#   current/bin/build-installer -o ~/Downloads    # zip → specific dir
+#   current/bin/build-installer --keep-stage      # leave the staging
+#                                                 # dir for inspection
+#   current/bin/build-installer --with-dev-docs   # include current/docs/
+#                                                 # (developer reference);
+#                                                 # output filename gains
+#                                                 # a -dev suffix
 #
 # After first checkout: chmod +x current/bin/build-installer
 
@@ -27,6 +33,7 @@ ROE_ROOT="$(cd "$RAILS_ROOT/.." && pwd)"
 # ── Args ───────────────────────────────────────────────────────────────
 OUTPUT_DIR="$(pwd)"
 KEEP_STAGE=0
+INCLUDE_DEV_DOCS=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,6 +41,8 @@ while [[ $# -gt 0 ]]; do
       OUTPUT_DIR="$2"; shift 2 ;;
     --keep-stage)
       KEEP_STAGE=1; shift ;;
+    --with-dev-docs)
+      INCLUDE_DEV_DOCS=1; shift ;;
     -h|--help)
       sed -n '/^# build-installer/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -66,7 +75,13 @@ if [[ -z "$VERSION" ]]; then
   echo "Expected something like:  version: 0.1.1" >&2
   exit 1
 fi
-ZIP_NAME="roe-${VERSION}.zip"
+# --with-dev-docs gets a -dev suffix so the two flavours can sit side
+# by side on disk without anyone having to remember which is which.
+if [[ "$INCLUDE_DEV_DOCS" -eq 1 ]]; then
+  ZIP_NAME="roe-${VERSION}-dev.zip"
+else
+  ZIP_NAME="roe-${VERSION}.zip"
+fi
 ZIP_PATH="$OUTPUT_DIR/$ZIP_NAME"
 
 # ── Tool checks ────────────────────────────────────────────────────────
@@ -141,33 +156,44 @@ chmod +x "$STAGE_ROOT/roe.sh" "$STAGE_ROOT/start.command"
 #     ending up in a user-facing installer
 #   * Inner VERSION (root VERSION is canonical; a stale current/VERSION
 #     would confuse the update checker)
-rsync -a \
-  --exclude='.git/' \
-  --exclude='.bundle/' \
-  --exclude='.byebug_history' \
-  --exclude='.rspec_status' \
-  --exclude='.DS_Store' \
-  --exclude='coverage/' \
-  --exclude='log/' \
-  --exclude='tmp/' \
-  --exclude='storage/' \
-  --exclude='node_modules/' \
-  --exclude='vendor/bundle/' \
-  --exclude='public/assets/' \
-  --exclude='public/packs/' \
-  --exclude='db/*.sqlite3' \
-  --exclude='db/*.sqlite3-wal' \
-  --exclude='db/*.sqlite3-shm' \
-  --exclude='db/development/' \
-  --exclude='db/production/' \
-  --exclude='config/master.key' \
-  --exclude='config/credentials.yml.enc' \
-  --exclude='config/deploy.yml' \
-  --exclude='.kamal/secrets' \
-  --exclude='fly.toml' \
-  --exclude='bin/build-installer' \
-  --exclude='VERSION' \
-  "$RAILS_ROOT/" "$STAGE_ROOT/current/"
+#   * /current/docs/ (developer reference) — EXCLUDED BY DEFAULT.
+#     --with-dev-docs reverses this for the hacker build.
+#
+# Excludes live in an array so the docs exclusion can be conditionally
+# omitted without duplicating the rest of the list.
+RSYNC_EXCLUDES=(
+  --exclude='.git/'
+  --exclude='.bundle/'
+  --exclude='.byebug_history'
+  --exclude='.rspec_status'
+  --exclude='.DS_Store'
+  --exclude='coverage/'
+  --exclude='log/'
+  --exclude='tmp/'
+  --exclude='storage/'
+  --exclude='node_modules/'
+  --exclude='vendor/bundle/'
+  --exclude='public/assets/'
+  --exclude='public/packs/'
+  --exclude='db/*.sqlite3'
+  --exclude='db/*.sqlite3-wal'
+  --exclude='db/*.sqlite3-shm'
+  --exclude='db/development/'
+  --exclude='db/production/'
+  --exclude='config/master.key'
+  --exclude='config/credentials.yml.enc'
+  --exclude='config/deploy.yml'
+  --exclude='.kamal/secrets'
+  --exclude='fly.toml'
+  --exclude='bin/build-installer'
+  --exclude='VERSION'
+)
+
+if [[ "$INCLUDE_DEV_DOCS" -eq 0 ]]; then
+  RSYNC_EXCLUDES+=( --exclude='docs/' )
+fi
+
+rsync -a "${RSYNC_EXCLUDES[@]}" "$RAILS_ROOT/" "$STAGE_ROOT/current/"
 
 # ── Defensive sanity check ─────────────────────────────────────────────
 # Belt-and-suspenders: scan the staging tree for filenames that
