@@ -31,7 +31,7 @@
                   page.missing_site_gated_fields.each { |name| reasons << "missing #{name}" }
                   page.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
                 %>
-                <span class="inline-block text-base text-amber-600 font-semibold font-sans"
+                <span class="line-clamp-1 inline-block text-base text-amber-600 font-semibold font-sans"
                       title="<%= reasons.join(', ') %>">
                   ⚠
                 </span>

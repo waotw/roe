@@ -1,0 +1,4 @@
+# Snipcart Configuration
+# Get your API keys from: https://app.snipcart.com/dashboard/account/credentials
+test:
+  api_key: ""

@@ -1,13 +1,20 @@
 class PageGenerator
   PAGES_PATH = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "pages"))
 
+  # The default pages (currently just home.md) now ship as files under
+  # lib/site_templates/minimum/pages/ and are installed by
+  # ConfigGenerator.generate_all → SiteTemplates::Loader. This method
+  # remains as the initializer's call site for any page-level setup
+  # that isn't a static template — today that's the theme compat shim.
   def self.generate_defaults
-    FileUtils.mkdir_p(PAGES_PATH)
-
-    generate_home_page unless File.exist?(PAGES_PATH.join("home.md"))
     activate_default_theme
   end
 
+  # Backward-compatibility safety net for sites whose existing site.yml
+  # is missing the theme key entirely (pre-template-kit installs).
+  # Fresh installs get `theme: { active: "default" }` from the template,
+  # so this method returns immediately. Kept so an old site.yml never
+  # boots without a theme set.
   def self.activate_default_theme
     site_yml_path = File.join(RoeSitePaths::SITE_PATH, "system", "global", "site.yml")
     return unless File.exist?(site_yml_path)
@@ -21,28 +28,6 @@ class PageGenerator
   end
 
   private
-
-  def self.generate_home_page
-    content = <<~MARKDOWN
-      ---
-      title: Home
-      url_name: home
-      status: published
-      ---
-
-      # Welcome
-
-      ```collection
-      heading: Latest Posts
-      source: posts
-      limit: 10
-      show_more: true
-      ```
-    MARKDOWN
-
-    File.write(PAGES_PATH.join("home.md"), content)
-    Rails.logger.info "Created default home.md"
-  end
 
   def self.generate_archive_page
     content = <<~MARKDOWN

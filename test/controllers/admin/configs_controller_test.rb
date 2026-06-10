@@ -364,7 +364,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
       File.write(path, <<~YAML)
         payments:
           enabled: true
-        newsletter & email:
+        newsletter:
           enabled: true
       YAML
     else

@@ -111,8 +111,8 @@
                       post.metadata['tags']&.join(' '),
                       post.status
                     ].compact.join(' ').downcase %>">
-                  <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
-                    <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4" %>
+                  <td class="py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
+                    <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "line-clamp-1 text-blue-600 hover:text-blue-900 mr-4" %>
                     <% if post.needs_attention? %>
                       <%
                         reasons = []

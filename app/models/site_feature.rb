@@ -38,7 +38,7 @@ module SiteFeature
   # Newsletters enabled = members enabled AND newsletter.enabled in members.yml
   def newsletters_feature_enabled?
     return false unless members_enabled?
-    SiteConfig.feature("members", "newsletter & email.enabled") == true
+    SiteConfig.feature("members", "newsletter.enabled") == true
   end
 
   # ── Integration files present ───────────────────────────────────────────

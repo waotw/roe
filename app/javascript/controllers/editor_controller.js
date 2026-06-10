@@ -627,10 +627,63 @@ export default class extends Controller {
 
     const cursorPos = this.textareaTarget.value.length;
     this.textareaTarget.setSelectionRange(cursorPos, cursorPos);
-    this.textareaTarget.scrollTop = this.textareaTarget.scrollHeight;
-    this.scrollBeforeInput = window.scrollY;
+
+    // State for cleanup if the user dismisses without typing. Positions
+    // are valid as long as the inline anchor area stays intact — the
+    // returnFromFootnote() cleanup re-verifies before mutating anything.
+    this.pendingFootnote = {
+      number: nextNumber,
+      inlineRefStart: originalPos,
+      inlineRefEnd: positionAfterReference,
+      footnoteBlockStart: endPos,
+      footnoteContentStart: cursorPos,
+    };
 
     this.showFootnoteDoneButton(positionAfterReference);
+
+    // Defer the window scroll: the two execCommand calls above fired
+    // input events that schedule rAF callbacks comparing against the
+    // OLD scrollBeforeInput. If we scroll now, those rAFs will fire
+    // and snap us back. setTimeout(60) lets them settle first, then
+    // scrollCursorIntoView() updates the lock baseline so subsequent
+    // typing into the footnote doesn't snap back to the top either.
+    setTimeout(() => {
+      this.autoExpandTextarea();
+      this.scrollCursorIntoView(this.textareaTarget.value.length);
+    }, 60);
+  }
+
+  // Scroll the WINDOW (not the textarea) so the cursor at `position`
+  // sits about 1/3 down the viewport. The textarea auto-expands to
+  // fit its content, so it has no internal scrollbar — adjusting
+  // textarea.scrollTop is a no-op. We have to translate the cursor's
+  // position-in-text to a pixel y-coordinate in the document and
+  // scroll the window there.
+  scrollCursorIntoView(position) {
+    const textarea = this.textareaTarget;
+    const style = window.getComputedStyle(textarea);
+    const lineHeight =
+      parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.5;
+    const paddingTop = parseInt(style.paddingTop) || 0;
+
+    const linesBefore = textarea.value
+      .substring(0, position)
+      .split("\n").length;
+    const cursorY = paddingTop + (linesBefore - 1) * lineHeight;
+
+    const textareaRect = textarea.getBoundingClientRect();
+    const cursorDocumentY = window.scrollY + textareaRect.top + cursorY;
+
+    const targetScroll = Math.max(
+      0,
+      cursorDocumentY - window.innerHeight / 3,
+    );
+
+    window.scrollTo({ top: targetScroll, behavior: "instant" });
+
+    // Reset the input-lock baseline to where we just landed so the
+    // next input event doesn't snap the page back.
+    this.scrollBeforeInput = window.scrollY;
   }
 
   handleFootnoteEnter(event) {
@@ -701,26 +754,68 @@ export default class extends Controller {
   returnFromFootnote(returnPosition) {
     console.log("[FOOTNOTE] Returning to position:", returnPosition);
 
-    // Focus textarea and jump back
-    this.textareaTarget.focus({ preventScroll: false });
-    this.textareaTarget.setSelectionRange(returnPosition, returnPosition);
+    let targetPosition = returnPosition;
+    const pending = this.pendingFootnote;
 
-    // Scroll to make cursor visible
-    const lineHeight = parseInt(
-      window.getComputedStyle(this.textareaTarget).lineHeight,
-    );
-    const lines = this.textareaTarget.value
-      .substring(0, returnPosition)
-      .split("\n").length;
-    this.textareaTarget.scrollTop = Math.max(0, (lines - 10) * lineHeight);
+    // Cleanup pass: if the user pressed Done / Esc without adding any
+    // footnote text, remove the empty footnote definition AND the
+    // inline anchor so they're not left with a dangling reference.
+    //
+    // Two safety checks before mutating:
+    //   1. inline anchor at recorded position still reads as the
+    //      `[^N]` we inserted (positions could have shifted if the
+    //      user edited text BEFORE the anchor while the prompt was
+    //      open — rare but possible).
+    //   2. text after the footnote `[^N]: ` is whitespace-only.
+    if (pending) {
+      const content = this.textareaTarget.value;
+      const expectedRef = `[^${pending.number}]`;
+      const actualRef = content.substring(
+        pending.inlineRefStart,
+        pending.inlineRefEnd,
+      );
+      const inlineRefIntact = actualRef === expectedRef;
+      const footnoteEmpty =
+        content.substring(pending.footnoteContentStart).trim() === "";
 
-    // Update scroll lock position
-    setTimeout(() => {
-      this.scrollBeforeInput = window.scrollY;
-    }, 100);
+      if (inlineRefIntact && footnoteEmpty) {
+        console.log("[FOOTNOTE] Empty footnote — removing both anchors");
+        this.textareaTarget.focus({ preventScroll: true });
 
-    // Remove done button
+        // Remove the footnote block (separator + `[^N]: `). We delete
+        // from footnoteBlockStart to current end of content, which is
+        // safe because the user didn't type past that point.
+        this.textareaTarget.setSelectionRange(
+          pending.footnoteBlockStart,
+          this.textareaTarget.value.length,
+        );
+        document.execCommand("insertText", false, "");
+
+        // Remove the inline anchor. Positions are still valid: the
+        // deletion above only affected content AFTER inlineRefEnd.
+        this.textareaTarget.setSelectionRange(
+          pending.inlineRefStart,
+          pending.inlineRefEnd,
+        );
+        document.execCommand("insertText", false, "");
+
+        targetPosition = pending.inlineRefStart;
+      }
+    }
+
+    this.pendingFootnote = null;
+
+    this.textareaTarget.focus({ preventScroll: true });
+    this.textareaTarget.setSelectionRange(targetPosition, targetPosition);
+
     this.removeFootnoteDoneButton();
+
+    // Defer scroll past the input-lock rAF cycle, same reasoning as
+    // insertFootnote(). The cleanup path fires execCommand events too.
+    setTimeout(() => {
+      this.autoExpandTextarea();
+      this.scrollCursorIntoView(targetPosition);
+    }, 60);
   }
 
   removeFootnoteDoneButton() {

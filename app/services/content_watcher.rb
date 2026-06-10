@@ -419,20 +419,11 @@ class ContentWatcher
       File.write(file_path, YAML.dump(site_config.config))
       puts "   🔄 Restored #{filename}.yml from database (required config)"
     else
-      # Generate fresh defaults
-      generator = ConfigGenerator.new
-      generator.send(:ensure_directories)
-
-      case config_type
-      when "site"
-        generator.send(:generate_site_config)
-      when "fonts"
-        generator.send(:generate_fonts_config)
-      when "defaults/cards"
-        generator.send(:generate_cards_defaults)
-      when "defaults/collections"
-        generator.send(:generate_collections_defaults)
-      end
+      # Generate fresh defaults. ConfigGenerator.generate_all walks the
+      # minimum kit via SiteTemplates::Loader, which skips any file
+      # that already exists — so this restores only the missing file
+      # (this one) without touching the rest of /site.
+      ConfigGenerator.new.generate_all
 
       # Sync new file to database
       SiteConfig.sync_from_file(config_type)

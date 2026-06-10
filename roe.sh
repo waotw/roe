@@ -499,18 +499,37 @@ cmd_check() {
         echo ""
         read -rp "  Install libvips now? [y/n]: " REPLY
         if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Capture the install command + description once so the
+            # retry loop can re-show the same command without the
+            # OS-detection ladder being duplicated.
+            local vips_desc="libvips" vips_cmd
             if is_macos && check_brew; then
-                install_prompt "libvips" "brew install libvips"
+                vips_cmd="brew install libvips"
             elif is_macos; then
-                install_prompt "libvips" '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install libvips'
+                vips_cmd='/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install libvips'
             else
-                install_prompt "libvips" "sudo apt-get install libvips-dev   # or: sudo dnf install vips-devel"
+                vips_cmd="sudo apt-get install libvips-dev   # or: sudo dnf install vips-devel"
             fi
+            install_prompt "$vips_desc" "$vips_cmd"
+
+            # Retry loop. Unlike the required-tool ensure_installed
+            # helper, libvips is optional — so [n] skips and continues
+            # the rest of `check` instead of exiting the script.
+            while ! check_libvips; do
+                echo ""
+                read -rp "  libvips still not found. Try again? [y/n]: " REPLY
+                echo ""
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    install_prompt "$vips_desc" "$vips_cmd"
+                else
+                    log_info "Skipping libvips — you can install it later"
+                    break
+                fi
+            done
+
             if check_libvips; then
                 log_success "libvips installed!"
                 has_optional_missing=false
-            else
-                log_warning "libvips still not found — you can install it later"
             fi
         else
             log_info "Skipping libvips — you can install it later"

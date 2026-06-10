@@ -35,8 +35,17 @@ FileUtils.rm_rf(TEST_SITE_PATH)
 ].each { |sub| FileUtils.mkdir_p(File.join(TEST_SITE_PATH, sub)) }
 
 # Seed the default email templates that EmailRenderer expects to find.
-# ConfigGenerator is idempotent — it skips files that already exist.
-ConfigGenerator.new.generate_member_emails
+# Copying directly from the template kit instead of routing through
+# ConfigGenerator so the test rig stays decoupled from feature-toggle
+# orchestration (members.yml, pages, integrations). Skip-if-exists
+# matches the previous generate_member_emails behaviour.
+emails_src = Rails.root.join("lib", "site_templates", "features", "members", "emails")
+emails_dst = File.join(TEST_SITE_PATH, "emails")
+FileUtils.mkdir_p(emails_dst)
+emails_src.each_child do |source|
+  target = File.join(emails_dst, source.basename.to_s)
+  FileUtils.cp(source, target) unless File.exist?(target)
+end
 
 # Seed a minimal site.yml so SiteConfig.current("site") resolves through
 # the same find_by(file_path:) → create_from_file path it uses in

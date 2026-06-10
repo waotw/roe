@@ -1,0 +1,5 @@
+# Postmark Test Token
+# This token is for testing only. The live token is stored in the database.
+# Get your server token from: https://account.postmarkapp.com/servers
+test:
+  server_token: ""

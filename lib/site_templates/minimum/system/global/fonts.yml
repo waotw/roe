@@ -1,0 +1,12 @@
+heading:
+  family: "Manrope"
+  source: "google"
+body:
+  family: "Source Serif 4"
+  source: "google"
+mono:
+  family: "Inconsolata"
+  source: "google"
+accent:
+  family: ""
+  source: ""
