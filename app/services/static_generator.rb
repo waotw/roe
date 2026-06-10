@@ -6,7 +6,7 @@
 # Architecture:
 #   - Source of truth: Markdown files in /site directory
 #   - Database: Synchronized cache for querying/filtering
-#   - Output: Static HTML files in /public directory
+#   - Output: Static HTML files in /static_site directory
 #   - Change detection: Manifest-based tracking with microsecond timestamps
 #
 # Incremental Build Strategy:
