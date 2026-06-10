@@ -39,7 +39,7 @@
               <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>>
       <option value="">Select...</option>
       <% field_options.each do |option| %>
-        <option value="<%= option %>" <%= 'selected' if value.to_s == option.to_s %>><%= option %></option>
+        <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
       <% end %>
     </select>
     <% if field_hint %>

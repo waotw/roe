@@ -1,8 +1,8 @@
-<% if @podcast_episodes.present?
-     current_index = @podcast_episodes.index { |e| e.url_name == post.url_name }
+<% if podcast_episodes.present?
+     current_index = podcast_episodes.index { |e| e.url_name == post.url_name }
      # Episodes are newest-first, so "next" is older (higher index), "prev" is newer (lower index)
-     prev_episode = current_index && current_index > 0 ? @podcast_episodes[current_index - 1] : nil
-     next_episode = current_index && current_index < @podcast_episodes.length - 1 ? @podcast_episodes[current_index + 1] : nil
+     prev_episode = current_index && current_index > 0 ? podcast_episodes[current_index - 1] : nil
+     next_episode = current_index && current_index < podcast_episodes.length - 1 ? podcast_episodes[current_index + 1] : nil
    end %>
 <div class="podcast-episode">
 
@@ -12,7 +12,7 @@
       <%# raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title) %>
     <% end %>
     <div class="hero-player">
-      <%= render 'posts/media_player', post: post, podcast_config: @podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
+      <%= render 'posts/media_player', post: post, podcast_config: podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
     </div>
   </div>
 
@@ -20,11 +20,11 @@
     <%= render_post_content(post) %>
   </div>
 
-  <% if @podcast_config.present? || post.metadata['podcast'].present? %>
+  <% if podcast_config.present? || post.metadata['podcast'].present? %>
     <div class="podcast-subscribe">
       <% if post.metadata['podcast'].present? %>
         <%# Show public feed unless podcast is paid-only (admins always see it) %>
-        <% if authenticated? || @podcast_config&.dig('audience') != 'paid' %>
+        <% if authenticated? || podcast_config&.dig('audience') != 'paid' %>
           <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="feed-link" target="_blank">
             RSS Feed
           </a>
@@ -43,11 +43,11 @@
     </div>
   <% end %>
 
-  <% if @podcast_episodes.present? && @podcast_episodes.length > 1 %>
+  <% if podcast_episodes.present? && podcast_episodes.length > 1 %>
     <div class="episode-list">
       <h2>All Episodes</h2>
       <ol>
-        <% @podcast_episodes.each do |episode| %>
+        <% podcast_episodes.each do |episode| %>
           <li class="episode-item <%= 'is-current' if episode.url_name == post.url_name %>">
             <a href="<%= post_path(episode.url_name) %>">
               <div class="episode-meta-row">

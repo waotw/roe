@@ -100,7 +100,7 @@ module HasMarkdownExtensions
     # Process images to make them responsive
     html = process_responsive_images(html)
 
-    html
+    html.html_safe
   ensure
     # Clear render context to prevent data leaking between requests
     @render_context = nil

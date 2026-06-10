@@ -1,9 +1,10 @@
-<article class="post post-<%= @post.post_type %>">
+<% article_classes = "post post-#{@post.post_type}" %>
+<article class="<%= article_classes %>">
   <div class="content">
-    <%= render 'posts/header', post: @post %>
+    <%= render 'posts/header', post: @post, podcast_config: @podcast_config %>
 
     <% if lookup_context.exists?("posts/types/#{@post.post_type}", [], true) %>
-      <%= render "posts/types/#{@post.post_type}", post: @post %>
+      <%= render "posts/types/#{@post.post_type}", post: @post, podcast_config: @podcast_config, podcast_episodes: @podcast_episodes %>
     <% else %>
       <%# Fallback to article if type partial doesn't exist %>
       <%= render "posts/types/article", post: @post %>

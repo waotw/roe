@@ -124,7 +124,7 @@
                         <option value="">Select...</option>
                         <% theme_options = config_schema.dig(:theme, :fields, 'active', :options) || [] %>
                         <% theme_options.each do |option| %>
-                          <option value="<%= option %>" <%= 'selected' if theme_active == option %>><%= option %></option>
+                          <option value="<%= option %>"<% if theme_active == option %> selected<% end %>><%= option %></option>
                         <% end %>
                       </select>
                       <p class="text-xs text-gray-500 mt-1">Select the theme for your site</p>
@@ -219,8 +219,8 @@
                                   class="w-48 font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                   data-config-field="enabled"
                                   onchange="updateBooleanFieldIndicators()">
-                            <option value="true" <%= 'selected' if flattened_config['enabled'] == true || flattened_config['enabled'] == 'true' %>>true</option>
-                            <option value="false" <%= 'selected' if flattened_config['enabled'] == false || flattened_config['enabled'] == 'false' %>>false</option>
+                            <option value="true"<% if flattened_config['enabled'] == true || flattened_config['enabled'] == 'true' %> selected<% end %>>true</option>
+                            <option value="false"<% if flattened_config['enabled'] == false || flattened_config['enabled'] == 'false' %> selected<% end %>>false</option>
                           </select>
                           <span class="boolean-indicator inline-flex items-center justify-center w-3 h-3 rounded-full"
                                 data-field="enabled"
@@ -238,12 +238,12 @@
                                 class="w-48 font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                 data-config-field="currency">
                           <% current_currency = flattened_config['currency'] || 'usd' %>
-                          <option value="usd" <%= 'selected' if current_currency == 'usd' %>>USD - US Dollar</option>
-                          <option value="eur" <%= 'selected' if current_currency == 'eur' %>>EUR - Euro</option>
-                          <option value="gbp" <%= 'selected' if current_currency == 'gbp' %>>GBP - British Pound</option>
-                          <option value="cad" <%= 'selected' if current_currency == 'cad' %>>CAD - Canadian Dollar</option>
-                          <option value="aud" <%= 'selected' if current_currency == 'aud' %>>AUD - Australian Dollar</option>
-                          <option value="jpy" <%= 'selected' if current_currency == 'jpy' %>>JPY - Japanese Yen</option>
+                          <option value="usd"<% if current_currency == 'usd' %> selected<% end %>>USD - US Dollar</option>
+                          <option value="eur"<% if current_currency == 'eur' %> selected<% end %>>EUR - Euro</option>
+                          <option value="gbp"<% if current_currency == 'gbp' %> selected<% end %>>GBP - British Pound</option>
+                          <option value="cad"<% if current_currency == 'cad' %> selected<% end %>>CAD - Canadian Dollar</option>
+                          <option value="aud"<% if current_currency == 'aud' %> selected<% end %>>AUD - Australian Dollar</option>
+                          <option value="jpy"<% if current_currency == 'jpy' %> selected<% end %>>JPY - Japanese Yen</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-1">Default currency for your store</p>
                       </div>
@@ -324,9 +324,9 @@
                                 class="w-48 font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                 data-config-field="grouped_products.price_display">
                           <% current_price_display = flattened_config['grouped_products.price_display'] || 'range' %>
-                          <option value="range" <%= 'selected' if current_price_display == 'range' %>>range</option>
-                          <option value="lowest" <%= 'selected' if current_price_display == 'lowest' %>>lowest</option>
-                          <option value="highest" <%= 'selected' if current_price_display == 'highest' %>>highest</option>
+                          <option value="range"<% if current_price_display == 'range' %> selected<% end %>>range</option>
+                          <option value="lowest"<% if current_price_display == 'lowest' %> selected<% end %>>lowest</option>
+                          <option value="highest"<% if current_price_display == 'highest' %> selected<% end %>>highest</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-1">How to display prices for grouped products</p>
                       </div>
@@ -361,8 +361,8 @@
                                 class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                 data-config-field="snipcart.load_strategy">
                           <% current_load_strategy = flattened_config['snipcart.load_strategy'] || 'on-user-interaction' %>
-                          <option value="on-user-interaction" <%= 'selected' if current_load_strategy == 'on-user-interaction' %>>on-user-interaction</option>
-                          <option value="manual" <%= 'selected' if current_load_strategy == 'manual' %>>manual</option>
+                          <option value="on-user-interaction"<% if current_load_strategy == 'on-user-interaction' %> selected<% end %>>on-user-interaction</option>
+                          <option value="manual"<% if current_load_strategy == 'manual' %> selected<% end %>>manual</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-1">How Snipcart JavaScript loads on your site</p>
                       </div>
@@ -376,8 +376,8 @@
                                 class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                 data-config-field="snipcart.modal_style">
                           <% current_modal_style = flattened_config['snipcart.modal_style'] || 'side' %>
-                          <option value="side" <%= 'selected' if current_modal_style == 'side' %>>side</option>
-                          <option value="full" <%= 'selected' if current_modal_style == 'full' %>>full</option>
+                          <option value="side"<% if current_modal_style == 'side' %> selected<% end %>>side</option>
+                          <option value="full"<% if current_modal_style == 'full' %> selected<% end %>>full</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-1">How the shopping cart displays</p>
                       </div>
@@ -393,8 +393,8 @@
                                   data-config-field="snipcart.show_taxes"
                                   onchange="updateBooleanFieldIndicators()">
                             <% current_show_taxes = flattened_config['snipcart.show_taxes'] %>
-                            <option value="true" <%= 'selected' if current_show_taxes == true || current_show_taxes == 'true' %>>true</option>
-                            <option value="false" <%= 'selected' if current_show_taxes == false || current_show_taxes == 'false' %>>false</option>
+                            <option value="true"<% if current_show_taxes == true || current_show_taxes == 'true' %> selected<% end %>>true</option>
+                            <option value="false"<% if current_show_taxes == false || current_show_taxes == 'false' %> selected<% end %>>false</option>
                           </select>
                           <span class="boolean-indicator inline-flex items-center justify-center w-3 h-3 rounded-full"
                                 data-field="snipcart.show_taxes"
@@ -414,8 +414,8 @@
                                   data-config-field="snipcart.show_quantity"
                                   onchange="updateBooleanFieldIndicators()">
                             <% current_show_quantity = flattened_config['snipcart.show_quantity'] %>
-                            <option value="true" <%= 'selected' if current_show_quantity == true || current_show_quantity == 'true' %>>true</option>
-                            <option value="false" <%= 'selected' if current_show_quantity == false || current_show_quantity == 'false' %>>false</option>
+                            <option value="true"<% if current_show_quantity == true || current_show_quantity == 'true' %> selected<% end %>>true</option>
+                            <option value="false"<% if current_show_quantity == false || current_show_quantity == 'false' %> selected<% end %>>false</option>
                           </select>
                           <span class="boolean-indicator inline-flex items-center justify-center w-3 h-3 rounded-full"
                                 data-field="snipcart.show_quantity"
@@ -514,7 +514,7 @@
                                           data-config-field="<%= nested_field_key %>">
                                     <% @field_options[field_options_key].each do |option| %>
                                       <% display_text = option.blank? ? '-- select --' : option %>
-                                      <option value="<%= option %>" <%= 'selected' if subvalue.to_s == option.to_s %>><%= display_text %></option>
+                                      <option value="<%= option %>"<% if subvalue.to_s == option.to_s %> selected<% end %>><%= display_text %></option>
                                     <% end %>
                                   </select>
 
@@ -570,7 +570,7 @@
                                     class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                                     data-config-field="<%= key %>">
                               <% @field_options[key].each do |option| %>
-                                <option value="<%= option %>" <%= 'selected' if value.to_s == option.to_s %>><%= option %></option>
+                                <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
                               <% end %>
                             </select>
                           <% else %>

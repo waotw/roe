@@ -38,7 +38,7 @@ class ResponsiveImageRenderer
     # Check if variants exist
     source_full_path = File.join(RoeSitePaths::SITE_PATH, source_path.sub(%r{^/}, "")).to_s
 
-    if ImageVariantGenerator.variants_exist?(source_full_path)
+    html = if ImageVariantGenerator.variants_exist?(source_full_path)
       build_picture_tag
     else
       # Queue generation for first view, show original for now. queue! is
@@ -47,6 +47,8 @@ class ResponsiveImageRenderer
       ImageVariantGenerator.queue!(source_path)
       simple_img_tag
     end
+
+    html.html_safe
   end
 
   private

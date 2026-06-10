@@ -76,7 +76,7 @@
                       class="w-full font-mono text-sm p-2 border border-gray-300">
                 <option value="">-- select --</option>
                 <% Array(req[:options]).each do |option| %>
-                  <option value="<%= option %>" <%= 'selected' if req[:current] == option %>>
+                  <option value="<%= option %>"<% if req[:current] == option %> selected<% end %>>
                     <%= option %>
                   </option>
                 <% end %>

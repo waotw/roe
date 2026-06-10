@@ -377,7 +377,7 @@
                       this, `true == "true"` is false and the select renders
                       with no selection, which used to let handlePodcastChange
                       overwrite the user's per-episode choice on every load. %>
-                  <option value="<%= option %>" <% if value.to_s == option.to_s %>selected<% end %>><%= option %></option>
+                  <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
                   <% end %>
                 </select>
               <% when :textarea %>

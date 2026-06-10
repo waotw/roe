@@ -4,7 +4,7 @@
     <div>
       <%# Feed links %>
       <% if post.post_type == 'podcast' && post.metadata['podcast'].present? %>
-        <% if authenticated? || @podcast_config&.dig('audience') != 'paid' %>
+        <% if authenticated? || podcast_config&.dig('audience') != 'paid' %>
           <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="feed-link" target="_blank" title="RSS Feed">RSS</a>
         <% end %>
         <% if authenticated? %>
@@ -27,12 +27,12 @@
         <%= post.date.strftime("%B %d, %Y") %>
       </time>
     <% end %>
-    <% display_author = post.author.presence || @podcast_config&.dig('author') %>
+    <% display_author = post.author.presence || podcast_config&.dig('author') %>
     <% if display_author %>
       <span class="post-author"> • <%= display_author %></span>
     <% end %>
   </div>
   <% if post.image && post.metadata['image_in_header'].to_s == 'true' %>
-    <%= raw ResponsiveImageRenderer.render(post.image, alt: post.title, class: "post-image", sizes: "(min-width: 1020px) 8rem, 100vw") %>
+    <%= ResponsiveImageRenderer.render(post.image, alt: post.title, class: "post-image", sizes: "(min-width: 1020px) 8rem, 100vw") %>
   <% end %>
 </header>
