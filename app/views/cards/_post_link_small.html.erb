@@ -1,0 +1,19 @@
+<div class="card post-link-small">
+  <% if image.present? %>
+    <img src="<%= image %>"
+         alt="<%= title %>"
+         class="card-image"
+         data-sizes="(min-width: 768px) 300px, 100vw">
+  <% end %>
+  <div class="card-content">
+    <h4 class="card-title"><%= title %></h4>
+    <% if author.present? || date.present? %>
+      <p class="card-metadata">
+        <% if author.present? %><span class="card-author"><%= author %></span><% end %>
+        <% if date.present? && author.present? %> • <% end %>
+        <% if date.present? %><span class="card-date"><%= date %></span><% end %>
+      </p>
+    <% end %>
+    <a href="<%= url %>" class="card-link"><%= link_text %></a>
+  </div>
+</div>

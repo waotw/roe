@@ -1,0 +1,32 @@
+<%# Large post-link card — flat grid layout.
+    All children are direct grid items so the responsive layout can
+    place the image anywhere in the sequence (between text elements
+    on mobile, alongside them on desktop). Locals: same as before. %>
+<div class="card post-link-large<%= ' no-image' if image.blank? %>">
+  <h4 class="card-title"><%= title %></h4>
+
+  <% if subtitle.present? %>
+    <p class="card-subtitle"><%= subtitle %></p>
+  <% end %>
+
+  <% if author.present? || date.present? %>
+    <p class="card-metadata">
+      <% if author.present? %><span class="card-author"><%= author %></span><% end %>
+      <% if author.present? && date.present? %> • <% end %>
+      <% if date.present? %><span class="card-date"><%= date %></span><% end %>
+    </p>
+  <% end %>
+
+  <% if image.present? %>
+    <img src="<%= image %>"
+         alt="<%= title %>"
+         class="card-image"
+         data-sizes="(min-width: 768px) 600px, 100vw">
+  <% end %>
+
+  <% if excerpt.present? %>
+    <p class="card-excerpt"><%= excerpt %></p>
+  <% end %>
+
+  <a href="<%= url %>" class="card-link"><%= link_text %></a>
+</div>

@@ -1402,20 +1402,35 @@ module HasMarkdownExtensions
     author ||= SiteConfig.get("author")  # 3. From site config (FIXED)
     author ||= ""  # 4. Blank if none found
 
-    # Handle image with priority: explicit > post metadata > default
+    # Handle image with priority:
+    #   1. explicit `image:` in the card (including "none" → no image)
+    #   2. referenced post's image (merged into config[:image] above
+    #      via post_data when the post has one)
+    #   3. SiteConfig "default_image" — ONLY for inline cards with no
+    #      `post:` reference. If a `post:` resolved a real post that
+    #      simply has no image, honor that (no fallback) — otherwise
+    #      every image-less post would silently pick up the same
+    #      generic default thumbnail, defeating the point of leaving
+    #      the post's image field empty.
     image = if config.key?(:image)
-      # Image key exists in config
+      # Image key exists in config (either typed in the card or merged
+      # in from the referenced post's metadata).
       if config[:image] == "none"
         nil  # Explicitly no image
       elsif config[:image].blank?
-        # Empty image value - warn in preview
         Rails.logger.warn "Empty image value in post-link card for #{title}" if preview
         nil
       else
-        config[:image]  # Explicitly provided image
+        config[:image]  # Explicit URL — user-provided or post-provided
       end
+    elsif referenced_post
+      # A post: reference resolved (we'd have returned an error card
+      # earlier if it hadn't) but the post has no image — that's how
+      # post_data ended up without an :image key. Respect that.
+      nil
     else
-      # No image key - use default
+      # Inline card, no post: reference, no explicit image: — fall
+      # back to the site-wide default thumbnail.
       SiteConfig.default("cards", "post-link")&.[]("default_image")
     end
 
@@ -1435,60 +1450,142 @@ module HasMarkdownExtensions
     metadata_parts = [ author, date ].reject(&:blank?)
     metadata = metadata_parts.join(" • ")
 
-    # For large style: show subtitle if available, fallback to excerpt, otherwise nothing
-    body_html = ""
-    if style == "large" || style == "medium"
-      body_text = subtitle.present? ? subtitle : excerpt
-      if body_text.present?
-        # Medium gets shorter excerpt than large
-        max_length = style == "large" ? 200 : 120
-        truncated = body_text.length > max_length ? body_text[0..max_length-3] + "..." : body_text
-        body_html = "<p class=\"card-body\">#{truncated}</p>"
-      end
-    end
+    # Excerpt resolution + truncation. Shared resolver so any post-link
+    # size can use it — large passes 200, medium would pass 120 if/when
+    # its partial starts rendering excerpts. The resolver handles the
+    # three-tier fallback (explicit > post metadata excerpt > post's
+    # first prose paragraph) and the truncation cap.
+    card_excerpt = resolve_card_excerpt(
+      explicit:        excerpt,
+      referenced_post: referenced_post,
+      max_length:      300,
+    )
 
     # Build HTML based on style
     if style == "large"
-      # Large style: title, metadata, image, body, link
-      <<~HTML
-        <div class="card post-link-#{style}">
-          <div class="card-content">
-            <h4 class="card-title">#{title}</h4>
-            #{metadata.present? ? "<p class=\"card-metadata\">#{metadata}</p>" : ''}
-          </div>
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 600px, 100vw\">" : ''}
-          <div class="card-content">
-            #{body_html}
-            <a href="#{url}" class="card-link">#{link_text}</a>
-          </div>
-        </div>
-      HTML
+      ApplicationController.renderer.render(
+        partial: "cards/post_link_large",
+        locals: {
+          title:     title,
+          url:       url,
+          image:     image,
+          metadata:  metadata,
+          subtitle:  subtitle,
+          excerpt:   card_excerpt,
+          link_text: link_text,
+          author:    author,
+          date:      date,
+        },
+      )
     elsif style == "medium"
       # Medium style: image, title, metadata, excerpt, link (smaller than large)
-      <<~HTML
-        <div class="card post-link-#{style}">
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 400px, 100vw\">" : ''}
-          <div class="card-content">
-            <h4 class="card-title">#{title}</h4>
-            #{metadata.present? ? "<p class=\"card-metadata\">#{metadata}</p>" : ''}
-            #{body_html}
-            <a href="#{url}" class="card-link">#{link_text}</a>
-          </div>
-        </div>
-      HTML
+      ApplicationController.renderer.render(
+        partial: "cards/post_link_medium",
+        locals: {
+          title:     title,
+          subtitle: subtitle,
+          url:       url,
+          image:     image,
+          metadata:  metadata,
+          link_text: link_text,
+          author:    author,
+          date:      date,
+        },
+      )
     else
       # Small style: image, title, metadata, link (no excerpt)
-      <<~HTML
-        <div class="card post-link-#{style}">
-          #{image.present? ? "<img src=\"#{image}\" alt=\"#{title}\" class=\"card-image\" data-sizes=\"(min-width: 768px) 300px, 100vw\">" : ''}
-          <div class="card-content">
-            <h4 class="card-title">#{title}</h4>
-            #{metadata.present? ? "<p class=\"card-metadata\">#{metadata}</p>" : ''}
-            <a href="#{url}" class="card-link">#{link_text}</a>
-          </div>
-        </div>
-      HTML
+      ApplicationController.renderer.render(
+        partial: "cards/post_link_small",
+        locals: {
+          title:     title,
+          url:       url,
+          image:     image,
+          metadata:  metadata,
+          link_text: link_text,
+          author:    author,
+          date:      date,
+        },
+      )
     end
+  end
+
+  # Resolve and truncate a card excerpt with the full fallback chain:
+  #   1. `explicit` — card-level or post-metadata excerpt (already
+  #      merged together by render_post_link before this is called)
+  #   2. first prose paragraph of the referenced post (skipping
+  #      fenced blocks, headings, lists, blockquotes, HTML)
+  # Returns "" when neither source produces text. Centralized here so
+  # the same fallback semantics + truncation apply to every post-link
+  # size — large passes max_length: 200 today; medium / small can pass
+  # their own value when their partials start rendering excerpt.
+  def resolve_card_excerpt(explicit:, referenced_post:, max_length:)
+    text = explicit.to_s
+    text = first_paragraph_of_post(referenced_post) if text.blank? && referenced_post.present?
+    return "" if text.blank?
+    text.length > max_length ? text[0..max_length - 3] + "..." : text
+  end
+
+  # Walk a post's markdown content line by line, looking for the first
+  # chunk that reads as actual prose. Skips:
+  #   * fenced blocks of any kind (```collection, ```card, ```ruby, …)
+  #   * ATX headings (#, ##, …)
+  #   * blockquote lines (>)
+  #   * unordered + ordered list items (-, *, +, 1.)
+  #   * HTML blocks (lines starting with <)
+  #   * table rows (|...|...|)
+  # Returns "" if no chunk qualifies. After picking the prose paragraph,
+  # strips light markdown decoration so the result reads as plain text.
+  #
+  # Not a full markdown parser — line-based heuristic. Good enough for
+  # a teaser, and crucially it doesn't dump a leading ```collection
+  # block's YAML into the card the way a naive blank-line split would.
+  def first_paragraph_of_post(post)
+    return "" unless post && post.respond_to?(:content) && post.content.present?
+
+    in_fence = false
+    current = []
+    paragraphs = []
+
+    post.content.to_s.each_line do |line|
+      if line.lstrip.start_with?("```")
+        in_fence = !in_fence
+        paragraphs << current.join unless current.empty?
+        current = []
+        next
+      end
+
+      next if in_fence
+
+      if line.strip.empty?
+        paragraphs << current.join unless current.empty?
+        current = []
+      else
+        current << line
+      end
+    end
+    paragraphs << current.join unless current.empty?
+
+    prose = paragraphs.find do |p|
+      stripped = p.strip
+      next false if stripped.empty?
+      next false if stripped.start_with?("#")           # heading
+      next false if stripped.start_with?(">")           # blockquote
+      next false if stripped.start_with?("<")           # HTML block
+      next false if stripped =~ /\A[-*+]\s/             # unordered list
+      next false if stripped =~ /\A\d+\.\s/             # ordered list
+      next false if stripped =~ /\A\|.*\|/              # table row
+      true
+    end
+
+    return "" if prose.blank?
+
+    prose
+      .strip
+      .gsub(/!\[([^\]]*)\]\([^)]+\)/, "")          # ![alt](url) → "" (images)
+      .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')         # [text](url) → text
+      .gsub(/<\/?[^>]+>/, "")                      # strip inline HTML tags
+      .gsub(/[*_`]/, "")                           # emphasis / inline code chars
+      .strip
   end
 
   ### ASIDES
