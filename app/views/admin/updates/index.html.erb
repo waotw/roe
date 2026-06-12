@@ -31,6 +31,12 @@
   </div>
 
   <h2 class="mt-4 text-2xl font-bold text-gray-900 mb-4">Roe Version & Updates</h2>
+  <%# Top status block. Picks one state by priority, in the order
+      they're checked: in-progress > restart-pending > restart-complete
+      > update-available > up-to-date > no-info. The restart states
+      take priority over update-available/up-to-date so the page
+      reflects "what just happened" first when there's a fresh update
+      in the picture. %>
   <% if @in_progress %>
     <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-4"
          data-updates-target="inProgressPanel">
@@ -56,6 +62,144 @@
            data-updates-target="log">
         <%= simple_format(@last_update&.log || '') %>
       </div>
+    </div>
+  <% elsif @restart_pending %>
+    <%# Update installed but the running Puma is still on the old
+        version. The server's in-memory VersionChecker has cached the
+        boot-time version which is still < @last_update.to_version.
+        Detailed terminal restart instructions because the beta
+        audience (Substack/Ghost/WordPress users) isn't all comfortable
+        in a terminal. %>
+    <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-4">
+      <h3 class="text-base font-semibold text-blue-900 mb-2">
+        Update Installed — Restart Roe to Finish
+      </h3>
+      <p class="text-sm text-blue-800 mb-5">
+        Roe <span class="font-mono"><%= @last_update.to_version %></span>
+        is installed and ready. Your running server is still on
+        <span class="font-mono"><%= @current_version %></span>
+        — restart it to load the new code.
+      </p>
+
+      <div class="bg-white border border-blue-200 rounded-sm p-5 mb-3">
+        <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart your Roe server</h4>
+
+        <ol class="space-y-5 text-sm text-gray-800">
+          <li>
+            <p class="font-medium mb-1">1. Find the terminal window where Roe is running.</p>
+            <p class="text-xs text-gray-600 leading-relaxed">
+              Look for a window showing the running server. It usually has text like
+              <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">Listening on http://0.0.0.0:3000</code>
+              near the top, and your cursor sits at the bottom with no prompt.
+              If you double-clicked
+              <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">start.command</code>
+              to launch Roe, that's the window.
+            </p>
+          </li>
+
+          <li>
+            <p class="font-medium mb-1">
+              2. Press
+              <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">Control</kbd>
+              +
+              <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">C</kbd>
+              to stop the server.
+            </p>
+            <p class="text-xs text-gray-600 leading-relaxed">
+              Wait until your command prompt comes back. It usually looks like
+              <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">$</code> or
+              your username followed by
+              <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">%</code>.
+            </p>
+          </li>
+
+          <li>
+            <p class="font-medium mb-2">3. Paste this command and press Enter:</p>
+            <div class="flex items-center gap-2">
+              <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all">./roe.sh start</code>
+              <button type="button"
+                      data-action="click->updates#copyCommand"
+                      data-command="./roe.sh start"
+                      class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
+                Copy
+              </button>
+            </div>
+            <p class="mt-2 text-xs text-gray-600 leading-relaxed">
+              Your browser will reload to
+              <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">localhost:3000</code>
+              automatically when the new server is ready. This page will
+              update to confirm the restart completed.
+            </p>
+          </li>
+        </ol>
+      </div>
+
+      <details class="mt-3">
+        <summary class="text-sm text-blue-700 cursor-pointer hover:text-blue-900 select-none">
+          Lost the terminal window? →
+        </summary>
+        <div class="mt-3 bg-white border border-blue-200 rounded-sm p-5">
+          <p class="text-sm text-gray-800 mb-4 leading-relaxed">
+            If you closed the terminal where Roe was running, open a new one
+            (on macOS: search for <strong>Terminal</strong> in Spotlight with
+            <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">⌘</kbd>
+            +
+            <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">Space</kbd>),
+            then paste these two commands one at a time:
+          </p>
+
+          <div class="mb-3">
+            <p class="text-xs text-gray-600 mb-1">First, move to the Roe folder:</p>
+            <div class="flex items-center gap-2">
+              <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all">cd "<%= RoeSitePaths::ROE_ROOT %>"</code>
+              <button type="button"
+                      data-action="click->updates#copyCommand"
+                      data-command='cd "<%= RoeSitePaths::ROE_ROOT %>"'
+                      class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <p class="text-xs text-gray-600 mb-1">Then start Roe:</p>
+            <div class="flex items-center gap-2">
+              <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all">./roe.sh start</code>
+              <button type="button"
+                      data-action="click->updates#copyCommand"
+                      data-command="./roe.sh start"
+                      class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <p class="text-xs text-gray-600 mt-4 leading-relaxed">
+            Or, if you'd rather not use the terminal: open the Roe folder
+            in Finder and double-click
+            <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">start.command</code>.
+          </p>
+        </div>
+      </details>
+    </div>
+  <% elsif @restart_complete %>
+    <%# Update is done AND the server has restarted — VersionChecker
+        re-read VERSION on boot and now matches to_version. Green
+        confirmation shows for the rest of the 5-minute window from
+        completed_at, then naturally falls back to "Up to Date" once
+        @recent_update is false. %>
+    <div class="bg-green-50 border border-green-200 rounded-sm p-6 mb-4">
+      <h2 class="text-lg font-semibold text-green-900 mb-2">
+        Update Successful
+      </h2>
+      <p class="text-sm text-green-800">
+        Roe restarted on
+        <span class="font-mono font-bold"><%= @current_version %></span>
+        — the new code is now live.
+      </p>
+      <p class="text-xs text-green-700 mt-2">
+        Completed <%= time_ago_in_words(@last_update.completed_at) %> ago.
+      </p>
     </div>
   <% elsif @update_info %>
     <% if @update_info[:update_available] %>
@@ -189,128 +333,10 @@
     </div>
   <% end %>
 
-  <% if @last_update && @last_update.status == 'completed' && @last_update.completed_at && @last_update.completed_at > 5.minutes.ago %>
-    <%# The update system runs on the user's LOCAL Roe install, not on
-        production — the Docker image deploy model means the production
-        container is immutable and gets replaced via Kamal/Fly, not
-        through this in-app updater. The controller blocks all actions
-        in production (Admin::UpdatesController#block_in_production)
-        and the nav link is hidden in production too — so this entire
-        page only ever renders in dev. That makes the success panel
-        unconditionally "needs manual restart": no supervisor to bounce
-        the running Puma, blue "action needed" tone, detailed terminal
-        instructions for the Substack/Ghost/WordPress beta audience. %>
-    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-sm p-6">
-        <h3 class="text-base font-semibold text-blue-900 mb-2">
-          Update Installed — Restart Roe to Finish
-        </h3>
-        <p class="text-sm text-blue-800 mb-5">
-          Roe <span class="font-mono"><%= @last_update.to_version %></span>
-          is installed and ready. Your running server is still on the
-          previous version — restart it to load the new code.
-        </p>
-
-        <div class="bg-white border border-blue-200 rounded-sm p-5 mb-3">
-          <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart your Roe server</h4>
-
-          <ol class="space-y-5 text-sm text-gray-800">
-            <li>
-              <p class="font-medium mb-1">1. Find the terminal window where Roe is running.</p>
-              <p class="text-xs text-gray-600 leading-relaxed">
-                Look for a window showing the running server. It usually has text like
-                <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">Listening on http://0.0.0.0:3000</code>
-                near the top, and your cursor sits at the bottom with no prompt.
-                If you double-clicked
-                <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">start.command</code>
-                to launch Roe, that's the window.
-              </p>
-            </li>
-
-            <li>
-              <p class="font-medium mb-1">
-                2. Press
-                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">Control</kbd>
-                +
-                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">C</kbd>
-                to stop the server.
-              </p>
-              <p class="text-xs text-gray-600 leading-relaxed">
-                Wait until your command prompt comes back. It usually looks like
-                <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">$</code> or
-                your username followed by
-                <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">%</code>.
-              </p>
-            </li>
-
-            <li>
-              <p class="font-medium mb-2">3. Paste this command and press Enter:</p>
-              <div class="flex items-center gap-2">
-                <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all">./roe.sh start</code>
-                <button type="button"
-                        data-action="click->updates#copyCommand"
-                        data-command="./roe.sh start"
-                        class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
-                  Copy
-                </button>
-              </div>
-              <p class="mt-2 text-xs text-gray-600 leading-relaxed">
-                Your browser will reload to
-                <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">localhost:3000</code>
-                automatically when the new server is ready.
-              </p>
-            </li>
-          </ol>
-        </div>
-
-        <details class="mt-3">
-          <summary class="text-sm text-blue-700 cursor-pointer hover:text-blue-900 select-none">
-            Lost the terminal window? →
-          </summary>
-          <div class="mt-3 bg-white border border-blue-200 rounded-sm p-5">
-            <p class="text-sm text-gray-800 mb-4 leading-relaxed">
-              If you closed the terminal where Roe was running, open a new one
-              (on macOS: search for <strong>Terminal</strong> in Spotlight with
-              <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">⌘</kbd>
-              +
-              <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">Space</kbd>),
-              then paste these two commands one at a time:
-            </p>
-
-            <div class="mb-3">
-              <p class="text-xs text-gray-600 mb-1">First, move to the Roe folder:</p>
-              <div class="flex items-center gap-2">
-                <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all">cd "<%= RoeSitePaths::ROE_ROOT %>"</code>
-                <button type="button"
-                        data-action="click->updates#copyCommand"
-                        data-command='cd "<%= RoeSitePaths::ROE_ROOT %>"'
-                        class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
-                  Copy
-                </button>
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <p class="text-xs text-gray-600 mb-1">Then start Roe:</p>
-              <div class="flex items-center gap-2">
-                <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all">./roe.sh start</code>
-                <button type="button"
-                        data-action="click->updates#copyCommand"
-                        data-command="./roe.sh start"
-                        class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
-                  Copy
-                </button>
-              </div>
-            </div>
-
-            <p class="text-xs text-gray-600 mt-4 leading-relaxed">
-              Or, if you'd rather not use the terminal: open the Roe folder
-              in Finder and double-click
-              <code class="text-xs bg-gray-100 px-1 py-0.5 rounded-xs">start.command</code>.
-            </p>
-          </div>
-        </details>
-      </div>
-  <% end %>
+  <%# The post-update "restart needed" / "update successful" panels
+      have moved into the top status block so they appear in the same
+      prominent slot as the other version-status states (in-progress,
+      update-available, up-to-date). %>
 
   <%# ══════════════════════════════════════════════════════════════════════
       Deploy section — only show in development/staging

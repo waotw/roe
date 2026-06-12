@@ -15,6 +15,30 @@ class Admin::UpdatesController < Admin::BaseController
     @last_update     = UpdateStatus.order(created_at: :desc).first
     @in_progress     = UpdateStatus.where(status: "in_progress").exists?
 
+    # Post-update display state. The version-status block at the top
+    # of the page picks one of: amber in-progress / blue restart-needed
+    # / green just-updated / blue update-available / green up-to-date.
+    # The two restart flags use VersionChecker.current_version, which
+    # is memoized at Rails boot (line 9 of version_checker.rb), as a
+    # proxy for "what version is the running process on?" — distinct
+    # from the on-disk VERSION file which the orchestrator rewrites
+    # mid-update.
+    #
+    #   running version < to_version → updated, not yet restarted
+    #   running version >= to_version → restarted, now on new code
+    @recent_update = @last_update &&
+                     @last_update.status == "completed" &&
+                     @last_update.completed_at.present? &&
+                     @last_update.completed_at > 5.minutes.ago
+    @restart_pending  = false
+    @restart_complete = false
+    if @recent_update && @last_update.to_version.present?
+      running = Gem::Version.new(@current_version)
+      target  = Gem::Version.new(@last_update.to_version)
+      @restart_pending  = running < target
+      @restart_complete = running >= target
+    end
+
     # Deploy section
     @deploy_status       = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
     @last_deploy_time    = load_last_deploy_time
@@ -59,7 +83,24 @@ class Admin::UpdatesController < Admin::BaseController
       return
     end
 
-    PerformUpdateJob.perform_later(version: version)
+    # Create the UpdateStatus eagerly, BEFORE redirecting. Solid Queue
+    # may take a second or two to pick up the enqueued job — if the
+    # job were the one creating the record (the old flow), the page
+    # would re-render with @in_progress = false, no in-progress
+    # panel, and no JS polling target. The user would see a stale
+    # "Update Available" panel with no indication anything was
+    # happening. Creating it here means the next render shows the
+    # amber in-progress panel immediately and Stimulus polling
+    # starts on first paint.
+    status = UpdateStatus.create!(
+      status:           "in_progress",
+      from_version:     RoeUpdater::VersionChecker.current_version,
+      to_version:       version,
+      current_step:     "Queued — waiting for worker…",
+      progress_percent: 0,
+    )
+
+    PerformUpdateJob.perform_later(version: version, status_id: status.id)
 
     flash[:notice] = "Update to v#{version} started. This may take a few minutes."
     redirect_to admin_updates_path

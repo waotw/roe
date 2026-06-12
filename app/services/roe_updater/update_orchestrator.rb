@@ -7,8 +7,9 @@ module RoeUpdater
       { name: "testing",            percent: 50,  description: "Testing migrations" },
       { name: "migrating",          percent: 70,  description: "Running production migrations" },
       { name: "switching",          percent: 85,  description: "Switching to new version" },
+      { name: "preserving_secrets", percent: 86,  description: "Preserving per-install secrets" },
       { name: "syncing_root_files", percent: 87,  description: "Syncing root-level files" },
-      { name: "writing_version",    percent: 89,  description: "Updating VERSION file" },
+      { name: "writing_version",    percent: 89,  description: "Updating VERSION files" },
       { name: "building_assets",    percent: 92,  description: "Building assets" },
       { name: "restarting",         percent: 95,  description: "Restarting server" },
       { name: "completed",          percent: 100, description: "Update complete" }
@@ -19,6 +20,22 @@ module RoeUpdater
     # copied out after every successful switch so updates pick up new
     # versions of the launcher / docs without manual intervention.
     ROOT_SYNC_FILES = %w[roe.sh README.md AGENTS.md].freeze
+
+    # Files that live INSIDE current/ but are per-install (gitignored,
+    # never in the cloned tag) and so don't survive the SwitchManager
+    # rename. We copy them across from current.backup/ → current/ after
+    # the swap so they aren't regenerated to new values, which would:
+    #   - production: leave the new container without master.key, so
+    #     credentials.yml.enc can't be decrypted and the app refuses
+    #     to boot.
+    #   - development: regenerate tmp/development_secret.txt to a new
+    #     value, which rotates Rails' session secret_key_base and
+    #     invalidates every existing session cookie — the user gets
+    #     signed out the moment they restart on the new code.
+    PRESERVED_FROM_OLD_CURRENT = %w[
+      config/master.key
+      tmp/development_secret.txt
+    ].freeze
 
     class << self
       def start_update(to_version, status_record)
@@ -31,8 +48,9 @@ module RoeUpdater
         execute_step(:testing) { MigrationTester.test_migrations(@status) }
         execute_step(:migrating) { run_production_migrations }
         execute_step(:switching) { SwitchManager.switch_versions(@status) }
+        execute_step(:preserving_secrets) { preserve_secrets }
         execute_step(:syncing_root_files) { sync_root_files }
-        execute_step(:writing_version) { write_root_version_file }
+        execute_step(:writing_version) { write_version_files }
         execute_step(:building_assets) { build_assets }
         execute_step(:restarting) { restart_server }
 
@@ -110,6 +128,34 @@ module RoeUpdater
         log("Production migrations completed")
       end
 
+      # Copy per-install secrets from the previous current/ (now
+      # current.backup/) into the freshly-switched current/. See the
+      # PRESERVED_FROM_OLD_CURRENT comment above for why each path
+      # matters. Missing source files are silently skipped — an
+      # install that never had a dev_secret yet doesn't need one
+      # propagated. Missing destination directories are created.
+      def preserve_secrets
+        old_current = File.join(RoeSitePaths::ROE_ROOT, "current.backup")
+        new_current = File.join(RoeSitePaths::ROE_ROOT, "current")
+
+        preserved = []
+        PRESERVED_FROM_OLD_CURRENT.each do |relpath|
+          source = File.join(old_current, relpath)
+          dest   = File.join(new_current, relpath)
+          next unless File.exist?(source)
+
+          FileUtils.mkdir_p(File.dirname(dest))
+          FileUtils.cp(source, dest)
+          preserved << relpath
+        end
+
+        if preserved.any?
+          log("✓ Preserved per-install secrets: #{preserved.join(', ')}")
+        else
+          log("⊘ No per-install secrets to preserve")
+        end
+      end
+
       # Copy root-level companion files (launcher script + top-level
       # docs) from the freshly-switched current/ up to ROE_ROOT/. These
       # files are versioned with Roe but need to be visible at the
@@ -133,23 +179,36 @@ module RoeUpdater
         end
       end
 
-      # Refresh ROE_ROOT/VERSION so the launcher and VersionChecker
-      # report the new version after the swap. We write authoritatively
-      # from the orchestrator (which knows @version) rather than copying
-      # from current/VERSION — that way a Roe distribution doesn't need
-      # to ship a separate root-level VERSION; the file gets created/
-      # rewritten on every successful update.
-      def write_root_version_file
-        version_path = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
-
-        existing = File.exist?(version_path) ? (YAML.load_file(version_path) || {}) : {}
-        updated = existing.merge(
+      # Refresh BOTH VERSION files so they report the new version
+      # after the swap:
+      #
+      #   ROE_ROOT/VERSION  — what dev installs read via VersionChecker
+      #                       (and what the launcher script greps for in
+      #                       `roe.sh status`)
+      #   current/VERSION   — what production Docker builds copy into
+      #                       /rails/VERSION at image-build time, so the
+      #                       production container's VersionChecker
+      #                       reports the right version too
+      #
+      # Writing authoritatively from @version rather than reading from
+      # the cloned tag's current/VERSION means a Roe distribution
+      # whose tag content has a stale current/VERSION (developer forgot
+      # to bump before tagging) still ends up consistent on disk after
+      # an update — defensive against tag-time mistakes.
+      def write_version_files
+        data = {
           "version"      => @version,
-          "release_date" => Date.today.iso8601
-        )
+          "release_date" => Date.today.iso8601,
+        }
 
-        File.write(version_path, updated.to_yaml)
-        log("Wrote VERSION file: #{@version}")
+        [
+          File.join(RoeSitePaths::ROE_ROOT, "VERSION"),
+          File.join(RoeSitePaths::ROE_ROOT, "current", "VERSION"),
+        ].each do |path|
+          existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+          File.write(path, existing.merge(data).to_yaml)
+          log("✓ Wrote VERSION file: #{path.sub(RoeSitePaths::ROE_ROOT, '')} → #{@version}")
+        end
       end
 
       # Compile build-time assets (Tailwind CSS, anything else
