@@ -272,6 +272,16 @@ module RoeUpdater
         BackupManager.cleanup_update_backups
         SwitchManager.cleanup_backup
 
+        # Invalidate the cached "is there an update available?" result.
+        # That cache was populated BEFORE the update with the answer
+        # "yes, X is available" — leaving it in place means the next
+        # admin page render after the update would still pull that
+        # stale entry and show the blue "Update Available" panel
+        # alongside the "Restart Roe" message. Clearing it forces a
+        # fresh fetch on next render → answers "no, you're current"
+        # → correct state.
+        RoeUpdater::VersionChecker.clear_cache
+
         log("✓ Update completed successfully!")
       end
 

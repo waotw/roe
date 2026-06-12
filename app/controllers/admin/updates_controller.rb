@@ -18,25 +18,34 @@ class Admin::UpdatesController < Admin::BaseController
     # Post-update display state. The version-status block at the top
     # of the page picks one of: amber in-progress / blue restart-needed
     # / green just-updated / blue update-available / green up-to-date.
-    # The two restart flags use VersionChecker.current_version, which
-    # is memoized at Rails boot (line 9 of version_checker.rb), as a
-    # proxy for "what version is the running process on?" — distinct
-    # from the on-disk VERSION file which the orchestrator rewrites
-    # mid-update.
     #
-    #   running version < to_version → updated, not yet restarted
-    #   running version >= to_version → restarted, now on new code
+    # Detection signal: compare @last_update.completed_at against the
+    # Puma process's boot time (captured once in
+    # config/initializers/server_boot_time.rb, persists across Rails
+    # autoreload, resets only on a real Puma restart).
+    #
+    #   completed_at > boot_time → update finished IN this process,
+    #                              user still needs to restart Puma →
+    #                              show blue "Restart Roe" panel.
+    #   completed_at < boot_time → update finished BEFORE this process
+    #                              started, so Puma has already been
+    #                              relaunched on the new code →
+    #                              show green "Update Successful" panel.
+    #
+    # This replaces an older version-comparison approach that was
+    # unreliable because Rails autoreload may or may not refresh
+    # VersionChecker's memoized current_version, depending on whether
+    # the file's content changed between tags.
     @recent_update = @last_update &&
                      @last_update.status == "completed" &&
                      @last_update.completed_at.present? &&
                      @last_update.completed_at > 5.minutes.ago
     @restart_pending  = false
     @restart_complete = false
-    if @recent_update && @last_update.to_version.present?
-      running = Gem::Version.new(@current_version)
-      target  = Gem::Version.new(@last_update.to_version)
-      @restart_pending  = running < target
-      @restart_complete = running >= target
+    if @recent_update
+      boot_time = Rails.application.config.server_boot_time
+      @restart_pending  = boot_time && @last_update.completed_at >= boot_time
+      @restart_complete = boot_time && @last_update.completed_at <  boot_time
     end
 
     # Deploy section
