@@ -126,14 +126,24 @@ module RoeUpdater
 
       def parse_git_tags_output(tags_output)
         # Capture both forms of each tag:
-        #   original — what git knows, with the v prefix if present
-        #              (used for Codeberg API calls and release URLs)
+        #   original — what git knows, including the required `v` prefix
+        #              (used for Codeberg API calls, release URLs, and
+        #              for the Downloader's `git clone --branch vX.Y.Z`)
         #   stripped — the bare version (used for VERSION-file comparison
         #              and the value the rest of Roe stores/displays)
+        #
+        # The `v` prefix is REQUIRED. Roe's convention follows the wider
+        # ecosystem: bare numbers in code (`VERSION`, displays, comparison)
+        # and `v`-prefixed tags in git. A tag pushed without the prefix
+        # (e.g. `0.0.9` instead of `v0.0.9`) is intentionally ignored here
+        # — otherwise VersionChecker would happily surface it as an
+        # available update and Downloader would then fail trying to
+        # `--branch v0.0.9` on a tag that doesn't exist.
+        #
         # The regex anchor `$` filters out git's dereferenced-tag lines
         # like `v0.1.0^{}` automatically.
         pairs = tags_output.lines.map do |line|
-          match = line.match(/refs\/tags\/(v?(\d+\.\d+(?:\.\d+)?))$/)
+          match = line.match(/refs\/tags\/(v(\d+\.\d+(?:\.\d+)?))$/)
           [ match[1], match[2] ] if match
         end.compact
 
