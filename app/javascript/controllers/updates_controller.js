@@ -276,6 +276,38 @@ export default class extends Controller {
     });
   }
 
+  // ── Copy-to-clipboard for the post-update restart instructions ────────
+  //
+  // Wired up on the "Copy" buttons next to terminal commands in the
+  // post-update success panel. Reads the command string from the
+  // button's data-command attribute, drops it on the clipboard, then
+  // flashes the button to "Copied!" for ~1.5s as visual confirmation.
+  // Non-technical users on the beta — the audience the restart panel
+  // is written for — really benefit from "click button" vs "select
+  // text manually" when copying paths with spaces.
+  async copyCommand(event) {
+    const btn = event.currentTarget;
+    const command = btn.dataset.command;
+    if (!command) return;
+
+    try {
+      await navigator.clipboard.writeText(command);
+      const originalText = btn.textContent;
+      btn.textContent = "Copied!";
+      btn.classList.add("bg-green-100", "border-green-500", "text-green-800");
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove("bg-green-100", "border-green-500", "text-green-800");
+      }, 1500);
+    } catch (e) {
+      // navigator.clipboard requires a secure context (HTTPS or localhost)
+      // and a user gesture. localhost in dev should always satisfy both,
+      // but fall back gracefully just in case.
+      console.warn("[updates] clipboard write failed:", e.message);
+      btn.textContent = "Select & copy manually";
+    }
+  }
+
   // ── Shared helpers ─────────────────────────────────────────────────────
 
   formatLog(log) {
