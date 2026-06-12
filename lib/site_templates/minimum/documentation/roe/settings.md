@@ -1,5 +1,6 @@
 ---
-title: Configuration & Defaults
+roe_version: 0.0.9
+title: Settings
 status: published
 ---
 

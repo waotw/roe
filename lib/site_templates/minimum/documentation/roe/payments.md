@@ -1,4 +1,5 @@
 ---
+roe_version: 0.0.9
 title: Payments & Stripe
 status: published
 url_name: payments

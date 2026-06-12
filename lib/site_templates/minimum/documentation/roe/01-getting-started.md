@@ -1,4 +1,5 @@
 ---
+roe_version: 0.0.9
 title: Getting Started with Roe CMS
 status: published
 ---

@@ -1,4 +1,5 @@
 ---
+roe_version: 0.0.9
 title: Configuration & Defaults with YAML
 status: draft
 ---

@@ -1,4 +1,5 @@
 ---
+roe_version: 0.0.9
 title: Images & Image Galleries
 status: published
 url_name: galleries
