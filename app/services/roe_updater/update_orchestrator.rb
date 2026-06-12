@@ -114,7 +114,26 @@ module RoeUpdater
         # Hardcoding production fails in dev with "Missing
         # secret_key_base" because the parent doesn't have a master.key.
         rails_env = Rails.env
-        migrate_cmd = "cd '#{staging_app}' && RAILS_ENV=#{rails_env} bundle exec rails db:migrate 2>&1"
+
+        # Critical: pass ROE_SITE_PATH explicitly. Without it, the
+        # staging subprocess computes RoeSitePaths::ROE_ROOT from
+        # File.basename(Rails.root), which in staging/ returns
+        # "staging" (not "current") — so ROE_ROOT collapses to
+        # <staging> itself, SITE_PATH becomes <staging>/site (which
+        # doesn't exist), and SQLite silently creates a brand-new
+        # empty DB there. The migration applies cleanly to that empty
+        # DB, exit code 0, "✓ migrations completed" gets logged —
+        # but the real production DB at <ROE_ROOT>/site/db/<env>/ is
+        # never touched. On next boot, schema_migrations doesn't
+        # have the new version → PendingMigrationError. By passing
+        # ROE_SITE_PATH from THIS process (where ROE_ROOT resolves
+        # correctly to the parent), the staging subprocess targets
+        # the real DB and the migration actually persists.
+        site_path = RoeSitePaths::SITE_PATH
+        migrate_cmd = "cd '#{staging_app}' && " \
+                      "RAILS_ENV=#{rails_env} " \
+                      "ROE_SITE_PATH='#{site_path}' " \
+                      "bundle exec rails db:migrate 2>&1"
         output = nil
 
         Bundler.with_original_env do
