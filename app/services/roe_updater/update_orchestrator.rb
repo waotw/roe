@@ -5,7 +5,7 @@ module RoeUpdater
       { name: "backing_up_db",      percent: 15,  description: "Creating database backup" },
       { name: "downloading",        percent: 30,  description: "Downloading new version" },
       { name: "testing",            percent: 50,  description: "Testing migrations" },
-      { name: "migrating",          percent: 70,  description: "Running production migrations" },
+      { name: "migrating",          percent: 70,  description: "Running database migrations" },
       { name: "switching",          percent: 85,  description: "Switching to new version" },
       { name: "preserving_secrets", percent: 86,  description: "Preserving per-install secrets" },
       { name: "syncing_root_files", percent: 87,  description: "Syncing root-level files" },
@@ -46,7 +46,7 @@ module RoeUpdater
         execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
         execute_step(:downloading) { Downloader.download_version(@version, @status) }
         execute_step(:testing) { MigrationTester.test_migrations(@status) }
-        execute_step(:migrating) { run_production_migrations }
+        execute_step(:migrating) { run_migrations }
         execute_step(:switching) { SwitchManager.switch_versions(@status) }
         execute_step(:preserving_secrets) { preserve_secrets }
         execute_step(:syncing_root_files) { sync_root_files }
@@ -98,40 +98,46 @@ module RoeUpdater
         end
       end
 
-      def run_production_migrations
-        log("Running production migrations...")
+      # Apply pending migrations against the development database.
+      #
+      # This method only ever runs in development — by design. Two
+      # guards make that true:
+      #
+      #   1. Admin::UpdatesController#block_in_production redirects
+      #      every action in production, so the in-app updater never
+      #      reaches this code in a prod container.
+      #   2. The Updates & Deploy nav link is hidden in production
+      #      too, so users don't get nudged toward a path that would
+      #      no-op.
+      #
+      # Production databases are migrated as part of the deploy flow
+      # (Kamal pushes a new Docker image; Fly does the same on its
+      # release_command), NOT here. The in-app updater is purely for
+      # the developer's local dev install and its local SQLite.
+      #
+      # RAILS_ENV is hardcoded to `development` rather than read from
+      # Rails.env to close a footgun: if someone ever booted the dev
+      # install with RAILS_ENV=production (testing prod config locally,
+      # say), reading Rails.env would have the updater migrate the
+      # local production SQLite instead of the dev one. Pinning here
+      # means "no matter what env the running process is in, the
+      # migration step targets development."
+      #
+      # ROE_SITE_PATH is passed explicitly so the staging subprocess
+      # finds the real /site directory. Without it, the subprocess's
+      # RoeSitePaths::ROE_ROOT resolves to <staging> (because
+      # File.basename(Rails.root) is "staging", not "current"), and
+      # SITE_PATH points at <staging>/site which doesn't exist —
+      # SQLite would silently create a fresh empty DB there and the
+      # migration would apply to nothing meaningful.
+      def run_migrations
+        log("Running database migrations...")
 
-        # Run from staging/, not current/. At this point the new code +
-        # new migration files are still in staging/ — the switch hasn't
-        # happened yet. Running from current/ would silently no-op
-        # (no new migration files visible) and the new app would boot
-        # against an unmigrated schema after the switch.
         staging_app = File.join(RoeSitePaths::ROE_ROOT, "staging")
+        site_path   = RoeSitePaths::SITE_PATH
 
-        # Inherit the parent's Rails.env. In real production updates
-        # this is `production` (and credentials are available); in dev
-        # tests this is `development` (and we don't need prod creds).
-        # Hardcoding production fails in dev with "Missing
-        # secret_key_base" because the parent doesn't have a master.key.
-        rails_env = Rails.env
-
-        # Critical: pass ROE_SITE_PATH explicitly. Without it, the
-        # staging subprocess computes RoeSitePaths::ROE_ROOT from
-        # File.basename(Rails.root), which in staging/ returns
-        # "staging" (not "current") — so ROE_ROOT collapses to
-        # <staging> itself, SITE_PATH becomes <staging>/site (which
-        # doesn't exist), and SQLite silently creates a brand-new
-        # empty DB there. The migration applies cleanly to that empty
-        # DB, exit code 0, "✓ migrations completed" gets logged —
-        # but the real production DB at <ROE_ROOT>/site/db/<env>/ is
-        # never touched. On next boot, schema_migrations doesn't
-        # have the new version → PendingMigrationError. By passing
-        # ROE_SITE_PATH from THIS process (where ROE_ROOT resolves
-        # correctly to the parent), the staging subprocess targets
-        # the real DB and the migration actually persists.
-        site_path = RoeSitePaths::SITE_PATH
         migrate_cmd = "cd '#{staging_app}' && " \
-                      "RAILS_ENV=#{rails_env} " \
+                      "RAILS_ENV=development " \
                       "ROE_SITE_PATH='#{site_path}' " \
                       "bundle exec rails db:migrate 2>&1"
         output = nil
@@ -141,10 +147,10 @@ module RoeUpdater
         end
 
         unless $?.success?
-          raise "Production migration failed: #{output}"
+          raise "Database migration failed: #{output}"
         end
 
-        log("Production migrations completed")
+        log("Database migrations completed")
       end
 
       # Copy per-install secrets from the previous current/ (now
