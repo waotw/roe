@@ -622,6 +622,111 @@ kill_tailwind_watchers() {
     fi
 }
 
+# ── Port collision handling ──────────────────────────────────────────
+#
+# When a user runs ./roe.sh start and something is already bound to
+# port 3000 (a different Roe install, a Rails app, a React dev server,
+# etc.), Puma fails with EADDRINUSE and the user sees a wall of stack
+# trace they can't interpret. The helpers below let us recover
+# gracefully:
+#
+#   1. If the thing on the port responds as Roe (HTTP probe → "Roe CMS"
+#      in the /admin page title), we kill it. Two Roes on one port is
+#      impossible and starting a new one is what the user asked for.
+#
+#   2. If the thing on the port is something else, we pick an
+#      alternate port (next free above the requested one). Killing an
+#      unknown process is too dangerous — could be the user's other
+#      dev work.
+#
+# Requires lsof (for port checks and finding the PID — ships on macOS,
+# universally available on Linux). curl is used for the Roe HTTP probe.
+# Without either, we degrade to "let Puma's bind fail" which is the
+# pre-existing behaviour.
+
+# Returns 0 if the given TCP port is bound by some process, 1 otherwise.
+port_in_use() {
+    local port="$1"
+    command -v lsof >/dev/null 2>&1 || return 1
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+# Returns 0 if whatever's on the given port responds as a Roe install.
+# Hits /admin (every Roe install serves it) and looks for "Roe CMS" in
+# the response body — that's the <title> on the admin layout, so a
+# match is a strong positive. False positives are essentially
+# impossible without someone deliberately mimicking the title.
+is_roe_on_port() {
+    local port="$1"
+    command -v curl >/dev/null 2>&1 || return 1
+    local body
+    body=$(curl -sf --max-time 2 "http://localhost:$port/admin" 2>/dev/null || true)
+    [ -n "$body" ] && echo "$body" | grep -q "Roe CMS"
+}
+
+# Soft-kill (SIGTERM) the process bound to a port. Waits a moment for
+# graceful shutdown, then SIGKILLs if still alive.
+kill_pid_on_port() {
+    local port="$1"
+    command -v lsof >/dev/null 2>&1 || return 1
+    local pid
+    pid=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    [ -z "$pid" ] && return 1
+
+    kill "$pid" 2>/dev/null || true
+    sleep 2
+    if ps -p "$pid" >/dev/null 2>&1; then
+        kill -9 "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# Find the next free port at or above the given start, up to start+20.
+# Echoes the port to stdout, or returns 1 if nothing's free in the
+# scan range (unusual — would mean 20 consecutive busy ports).
+find_free_port() {
+    local candidate="$1"
+    local max=$((candidate + 20))
+    while [ "$candidate" -lt "$max" ]; do
+        if ! port_in_use "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+        candidate=$((candidate + 1))
+    done
+    return 1
+}
+
+# Main entry point: resolve a collision on $PORT before we actually
+# try to bind. Updates $PORT in place if we shift to an alternate
+# (anything calling this should re-derive $URL afterward).
+resolve_port_collision() {
+    port_in_use "$PORT" || return 0    # Port is free, nothing to do.
+
+    if is_roe_on_port "$PORT"; then
+        log_warning "Roe is already running on port $PORT. Stopping it before starting fresh…"
+        kill_pid_on_port "$PORT"
+        if ! port_in_use "$PORT"; then
+            log_info "Port $PORT is now free."
+            return 0
+        fi
+        log_warning "Port $PORT didn't free up after stopping the other Roe. Looking for an alternate."
+    else
+        log_warning "Port $PORT is in use by another app (not Roe). Looking for an alternate port."
+    fi
+
+    local original_port="$PORT"
+    local new_port
+    new_port=$(find_free_port "$((original_port + 1))")
+    if [ -n "$new_port" ]; then
+        PORT="$new_port"
+        log_info "Using port $PORT instead of $original_port."
+    else
+        log_error "Couldn't find a free port near $original_port. Free up a port, or set PORT=<n> ./roe.sh start to choose one yourself."
+        exit 1
+    fi
+}
+
 cmd_start() {
     log_info "Starting Roe CMS..."
 
@@ -641,6 +746,13 @@ cmd_start() {
     RAILS_ENV="${RAILS_ENV:-development}"
 
     PORT="${PORT:-3000}"
+
+    # Recover gracefully if something is already on PORT — either kill
+    # it (if it identifies as another Roe install via HTTP probe) or
+    # shift to the next free port (if it's some other app). Modifies
+    # $PORT in place, so $URL has to be derived AFTER this call.
+    resolve_port_collision
+
     URL="http://localhost:${PORT}"
 
     if [ "$RAILS_ENV" = "development" ]; then
@@ -651,12 +763,31 @@ cmd_start() {
         echo -e "  Server: ${CYAN}${URL}${NC}"
         echo -e "  Admin:  ${CYAN}${URL}/admin${NC}"
         echo ""
-        read -rp "  Start the app and open in browser? [y/n]: " REPLY
+        echo "  Choose:"
+        echo "    [y] Start server and open in browser  (default)"
+        echo "    [s] Start server only — don't open browser"
+        echo "    [q] Quit without starting"
         echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Cancelled. Run './roe.sh start' when ready."
-            exit 0
-        fi
+        read -rp "  Choice [Y/s/q]: " REPLY
+        echo ""
+
+        # Default (empty input) = launch browser. Anything starting with
+        # s/S = start server but skip the auto-open. q/Q = bail out
+        # entirely. Unknown input falls through to the default (launch)
+        # rather than quitting — safer on a wrong keystroke.
+        case "${REPLY:-y}" in
+            [Qq]*)
+                log_info "Cancelled. Run './roe.sh start' when ready."
+                exit 0
+                ;;
+            [Ss]*)
+                OPEN_BROWSER=0
+                log_info "Starting server — browser will not open automatically."
+                ;;
+            *)
+                OPEN_BROWSER=1
+                ;;
+        esac
 
         log_info "Starting Tailwind CSS watcher..."
         "$APP_DIR/bin/rails" tailwindcss:watch &
@@ -678,16 +809,19 @@ cmd_start() {
             OPEN_URL="$URL"
         fi
 
-        # Open browser after a short delay to let the server boot
-        # Supports macOS (open) and Linux (xdg-open)
-        (
-            sleep 3
-            if command -v open >/dev/null 2>&1; then
-                open "$OPEN_URL"
-            elif command -v xdg-open >/dev/null 2>&1; then
-                xdg-open "$OPEN_URL"
-            fi
-        ) &
+        # Open browser after a short delay to let the server boot.
+        # Supports macOS (open) and Linux (xdg-open). Skipped entirely
+        # when the user chose [s] (start server only) at the prompt.
+        if [ "$OPEN_BROWSER" = "1" ]; then
+            (
+                sleep 3
+                if command -v open >/dev/null 2>&1; then
+                    open "$OPEN_URL"
+                elif command -v xdg-open >/dev/null 2>&1; then
+                    xdg-open "$OPEN_URL"
+                fi
+            ) &
+        fi
 
         # bin/thrust is shipped by Rails 8 (the thruster gem) and would
         # otherwise be preferred here, but Thruster binds port 80 by
