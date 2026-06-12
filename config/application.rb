@@ -17,7 +17,7 @@ module Roe
     config.autoload_lib(ignore: %w[assets tasks])
 
     # Only allow explicit database specification for migrations
-    config.active_record.dump_schema_after_migration = false
+    config.active_record.dump_schema_after_migration = true
 
     # Silence the "Unpermitted parameters" warning for authenticity_token
     # and commit — these are standard Rails form params (CSRF token and

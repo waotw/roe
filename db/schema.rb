@@ -10,7 +10,13 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_12_162108) do
+  create_table "deploy_secrets", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "registry_password"
+    t.datetime "updated_at", null: false
+  end
+
   create_table "disputes", force: :cascade do |t|
     t.integer "amount_cents"
     t.datetime "created_at", null: false
@@ -155,8 +161,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
   create_table "postmark_configs", force: :cascade do |t|
     t.datetime "connected_at"
     t.datetime "created_at", null: false
+    t.integer "mode", default: 0, null: false
     t.text "server_token"
     t.datetime "updated_at", null: false
+    t.datetime "verified_at"
     t.string "webhook_token"
   end
 
@@ -177,6 +185,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
     t.json "metadata", default: {}
     t.datetime "updated_at", null: false
     t.index ["file_path"], name: "index_products_on_file_path", unique: true
+  end
+
+  create_table "recovery_codes", force: :cascade do |t|
+    t.string "code_digest", null: false
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["user_id"], name: "index_recovery_codes_on_user_id"
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -204,6 +221,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
     t.integer "mode", default: 0, null: false
     t.text "snippet"
     t.datetime "updated_at", null: false
+    t.datetime "verified_at"
   end
 
   create_table "solid_cable_messages", force: :cascade do |t|
@@ -228,8 +246,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
     t.text "secret_key_live"
     t.text "secret_key_test"
     t.datetime "updated_at", null: false
+    t.datetime "verified_at"
     t.string "webhook_signing_secret_live"
     t.string "webhook_signing_secret_test"
+  end
+
+  create_table "sync_configs", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "peer_url"
+    t.text "token"
+    t.datetime "updated_at", null: false
   end
 
   create_table "update_statuses", force: :cascade do |t|
@@ -239,6 +265,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
     t.text "error_message"
     t.string "from_version"
     t.text "log"
+    t.string "note"
     t.integer "progress_percent", default: 0
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
@@ -263,5 +290,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_221914) do
   add_foreign_key "members", "imports"
   add_foreign_key "newsletter_sends", "imports"
   add_foreign_key "posts", "imports"
+  add_foreign_key "recovery_codes", "users"
   add_foreign_key "sessions", "users"
 end

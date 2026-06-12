@@ -204,33 +204,44 @@ module RoeUpdater
         nil
       end
 
-      # Compose the short summary the admin Updates page shows. Sourced
-      # from the release title (if any) plus the first paragraph of the
-      # release body. Falls back to a generic message when nothing is
-      # available — covers the "git tag without a Codeberg release" case.
+      # Compose the release-notes preview the admin Updates page shows.
+      # Sourced from the release title (if any) + as much of the body
+      # as fits in a panel-friendly preview length. Falls back to a
+      # generic message when nothing is available — covers the "git
+      # tag without a Codeberg release" case.
+      #
+      # Truncates at ~600 chars on a word boundary so the panel doesn't
+      # blow up to fill the page on long release notes — the view
+      # already shows a "View full release notes on Codeberg →" link
+      # below, so anyone who wants the full thing follows it.
+      #
+      # Light markdown cleanup: strips leading `#` from heading lines
+      # so `## What's new in 0.0.11` reads as `What's new in 0.0.11`
+      # in the panel. Other markers (bullets `-`, emphasis `**`, code
+      # `` ` ``) are left in place — they're tolerable in a plain-text
+      # preview and stripping them aggressively risks mangling content
+      # that uses them legitimately (e.g. a flag name with hyphens).
       def build_summary(name, body)
-        title    = name.to_s.strip.presence
-        lead     = first_paragraph(body)
-        parts    = []
+        title = name.to_s.strip.presence
+        body_text = clean_markdown_headings(body.to_s.strip)
+
+        parts = []
         parts << title if title
-        parts << lead  if lead.present?
+        parts << body_text if body_text.present?
 
-        if parts.empty?
-          "View the changelog and commit history on Codeberg."
-        else
-          parts.join("\n\n")
-        end
+        return "View the changelog and commit history on Codeberg." if parts.empty?
+
+        full = parts.join("\n\n")
+        full.length > 600 ? full.truncate(600, separator: " ", omission: "…") : full
       end
 
-      # First non-empty paragraph of a markdown string. Stops at the
-      # first blank line so headings and lists don't bleed in. Strips
-      # leading markdown markers (#, -, *) defensively.
-      def first_paragraph(text)
-        return nil if text.blank?
-
-        first = text.to_s.split(/\n\s*\n/).first.to_s.strip
-        first.sub(/\A[#\-*]+\s*/, "").presence
+      # Strip leading ATX heading markers (`#`, `##`, `###`, …) from
+      # each line. Preserves indentation, list markers, and inline
+      # emphasis — only the line-leading `#`s are removed.
+      def clean_markdown_headings(text)
+        text.lines.map { |line| line.sub(/\A#+\s*/, "") }.join
       end
+
 
       def git_available?
         system("which git > /dev/null 2>&1")
