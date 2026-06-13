@@ -1,5 +1,5 @@
 ---
-version: 0.0.19
-release_date: "2026-06-12"
+version: 0.0.20
+release_date: '2026-06-13'
 channel: beta
 repository: https://codeberg.org/waotw/roe
