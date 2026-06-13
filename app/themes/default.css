@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 1.0.0
-   Bundled with: Roe v0.1.0
+   Version: 0.9.1
+   Bundled with: Roe v0.0.19
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -35,7 +35,7 @@
 
   /* Font Sizes */
   --text-xxs: 0.7rem;
-  --text-xs: 0.8rem;
+  --text-xs: 0.775rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
@@ -392,7 +392,7 @@ div.flash {
 }
 
 .content h1 {
-  font-size: var(--text-3xl);
+  font-size: var(--text-4xl);
   line-height: 1;
   margin: var(--space-0) 0 var(--space-4) 0;
   font-weight: 700;
@@ -417,7 +417,7 @@ div.flash {
 .content h4 {
   font-size: var(--text-lg);
   line-height: 1.25;
-  margin: var(--space-6) 0 0 0;
+  margin: var(--space-6) 0 var(--space-1) 0;
   font-weight: 700;
 }
 
@@ -1134,12 +1134,17 @@ p.collection-more a:hover {
 .card.post-link-medium,
 .card.post-link-large {
   display: flex;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  margin: var(--space-8) 0;
   text-decoration: none;
   align-items: flex-start;
   border: 1px solid var(--color-border);
+}
+
+.card.post-link-small .card-content,
+.card.post-link-medium .card-content,
+.card.post-link-large .card-content {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
 }
 
 .card.post-link-small:hover,
@@ -1174,48 +1179,87 @@ p.collection-more a:hover {
   display: inline-block;
   color: var(--color-link);
   text-decoration: underline;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  margin: auto 0 0 0;
 }
 
 .card[class*="post-link-"] .card-link:hover {
   color: var(--color-text);
 }
 
+.card[class*="post-link-"] .card-metadata {
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+}
+
+.card[class*="post-link-"] .card-author {
+  font-style: italic;
+}
+
+/* Excerpt typography — applies to all post-link sizes (small / medium /
+   large) since they all use .card-excerpt now. */
+/*.card[class*="post-link-"] .card-excerpt {
+  margin: var(--space-2) 0 0 0;
+  font-size: var(--text-base);
+  line-height: 1.4;
+  color: var(--color-text);
+}*/
+
 /* Post Link - Small */
 
+.card.post-link-small {
+  gap: var(--space-4);
+  padding: var(--space-3);
+  margin: var(--space-0) 0 var(--space-6) 0;
+}
+
 .card.post-link-small .card-image {
-  width: 70px;
-  height: 70px;
+  width: 75px;
+  height: 75px;
+  display: block;
 }
 
 .card.post-link-small .card-title {
-  margin: 0 0 var(--space-1) 0;
+  margin: 0 0 calc(var(--space-1) * 0.5) 0;
   font-size: var(--text-base);
   font-weight: 700;
 }
 
 .card.post-link-small .card-metadata {
   margin: 0 0 var(--space-1) 0;
-  font-size: var(--text-xs);
   color: var(--color-muted);
 }
 
 /* Post Link - Medium */
 
+.card.post-link-medium {
+  gap: var(--space-8);
+  padding: var(--space-3);
+  margin: var(--space-4) 0 var(--space-8) 0;
+}
+
 .card.post-link-medium .card-image {
   width: 120px;
   height: 120px;
+  display: block;
 }
 
 .card.post-link-medium .card-title {
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-1) 0;
   font-size: var(--text-lg);
   font-weight: 700;
 }
 
+.card.post-link-medium .card-subtitle {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 .card.post-link-medium .card-metadata {
   margin: 0 0 var(--space-2) 0;
-  font-size: var(--text-sm);
   color: var(--color-muted);
 }
 
@@ -1225,36 +1269,179 @@ p.collection-more a:hover {
   color: var(--color-text);
 }
 
-/* Post Link - Large */
+/* Post Link - Large
+   Grid layout with template areas. Mobile-first single column where
+   the image sits between metadata and excerpt. Desktop (≥960px) uses
+   a two-column grid with the image on the left spanning all text
+   rows. Adding/removing a breakpoint = editing one template-areas
+   string; HTML order doesn't matter. */
 
-.card.post-link-large .card-image {
-  width: 200px;
-  height: 200px;
+.card.post-link-large {
+  /* Override the shared .card flex layout — grid is what enables the
+     responsive reflow without changing HTML order. */
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "title"
+    "subtitle"
+    "metadata"
+    "image"
+    "excerpt"
+    "link";
+  padding: var(--space-4);
+  margin: var(--space-4) 0 var(--space-6) 0;
 }
 
+/* Map each direct child to its named area. Direct-child (>)
+   selectors so anything nested inside (e.g. <a> in .card-title)
+   isn't accidentally caught. */
+.card.post-link-large > .card-title {
+  grid-area: title;
+}
+.card.post-link-large > .card-subtitle {
+  grid-area: subtitle;
+}
+.card.post-link-large > .card-metadata {
+  grid-area: metadata;
+}
+.card.post-link-large > picture,
+.card.post-link-large > img.card-image {
+  grid-area: image;
+}
+.card.post-link-large > .card-excerpt {
+  grid-area: excerpt;
+}
+.card.post-link-large > .card-link {
+  grid-area: link;
+}
+
+/* Image sizing — fills its grid cell width and keeps proportions.
+   Picture wrapper has to be block-level for sizing to apply when
+   ResponsiveImageRenderer added variants. */
+.card.post-link-large > picture {
+  display: block;
+}
+
+.card.post-link-large .card-image {
+  border: none;
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-bottom: var(--space-4);
+}
+
+/* Image-less cards collapse the image row so there's no empty space.
+   Modifier class is added in the partial when image is blank. */
+.card.post-link-large.no-image {
+  grid-template-areas:
+    "title"
+    "subtitle"
+    "metadata"
+    "excerpt"
+    "link";
+}
+
+/* Typography — unchanged by the layout switch, since these target
+   the same descendant elements regardless of the parent's display. */
 .card.post-link-large .card-title {
-  margin: 0 0 var(--space-2) 0;
-  font-size: var(--text-xl);
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-2xl);
   font-weight: 700;
+}
+
+.card.post-link-large .card-subtitle {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-base);
+  line-height: 1.3;
+  color: var(--color-muted);
+  font-style: italic;
 }
 
 .card.post-link-large .card-metadata {
   margin: 0 0 var(--space-2) 0;
-  font-size: var(--text-sm);
   color: var(--color-muted);
 }
 
-.card.post-link-large .card-body {
+.card.post-link-large .card-excerpt {
+  margin: 0 0 var(--space-2) 0;
   font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--color-text);
 }
 
-.card[class*="post-link-"] .card-excerpt {
-  margin: var(--space-2) 0 0 0;
+.card.post-link-large .card-link {
   font-size: var(--text-sm);
-  line-height: 1.4;
-  color: var(--color-text);
+}
+
+/* Mid breakpoint (≥601px) — bump the excerpt up to text-base for the
+   awkward sizes where the card is still single-column but the viewport
+   has room for a slightly larger reading size. The desktop rule below
+   overrides this back to text-sm at ≥960. Order matters: this block
+   MUST appear before the 960px block so the later block wins at the
+   overlap. */
+@media (min-width: 601px) {
+  .card.post-link-large .card-excerpt {
+    font-size: var(--text-base);
+  }
+}
+
+/* Desktop layout — two columns, image left, link pinned to bottom
+   of its cell so it lines up with the bottom of the image. */
+@media (min-width: 960px) {
+  .card.post-link-large {
+    grid-template-columns: 45% 1fr;
+    /* Four auto rows for the text, then 1fr for the link row so it
+       absorbs the difference between the image's intrinsic height and
+       the text rows' content height. Without the 1fr, the link's row
+       would be auto-sized to the link itself and there'd be nothing
+       for `align-self: end` to push against. With it, the link row
+       fills the leftover space and `align-self: end` pins the link
+       to the bottom of the image. */
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas:
+      "image title"
+      "image subtitle"
+      "image metadata"
+      "image excerpt"
+      "image link";
+    /* Row gap was applying between every text element on desktop and
+       compounding with each element's own margin-bottom — way too
+       much air. Drop it to 0 and let the elements' margins control
+       inter-row spacing; keep the column gap so image and text don't
+       touch. */
+    row-gap: 0;
+    column-gap: var(--space-8);
+  }
+
+  .card.post-link-large .card-excerpt {
+    font-size: var(--text-sm);
+  }
+
+  .card.post-link-large.no-image .card-excerpt {
+    font-size: var(--text-base);
+  }
+
+  /* Image cell stretches to the full text-column height. */
+  .card.post-link-large > picture,
+  .card.post-link-large > img.card-image {
+    align-self: stretch;
+  }
+
+  .card.post-link-large .card-image {
+    margin-bottom: 0;
+  }
+
+  /* Same effect as the old flex `margin-top: auto` — pushes the link
+     to the bottom of its (now-expanded) grid cell so it bottom-aligns
+     with the image. */
+  .card.post-link-large > .card-link {
+    font-size: var(--text-xs);
+    align-self: end;
+  }
+
+  /* No-image cards collapse back to a single column on desktop too,
+     otherwise an empty 45% slot would sit next to the text. */
+  .card.post-link-large.no-image {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Asides */
@@ -2076,14 +2263,25 @@ article.post-podcast {
 
 /* ============ DOCUMENTATION =============== */
 
-.documentation mark {
-  background-color: var(--color-highlight-text);
-  color: var(--color-text);
-}
-
 .docs-back-link {
   margin-bottom: var(--space-4);
   display: inline-block;
+}
+
+.documentation mark {
+  background-color: var(--color-highlight-text);
+  color: var(--color-text);
+  padding: 0 calc(var(--space-1) * 0.8);
+  border-radius: 1px;
+}
+
+.content.documentation p code {
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation li code {
+  font-size: var(--text-xs);
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
 }
 
 /* =============== UTILITIES ================ */
