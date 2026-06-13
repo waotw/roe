@@ -199,28 +199,51 @@ test/
 
 ### Update & Deploy
 
-Roe supports two workflows for updating production:
+Two distinct workflows that target different audiences.
 
-**1. In-App Update System (for production-only installations):**
-- **VersionChecker**: Checks Codeberg repository (waotw/roe) for new releases with HTTPS → SSH fallback for private repos
-- **BackupManager**: Creates DB and full site backups before updating
-- **Downloader**: Clones new versions to `staging/`
-- **MigrationTester**: Tests migrations on a copy before applying to production
-- **SwitchManager**: Atomic directory swap (`current/` ↔ `staging/`)
-- **UpdateOrchestrator**: Coordinates the entire flow with progress tracking
+**1. In-App Update System (DEVELOPMENT installs only)**
+
+Updates the developer's local Roe install to a new tagged release from Codeberg. Hidden in production: `Admin::UpdatesController#block_in_production` redirects every action and the nav link is conditionally rendered. Migrations always target the development SQLite — production DBs are migrated by the deploy flow (Kamal/Fly release_command), not by this system. `RAILS_ENV` is hardcoded to `development` for the migration subprocess to close the footgun where booting dev with `RAILS_ENV=production` would otherwise route migrations at the wrong DB.
+
+Orchestrated by `RoeUpdater::UpdateOrchestrator`, run inside `PerformUpdateJob`. Components:
+
+- **VersionChecker**: Reads root `/VERSION` for the installed version; queries Codeberg (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.0.17`); bare-numbered tags are ignored.
+- **BackupManager**: Snapshots dev + prod SQLite to `site_backups/` with a timestamp stamped onto the `UpdateStatus` so rollback restores the right one.
+- **Downloader**: `git clone --branch <tag>` into `staging/`.
+- **MigrationTester**: Rsyncs migrations from `staging/` into a throwaway copy of `current/` and dry-runs them against a cloned dev DB.
+- **SwitchManager**: Renames `current/` → `current.backup/`, `staging/` → `current/`. Rollback uses a rename-to-quarantine pattern (`current/` → `current.broken-<ts>`) so the swap is atomic and immune to asset-writer races.
+- **UpdateOrchestrator**: Coordinates the 11-step pipeline + progress tracking via `UpdateStatus`.
+
+Step pipeline (matches `UpdateOrchestrator::STEPS`):
+
+1. `validating` — git available, `staging/` empty
+2. `backing_up_db` — DB snapshots
+3. `downloading` — clone tag to `staging/`
+4. `testing` — dry-run migrations against a copy
+5. `migrating` — apply migrations to the real dev DB
+6. `switching` — rename current → current.backup, staging → current
+7. `preserving_secrets` — copy `config/master.key` + `tmp/development_secret.txt` from `current.backup/` (gitignored, absent from the clone — without this the user gets signed out)
+8. `syncing_root_files` — copy `roe.sh`, `README.md`, `AGENTS.md` from `current/` to root
+9. `writing_version` — rewrite both root `/VERSION` and `current/VERSION` with the new tag's full YAML
+10. `building_assets` — `assets:precompile` against the new code
+11. `restarting` — schedule a 5-second exit so the supervisor (`roe.sh`) relaunches Puma on the new code
+
+**Rollback (automatic on any step failure)**: `handle_failure` restores the DB from this update's backup, calls `SwitchManager.rollback` (quarantine + restore), re-mirrors `current/VERSION` to root `/VERSION` so the admin UI reflects the rolled-back state, and wipes `staging/`. Failures inside rollback propagate to the user with the real exception class + message — there is intentionally no silent swallow.
+
+**Restart-aware UI**: The Updates index decides "Restart Roe" vs "Update Successful" by comparing `@status.completed_at` against `Rails.application.config.server_boot_time` (captured at initializer load). `completed_at > server_boot_time` means the user still needs to restart manually.
 
 **Access**: Admin → Updates
-**Process**: Check → Backup → Download → Test → Migrate → Switch → Restart
 
-**2. Deploy to Live (for local development workflow):**
-Deploy the current codebase from local to a live server via Kamal or Fly.io.
+**2. Deploy to Live (production deployment)**
+
+Deploys the current codebase from local to a live server via Kamal or Fly.io.
+
 - **Access**: Admin → Updates & Deploy (or `./roe.sh deploy` from CLI)
 - **Targets**: Kamal (SSH-based) or Fly.io (container platform)
-- **VERSION file**: Must exist at `ROE_ROOT/VERSION` (git-tracked or manually created)
-- **Fly.io Migrations**: Automatically run via `[deploy] release_command` in fly.toml
-- **Docker Entrypoint**: Updated to detect Rails server and run `db:prepare` with proper path handling
-
-**Rollback**: Automatic on update failure; manual rollback available for deploy
+- **VERSION file**: Lives at `ROE_ROOT/VERSION`. The in-app updater keeps this in sync with `current/VERSION` automatically; manual creation only needed for fresh installs.
+- **Fly.io migrations**: Run via `[deploy] release_command` in `fly.toml`
+- **Docker entrypoint**: Detects Rails server and runs `db:prepare` with proper path handling
+- **Rollback**: Manual (via the deploy target's own tooling)
 
 ### Content sync
 Markdown files in `site/` are the source of truth. `ContentSync` parses front-matter and body and upserts `Post`, `Page`, `Documentation`, `Medium`, `Product`, and `*Config` rows. `ContentWatcher` (dev) re-syncs on file changes. JSON metadata is stored as a text column and queried via SQLite `json_extract`.
