@@ -1,0 +1,71 @@
+<%# Single modal shared across all "Update to vX" buttons on the themes
+    index. JS populates the placeholder spans + the form's action +
+    the suggested custom-name value based on which row was clicked.
+    Mirrors the pattern in _reset_theme_modal.html.erb but always
+    submits to the `reset` action with reset_type ∈
+    {overwrite, preserve_and_update}. %>
+<div id="update-theme-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6 shadow-xl max-w-lg w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">
+      Update <span data-update-theme-modal-display-name>Theme</span>
+    </h3>
+    <p class="text-sm text-gray-600 mb-4">
+      A new version (v<span data-update-theme-modal-bundled-version></span>) is available. Choose how to apply it:
+    </p>
+
+    <%= form_with url: "#", method: :post, id: "update-theme-form" do |form| %>
+      <div class="space-y-4 mb-6">
+        <!-- Option 1: Overwrite installed -->
+        <div class="border border-gray-200 rounded p-4 hover:bg-gray-50 cursor-pointer" data-update-theme-modal-select="overwrite">
+          <div class="flex items-start">
+            <%= form.radio_button :reset_type, "overwrite", class: "mt-1 mr-3" %>
+            <div>
+              <label class="font-medium text-gray-900 cursor-pointer">
+                Overwrite my installed version with v<span data-update-theme-modal-bundled-version></span>
+              </label>
+              <p class="text-sm text-gray-600 mt-1">
+                Replaces your installed v<span data-update-theme-modal-installed-version></span> with the new version.
+                <strong class="text-red-600">Any local edits will be lost.</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option 2: Preserve customizations + update -->
+        <div class="border border-gray-200 rounded p-4 hover:bg-gray-50 cursor-pointer" data-update-theme-modal-select="preserve_and_update">
+          <div class="flex items-start">
+            <%= form.radio_button :reset_type, "preserve_and_update", class: "mt-1 mr-3" %>
+            <div class="flex-1">
+              <label class="font-medium text-gray-900 cursor-pointer">
+                Install v<span data-update-theme-modal-bundled-version></span> and keep my edits as a custom theme
+              </label>
+              <p class="text-sm text-gray-600 mt-1 mb-2">
+                Renames <code class="bg-gray-100 px-1">Roe Theme:</code> name and the css filename so it
+                becomes a custom theme (untracked, no future update nags). Then installs the new bundled
+                v<span data-update-theme-modal-bundled-version></span> as <span data-update-theme-modal-display-name></span>.
+              </p>
+              <div class="mt-2">
+                <%= form.text_field :custom_name,
+                                    placeholder: "Theme name",
+                                    class: "w-full px-3 py-2 border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                    data: { update_theme_modal_target: "customNameInput" } %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 justify-end">
+        <button type="button"
+                onclick="hideUpdateThemeModal()"
+                class="uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-100 font-mono rounded-xs">
+          Cancel Update
+        </button>
+        <%= form.submit "Continue",
+                        class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer",
+                        data: { update_theme_modal_target: "submitButton" },
+                        disabled: true %>
+      </div>
+    <% end %>
+  </div>
+</div>

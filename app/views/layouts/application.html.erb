@@ -125,7 +125,7 @@
           <% if content_for?(:admin_nav) %>
           <div class="flex items-center gap-6">
             <div class="relative inline-flex items-center">
-              <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900 text-nowrap" %>
               <% if Rails.env.development? && SiteSync::Exchange.can_call_peer? %>
                 <%
                   peer_state    = (SiteSync::Exchange.refresh_if_stale rescue nil)
@@ -145,7 +145,7 @@
                 local Roe install, not from the live admin. The controller
                 also blocks the route in production as a backstop. %>
             <% unless Rails.env.production? %>
-              <%= link_to "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <%= link_to "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900 text-nowrap" %>
             <% end %>
             <div class="relative inline-flex items-center">
               <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>

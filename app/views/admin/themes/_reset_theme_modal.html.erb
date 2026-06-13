@@ -45,11 +45,11 @@
       <div class="flex gap-3 justify-end">
         <button type="button"
                 onclick="hideResetThemeModal()"
-                class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                class="uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-100 font-mono rounded-xs">
           Cancel
         </button>
         <%= form.submit "Reset Theme",
-                        class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed",
+                        class: "uppercase text-sm px-4 py-2 border border-red-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs cursor-pointer",
                         data: { theme_reset_modal_target: "submitButton" },
                         disabled: true %>
       </div>

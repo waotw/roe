@@ -4,6 +4,7 @@ pin "application"
 pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "delete_modal", to: "delete_modal.js", preload: true
 pin "theme_reset_modal", to: "theme_reset_modal.js", preload: true
+pin "update_theme_modal", to: "update_theme_modal.js", preload: true
 pin "editor", to: "editor.js", preload: true
 
 pin "@hotwired/stimulus", to: "stimulus.min.js"

@@ -126,14 +126,21 @@
                   <% end %>
 
                   <% if is_installed && is_master && theme[:status] == :tracked_outdated %>
-                    <%# Overwrite the installed file with the bundled file
-                        (reset_type=overwrite reuses the existing reset
-                        action that already does this). %>
-                    <%= button_to "Update to v#{theme[:bundled_version]}",
-                                  reset_admin_theme_path(theme[:name], reset_type: "overwrite"),
-                                  method: :post,
-                                  data: { turbo_confirm: "This will overwrite your installed #{theme[:display_name]} theme (v#{theme[:installed_version]}) with the bundled v#{theme[:bundled_version]}. Any local edits will be lost. Continue?" },
-                                  class: "uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs" %>
+                    <%# Opens the shared update-theme modal (rendered once
+                        at the bottom of this template). The modal lets the
+                        user pick between Overwrite and Preserve-and-update;
+                        both submit to the `reset` action with the
+                        appropriate reset_type. %>
+                    <button type="button"
+                            data-update-theme-trigger
+                            data-theme-name="<%= theme[:name] %>"
+                            data-display-name="<%= theme[:display_name] %>"
+                            data-installed-version="<%= theme[:installed_version] %>"
+                            data-bundled-version="<%= theme[:bundled_version] %>"
+                            data-suggested-name="<%= theme[:display_name] %> v<%= theme[:installed_version] %>"
+                            class="uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs">
+                      Update to v<%= theme[:bundled_version] %>
+                    </button>
                   <% end %>
 
                   <% if is_installed && !is_active %>
@@ -155,6 +162,8 @@
     </div>
   </div>
 </div>
+
+<%= render "update_theme_modal" %>
 
 <!-- Delete Theme Modal -->
 <div id="delete-modal-theme" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">

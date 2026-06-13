@@ -125,6 +125,65 @@ class Admin::ThemesController < Admin::BaseController
       FileUtils.cp(source_file, dest_file)
       flash[:notice] = "Fresh copy installed as '#{new_name}'. Your original theme remains unchanged."
       redirect_to edit_admin_theme_path(new_name)
+    elsif reset_type == "preserve_and_update"
+      # Driven from the "Update available" flow on the themes index when
+      # the user wants the new bundled version BUT also wants to keep
+      # their existing customizations. Renames the user's installed
+      # file to a new custom name, rewrites its `Roe Theme:` header so
+      # ThemeInspector permanently classifies it as a custom theme (no
+      # future update nags), then installs the bundled version at the
+      # original filename. Net effect after this action: original
+      # filename now holds clean bundled v{new}; the user's prior work
+      # lives on at the chosen custom name as an untracked theme.
+      installed_file = USER_THEME_DIR.join("#{theme_name}.css")
+      unless installed_file.exist?
+        flash[:error] = "Theme '#{theme_name}' is not installed."
+        redirect_to admin_themes_path and return
+      end
+
+      # `custom_name` is treated as the human-readable display name
+      # (spaces and mixed case allowed, matching what `Roe Theme:`
+      # headers conventionally look like). The filename slug is
+      # derived from it via `parameterize`, which handles spaces,
+      # periods (so "Default v0.9.0" → "default-v0-9-0"), case, and
+      # punctuation in one shot. Internal whitespace runs are
+      # collapsed first so a value pasted with line breaks or extra
+      # spaces still produces a clean header line.
+      display_name = (custom_name.presence || "#{theme_name.capitalize} preserved")
+                       .gsub(/\s+/, " ").strip
+      preserve_slug = display_name.parameterize
+
+      if preserve_slug.blank?
+        flash[:error] = "Custom name must contain at least one letter or number."
+        redirect_to admin_themes_path and return
+      end
+
+      if preserve_slug == theme_name
+        flash[:error] = "Custom name cannot resolve to the same filename as the original theme."
+        redirect_to admin_themes_path and return
+      end
+
+      preserved_file = USER_THEME_DIR.join("#{preserve_slug}.css")
+      if preserved_file.exist?
+        flash[:error] = "A theme file named '#{preserve_slug}.css' already exists. Please choose a different name."
+        redirect_to admin_themes_path and return
+      end
+
+      # Save the customized file under its new name with a rewritten
+      # `Roe Theme:` header first — so even if the bundled cp below
+      # somehow fails, the user's work is already on disk under the
+      # preserved filename. Only `.sub` (not `gsub`) on the header to
+      # avoid mangling any later occurrences in CSS comments.
+      content = File.read(installed_file)
+      rewritten = content.sub(/^(\s*Roe Theme:\s*).+$/) { "#{Regexp.last_match(1)}#{display_name}" }
+      File.write(preserved_file, rewritten)
+
+      FileUtils.cp(source_file, installed_file)
+
+      bundled_version = ThemeInspector.parse_header(source_file)&.version
+      flash[:notice] = "Saved your customized #{theme_name.capitalize} theme as '#{display_name}' " \
+                       "(#{preserve_slug}.css, now a custom theme) and installed bundled v#{bundled_version} as #{theme_name.capitalize}."
+      redirect_to admin_themes_path
     else
       flash[:error] = "Invalid reset type"
       redirect_to edit_admin_theme_path(theme_name)

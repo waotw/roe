@@ -1,5 +1,5 @@
 ---
-roe_version: 0.0.9
+roe_version: 0.0.19
 title: The Editor
 post_type: documentation
 status: published

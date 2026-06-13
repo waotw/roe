@@ -3,6 +3,7 @@ import "@hotwired/turbo-rails";
 import "controllers";
 import "delete_modal";
 import "theme_reset_modal";
+import "update_theme_modal";
 
 // Auto-dismiss floating flash messages
 document.addEventListener("turbo:load", function () {

@@ -27,8 +27,8 @@
       <% end %>
 
       <%# No form wrapper — Confirm injects these values into the main editor %>
-      <%# form and submits that, so the post's content + metadata save in one  %>
-      <%# go (along with status: published).                                    %>
+      <%# form and submits that, so the post's content + metadata save in one %>
+      <%# go (along with status: published). %>
       <div class="space-y-6">
         <% @missing_requirements.each do |req| %>
           <%
@@ -158,7 +158,7 @@
           </button>
           <button type="button"
                   data-action="click->editor#cancelPublish"
-                  class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs">
+                  class="uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-100 font-mono rounded-xs">
             Cancel
           </button>
         </div>
