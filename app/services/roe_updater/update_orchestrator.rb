@@ -42,6 +42,16 @@ module RoeUpdater
         @status = status_record
         @version = to_version
 
+        # Stash the pre-update root /VERSION value so handle_failure can
+        # restore it if anything later in the pipeline blows up. The
+        # write_version_files step rewrites root /VERSION before the
+        # restart, and a failure between that write and SwitchManager's
+        # rollback would otherwise leave root /VERSION pointing at the
+        # new version while current/ has been rolled back to the old
+        # code — the admin UI would then show the wrong version after
+        # a "rolled_back" outcome.
+        @pre_update_root_version = read_root_version
+
         execute_step(:validating) { validate_prerequisites }
         execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
         execute_step(:downloading) { Downloader.download_version(@version, @status) }
@@ -319,7 +329,17 @@ module RoeUpdater
           # THIS update's backup (stamped during backup_databases),
           # rather than guessing at the most recent one on disk.
           BackupManager.restore_databases(@status)
+
+          # SwitchManager.rollback now propagates failures instead of
+          # silently returning false — wrap the rest in the same begin
+          # block so a rollback failure lands in the rescue below and
+          # gets surfaced to the user verbatim. Also restore root
+          # /VERSION here (after the directory swap) so the value the
+          # admin UI displays matches the code that current/ is now
+          # pointing at.
           SwitchManager.rollback
+          restore_root_version
+
           # Wipe the staging clone too — otherwise the next update
           # attempt will fail validate_prerequisites' "non-empty
           # staging/" check and the user has to clean it up by hand.
@@ -333,13 +353,50 @@ module RoeUpdater
 
           log("Rollback completed")
         rescue => rollback_error
-          log("CRITICAL: Rollback failed: #{rollback_error.message}")
+          # Surface the actual rollback failure (and its class) in both
+          # the log and error_message. Before this, the admin UI would
+          # show "Rollback completed" because SwitchManager.rollback
+          # rescued internally and returned false — leaving the user
+          # convinced everything was clean while current/ was actually
+          # half-deleted and current.backup/ was still on disk. Now any
+          # exception from rollback (or restore_databases, or
+          # cleanup_staging) propagates here with a real message.
+          log("CRITICAL: Rollback failed: #{rollback_error.class} - #{rollback_error.message}")
           @status.update!(
             status: "failed",
-            error_message: "#{error.message}. Rollback also failed: #{rollback_error.message}",
+            error_message: "#{error.message}. Rollback also failed: " \
+                          "#{rollback_error.class} - #{rollback_error.message}",
             current_step: "CRITICAL: Manual intervention required"
           )
         end
+      end
+
+      # Read the current value of root /VERSION (called once at the
+      # start of an update so we can put it back if we have to roll
+      # back). Returns nil if the file doesn't exist or is unparseable
+      # — handle_failure just skips the restore in that case rather
+      # than guessing.
+      def read_root_version
+        version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
+        return nil unless File.exist?(version_file)
+
+        config = YAML.load_file(version_file)
+        config.is_a?(Hash) ? config["version"] : nil
+      rescue => e
+        Rails.logger.warn "Could not read pre-update root VERSION: #{e.message}"
+        nil
+      end
+
+      # Rewrite root /VERSION back to the value captured at the top of
+      # start_update. No-op if the pre-update read failed — better to
+      # leave whatever's there than overwrite with nil.
+      def restore_root_version
+        return unless @pre_update_root_version
+
+        version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
+        File.write(version_file, { "version" => @pre_update_root_version }.to_yaml)
+      rescue => e
+        Rails.logger.warn "Could not restore root VERSION: #{e.message}"
       end
 
       def log(message)

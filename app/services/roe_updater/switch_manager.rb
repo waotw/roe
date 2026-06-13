@@ -37,19 +37,46 @@ module RoeUpdater
         raise SwitchError, "Version switch failed: #{e.message}"
       end
 
+      # Restore the pre-update directory by renaming current.backup →
+      # current. Used by UpdateOrchestrator#handle_failure when a later
+      # step blows up partway through.
+      #
+      # The previous implementation did `rm_rf(current) + rename(backup,
+      # current)`, which sounded fine but lost a race against asset
+      # builds and bootsnap: by the time rm_rf finished walking the tree,
+      # Tailwind's watcher or Rails' bootsnap cache had already written
+      # NEW files into the half-deleted current/ (typically
+      # app/assets/build/tailwind.css and tmp/cache/bootsnap/*). The
+      # follow-up `File.rename(backup, current)` then failed with
+      # `Errno::ENOTEMPTY (Directory not empty)` because POSIX rename
+      # refuses to overwrite a non-empty directory — and the old rescue
+      # silently turned that into `return false`. The orchestrator logged
+      # "Rollback completed" while the filesystem was still wrecked.
+      #
+      # Rename-to-quarantine fixes this: the broken current/ moves out
+      # of the way atomically (rename of a directory within the same
+      # filesystem is a single inode operation — no walk, no window for
+      # asset writers to interfere), the backup slides into its place,
+      # and the quarantined copies get cleaned up afterwards. Failures
+      # are NOT rescued here — they propagate to handle_failure so the
+      # user sees the real reason in the admin UI.
       def rollback
         return false unless File.exist?(BACKUP_PATH)
 
         if File.exist?(CURRENT_PATH)
-          FileUtils.rm_rf(CURRENT_PATH)
+          quarantine = "#{CURRENT_PATH}.broken-#{Time.current.to_i}"
+          File.rename(CURRENT_PATH, quarantine)
         end
 
         File.rename(BACKUP_PATH, CURRENT_PATH)
 
+        Dir.glob("#{CURRENT_PATH}.broken-*").each do |dir|
+          FileUtils.rm_rf(dir)
+        rescue => e
+          Rails.logger.warn "Could not clean up quarantine #{dir}: #{e.message}"
+        end
+
         true
-      rescue => e
-        Rails.logger.error "Rollback failed: #{e.message}"
-        false
       end
 
       def cleanup_backup
