@@ -42,16 +42,6 @@ module RoeUpdater
         @status = status_record
         @version = to_version
 
-        # Stash the pre-update root /VERSION value so handle_failure can
-        # restore it if anything later in the pipeline blows up. The
-        # write_version_files step rewrites root /VERSION before the
-        # restart, and a failure between that write and SwitchManager's
-        # rollback would otherwise leave root /VERSION pointing at the
-        # new version while current/ has been rolled back to the old
-        # code — the admin UI would then show the wrong version after
-        # a "rolled_back" outcome.
-        @pre_update_root_version = read_root_version
-
         execute_step(:validating) { validate_prerequisites }
         execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
         execute_step(:downloading) { Downloader.download_version(@version, @status) }
@@ -371,30 +361,26 @@ module RoeUpdater
         end
       end
 
-      # Read the current value of root /VERSION (called once at the
-      # start of an update so we can put it back if we have to roll
-      # back). Returns nil if the file doesn't exist or is unparseable
-      # — handle_failure just skips the restore in that case rather
-      # than guessing.
-      def read_root_version
-        version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
-        return nil unless File.exist?(version_file)
-
-        config = YAML.load_file(version_file)
-        config.is_a?(Hash) ? config["version"] : nil
-      rescue => e
-        Rails.logger.warn "Could not read pre-update root VERSION: #{e.message}"
-        nil
-      end
-
-      # Rewrite root /VERSION back to the value captured at the top of
-      # start_update. No-op if the pre-update read failed — better to
-      # leave whatever's there than overwrite with nil.
+      # Re-mirror current/VERSION to root /VERSION after a rollback.
+      # write_version_files (step 9) wrote the NEW version to root just
+      # before the asset-build step that typically fails — leaving root
+      # /VERSION pointing at the version we tried to install while
+      # current/ has been swapped back to the old code. SwitchManager
+      # has already restored current/ from current.backup/ by the time
+      # this runs, so current/VERSION holds the correct full YAML
+      # (version + release_date + channel + repository) for the
+      # rolled-back state. Just copying it to root keeps all the
+      # metadata intact — earlier attempts at re-emitting a minimal
+      # `{version: X}` hash silently dropped release_date/channel/repo.
+      #
+      # No-op if current/VERSION doesn't exist for some reason — better
+      # to leave whatever's there than overwrite with nothing.
       def restore_root_version
-        return unless @pre_update_root_version
+        source = File.join(RoeSitePaths::ROE_ROOT, "current", "VERSION")
+        target = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
+        return unless File.exist?(source)
 
-        version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
-        File.write(version_file, { "version" => @pre_update_root_version }.to_yaml)
+        FileUtils.cp(source, target)
       rescue => e
         Rails.logger.warn "Could not restore root VERSION: #{e.message}"
       end
