@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_12_193743) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_13_110754) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -265,11 +265,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_12_193743) do
     t.text "error_message"
     t.string "from_version"
     t.text "log"
-    t.string "note"
     t.integer "progress_percent", default: 0
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
-    t.datetime "tested_at"
     t.string "to_version"
     t.datetime "updated_at", null: false
     t.index ["created_at"], name: "index_update_statuses_on_created_at"
