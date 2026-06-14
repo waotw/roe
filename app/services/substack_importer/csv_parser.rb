@@ -24,7 +24,7 @@ module SubstackImporter
           date: parse_date(row["post_date"]),
           type: row["type"].to_s,
           audience: row["audience"].to_s,
-          is_published: row["is_published"].to_s == "true",
+          is_published: truthy?(row["is_published"]),
           email_sent_at: parse_date(row["email_sent_at"]),
           inbox_sent_at: parse_date(row["inbox_sent_at"]),
           podcast_url: row["podcast_url"].to_s
@@ -38,7 +38,7 @@ module SubstackImporter
       filtered = @posts.dup
 
       # Handle drafts - only include drafts if explicitly requested
-      unless options[:drafts].to_s == "true"
+      unless truthy?(options[:drafts])
         filtered = filtered.select(&:is_published)
       end
 
@@ -97,6 +97,13 @@ module SubstackImporter
       return nil if value.nil? || value.to_s.strip.empty?
 
       value.to_s
+    end
+
+    # Convert a string-ish value to a boolean using Rails's built-in caster.
+    # Handles "1", "true", "TRUE", "yes", true, 1, etc. as truthy and
+    # everything else (including nil, "", "false", "FALSE", "0", 0) as falsey.
+    def truthy?(value)
+      ActiveModel::Type::Boolean.new.cast(value) == true
     end
   end
 end
