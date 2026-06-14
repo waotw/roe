@@ -56,6 +56,12 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Favicon",
           hint: "Copy logo url from Global Images.",
           placeholder: "favicon.ico"
+        },
+        "social_image" => {
+          type: :text,
+          label: "Social Image",
+          hint: "Default image shown when your site is shared on social platforms (Facebook, X, LinkedIn, iMessage, Slack). Used as a fallback when a post or page has no `image:` of its own. Recommended size: 1200×630.",
+          placeholder: "social-share.jpg"
         }
       }
     },

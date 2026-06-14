@@ -1,10 +1,12 @@
 title: ""
+url: ""
 description: ""
 author: ""
 author_email: ""
 logo: ""
 logo_style: ""
 favicon: ""
+social_image: ""
 theme:
   active: "default"
 static_generation_enabled: false

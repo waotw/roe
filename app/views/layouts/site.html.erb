@@ -2,13 +2,15 @@
 <!-- Site Mode: <%= @static_generation ? 'Static (Generated)' : 'Dynamic (Rails)' %> -->
 <html>
   <head>
-    <title><%= site_title %></title>
+    <%# SEO metadata: title, description, OG, Twitter Cards, canonical,
+        JSON-LD, RSS/Atom auto-discovery (main + per-podcast). The
+        partial pulls everything from SeoHelper, which auto-detects
+        the page subject from @post / @page (Page record) / @product
+        / @doc and falls back to site config defaults. %>
+    <%= render "shared/head_meta" %>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    <!-- Feed autodiscovery -->
-    <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="<%= feed_url(format: :xml) %>">
-    <link rel="alternate" type="application/atom+xml" title="Atom Feed" href="<%= feed_atom_url(format: :xml) %>">
     <!-- Font preloading -->
     <% fonts_config = SiteConfig.get('fonts') %>
     <% if fonts_config %>
@@ -39,9 +41,11 @@
     <% if SiteConfig.get('favicon').present? %>
       <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
     <% end %>
-    <!-- Apple touch icon -->
-    <% if SiteConfig.get('logo').present? %>
-      <link rel="apple-touch-icon" href="<%= system_image_path(SiteConfig.get('logo')) %>">
+    <!-- Apple touch icon — uses social_image when set (Apple prefers
+         square art with margin); falls back to logo. -->
+    <% touch_icon = SiteConfig.get('social_image').presence || SiteConfig.get('logo').presence %>
+    <% if touch_icon %>
+      <link rel="apple-touch-icon" href="<%= system_image_path(touch_icon) %>">
     <% end %>
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>
