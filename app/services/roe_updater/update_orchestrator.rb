@@ -29,12 +29,17 @@ module RoeUpdater
     # existing session cookie — the user gets signed out the moment
     # they restart on the new code.
     #
+    # Rails 8 renamed `tmp/development_secret.txt` to `tmp/local_secret.txt`
+    # (now used in BOTH development and test). This list previously
+    # preserved the old name, which silently no-op'd post-Rails-7.1 —
+    # which is why sessions started dying on every update.
+    #
     # master.key and credentials.yml.enc used to live here too, but
     # they're now under /site/system/secrets/ (per-install, carried by
     # backups, never touched by current/ swaps). See config/application.rb
     # for the path config and bin/setup for the generation flow.
     PRESERVED_FROM_OLD_CURRENT = %w[
-      tmp/development_secret.txt
+      tmp/local_secret.txt
     ].freeze
 
     class << self
