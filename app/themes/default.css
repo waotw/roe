@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
    Version: 0.9.1
-   Bundled with: Roe v0.0.20
+   Bundled with: Roe v0.0.25
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -51,6 +51,7 @@
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
+  --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-7: 1.75rem;
   --space-8: 2rem;
@@ -59,7 +60,7 @@
   --space-gallery: 0.75rem;
 
   /* Colors */
-  --color-bg: #fffffff;
+  --color-bg: #ffffff;
   --color-bg-dim: #f5f5f5;
   --color-text: #000000;
   --color-heading: #000000;
@@ -592,7 +593,7 @@ a.footnote-backlink-number:hover {
 .footnote-tooltip code {
   background: var(--color-code-bg);
   border-radius: 1px;
-  padding: 0rem 0.25rem;
+  padding: 0rem var(--space-1);
   border: 1px solid var(--color-border);
 }
 
@@ -662,7 +663,7 @@ a.footnote-backlink-number:hover {
 }
 
 h1.post-title {
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-1) 0;
 }
 
 .post-meta {
@@ -934,7 +935,7 @@ p.collection-more a:hover {
 
 .title-media-icon {
   padding-left: var(--space-1);
-  vertical-align: -4px;
+  vertical-align: -1px;
   opacity: 0.5;
 }
 
@@ -1449,10 +1450,10 @@ p.collection-more a:hover {
 .card-aside {
   float: none;
   width: auto;
-  margin: 1.5rem 0;
+  margin: var(--space-6) 0;
   display: grid;
   grid-template-columns: minmax(0, 30%) 1fr;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: start;
   color: var(--color-muted);
   font-size: var(--text-xs);
@@ -1612,19 +1613,20 @@ article .content,
 /* Audio Player */
 
 .audio-player {
-  padding: 1.25rem;
+  padding: var(--space-5);
   background: var(--player-bg);
   border: 1px solid var(--player-border);
-  margin: 1.5rem 0;
+  margin: var(--space-6) 0;
 }
 
 .player-header {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
 
 .player-header img {
+  border: 1px solid var(--color-border);
   margin: 0;
 }
 
@@ -1677,7 +1679,7 @@ article .content,
   height: 6px;
   background: var(--player-track);
   cursor: pointer;
-  margin: 0.25rem 0;
+  margin: var(--space-1) 0;
 }
 
 .progress-fill {
@@ -1724,7 +1726,7 @@ article .content,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .player-controls-center {
@@ -1732,7 +1734,7 @@ article .content,
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .controls-center {
@@ -1748,7 +1750,7 @@ article .content,
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  /*border-radius: 50%;*/
   transition:
     background 0.15s,
     color 0.15s;
@@ -1768,6 +1770,7 @@ article .content,
   height: 40px;
   background: var(--player-accent);
   color: var(--player-btn-play-color);
+  border-radius: 50%;
 }
 
 .btn-play:hover {
@@ -1795,9 +1798,10 @@ article .content,
 .btn-speed {
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  min-width: 3rem;
+  padding: var(--space-1) var(--space-2);
+  min-width: var(--space-12);
   border: 1px solid var(--player-border);
+  border-radius: 0.1rem;
   background: var(--color-bg);
   color: var(--player-btn-color);
   font-variant-numeric: tabular-nums;
@@ -1831,11 +1835,15 @@ article .content,
   color: var(--player-btn-color);
   background: none;
   border: none;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   cursor: pointer;
   transition: background 0.15s;
   flex: 0 0 auto;
   max-width: 80%;
+}
+
+a.btn-episode {
+  color: var(--player-btn-color);
 }
 
 .btn-prev {
@@ -1855,8 +1863,8 @@ article .content,
 }
 
 .btn-episode svg {
-  width: 20px;
-  height: 20px;
+  width: 12px;
+  height: 12px;
   flex-shrink: 0;
 }
 
@@ -1880,17 +1888,17 @@ article .content,
 
 .player-chapters {
   border-top: 1px solid var(--player-border);
-  padding-top: 0.75rem;
-  margin-top: 0.75rem;
+  padding-top: var(--space-3);
+  margin-top: var(--space-3);
 }
 
 .player-chapters-heading {
-  font-size: 0.75rem;
+  font-size: var(--space-3);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--player-meta-color);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .chapter-list {
@@ -1899,13 +1907,13 @@ article .content,
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .chapter {
   display: flex;
-  gap: 0.75rem;
-  padding: 0.35rem 0.5rem;
+  gap: var(--space-3);
+  padding: 0.35rem var(--space-2);
   cursor: pointer;
   font-size: 0.85rem;
   transition: background 0.1s;
@@ -1933,7 +1941,7 @@ article .content,
   position: relative;
   background: #000;
   overflow: hidden;
-  margin: 1.5rem 0;
+  /*margin: var(--space-6) 0;*/
 }
 
 .video-player-video {
@@ -1993,20 +2001,20 @@ article .content,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .video-controls-left,
 .video-controls-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .video-btn {
   background: none;
   border: none;
-  padding: 8px;
+  padding: var(--space-2);
   cursor: pointer;
   color: #fff;
   display: flex;
@@ -2014,6 +2022,10 @@ article .content,
   justify-content: center;
   border-radius: 50%;
   transition: background 0.15s;
+}
+
+a.video-btn {
+  color: var(--color-bg);
 }
 
 .video-btn:hover {
@@ -2043,12 +2055,12 @@ article .content,
 
 .video-time {
   color: #fff;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   margin-left: 12px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .video-time-separator {
@@ -2101,7 +2113,8 @@ article.post-podcast {
 .podcast-hero {
   gap: var(--space-4);
   position: relative;
-  margin-bottom: 1.5rem;
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-3);
   align-items: center;
   justify-content: center;
 }
@@ -2138,12 +2151,20 @@ article.post-podcast {
   border: 1px solid var(--player-border);
 }
 
+p.podcast-audio-fallback {
+  font-size: var(--text-xs);
+  margin: 0 0 0 0;
+  line-height: 1;
+  position: absolute;
+  right: 0;
+}
+
 /* Episode list */
 
 .episode-list {
   margin-top: var(--space-8);
   border-top: 1px solid var(--color-border);
-  padding-top: 1.5rem;
+  padding-top: var(--space-0);
 }
 
 .episode-list ol {
@@ -2156,9 +2177,9 @@ article.post-podcast {
 }
 
 .episode-list h2 {
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-weight: 600;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .episode {
@@ -2172,7 +2193,7 @@ article.post-podcast {
 .episode-list-meta {
   font-size: var(--text-sm);
   font-weight: 600;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .episode-item {
@@ -2186,8 +2207,8 @@ article.post-podcast {
 .episode-item a {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem var(--space-4);
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
   text-decoration: none;
   color: inherit;
   transition: background 0.1s;
@@ -2207,7 +2228,7 @@ article.post-podcast {
 
 .episode-meta-row {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   font-size: 0.75rem;
   color: var(--player-meta-color);
 }
@@ -2219,7 +2240,7 @@ article.post-podcast {
 /* Subscribe / feed */
 
 .podcast-episode .podcast-subscribe {
-  margin-top: 1.5rem;
+  margin-top: var(--space-6);
   font-size: 0.85rem;
 }
 
@@ -2229,7 +2250,7 @@ article.post-podcast {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.3rem 0.75rem;
+  padding: 0.3rem var(--space-3);
   border: 1px solid var(--player-border);
   color: var(--player-btn-color);
   font-size: 0.8rem;
@@ -2243,7 +2264,7 @@ article.post-podcast {
 }
 
 .feed-link {
-  font-size: 0.7rem;
+  font-size: var(--text-xxs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.15rem 0.4rem;
@@ -2546,7 +2567,7 @@ a.member-account-icon svg {
 
 .member-page .donate-presets button {
   flex: 1 1 auto;
-  min-width: 4rem;
+  min-width: var(--space-16);
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--color-border);
   background-color: var(--color-bg);
@@ -2702,7 +2723,7 @@ article.page-store h2 {
 .product-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: var(--space-4);
   margin: var(--space-8) 0;
 }
 
@@ -2714,7 +2735,7 @@ article.page-store h2 {
 
 @media (min-width: 601px) {
   .product-grid {
-    gap: 2rem;
+    gap: var(--space-8);
   }
 }
 

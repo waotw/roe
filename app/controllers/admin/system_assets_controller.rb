@@ -79,15 +79,20 @@ class Admin::SystemAssetsController < Admin::BaseController
     asset_type = params[:asset_type] || "fonts"
     file_path = ASSETS_PATH.join(asset_type, filename)
 
-    Rails.logger.info "Attempting to delete: #{file_path}"
-    Rails.logger.info "File exists: #{File.exist?(file_path)}"
+    # Redirect back to whichever browse page the user was on. Falls
+    # through to the fonts browser for any future asset_type that
+    # doesn't yet have its own browse view.
+    redirect_target = case asset_type
+    when "images" then browse_images_admin_system_assets_path
+    else               browse_fonts_admin_system_assets_path
+    end
 
     if File.exist?(file_path)
       File.delete(file_path)
-      redirect_to browse_fonts_admin_system_assets_path, notice: "#{filename} deleted successfully"
+      redirect_to redirect_target, notice: "#{filename} deleted successfully"
     else
-      Rails.logger.error "File not found at: #{file_path}"
-      redirect_to browse_fonts_admin_system_assets_path, alert: "File not found: #{file_path}"
+      Rails.logger.warn "[SystemAssets] Delete attempt for missing file: #{file_path}"
+      redirect_to redirect_target, alert: "File not found: #{filename}"
     end
   end
 

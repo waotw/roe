@@ -1,8 +1,15 @@
 <% if podcast_episodes.present?
      current_index = podcast_episodes.index { |e| e.url_name == post.url_name }
-     # Episodes are newest-first, so "next" is older (higher index), "prev" is newer (lower index)
-     prev_episode = current_index && current_index > 0 ? podcast_episodes[current_index - 1] : nil
-     next_episode = current_index && current_index < podcast_episodes.length - 1 ? podcast_episodes[current_index + 1] : nil
+     # Episodes are newest-first, so "Previous episode" (the one that
+     # came out BEFORE this one) is at a HIGHER index, and "Next
+     # episode" (the one that came out AFTER this one) is at a LOWER
+     # index. This matches the chronological convention users expect
+     # from podcast player buttons: ⏮ goes back in time, ⏭ goes
+     # forward. Boundary checks match this: prev only exists when
+     # there's an older episode below in the list; next only when
+     # there's a newer one above.
+     prev_episode = current_index && current_index < podcast_episodes.length - 1 ? podcast_episodes[current_index + 1] : nil
+     next_episode = current_index && current_index > 0 ? podcast_episodes[current_index - 1] : nil
    end %>
 <div class="podcast-episode">
 
@@ -15,6 +22,18 @@
       <%= render 'posts/media_player', post: post, podcast_config: podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
     </div>
   </div>
+
+  <%# When the episode has both video (playing above) and audio, surface
+      the audio file as a direct link so listeners who'd rather just
+      hear it can grab the audio without going through the RSS feed
+      or switching apps. Only renders when both media types exist —
+      audio-only episodes already render the audio player as the
+      primary, so the link would be redundant there. %>
+  <% if post.video.present? && post.audio.present? %>
+    <p class="podcast-audio-fallback">
+      Audio available: <a href="<%= post.audio %>">here</a>
+    </p>
+  <% end %>
 
   <div class="post-content">
     <%= render_post_content(post) %>
