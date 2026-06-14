@@ -11,20 +11,50 @@ FileUtils.chdir APP_ROOT do
   puts "== Installing dependencies =="
   system("bundle check") || system!("bundle install")
 
+  # Per-install encryption keys live under /site/system/secrets/ (not
+  # current/config/) — see the lengthy comment in config/application.rb
+  # for the why. We need to compute that path here without loading Rails
+  # (which would itself try to read credentials and fail if missing).
+  parent_dir       = File.expand_path("..", APP_ROOT)
+  versioned_layout = File.basename(APP_ROOT) == "current"
+  roe_root         = versioned_layout ? parent_dir : APP_ROOT
+  site_path        = ENV["ROE_SITE_PATH"] || File.join(roe_root, "site")
+  secrets_dir      = File.join(site_path, "system", "secrets")
+
   puts "\n== Checking master key =="
-  unless File.exist?("config/master.key")
-    puts "⚠️  config/master.key not found. Generating new master key..."
+  master_key_path  = File.join(secrets_dir, "master.key")
+  credentials_path = File.join(secrets_dir, "credentials.yml.enc")
+
+  unless File.exist?(master_key_path)
+    # Legacy migration: if a master.key still exists under current/config/
+    # (pre-/site/system/secrets/ install), the one-time block in
+    # config/application.rb would have already moved it on first boot.
+    # We hit this branch only on truly fresh installs.
+    puts "⚠️  #{master_key_path.sub(roe_root + '/', '')} not found. Generating new master key..."
     require "securerandom"
-    File.write("config/master.key", SecureRandom.hex(16))
-    File.chmod(0600, "config/master.key")
-    puts "✅ Master key created"
+    FileUtils.mkdir_p(secrets_dir)
+    File.chmod(0o700, secrets_dir)
+    File.write(master_key_path, SecureRandom.hex(16))
+    File.chmod(0o600, master_key_path)
+    puts "✅ Master key created at site/system/secrets/master.key"
 
     # Remove any existing credentials file — it was encrypted with a different
     # key and would cause InvalidMessage errors on boot.
-    creds = File.expand_path("config/credentials.yml.enc", APP_ROOT)
-    if File.exist?(creds)
-      File.delete(creds)
+    if File.exist?(credentials_path)
+      File.delete(credentials_path)
       puts "   Removed stale credentials.yml.enc (will be regenerated)"
+    end
+
+    # Drop a one-line warning README so anyone poking around the
+    # secrets directory understands what's in there.
+    readme_path = File.join(secrets_dir, "README.txt")
+    unless File.exist?(readme_path)
+      File.write(readme_path,
+        "This directory contains your install's encryption keys.\n" \
+        "Do NOT copy these files to other Roe installs or share them publicly.\n" \
+        "Do ADD this directory to your .gitignore file if your repo is public.\n" \
+        "Site backups include these files so a /site restore is self-sufficient.\n" \
+        "SiteSync is configured to exclude this directory so dev/prod stay independent.\n")
     end
   end
 
@@ -34,9 +64,6 @@ FileUtils.chdir APP_ROOT do
   require "active_support"
   require "active_support/encrypted_configuration"
   require "securerandom"
-
-  master_key_path = File.expand_path("../config/master.key", __dir__)
-  credentials_path = File.expand_path("../config/credentials.yml.enc", __dir__)
 
   if File.exist?(master_key_path) && File.exist?(credentials_path)
     master_key = File.read(master_key_path).strip

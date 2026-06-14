@@ -44,14 +44,24 @@ module SiteSync
       "--exclude=system/global/.last_deploy.yml"
     ].freeze
 
+    # system/secrets/ is excluded from PUSH and PULL so dev and prod each
+    # keep their own per-install encryption keys (master.key +
+    # credentials.yml.enc). BACKUP_EXCLUDES intentionally does NOT
+    # exclude it — when pulling a remote /site for backup, you DO want
+    # the remote's secrets so that backup is self-sufficient for an
+    # emergency restore on the remote environment.
+    SECRETS_EXCLUDE = "--exclude=system/secrets/".freeze
+
     PUSH_EXCLUDES = (COMMON_EXCLUDES + [
       "--exclude=db/production/",
-      "--exclude=db/development/.gitkeep"
+      "--exclude=db/development/.gitkeep",
+      SECRETS_EXCLUDE
     ]).freeze
 
     PULL_EXCLUDES = (COMMON_EXCLUDES + [
       "--exclude=db/development/",
-      "--exclude=db/production/.gitkeep"
+      "--exclude=db/production/.gitkeep",
+      SECRETS_EXCLUDE
     ]).freeze
 
     BACKUP_EXCLUDES = (COMMON_EXCLUDES + [

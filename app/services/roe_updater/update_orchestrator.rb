@@ -24,16 +24,16 @@ module RoeUpdater
     # Files that live INSIDE current/ but are per-install (gitignored,
     # never in the cloned tag) and so don't survive the SwitchManager
     # rename. We copy them across from current.backup/ → current/ after
-    # the swap so they aren't regenerated to new values, which would:
-    #   - production: leave the new container without master.key, so
-    #     credentials.yml.enc can't be decrypted and the app refuses
-    #     to boot.
-    #   - development: regenerate tmp/development_secret.txt to a new
-    #     value, which rotates Rails' session secret_key_base and
-    #     invalidates every existing session cookie — the user gets
-    #     signed out the moment they restart on the new code.
+    # the swap so they aren't regenerated to new values, which would
+    # rotate Rails' session secret_key_base and invalidate every
+    # existing session cookie — the user gets signed out the moment
+    # they restart on the new code.
+    #
+    # master.key and credentials.yml.enc used to live here too, but
+    # they're now under /site/system/secrets/ (per-install, carried by
+    # backups, never touched by current/ swaps). See config/application.rb
+    # for the path config and bin/setup for the generation flow.
     PRESERVED_FROM_OLD_CURRENT = %w[
-      config/master.key
       tmp/development_secret.txt
     ].freeze
 

@@ -16,9 +16,10 @@
   <!-- Tabs for Post Types -->
   <div class="mt-6 border-b border-gray-200">
     <nav class="-mb-px flex space-x-8" data-posts-filter-target="tabContainer">
+      <h2 class="inline-flex items-center text-sm font-medium uppercase py-2">Type:</h2>
       <!-- Always show 'All' -->
       <button data-action="click->posts-filter#filterByType" data-type="all" data-posts-filter-target="tab"
-              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+              class="whitespace-nowrap border-b-2 pt-2 pb-[0.4rem] px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
         All
       </button>
 
@@ -26,7 +27,7 @@
       <% ['article', 'podcast', 'music', 'audio', 'video', 'docs'].each do |type| %>
         <% if @existing_types.include?(type) %>
           <button data-action="click->posts-filter#filterByType" data-type="<%= type %>" data-posts-filter-target="tab"
-                  class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                  class="whitespace-nowrap border-b-2 pt-2 pb-[0.4rem] px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             <%= type %>
           </button>
         <% end %>

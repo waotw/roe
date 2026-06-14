@@ -15,6 +15,15 @@ module SiteSync
     #   - .sync-backups/ defensive — in case anyone parks site backups inside
     EXCLUDED_DIRS = %w[db .git .sync-backups].freeze
 
+    # Paths (nested) excluded as whole subtrees, matched as path
+    # prefixes from /site's root:
+    #   - system/secrets/   per-install encryption keys (master.key +
+    #                       credentials.yml.enc). Kept out of SiteSync
+    #                       so dev and prod each have their own keys
+    #                       and an accidental sync can never overwrite
+    #                       the production key with a dev one.
+    EXCLUDED_PATHS = %w[system/secrets].freeze
+
     # Filenames excluded wherever they appear in the tree:
     #   - .DS_Store       macOS noise that appears in every browsed dir
     #   - .sync-state.json the ledger itself; otherwise the ledger's mtime
@@ -156,6 +165,7 @@ module SiteSync
       parts = relative_path.split("/")
       return true if EXCLUDED_DIRS.include?(parts.first)
       return true if EXCLUDED_FILES.include?(parts.last)
+      return true if EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
       false
     end
   end
