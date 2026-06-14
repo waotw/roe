@@ -60,13 +60,14 @@ FileUtils.chdir APP_ROOT do
 
   puts "\n== Checking AR Encryption credentials =="
   # Check credentials directly without loading Rails to avoid double-init.
-  # ActiveSupport::EncryptedConfiguration can decrypt the file standalone.
+  # ActiveSupport::EncryptedConfiguration can decrypt the file standalone
+  # — and importantly, write to it whether or not it already exists, so
+  # this branch runs even on installs that never had a credentials.yml.enc.
   require "active_support"
   require "active_support/encrypted_configuration"
   require "securerandom"
 
-  if File.exist?(master_key_path) && File.exist?(credentials_path)
-    master_key = File.read(master_key_path).strip
+  if File.exist?(master_key_path)
     enc_config = ActiveSupport::EncryptedConfiguration.new(
       config_path: credentials_path,
       key_path:    master_key_path,
@@ -87,10 +88,10 @@ FileUtils.chdir APP_ROOT do
         'key_derivation_salt' => SecureRandom.alphanumeric(32)
       }
       enc_config.write(hash.to_yaml)
-      puts "✅ AR Encryption keys added to credentials"
+      puts "✅ AR Encryption keys written to credentials.yml.enc"
     end
   else
-    puts "   Skipping (credentials or master key not found yet)"
+    puts "   Skipping (master key not found yet)"
   end
 
   # Load Rails environment once — boots everything
