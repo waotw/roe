@@ -1,0 +1,236 @@
+<%# Full-page "modal" mirroring new_members_modal.html.erb. Routed
+    via GET new_podcast_setup; submits to either POST create_podcast
+    (Enable Podcasts button) or POST preview_podcast_from_rss
+    (Fill from feed button). Per-button formaction overrides the
+    form's default url. %>
+<div class="px-4 sm:px-0 max-w-2xl mx-auto mt-12">
+  <div class="bg-white border-2 border-gray-900 p-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Enable Podcasts</h1>
+
+    <div class="mb-6">
+      <p class="text-gray-700 mb-4">
+        Set up your first podcast now. You can either paste an existing podcast feed URL to fill the fields automatically, or fill them in manually below. Fields can be edited at any time after enabling.
+      </p>
+      <div class="bg-blue-50 border border-blue-300 p-4">
+        <p class="text-sm text-gray-700 leading-7">
+          <strong>Note:</strong> You can change these settings anytime at: <br>
+          <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">Settings → Features → podcast.yml </code>
+        </p>
+      </div>
+    </div>
+
+    <% if flash.now[:alert] %>
+      <div data-flash-message class="mb-6 px-4 py-3 bg-red-50 border border-red-300 text-red-800 text-sm">
+        <%= flash.now[:alert] %>
+      </div>
+    <% end %>
+    <% if flash.now[:notice] %>
+      <div data-flash-message class="mb-6 px-4 py-3 bg-green-50 border border-green-300 text-green-800 text-sm">
+        <%= flash.now[:notice] %>
+      </div>
+    <% end %>
+
+    <%= form_with url: create_podcast_admin_configs_path, method: :post, class: "space-y-6" do |f| %>
+      <%# Carries the source artwork URL through Fill-from-feed → Enable.
+          Hidden, populated only by the preview action; manual users
+          leave it blank and supply a filename in the artwork field. %>
+      <%= hidden_field_tag :image_url, @image_url %>
+
+      <!-- Seed from feed -->
+      <div class="bg-gray-50 border border-gray-300 p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">Have an existing feed?</h3>
+        <p class="text-sm text-gray-700 mb-4">
+          Paste your podcast's RSS or Atom feed URL. Roe will fetch it and fill the canonical fields below — you can still edit anything before clicking Enable. <strong>This will overwrite whatever you've already typed.</strong>
+        </p>
+        <div class="flex gap-2">
+          <%= text_field_tag :rss_url, @rss_url,
+                             placeholder: "https://example.com/podcast/feed.xml",
+                             autocomplete: "off",
+                             class: "flex-1 px-3 py-2 border border-gray-300 text-sm font-mono" %>
+          <%= f.submit "Fill from feed",
+                       formaction: preview_podcast_from_rss_admin_configs_path,
+                       class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer" %>
+        </div>
+      </div>
+
+      <!-- Canonical podcast fields -->
+      <div class="bg-gray-50 border border-gray-300 p-6 space-y-4">
+        <h3 class="font-semibold text-gray-900 mb-3">Podcast details</h3>
+
+        <% field_label = ->(name, label) { %>
+          <label class="block text-sm font-medium text-gray-900 mb-1"><%= label %></label>
+        <% } %>
+
+        <%# Template-level fields_for (NOT f.fields_for). The form_builder
+            method `f.fields_for :podcast` prepends the parent
+            form_builder's object_name with brackets, and form_with(url:)
+            without a model gives the parent an empty object_name — so
+            you end up with field names like `[podcast][title]` (literal
+            leading bracket) and params[:podcast] arrives as nil. The
+            template helper `fields_for :podcast` doesn't do that, so
+            field names come out as `podcast[title]` and the controller
+            sees params[:podcast] as expected. Every field carries an
+            explicit `value:` since there's no object to read defaults
+            from — that's fine, @podcast_data already has the canonical
+            shape. %>
+        <%= fields_for :podcast do |pf| %>
+          <div>
+            <label class="block text-sm font-medium text-gray-900 mb-1">Title <span class="text-red-600">*</span></label>
+            <%= pf.text_field :title, value: @podcast_data["title"], class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-900 mb-1">Description</label>
+            <%= pf.text_area :description, value: @podcast_data["description"], rows: 3, class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Author</label>
+              <%= pf.text_field :author, value: @podcast_data["author"], class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Owner name</label>
+              <%= pf.text_field :owner_name, value: @podcast_data["owner_name"], class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-900 mb-1">Owner email</label>
+            <%= pf.email_field :email, value: @podcast_data["email"], class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+            <p class="text-xs text-gray-500 mt-1">iTunes/Apple Podcasts requires this even though they don't show it publicly.</p>
+          </div>
+
+          <%# Category selects with iTunes taxonomy. Subcategory options
+              are filtered by the chosen category — initial render
+              reflects whatever category is already set (default: blank,
+              showing no subcategories). The small <script> at the
+              bottom of this template rebinds subcategory options when
+              the category changes. %>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Category</label>
+              <%= pf.select :category,
+                            [""] + itunes_categories,
+                            { selected: @podcast_data["category"] },
+                            { class: "w-full px-3 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat", data: { podcast_category: "primary" } } %>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Subcategory</label>
+              <%= pf.select :subcategory,
+                            [""] + (itunes_subcategories[@podcast_data["category"]] || []),
+                            { selected: @podcast_data["subcategory"] },
+                            { class: "w-full px-3 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat", data: { podcast_subcategory: "primary" } } %>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Secondary category</label>
+              <%= pf.select :category_secondary,
+                            [""] + itunes_categories,
+                            { selected: @podcast_data["category_secondary"] },
+                            { class: "w-full px-3 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat", data: { podcast_category: "secondary" } } %>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Secondary subcategory</label>
+              <%= pf.select :subcategory_secondary,
+                            [""] + (itunes_subcategories[@podcast_data["category_secondary"]] || []),
+                            { selected: @podcast_data["subcategory_secondary"] },
+                            { class: "w-full px-3 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat", data: { podcast_subcategory: "secondary" } } %>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Language</label>
+              <%= pf.text_field :language, value: @podcast_data["language"], class: "w-full px-3 py-2 border border-gray-300 text-sm font-mono" %>
+              <p class="text-xs text-gray-500 mt-1">ISO 639-1 (en, es, fr…)</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Type</label>
+              <%= pf.select :type, [["Episodic", "episodic"], ["Serial", "serial"]], { selected: @podcast_data["type"] }, { class: "w-full px-3 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" } %>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-900 mb-1">Explicit</label>
+              <%= pf.select :explicit, [["No", "false"], ["Yes", "true"]], { selected: @podcast_data["explicit"] }, { class: "w-full px-3 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" } %>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-900 mb-1">Copyright</label>
+            <%= pf.text_field :copyright, value: @podcast_data["copyright"], placeholder: "© #{Date.today.year} Your Name", class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-900 mb-1">Website link</label>
+            <%= pf.url_field :link, value: @podcast_data["link"], placeholder: "https://example.com", class: "w-full px-3 py-2 border border-gray-300 text-sm" %>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-900 mb-1">Artwork filename</label>
+            <%# Shared image-upload widget: text field + Upload button +
+                inline existence check. The partial wires its own <input>
+                with the explicit `name:` we pass, so it bypasses the
+                surrounding fields_for block while still arriving as
+                params[:podcast][:artwork] on submit (DOM-nested in the
+                form). The help_text local controls the small grey
+                explanation below the field — copy is yours to adjust. %>
+            <%= render "shared/image_upload_field",
+                       name: "podcast[artwork]",
+                       value: @podcast_data["artwork"],
+                       placeholder: "my-show.jpg",
+                       help_text: "If artwork is available in an existing feed, it will be imported and added here. You can also upload artwork here or at any time in the future once podcasts are enabled." %>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="flex items-center gap-3 justify-center">
+        <%= link_to "Cancel", admin_configs_path,
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-100 font-mono rounded-xs" %>
+        <%= f.submit "Enable Podcasts",
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Dependent-subcategory wiring. Keeps the subcategory dropdown in
+    sync with the chosen category — Apple's spec only allows a
+    subcategory whose parent matches. Vanilla JS (no Stimulus) since
+    this template only ever renders once and the global controllers
+    don't need to know about it. %>
+<script>
+  (function () {
+    const SUBCATS = <%= raw itunes_subcategories.to_json %>;
+
+    // When the category changes, rebuild the subcategory dropdown
+    // from the new category's valid options. Subcategory always
+    // resets to blank — Apple's spec doesn't allow cross-category
+    // subcategories, so a stale selection would be invalid anyway.
+    // Initial render is server-driven (the partial filters options
+    // by @podcast_data["category"] and `selected:` picks the value),
+    // so a "Fill from feed" submission shows both correctly without
+    // any JS running.
+    function bind(categorySelect, subcategorySelect) {
+      if (!categorySelect || !subcategorySelect) return;
+      categorySelect.addEventListener("change", function () {
+        const list = SUBCATS[categorySelect.value] || [];
+        subcategorySelect.innerHTML =
+          '<option value=""></option>' +
+          list.map(function (s) {
+            return '<option value="' + s + '">' + s + '</option>';
+          }).join("");
+      });
+    }
+
+    bind(
+      document.querySelector('[data-podcast-category="primary"]'),
+      document.querySelector('[data-podcast-subcategory="primary"]')
+    );
+    bind(
+      document.querySelector('[data-podcast-category="secondary"]'),
+      document.querySelector('[data-podcast-subcategory="secondary"]')
+    );
+  })();
+</script>

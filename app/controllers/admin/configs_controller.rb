@@ -175,6 +175,20 @@ class Admin::ConfigsController < Admin::BaseController
     }
   }.freeze
 
+  helper_method :itunes_categories, :itunes_subcategories
+
+  # Top-level iTunes podcast categories. Single source of truth —
+  # used both by the inline category list in build_field_options_for_podcast
+  # and by the new-podcast-setup modal so they stay in sync.
+  def itunes_categories
+    [
+      "Arts", "Business", "Comedy", "Education", "Fiction", "Government",
+      "Health & Fitness", "History", "Kids & Family", "Leisure", "Music",
+      "News", "Religion & Spirituality", "Science", "Society & Culture",
+      "Sports", "Technology", "True Crime", "TV & Film"
+    ]
+  end
+
   def itunes_subcategories
     {
       "Arts" => [ "Books", "Design", "Fashion & Beauty", "Food", "Performing Arts", "Visual Arts" ],
@@ -487,16 +501,98 @@ class Admin::ConfigsController < Admin::BaseController
     end
   end
 
-  def generate_podcast
+  # GET — renders the "Enable Podcasts" setup form (full-page modal,
+  # mirroring new_members_setup). The form carries the full canonical
+  # field set + an RSS/Atom URL the user can optionally seed from.
+  # Cancelling navigates away without writing anything; submitting
+  # writes podcast.yml AND enables the feature in one shot.
+  def new_podcast_setup
     if File.exist?(SiteConfig::FEATURES_PATH.join("podcast.yml"))
       flash[:alert] = "Podcast configuration already exists"
-    else
-      ConfigGenerator.generate_podcast
-      SiteConfig.sync_from_file("features/podcast")
-      flash[:notice] = "Podcast configuration created successfully"
+      redirect_to admin_configs_path and return
     end
 
-    redirect_to admin_configs_path
+    @podcast_data = PodcastConfig.default_entry
+    @rss_url      = ""
+    @image_url    = ""
+    render :new_podcast_modal
+  end
+
+  # POST — server-side "Fill from feed" preview. Fetches + parses the
+  # RSS/Atom URL, then re-renders the setup form with the canonical
+  # fields populated. Failures (bad URL, no <title>, network) re-render
+  # the form with an inline error and the user's current input
+  # preserved, matching the agreed-upon UX.
+  def preview_podcast_from_rss
+    @rss_url      = params[:rss_url].to_s.strip
+    @podcast_data = PodcastConfig.default_entry.merge(submitted_podcast_data)
+    @image_url    = ""
+
+    if @rss_url.blank?
+      flash.now[:alert] = "Paste a podcast RSS or Atom feed URL to fill from."
+      return render(:new_podcast_modal, status: :unprocessable_entity)
+    end
+
+    fetch = PodcastFeedFetcher.fetch(@rss_url)
+    unless fetch.success?
+      flash.now[:alert] = "Could not load feed: #{fetch.error}"
+      return render(:new_podcast_modal, status: :unprocessable_entity)
+    end
+
+    channel = fetch.data[:channel] || {}
+    if channel[:title].to_s.strip.empty?
+      flash.now[:alert] = "Feed has no <title> — cannot derive a podcast."
+      return render(:new_podcast_modal, status: :unprocessable_entity)
+    end
+
+    # Overwrite all canonical fields with what the feed gave us
+    # (user explicitly asked for "Fill from feed"). The artwork
+    # filename stays blank in the form — the actual download happens
+    # at create_podcast time, using @image_url passed through as a
+    # hidden field. PodcastConfigSeeder.entry_from_channel handles
+    # the channel-key-to-canonical-field mapping (RSS vs Atom is
+    # already collapsed by PodcastFeedParser into a uniform shape).
+    @podcast_data = PodcastConfigSeeder.entry_from_channel(channel)
+    @image_url    = channel[:image_url].to_s
+
+    flash.now[:notice] = "Filled fields from feed. Review and adjust before enabling."
+    render :new_podcast_modal, status: :unprocessable_entity
+  end
+
+  # POST — final submit. Writes podcast.yml as a single entry; if the
+  # form carries a hidden image_url (from Fill-from-feed), downloads
+  # the artwork too and uses the resulting filename for the artwork
+  # field. Form values take precedence over feed-derived values
+  # everywhere except artwork (user only sees the filename, not a
+  # URL).
+  def create_podcast
+    if File.exist?(SiteConfig::FEATURES_PATH.join("podcast.yml"))
+      flash[:alert] = "Podcast configuration already exists"
+      redirect_to admin_configs_path and return
+    end
+
+    data = PodcastConfig.default_entry.merge(submitted_podcast_data)
+    title = data["title"].to_s.strip
+
+    if title.blank?
+      @podcast_data = data
+      @rss_url      = params[:rss_url].to_s
+      @image_url    = params[:image_url].to_s
+      flash.now[:alert] = "Title is required to create a podcast."
+      return render(:new_podcast_modal, status: :unprocessable_entity)
+    end
+
+    key = PodcastConfigSeeder.derive_key(title)
+
+    image_url = params[:image_url].to_s
+    if image_url.present?
+      data["artwork"] = PodcastConfigSeeder.fetch_artwork(key, image_url)
+    end
+
+    write_single_podcast_entry(key, data)
+    SiteConfig.sync_from_file("features/podcast")
+    flash[:notice] = "Podcast '#{title}' created and feature enabled."
+    redirect_to admin_edit_podcast_config_path
   end
 
   def delete_podcast
@@ -1028,6 +1124,27 @@ class Admin::ConfigsController < Admin::BaseController
   # diffs clean across the codebase.
   def write_yaml(path, data)
     File.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
+  end
+
+  # Extract just the canonical podcast fields from form params,
+  # stringified. Anything outside CANONICAL_FIELDS is silently
+  # dropped — we don't want stray params landing in podcast.yml.
+  def submitted_podcast_data
+    return {} unless params[:podcast].is_a?(ActionController::Parameters)
+    params[:podcast]
+      .permit(PodcastConfig::CANONICAL_FIELDS)
+      .to_h
+      .transform_values(&:to_s)
+  end
+
+  # Write podcast.yml as a single-entry file. Same format as
+  # PodcastConfigSeeder produces (no document marker, since the
+  # admin form-based YAML editor saves without one).
+  def write_single_podcast_entry(key, data)
+    path = SiteConfig::FEATURES_PATH.join("podcast.yml")
+    FileUtils.mkdir_p(File.dirname(path))
+    yaml = { key => data }.to_yaml.sub(/\A---\s*\n/, "")
+    File.write(path, yaml)
   end
 
   # Sum of all file sizes the SiteSync ledger would track under /site.

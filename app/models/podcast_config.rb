@@ -1,6 +1,45 @@
 class PodcastConfig
   REQUIRED_FIELDS = %w[title description author email category language artwork link].freeze
 
+  # Canonical iTunes-spec field set. Every podcast entry in
+  # podcast.yml carries the full list so blank values become visible
+  # "fill me in" prompts in the admin editor — missing keys are
+  # invisible, present-but-blank ones aren't. PodcastConfigSeeder and
+  # the "Enable Podcasts" modal both emit this exact set.
+  #
+  # Order matters: it's the order fields render in the YAML output
+  # and in any all-canonical-fields admin form.
+  CANONICAL_FIELDS = %w[
+    title
+    description
+    author
+    email
+    owner_name
+    category
+    subcategory
+    category_secondary
+    subcategory_secondary
+    language
+    copyright
+    explicit
+    type
+    artwork
+    link
+  ].freeze
+
+  # Defaults applied when a canonical field has no value from any
+  # source (form input, feed extraction, etc.). Anything not listed
+  # defaults to "".
+  FIELD_DEFAULTS = {
+    "language" => "en",
+    "type"     => "episodic",
+    "explicit" => "false"
+  }.freeze
+
+  def self.default_entry
+    CANONICAL_FIELDS.each_with_object({}) { |f, h| h[f] = FIELD_DEFAULTS.fetch(f, "") }
+  end
+
   # Get a specific podcast config by key
   def self.get(podcast_key)
     config = all_podcasts[podcast_key.to_s]

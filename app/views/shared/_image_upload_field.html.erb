@@ -1,0 +1,90 @@
+<%# Reusable image-filename + upload field with inline existence
+    check. Paired with the image-upload Stimulus controller.
+
+    Locals:
+      name         — form field name for the filename input (required).
+                     e.g. "podcast[artwork]"
+      value        — current filename (default: "")
+      placeholder  — text input placeholder (default: "image-filename.jpg")
+      help_text    — small grey help text below the field (optional)
+      show_upload  — render the Upload button + hidden file picker
+                     (default: true). Set false when the page already
+                     surfaces a separate upload path (e.g. a "Global
+                     Images" link to browse_images) and you just want
+                     the verify-on-blur behaviour.
+      browse_url   — URL for an inline "Global Images" link rendered
+                     beside the input, opens in a new tab. Useful in
+                     verify-only mode where there's no inline Upload
+                     button but the user still needs a way to reach
+                     the system-images browser. Default: nil (no link).
+      input_class  — class for the filename input. Default styles the
+                     field for modals; pass a custom class to match
+                     the surrounding form's visual conventions. Note
+                     that any inline sibling (Upload button or browse
+                     link) requires the input to play nicely with
+                     flex — `flex-1 min-w-0` works well.
+      base_url     — URL prefix used to verify existence (default
+                     "/system/images/", which serves from
+                     /site/system/assets/images/)
+      asset_type   — upload route parameter (default "images")
+      upload_url   — endpoint for the multipart upload (default
+                     "/admin/system_assets")
+%>
+<%
+  value       = local_assigns.fetch(:value, "").to_s
+  placeholder = local_assigns.fetch(:placeholder, "image-filename.jpg")
+  help_text   = local_assigns[:help_text]
+  show_upload = local_assigns.fetch(:show_upload, true)
+  browse_url  = local_assigns[:browse_url]
+  input_class = local_assigns.fetch(:input_class, "flex-1 px-3 py-2 border border-gray-300 text-sm font-mono")
+  base_url    = local_assigns.fetch(:base_url, "/system/images/")
+  asset_type  = local_assigns.fetch(:asset_type, "images")
+  upload_url  = local_assigns.fetch(:upload_url, "/admin/system_assets")
+  extra_input_data = local_assigns.fetch(:extra_input_data, {})
+  has_inline_action = show_upload || browse_url.present?
+%>
+<div data-controller="image-upload"
+     data-image-upload-base-url-value="<%= base_url %>"
+     data-image-upload-asset-type-value="<%= asset_type %>"
+     data-image-upload-upload-url-value="<%= upload_url %>">
+  <div class="<%= "flex gap-2 items-stretch" if has_inline_action %>">
+    <input type="text"
+           name="<%= name %>"
+           value="<%= value %>"
+           placeholder="<%= placeholder %>"
+           autocomplete="off"
+           data-image-upload-target="filename"
+           data-action="blur->image-upload#verify input->image-upload#verify"
+           <% extra_input_data.each do |k, v| %>data-<%= k %>="<%= v %>" <% end %>
+           class="<%= input_class %>">
+    <% if browse_url.present? %>
+      <%= link_to "Global Images", browse_url,
+                  target: "_blank",
+                  class: "uppercase text-xs px-2 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs whitespace-nowrap flex items-center" %>
+    <% end %>
+    <% if show_upload %>
+      <button type="button"
+              data-image-upload-target="uploadButton"
+              data-action="click->image-upload#triggerFilePicker"
+              class="uppercase text-xs px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono">
+        Upload
+      </button>
+      <input type="file"
+             accept="image/*,.svg"
+             class="hidden"
+             data-image-upload-target="fileInput"
+             data-action="change->image-upload#upload">
+    <% end %>
+  </div>
+  <% if help_text.present? %>
+    <p class="text-xs text-gray-500 mt-1"><%= help_text %></p>
+  <% end %>
+  <p data-image-upload-target="warning"
+     class="text-xs text-amber-700 mt-1 hidden">
+    ⚠ File not found in <code class="bg-amber-50 px-1">/site/system/assets/images/</code>
+  </p>
+  <% if show_upload %>
+    <p data-image-upload-target="status"
+       class="text-xs text-gray-600 mt-1 hidden"></p>
+  <% end %>
+</div>

@@ -32,10 +32,9 @@
   <% unless podcast_enabled? %>
     <div class="mt-4">
       <h3 class="mb-2 text-xl font-bold text-gray-900">Features</h3>
-      <%= button_to "Enable Podcasts",
-                    generate_podcast_admin_configs_path,
-                    method: :post,
-                    class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      <%= link_to "Enable Podcasts",
+                  new_podcast_setup_admin_configs_path,
+                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     </div>
   <% end %>
 

@@ -5,20 +5,26 @@ import "delete_modal";
 import "theme_reset_modal";
 import "update_theme_modal";
 
-// Auto-dismiss floating flash messages
-document.addEventListener("turbo:load", function () {
-  const flashMessages = document.querySelectorAll("[data-flash-message]");
+// Auto-dismiss floating flash messages. Re-runs on both turbo:load
+// (initial loads + successful redirects) AND turbo:render (form
+// re-renders via 422 responses) so any flash added during a
+// re-render still picks up the click + timeout handlers. A
+// per-element wired-flag prevents double-binding if both events
+// fire for the same DOM node.
+function wireDismissibleFlashes() {
+  document.querySelectorAll("[data-flash-message]").forEach(function (flash) {
+    if (flash.dataset.flashWired === "1") return;
+    flash.dataset.flashWired = "1";
 
-  flashMessages.forEach(function (flash) {
-    // Auto-dismiss after 3 seconds - just remove it
     setTimeout(function () {
       flash.remove();
     }, 4000);
 
-    // Allow manual dismiss on click
     flash.style.cursor = "pointer";
     flash.addEventListener("click", function () {
       flash.remove();
     });
   });
-});
+}
+document.addEventListener("turbo:load",   wireDismissibleFlashes);
+document.addEventListener("turbo:render", wireDismissibleFlashes);

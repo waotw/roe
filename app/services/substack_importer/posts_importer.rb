@@ -380,7 +380,7 @@ module SubstackImporter
 
     # Create or update a podcast.yml entry from the RSS channel data so
     # imported episodes' `podcast:` references resolve. Downloads the
-    # podcast artwork to /site/system/images/<key>-artwork.<ext>.
+    # podcast artwork to /site/system/assets/images/<key>-artwork.<ext>.
     def seed_podcast_config_from_rss(podcast_key)
       channel = @import.rss_data["channel"] || @import.rss_data[:channel]
       return unless channel

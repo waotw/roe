@@ -535,6 +535,31 @@
                                       <!-- Subcategories added here by JS -->
                                     </div>
                                   <% end %>
+                                <% elsif @config_type == 'podcast' && subkey == 'artwork' %>
+                                  <%# Image-upload Stimulus widget in verify-only
+                                      mode. show_upload: false hides the inline
+                                      Upload button because podcast artwork is
+                                      uploaded via the "Global Images" link
+                                      rendered beside this field (browse_url:),
+                                      which opens browse_images in a new tab —
+                                      the user can upload there without losing
+                                      their form state and copy the filename
+                                      back into this input. The verify-on-blur
+                                      behaviour stays on, so a typo'd filename
+                                      shows the inline warning.
+
+                                      flex-1 min-w-0 (not w-full) on the input
+                                      so the inline Global Images button can
+                                      sit beside it without getting pushed
+                                      off-row. %>
+                                  <%= render "shared/image_upload_field",
+                                             name: "config_fields[#{key}][#{subkey}]",
+                                             value: subvalue,
+                                             placeholder: "podcast-artwork.jpg",
+                                             show_upload: false,
+                                             browse_url: browse_images_admin_system_assets_path,
+                                             input_class: "flex-1 min-w-0 font-mono text-sm p-2 border border-gray-300",
+                                             extra_input_data: { "config-field" => nested_field_key } %>
                                 <% else %>
                                   <!-- Regular text input for nested field -->
                                   <input type="text"

@@ -142,7 +142,9 @@ Rails.application.routes.draw do
 
     resources :configs, only: [ :index ] do
       collection do
-        post :generate_podcast
+        get  :new_podcast_setup
+        post :preview_podcast_from_rss
+        post :create_podcast
         delete :delete_podcast
         get :new_members_setup
         post :create_members

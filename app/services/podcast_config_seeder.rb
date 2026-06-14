@@ -2,7 +2,9 @@ require "yaml"
 require "open-uri"
 
 # Seeds an entry in site/system/features/podcast.yml from RSS channel
-# data, and downloads the podcast artwork to /site/system/images/.
+# data, and downloads the podcast artwork to /site/system/assets/images/
+# — the canonical location for system-level images, the same place the
+# admin "Manage Global Images" UI uploads to.
 #
 # Two modes:
 # - mode: :create  — only adds the entry if missing (default; safe for
@@ -13,7 +15,7 @@ require "open-uri"
 #   for the podcast.yml entry to be (re)generated.
 class PodcastConfigSeeder
   PODCAST_YML = File.join(RoeSitePaths::SITE_PATH, "system/features/podcast.yml").freeze
-  ARTWORK_DIR = File.join(RoeSitePaths::SITE_PATH, "system/images").freeze
+  ARTWORK_DIR = File.join(RoeSitePaths::SITE_PATH, "system/assets/images").freeze
 
   # Single source of truth for podcast-key derivation. Both the Substack
   # importer (deriving the `podcast:` field for episodes) and the admin
@@ -72,8 +74,13 @@ class PodcastConfigSeeder
     File.write(PODCAST_YML, yaml)
   end
 
+  # Build a canonical-shape entry from feed channel data. All
+  # PodcastConfig::CANONICAL_FIELDS are always emitted, blank when
+  # the source provided nothing — they become visible "fill me in"
+  # prompts in the admin editor, which is what we want for iTunes
+  # spec compliance.
   def build_entry(artwork_filename)
-    {
+    extracted = {
       # Strip trailing parenthesized suffixes — Substack private feeds get
       # auto-tagged with "(private feed for <email>)" which we don't want
       # showing up as the public-facing podcast title.
@@ -81,16 +88,48 @@ class PodcastConfigSeeder
       "description" => strip_html(@channel["description"]),
       "author"      => @channel["author"].to_s,
       "email"       => @channel["owner_email"].to_s,
+      # Owner name falls back to author — that's what RSS feeds with
+      # only one of the two conventionally mean. Atom feeds typically
+      # populate author/name into both via the parser.
+      "owner_name"  => (@channel["owner_name"].presence || @channel["author"]).to_s,
       "category"    => @channel["category"].to_s,
       "subcategory" => @channel["subcategory"].to_s,
-      "language"    => (@channel["language"] || "en").to_s,
+      "language"    => (@channel["language"].presence || "en").to_s,
       "copyright"   => @channel["copyright"].to_s,
-      "explicit"    => parse_bool(@channel["explicit"]),
+      "explicit"    => parse_bool(@channel["explicit"]).to_s,
       "type"        => (@channel["type"].presence || "episodic").to_s,
       "artwork"     => artwork_filename.to_s,
       "link"        => @channel["link"].to_s
-    }.reject { |_, v| v.respond_to?(:empty?) && v.empty? }
+    }
+
+    PodcastConfig::CANONICAL_FIELDS.each_with_object({}) do |field, entry|
+      entry[field] = extracted.fetch(field, PodcastConfig::FIELD_DEFAULTS.fetch(field, ""))
+    end
   end
+
+  # Public entry points for callers that need the seeder's behaviour
+  # piecemeal (the "Enable Podcasts" modal uses these so it can
+  # respect form edits on top of feed-derived values).
+  public
+
+  # Class-method wrapper around the instance's download_artwork so a
+  # caller can download artwork without going through a full seed!.
+  # Returns the filename written to /site/system/assets/images/ (or ""
+  # on any failure — never raises).
+  def self.fetch_artwork(podcast_key, image_url)
+    return "" if image_url.to_s.empty?
+    new(podcast_key, { "image_url" => image_url }, mode: :overwrite).send(:download_artwork)
+  end
+
+  # Build the canonical entry hash from feed channel data WITHOUT
+  # writing or downloading. Used by the "Fill from feed" preview in
+  # the enable modal — preview shouldn't have side effects.
+  def self.entry_from_channel(channel, artwork_filename: "")
+    new("preview", (channel || {}).transform_keys(&:to_s), mode: :overwrite)
+      .send(:build_entry, artwork_filename)
+  end
+
+  private
 
   def parse_bool(value)
     %w[yes true 1].include?(value.to_s.downcase)
@@ -100,9 +139,10 @@ class PodcastConfigSeeder
     text.to_s.gsub(/<[^>]+>/, "").strip
   end
 
-  # Downloads the podcast cover art to /site/system/images/<key>-artwork.<ext>.
+  # Downloads the podcast cover art to /site/system/assets/images/<key>-artwork.<ext>.
   # Returns the filename only (matches existing convention in podcast.yml's
-  # `artwork:` field — paths are resolved relative to /system/images/).
+  # `artwork:` field — paths are resolved relative to /system/images/,
+  # which the System::ImagesController serves from /site/system/assets/images/).
   # Returns "" on any failure so seeding still succeeds with no artwork.
   def download_artwork
     url = @channel["image_url"].to_s
