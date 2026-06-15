@@ -1,5 +1,5 @@
 ---
-roe_version: 0.0.19
+roe_version: 0.0.26
 title: Add an Image Gallery
 status: published
 tags: tutorial

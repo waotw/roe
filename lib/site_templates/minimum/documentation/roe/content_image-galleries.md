@@ -1,5 +1,5 @@
 ---
-roe_version: 0.0.19
+roe_version: 0.0.26
 title: "Content: Images & Image Galleries"
 status: published
 url_name: galleries
