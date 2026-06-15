@@ -247,6 +247,9 @@ Rails.application.routes.draw do
     get "configs/site/edit", to: "configs#edit_site", as: "edit_site_config"
     patch "configs/site", to: "configs#update_site", as: "site_config"
 
+    get   "configs/custom_code/edit", to: "configs#edit_custom_code", as: "edit_custom_code_config"
+    patch "configs/custom_code",      to: "configs#update_custom_code", as: "custom_code_config"
+
     get "configs/fonts/edit", to: "configs#edit_fonts", as: "edit_fonts_config"
     patch "configs/fonts", to: "configs#update_fonts", as: "fonts_config"
 

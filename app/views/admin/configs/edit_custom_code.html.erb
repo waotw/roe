@@ -1,0 +1,80 @@
+<% content_for :title, "Edit Custom Code" %>
+
+<div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300">
+  <div class="flex items-baseline gap-2">
+  <h1 class="text-3xl font-bold font-sans">Custom Code</h1>
+  <a href="/documentation/custom-code" target="_blank" class="text-blue-500">[info/doc ↗]</a>
+  </div>
+  <%= link_to "← Back to Settings",
+              admin_configs_path,
+              class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
+</div>
+
+<%= form_with url: admin_custom_code_config_path, method: :patch, local: true, class: "space-y-6" do %>
+  <%# Theme scoping — only ticked themes load this code. Empty selection
+      means the code doesn't run anywhere (a useful soft kill-switch).
+      Only installed themes are listed (themes present in /site/theme/);
+      bundled themes that haven't been activated yet can't be the
+      currently-active theme, so scoping to them would never match. %>
+  <div>
+    <label class="block text-sm font-semibold uppercase text-gray-900 mb-1">
+      Themes:
+    </label>
+    <p class="text-xs text-gray-600 mb-2">
+      Check theme/s to activate code for that theme. Unchecked themes will not recieve custom code.
+    </p>
+    <div class="flex flex-wrap gap-3 p-3 border border-gray-300 bg-gray-50">
+      <% (@available_themes || []).each do |theme_name| %>
+        <label class="inline-flex items-center gap-1.5 cursor-pointer text-sm font-mono">
+          <%= check_box_tag "themes[]", theme_name, @themes.include?(theme_name), class: "" %>
+          <%= theme_name %>
+        </label>
+      <% end %>
+      <% if (@available_themes || []).empty? %>
+        <p class="text-xs text-gray-500 italic">No themes installed in /site/theme/ yet.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div>
+    <label for="head_html" class="block text-sm font-semibold uppercase text-gray-900 mb-1">
+      Header
+    </label>
+    <p class="text-xs text-gray-600 mb-2">
+      Inserted just before <code class="bg-gray-100 px-1">&lt;/head&gt;</code>.
+    </p>
+    <%= text_area_tag :head_html,
+                      @head_html,
+                      id: "head_html",
+                      rows: 16,
+                      class: "w-full font-mono text-sm p-3 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                      spellcheck: false,
+                      placeholder: "<!-- Example: tippy.js -->\n<script src=\"https://unpkg.com/@popperjs/core@2\"></script>\n<script src=\"https://unpkg.com/tippy.js@6\"></script>\n<script>\n  // With the above scripts loaded, you can call `tippy()` with a CSS\n  // selector and a `content` prop:\n  tippy('#myButton', {\n    content: 'My tooltip!',\n  });\n</script>" %>
+  </div>
+
+  <div>
+    <label for="footer_html" class="block text-sm font-semibold uppercase text-gray-900 mb-1">
+      Footer
+    </label>
+    <p class="text-xs text-gray-600 mb-2">
+      Inserted just before <code class="bg-gray-100 px-1">&lt;/body&gt;</code>.
+    </p>
+    <%= text_area_tag :footer_html,
+                      @footer_html,
+                      id: "footer_html",
+                      rows: 12,
+                      class: "w-full font-mono text-sm p-3 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                      spellcheck: false,
+                      placeholder: "<!-- Example: HTMX -->\n<script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js\"\n        integrity=\"sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V\"\n        crossorigin=\"anonymous\"></script>\n<!-- have a button POST a click via AJAX -->\n<button hx-post=\"/clicked\" hx-swap=\"outerHTML\">\n  Click Me\n</button>" %>
+  </div>
+
+  <div class="h-12"></div>
+
+  <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 right-12 bg-white">
+    <%= submit_tag "Save",
+                   class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+    <%= link_to "Cancel",
+                admin_configs_path,
+                class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+  </div>
+<% end %>

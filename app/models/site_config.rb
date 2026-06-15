@@ -7,6 +7,7 @@ class SiteConfig < ApplicationRecord
 
   SITE_FILE = File.join(SITE_PATH, "site.yml")
   FONTS_FILE = File.join(SITE_PATH, "fonts.yml")
+  CUSTOM_CODE_FILE = File.join(SITE_PATH, "custom_code.yml")
   DEVELOPMENT_FILE = File.join(SITE_PATH, "development.yml")
   DEPLOY_FILE = File.join(SITE_PATH, "deploy.yml")
 
@@ -36,6 +37,23 @@ class SiteConfig < ApplicationRecord
     config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.fonts error: #{e.message}"
+    nil
+  end
+
+  # Get custom code config (head_html, footer_html, themes scoping).
+  # Returns nil when the file doesn't exist yet — the layout's
+  # renderer treats nil as "nothing to inject", so brand-new installs
+  # never error on the missing file.
+  def self.custom_code(key = nil)
+    return nil unless File.exist?(CUSTOM_CODE_FILE)
+    config_data = YAML.load_file(CUSTOM_CODE_FILE)
+
+    return config_data unless key
+
+    keys = key.to_s.split(".")
+    config_data&.dig(*keys)
+  rescue => e
+    Rails.logger.error "SiteConfig.custom_code error: #{e.message}"
     nil
   end
 

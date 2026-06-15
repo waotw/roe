@@ -230,6 +230,13 @@ class Admin::ConfigsController < Admin::BaseController
         edit_path: admin_edit_site_config_path
       },
       {
+        name: "custom_code.yml",
+        path: "global/custom_code.yml",
+        type: "custom_code",
+        description: "Add analytics, fonts, widgets, or any HTML/JS/CSS into your site's <head> or footer",
+        edit_path: admin_edit_custom_code_config_path
+      },
+      {
         name: "fonts.yml",
         path: "global/fonts.yml",
         type: "fonts",
@@ -374,6 +381,44 @@ class Admin::ConfigsController < Admin::BaseController
     update_config("site", SiteConfig::SITE_FILE)
   end
 
+  # GET — focused edit page for custom_code.yml. Loads the three
+  # fields: themes (scoping array), head_html, footer_html. Also
+  # surfaces @available_themes so the multi-select can render
+  # checkboxes for every theme the install knows about. When the
+  # file doesn't exist yet (first-time editors before any save),
+  # falls back to empty values.
+  def edit_custom_code
+    config = SiteConfig.custom_code || {}
+    @themes      = Array(config["themes"])
+    @head_html   = config["head_html"].to_s
+    @footer_html = config["footer_html"].to_s
+    @available_themes = list_installed_themes
+  end
+
+  # POST — writes the three fields back to custom_code.yml. Creates
+  # the file on first save (the SiteTemplates loader's auto-install
+  # only runs at boot for fresh installs; existing installs that
+  # pre-date the file get it on their first save here).
+  #
+  # YAML.dump prefixes a `---\n` document marker that the rest of
+  # Roe's config files don't carry — strip it so the file stays
+  # consistent with site.yml, fonts.yml, etc.
+  def update_custom_code
+    config = {
+      "themes"      => Array(params[:themes]).reject(&:blank?),
+      "head_html"   => params[:head_html].to_s,
+      "footer_html" => params[:footer_html].to_s
+    }
+
+    FileUtils.mkdir_p(File.dirname(SiteConfig::CUSTOM_CODE_FILE))
+    File.write(SiteConfig::CUSTOM_CODE_FILE, config.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteConfig.sync_from_file("custom_code")
+    Rails.cache.clear
+
+    flash[:notice] = "Custom code saved."
+    redirect_to admin_edit_custom_code_config_path
+  end
+
   def edit_fonts
     @config_type = "fonts"
     @config_content = File.read(SiteConfig::FONTS_FILE)
@@ -390,6 +435,17 @@ class Admin::ConfigsController < Admin::BaseController
     user_dir = File.join(RoeSitePaths::SITE_PATH, "theme")
     names += Dir.glob(File.join(user_dir, "*.css")).map { |f| File.basename(f, ".css") } if Dir.exist?(user_dir)
     names.uniq.sort
+  end
+
+  # Themes that are actually INSTALLED on this site (present in
+  # /site/theme/, regardless of whether they're a copy of a bundled
+  # one or a hand-rolled custom). Used by Custom Code's theme
+  # multi-select — bundled-but-not-installed themes can't be the
+  # active theme, so scoping to them would never match.
+  def list_installed_themes
+    user_dir = File.join(RoeSitePaths::SITE_PATH, "theme")
+    return [] unless Dir.exist?(user_dir)
+    Dir.glob(File.join(user_dir, "*.css")).map { |f| File.basename(f, ".css") }.sort
   end
 
   def update_fonts

@@ -1,0 +1,17 @@
+# Custom code injection. Edited via Admin → Settings → Custom Code.
+#
+# themes      — names of themes this code should be active for.
+#               Only ticked themes load the code. Empty list (default)
+#               means the code runs nowhere — useful as a soft
+#               kill-switch (clear the list to deactivate without
+#               losing the code below). To activate on every install
+#               theme, list them all.
+# head_html   — pasted just before </head>. Supports <script>,
+#               <style>, <link>, <meta>, etc. Common uses: analytics
+#               snippets, external fonts, third-party widgets.
+# footer_html — pasted just before </body>. Conventionally just
+#               scripts that need the DOM ready before they run
+#               (chat widgets, A/B test SDKs).
+themes: []
+head_html: ""
+footer_html: ""

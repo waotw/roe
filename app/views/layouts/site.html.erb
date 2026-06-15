@@ -50,6 +50,12 @@
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>
     <meta name="turbo-visit-control" content="restore">
+
+    <%# Custom code — user-pasted HTML for analytics, fonts, widgets,
+        etc. Injected verbatim except for nonce attributes added to
+        inline <script>/<style> tags via CustomCodeRenderer. Edited
+        in Admin → Settings → Custom Code. %>
+    <%= CustomCodeRenderer.render_field("head_html", nonce: request.content_security_policy_nonce) %>
   </head>
   <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}" ].compact.join(" ") %>
   <body class="<%= body_classes %>">
@@ -126,5 +132,10 @@
         </script>
       <% end %>
     <% end %>
+
+    <%# Custom code — user-pasted footer injection (chat widgets,
+        late-binding tracking SDKs, etc.). Same nonce + allowlist
+        handling as the head_html injection above. %>
+    <%= CustomCodeRenderer.render_field("footer_html", nonce: request.content_security_policy_nonce) %>
   </body>
 </html>
