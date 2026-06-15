@@ -1,6 +1,6 @@
 ---
 roe_version: 0.0.19
-title: Images & Image Galleries
+title: "Content: Images & Image Galleries"
 status: published
 url_name: galleries
 ---

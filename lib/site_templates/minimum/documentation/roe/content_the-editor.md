@@ -1,6 +1,6 @@
 ---
 roe_version: 0.0.19
-title: The Editor
+title: "Content: The Editor"
 post_type: documentation
 status: published
 ---

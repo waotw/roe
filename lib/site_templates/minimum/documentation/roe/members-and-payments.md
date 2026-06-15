@@ -1,45 +1,59 @@
 ---
-roe_version: 0.0.20
-title: Members & Payments
+roe_version: 0.0.19
+title: "Features: Members"
 status: published
 ---
 
-# Members & Payments
+# Members
 
 Roe CMS includes a complete membership and payment system that allows you to:
-- Build an email list with free member signups
-- Accept one-time payments for premium content access
+
+- Build an email list with free member (and/or paid) signups
+- Accept one-time payments for lifetime access to premium content
 - Gate content behind a paywall with preview snippets
 - Manage members and their access levels from the admin
+- Accept donations from anyone visiting the site
 
 The system is designed to be flexible: you can use it for free newsletters only, paid memberships only, or a combination of both. You can even use payments purely for donations/support without gating any content.
+
+<mark>Note: Static-site generation does not support Members at this time. This is something we would love to add in the future but requires some work. For now, leave static-site-generation disabled if you want to have Members.</mark>
 
 ## Enabling the Members System
 
 1. Go to <mark>Admin → Settings</mark>
 2. Click **"Enable Members"**
-3. Choose how you'd like paid content to be presented on the site
-4. Finish setup with: **"Enable Members"**
+3. Enable/disable Paid Memberships
+  - Add your paid membership price
+4. Enable/disable Newsletters
+5. Choose if you would like to show free members/regular visitors paid content.
+6. Click `ENABLE MEMBERS`
 
 This creates:
 
-- Your members configuration
-- Member pages: signup, signin, upgrade, check-email
+- Your members configuration file
+- Member [Pages](/admin/pages): signup, signin, upgrade, check-email, etc.
 
 ## Member Pages
 
 When you enable members, Roe generates several pages that you can customize:
 
-- <mark>Sign up</mark> - Where people create free accounts
-- <mark>Sign in</mark> - Where members sign in with their email
-- <mark>Upgrade</mark> - Where you pitch your paid membership
-- <mark>Check your email</mark> - Confirmation page after requesting a magic link
+- `Sign up` | `signup.md` - Where people create free accounts
+- `Sign in` | `signin.md` - Where members sign in with their email
+- `Check your email` | `check-email.md` - Confirmation page after requesting a magic link
+- `Upgrade` | `upgrade.md` - Where you pitch your paid membership
+- `Donate` | `donate.md` - One-time support page (no account required)
+- `Unsubscribe` | `unsubscribe.md` - Confirmation prompt before leaving the newsletter
+- `Unsubscribed` | `unsubscribed.md` - Shown after a successful unsubscribe
+- `Checkout success` | `checkout-success.md` - Stripe return URL after a successful paid-membership payment
+- `Checkout cancel` | `checkout-cancel.md` - Stripe return URL when someone backs out of paid-membership checkout
+- `Donation success` | `donation-success.md` - Stripe return URL after a successful donation
+- `Donation cancel` | `donation-cancel.md` - Stripe return URL when someone backs out of a donation
 
 These are regular markdown pages. You can edit the copy, add images, and customize them however you want.
 
 ## How Members Sign In (Magic Links)
 
-Roe uses **passwordless authentication** for free members. When someone signs in:
+Roe uses **passwordless authentication** for all members. When someone signs in:
 
 1. They enter their email address
 2. They receive an email with a "magic link"
@@ -47,141 +61,6 @@ Roe uses **passwordless authentication** for free members. When someone signs in
 4. The link expires after 24 hours
 
 Paid members can optionally use passwords (generated automatically after payment), but magic links still work for them too.
-
-## Setting Up Payments with Stripe
-
-To accept payments, you need to connect your Stripe account:
-
-### 1. Get Your Stripe Keys
-
-1. Create a Stripe account at [stripe.com](https://stripe.com)
-2. Go to **Developers → API Keys** in your Stripe dashboard
-3. Copy your **Publishable Key** and **Secret Key**
-4. For testing, use the test mode keys
-5. For production, use the live mode keys
-
-### 2. Add Keys to Roe
-
-1. Go to <mark>Admin → Payments</mark>
-2. Paste your Publishable Key
-3. Paste your Secret Key
-4. Click **"Save & Test Connection"**
-
-If successful, you'll see a green confirmation message.
-
-### 3. Set Your Price
-
-1. Go to <mark>Admin → Settings → members.yml</mark>
-2. Find the `payments:` section
-3. Set `enabled: true`
-4. Set your `price:` (e.g., `49.00` for $49)  
-  • <mark>Note: Stripe will default to your local currency if set in Stripe</mark>
-5. Click **"Save Configuration"**
-
-When you save, Roe automatically creates a product and price in your Stripe account.
-
-### 4. Set Up Webhooks
-
-Webhooks tell Roe when a payment succeeds:
-
-1. In your Stripe dashboard, go to **Developers → Webhooks**
-2. Click **"Add endpoint"**
-3. Enter your webhook URL: `https://yoursite.com/webhooks/stripe`
-4. Select events: `checkout.session.completed`
-5. Copy the **Signing Secret**
-6. Add it to your Stripe configuration in Roe
-
-## The Payment Flow
-
-Here's what happens when someone upgrades to paid:
-
-1. **Member clicks "Upgrade"** (on their account page or the upgrade page)
-2. **Redirected to Stripe Checkout** (secure payment form)
-3. **Enters payment details** (credit card, Apple Pay, etc.)
-4. **Payment processes** and Stripe sends webhook to Roe
-5. **Member upgraded automatically** to paid tier
-6. **They can now access paid content**
-
-The entire process is handled automatically - no manual intervention needed.
-
-## Signup Options: Free vs Paid
-
-Your signup page can offer two buttons:
-
-````markdown
-```form
-for: signup
-button-text: Sign up free
-upgrade-button-text: Sign up and become a paid member
-```
-````
-
-**How it works:**
-- **"Sign up free"** → Creates free account, sends magic link
-- **"Sign up and become a paid member"** → Creates account AND redirects to Stripe for payment
-
-The upgrade button only appears if payments are enabled in your config.
-
-## Creating Paywalled Content
-
-To make a post or page premium/paid-only:
-
-### 1. Set the Audience
-
-Add this to your post's frontmatter:
-
-```yaml
----
-title: My Premium Article
-audience: paid
----
-```
-
-### 2. Add a Paywall (Optional)
-
-You can control where the paywall appears in your content using a `paid_content` form block:
-
-````markdown
-This is the free preview that everyone can read. It gives them a taste of what's inside...
-
-```form
-for: paid_content
-text: This is premium content. Upgrade to continue reading.
-button-text: Become a paid member
-```
-
-Everything below this point is only visible to paid members. This is where your premium content lives - the analysis, insights, and deep dives that paying members get access to.
-````
-
-**How it works:**
-- ✅ **Paid members** see the entire post (paywall form is hidden)
-- ✅ **Free members & guests** see everything up to the form, then content stops
-- ✅ **The form** shows an upgrade button linking to `/upgrade`
-
-**In the editor:** When editing a post with `audience: paid`, you'll see a blue `ADD PAYWALL` button in the toolbar. Click it to insert the paywall form block instantly.
-
-### 3. Without a Paywall Form
-
-If you mark a post as `audience: paid` but don't add a paywall form, visitors who try to access it will be redirected to your <mark>Upgrade</mark> page.
-
-## Smart Upgrade Buttons
-
-The upgrade page shows different buttons depending on who's viewing it:
-
-````markdown
-```form
-for: checkout
-member-button-text: Upgrade Now
-non-member-button-text: Sign up as paid member
-```
-````
-
-**How it works:**
-- **Signed-in free members** see "Upgrade Now" → goes straight to Stripe
-- **Not signed in** see "Sign up as paid member" → goes to signup page
-- **Paid members** don't see the form (they're already paid)
-
-This creates a seamless experience - everyone sees the right call-to-action for their situation.
 
 ## Account Management
 
@@ -204,32 +83,6 @@ When a member changes their email address:
 5. Original email stays active until confirmed
 
 This prevents accidental or malicious email changes.
-
-## Admin: Managing Members
-
-Go to **Admin → Members** to:
-
-- **View all members** with search and filtering
-- **See member details** (tier, status, join date, upgrade date)
-- **Manually upgrade members** (for comps, gifts, etc.)
-- **Cancel memberships** (keeps account, revokes access)
-- **Delete members** (removes account entirely)
-- **Reactivate cancelled members**
-
-### Manual Upgrades
-
-To give someone free paid access:
-
-1. Go to **Admin → Members**
-2. Click on the member
-3. Click **"Upgrade to Paid Tier"**
-4. Enter a password or let Roe generate one
-5. Click **"Upgrade"**
-
-This is perfect for:
-- Giving free access to friends/family
-- Comp subscriptions for reviewers
-- Converting existing supporters
 
 ## Payment Models
 
@@ -318,20 +171,11 @@ You can edit these templates and use variables like:
 
 Collections automatically respect paid content settings:
 
----
-
-```collection
-heading: Latest Posts
-limit: 5
-```
-
----
-
 **How it works:**
 
-- ✅ **Paid posts show** in collections (with lightning bolt if `show_paid_indicator: true`)
-- ✅ **Clicking a paid post** shows the paywall/preview or redirects based on `show_paid_content` setting
-- ✅ **Paid members** see all posts normally
+- **Paid posts show** in collections (with paid-lock-icon if `show_paid_indicator: true`)
+- **Clicking a paid post** will show a preview and paywall if you've added one to the post, otherwise, it redirects to the Upgrade page immediately.
+- **Paid members** see all posts normally
 
 ## Webhooks & Security
 
@@ -350,17 +194,6 @@ The system includes error handling for:
 - Deleted members
 - Duplicate payments
 - Invalid webhooks
-
-## Static Site Generation
-
-If you're using static site generation, member features work differently:
-
-- **Paywalled content** is properly truncated in generated HTML
-- **Member pages** (signup, signin, etc.) can be generated as static pages
-- **Magic links** and authentication require server-side processing
-- ⚠︎ **Consider** keeping auth pages dynamic even in static mode
-
-Static + members is an advanced feature still in development.
 
 ## Use Cases & Examples
 

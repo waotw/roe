@@ -6,7 +6,12 @@ status: published
 
 # Cards
 
-Cards use a similar syntax to Collections and allow you to embed styled elements directly in a markdown file: [pullquote](#pull-quote), [post link](#post-link), [aside](#aside).
+```card
+type: aside
+text: This is an aside which is adding some helpful info about the this paragraph.
+``` 
+
+Cards use a similar syntax to [Collections](/documentation/collections) and allow you to embed styled elements directly in a markdown file: [pullquote](#pull-quote), [post link](#post-link), [aside](#aside).
 
 To keep things simple, each card `type` has it's own defaults. The card defaults can be edited in [Admin/Settings](/admin/configs/cards/edit).
 
@@ -114,7 +119,7 @@ Post links are a great way to link to other posts in your site with support for 
 ```card
 type: post-link
 style: small
-post: the-literary-wasteland-1
+post: collection-full
 ```
 ````
 
@@ -123,7 +128,25 @@ post: the-literary-wasteland-1
 ```card
 type: post-link
 style: small
-post: the-literary-wasteland-1
+post: collection-full
+```
+
+And you can change the size (small/medium/large)
+
+````markdown
+```card
+type: post-link
+style: medium
+post: collection-full
+```
+````
+
+↑ That code will produce this ↓ :
+
+```card
+type: post-link
+style: medium
+post: collection-full
 ```
 
 This simple syntax will pull all the information from the Post itself. You can also override this fully if you want. Just add the fields you'd like to replace ↓ :
@@ -131,12 +154,12 @@ This simple syntax will pull all the information from the Post itself. You can a
 ````markdown
 ```card
 type: post-link
-post: the-literary-wasteland-1
+post: collection-full
 style: large
-title: The Literary Wasteland, 1
-author: Darren Allen, Esq.
+title: Collection Full
+author: Benjamin Welch, Esq.
 date: 1983-06-15
-excerpt: Mediocre Literature is coming for us all.
+excerpt: Example of full collection
 link_text: Read more…
 ```
 ````
@@ -145,16 +168,16 @@ link_text: Read more…
 
 ```card
 type: post-link
-post: the-literary-wasteland-1
+post: collection-full
 style: large
-title: The Literary Wasteland, 1
-author: Darren Allen, Esq.
-date: 1983-05-15
-excerpt: Mediocre Literature is coming for us all.
-link_text: Read more...
+title: Collection Full
+author: Benjamin Welch, Esq.
+date: 1983-06-15
+excerpt: Example of full collection
+link_text: Read more…
 ```
 
-<mark>Note:</mark> that when you add `style: small` or `style: large` this adds a CSS class to the element so that you can style it however you like. You could use `style: featured` if you like and use CSS to style the `post-link-featured` card.
+<mark>Note:</mark> when you add `style: small`, `style: mediuam` or `style: large` this adds a CSS class to the element so that you can style it however you like. You could use `style: featured` if you like and use CSS to style the `post-link-featured` card.
 
 ## Aside
 
@@ -188,11 +211,10 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ### Just Image
 
-
 ````markdown
 ```card
 type: aside
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
@@ -204,7 +226,7 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ```card
 type: aside
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
@@ -219,7 +241,7 @@ You can use both image and text like so ↓ :
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 ````
@@ -231,7 +253,7 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 

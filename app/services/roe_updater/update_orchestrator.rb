@@ -1,3 +1,5 @@
+require "shellwords"
+
 module RoeUpdater
   class UpdateOrchestrator
     STEPS = [
@@ -9,6 +11,7 @@ module RoeUpdater
       { name: "switching",          percent: 85,  description: "Switching to new version" },
       { name: "preserving_secrets", percent: 86,  description: "Preserving per-install secrets" },
       { name: "syncing_root_files", percent: 87,  description: "Syncing root-level files" },
+      { name: "syncing_docs",       percent: 88,  description: "Syncing bundled documentation" },
       { name: "writing_version",    percent: 89,  description: "Updating VERSION files" },
       { name: "building_assets",    percent: 92,  description: "Building assets" },
       { name: "restarting",         percent: 95,  description: "Restarting server" },
@@ -55,6 +58,7 @@ module RoeUpdater
         execute_step(:switching) { SwitchManager.switch_versions(@status) }
         execute_step(:preserving_secrets) { preserve_secrets }
         execute_step(:syncing_root_files) { sync_root_files }
+        execute_step(:syncing_docs) { sync_docs }
         execute_step(:writing_version) { write_version_files }
         execute_step(:building_assets) { build_assets }
         execute_step(:restarting) { restart_server }
@@ -207,6 +211,54 @@ module RoeUpdater
           FileUtils.cp(source, dest)
           log("✓ Synced #{filename} → ROE_ROOT")
         end
+      end
+
+      # Mirror the bundled documentation subtree from the new code
+      # into the user's site/ tree. The CONTRACT with users is:
+      #
+      #   Everything inside /site/documentation/roe/ is owned by Roe
+      #   and is REPLACED on every update — files added, files
+      #   updated, files removed from the tag all reflect immediately
+      #   in the user's docs. To keep a custom version of a Roe doc,
+      #   move it OUT of the roe/ subfolder (e.g. into
+      #   /site/documentation/my-notes/). Anything outside roe/ is
+      #   untouched, forever.
+      #
+      # rsync --delete enforces the mirror: docs deprecated/renamed
+      # in this release disappear from the user's tree too, so the
+      # rendered docs site can't drift out of sync with the bundled
+      # set. The destination is created if missing (handles installs
+      # predating this feature where /site/documentation/roe/ may
+      # not exist yet).
+      #
+      # NOT rolled back by handle_failure on a failed update: docs
+      # aren't critical state and snapshotting the subtree on every
+      # update is overkill. Worst case, a failed update leaves the
+      # user on the previous code with the new docs, which renders
+      # fine in practice — the previous code can read the new docs
+      # without issue, just may miss any feature-specific updates.
+      def sync_docs
+        source = File.join(
+          RoeSitePaths::ROE_ROOT, "current",
+          "lib", "site_templates", "minimum", "documentation", "roe"
+        )
+        dest = File.join(RoeSitePaths::SITE_PATH, "documentation", "roe")
+
+        unless Dir.exist?(source)
+          log("⊘ Bundled docs subtree not found at #{source}, skipping")
+          return
+        end
+
+        FileUtils.mkdir_p(dest)
+
+        cmd = "rsync -a --delete #{source.shellescape}/ #{dest.shellescape}/ 2>&1"
+        output = `#{cmd}`
+        unless $?.success?
+          raise "Doc sync failed (rsync exit #{$?.exitstatus}): #{output}"
+        end
+
+        file_count = Dir.glob(File.join(dest, "**", "*")).count { |p| File.file?(p) }
+        log("✓ Synced bundled docs → /site/documentation/roe/ (#{file_count} files)")
       end
 
       # Refresh BOTH VERSION files so they report the new version
