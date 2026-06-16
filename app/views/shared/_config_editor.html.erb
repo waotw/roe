@@ -122,7 +122,15 @@
                               class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
                               data-config-field="theme.active">
                         <option value="">Select...</option>
-                        <% theme_options = config_schema.dig(:theme, :fields, 'active', :options) || [] %>
+                        <%# Prefer the dynamically-populated `available_themes`
+                            local (passed in by edit_site / edit_fonts) so
+                            user-installed themes like roe-site show up.
+                            Falls back to the schema's hardcoded options when
+                            the partial is rendered from a context that
+                            doesn't supply available_themes. %>
+                        <% theme_options = (local_assigns[:available_themes].presence) ||
+                                           config_schema.dig(:theme, :fields, 'active', :options) ||
+                                           [] %>
                         <% theme_options.each do |option| %>
                           <option value="<%= option %>"<% if theme_active == option %> selected<% end %>><%= option %></option>
                         <% end %>
@@ -272,7 +280,8 @@
                                value="<%= (flattened_config['product_categories'].is_a?(Array) ? flattened_config['product_categories'].join(', ') : flattened_config['product_categories'].to_s) %>"
                                placeholder="book, ebook, poster, tshirt"
                                class="w-full font-mono text-sm px-2 py-1.5 border border-gray-300"
-                               data-config-field="product_categories">
+                               data-config-field="product_categories"
+                               data-config-csv-array="true">
                         <p class="text-xs text-gray-500 mt-1">Comma-separated list of product categories for organization and SKU generation</p>
                       </div>
 
@@ -484,7 +493,7 @@
                             <% value.each do |subkey, subvalue| %>
                               <%
                                 # Skip subcategory fields - they're dynamically managed
-                                next if subkey == 'subcategory' || subkey == 'subcategory_2'
+                                next if subkey == 'subcategory' || subkey == 'subcategory_secondary'
                               %>
 
                               <% nested_field_key = "#{key}.#{subkey}" %>
@@ -503,7 +512,7 @@
 
                                 <%
                                   # Skip subcategory fields - they're dynamically managed
-                                  next if subkey == 'subcategory' || subkey == 'subcategory_2'
+                                  next if subkey == 'subcategory' || subkey == 'subcategory_secondary'
                                 %>
 
                                 <% field_options_key = @field_options&.key?(nested_field_key) ? nested_field_key : subkey %>
@@ -528,7 +537,7 @@
                                   <% end %>
 
                                   <%# Add subcategory container after secondary category %>
-                                  <% if subkey == 'category_2' %>
+                                  <% if subkey == 'category_secondary' %>
                                     <div class="category-subcategories mt-2"
                                          data-podcast-key="<%= key %>"
                                          data-category-type="secondary">
@@ -1028,6 +1037,17 @@
   // Setup font validation
   setupFontValidation();
 
+  // Wire up podcast category dropdowns: load the iTunes subcategory
+  // map, restore saved subcategory selections from the YAML textarea,
+  // and apply the secondary-category constraints (disabled until
+  // primary chosen, primary excluded from secondary's options).
+  // Only meaningful on the podcast edit page; on other config pages
+  // the inner querySelectorAll returns zero elements and the function
+  // exits cleanly.
+  if (typeof setupPodcastCategories === 'function') {
+    setupPodcastCategories();
+  }
+
   // Set up form submission handler (only if form exists)
   const configForm = document.getElementById('config-form');
   if (configForm) {
@@ -1108,6 +1128,19 @@
         value = input.value;
       }
 
+      // Comma-separated string → array. The text input for fields
+      // tagged with data-config-csv-array (e.g. product_categories)
+      // stores its UI value as "album, book, ebook". Without this
+      // conversion the YAML would persist as a quoted string and
+      // any consumer expecting an array (ProductCategory, the new
+      // category dropdown in product editor, etc.) would have to
+      // re-parse. Splitting here standardizes on the array shape.
+      if (input.dataset.configCsvArray === 'true' && typeof value === 'string') {
+        value = value.split(',')
+                     .map(s => s.trim())
+                     .filter(s => s.length > 0);
+      }
+
       // Handle nested fields (fonts.heading.family OR post-link.default_link_text)
       const parts = fieldName.split('.');
       if (parts.length > 1) {
@@ -1118,9 +1151,13 @@
           }
           current = current[parts[i]];
         }
-        current[parts[parts.length - 1]] = value.trim ? value.trim() : value;
+        current[parts[parts.length - 1]] = Array.isArray(value)
+          ? value
+          : (value.trim ? value.trim() : value);
       } else {
-        fields[fieldName] = value.trim ? value.trim() : value;
+        fields[fieldName] = Array.isArray(value)
+          ? value
+          : (value.trim ? value.trim() : value);
       }
     });
 
@@ -1191,21 +1228,44 @@
       .replace(/^-|-$/g, '');
   }
 
+  // Emit a YAML array as a block-style list under the given key.
+  // System-emitted arrays standardize on block style:
+  //
+  //   key:
+  //     - "value-1"
+  //     - "value-2"
+  //
+  // Empty arrays still emit inline `key: []` since "no items" reads
+  // most clearly that way. Block-form is what Psych emits when given
+  // a hash containing an Array, what ProductCategory's surgical
+  // writer produces, and what the user is most likely to
+  // hand-author. The reader path (YAML.load + every consumer that
+  // calls Array() on the value) handles flow-style `[a, b]` too, so
+  // users who hand-edit to inline arrays don't break anything — but
+  // the next system write normalizes back to block style.
+  function emitArrayBlock(spaces, key, arr) {
+    if (!Array.isArray(arr) || arr.length === 0) {
+      return `${spaces}${key}: []\n`;
+    }
+    const childSpaces = spaces + '  ';
+    let block = `${spaces}${key}:\n`;
+    arr.forEach(v => {
+      block += `${childSpaces}- "${String(v).replace(/"/g, '\\"')}"\n`;
+    });
+    return block;
+  }
+
   function simpleYamlStringify(obj, indent) {
     let yaml = '';
     const spaces = '  '.repeat(indent);
+    const nestedSpaces = spaces + '  ';
     const configType = '<%= @config_type %>';
     const yamlOperator = (configType === 'store') ? '|' : '|-';
 
     for (const [key, value] of Object.entries(obj)) {
       // CHECK ARRAYS FIRST (before objects)
       if (Array.isArray(value)) {
-        if (value.length === 0) {
-          yaml += `${spaces}${key}: []\n`;
-        } else {
-          const quotedValues = value.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
-          yaml += `${spaces}${key}: [${quotedValues.join(', ')}]\n`;
-        }
+        yaml += emitArrayBlock(spaces, key, value);
       } else if (typeof value === 'object' && value !== null) {
         // Nested object (like podcast configs)
         yaml += `${spaces}${key}:\n`;
@@ -1214,18 +1274,13 @@
 
         nestedEntries.forEach(([nestedKey, nestedValue]) => {
           // Skip subcategory fields - they'll be output after their parent category
-          if (nestedKey === 'subcategory' || nestedKey === 'subcategory_2') {
+          if (nestedKey === 'subcategory' || nestedKey === 'subcategory_secondary') {
             return;
           }
 
           // Output the field
           if (Array.isArray(nestedValue)) {
-            if (nestedValue.length === 0) {
-              yaml += `${spaces}  ${nestedKey}: []\n`;
-            } else {
-              const quotedValues = nestedValue.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
-              yaml += `${spaces}  ${nestedKey}: [${quotedValues.join(', ')}]\n`;
-            }
+            yaml += emitArrayBlock(nestedSpaces, nestedKey, nestedValue);
           } else if (typeof nestedValue === 'object' && nestedValue !== null) {
             yaml += simpleYamlStringify({ [nestedKey]: nestedValue }, indent + 1);
           } else {
@@ -1243,20 +1298,12 @@
 
           // After category, immediately output subcategory if it exists
           if (nestedKey === 'category' && value['subcategory']) {
-            const subcats = value['subcategory'];
-            if (Array.isArray(subcats) && subcats.length > 0) {
-              const quotedValues = subcats.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
-              yaml += `${spaces}  subcategory: [${quotedValues.join(', ')}]\n`;
-            }
+            yaml += emitArrayBlock(nestedSpaces, 'subcategory', value['subcategory']);
           }
 
-          // After category_2, immediately output subcategory_2 if it exists
-          if (nestedKey === 'category_2' && value['subcategory_2']) {
-            const subcats = value['subcategory_2'];
-            if (Array.isArray(subcats) && subcats.length > 0) {
-              const quotedValues = subcats.map(v => `"${String(v).replace(/"/g, '\\"')}"`);
-              yaml += `${spaces}  subcategory_2: [${quotedValues.join(', ')}]\n`;
-            }
+          // After category_secondary, immediately output subcategory_secondary if it exists
+          if (nestedKey === 'category_secondary' && value['subcategory_secondary']) {
+            yaml += emitArrayBlock(nestedSpaces, 'subcategory_secondary', value['subcategory_secondary']);
           }
         });
       } else {
@@ -1293,7 +1340,12 @@
   // ========== PODCAST CATEGORY/SUBCATEGORY MANAGEMENT ==========
 
   if (typeof subcategoryMap === 'undefined') {
-    var subcategoryMap = <%= raw @itunes_subcategories.to_json %>;
+    // iTunes subcategory taxonomy — read from the helper method (not
+    // an ivar, which would render as `null` and bail the entire
+    // category UI at the load-guard below). Keyed by primary category
+    // name; values are arrays of valid subcategories under that
+    // category.
+    var subcategoryMap = <%= raw itunes_subcategories.to_json %>;
   }
 
   function setupPodcastCategories() {
@@ -1305,8 +1357,8 @@
     document.querySelectorAll('[data-podcast-key]').forEach(container => {
       const podcastKey = container.dataset.podcastKey;
       const categoryType = container.dataset.categoryType; // 'primary' or 'secondary'
-      const categoryField = categoryType === 'primary' ? 'category' : 'category_2';
-      const subcategoryField = categoryType === 'primary' ? 'subcategory' : 'subcategory_2';
+      const categoryField = categoryType === 'primary' ? 'category' : 'category_secondary';
+      const subcategoryField = categoryType === 'primary' ? 'subcategory' : 'subcategory_secondary';
 
       const categorySelect = document.querySelector(`select[data-config-field="${podcastKey}.${categoryField}"]`);
       if (!categorySelect) return;
@@ -1319,62 +1371,203 @@
         updateSubcategoryUI(container, podcastKey, categoryField, subcategoryField, this.value);
       });
     });
+
+    // Layer the secondary-category UX on top: disabled until the
+    // primary is chosen; primary's value excluded from secondary's
+    // dropdown so the same category can't be picked twice.
+    setupSecondaryCategoryConstraints();
+  }
+
+  // For every podcast: tie the secondary <category_secondary> select
+  // to the primary <category> select.
+  //
+  //   - When primary is empty → secondary disabled + value cleared
+  //   - When primary has a value → secondary enabled, options
+  //     rebuilt to exclude the primary's value
+  //   - Changing primary that previously matched secondary's value →
+  //     secondary's value clears
+  //
+  // After any state change we dispatch `change` on the secondary
+  // select so the existing subcategory listener (from
+  // setupPodcastCategories above) refreshes the dependent
+  // subcategory UI for free.
+  function setupSecondaryCategoryConstraints() {
+    document.querySelectorAll('select[data-config-field$=".category"]').forEach(primarySelect => {
+      const fullField = primarySelect.dataset.configField;
+      const podcastKey = fullField.replace(/\.category$/, '');
+      const secondarySelect = document.querySelector(
+        `select[data-config-field="${podcastKey}.category_secondary"]`
+      );
+      if (!secondarySelect) return;
+
+      // Snapshot the FULL set of options once. We rebuild from this
+      // every time primary changes — simpler than diff-and-patch.
+      const allOptions = Array.from(secondarySelect.options).map(opt => ({
+        value: opt.value,
+        text: opt.textContent
+      }));
+
+      function refreshSecondary() {
+        const primaryValue = primarySelect.value;
+        const previousValue = secondarySelect.value;
+
+        if (!primaryValue) {
+          secondarySelect.disabled = true;
+          if (secondarySelect.value !== '') {
+            secondarySelect.value = '';
+            secondarySelect.dispatchEvent(new Event('change'));
+          }
+          return;
+        }
+
+        secondarySelect.disabled = false;
+
+        // Rebuild options excluding the primary's chosen value.
+        // Try to preserve the user's previous secondary selection if
+        // it's still a valid option after the exclusion.
+        secondarySelect.innerHTML = '';
+        let preserved = false;
+        allOptions.forEach(opt => {
+          if (opt.value && opt.value === primaryValue) return;
+          const newOpt = document.createElement('option');
+          newOpt.value = opt.value;
+          newOpt.textContent = opt.text;
+          if (opt.value === previousValue) {
+            newOpt.selected = true;
+            preserved = true;
+          }
+          secondarySelect.appendChild(newOpt);
+        });
+
+        if (!preserved) {
+          // The previous secondary value is no longer valid (it
+          // matched the new primary, or was outside this option set).
+          secondarySelect.value = '';
+        }
+
+        // Fire change so the secondary's subcategory UI refreshes
+        // based on its (possibly cleared) value.
+        secondarySelect.dispatchEvent(new Event('change'));
+      }
+
+      primarySelect.addEventListener('change', refreshSecondary);
+      refreshSecondary(); // apply initial state on page load
+    });
+  }
+
+  // Extract saved subcategory values for one field of one podcast,
+  // out of the raw YAML in the textarea. Handles both forms the
+  // system might have emitted:
+  //
+  //   Block (system default, written by simpleYamlStringify):
+  //     subcategory:
+  //       - "Books"
+  //       - "Design"
+  //
+  //   Flow (user hand-edit, or older system writes):
+  //     subcategory: ["Books", "Design"]
+  //
+  //   Empty:
+  //     subcategory: []
+  //
+  // Returns an array of strings (possibly empty).
+  function parseSubcategoriesFromYaml(yamlContent, podcastKey, subcategoryField) {
+    const lines = yamlContent.split('\n');
+    let inPodcast = false;
+    let inBlockArray = false;
+    const result = [];
+    // Anchored to the start of a single line, allowing any leading
+    // whitespace (the podcast keys are indented one level beyond
+    // their parent).
+    const subcatRe = new RegExp('^\\s+' + subcategoryField + ':(.*)$');
+
+    for (const line of lines) {
+      // Track entering / leaving the podcast block. The podcast key
+      // appears at column 0, so any line starting with non-whitespace
+      // (other than the key itself) means we've left.
+      if (line.trim() === `${podcastKey}:`) {
+        inPodcast = true;
+        inBlockArray = false;
+        continue;
+      }
+      if (inPodcast && /^\S/.test(line)) {
+        inPodcast = false;
+        inBlockArray = false;
+      }
+      if (!inPodcast) continue;
+
+      // If we're inside a block-style array, eat indented `- "value"`
+      // items until we hit another key.
+      if (inBlockArray) {
+        const itemMatch = line.match(/^\s+-\s+["']?([^"']*?)["']?\s*$/);
+        if (itemMatch) {
+          if (itemMatch[1]) result.push(itemMatch[1]);
+          continue;
+        }
+        if (/^\s+\w+:/.test(line)) {
+          inBlockArray = false;
+          // fall through to handle this line normally
+        }
+      }
+
+      if (!inBlockArray) {
+        const subcatMatch = line.match(subcatRe);
+        if (subcatMatch) {
+          const after = subcatMatch[1].trim();
+
+          // Inline flow form: subcategory: ["a", "b"]
+          const flowMatch = after.match(/^\[(.*)\]$/);
+          if (flowMatch) {
+            flowMatch[1].split(',').forEach(v => {
+              const cleaned = v.trim().replace(/^["']|["']$/g, '');
+              if (cleaned) result.push(cleaned);
+            });
+            return result;
+          }
+
+          // Empty header — next indented items are ours
+          if (after === '') {
+            inBlockArray = true;
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   function initializeSubcategories(container, podcastKey, categoryField, subcategoryField, categoryValue) {
-    console.log(`🎬 initializeSubcategories called for ${podcastKey}.${subcategoryField}`);
-
     // Guard: Check if subcategoryMap exists
-      if (!subcategoryMap || typeof subcategoryMap !== 'object') {
-        console.warn('⚠️  subcategoryMap not loaded');
-        return;
-      }
+    if (!subcategoryMap || typeof subcategoryMap !== 'object') {
+      console.warn('subcategoryMap not loaded');
+      return;
+    }
 
-    // Read existing subcategory values from YAML data
+    // Read existing subcategory values from the raw YAML in the
+    // textarea. We deliberately read from the textarea (not from any
+    // form-internal state) because the textarea reflects the
+    // canonical disk state on first render; on subsequent toggles,
+    // formToYaml regenerates it from current form state.
     const yamlTextarea = document.getElementById('config-yaml');
     if (yamlTextarea && yamlTextarea.value) {
       try {
-        // Parse the YAML to extract subcategory values
-        const yamlContent = yamlTextarea.value;
-        const lines = yamlContent.split('\n');
+        const existingSubcats = parseSubcategoriesFromYaml(
+          yamlTextarea.value, podcastKey, subcategoryField
+        );
 
-        let inPodcast = false;
-        let existingSubcats = [];
-
-        lines.forEach(line => {
-          if (line.trim() === `${podcastKey}:`) {
-            inPodcast = true;
-          } else if (inPodcast && line.match(/^\S/)) {
-            inPodcast = false; // Left the podcast block
-          }
-
-          if (inPodcast && line.includes(`${subcategoryField}:`)) {
-            // Extract array values from flow style: ["Value1", "Value2"]
-            const match = line.match(/\[(.*?)\]/);
-            if (match) {
-              const arrayContent = match[1];
-              existingSubcats = arrayContent.split(',').map(v =>
-                v.trim().replace(/^"/, '').replace(/"$/, '')
-              ).filter(v => v);
-            }
-          }
-        });
-
-        // Populate the UI with existing values
         if (existingSubcats.length > 0) {
-          console.log(`Found existing subcats:`, existingSubcats);
           existingSubcats.forEach(value => {
             addSubcategoryField(container, podcastKey, subcategoryField, categoryValue, value);
           });
           updateAddSubcategoryButton(container, podcastKey, subcategoryField, categoryValue);
-          return; // Already initialized
+          return; // Already initialized from saved data
         }
       } catch (e) {
         console.error('Failed to parse existing subcategories:', e);
       }
     }
 
-    // If no existing data, just set up the UI
+    // No saved data — set up empty UI
     updateSubcategoryUI(container, podcastKey, categoryField, subcategoryField, categoryValue);
   }
 

@@ -78,18 +78,31 @@ class ConfigGenerator
     categories = if product_categories.is_a?(String)
       product_categories.split(",").map(&:strip).map(&:downcase).reject(&:blank?)
     else
-      Array(product_categories)
+      Array(product_categories).map { |c| c.to_s.strip }.reject(&:empty?)
     end
-    categories_string = categories.any? ? categories.join(", ") : "book, ebook, file"
+
+    # YAML block fragment for `product_categories:`. Empty list emits
+    # `[]` inline (the conventional empty-array form). Populated list
+    # emits block-style with each entry on its own line, matching how
+    # ProductCategory#rewritten_store_yaml_with_categories writes it
+    # when a product save triggers a category-list update. Previously
+    # the template baked the placeholder hint ("book, ebook, file")
+    # into the file whenever the user left the modal field blank;
+    # now blank = empty array = no preloaded categories.
+    categories_yaml = if categories.empty?
+      " []"
+    else
+      "\n" + categories.map { |c| %(  - "#{c.gsub('"', '\\"')}") }.join("\n")
+    end
 
     overwrite_from_template(
       folder:   "features/store",
       template: "system/features/store.yml.erb",
       target:   File.join(FEATURES_PATH, "store.yml"),
       locals: {
-        currency:          currency,
-        default_domain:    default_domain,
-        categories_string: categories_string,
+        currency:        currency,
+        default_domain:  default_domain,
+        categories_yaml: categories_yaml,
       },
     )
 

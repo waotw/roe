@@ -1,7 +1,7 @@
 enabled: true
 currency: "<%= currency %>"
 default_domain: "<%= default_domain %>"
-product_categories: "<%= categories_string %>"
+product_categories:<%= categories_yaml %>
 product_button_template: |
   ![Add Image Description](@image)
 
@@ -16,11 +16,11 @@ product_button_template: |
   text: Add to Cart
   style: primary
   ```
-# Grouped product display settings
+
 grouped_products:
   button_text: "View"
-  price_display: "range"  # Options: range, lowest, highest
-  price_separator: "-"    # Separator between min/max prices in range mode
+  price_display: "range"
+  price_separator: "-"
 snipcart:
   load_strategy: "on-user-interaction"
   modal_style: "side"

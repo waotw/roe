@@ -1,6 +1,3 @@
-# Stripe Test Keys
-# These keys are for testing only. Live keys are stored in the database.
-# Get your test keys from: https://dashboard.stripe.com/test/apikeys
 test:
   publishable_key: ""
   secret_key: ""

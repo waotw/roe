@@ -253,22 +253,69 @@ class Admin::ThemesController < Admin::BaseController
   def update_active_theme(theme_name)
     site_file = SiteConfig::SITE_FILE
 
-    # Read existing config
-    config = if File.exist?(site_file)
-      YAML.safe_load_file(site_file, permitted_classes: [ Date, Time, Symbol ]) || {}
-    else
-      {}
-    end
-
-    # Update theme
-    config["theme"] ||= {}
-    config["theme"]["active"] = theme_name
-
-    # Write back to file (preserving structure)
-    File.write(site_file, config.to_yaml)
+    # Surgical string update — find the `active:` line under
+    # `theme:` and replace just its value. Round-tripping through
+    # YAML.load + to_yaml would rewrite the entire file in Psych's
+    # preferred style (unquoting "Roe Dev" → Roe Dev, replacing ""
+    # with '', dropping comments) which clobbers any formatting
+    # choices the user made when authoring site.yml. Since this code
+    # path only ever changes one value, surgical is also faster than
+    # a full re-emit.
+    File.write(site_file, rewritten_site_yaml_with_theme(theme_name))
 
     # Sync to database and clear cache
     SiteConfig.sync_from_file("site")
+  end
+
+  # Read site.yml as text, replace the `theme:` → `active:` value
+  # in place (preserving every other line as-is), and return the
+  # updated string. Handles three cases:
+  #
+  #   1. theme.active already exists — replace just the value, leave
+  #      surrounding indentation and quote style of OTHER keys alone.
+  #   2. theme: exists but no active: child key — inject the active
+  #      line directly under it.
+  #   3. No theme: block at all — append one to the end of the file.
+  #
+  # Uses double-quotes (the convention in the minimum template),
+  # matching how the rest of Roe's site.yml ships.
+  def rewritten_site_yaml_with_theme(theme_name)
+    unless File.exist?(SiteConfig::SITE_FILE)
+      return %(theme:\n  active: "#{theme_name}"\n)
+    end
+
+    content = File.read(SiteConfig::SITE_FILE)
+    in_theme_block = false
+    found_active = false
+
+    new_lines = content.lines.map do |line|
+      if line.match?(/\A\s*#/)
+        line                                          # untouched comment
+      elsif line.match?(/\Atheme:\s*\Z/)
+        in_theme_block = true
+        line
+      elsif in_theme_block && line.match?(/\A[ \t]+active:\s/)
+        found_active = true
+        line.sub(/(active:)\s+.*/, %(\\1 "#{theme_name}"))
+      elsif in_theme_block && line.match?(/\A\S/)
+        in_theme_block = false                        # left the theme block
+        line
+      else
+        line
+      end
+    end
+
+    result = new_lines.join
+
+    return result if found_active
+
+    if result.match?(/\Atheme:\s*\Z/m) || result.match?(/^theme:\s*$/)
+      # theme: header exists but no active child — insert right under it
+      result.sub(/^(theme:\s*\n)/, %(\\1  active: "#{theme_name}"\n))
+    else
+      # No theme block at all — append one
+      result.chomp + %(\n\ntheme:\n  active: "#{theme_name}"\n)
+    end
   end
 
   def generate_unique_theme_name(base_name)

@@ -30,7 +30,8 @@
                config_content: @config_content,
                config_hash: @config_hash,
                flattened_config: @flattened_config,
-               config_schema: @config_schema %>
+               config_schema: @config_schema,
+               available_themes: @available_themes %>
   <% elsif @config_type == 'fonts' %>
     <%= render 'shared/config_editor',
               form_url: admin_fonts_config_path,

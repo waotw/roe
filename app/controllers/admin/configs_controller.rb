@@ -374,6 +374,12 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = File.read(SiteConfig::SITE_FILE)
     @config_hash = YAML.load(@config_content) || {}
     @config_schema = SITE_CONFIG_SCHEMA
+    # Active-theme dropdown options must include any custom theme the
+    # user has installed (e.g. roe-site), not just the bundled ones
+    # the schema hardcodes. Without this, the user's actual active
+    # theme can't be shown as selected, and saving the site config
+    # would clear it.
+    @available_themes = list_available_themes
     render :edit
   end
 
@@ -1199,14 +1205,62 @@ class Admin::ConfigsController < Admin::BaseController
       .transform_values(&:to_s)
   end
 
-  # Write podcast.yml as a single-entry file. Same format as
-  # PodcastConfigSeeder produces (no document marker, since the
-  # admin form-based YAML editor saves without one).
+  # Write podcast.yml as a single-entry file. Builds the YAML by hand
+  # rather than round-tripping through `Hash#to_yaml` so the output
+  # quoting matches what the admin config editor's formToYaml emits:
+  # strings always wrapped in `""` (including empty strings), boolean
+  # values unquoted, arrays in block style. Round-tripping through
+  # Psych would otherwise produce `''` for empty strings, bare
+  # unquoted values for safe identifiers like "Business", and
+  # flow-style arrays — every save would oscillate between two
+  # different formats depending on which entry point wrote it.
   def write_single_podcast_entry(key, data)
     path = SiteConfig::FEATURES_PATH.join("podcast.yml")
     FileUtils.mkdir_p(File.dirname(path))
-    yaml = { key => data }.to_yaml.sub(/\A---\s*\n/, "")
-    File.write(path, yaml)
+
+    lines = [ "#{key}:" ]
+    data.each do |field, value|
+      lines << format_yaml_field(field, value, indent: 1)
+    end
+
+    File.write(path, lines.join("\n") + "\n")
+  end
+
+  # Format a single YAML field at the given indentation level.
+  # Mirrors the JS `simpleYamlStringify` + `formatYamlValue` rules:
+  #   - true/false (Ruby) and "true"/"false" strings → unquoted
+  #     YAML boolean
+  #   - Integer/numeric strings → unquoted
+  #   - Arrays → block style, empty stays `[]`
+  #   - Everything else → double-quoted string, even when empty
+  def format_yaml_field(key, value, indent:)
+    spaces = "  " * indent
+
+    case value
+    when Array
+      return "#{spaces}#{key}: []" if value.empty?
+
+      block = [ "#{spaces}#{key}:" ]
+      child_spaces = "  " * (indent + 1)
+      value.each do |v|
+        block << %(#{child_spaces}- "#{v.to_s.gsub('"', '\\"')}")
+      end
+      block.join("\n")
+    when TrueClass, FalseClass
+      "#{spaces}#{key}: #{value}"
+    when nil
+      %(#{spaces}#{key}: "")
+    else
+      str = value.to_s
+      if str == "true" || str == "false"
+        "#{spaces}#{key}: #{str}"
+      elsif str.match?(/\A-?\d+(\.\d+)?\z/)
+        "#{spaces}#{key}: #{str}"
+      else
+        escaped = str.gsub('"', '\\"')
+        %(#{spaces}#{key}: "#{escaped}")
+      end
+    end
   end
 
   # Sum of all file sizes the SiteSync ledger would track under /site.
@@ -1293,14 +1347,14 @@ class Admin::ConfigsController < Admin::BaseController
         "News", "Religion & Spirituality", "Science", "Society & Culture",
         "Sports", "Technology", "True Crime", "TV & Film"
       ],
-      "category_2" => [
+      "category_secondary" => [
         "",
         "Arts", "Business", "Comedy", "Education", "Fiction", "Government",
         "Health & Fitness", "History", "Kids & Family", "Leisure", "Music",
         "News", "Religion & Spirituality", "Science", "Society & Culture",
         "Sports", "Technology", "True Crime", "TV & Film"
       ],
-      # Note: subcategory/subcategory_2 are arrays, handled by JS
+      # Note: subcategory/subcategory_secondary are arrays, handled by JS
       "language" => [ "en", "es", "fr", "de", "it", "pt", "ja", "zh", "ko", "ru" ],
       "explicit" => [ "false", "true" ],
       "episode_type" => [ "full", "trailer", "bonus" ],

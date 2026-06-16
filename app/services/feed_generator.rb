@@ -245,27 +245,48 @@ class FeedGenerator
   end
 
   def add_itunes_categories_xml(xml, config)
-    # Primary category
+    # Primary category + its subcategories (if any).
     if config["category"].present?
       xml["itunes"].category(text: config["category"]) do
-        # Subcategories (handle array format)
-        if config["subcategory"].is_a?(Array)
-          config["subcategory"].first(2).each do |subcat|
-            xml["itunes"].category(text: subcat)
-          end
+        normalize_subcategories(config["subcategory"]).first(2).each do |subcat|
+          xml["itunes"].category(text: subcat)
         end
       end
     end
 
-    # Secondary category (if your config supports it later)
-    if config["category_secondary"].present?
-      xml["itunes"].category(text: config["category_secondary"]) do
-        if config["subcategory_secondary"].is_a?(Array)
-          config["subcategory_secondary"].first(2).each do |subcat|
-            xml["itunes"].category(text: subcat)
-          end
+    # Secondary category. Two defensive checks: it must be present,
+    # AND it must not be the same as the primary — otherwise we'd
+    # emit two identical <itunes:category> tags, which is redundant
+    # (and looks like a misconfiguration to anyone validating the feed).
+    secondary = config["category_secondary"].to_s.strip
+    if secondary.present? && secondary != config["category"].to_s.strip
+      xml["itunes"].category(text: secondary) do
+        normalize_subcategories(config["subcategory_secondary"]).first(2).each do |subcat|
+          xml["itunes"].category(text: subcat)
         end
       end
+    end
+  end
+
+  # Normalize a podcast.yml subcategory field into an Array of
+  # non-blank strings. The field can arrive in two shapes:
+  #
+  #   - String (single value): "Personal Journals"
+  #       Written by the podcast modal's format_yaml_field, which
+  #       writes string values as plain strings.
+  #   - Array (one or more values): ["Personal Journals", "Philosophy"]
+  #       Written by the admin form's formToYaml (block style on
+  #       disk; parsed back to Array by YAML.load), and how the
+  #       iTunes spec models it conceptually.
+  #
+  # Without normalization here, single-string subcategories silently
+  # drop out of the generated feed (the previous `is_a?(Array)` check
+  # rejected them).
+  def normalize_subcategories(raw)
+    case raw
+    when Array  then raw
+    when String then raw.strip.empty? ? [] : [ raw.strip ]
+    else             []
     end
   end
 
