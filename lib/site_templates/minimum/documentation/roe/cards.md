@@ -113,7 +113,7 @@ Post links are a great way to link to other posts in your site with support for 
 ```card
 type: post-link
 style: small
-post: the-literary-wasteland-1
+post: url-name-of-post-you-want-to-link
 ```
 ````
 
@@ -122,7 +122,7 @@ post: the-literary-wasteland-1
 ```card
 type: post-link
 style: small
-post: the-literary-wasteland-1
+post: url-name-of-post-you-want-to-link
 ```
 
 This simple syntax will pull all the information from the Post itself. You can also override this fully if you want. Just add the fields you'd like to replace ↓ :
@@ -130,7 +130,7 @@ This simple syntax will pull all the information from the Post itself. You can a
 ````markdown
 ```card
 type: post-link
-post: the-literary-wasteland-1
+post: url-name-of-post-you-want-to-link
 style: large
 title: The Literary Wasteland, 1
 author: Darren Allen, Esq.
@@ -144,7 +144,7 @@ link_text: Read more…
 
 ```card
 type: post-link
-post: the-literary-wasteland-1
+post: url-name-of-post-you-want-to-link
 style: large
 title: The Literary Wasteland, 1
 author: Darren Allen, Esq.

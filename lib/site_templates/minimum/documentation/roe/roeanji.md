@@ -1,5 +1,4 @@
 ---
-version: 0.0.25
 title: RoeAnji
 status: published
 ---
@@ -10,7 +9,7 @@ Simple markdown extensions that are easy to learn and use. They all use the same
 
 ## [Collections](/documentation/collections)
 
-A Collection is just a group of posts, pages or products. The syntax is pretty simple though you have a lot of options. Learn more about [Collections](/documentation/collections).
+A Collection is just a group of posts, pages or products. The syntax is pretty simple though you have a lot of options. Learn more about [Collections](/documentation/roe/collections).
 
 ````markdown
 ```collection
