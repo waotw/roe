@@ -132,6 +132,64 @@ rescue => e
   warn "[RoeSecrets] One-time migration warning: #{e.class}: #{e.message}"
 end
 
+# Self-heal `secret_key_base` in credentials.yml.enc. Rails 8 in
+# production REQUIRES this value to be set somewhere (credentials or
+# ENV) and refuses to auto-generate one the way dev/test do. Older
+# bin/setup runs populated active_record_encryption keys into
+# credentials.yml.enc but never seeded secret_key_base, so any
+# install upgraded from those versions has a credentials file that's
+# missing this field — and production boot aborts with:
+#
+#   ArgumentError: Missing `secret_key_base` for 'production'
+#
+# Running here (at file-load time, before Application is defined)
+# means the next boot after upgrade detects the gap, writes a fresh
+# secret_key_base into the existing encrypted credentials file, and
+# Rails proceeds normally — no manual `credentials:edit` on the
+# server, no `SECRET_KEY_BASE` env-var workaround.
+#
+# Conservative scope: only triggers when BOTH master.key AND
+# credentials.yml.enc already exist on disk. A brand-new install
+# with no secrets at all is still expected to run bin/setup
+# (deliberate user action) — we don't silently generate a fresh
+# master.key at boot, because that would mask configuration mistakes
+# behind a self-healing illusion.
+#
+# Never regenerates an existing secret_key_base — that would
+# invalidate every existing session cookie on the install. Once
+# present, the field is left alone forever.
+begin
+  secrets_dir      = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
+  master_key_path  = File.join(secrets_dir, "master.key")
+  credentials_path = File.join(secrets_dir, "credentials.yml.enc")
+
+  if File.exist?(master_key_path) && File.exist?(credentials_path)
+    require "active_support"
+    require "active_support/encrypted_configuration"
+    require "securerandom"
+    require "yaml"
+
+    enc_config = ActiveSupport::EncryptedConfiguration.new(
+      config_path: credentials_path,
+      key_path:    master_key_path,
+      env_key:     "RAILS_MASTER_KEY",
+      raise_if_missing_key: false
+    )
+
+    existing = enc_config.config rescue {}
+
+    if existing[:secret_key_base].to_s.empty?
+      raw  = enc_config.read rescue ""
+      hash = raw.blank? ? {} : (YAML.safe_load(raw) || {})
+      hash["secret_key_base"] = SecureRandom.hex(64)
+      enc_config.write(hash.to_yaml)
+      warn "[RoeSecrets] Seeded secret_key_base into #{credentials_path.sub(RoeSitePaths::ROE_ROOT + '/', '')}"
+    end
+  end
+rescue => e
+  warn "[RoeSecrets] secret_key_base seed warning: #{e.class}: #{e.message}"
+end
+
 module Roe
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

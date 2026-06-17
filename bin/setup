@@ -58,11 +58,26 @@ FileUtils.chdir APP_ROOT do
     end
   end
 
-  puts "\n== Checking AR Encryption credentials =="
+  puts "\n== Checking encrypted credentials =="
   # Check credentials directly without loading Rails to avoid double-init.
   # ActiveSupport::EncryptedConfiguration can decrypt the file standalone
   # — and importantly, write to it whether or not it already exists, so
   # this branch runs even on installs that never had a credentials.yml.enc.
+  #
+  # Two independent fields are seeded here:
+  #
+  #   - secret_key_base       — Rails 8 production REQUIRES this to be
+  #                             present in credentials (or in ENV); without
+  #                             it boot aborts. We generate a 128-char hex
+  #                             string, Rails' convention for this value.
+  #   - active_record_encryption.{primary, deterministic, salt}
+  #                           — the keys used to encrypt the integration-
+  #                             secret columns (Stripe/Postmark/Snipcart).
+  #                             Once set, NEVER regenerate — that would
+  #                             break decryption of existing rows.
+  #
+  # Each is checked independently. We write the file once at the end,
+  # only if something actually needs to change.
   require "active_support"
   require "active_support/encrypted_configuration"
   require "securerandom"
@@ -76,19 +91,34 @@ FileUtils.chdir APP_ROOT do
     )
 
     existing = enc_config.config rescue {}
+    raw      = enc_config.read   rescue ""
+    hash     = raw.blank? ? {} : (YAML.safe_load(raw) || {})
+
+    needs_write = false
+
+    if existing[:secret_key_base].to_s.empty?
+      puts "   Generating secret_key_base..."
+      hash["secret_key_base"] = SecureRandom.hex(64)
+      needs_write = true
+    else
+      puts "   secret_key_base present, skipping"
+    end
+
     if existing.dig(:active_record_encryption, :primary_key).present?
       puts "   AR Encryption keys present, skipping"
     else
       puts "   Generating AR Encryption keys..."
-      raw = enc_config.read rescue ""
-      hash = raw.blank? ? {} : YAML.safe_load(raw) || {}
-      hash['active_record_encryption'] = {
-        'primary_key'         => SecureRandom.alphanumeric(32),
-        'deterministic_key'   => SecureRandom.alphanumeric(32),
-        'key_derivation_salt' => SecureRandom.alphanumeric(32)
+      hash["active_record_encryption"] = {
+        "primary_key"         => SecureRandom.alphanumeric(32),
+        "deterministic_key"   => SecureRandom.alphanumeric(32),
+        "key_derivation_salt" => SecureRandom.alphanumeric(32)
       }
+      needs_write = true
+    end
+
+    if needs_write
       enc_config.write(hash.to_yaml)
-      puts "✅ AR Encryption keys written to credentials.yml.enc"
+      puts "✅ Wrote credentials.yml.enc"
     end
   else
     puts "   Skipping (master key not found yet)"
