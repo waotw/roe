@@ -2,13 +2,18 @@
 
 module SubstackImporter
   class Converter
-    def initialize(verbose: false, insert_paywalls: true, paywall_text: nil, paywall_button_text: nil)
+    def initialize(verbose: false, insert_paywalls: true, paywall_text: nil, paywall_button_text: nil, substack_url: nil)
       @verbose = verbose
       @images = []
       @footnotes = {}
       @insert_paywalls = insert_paywalls
       @paywall_text = paywall_text || "Upgrade to continue reading."
       @paywall_button_text = paywall_button_text || "Become a paid member"
+      # Normalized hostname of the Substack publication being imported,
+      # used to detect internal links so we can rewrite them to point
+      # at the destination Roe site instead of leaking back out to
+      # Substack. Stored as lowercase, www-stripped, e.g. "foo.substack.com".
+      @substack_host = extract_substack_host(substack_url)
     end
 
     def convert(html)
@@ -349,7 +354,7 @@ module SubstackImporter
           when "br"
             "\n"
           when "a"
-            href = child["href"].to_s
+            href = rewrite_internal_url(child["href"].to_s)
             text = preformatted_inline(child)
             href.empty? ? text : "[#{text}](#{href})"
           else
@@ -376,7 +381,7 @@ module SubstackImporter
 
     def process_button(node)
       data = parse_data_attrs(node["data-attrs"]) || {}
-      url = data["url"].to_s
+      url = rewrite_internal_url(data["url"].to_s)
       text = data["text"].to_s
 
       if text.downcase.include?("subscribe")
@@ -399,7 +404,7 @@ module SubstackImporter
 
       if button_el
         data = parse_data_attrs(button_el["data-attrs"]) || {}
-        url = data["url"].to_s
+        url = rewrite_internal_url(data["url"].to_s)
         text = data["text"].to_s
 
         if text.downcase.include?("subscribe")
@@ -414,7 +419,7 @@ module SubstackImporter
 
     def process_subscribe_widget(node)
       data = parse_data_attrs(node["data-attrs"]) || {}
-      url = data["url"].to_s
+      url = rewrite_internal_url(data["url"].to_s)
 
       "[SUBSCRIBE](#{url})\n\n"
     end
@@ -518,7 +523,7 @@ module SubstackImporter
     end
 
     def process_link(node, depth: 0)
-      href = node["href"].to_s
+      href = rewrite_internal_url(node["href"].to_s)
       text = process_children(node, depth: depth).strip
 
       return href if text.empty?
@@ -644,6 +649,77 @@ module SubstackImporter
         .gsub(/\n{3,}/, "\n\n")
         .gsub(/ +\n/, "\n")
         .strip
+    end
+
+    # Parses the user-supplied publication URL into a bare hostname
+    # for comparison against link hrefs at conversion time. Returns
+    # nil on blank or malformed input — the rewrite helper treats nil
+    # as "no rewriting", so an importer caller that doesn't pass
+    # substack_url: just gets the old pass-through behaviour.
+    def extract_substack_host(url)
+      return nil if url.to_s.strip.empty?
+
+      host = URI.parse(url.to_s.strip).host
+      host&.sub(/\Awww\./i, "")&.downcase
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    # Naive internal-link rewriter. Anchor hrefs that resolve to the
+    # imported Substack publication become root-relative paths on the
+    # destination Roe site:
+    #
+    #   https://foo.substack.com/p/great-post  →  /posts/great-post
+    #   https://foo.substack.com/about         →  /about
+    #   /p/another-post                        →  /posts/another-post
+    #
+    # External URLs, fragment-only links, mailto:, tel:, and anything
+    # we can't confidently classify are returned untouched. Query
+    # strings are dropped on rewrite (they're typically Substack
+    # tracking params); fragments are preserved.
+    #
+    # NOTE — slug match is naive. If a post's slug differs between
+    # Substack and Roe (rename on import, normalization differences),
+    # the rewritten URL will 404. The planned wikilinks/internal-ref
+    # system will catch and surface those drifts; until then this is
+    # a known limitation, same as the existing post-link cards.
+    def rewrite_internal_url(href)
+      return href if href.to_s.empty?
+      return href if href.start_with?("#")
+
+      uri = begin
+              URI.parse(href)
+      rescue URI::InvalidURIError
+              return href
+      end
+
+      # Schemed but not http(s) (mailto:, tel:, javascript:, etc.) —
+      # leave alone.
+      return href if uri.scheme && !%w[http https].include?(uri.scheme.downcase)
+
+      if uri.host
+        host = uri.host.sub(/\Awww\./i, "").downcase
+        return href if @substack_host.nil? || host != @substack_host
+        # Same host as the imported publication — fall through to rewrite.
+      elsif !uri.path.start_with?("/")
+        # Relative URL without a leading slash (e.g. "next-page") —
+        # not safely interpretable, leave alone.
+        return href
+      end
+
+      path = uri.path
+      fragment = uri.fragment
+
+      new_path =
+        if (m = path.match(%r{\A/p/([^/]+)}))
+          "/posts/#{m[1]}"
+        elsif path.empty?
+          "/"
+        else
+          path
+        end
+
+      fragment && !fragment.empty? ? "#{new_path}##{fragment}" : new_path
     end
   end
 end

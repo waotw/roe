@@ -148,12 +148,17 @@ module SubstackImporter
       # imported episodes' `podcast: <key>` field references a valid show.
       seed_podcast_config_from_rss(podcast_key) if podcast_key
 
-      # Setup converter
+      # Setup converter. base_url is the user-supplied Substack
+      # publication URL captured in the importer's first setup step;
+      # the converter uses it to recognise internal links so they get
+      # rewritten to root-relative paths on the destination Roe site
+      # instead of remaining as live URLs back to Substack.
       converter = Converter.new(
         verbose: Rails.env.development?,
         insert_paywalls: @import.options["insert_paywalls"] == "1",
         paywall_text: @import.options["paywall_text"].presence,
-        paywall_button_text: @import.options["paywall_button_text"].presence
+        paywall_button_text: @import.options["paywall_button_text"].presence,
+        substack_url: @import.base_url
       )
 
       # Process each post

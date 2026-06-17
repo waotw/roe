@@ -5,7 +5,7 @@ require 'fileutils'
 require 'optparse'
 
 # Configuration
-IMPORT_DIR = File.expand_path('~/Downloads/P4MPjfCCR1q-9K81hwOokA')
+IMPORT_DIR = File.expand_path('~/Downloads/6T7ziioST9qpys_DDx5Cpg')
 OUTPUT_DIR = File.expand_path('~/Downloads/ee-test-export')
 NUM_SUBSCRIBERS = 100
 NUM_POSTS = 20
