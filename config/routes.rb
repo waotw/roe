@@ -334,6 +334,8 @@ Rails.application.routes.draw do
   get "p/:id", to: "posts#show_by_id", constraints: { id: /\d+/ }, as: :post_by_id
 
   get "posts/:url_name", to: "posts#show", as: :post
+  # System-guaranteed docs index.
+  get "roe/documentation", to: "documentation#index", as: :roe_documentation
   get "documentation/:url_name", to: "documentation#show", as: :documentation
   get "store/:url_name", to: "products#show", as: :product
   # get "store/:url_name/validate", to: "products#validate", as: :product_validate, defaults: { format: :json }

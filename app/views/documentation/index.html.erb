@@ -1,0 +1,9 @@
+<%# Mirror the wrapper that PagesController#show produces (see
+    app/views/pages/show.html.erb) so theme rules targeting
+    `.page-documentation` apply to this system view exactly the
+    same way they apply to a user-authored documentation page. %>
+<article class="page page-documentation">
+  <div class="content">
+    <%= @docs_html %>
+  </div>
+</article>
