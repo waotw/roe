@@ -132,77 +132,113 @@ rescue => e
   warn "[RoeSecrets] One-time migration warning: #{e.class}: #{e.message}"
 end
 
-# Self-heal `secret_key_base` in credentials.yml.enc. Rails 8 in
-# production REQUIRES this value to be set somewhere (credentials or
-# ENV) and refuses to auto-generate one the way dev/test do. Older
-# bin/setup runs populated active_record_encryption keys into
-# credentials.yml.enc but never seeded secret_key_base, so any
-# install upgraded from those versions has a credentials file that's
-# missing this field — and production boot aborts with:
+# Bootstrap & self-heal Roe's per-install secrets at boot, before
+# Rails reads them. Three scenarios we have to handle, all here in
+# one pass, all idempotent:
 #
-#   ArgumentError: Missing `secret_key_base` for 'production'
+#   1. Fresh container deploy with empty /site volume — no
+#      master.key, no credentials.yml.enc. We generate both,
+#      seeding both secret_key_base and active_record_encryption
+#      keys into the new credentials file. This is the "just
+#      deploys cleanly to a new droplet" path; bin/setup never
+#      runs in a container, so the boot has to do it.
 #
-# Running here (at file-load time, before Application is defined)
-# means the next boot after upgrade detects the gap, writes a fresh
-# secret_key_base into the existing encrypted credentials file, and
-# Rails proceeds normally — no manual `credentials:edit` on the
-# server, no `SECRET_KEY_BASE` env-var workaround.
+#   2. Upgrade-in-place from an older Roe where bin/setup populated
+#      active_record_encryption keys but not secret_key_base. We
+#      add secret_key_base to the existing credentials file; AR
+#      encryption keys are left untouched (regenerating them would
+#      destroy decryption of already-encrypted DB columns).
 #
-# Conservative scope: only triggers when BOTH master.key AND
-# credentials.yml.enc already exist on disk. A brand-new install
-# with no secrets at all is still expected to run bin/setup
-# (deliberate user action) — we don't silently generate a fresh
-# master.key at boot, because that would mask configuration mistakes
-# behind a self-healing illusion.
+#   3. Steady state — everything already present. Loop exits with
+#      no writes, no warnings.
 #
-# Never regenerates an existing secret_key_base — that would
-# invalidate every existing session cookie on the install. Once
-# present, the field is left alone forever.
+# Runs at file-load time (before `Application` is defined) for the
+# same reason as the legacy-migration block above: Rails reads
+# credentials very early during Application init.
+#
+# The one thing we DON'T do: silently regenerate an existing
+# master.key or an existing secret_key_base. master.key is the
+# decryption key for any AR-encrypted columns already in the DB
+# (Stripe / Postmark / Snipcart secrets); regenerating would brick
+# all of them. secret_key_base regeneration would invalidate every
+# session cookie. Both are write-once at install time.
+#
+# If you see the "Generated fresh master.key" warning on every
+# boot, your persistent volume isn't mounted where SITE_PATH
+# resolves to — each container restart is starting with an empty
+# /site and regenerating, which means encrypted data written by a
+# previous boot is no longer decryptable. Fix the volume mount.
 begin
+  require "active_support"
+  require "active_support/encrypted_configuration"
+  require "securerandom"
+  require "yaml"
+  require "fileutils"
+
   secrets_dir      = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
   master_key_path  = File.join(secrets_dir, "master.key")
   credentials_path = File.join(secrets_dir, "credentials.yml.enc")
 
-  if File.exist?(master_key_path)
-    require "active_support"
-    require "active_support/encrypted_configuration"
-    require "securerandom"
-    require "yaml"
+  unless File.directory?(secrets_dir)
+    FileUtils.mkdir_p(secrets_dir)
+    File.chmod(0o700, secrets_dir)
+  end
 
-    enc_config = ActiveSupport::EncryptedConfiguration.new(
-      config_path: credentials_path,
-      key_path:    master_key_path,
-      env_key:     "RAILS_MASTER_KEY",
-      raise_if_missing_key: false
-    )
+  master_key_was_generated = false
+  unless File.exist?(master_key_path)
+    File.write(master_key_path, SecureRandom.hex(16))
+    File.chmod(0o600, master_key_path)
+    master_key_was_generated = true
+  end
 
-    # `.config rescue {}` returns an empty Hash both when the file
-    # doesn't exist and when it exists but lacks secret_key_base —
-    # so the same branch handles "create from scratch" and
-    # "add the missing field" without needing to special-case.
-    existing = enc_config.config rescue {}
+  enc_config = ActiveSupport::EncryptedConfiguration.new(
+    config_path: credentials_path,
+    key_path:    master_key_path,
+    env_key:     "RAILS_MASTER_KEY",
+    raise_if_missing_key: false
+  )
 
-    if existing[:secret_key_base].to_s.empty?
-      file_existed = File.exist?(credentials_path)
-      raw  = enc_config.read rescue ""
-      hash = raw.blank? ? {} : (YAML.safe_load(raw) || {})
-      hash["secret_key_base"] = SecureRandom.hex(64)
-      enc_config.write(hash.to_yaml)
+  existing            = enc_config.config rescue {}
+  raw                 = enc_config.read   rescue ""
+  hash                = raw.blank? ? {} : (YAML.safe_load(raw) || {})
+  credentials_existed = File.exist?(credentials_path)
+  seeded              = []
 
-      action = file_existed ? "Seeded secret_key_base into existing" : "Created"
-      rel    = credentials_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
-      warn "[RoeSecrets] #{action} #{rel}"
+  if existing[:secret_key_base].to_s.empty?
+    hash["secret_key_base"] = SecureRandom.hex(64)
+    seeded << "secret_key_base"
+  end
+
+  # Seed AR encryption keys ONLY when we generated master.key in
+  # the same run. Anything else (existing master.key, existing
+  # credentials file missing AR keys) means the user has chosen to
+  # manage them separately — don't overwrite that decision.
+  if master_key_was_generated && existing.dig(:active_record_encryption, :primary_key).blank?
+    hash["active_record_encryption"] = {
+      "primary_key"         => SecureRandom.alphanumeric(32),
+      "deterministic_key"   => SecureRandom.alphanumeric(32),
+      "key_derivation_salt" => SecureRandom.alphanumeric(32)
+    }
+    seeded << "active_record_encryption"
+  end
+
+  if seeded.any?
+    enc_config.write(hash.to_yaml)
+    File.chmod(0o600, credentials_path)
+
+    rel_key  = master_key_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
+    rel_cred = credentials_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
+    parts    = []
+    parts << "Generated fresh master.key (#{rel_key})" if master_key_was_generated
+    parts << "#{credentials_existed ? 'Updated' : 'Created'} #{rel_cred}: #{seeded.join(', ')}"
+    warn "[RoeSecrets] #{parts.join(' • ')}"
+
+    if master_key_was_generated
+      warn "[RoeSecrets] First-install secrets generated. If this message appears on EVERY boot, your persistent volume isn't mounted at #{RoeSitePaths::SITE_PATH} — fix that before any encrypted data is written, or it'll be unrecoverable across container restarts."
     end
-  else
-    # master.key is the one thing we *won't* generate from boot —
-    # if it's truly missing, that signals a deeper config problem
-    # (wrong volume mount, fresh install needing bin/setup, etc.)
-    # that should be surfaced loudly rather than papered over.
-    rel = master_key_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
-    warn "[RoeSecrets] master.key not found at #{rel} — skipping secret_key_base seed (run bin/setup or restore secrets)"
   end
 rescue => e
-  warn "[RoeSecrets] secret_key_base seed warning: #{e.class}: #{e.message}"
+  warn "[RoeSecrets] secret bootstrap warning: #{e.class}: #{e.message}"
 end
 
 module Roe
