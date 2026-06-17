@@ -1,7 +1,6 @@
 ---
-roe_version: 0.0.26
 title: Collections
-status: published
+status: draft
 ---
 
 # Collections
@@ -17,6 +16,7 @@ To add a default Collection to your Post/Page, this is all you need:
 ````
 
 When left empty like the above ↑, the defaults will be used ↓ :
+
 ````
 ```collection
 default_source: posts
@@ -107,22 +107,22 @@ show_more_text: All the music posts →
 ### order
 (Sort posts, default: `date`)
 
-**Order options:**
-  - `order: date` - (newest → oldest)
-  - `order: date-asc` - (oldest → newest)
-  - `order: title` - (alphabetical by post title)
-  - `order: filename` - (create custom order by adding number to filenames)
-    - example: `01-My Best Post.md`
-    - example: `02-My Second Best Post.md`
+- `order: date` - (newest → oldest)
+- `order: date-asc` - (oldest → newest)
+- `order: title` - (alphabetical by post title)
+- `order: filename` - (create custom order by adding number to filenames)
+  - example: `01-My Best Post.md`
+  - example: `02-My Second Best Post.md`
 
 ### template
 
 (optional, default: `list`) 
 
 **Template options:**
-  - `template: list` = Title (h3), subtitle (italic), date (italic)
-  - `template: compact` = Title and date on single line, separated by bullet
-  - `template: links` = Title and subtitle, no date
+
+- `template: list` = Title (h3), subtitle (italic), date (italic)
+- `template: compact` = Title and date on single line, separated by bullet
+- `template: links` = Title and subtitle, no date
   
 ### tags
 (Filter by tag, optional, default: none)

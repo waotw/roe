@@ -1,5 +1,4 @@
 ---
-roe_version: 0.0.26
 title: Collections
 status: published
 ---
@@ -108,6 +107,7 @@ show_more_text: All the music posts →
 (Sort posts, default: `date`)
 
 **Order options:**
+
   - `order: date` - (newest → oldest)
   - `order: date-asc` - (oldest → newest)
   - `order: title` - (alphabetical by post title)
@@ -120,6 +120,7 @@ show_more_text: All the music posts →
 (optional, default: `list`) 
 
 **Template options:**
+
   - `template: list` = Title (h3), subtitle (italic), date (italic)
   - `template: compact` = Title and date on single line, separated by bullet
   - `template: links` = Title and subtitle, no date

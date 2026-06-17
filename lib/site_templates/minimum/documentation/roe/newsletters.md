@@ -1,5 +1,4 @@
 ---
-roe_version: 0.0.26
 title: Newsletters
 status: published
 ---

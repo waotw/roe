@@ -7,9 +7,14 @@
 #                                      on a running install)
 #   2. current/VERSION                (mirrors root, gets copied to
 #                                      root on install)
-#   3. lib/site_templates/**/*.md     (roe_version: frontmatter — only
-#                                      on docs that already declare
-#                                      the key, never injected)
+#   3. _versions.yml manifest         (one file under the bundled docs
+#                                      folder; maps each doc's path to
+#                                      the Roe version in which it was
+#                                      last meaningfully changed —
+#                                      replaces the per-doc roe_version
+#                                      frontmatter we used to stamp,
+#                                      which caused noise churn every
+#                                      rsync round-trip)
 #   4. app/themes/*.css               ("Bundled with: Roe v…" header
 #                                      line — always re-stamped so
 #                                      every release advertises being
@@ -29,6 +34,7 @@ require "yaml"
 require "date"
 require "set"
 require "shellwords"
+require "pathname"
 
 namespace :release do
   desc "Bump version across VERSION files, site_templates docs, and bundled theme headers. Set VERSION=x.y.z."
@@ -48,7 +54,7 @@ namespace :release do
     touched = touched_paths_since_last_tag(root)
 
     bump_version_files(root, version, today)
-    bump_doc_frontmatter(root, version, touched)
+    bump_docs_manifest(root, version, touched)
     bump_theme_headers(root, version, touched)
 
     puts ""
@@ -78,50 +84,85 @@ namespace :release do
     end
   end
 
-  def bump_doc_frontmatter(root, version, touched)
-    pattern = File.join(root, "current", "lib", "site_templates", "**", "*.md")
-    files = Dir.glob(pattern)
-    changed = 0
-    no_key = 0
-    untouched = 0
+  # Writes lib/site_templates/minimum/documentation/roe/_versions.yml
+  # — a single flat mapping of each doc's path (relative to the docs
+  # folder) to the Roe version in which the doc was last meaningfully
+  # changed. Replaces the per-doc `roe_version:` frontmatter approach
+  # (every rsync round-trip restamped every file's frontmatter,
+  # producing a wall of meaningless diffs in git status).
+  #
+  # Update policy for each doc on disk:
+  #   - in touched set (changed since last tag) → stamp at new version
+  #   - new doc not yet in manifest → stamp at new version
+  #   - otherwise → keep its existing version (last meaningful change)
+  #
+  # Manifest entries for files that no longer exist on disk are
+  # pruned so the manifest stays in sync with reality.
+  #
+  # Ships with the docs (under lib/site_templates), gets installed to
+  # /site/documentation/roe/_versions.yml on next install, and is
+  # readable at runtime by the docs view to show "Updated in Roe X.Y.Z"
+  # alongside each doc.
+  def bump_docs_manifest(root, version, touched)
+    docs_root = File.join(root, "current", "lib", "site_templates", "minimum", "documentation", "roe")
+
+    unless Dir.exist?(docs_root)
+      puts ""
+      puts "Docs manifest: docs folder not found at #{relative(docs_root, root)} — skipped"
+      return
+    end
+
+    manifest_path = File.join(docs_root, "_versions.yml")
+    manifest = File.exist?(manifest_path) ? (YAML.safe_load_file(manifest_path) || {}) : {}
+
+    files = Dir.glob(File.join(docs_root, "**", "*.md"))
+    on_disk_keys = files.map { |path| manifest_key(path, docs_root) }.to_set
+
+    added = updated = kept = removed = 0
 
     files.each do |path|
-      # Smart-bump: only re-stamp roe_version on docs that have
-      # actually changed since the last tag (or have uncommitted
-      # local edits — i.e. are about to ship). Docs that haven't
-      # moved keep their previous roe_version, which now reads as
-      # "last revised in this Roe version."
-      unless touched.include?(path)
-        untouched += 1
-        next
-      end
+      key = manifest_key(path, docs_root)
+      should_stamp = touched.include?(path) || !manifest.key?(key)
 
-      content = File.read(path)
-
-      # Only touch files whose frontmatter already declares
-      # roe_version. We never inject the key into docs that don't
-      # track it.
-      new_content = content.sub(/\A(---\s*\n.*?\n---\s*\n)/m) do |frontmatter|
-        if frontmatter =~ /^roe_version:\s*\S+/
-          frontmatter.sub(/^(roe_version:\s*)\S+/) { "#{Regexp.last_match(1)}#{version}" }
+      if should_stamp
+        if manifest.key?(key)
+          if manifest[key] == version
+            kept += 1
+          else
+            manifest[key] = version
+            updated += 1
+          end
         else
-          frontmatter
+          manifest[key] = version
+          added += 1
         end
-      end
-
-      if new_content == content
-        no_key += 1
       else
-        File.write(path, new_content)
-        changed += 1
+        kept += 1
       end
     end
 
+    # Prune entries for docs that no longer exist on disk.
+    manifest.keys.reject { |k| on_disk_keys.include?(k) }.each do |stale_key|
+      manifest.delete(stale_key)
+      removed += 1
+    end
+
+    # Sort alphabetically for stable, diff-friendly output across runs.
+    File.write(manifest_path, manifest.sort.to_h.to_yaml)
+
     puts ""
-    puts "Docs (#{relative(File.dirname(pattern), root)}):"
-    puts "  ✓ #{changed} stamped at #{version}"
-    puts "  · #{untouched} unchanged since last tag (kept their existing roe_version)" if untouched > 0
-    puts "  · #{no_key} touched but no roe_version frontmatter (skipped)" if no_key > 0
+    puts "Docs manifest (#{relative(manifest_path, root)}):"
+    puts "  ✓ #{updated} stamped at #{version}" if updated > 0
+    puts "  + #{added} added at #{version}"     if added > 0
+    puts "  · #{kept} unchanged"                if kept > 0
+    puts "  − #{removed} pruned (no longer on disk)" if removed > 0
+  end
+
+  # Path inside the docs folder, used as the manifest key. Preserves
+  # subdirectories so docs under tutorials/ etc. don't collide with
+  # top-level docs of the same basename.
+  def manifest_key(path, docs_root)
+    Pathname.new(path).relative_path_from(Pathname.new(docs_root)).to_s
   end
 
   def bump_theme_headers(root, version, touched)

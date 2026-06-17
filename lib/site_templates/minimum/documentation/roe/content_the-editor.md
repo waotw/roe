@@ -1,5 +1,4 @@
 ---
-roe_version: 0.0.26
 title: "Content: The Editor"
 post_type: documentation
 status: published
