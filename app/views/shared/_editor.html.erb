@@ -14,7 +14,7 @@
 
   <div>
     <!-- Sticky container for buttons + TOC -->
-    <div class="sticky top-0 z-10 bg-white border-b border-gray-300">
+    <div data-controller="sticky-toolbar" class="sticky top-0 z-10 bg-white border-b border-gray-300">
           <!-- Button bar -->
           <div class="flex justify-start gap-6 items-center py-2 px-2">
             <div class="flex gap-4">
@@ -94,30 +94,41 @@
           <% end %>
         </div>
       </div>
-    </div>
-    </div><!-- /flex gap-4 -->
+    </div><!-- /flex justify-start gap-6 -->
 
-    <!-- TOC toggle row -->
-    <div class="flex items-center px-2 py-1 border-t border-gray-200">
-      <button type="button"
-              data-action="click->editor#toggleTOC"
-              class="text-xs text-gray-600 hover:text-gray-900 text-nowrap">
-        Table of Contents
-        <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800">▶</span>
-      </button>
-    </div>
+      <!-- Auto-hide region: TOC toggle + panel collapse on scroll-
+           down and reappear on scroll-up. The primary button bar
+           above stays visible at all times. The sticky-toolbar
+           Stimulus controller animates max-height inline on this
+           element and uses clamp detection to avoid the scroll-
+           feedback oscillation that height changes can cause. -->
+      <div data-sticky-toolbar-target="collapsible"
+           class="overflow-hidden transition-[max-height] duration-200 ease-out">
+        <!-- TOC toggle row -->
+        <div class="flex items-center px-2 py-1 border-t border-gray-200">
+          <button type="button"
+                  data-action="click->editor#toggleTOC"
+                  class="text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+            Table of Contents
+            <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800">▶</span>
+          </button>
+        </div>
 
-    <!-- TOC Panel (inside sticky container) -->
-    <div data-editor-target="tocPanel"
-      class="hidden border-t border-gray-300 bg-gray-50 p-3 max-h-60 overflow-y-auto transition-all"
-      data-action="mouseenter->editor#restoreTocOpacity">
-      <div data-editor-target="tocContent" class="text-sm font-mono">
-        <!-- TOC will be rendered here -->
+        <!-- TOC Panel -->
+        <div data-editor-target="tocPanel"
+          class="hidden border-t border-gray-300 bg-gray-50 p-3 max-h-60 overflow-y-auto transition-all"
+          data-action="mouseenter->editor#restoreTocOpacity">
+          <div data-editor-target="tocContent" class="text-sm font-mono">
+            <!-- TOC will be rendered here -->
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
+    </div><!-- /sticky-toolbar -->
 
-    <!-- Textarea -->
+    <!-- Textarea — inside the wrapper so the sticky bar's containing
+         block extends down through the textarea. Without this, the
+         sticky bar's range is only ~80px (just the toolbar+TOC), and
+         it scrolls out of view as soon as you start editing. -->
     <%= form.text_area :content, value: content,
             class: "w-full font-mono text-sm p-1 border border-gray-300 box-border bg-white resize-none overflow-hidden pb-96",
             data: {
@@ -125,6 +136,7 @@
               action: "input->editor#hideFlashOnInput input->editor#updateTOC"
             },
             id: "content-textarea" %>
+  </div>
 
   <!-- Media Picker Modal -->
   <div data-editor-target="mediaPickerModal"

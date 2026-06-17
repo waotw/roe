@@ -139,11 +139,6 @@
                 <% end %>
               <% end %>
             </div>
-            <%# Updates & Deploy is local-only. The in-app updater swaps files
-                in current/ which can't work inside the production container's
-                immutable image layer; deploys are triggered from the user's
-                local Roe install, not from the live admin. The controller
-                also blocks the route in production as a backstop. %>
             <% unless Rails.env.production? %>
               <%= link_to "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900 text-nowrap" %>
             <% end %>
@@ -153,6 +148,7 @@
                 <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
               <% end %>
             </div>
+            <a href="/documentation" class="text-sm font-medium text-gray-500 hover:text-gray-900">Docs</a>
             <%= link_to "Account", admin_account_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>
