@@ -163,7 +163,7 @@ begin
   master_key_path  = File.join(secrets_dir, "master.key")
   credentials_path = File.join(secrets_dir, "credentials.yml.enc")
 
-  if File.exist?(master_key_path) && File.exist?(credentials_path)
+  if File.exist?(master_key_path)
     require "active_support"
     require "active_support/encrypted_configuration"
     require "securerandom"
@@ -176,15 +176,30 @@ begin
       raise_if_missing_key: false
     )
 
+    # `.config rescue {}` returns an empty Hash both when the file
+    # doesn't exist and when it exists but lacks secret_key_base —
+    # so the same branch handles "create from scratch" and
+    # "add the missing field" without needing to special-case.
     existing = enc_config.config rescue {}
 
     if existing[:secret_key_base].to_s.empty?
+      file_existed = File.exist?(credentials_path)
       raw  = enc_config.read rescue ""
       hash = raw.blank? ? {} : (YAML.safe_load(raw) || {})
       hash["secret_key_base"] = SecureRandom.hex(64)
       enc_config.write(hash.to_yaml)
-      warn "[RoeSecrets] Seeded secret_key_base into #{credentials_path.sub(RoeSitePaths::ROE_ROOT + '/', '')}"
+
+      action = file_existed ? "Seeded secret_key_base into existing" : "Created"
+      rel    = credentials_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
+      warn "[RoeSecrets] #{action} #{rel}"
     end
+  else
+    # master.key is the one thing we *won't* generate from boot —
+    # if it's truly missing, that signals a deeper config problem
+    # (wrong volume mount, fresh install needing bin/setup, etc.)
+    # that should be surfaced loudly rather than papered over.
+    rel = master_key_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
+    warn "[RoeSecrets] master.key not found at #{rel} — skipping secret_key_base seed (run bin/setup or restore secrets)"
   end
 rescue => e
   warn "[RoeSecrets] secret_key_base seed warning: #{e.class}: #{e.message}"
