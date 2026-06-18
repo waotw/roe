@@ -550,11 +550,65 @@ module HasMarkdownExtensions
       []
     end
 
+    # `related: true` — filter the source collection to items that
+    # share a `related:` link with this document, in *either*
+    # direction. Lets a doc/post/page render a "see also" block
+    # without every pair having to declare each other:
+    #
+    #   # foo.md frontmatter:
+    #   related:
+    #     - "bar"
+    #
+    #   # bar.md frontmatter: (no `related:` needed)
+    #
+    #   # bar.md content:
+    #   ```collection
+    #   source: documentation
+    #   related: true
+    #   ```
+    #
+    # Bar's collection still shows foo because foo declared bar.
+    # Forward items (this doc's own `related:` list) come first, in
+    # the order they were declared (author-curated), followed by
+    # back-link items (sources that declared this doc), deduped on
+    # url_name and with self removed. The block's `order:` still
+    # overrides — set it explicitly if you'd rather get a uniform
+    # alphabetical / date / etc. sort across the union.
+    #
+    # Source-agnostic: works identically for docs, posts, pages,
+    # products via the shared HasMetadata interface.
+    related_filter = collection_truthy?(config[:related])
+    if related_filter
+      my_url_name      = url_name.to_s
+      my_related_slugs = Array(metadata["related"]).map(&:to_s).reject(&:empty?)
+
+      items_array = items.to_a
+      by_slug     = items_array.index_by(&:url_name)
+
+      # Forward: items I declare as related, in my declared order.
+      forward = my_related_slugs.map { |slug| by_slug[slug] }.compact
+
+      # Backward: items that declare *me* as related.
+      backward = items_array.select do |item|
+        Array(item.metadata["related"]).map(&:to_s).include?(my_url_name)
+      end
+
+      items = (forward + backward)
+        .reject { |item| item.url_name == my_url_name } # drop self before dedup
+        .uniq   { |item| item.url_name }                # forward wins on collision
+    end
+
     # Apply paid content filter (before ordering!)
     items = CollectionMembersFilter.filter(items, config)
 
-    # Apply ordering based on order parameter
-    items = apply_collection_order(items, order_by)
+    # Apply ordering based on order parameter — unless we just
+    # populated `items` from the curated `related:` list AND the
+    # block didn't specify its own order, in which case the author's
+    # frontmatter ordering is the right answer and we leave it
+    # alone.
+    unless related_filter && config[:order].blank?
+      items = apply_collection_order(items, order_by)
+    end
 
     # Apply offset and limit
     offset_value = config[:offset].to_i

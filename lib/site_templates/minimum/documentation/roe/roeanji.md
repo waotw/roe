@@ -5,9 +5,9 @@ status: published
 
 # RoeAnji
 
-Simple markdown extensions that are easy to learn and use. They all use the same basic syntax.
+Simple markdown extensions that are easy to learn and use. They all use the same basic syntax similar to a code block in markdown.
 
-## [Collections](/documentation/collections)
+## [Collections](/documentation/roe/collections)
 
 A Collection is just a group of posts, pages or products. The syntax is pretty simple though you have a lot of options. Learn more about [Collections](/documentation/roe/collections).
 
@@ -19,3 +19,19 @@ limit: 10
 tags: music
 ```
 ````
+
+## [Cards](/documentation/roe/cards)
+
+Markdown is fantastic but it doesn't support special elements such as Pull Quotes, Asides, Post Links, Buttons, etc. Cards allow you to use these elements in your posts and pages. Learn more about [Cards](/documentation/roe/cards).
+
+### Basic Pullquote
+
+````markdown
+```card
+type: pullquote
+text: There's only one way to find out…
+position: right
+```
+````
+
+### Basic Post Link
