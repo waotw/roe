@@ -132,6 +132,18 @@ rescue => e
   warn "[RoeSecrets] One-time migration warning: #{e.class}: #{e.message}"
 end
 
+# Skip the disk-based bootstrap entirely when running on Fly.
+# Fly Machines get their secrets injected as env vars from `fly
+# secrets set` — same values across every Machine in the app —
+# so per-Machine disk-based generation would defeat the purpose
+# (each Machine has its own volume, so each Machine would generate
+# its own divergent keys, and a user's session cookie signed by
+# Machine A would fail verification on Machine B). FLY_APP_NAME
+# is auto-injected on every Fly Machine and never present on
+# Kamal containers or local dev, so it's a reliable per-environment
+# signal. See `bin/rails roe:fly:sync_secrets` for the rake task
+# that populates the Fly secret store from a local install.
+unless ENV["FLY_APP_NAME"].present?
 # Bootstrap & self-heal Roe's per-install secrets at boot, before
 # Rails reads them. Three scenarios we have to handle, all here in
 # one pass, all idempotent:
@@ -240,6 +252,7 @@ begin
 rescue => e
   warn "[RoeSecrets] secret bootstrap warning: #{e.class}: #{e.message}"
 end
+end # unless ENV["FLY_APP_NAME"].present?
 
 module Roe
   class Application < Rails::Application
@@ -268,6 +281,25 @@ module Roe
     # generates fresh ones at this path for a brand-new install.
     config.credentials.content_path = Pathname.new(File.join(RoeSitePaths::SITE_SYSTEM_SECRETS_PATH, "credentials.yml.enc"))
     config.credentials.key_path     = Pathname.new(File.join(RoeSitePaths::SITE_SYSTEM_SECRETS_PATH, "master.key"))
+
+    # Fly path for AR encryption keys: read from env vars instead of
+    # credentials.yml.enc. Lets every Machine in a multi-Machine app
+    # share the same encryption keys (so Stripe API keys written by
+    # Machine A are decryptable by Machine B) without needing a
+    # synchronized credentials file across per-Machine volumes.
+    #
+    # Kamal containers and local dev (no FLY_APP_NAME) fall through
+    # to Rails' default behaviour of reading these from credentials,
+    # so this branch is invisible there.
+    #
+    # The three env vars are populated by `bin/rails roe:fly:sync_secrets
+    # APP=…`, which reads the local install's credentials and pushes
+    # the keys to Fly's secret store. See lib/tasks/fly.rake.
+    if ENV["FLY_APP_NAME"].present?
+      config.active_record.encryption.primary_key         = ENV["AR_ENCRYPTION_PRIMARY_KEY"]
+      config.active_record.encryption.deterministic_key   = ENV["AR_ENCRYPTION_DETERMINISTIC_KEY"]
+      config.active_record.encryption.key_derivation_salt = ENV["AR_ENCRYPTION_KEY_DERIVATION_SALT"]
+    end
 
     # Configuration for the application, engines, and railties goes here.
     #
