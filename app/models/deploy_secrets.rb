@@ -2,8 +2,9 @@
 # Singleton — always use DeploySecrets.current.
 #
 # Currently holds the Docker registry password (for Kamal deploys).
-# The Rails master key is read directly from config/master.key and
-# never persisted here — it's already on disk and gitignored.
+# The Rails master key is read directly from site/system/secrets/master.key
+# (RoeSitePaths::SITE_SYSTEM_SECRETS_PATH) and never persisted here —
+# it's already on disk and lives outside this app's git tree.
 #
 # On save, DeployConfigGenerator.generate_secrets! writes .kamal/secrets
 # from this record + the master key file.

@@ -103,7 +103,7 @@
               <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
               </svg>
-              <span>Found at <code class="font-mono text-xs bg-green-50 px-0.5">config/master.key</code> — used automatically.</span>
+              <span>Found at <code class="font-mono text-xs bg-green-50 px-0.5">site/system/secrets/master.key</code> — used automatically.</span>
             </div>
           <% else %>
             <div class="flex items-start gap-1.5 text-sm text-red-700">
@@ -111,9 +111,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
               <span>
-                Not found at <code class="font-mono text-xs bg-red-50 px-0.5">config/master.key</code>.
-                This file is required for deployment. Copy it from your Rails credentials setup or
-                generate new credentials with <code class="font-mono text-xs bg-red-50 px-0.5">bin/rails credentials:edit</code>.
+                Not found at <code class="font-mono text-xs bg-red-50 px-0.5">site/system/secrets/master.key</code>.
+                This file is required for deployment. Run <code class="font-mono text-xs bg-red-50 px-0.5">bin/setup</code>
+                to generate it (creates the secrets directory and seeds master.key + credentials.yml.enc in one shot).
               </span>
             </div>
           <% end %>
@@ -176,7 +176,6 @@
           </p>
           <div class="bg-gray-50 border border-gray-200 rounded-xs p-3 space-y-1.5 font-mono text-xs">
             <p class="select-all">fly auth login</p>
-            <!--<p class="select-all">fly secrets set RAILS_MASTER_KEY=$(cat config/master.key)</p>-->
           </div>
           <p class="mt-2 text-xs text-gray-500">Fly stores these securely on the platform — no local secrets file needed.</p>
         </div>

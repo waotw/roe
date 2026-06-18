@@ -42,15 +42,16 @@ class DeployConfigGenerator
   end
 
   # Writes .kamal/secrets from the stored DeploySecrets registry password
-  # and the Rails master key at config/master.key.
+  # and the Rails master key at site/system/secrets/master.key (the
+  # per-install secrets location; see RoeSitePaths::SITE_SYSTEM_SECRETS_PATH).
   # Raises GenerationError with a clear message if either is missing.
   def self.generate_secrets!
-    master_key_path = Rails.root.join("config", "master.key")
+    master_key_path = File.join(RoeSitePaths::SITE_SYSTEM_SECRETS_PATH, "master.key")
 
-    raise GenerationError, "config/master.key not found — this file must exist to deploy" unless File.exist?(master_key_path)
+    raise GenerationError, "master.key not found at site/system/secrets/ — run bin/setup to generate it, then retry" unless File.exist?(master_key_path)
 
     master_key = File.read(master_key_path).strip
-    raise GenerationError, "config/master.key is empty" if master_key.blank?
+    raise GenerationError, "master.key at site/system/secrets/ is empty — run bin/setup to regenerate it" if master_key.blank?
 
     secrets = DeploySecrets.current
     raise GenerationError, "Registry password not set — add it in Deploy Configuration" unless secrets.registry_password.present?
@@ -79,9 +80,9 @@ class DeployConfigGenerator
     raise GenerationError, "Failed to write .kamal/secrets: #{e.message}"
   end
 
-  # Returns true if config/master.key exists and has content.
+  # Returns true if site/system/secrets/master.key exists and has content.
   def self.master_key_present?
-    path = Rails.root.join("config", "master.key")
+    path = File.join(RoeSitePaths::SITE_SYSTEM_SECRETS_PATH, "master.key")
     File.exist?(path) && File.read(path).strip.present?
   rescue
     false

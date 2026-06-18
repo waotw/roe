@@ -344,7 +344,7 @@ class Admin::UpdatesController < Admin::BaseController
       issues << "no server address is set"     if servers.empty?
       issues << "registry username is not set" if config.dig("kamal", "registry_username").blank?
       issues << "registry password not set — add it in Deploy Configuration" unless DeploySecrets.current.registry_password.present?
-      issues << "master key not found at config/master.key" unless DeployConfigGenerator.master_key_present?
+      issues << "master.key not found at site/system/secrets/ — run bin/setup to generate it" unless DeployConfigGenerator.master_key_present?
       issues << "Kamal CLI is not available (run bundle install in current/)" unless DeployConfigGenerator.kamal_cli_available?
     when "fly"
       issues << "Fly region is not set"  if config.dig("fly", "region").blank?
