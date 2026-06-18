@@ -1,0 +1,187 @@
+#!/bin/bash
+# Generate release notes from git commits between the last two tags
+# Groups commits by conventional commit type (feat, fix, etc.)
+#
+# Usage:
+#   bin/generate-release-notes
+#   bin/generate-release-notes v0.0.28  # use specific "current" tag
+#   bin/generate-release-notes --save   # save to RELEASE_NOTES.md
+
+set -e
+
+# Get tags
+if [ -n "$1" ] && [ "$1" != "--save" ]; then
+    # Use provided tag as the "current" (newest) tag
+    CURRENT_TAG="$1"
+    PREVIOUS_TAG=$(git describe --tags --abbrev=0 "$CURRENT_TAG"^ 2>/dev/null || echo "")
+else
+    # Get the last two tags
+    CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    PREVIOUS_TAG=$(git describe --tags --abbrev=0 "$CURRENT_TAG"^ 2>/dev/null || echo "")
+fi
+
+SAVE_MODE=false
+if [ "$1" = "--save" ] || [ "$2" = "--save" ]; then
+    SAVE_MODE=true
+fi
+
+if [ -z "$CURRENT_TAG" ]; then
+    echo "No tags found in this repository."
+    exit 1
+fi
+
+if [ -z "$PREVIOUS_TAG" ]; then
+    echo "Generating release notes for: $CURRENT_TAG (first release)"
+    PREVIOUS_TAG=""
+else
+    echo "Generating release notes: $PREVIOUS_TAG → $CURRENT_TAG"
+fi
+echo ""
+
+# Generate the notes
+generate_notes() {
+    echo "## What's Changed"
+    echo ""
+
+    # Get all commits between previous and current tag
+    if [ -n "$PREVIOUS_TAG" ]; then
+        commits=$(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --no-merges --format="%s" 2>/dev/null)
+    else
+        # First release - get all commits up to current tag
+        commits=$(git log "$CURRENT_TAG" --no-merges --format="%s" 2>/dev/null)
+    fi
+
+    # Breaking changes (commits with ! in type)
+    breaking=$(echo "$commits" | grep -E '^[a-z]+(\([^)]*\))?!:' | sed 's/^[a-z]\+(\([^)]*\))\?![[:space:]]*:[[:space:]]*//' || true)
+
+    # Features
+    feat=$(echo "$commits" | grep -E '^feat(\([^)]*\))?:' | sed 's/^feat(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Bug fixes
+    fix=$(echo "$commits" | grep -E '^fix(\([^)]*\))?:' | sed 's/^fix(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Performance
+    perf=$(echo "$commits" | grep -E '^perf(\([^)]*\))?:' | sed 's/^perf(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Documentation
+    docs=$(echo "$commits" | grep -E '^docs(\([^)]*\))?:' | sed 's/^docs(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Refactoring
+    refactor=$(echo "$commits" | grep -E '^refactor(\([^)]*\))?:' | sed 's/^refactor(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Style
+    style=$(echo "$commits" | grep -E '^style(\([^)]*\))?:' | sed 's/^style(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Tests
+    test=$(echo "$commits" | grep -E '^test(\([^)]*\))?:' | sed 's/^test(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Maintenance
+    chore=$(echo "$commits" | grep -E '^chore(\([^)]*\))?:' | sed 's/^chore(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Build
+    build=$(echo "$commits" | grep -E '^build(\([^)]*\))?:' | sed 's/^build(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # CI
+    ci=$(echo "$commits" | grep -E '^ci(\([^)]*\))?:' | sed 's/^ci(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Other (no prefix)
+    other=$(echo "$commits" | grep -v -E '^[a-z]+(\([^)]*\))?!?:' || true)
+
+    # Output sections
+    if [ -n "$breaking" ]; then
+        echo "### ⚠︎ Breaking Changes"
+        echo "$breaking" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$feat" ]; then
+        echo "### Features"
+        echo "$feat" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$fix" ]; then
+        echo "### Bug Fixes"
+        echo "$fix" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$perf" ]; then
+        echo "### Performance"
+        echo "$perf" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$docs" ]; then
+        echo "### Documentation"
+        echo "$docs" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$refactor" ]; then
+        echo "### Refactoring"
+        echo "$refactor" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$style" ]; then
+        echo "### Style"
+        echo "$style" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$test" ]; then
+        echo "### Tests"
+        echo "$test" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$chore" ]; then
+        echo "### Maintenance"
+        echo "$chore" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$build" ]; then
+        echo "### Build"
+        echo "$build" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$ci" ]; then
+        echo "### CI"
+        echo "$ci" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$other" ]; then
+        echo "### Other Changes"
+        echo "$other" | sed 's/^/- /'
+        echo ""
+    fi
+
+    # Add comparison link
+    echo "---"
+    echo ""
+    if [ -n "$PREVIOUS_TAG" ]; then
+        echo "**Full Changelog**: https://codeberg.org/waotw/roe/compare/$PREVIOUS_TAG...$CURRENT_TAG"
+    else
+        echo "**Full Changelog**: https://codeberg.org/waotw/roe/releases/tag/$CURRENT_TAG"
+    fi
+}
+
+if [ "$SAVE_MODE" = true ]; then
+    # Generate and save to file
+    generate_notes > RELEASE_NOTES.md
+    echo "Release notes saved to RELEASE_NOTES.md"
+
+    # Also output to console
+    echo ""
+    cat RELEASE_NOTES.md
+else
+    # Just output to console
+    generate_notes
+fi
+
+echo ""
+echo "Tip: Run with --save to write to RELEASE_NOTES.md"
