@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_12_162108) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_19_212000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -214,11 +214,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_12_162108) do
   end
 
   create_table "snipcart_configs", force: :cascade do |t|
-    t.text "api_key_live"
-    t.text "api_key_test"
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
+    t.text "secret_key_live"
+    t.text "secret_key_test"
     t.text "snippet"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
@@ -265,7 +265,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_12_162108) do
     t.text "error_message"
     t.string "from_version"
     t.text "log"
-    t.string "note"
     t.integer "progress_percent", default: 0
     t.datetime "started_at"
     t.string "status", default: "pending", null: false

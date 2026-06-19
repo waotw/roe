@@ -168,15 +168,17 @@ class Admin::ConfigsController < Admin::BaseController
 
   SNIPCART_CONFIG_SCHEMA = {
     test_keys: {
-      label: "Snipcart Test API Key",
+      label: "Snipcart Test Mode",
       fields: {
-        "api_key" => { type: :text, label: "Public API Key (Test)", hint: "Your Snipcart test public API key" }
+        "snippet" => { type: :textarea, label: "Snippet (Test)", hint: "Paste the full Snipcart snippet from your Test mode dashboard" },
+        "secret_key" => { type: :password, label: "Secret API Key (Test)", hint: "Create a Secret Key in Test Mode and paste it here" }
       }
     },
     live_keys: {
-      label: "Snipcart Live API Key",
+      label: "Snipcart Live Mode",
       fields: {
-        "api_key" => { type: :text, label: "Public API Key (Live)", hint: "Your Snipcart live public API key" }
+        "snippet" => { type: :textarea, label: "Snippet (Live)", hint: "Paste the full Snipcart snippet from your Live mode dashboard" },
+        "secret_key" => { type: :password, label: "Secret API Key (Live)", hint: "Create a Secret Key in Live Mode and paste it here" }
       }
     }
   }.freeze
@@ -1141,7 +1143,7 @@ class Admin::ConfigsController < Admin::BaseController
     SnipcartConfig.save_test_config(existing["test"])
     SnipcartConfig.current.verify!
 
-    flash[:notice] = "Store (Snipcart) configuration saved"
+    flash[:notice] = "Store (Snipcart) Test configuration saved"
     redirect_to admin_edit_snipcart_integration_config_path
   end
 
@@ -1151,14 +1153,20 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_edit_snipcart_integration_config_path and return
     end
 
+    # Save live snippet to YAML
+    if params[:live] && params[:live][:snippet].present? && params[:live][:snippet] != "•" * 16
+      SnipcartConfig.save_live_snippet(params[:live][:snippet])
+    end
+
+    # Save live secret key to database (encrypted)
     snipcart = SnipcartConfig.current
-    apply_live_keys(snipcart, params[:live] || {}, %w[api_key])
+    apply_live_keys(snipcart, params[:live] || {}, %w[secret_key])
 
     if snipcart.save
       snipcart.verify!
-      flash[:notice] = "Snipcart live key saved"
+      flash[:notice] = "Snipcart Live configuration saved"
     else
-      flash[:error] = "Failed to save Snipcart live key"
+      flash[:error] = "Failed to save Snipcart Live configuration"
     end
     redirect_to admin_edit_snipcart_integration_config_path
   end
@@ -1180,7 +1188,7 @@ class Admin::ConfigsController < Admin::BaseController
     render json: {
       verified:    success,
       verified_at: success ? snipcart.verified_at.iso8601 : nil,
-      error:       success ? nil : "Could not connect to Snipcart. Check your API key."
+      error:       success ? nil : "Could not connect to Snipcart. Check your Secret API key."
     }
   end
 

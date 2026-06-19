@@ -252,26 +252,28 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?]", admin_snipcart_integration_config_path
   end
 
-  test "update_snipcart writes test key to YAML and syncs" do
+  test "update_snipcart writes test config to YAML and syncs" do
     patch admin_snipcart_integration_config_path, params: {
-      test: { api_key: "test-api-key-123" }
+      test: { snippet: "<div>test</div>", secret_key: "test-secret-key-123" }
     }
 
     assert_redirected_to admin_edit_snipcart_integration_config_path
-    assert_equal "Store (Snipcart) configuration saved", flash[:notice]
+    assert_equal "Store (Snipcart) Test configuration saved", flash[:notice]
 
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     assert File.exist?(path)
     yaml = YAML.load_file(path)
-    assert_equal "test-api-key-123", yaml["test"]["api_key"]
+    assert_equal "test-secret-key-123", yaml["test"]["secret_key"]
+    assert_equal "<div>test</div>", yaml["test"]["snippet"]
 
     snipcart = SnipcartConfig.current
-    assert_equal "test-api-key-123", snipcart.api_key_test
+    assert_equal "test-secret-key-123", snipcart.secret_key_test
+    assert_equal "<div>test</div>", snipcart.snippet_test
   end
 
   test "update_snipcart_live redirects in non-production" do
     patch admin_live_snipcart_integration_config_path, params: {
-      live: { api_key: "live-api-key" }
+      live: { secret_key: "live-secret-key" }
     }
 
     assert_redirected_to admin_edit_snipcart_integration_config_path
@@ -280,7 +282,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
   test "update_snipcart_mode switches mode to live when live key present" do
     snipcart = SnipcartConfig.current
-    snipcart.update!(api_key_live: "live-api-key", verified_at: Time.current)
+    snipcart.update!(secret_key_live: "live-secret-key", verified_at: Time.current)
 
     patch admin_mode_snipcart_integration_config_path, params: { mode: "live" }
 
@@ -291,8 +293,8 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
   test "disconnect_snipcart clears all keys" do
     snipcart = SnipcartConfig.current
-    snipcart.update!(api_key_test: "test-key", api_key_live: "live-key", verified_at: Time.current)
-    SnipcartConfig.save_test_config("api_key" => "test-key")
+    snipcart.update!(secret_key_test: "test-key", secret_key_live: "live-key", verified_at: Time.current)
+    SnipcartConfig.save_test_config("secret_key" => "test-key")
 
     delete admin_disconnect_snipcart_integration_config_path
 
@@ -300,15 +302,15 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Snipcart disconnected. All keys cleared.", flash[:notice]
 
     snipcart.reload
-    assert_nil snipcart.api_key_test
-    assert_nil snipcart.api_key_live
+    assert_nil snipcart.secret_key_test
+    assert_nil snipcart.secret_key_live
     assert_nil snipcart.verified_at
     assert_not File.exist?(SnipcartConfig::TEST_CONFIG_PATH)
   end
 
   test "verify_snipcart returns json verification status" do
     snipcart = SnipcartConfig.current
-    snipcart.update!(api_key_test: "test-key", verified_at: Time.current)
+    snipcart.update!(secret_key_test: "test-key", verified_at: Time.current)
 
     SnipcartConfig.any_instance.stubs(:verify!).returns(true)
 

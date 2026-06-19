@@ -121,8 +121,8 @@
     <% if snipcart_connected? %>
       <% snipcart = SnipcartConfig.current %>
 
-      <% if snipcart.snippet.present? %>
-        <%= snipcart.snippet_html %>
+      <% if snipcart.current_snippet.present? %>
+        <%= snipcart.current_snippet_html %>
 
         <script nonce="<%= request.content_security_policy_nonce %>">
           // Override currency after snippet loads but before Snipcart initializes

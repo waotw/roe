@@ -91,7 +91,7 @@
       <div class="flex items-center gap-3">
         <span data-integration-verify-target="status"></span>
         <% if integration_record&.respond_to?(:mode) %>
-          <span class="text-sm text-gray-500 font-mono">
+          <span class="text-sm text-gray-500 font-mono text-nowrap">
             Mode: <%= integration_record.mode_test? ? 'Test' : 'Live' %>
           </span>
         <% end %>
@@ -189,7 +189,7 @@
         wonder why the Live tab is greyed out. Skipped in production
         where the tab is interactive. %>
     <% unless is_production %>
-      <p class="text-sm text-amber-600">DO NOT PUT LIVE KEYS IN TEXT MODE.</p>
+      <p class="text-sm pl-2 mb-2 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">DO NOT PUT LIVE KEYS IN TEXT MODE.</p>
       <ul class="text-sm text-gray-500 italic mb-4 list-disc ml-4">
         <li>Test keys are stored as plain text in <code class="text-xs font-mono">site/system/integrations/<%= @config_type %>.yml</code>.</li>
         <li>Live keys are stored encrypted in the database.</li>
@@ -209,18 +209,28 @@
                   <%= field_config[:label] %>
                 </label>
                 <% current_value = @config_hash[field_name].to_s %>
-                <% masked = current_value.present? %>
-                <% if field_config[:type] == :password %>
-                  <input type="text"
+                <% case field_config[:type] %>
+                <% when :password %>
+                  <%# Sensitive: hide existing value behind mask, render as
+                      a password input so OS/browser autofill and shoulder-
+                      surfing can't reveal it. %>
+                  <input type="password"
                          name="test[<%= field_name %>]"
-                         value="<%= masked ? '••••••••••••••••' : '' %>"
+                         value="<%= current_value.present? ? '••••••••••••••••' : '' %>"
                          placeholder="<%= field_config[:hint] %>"
                          class="w-full font-mono text-sm p-2 border border-gray-300"
                          autocomplete="off">
+                <% when :textarea %>
+                  <%# Multi-line non-sensitive content (e.g. Snipcart snippet).
+                      Render the real value so the user can see + edit; no mask. %>
+                  <textarea name="test[<%= field_name %>]"
+                            placeholder="<%= field_config[:hint] %>"
+                            rows="4"
+                            class="w-full font-mono text-sm p-2 border border-gray-300"><%= current_value %></textarea>
                 <% else %>
                   <input type="text"
                          name="test[<%= field_name %>]"
-                         value="<%= masked ? '••••••••••••••••' : '' %>"
+                         value="<%= current_value.present? ? '••••••••••••••••' : '' %>"
                          placeholder="<%= field_config[:hint] %>"
                          class="w-full font-mono text-sm p-2 border border-gray-300">
                 <% end %>
