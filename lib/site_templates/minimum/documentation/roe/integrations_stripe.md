@@ -6,12 +6,25 @@ related:
   - "payments"
 ---
 
+##### Related documentation
+
+```collection
+source: documentation
+related: true
+limit: all
+template: links
+```
+
 # Setting up Stripe to work with Roe
 
-Stripe has a Sandboxes which allows you to test everything before you make things public. For this reason there are 2 modes in Roe: Test and Live. <mark>In order to switch to Live mode, you'll need to add your Stripe Standard keys.</mark> Here is an article about [Sandboxes on Stripe](https://docs.stripe.com/sandboxes#manage-sandboxes-in-the-dashboard)
+Stripe has a Sandboxes which allows you to test everything before you make things public. For this reason there are 2 modes in Roe: Test and Live. Here is an article about [Sandboxes on Stripe](https://docs.stripe.com/sandboxes#manage-sandboxes-in-the-dashboard)
 
 Stripe has an excellent onboarding that helps you set up what you need to accept payments. This article assumes you've created and account and gone through basic Stripe setup.  
 [Getting started wtih Stripe](https://support.stripe.com/topics/getting-started)
+
+#### Before Stripe
+
+You'll need to enable the Members feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE MEMBERS`. You will then set up Members and there you can enable `Payments` which turns on Stripe in Roe.
 
 ## 1. Get Your Stripe API Keys
 
@@ -55,10 +68,4 @@ In your Stripe dashboard, go to **Developers (bottom left of window) → Webhook
 5. Go back to Roe: [Admin → Settings → Payments](/admin/configs/payments/edit) and paste the Signing secret in Roe: `Webhook Signing Secret`.
 6. Click `SAVE TEST/LIVE KEYS`
 
-### Related documentation
-
-```collection
-source: documentation
-related: true
-template: links
-```
+If all is well, the indicator at the top of the page will be green and say `Connected`.

@@ -1,7 +1,7 @@
 ---
-title: Store
+title: Features → Store
 status: published
-url_name: store_old
+url_name: store
 ---
 
 # Store

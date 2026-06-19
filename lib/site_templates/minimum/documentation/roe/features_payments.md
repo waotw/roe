@@ -4,7 +4,15 @@ status: published
 url_name: payments
 ---
 
-# Payments
+### Related documentation
+
+```collection
+source: documentation
+related: true
+template: links
+```
+
+# Setting up Payments in Roe
 
 Roe CMS includes a complete payment system that allows you to:
 
@@ -360,11 +368,3 @@ If you're using static site generation:
 - Confirm `payments.mode` is `donations` or `both`
 
 **Donate buttons all show as one button containing `[5, 10, 20, 50]`?**
-
-### Related documentation
-
-```collection
-source: documentation
-related: true
-template: links
-```

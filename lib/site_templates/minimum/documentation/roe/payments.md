@@ -1,7 +1,7 @@
 ---
 title: Payments & Stripe
 status: published
-url_name: payments
+url_name: payments_and_stripe
 ---
 
 # Payments
