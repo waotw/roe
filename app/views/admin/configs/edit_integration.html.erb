@@ -189,10 +189,11 @@
         wonder why the Live tab is greyed out. Skipped in production
         where the tab is interactive. %>
     <% unless is_production %>
-      <p class="text-xs text-gray-500 italic mb-4">
-        Live keys are stored encrypted in the database and can only be saved on the production server.
-        Test keys are stored as plain text in <code class="font-mono">site/system/integrations/<%= @config_type %>.yml</code>.
-      </p>
+      <p class="text-sm text-amber-600">DO NOT PUT LIVE KEYS IN TEXT MODE.</p>
+      <ul class="text-sm text-gray-500 italic mb-4 list-disc ml-4">
+        <li>Test keys are stored as plain text in <code class="text-xs font-mono">site/system/integrations/<%= @config_type %>.yml</code>.</li>
+        <li>Live keys are stored encrypted in the database.</li>
+      </ul>
     <% end %>
 
   <%# Test tab %>

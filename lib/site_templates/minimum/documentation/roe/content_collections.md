@@ -147,6 +147,22 @@ show_more_text: All the music posts →
   - `source: documentation` - Documentation pages
   - `source: products` - Products from your store
 
+### related
+(show related posts)
+
+Add `related: <url_name>` to frontmatter of page, post, product, documentation:
+
+```
+related: <url_name>
+```
+
+Then add `related: true` to Collecton:
+
+```collection
+source: documentation
+related: true
+```
+
 ### category (products)
 (Filter products by category, optional, products only)
 

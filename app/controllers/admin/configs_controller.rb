@@ -262,7 +262,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "development.yml",
         path: "global/development.yml",
         type: "development",
-        description: "Development features and debugging (ngrok hosts, etc.)",
+        description: "Only needed if you're developing Roe itself.",
         edit_path: admin_edit_development_config_path
       }
     end
