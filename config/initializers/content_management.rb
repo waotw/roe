@@ -28,6 +28,22 @@ if should_run
         puts "🚀 Initializing Content Management System"
         puts "=" * 60
 
+        # Regenerate deploy config files if they were wiped by an update.
+        # fly.toml and config/deploy.yml live inside current/ and are
+        # removed when the updater swaps in a new release. As long as
+        # site/system/global/deploy.yml exists (it's in site/, which
+        # survives every update), we can regenerate them silently on boot.
+        if File.exist?(SiteConfig::DEPLOY_FILE)
+          fly_toml   = Rails.root.join("fly.toml")
+          kamal_yml  = Rails.root.join("config", "deploy.yml")
+          if !fly_toml.exist? || !kamal_yml.exist?
+            missing = [ (!fly_toml.exist? ? "fly.toml" : nil), (!kamal_yml.exist? ? "config/deploy.yml" : nil) ].compact
+            puts "\n🔄 Restoring missing deploy config#{'s' if missing.size > 1} after update: #{missing.join(', ')}"
+            DeployConfigGenerator.new.generate!
+            puts "✓ Deploy configs restored"
+          end
+        end
+
         ConfigGenerator.generate_all
         PageGenerator.generate_defaults
         ContentSync.sync_all
