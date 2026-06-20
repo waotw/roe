@@ -1,5 +1,5 @@
 ---
-title: "Admin: Layouts"
+title: "Admin → Layouts"
 status: published
 ---
 

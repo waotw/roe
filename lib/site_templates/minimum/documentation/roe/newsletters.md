@@ -1,5 +1,5 @@
 ---
-title: Newsletters
+title: Features → Newsletters & Email
 status: published
 related:
   - postmark
