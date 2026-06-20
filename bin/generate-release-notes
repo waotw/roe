@@ -54,8 +54,8 @@ generate_notes() {
     # Breaking changes (commits with ! in type)
     breaking=$(echo "$commits" | grep -E '^[a-z]+(\([^)]*\))?!:' | sed 's/^[a-z]\+(\([^)]*\))\?![[:space:]]*:[[:space:]]*//' || true)
 
-    # Features
-    feat=$(echo "$commits" | grep -E '^feat(\([^)]*\))?:' | sed 's/^feat(\([^)]*\))\?:[[:space:]]*//' || true)
+    # Features (feat or feature)
+    feat=$(echo "$commits" | grep -E '^(feat|feature)(\([^)]*\))?:' | sed 's/^(feat|feature)(\([^)]*\))\?:[[:space:]]*//' || true)
 
     # Bug fixes
     fix=$(echo "$commits" | grep -E '^fix(\([^)]*\))?:' | sed 's/^fix(\([^)]*\))\?:[[:space:]]*//' || true)
@@ -71,6 +71,9 @@ generate_notes() {
 
     # Style
     style=$(echo "$commits" | grep -E '^style(\([^)]*\))?:' | sed 's/^style(\([^)]*\))\?:[[:space:]]*//' || true)
+
+    # Theme
+    theme=$(echo "$commits" | grep -E '^theme(\([^)]*\))?:' | sed 's/^theme(\([^)]*\))\?:[[:space:]]*//' || true)
 
     # Tests
     test=$(echo "$commits" | grep -E '^test(\([^)]*\))?:' | sed 's/^test(\([^)]*\))\?:[[:space:]]*//' || true)
@@ -127,6 +130,12 @@ generate_notes() {
     if [ -n "$style" ]; then
         echo "### Style"
         echo "$style" | sed 's/^/- /'
+        echo ""
+    fi
+
+    if [ -n "$theme" ]; then
+        echo "### Theme"
+        echo "$theme" | sed 's/^/- /'
         echo ""
     fi
 
