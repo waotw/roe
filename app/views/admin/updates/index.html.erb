@@ -31,6 +31,18 @@
   </div>
 
   <h2 class="mt-4 text-2xl font-bold text-gray-900 mb-4">Roe Version & Updates</h2>
+
+  <% if @dev_install %>
+    <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-6">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">Development Checkout — Updates Disabled</h3>
+      <p class="text-sm text-amber-800">
+        This install is on a live git branch, which means you're working on Roe itself.
+        The in-app updater is disabled to prevent overwriting your working tree with a tagged release.
+        Use <code class="font-mono text-xs bg-amber-100 px-1 rounded">git pull</code> to bring in changes instead.
+      </p>
+    </div>
+  <% end %>
+
   <%# Top status block. Picks one state by priority, in the order
       they're checked: in-progress > restart-pending > restart-complete
       > update-available > up-to-date > no-info. The restart states
@@ -280,11 +292,13 @@
         </div>
 
         <div class="mt-6 flex items-center gap-3">
-          <%= button_to "Update Now",
-                        admin_start_update_path(version: @update_info[:latest_version]),
-                        method: :post,
-                        data: { confirm: "This will update Roe to v#{@update_info[:latest_version]}. Your site will be briefly unavailable. Continue?" },
-                        class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs" %>
+          <% unless @dev_install %>
+            <%= button_to "Update Now",
+                          admin_start_update_path(version: @update_info[:latest_version]),
+                          method: :post,
+                          data: { confirm: "This will update Roe to v#{@update_info[:latest_version]}. Your site will be briefly unavailable. Continue?" },
+                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs" %>
+          <% end %>
 
           <%= link_to "View full release notes on Codeberg →",
                       @update_info[:release_url],

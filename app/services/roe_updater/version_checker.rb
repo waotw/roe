@@ -9,6 +9,10 @@ module RoeUpdater
         @current_version ||= load_current_version
       end
 
+      def dev_install?
+        @dev_install ||= check_dev_install
+      end
+
       def check_for_updates
         cached = Rails.cache.read(CACHE_KEY)
         return cached if cached
@@ -245,6 +249,32 @@ module RoeUpdater
 
       def git_available?
         system("which git > /dev/null 2>&1")
+      end
+
+      # Returns true when current/ is a live git branch checkout (i.e. a
+      # developer working on Roe itself), rather than a detached HEAD from
+      # a tagged release clone (i.e. a normal user install).
+      #
+      # Detection strategy: ask git for the symbolic HEAD ref.
+      #   - Detached HEAD (user install): `git symbolic-ref HEAD` exits
+      #     non-zero — no branch name, just a commit SHA.
+      #   - Named branch (dev checkout): exits 0 and prints
+      #     refs/heads/main (or whatever branch).
+      #
+      # Falls back to false (not a dev install) on any error so that a
+      # missing or broken git setup never accidentally locks out updates.
+      def check_dev_install
+        return false unless git_available?
+
+        require "open3"
+        _, status = Open3.capture2e(
+          "git", "-C", Rails.root.to_s,
+          "symbolic-ref", "--quiet", "HEAD"
+        )
+        status.success?
+      rescue => e
+        Rails.logger.debug "[VersionChecker] dev_install? check failed: #{e.message}"
+        false
       end
 
       def update_available?(current, latest)

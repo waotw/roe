@@ -8,9 +8,11 @@ class Admin::UpdatesController < Admin::BaseController
   # route (typed URL, stale bookmark, old link) gets a clear redirect
   # back to the dashboard instead of a stale or broken page.
   before_action :block_in_production
+  before_action :block_on_dev_install, only: %i[start rollback]
 
   def index
     @current_version = RoeUpdater::VersionChecker.current_version
+    @dev_install     = RoeUpdater::VersionChecker.dev_install?
     @update_info     = RoeUpdater::VersionChecker.check_for_updates
     @last_update     = UpdateStatus.order(created_at: :desc).first
     @in_progress     = UpdateStatus.where(status: "in_progress").exists?
@@ -301,6 +303,17 @@ class Admin::UpdatesController < Admin::BaseController
     return unless Rails.env.production?
     redirect_to admin_root_path,
                 alert: "Updates and deploys happen from your local Roe install, not from the live site. Open your local admin's Updates & Deploy page instead.",
+                status: :see_other
+  end
+
+  # Prevent the in-app updater from running on a developer checkout of
+  # Roe itself. A dev install has HEAD on a named branch (e.g. `main`)
+  # rather than detached at a release tag. Running the updater here
+  # would clone a tagged release over an active development tree.
+  def block_on_dev_install
+    return unless RoeUpdater::VersionChecker.dev_install?
+    redirect_to admin_updates_path,
+                alert: "Updates are disabled on a development checkout of Roe. Use git directly to pull changes.",
                 status: :see_other
   end
 
