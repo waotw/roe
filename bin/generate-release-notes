@@ -87,8 +87,8 @@ generate_notes() {
     # CI
     ci=$(echo "$commits" | grep -E '^ci(\([^)]*\))?:' | sed 's/^ci(\([^)]*\))\?:[[:space:]]*//' || true)
 
-    # Other (no prefix)
-    other=$(echo "$commits" | grep -v -E '^[a-z]+(\([^)]*\))?!?:' || true)
+    # Other (no recognized prefix)
+    other=$(echo "$commits" | grep -v -E '^(feat|feature|fix|perf|docs|refactor|style|theme|test|chore|build|ci)(\([^)]*\))?!?:' || true)
 
     # Output sections
     if [ -n "$breaking" ]; then
