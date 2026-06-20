@@ -1017,11 +1017,44 @@ module HasMarkdownExtensions
       # Check if this is a grouped product
       is_grouped = group_products.length > 1
 
+      # Product image — detect missing/broken image in dev before rendering
+      image_url = display_product.respond_to?(:image) ? display_product.image.presence : nil
+
+      # An image is broken if: (a) blank/unset, or (b) points at a /media/
+      # path that doesn't exist on disk.
+      missing_file = image_url.present? &&
+                     image_url.start_with?("/media/") &&
+                     display_product.respond_to?(:missing_media_refs) &&
+                     display_product.missing_media_refs.any? { |r| r[:field] == "image" }
+      broken_image = image_url.blank? || missing_file
+
+      if broken_image && Rails.env.development?
+        variant_label = display_product.respond_to?(:variant) ? display_product.variant.presence : nil
+        primary_flag  = display_product.respond_to?(:primary?) && display_product.primary?
+        name_parts    = [ display_product.title.presence || "Untitled" ]
+        name_parts   << variant_label if variant_label
+        name_parts   << "primary" if is_grouped && primary_flag
+        label         = name_parts.join(" • ")
+
+        if image_url.blank?
+          warning_title = is_grouped ? "No image on primary product" : "No product image"
+          warning_msg   = "\"#{label}\" has no image set."
+          warning_hint  = is_grouped ? "The primary variant controls the image shown in collections. Add an image or mark a different variant as primary." : "Add an image path to this product's front matter."
+        else
+          warning_title = is_grouped ? "Broken image on primary product" : "Broken product image"
+          warning_msg   = "\"#{label}\" has image: #{image_url.inspect} but the file doesn't exist."
+          warning_hint  = is_grouped ? "The primary variant controls the image shown in collections. Fix the image path or mark a different variant as primary." : "Check the image path in this product's front matter."
+        end
+
+        output << "  <div class=\"grid-item\">"
+        output << dev_warning(warning_title, warning_msg, warning_hint)
+        output << "  </div>"
+        next
+      end
+
       output << '  <div class="grid-item">'
 
-      # Product image
-      image_url = display_product.respond_to?(:image) ? display_product.image : nil
-      image_url = "/media/images/404.png" if image_url.blank?
+      image_url ||= "/media/images/404.png"
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(display_product)}">)
