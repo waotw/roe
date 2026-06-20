@@ -226,13 +226,13 @@ export default class extends Controller {
             </button>
             <div class="flex items-center gap-3">
               <button id="git-refresh-btn"
-                class="flex-none uppercase text-sm px-4 py-2 border border-gray-400 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs">
+                class="flex-none uppercase text-sm px-4 py-2 border amber-gray-400 bg-amber-100 hover:bg-amber-200 font-mono rounded-xs">
                 Refresh
               </button>
               <span class="text-xs text-gray-500">I’ve committed manually — check again</span>
             </div>
             <button id="modal-cancel-btn"
-              class="w-full text-center text-sm text-gray-400 hover:text-gray-700 py-1">
+              class="w-full uppercase text-sm px-4 py-2.5 border border-gray-400 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono rounded-xs">
               Cancel
             </button>
           </div>
@@ -297,7 +297,11 @@ export default class extends Controller {
       btn.classList.add("bg-green-100", "border-green-500", "text-green-800");
       setTimeout(() => {
         btn.textContent = originalText;
-        btn.classList.remove("bg-green-100", "border-green-500", "text-green-800");
+        btn.classList.remove(
+          "bg-green-100",
+          "border-green-500",
+          "text-green-800",
+        );
       }, 1500);
     } catch (e) {
       // navigator.clipboard requires a secure context (HTTPS or localhost)

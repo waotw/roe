@@ -41,7 +41,7 @@
     <%# Automatic rollback completed cleanly — the update was attempted,
         something failed mid-flow, and the orchestrator restored the
         previous state. Site is healthy on the old version. %>
-    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-sm p-6">
+    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-xs p-6">
       <h3 class="text-sm font-semibold text-amber-900 mb-2">
         Last Update Rolled Back
       </h3>
@@ -57,21 +57,21 @@
           <summary class="text-xs text-amber-700 cursor-pointer hover:text-amber-900">
             Show failure details
           </summary>
-          <pre class="mt-2 p-3 bg-white border border-amber-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @last_update.error_message %></pre>
+          <pre class="mt-2 p-3 bg-white border border-amber-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @last_update.error_message %></pre>
         </details>
       <% end %>
     </div>
   <% end %>
 
   <% if @last_update && @last_update.status == 'failed' %>
-    <div class="mt-6 bg-red-50 border border-red-200 rounded-sm p-6">
+    <div class="mt-6 bg-red-50 border border-red-200 rounded-xs p-6">
       <h3 class="text-sm font-semibold text-red-900 mb-2">Last Update Failed</h3>
       <p class="text-sm text-red-700 mb-2">
         Both the update AND the automatic rollback failed. Manual
         intervention may be required.
       </p>
       <% if @last_update.error_message.present? %>
-        <pre class="mb-4 p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @last_update.error_message %></pre>
+        <pre class="mb-4 p-3 bg-white border border-red-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @last_update.error_message %></pre>
       <% end %>
       <%= button_to "Attempt Rollback",
                     admin_rollback_update_path,
@@ -81,7 +81,7 @@
     </div>
   <% end %>
   <% if @in_progress %>
-    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-4"
+    <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-4"
          data-updates-target="inProgressPanel">
       <h2 class="text-lg font-semibold text-amber-900 mb-2">Update in Progress</h2>
       <p class="text-amber-800 mb-4">
@@ -101,7 +101,7 @@
         </p>
       </div>
 
-      <div class="bg-white rounded-sm p-4 font-mono text-xs text-gray-600 h-48 overflow-y-auto"
+      <div class="bg-white rounded-xs p-4 font-mono text-xs text-gray-600 h-48 overflow-y-auto"
            data-updates-target="log">
         <%= simple_format(@last_update&.log || '') %>
       </div>
@@ -113,7 +113,7 @@
         Detailed terminal restart instructions because the beta
         audience (Substack/Ghost/WordPress users) isn't all comfortable
         in a terminal. %>
-    <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-4">
+    <div class="bg-blue-50 border border-blue-200 rounded-xs p-6 mb-4">
       <h3 class="text-base font-semibold text-blue-900 mb-2">
         Update Installed — Restart Roe to Finish
       </h3>
@@ -123,7 +123,7 @@
         — restart it to load the new code.
       </p>
 
-      <div class="bg-white border border-blue-200 rounded-sm p-5 mb-3">
+      <div class="bg-white border border-blue-200 rounded-xs p-5 mb-3">
         <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart your Roe server</h4>
 
         <ol class="space-y-5 text-sm text-gray-800">
@@ -176,7 +176,7 @@
         <summary class="text-sm text-blue-700 cursor-pointer hover:text-blue-900 select-none">
           Lost the terminal window? →
         </summary>
-        <div class="mt-3 bg-white border border-blue-200 rounded-sm p-5">
+        <div class="mt-3 bg-white border border-blue-200 rounded-xs p-5">
           <p class="text-sm text-gray-800 mb-4 leading-relaxed">
             If you closed the terminal where Roe was running, open a new one
             (on macOS: search for <strong>Terminal</strong> in Spotlight with
@@ -226,7 +226,7 @@
         confirmation shows for the rest of the 5-minute window from
         completed_at, then naturally falls back to "Up to Date" once
         @recent_update is false. %>
-    <div class="bg-green-50 border border-green-200 rounded-sm p-6 mb-4">
+    <div class="bg-green-50 border border-green-200 rounded-xs p-6 mb-4">
       <h2 class="text-lg font-semibold text-green-900 mb-2">
         Update Successful
       </h2>
@@ -241,7 +241,7 @@
     </div>
   <% elsif @update_info %>
     <% if @update_info[:update_available] %>
-      <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-6">
+      <div class="bg-blue-50 border border-blue-200 rounded-xs p-6 mb-6">
         <div class="flex items-start gap-4">
           <div class="flex-1">
             <h2 class="text-lg font-semibold text-blue-900 mb-2">
@@ -258,12 +258,16 @@
         </div>
 
         <% if @update_info[:release_notes].present? %>
-          <div class="mt-4 p-4 bg-white border border-blue-200 rounded-sm">
+          <div class="mt-4 p-4 bg-white border border-blue-200 rounded-xs">
             <h3 class="text-sm font-semibold text-gray-900 mb-2">Release Notes</h3>
             <div class="prose prose-sm max-w-none text-gray-700">
               <%= simple_format(@update_info[:release_notes]) %>
             </div>
           </div>
+          <%= link_to "View full release notes on Codeberg →",
+                      @update_info[:release_url],
+                      target: "_blank",
+                      class: "text-sm text-blue-600 hover:text-blue-900 underline" %>
         <% end %>
 
         <div class="mt-6 pt-4 border-t border-blue-200">
@@ -289,7 +293,7 @@
         </div>
       </div>
     <% else %>
-      <div class="bg-green-50 border border-green-200 rounded-sm p-4 mb-4">
+      <div class="bg-green-50 border border-green-200 rounded-xs p-4 mb-4">
         <h2 class="text-base font-semibold text-green-900">You're Up to Date</h2>
         <p class="text-green-800 mt-2 text-sm">
           You're running the latest version of Roe CMS (<%= @current_version %>).
@@ -297,13 +301,13 @@
       </div>
     <% end %>
   <% else %>
-    <div class="bg-gray-50 border border-gray-200 rounded-sm p-6">
+    <div class="bg-gray-50 border border-gray-200 rounded-xs p-6">
       <p class="text-gray-600">
         Click "Check for Updates" to see if a new version is available.
       </p>
     </div>
   <% end %>
-  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+  <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
     <div class="flex items-center justify-between mb-4">
       <div>
         <h2 class="text-lg font-semibold text-gray-900">Current Version</h2>
@@ -341,7 +345,7 @@
       last_deployed_at = @deploy_status&.dig(:completed_at) || @last_deploy_time
     %>
 
-    <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
 
       <%# Card header — always visible %>
       <div class="flex items-start justify-between mb-6">
@@ -367,7 +371,7 @@
 
       <%# ── Running state — Stimulus polls deployLog target ── %>
       <% if deploy_state == :running %>
-        <div class="bg-amber-50 border border-amber-200 rounded-sm p-4"
+        <div class="bg-amber-50 border border-amber-200 rounded-xs p-4"
              data-updates-target="deployInProgressPanel">
           <div class="flex items-center gap-2 mb-3">
             <span class="relative flex h-2 w-2">
@@ -382,7 +386,7 @@
             <% end %>
           </div>
           <p class="text-xs text-amber-800 mb-3">Please don’t close this window. The page updates automatically.</p>
-          <div class="bg-white border border-amber-200 rounded-sm p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
+          <div class="bg-white border border-amber-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
                data-updates-target="deployLog">
             <%= simple_format(@deploy_status[:log].presence || '') %>
           </div>
@@ -390,7 +394,7 @@
 
       <%# ── Completed state (only show if not dismissed) ── %>
       <% elsif deploy_state == :completed && !@deploy_status[:dismissed] %>
-        <div class="bg-green-50 border border-green-200 rounded-sm p-4">
+        <div class="bg-green-50 border border-green-200 rounded-xs p-4">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-sm font-semibold text-green-900">Deploy completed successfully</h3>
@@ -411,7 +415,7 @@
           <% if @deploy_status[:log].present? %>
             <details class="mt-3">
               <summary class="text-xs text-green-700 cursor-pointer hover:text-green-900">Show deploy log</summary>
-              <div class="mt-2 bg-white border border-green-200 rounded-sm p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
+              <div class="mt-2 bg-white border border-green-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
                 <%= simple_format(@deploy_status[:log]) %>
               </div>
             </details>
@@ -420,7 +424,7 @@
 
       <%# ── Failed state ── %>
       <% elsif deploy_state == :failed %>
-        <div class="bg-red-50 border border-red-200 rounded-sm p-4">
+        <div class="bg-red-50 border border-red-200 rounded-xs p-4">
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
             <div class="flex gap-2">
@@ -448,7 +452,7 @@
             <p class="text-xs text-red-700 mb-3"><%= @deploy_status[:error] %></p>
           <% end %>
           <% if @deploy_status[:log].present? %>
-            <div class="bg-white border border-red-200 rounded-sm p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
+            <div class="bg-white border border-red-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
               <%= simple_format(@deploy_status[:log]) %>
             </div>
           <% end %>
@@ -456,7 +460,7 @@
 
       <%# ── Not ready — prerequisites unmet ── %>
       <% elsif @deploy_issues.any? %>
-        <div class="bg-amber-50 border border-amber-200 rounded-sm p-4">
+        <div class="bg-amber-50 border border-amber-200 rounded-xs p-4">
           <h3 class="text-sm font-semibold text-amber-900 mb-2">Not ready to deploy</h3>
           <ul class="text-sm text-amber-800 list-disc list-inside space-y-1 mb-3">
             <% @deploy_issues.each do |issue| %>
