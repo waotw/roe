@@ -637,30 +637,48 @@ module HasMarkdownExtensions
     template = config[:template] || default_template
     list_markdown = render_template(display_items, template, config)
 
-    # Build output with proper spacing
+    # Build output with proper spacing.
+    # The compact template produces raw HTML list items (to preserve the
+    # .item-title span), so its wrapper must not carry markdown="1" —
+    # Kramdown would re-process the HTML and strip the span tags.
+    # All other templates emit Markdown/IAL and need markdown="1".
     output = []
-    output << "<div class=\"collection #{template}\" markdown=\"1\">"
-    output << ""
 
-    if heading.present?
-      output << "## #{heading}"
+    if template == "compact"
+      output << "<div class=\"collection #{template}\">"
+      output << "<h2>#{heading}</h2>" if heading.present?
+      output << list_markdown
+
+      if show_more && total_count > display_items.count && source == "posts"
+        show_more_text = config[:show_more_text] || "View all"
+        collection_url = generate_collection_url(config)
+        output << "<a href=\"#{collection_url}\" class=\"collection-more\">#{show_more_text}</a>"
+      end
+
+      output << "</div>"
+    else
+      output << "<div class=\"collection #{template}\" markdown=\"1\">"
       output << ""
-    end
 
-    output << list_markdown
+      if heading.present?
+        output << "## #{heading}"
+        output << ""
+      end
 
-    # Add "View More" link ONLY for posts source
-    if show_more && total_count > display_items.count && source == "posts"
-      show_more_text = config[:show_more_text] || "View all"
-      collection_url = generate_collection_url(config)
+      output << list_markdown
+
+      if show_more && total_count > display_items.count && source == "posts"
+        show_more_text = config[:show_more_text] || "View all"
+        collection_url = generate_collection_url(config)
+
+        output << ""
+        output << "[#{show_more_text}](#{collection_url})"
+        output << "{: .collection-more}"
+      end
 
       output << ""
-      output << "[#{show_more_text}](#{collection_url})"
-      output << "{: .collection-more}"
+      output << "</div>"
     end
-
-    output << ""
-    output << "</div>"
 
     tag_warning + output.join("\n")
   end
@@ -911,7 +929,7 @@ module HasMarkdownExtensions
   def render_compact(items, config = {})
     show_author = collection_truthy?(config[:show_author])
 
-    items.map do |item|
+    items_html = items.map do |item|
       date_str = item_date(item)
       author_str = show_author ? item_author(item) : nil
 
@@ -924,8 +942,11 @@ module HasMarkdownExtensions
       end
 
       title_html = decorate_title(item)
-      "- [#{title_html}](#{item_path(item)})#{meta_html}"
-    end.join("\n")
+      link_html = "<a href=\"#{item_path(item)}\">#{title_html}</a>"
+      "<li><span class=\"item-title\">#{link_html}</span>#{meta_html}</li>"
+    end
+
+    "<ul>\n#{items_html.join("\n")}\n</ul>"
   end
 
   def render_links(items)
