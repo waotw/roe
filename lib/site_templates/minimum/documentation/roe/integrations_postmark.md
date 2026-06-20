@@ -1,0 +1,62 @@
+---
+title: Integrations → Postmark
+status: published
+url_name: postmark
+---
+
+##### Related documentation
+
+```collection
+source: documentation
+related: true
+limit: all
+template: links
+```
+
+# Setting up Postmark to work with Roe
+
+Roe has a full featured newsletter system that supports free and paid members. Members can sign up with just their name/email, no password required. 
+
+#### Before Postmark
+
+You'll need to enable the Members feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE MEMBERS`. You will then set up Members and there you can enable `Newsletters` which turns on Postmark in Roe.
+
+## 1. Basic Postmark Setup
+
+Postmark has good documentation. Use this article to get your account set up correctly:  
+[Getting started with Postmark](https://postmarkapp.com/support/article/1002-getting-started-with-postmark). This ensures that your emails are delivered reliably. 
+
+1. Create a new Server or use the defaults created with your account (you can rename them)
+    - [Servers FAQ](https://postmarkapp.com/support/article/1137-servers-faq)
+    - [Message Streams Video](https://postmarkapp.com/videos/message-streams) (if curious)
+2. Postmark 
+2. Go to [Servers](https://account.postmarkapp.com/servers) → Open your server → API Tokens
+3. Click the token to copy it
+    - You'll need to paste this into Roe's settings.
+
+### 2. Connect Postmark to Roe
+
+1. Go to: [Admin → Settings → postmark.yml](/admin/configs/newsletters/edit)
+2. Paste your Server API Token
+3. Click **"Save Configuration"**
+4. You'll see a green confirmation if successful
+
+### 3. Configure Webhooks
+
+Webhooks tell Roe when emails are delivered, bounce, or are marked as spam. We recommend testing webhooks on a live URL/server.
+
+1. In Postmark, go to Postmark Server → Choose your Broadcast Stream → Settings → Webhooks
+2. Click **"Add webhook"**
+3. Copy the webhook URL shown in Roe's Postmark settings
+4. Paste it into Postmark: `Webhook URL`
+5. Enable these events:
+   - ✅ **Delivery** (optional, for logging)
+   - ✅ **Bounce** (required)
+      - ✅ include message content
+   - ✅ **Spam Complaint** (required)
+      - ✅ include message content
+6. Click `Send Test` to make sure things are set up correctly
+6. Save the webhook
+7. You only need to do this for Broadcast Stream.
+
+If all seems well, the indicator at the top of the page will be green and say `Connected`.

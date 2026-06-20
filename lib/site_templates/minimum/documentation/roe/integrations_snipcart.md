@@ -37,4 +37,4 @@ Whether is Test or Live Mode, there are 2 things you'll need to set up Snipcart 
 6. Paste the Snippet in it's section, paste the Secret Key in it's section.
 7. Click `SAVE (TEST/LIVE KEYS)`.
 
-If all is well, the indicator at the top of the page will be green and say `Connected`.
+If all seems well, the indicator at the top of the page will be green and say `Connected`.

@@ -19,7 +19,32 @@
   <% end %>
 
   <%= form_with url: admin_development_config_path, method: :patch, local: true, class: "space-y-6" do |f| %>
+
+    <%# Dev Host — explicit webhook callback host. Optional; when blank,
+        WebhookUrlHelper falls back to the first public-looking entry
+        in allowed_hosts below. %>
     <div class="bg-white border border-gray-200">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900">Dev Host</h3>
+        <p class="text-sm text-gray-500 mt-1">
+          The hostname used for webhook callbacks in development (Stripe,
+          Postmark, etc.). Optional — if blank, the first public-looking
+          entry under Allowed Hosts below is used. Set this explicitly
+          if you have multiple tunnels and want webhooks to point at a
+          specific one.
+        </p>
+      </div>
+      <div class="px-6 py-4">
+        <%= text_field_tag :dev_host, @dev_host,
+            class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs",
+            placeholder: "your-site.ngrok-free.app" %>
+      </div>
+    </div>
+
+    <%# Allowed Hosts — add/remove handled by allowed-hosts Stimulus
+        controller. CANCEL link below the form discards any in-page
+        changes because nothing has been submitted. %>
+    <div class="bg-white border border-gray-200" data-controller="allowed-hosts">
       <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-medium text-gray-900">Allowed Hosts</h3>
         <p class="text-sm text-gray-500 mt-1">
@@ -29,36 +54,39 @@
       </div>
 
       <div class="px-6 py-4">
-        <div id="allowed-hosts-container" class="space-y-2">
-          <% if @allowed_hosts.any? %>
-            <% @allowed_hosts.each_with_index do |host, index| %>
-              <div class="flex gap-2 allowed-host-row">
-                <%= text_field_tag "allowed_hosts[]", host,
-                    class: "flex-1 font-mono text-sm p-2 border border-gray-300 rounded-xs",
-                    placeholder: "your-site.ngrok-free.app" %>
-                <%= button_tag type: :button,
-                    class: "remove-host-btn font-mono px-3 text-xs py-2 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs",
-                    data: { action: "remove-host" } do %>
-                  Remove
-                <% end %>
-              </div>
-            <% end %>
-          <% else %>
-            <div class="flex gap-2 allowed-host-row">
-              <%= text_field_tag "allowed_hosts[]", "",
+        <div data-allowed-hosts-target="container" class="space-y-2">
+          <% (@allowed_hosts.presence || [ "" ]).each do |host| %>
+            <div data-allowed-hosts-target="row" class="flex gap-2">
+              <%= text_field_tag "allowed_hosts[]", host,
                   class: "flex-1 font-mono text-sm p-2 border border-gray-300 rounded-xs",
                   placeholder: "your-site.ngrok-free.app" %>
               <%= button_tag type: :button,
-                  class: "remove-host-btn font-mono px-3 text-xs py-2 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs",
-                  data: { action: "remove-host" } do %>
+                  data: { action: "click->allowed-hosts#remove" },
+                  class: "font-mono px-3 text-xs py-2 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs" do %>
                 Remove
               <% end %>
             </div>
           <% end %>
         </div>
 
+        <%# Template cloned by allowed-hosts#add. Lives inside the
+            controller's element so the cloned fragment's
+            data-action wires up to the same controller instance. %>
+        <template data-allowed-hosts-target="template">
+          <div data-allowed-hosts-target="row" class="flex gap-2">
+            <input type="text" name="allowed_hosts[]"
+              class="flex-1 font-mono text-sm p-2 border border-gray-300 rounded-xs"
+              placeholder="your-site.ngrok-free.app" />
+            <button type="button"
+              data-action="click->allowed-hosts#remove"
+              class="font-mono px-3 text-xs py-2 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs">
+              Remove
+            </button>
+          </div>
+        </template>
+
         <%= button_tag type: :button,
-            id: "add-host-btn",
+            data: { action: "click->allowed-hosts#add" },
             class: "mt-3 inline-flex font-mono text-xs items-center px-3 py-2 border border-gray-300 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 rounded-xs" do %>
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -87,42 +115,3 @@
                 class: "uppercase text-xs px-4 py-2 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
   </div>
 </div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const container = document.getElementById('allowed-hosts-container');
-    const addBtn = document.getElementById('add-host-btn');
-
-    addBtn.addEventListener('click', function() {
-      const newRow = document.createElement('div');
-      newRow.className = 'flex gap-2 allowed-host-row';
-      newRow.innerHTML = `
-        <input type="text" name="allowed_hosts[]"
-          class="flex-1 font-mono text-sm p-2 border border-gray-300 rounded-xs"
-          placeholder="your-site.ngrok-free.app" />
-        <button type="button"
-          class="remove-host-btn px-3 py-2 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs"
-          data-action="remove-host">
-          Remove
-        </button>
-      `;
-      container.appendChild(newRow);
-      attachRemoveHandler(newRow.querySelector('.remove-host-btn'));
-    });
-
-    function attachRemoveHandler(btn) {
-      btn.addEventListener('click', function() {
-        const rows = container.querySelectorAll('.allowed-host-row');
-        if (rows.length > 1) {
-          btn.closest('.allowed-host-row').remove();
-        } else {
-          // Clear the input instead of removing the last row
-          btn.closest('.allowed-host-row').querySelector('input').value = '';
-        }
-      });
-    }
-
-    // Attach handlers to existing remove buttons
-    document.querySelectorAll('.remove-host-btn').forEach(attachRemoveHandler);
-  });
-</script>

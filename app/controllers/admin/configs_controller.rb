@@ -153,9 +153,9 @@ class Admin::ConfigsController < Admin::BaseController
 
   NEWSLETTERS_CONFIG_SCHEMA = {
     test_keys: {
-      label: "Postmark Test Token",
+      label: "Postmark Test Server API Token",
       fields: {
-        "server_token" => { type: :password, label: "Server Token (Test)", hint: "Your Postmark server API token for testing" }
+        "server_token" => { type: :password, label: "Server Token (Test)", hint: "Your test Postmark server API token" }
       }
     },
     live_keys: {
@@ -888,41 +888,44 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path and return
     end
 
-    @config_type = "development"
+    @config_type    = "development"
     @config_content = File.read(development_config_path)
-    @config_hash = YAML.load(@config_content) || {}
-    @allowed_hosts = @config_hash["allowed_hosts"] || []
+    @config_hash    = YAML.load(@config_content) || {}
+    @allowed_hosts  = @config_hash["allowed_hosts"] || []
+    @dev_host       = @config_hash["dev_host"].to_s
     render :edit_development
   end
 
   def update_development
-    # Get hosts from params, filter out empty ones
-    hosts = params[:allowed_hosts]&.reject(&:blank?) || []
+    hosts    = params[:allowed_hosts]&.reject(&:blank?) || []
+    dev_host = params[:dev_host].to_s.strip
 
-    # Build YAML content
-    if hosts.any?
-      yaml_content = "allowed_hosts:\n"
-      hosts.each do |host|
-        yaml_content += "  - #{host}\n"
-      end
+    # Merge into the existing hash so any keys the form doesn't
+    # manage (future settings the user has hand-edited in, comments
+    # we wouldn't preserve through round-tripping, etc.) survive
+    # the round trip. We let Hash#to_yaml own the serialisation —
+    # this file is admin-managed-only, no user-authored formatting
+    # to preserve.
+    existing = File.exist?(SiteConfig::DEVELOPMENT_FILE) ? (YAML.load(File.read(SiteConfig::DEVELOPMENT_FILE)) || {}) : {}
+    existing["allowed_hosts"] = hosts
+    if dev_host.empty?
+      existing.delete("dev_host")
     else
-      yaml_content = "allowed_hosts: []\n"
+      existing["dev_host"] = dev_host
     end
 
-    # Write to file
-    File.write(SiteConfig::DEVELOPMENT_FILE, yaml_content)
-
-    # Sync to database
+    File.write(SiteConfig::DEVELOPMENT_FILE, existing.to_yaml)
     SiteConfig.sync_from_file("development")
 
     flash[:notice] = "Development configuration updated successfully"
     redirect_to admin_configs_path
   rescue => e
     flash.now[:error] = "Failed to update configuration: #{e.message}"
-    @config_type = "development"
+    @config_type    = "development"
     @config_content = File.read(SiteConfig::DEVELOPMENT_FILE)
-    @config_hash = YAML.load(@config_content) || {}
-    @allowed_hosts = @config_hash["allowed_hosts"] || []
+    @config_hash    = YAML.load(@config_content) || {}
+    @allowed_hosts  = @config_hash["allowed_hosts"] || []
+    @dev_host       = @config_hash["dev_host"].to_s
     render :edit_development
   end
 
@@ -935,11 +938,25 @@ class Admin::ConfigsController < Admin::BaseController
     if File.exist?(SiteConfig::DEVELOPMENT_FILE)
       flash[:alert] = "Development configuration already exists"
     else
-      # Create development.yml with default content
+      # Create development.yml with default content.
+      #
+      # `allowed_hosts` feeds Rails' Host Authorization so requests
+      # coming in from a tunnel hostname aren't rejected. The first
+      # public-looking entry here is also what WebhookUrlHelper
+      # uses as the dev webhook callback host (so Stripe / Postmark
+      # webhooks point at your tunnel instead of localhost).
+      #
+      # `dev_host` is an explicit override — set it if you want a
+      # different host for webhook callbacks than the first entry
+      # in allowed_hosts (e.g. multiple tunnels for different
+      # purposes). Commented out by default; most setups don't need
+      # it because the allowed_hosts fallback works.
       FileUtils.mkdir_p(SiteConfig::DEVELOPMENT_FILE.dirname)
       File.write(SiteConfig::DEVELOPMENT_FILE, <<~YAML)
         allowed_hosts:
           - your-site.ngrok-free.app
+
+        # dev_host: your-site.ngrok-free.app
       YAML
 
       SiteConfig.sync_from_file("development")

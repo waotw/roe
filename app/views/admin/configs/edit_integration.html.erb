@@ -126,37 +126,66 @@
   <%# Webhook endpoint. Postmark embeds a per-install token in the path
       and verifies it server-side (webhooks/postmark_controller.rb).
       Stripe uses one URL and authenticates via signing_secret. Snipcart
-      isn't webhook-driven in Roe so we skip the section. %>
+      isn't webhook-driven in Roe so we skip the section.
+      The URL is computed via WebhookUrlHelper — production uses the
+      live site domain, dev uses dev_host (or the first public-looking
+      allowed_hosts entry as a fallback), dev without either renders
+      the disabled-state UI below. %>
   <%
-    webhook_url = case @config_type
+    webhook_path = case @config_type
       when 'payments'
-        "#{request.base_url}/webhooks/stripe"
+        "/webhooks/stripe"
       when 'newsletters'
         token = integration_record&.respond_to?(:webhook_token) ? integration_record.webhook_token : nil
-        token.present? ? "#{request.base_url}/webhooks/postmark/#{token}" : nil
+        token.present? ? "/webhooks/postmark/#{token}" : nil
       end
+    resolved_webhook_url = webhook_path ? webhook_url(webhook_path) : nil
   %>
-  <% if webhook_url %>
-    <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
-      <h3 class="text-base font-semibold text-gray-900 mb-2">Webhook Endpoint</h3>
-      <p class="text-sm text-gray-600 mb-3">
-        <% if @config_type == 'newsletters' %>
-          Add this URL as a webhook in your Postmark server's settings so delivery
-          events (opens, clicks, bounces) reach Roe. The token at the end is unique
-          to this install — keep it secret. You can regenerate a new token in the Danger Zone below.
-        <% elsif @config_type == 'payments' %>
-          Add this URL as a webhook endpoint in your Stripe dashboard. Stripe will
-          give you a signing secret in return — paste that into the
-          <em>Webhook Signing Secret</em> field in the appropriate tab below.
-          Test and Live modes use the same URL but separate endpoints / signing secrets.
-        <% end %>
-      </p>
-      <input type="text"
-             value="<%= webhook_url %>"
-             readonly
-             onclick="this.select()"
-             class="w-full font-mono text-xs p-2 border border-gray-300 bg-white">
-    </div>
+  <% if webhook_path %>
+    <% if resolved_webhook_url %>
+      <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
+        <h3 class="text-base font-semibold text-gray-900 mb-2">Webhook URL</h3>
+        <p class="text-sm text-gray-600 mb-3">
+          <% if @config_type == 'newsletters' %>
+            Add this as your Webhook URL in your Postmark Server's Webhook settings so delivery
+            events (opens, clicks, bounces) reach Roe. The token at the end is unique
+            to this install — keep it secret. <span class="text-amber-600">You can regenerate a new token in the Danger Zone below.</span>
+          <% elsif @config_type == 'payments' %>
+            Add this URL as a webhook endpoint in your Stripe dashboard. Stripe will
+            give you a signing secret in return — paste that into the
+            <em>Webhook Signing Secret</em> field in the appropriate tab below.
+            Test and Live modes use the same URL but separate domains / signing secrets.
+          <% end %>
+        </p>
+        <input type="text"
+               value="<%= resolved_webhook_url %>"
+               readonly
+               onclick="this.select()"
+               class="w-full font-mono text-xs p-2 border border-gray-300 bg-white">
+      </div>
+    <% else %>
+      <div class="config-section mb-6 p-4 border border-amber-200 bg-amber-50">
+        <h3 class="text-base font-semibold text-gray-900 mb-2">Webhook URL — not available in development</h3>
+        <p class="text-sm text-gray-700 mb-2">
+          Webhooks from <%= @config_type == 'payments' ? 'Stripe' : 'Postmark' %> can't reach
+          <code class="font-mono text-xs bg-amber-100 px-0.5">localhost</code> from the public
+          internet, so this URL is disabled in development by default. Two options:
+        </p>
+        <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1 mb-2">
+          <li>
+            Set up an HTTPS tunnel (ngrok, cloudflared, etc.) and add its host either as the
+            first entry under <code class="font-mono text-xs bg-amber-100 px-0.5">allowed_hosts:</code>
+            or explicitly as <code class="font-mono text-xs bg-amber-100 px-0.5">dev_host:</code> in your
+            <%= link_to "development.yml", admin_edit_development_config_path, class: "underline" %>.
+            The webhook URL will switch to that host automatically.
+          </li>
+          <li>
+            Skip local webhook testing and verify after deploying — production uses your live
+            site domain automatically, no extra config needed.
+          </li>
+        </ul>
+      </div>
+    <% end %>
   <% end %>
 
   <%# Tabs — the controller wraps BOTH the nav and the panels below so
@@ -194,6 +223,7 @@
         <li>Test keys are stored as plain text in <code class="text-xs font-mono">site/system/integrations/<%= @config_type %>.yml</code>.</li>
         <li>Live keys are stored encrypted in the database.</li>
       </ul>
+      <hr class="border border-gray-300 mb-4">
     <% end %>
 
   <%# Test tab %>
@@ -225,7 +255,7 @@
                       Render the real value so the user can see + edit; no mask. %>
                   <textarea name="test[<%= field_name %>]"
                             placeholder="<%= field_config[:hint] %>"
-                            rows="4"
+                            rows="7"
                             class="w-full font-mono text-sm p-2 border border-gray-300"><%= current_value %></textarea>
                 <% else %>
                   <input type="text"

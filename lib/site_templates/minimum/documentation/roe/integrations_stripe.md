@@ -68,4 +68,4 @@ In your Stripe dashboard, go to **Developers (bottom left of window) → Webhook
 5. Go back to Roe: [Admin → Settings → Payments](/admin/configs/payments/edit) and paste the Signing secret in Roe: `Webhook Signing Secret`.
 6. Click `SAVE TEST/LIVE KEYS`
 
-If all is well, the indicator at the top of the page will be green and say `Connected`.
+If all seems well, the indicator at the top of the page will be green and say `Connected`.
