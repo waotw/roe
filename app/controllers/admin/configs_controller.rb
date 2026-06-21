@@ -1496,7 +1496,7 @@ class Admin::ConfigsController < Admin::BaseController
         flash[:notice] = "Site configuration updated successfully"
       end
 
-    when "defaults/members"
+    when "features/members"
       Rails.cache.clear
 
       # Sync Stripe product/price if payments are enabled

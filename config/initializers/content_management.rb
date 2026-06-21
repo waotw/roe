@@ -48,6 +48,22 @@ if should_run
         PageGenerator.generate_defaults
         ContentSync.sync_all
 
+        # Sync Stripe product/price if payments are enabled in members.yml
+        # but price_id is missing from the DB — happens when the DB is reset,
+        # after an update wipe, or when members.yml is edited directly.
+        members_yml = SiteConfig::FEATURES_PATH.join("members.yml")
+        members_config = File.exist?(members_yml) ? (YAML.load_file(members_yml) rescue nil) : nil
+        payments_config = members_config&.dig("payments")
+        if payments_config&.dig("enabled") && StripeConfig.current.connected? && StripeConfig.current.price_id.blank?
+          puts "\n💳 Stripe price_id missing — syncing product/price from members.yml..."
+          manager = StripeProductManager.new
+          if manager.sync_from_config(payments_config)
+            puts "✓ Stripe product/price synced (price_id: #{StripeConfig.current.price_id})"
+          else
+            puts "⚠️  Stripe sync failed: #{manager.errors.join(', ')}"
+          end
+        end
+
         # Start watcher in BOTH dev and production (single mode = safe)
         puts "\n🎬 Starting content watcher..."
         ContentWatcher.start
