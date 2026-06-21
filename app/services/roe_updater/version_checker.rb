@@ -3,6 +3,10 @@ module RoeUpdater
     CODEBERG_REPO = "waotw/roe"
     CACHE_KEY = "roe_latest_version"
     CACHE_TTL = 1.hour
+    # Persistent flag — no TTL. Set by CheckForUpdatesJob when an update
+    # is available. Cleared by UpdateOrchestrator#complete_update after
+    # a successful update. Read by the nav helper to show the amber dot.
+    UPDATE_AVAILABLE_KEY = "roe_update_available"
 
     class << self
       def current_version

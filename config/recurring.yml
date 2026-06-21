@@ -23,3 +23,7 @@ development:
     class: SiteSyncExchangeJob
     queue: default
     schedule: every hour
+  check_for_updates:
+    class: CheckForUpdatesJob
+    queue: default
+    schedule: every hour at minute 30

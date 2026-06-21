@@ -363,6 +363,7 @@ module RoeUpdater
         # fresh fetch on next render → answers "no, you're current"
         # → correct state.
         RoeUpdater::VersionChecker.clear_cache
+        Rails.cache.delete(RoeUpdater::VersionChecker::UPDATE_AVAILABLE_KEY)
 
         log("✓ Update completed successfully!")
       end

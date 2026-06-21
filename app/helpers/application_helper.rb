@@ -35,6 +35,13 @@ module ApplicationHelper
     svg.html_safe
   end
 
+  # Reads the persistent update-available flag written by CheckForUpdatesJob.
+  # No network call — just a cache read. The flag has no TTL so the dot
+  # stays visible across restarts until an update completes.
+  def update_available?
+    Rails.cache.read(RoeUpdater::VersionChecker::UPDATE_AVAILABLE_KEY) == true
+  end
+
   def safe_system_image_path(filename, **options)
     return nil if filename.blank?
     system_image_path(filename, **options)
