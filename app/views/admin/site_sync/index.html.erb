@@ -696,8 +696,8 @@
             </button>
           </div>
           <p class="text-xs text-gray-500 mt-1">
-            Click Copy to copy to clipboard. The same value must be set on both sides.
-            <%= "Paste this into the other environment's Site Sync settings." if Rails.env.development? %>
+            Click Copy to copy to clipboard. This token must be set on the live site.<br>
+            <%= "Paste this into the your live Site Sync settings." if Rails.env.development? %>
           </p>
         <% else %>
           <% if Rails.env.production? %>
@@ -734,7 +734,7 @@
         <% if Rails.env.development? %>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 mt-4">
-              Site URL <span class="text-xs font-normal text-gray-500">— your live/production site</span>
+              Live Site URL <span class="text-xs font-normal text-gray-500">— your live/production site</span>
             </label>
             <%= form.text_field :peer_url,
                                 value: @sync_config.peer_url,

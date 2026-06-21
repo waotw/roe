@@ -54,7 +54,7 @@ class DeployConfigGenerator
     raise GenerationError, "master.key at site/system/secrets/ is empty — run bin/setup to regenerate it" if master_key.blank?
 
     secrets = DeploySecrets.current
-    raise GenerationError, "Registry password not set — add it in Deploy Configuration" unless secrets.registry_password.present?
+    raise GenerationError, "Registry token not set — add it in Deploy Configuration" unless secrets.registry_password.present?
 
     secrets_path = Rails.root.join(".kamal", "secrets")
     FileUtils.mkdir_p(File.dirname(secrets_path))

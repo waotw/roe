@@ -119,10 +119,10 @@
           <% end %>
         </div>
 
-        <%# Registry password — Kamal only %>
+        <%# Registry token — Kamal only %>
         <div id="kamal-registry-section" class="<%= 'hidden' if target != 'kamal' %> mt-3">
           <label class="block text-sm font-bold text-gray-700 mb-1" for="deploy_registry_password">
-            Registry password
+            Registry token
             <span class="font-normal text-gray-400">(Docker Hub access token)</span>
           </label>
           <% if @deploy_secrets.registry_password_set? %>
@@ -138,7 +138,7 @@
               <%= link_to "Remove",
                     admin_clear_deploy_password_path,
                     class: "uppercase text-xs font-mono px-2 py-1 border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 rounded-xs",
-                    data: { turbo_method: :post, turbo_confirm: "Remove the saved registry password?" } %>
+                    data: { turbo_method: :post, turbo_confirm: "Remove the saved registry token?" } %>
             </div>
             <%# Actual input — hidden until Change is clicked %>
             <div id="password-edit-display" class="hidden">
@@ -162,7 +162,7 @@
                   autocomplete: "new-password" %>
           <% end %>
           <p class="mt-1 text-xs text-gray-500">
-            Create a token at Docker Hub → Account Settings → Security → New Access Token.
+            Create a token at Docker Hub → Account Settings → Security → New Access Token.<br>
             Grant it <strong>Read &amp; Write</strong> access.
           </p>
         </div>
@@ -269,7 +269,7 @@
         <p class="text-sm text-gray-500 mt-1">
           Configuration for
           <a href="https://kamal-deploy.org" target="_blank" class="underline">Kamal</a>
-          deploys. The registry password / Docker Hub token belongs in
+          deploys. The registry token / Docker Hub token belongs in
           <code class="font-mono text-xs bg-gray-100 px-0.5">.kamal/secrets</code>,
           not here.
         </p>
@@ -573,7 +573,7 @@
       });
     });
 
-    // ── Registry password Change / Cancel toggle ────────────────────
+    // ── Registry token Change / Cancel toggle ────────────────────
     const changePasswordBtn  = document.getElementById('change-password-btn');
     const cancelPasswordBtn  = document.getElementById('cancel-password-btn');
     const passwordSavedDisplay = document.getElementById('password-saved-display');

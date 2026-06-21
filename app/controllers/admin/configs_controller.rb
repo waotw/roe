@@ -795,7 +795,7 @@ class Admin::ConfigsController < Admin::BaseController
 
   def clear_deploy_password
     DeploySecrets.delete_all
-    flash[:notice] = "Registry password cleared."
+    flash[:notice] = "Registry token cleared."
     redirect_to admin_edit_deploy_config_path
   end
 
@@ -833,7 +833,7 @@ class Admin::ConfigsController < Admin::BaseController
     write_yaml(SiteConfig::DEPLOY_FILE, config)
     SiteConfig.sync_from_file("deploy")
 
-    # Save registry password if a new one was provided (blank = keep existing).
+    # Save registry token if a new one was provided (blank = keep existing).
     deploy_secrets   = DeploySecrets.current
     new_password     = params.dig(:deploy_secrets, :registry_password).presence
     if new_password
