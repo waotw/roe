@@ -67,7 +67,7 @@ module HasMarkdownExtensions
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_forms(processed_content, preview: preview)
     processed_content = process_buttons(processed_content, preview: preview)
-    processed_content = process_inline_footnotes(processed_content)
+    processed_content = process_image_captions(processed_content)
     processed_content = process_strikethrough(processed_content)
     processed_content = escape_inline_pipes(processed_content)
 
@@ -337,6 +337,32 @@ module HasMarkdownExtensions
       html
     end
     result
+  end
+
+  # Converts image+caption syntax into a <figure>/<figcaption> block.
+  #
+  # Syntax:  ![alt](/path.jpg)(*Caption text*)
+  #
+  # Runs before Kramdown so the raw HTML block is passed through
+  # unchanged. The image is rendered via ResponsiveImageRenderer so
+  # it gets the same srcset/picture treatment as uncaptioned images.
+  def process_image_captions(markdown)
+    markdown.gsub(/!\[([^\]]*)\]\(([^)]+)\)\(\*([^*]+)\*\)/) do
+      alt     = $1
+      src     = $2.strip
+      caption = $3.strip
+
+      img_html = if ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
+        ResponsiveImageRenderer.render(src, alt: alt)
+      else
+        "<img src=\"#{src}\" alt=\"#{CGI.escapeHTML(alt)}\">"
+      end
+
+      caption_html = Kramdown::Document.new(caption, input: "GFM").to_html.strip
+                                        .gsub(%r{\A<p>(.*)</p>\z}m, '\1')
+
+      "<figure>#{img_html}<figcaption>#{caption_html}</figcaption></figure>"
+    end
   end
 
   def render_gallery(content, preview: false)
