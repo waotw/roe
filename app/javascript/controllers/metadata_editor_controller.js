@@ -1286,12 +1286,25 @@ export default class extends Controller {
   }
 
   handlePublishModalCancelled() {
-    if (!this._pendingStatusRevert) return;
-
-    const { element, previousValue } = this._pendingStatusRevert;
-    element.value = previousValue;
-    this._previousStatus = previousValue;
-    this._pendingStatusRevert = null;
+    if (this._pendingStatusRevert) {
+      // Modal was opened via a status-select change — revert the select
+      // back to what it was before the user changed it.
+      const { element, previousValue } = this._pendingStatusRevert;
+      element.value = previousValue;
+      this._previousStatus = previousValue;
+      this._pendingStatusRevert = null;
+    } else {
+      // Modal was opened via the Publish button on content with no status
+      // field. Explicitly set status to 'draft' so the field becomes
+      // present in the file and the intent is unambiguous.
+      const statusField = this.element.querySelector(
+        '[data-metadata-field="status"]',
+      );
+      if (statusField && !statusField.value) {
+        statusField.value = "draft";
+        statusField.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
   }
 
   handlePublishModalConfirmed() {

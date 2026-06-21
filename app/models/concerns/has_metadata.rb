@@ -18,12 +18,11 @@ module HasMetadata
     }
 
     scope :not_draft, -> {
-      where("json_extract(metadata, '$.status') != ? OR json_extract(metadata, '$.status') IS NULL", "draft")
+      where("json_extract(metadata, '$.status') != ?", "draft")
     }
 
     scope :public_items, -> {
-      where("json_extract(metadata, '$.status') IN (?, ?) OR json_extract(metadata, '$.status') IS NULL",
-            "published", "unlisted")
+      where("json_extract(metadata, '$.status') IN (?, ?)", "published", "unlisted")
     }
 
     # Tag scopes - optimized for JSON array searching
@@ -153,9 +152,12 @@ module HasMetadata
     end
   end
 
-  # Status methods
+  # Status methods.
+  # Defaults to "draft" when not explicitly set — no-status content is
+  # private until the author consciously publishes it. This is the safe
+  # direction: it prevents accidental publication of in-progress work.
   def status
-    metadata["status"] || "published"
+    metadata["status"].presence || "draft"
   end
 
   def published?

@@ -46,7 +46,7 @@ class ContentSyncTest < ActiveSupport::TestCase
 
     assert result.persisted?
     assert_equal "Test Post", result.title
-    assert_equal "published", result.status
+    assert_equal "draft", result.status
   end
 
   test "updates existing post from file" do

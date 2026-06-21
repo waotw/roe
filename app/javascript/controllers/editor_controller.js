@@ -492,11 +492,11 @@ export default class extends Controller {
   }
 
   updatePublishButton(yaml) {
-    // Parse status from YAML
+    // Parse status from YAML. Treat a missing status field as 'draft' —
+    // consistent with the Ruby default, and ensures the Publish button
+    // is shown for content that has no status set yet.
     const statusMatch = yaml.match(/^status:\s*["']?(\w+)["']?$/m);
-    if (!statusMatch) return;
-
-    const newStatus = statusMatch[1];
+    const newStatus = statusMatch ? statusMatch[1] : "draft";
 
     // Find the button
     const publishButton = this.element.querySelector(
@@ -674,10 +674,7 @@ export default class extends Controller {
     const textareaRect = textarea.getBoundingClientRect();
     const cursorDocumentY = window.scrollY + textareaRect.top + cursorY;
 
-    const targetScroll = Math.max(
-      0,
-      cursorDocumentY - window.innerHeight / 3,
-    );
+    const targetScroll = Math.max(0, cursorDocumentY - window.innerHeight / 3);
 
     window.scrollTo({ top: targetScroll, behavior: "instant" });
 

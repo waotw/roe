@@ -126,10 +126,10 @@ class HasMetadataTest < ActiveSupport::TestCase
     assert_equal post.url_name, post.slug
   end
 
-  test "status defaults to published" do
+  test "status defaults to draft when not set" do
     post = create(:post, metadata: { "title" => "Test" })
 
-    assert_equal "published", post.status
+    assert_equal "draft", post.status
   end
 
   test "published predicate returns true for published" do
