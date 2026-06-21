@@ -3,6 +3,38 @@ module ApplicationHelper
     SiteConfig.get("title").presence || "(set site title in Settings → site)"
   end
 
+  # Reads an SVG from site/system/assets/images/ and returns it as inline
+  # HTML so CSS (currentColor, width/height via class) can style it directly.
+  # Falls back to an <img> tag via system_image_path if the file isn't found
+  # or isn't an SVG, and returns nil if the filename is blank.
+  def inline_system_svg(filename, **html_options)
+    return nil if filename.blank?
+    return nil unless filename.end_with?(".svg")
+
+    path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images", filename)
+    return nil unless File.exist?(path)
+
+    svg = File.read(path)
+
+    # Merge any html_options (class, title, aria-label, etc.) onto the root <svg> element
+    unless html_options.empty?
+      svg = svg.sub(/<svg([^>]*)>/i) do
+        tag_attrs = $1
+        html_options.each do |key, value|
+          attr = key.to_s.dasherize
+          if tag_attrs =~ /#{attr}="[^"]*"/
+            tag_attrs = tag_attrs.gsub(/#{attr}="[^"]*"/, "#{attr}=\"#{value}\"")
+          else
+            tag_attrs += " #{attr}=\"#{value}\""
+          end
+        end
+        "<svg#{tag_attrs}>"
+      end
+    end
+
+    svg.html_safe
+  end
+
   def safe_system_image_path(filename, **options)
     return nil if filename.blank?
     system_image_path(filename, **options)

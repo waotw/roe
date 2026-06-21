@@ -1,6 +1,6 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.9.2
+   Version: 0.9.3
    Bundled with: Roe v0.0.30
 
    This theme was installed from Roe. Leave this comment
@@ -299,24 +299,46 @@ p:has(.site-logo) {
   background-size: contain;
 }
 
-/* Navigation Cart Link */
+/* ================ SITE ACTIONS (cart, member icon) ================= */
 
-.nav-cart-wrapper {
-  margin-left: auto;
+.site-actions {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  z-index: 100;
 }
 
-.nav-cart {
-  text-decoration: none;
+.site-action {
+  display: flex;
+  align-items: center;
   position: relative;
+  text-decoration: none;
+  color: var(--color-link);
 }
 
-.nav-cart sup {
-  font-size: var(--text-xs);
-  background: var(--color-link);
-  color: var(--color-bg);
+.site-action svg {
+  height: var(--space-5);
+  width: var(--space-5);
+}
+
+.snipcart-items-count {
+  font-size: calc(var(--text-xs) * 0.7);
+  font-weight: 600;
+  color: var(--color-link);
   border-radius: 999px;
-  padding: 0 var(--space-1);
-  margin-left: var(--space-1);
+  min-width: 1.25em;
+  text-align: center;
+  position: absolute;
+  top: calc(var(--space-1) * -1.1);
+  right: calc(var(--space-1) * -2);
+}
+
+.snipcart-link,
+.member-link {
+  font-size: var(--text-xs);
 }
 
 /* ============ LAYOUT — SIDEBAR ============ */
@@ -437,6 +459,10 @@ div.flash {
   font-size: var(--text-sm);
 }
 
+div.flash mark {
+  background-color: var(--color-highlight-text);
+}
+
 /* ======== POST/PAGE CONTENT GLOBAL ======== */
 
 /* First element in any content block never has top margin */
@@ -470,7 +496,7 @@ div.flash {
 .content h4 {
   font-size: var(--text-lg);
   line-height: 1.25;
-  margin: var(--space-6) 0 var(--space-1) 0;
+  margin: var(--space-6) 0 var(--space-2) 0;
   font-weight: 700;
 }
 
@@ -501,6 +527,7 @@ div.flash {
 .content li > ul,
 .content li > ol {
   margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .content li {
@@ -884,7 +911,8 @@ p.collection-more a:hover {
   margin: 0;
 }
 
-.collection.list .title-media-icon {
+.collection.list .title-media-icon,
+.collection.list .paid-lock-icon {
   vertical-align: -2px;
 }
 
@@ -905,7 +933,8 @@ p.collection-more a:hover {
   font-style: italic;
 }
 
-.collection.compact .title-media-icon {
+.collection.compact .title-media-icon,
+.collection.compact .paid-lock-icon {
   vertical-align: -4px;
 }
 
@@ -980,7 +1009,8 @@ p.collection-more a:hover {
   object-fit: cover;
 }
 
-.title-media-icon {
+.title-media-icon,
+.paid-lock-icon {
   padding-left: var(--space-1);
   vertical-align: -4px;
   opacity: 0.5;
@@ -2363,11 +2393,12 @@ p.podcast-audio-fallback {
   display: inline-block;
 }
 
-.documentation mark {
+.content.documentation p mark {
   background-color: var(--color-highlight-text);
   color: var(--color-bg);
   padding: 0 calc(var(--space-1) * 0.8);
   border-radius: 1px;
+  line-height: 1;
 }
 
 .content.documentation p code {
@@ -2400,11 +2431,21 @@ hr.clear-floats {
 
 /* ================ MEMBERS ================= */
 
-a.member-account-icon svg {
-  height: var(--space-6);
-  position: fixed;
-  top: var(--space-4);
-  right: var(--space-4);
+/* Member pages (account/edit) */
+
+.member-page .account-details {
+  margin: 0 0 var(--space-6) 0;
+}
+
+.member-page .account-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.member-page .account-actions form {
+  display: contents;
 }
 
 /* Member pages (signup/signin/upgrade/donate/unsubscribe wrapper) */
@@ -2418,8 +2459,12 @@ a.member-account-icon svg {
   font-size: var(--text-base);
 }
 
+.member-page h1 {
+  margin: 0 0 var(--space-2) 0;
+}
+
 .member-page form {
-  margin: var(--space-6) 0;
+  margin: 0 0;
 }
 
 .member-page .form-field {
@@ -2457,14 +2502,14 @@ a.member-account-icon svg {
 .member-page [class*="btn-"] {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
-  margin: 0 var(--space-2) 0 0;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--text-base);
   cursor: pointer;
   text-decoration: none;
+  text-wrap: nowrap;
+  box-sizing: border-box;
+  line-height: normal;
 }
 
 .member-page button:hover,
@@ -2486,7 +2531,7 @@ a.member-account-icon svg {
 
 .member-page .btn-outline {
   background-color: transparent;
-  border-color: var(--color-link);
+  border: 1px solid var(--color-link);
   color: var(--color-link);
 }
 
@@ -2496,7 +2541,7 @@ a.member-account-icon svg {
 }
 
 .member-page .btn-destructive {
-  border-color: var(--color-link);
+  border: 1px solid var(--color-link);
   color: var(--color-link);
 }
 
@@ -2927,7 +2972,6 @@ article.page-store h2 {
   cursor: pointer;
   font-family: inherit;
   font-size: var(--text-sm);
-  letter-spacing: 0.05em;
   text-decoration: none;
 }
 
@@ -2941,19 +2985,15 @@ article.page-store h2 {
   padding: var(--space-2) var(--space-4);
   background: transparent;
   color: var(--color-heading);
-  border: 1px solid var(--color-heading);
+  border: 1px solid var(--color-text);
   cursor: pointer;
   font-family: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   text-decoration: none;
 }
 
 .btn-secondary:hover {
   background: var(--color-heading);
-  color: var(--color-bg);
 }
 
 /* Grid button modifier */
