@@ -19,12 +19,13 @@ Roe has a full featured newsletter system that supports free and paid members. M
 
 #### Before Postmark
 
-You'll need to enable the Members feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE MEMBERS`. You will then set up Members and there you can enable `Newsletters` which turns on Postmark in Roe.
+1. You'll need to enable the Members feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE MEMBERS`. You will then set up Members and there you can enable `Newsletters` which turns on Postmark in Roe.
+2. You'll want to make sure that you've added Author Email to: [Admin → Settings → site.yml](/admin/configs/site/edit). This is the email address that will be used by Postmark.
 
 ## 1. Basic Postmark Setup
 
 Postmark has good documentation. Use this article to get your account set up correctly:  
-[Getting started with Postmark](https://postmarkapp.com/support/article/1002-getting-started-with-postmark). This ensures that your emails are delivered reliably. 
+[Getting started with Postmark](https://postmarkapp.com/support/article/1002-getting-started-with-postmark). This ensures that your emails are delivered reliably. Make sure to verify the email address you've set in Roe as your Author Email: [Admin → Settings → site.yml](/admin/configs/site/edit)
 
 1. Create a new Server or use the defaults created with your account (you can rename them)
     - [Servers FAQ](https://postmarkapp.com/support/article/1137-servers-faq)
