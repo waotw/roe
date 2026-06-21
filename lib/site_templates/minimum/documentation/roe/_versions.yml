@@ -11,13 +11,13 @@ content_image-galleries.md: 0.0.29
 content_paid.md: 0.0.29
 content_the-editor.md: 0.0.29
 custom_code.md: 0.0.29
-deployment.md: 0.0.29
+deployment.md: 0.0.31
 features_payments.md: 0.0.29
 features_store.md: 0.0.29
 feeds.md: 0.0.29
 file-first-approach.md: 0.0.29
 image-galleries.md: 0.0.29
-integrations_postmark.md: 0.0.29
+integrations_postmark.md: 0.0.31
 integrations_snipcart.md: 0.0.29
 integrations_stripe.md: 0.0.29
 layouts.md: 0.0.29
@@ -31,7 +31,7 @@ podcasts.md: 0.0.29
 roeanji.md: 0.0.29
 settings.md: 0.0.29
 settings_features_members.md: 0.0.29
-settings_global_deploy.md: 0.0.29
+settings_global_deploy.md: 0.0.31
 settings_global_fonts.md: 0.0.29
 settings_global_site.md: 0.0.29
 store.md: 0.0.29
@@ -39,6 +39,7 @@ substack-imports.md: 0.0.29
 system_deployment.md: 0.0.29
 the-editor.md: 0.0.29
 themes.md: 0.0.29
+troubleshooting_deploy.md: 0.0.31
 tutorials/add an image gallery.md: 0.0.29
 tutorials/configuration-yaml.md: 0.0.29
 tutorials/create a post.md: 0.0.29
