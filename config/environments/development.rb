@@ -15,12 +15,14 @@ Rails.application.configure do
   # Enable server timing.
   config.server_timing = true
 
-  # Allow additional hosts from development config (e.g., ngrok for testing webhooks)
-  # These are configured in site/system/global/development.yml
-  if File.exist?(File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml"))
-    dev_config = YAML.load_file(File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml"))
-    allowed_hosts = dev_config&.dig("allowed_hosts") || []
-    allowed_hosts.each { |host| config.hosts << host }
+  # Allow additional hosts from development config (e.g., ngrok for testing webhooks).
+  # Uses |= so repeated evaluations (Rails autoreload) don't accumulate duplicates,
+  # which causes Rails 8's HostAuthorization middleware to misfire.
+  _dev_config_path = File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml")
+  if File.exist?(_dev_config_path)
+    dev_config = YAML.load_file(_dev_config_path)
+    allowed_hosts = Array(dev_config&.dig("allowed_hosts")).map(&:to_s).select(&:present?)
+    config.hosts |= allowed_hosts unless allowed_hosts.empty?
   end
 
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
