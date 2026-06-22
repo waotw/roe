@@ -1086,7 +1086,7 @@ export default class extends Controller {
           <input
             type="text"
             id="post-search-input"
-            placeholder="Search for a post by title..."
+            placeholder="Search posts, pages, products, docs..."
             class="w-full px-3 py-2 border border-gray-300"
           >
           <div id="post-search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 max-h-60 overflow-y-auto z-10"></div>
@@ -1190,27 +1190,37 @@ export default class extends Controller {
 
     fetch(`/admin/posts/search?q=${encodeURIComponent(query)}`)
       .then((response) => response.json())
-      .then((posts) => {
-        if (posts.length === 0) {
+      .then((results) => {
+        if (results.length === 0) {
           resultsDiv.innerHTML =
-            '<div class="p-2 text-gray-500 text-sm">No posts found</div>';
+            '<div class="p-2 text-gray-500 text-sm">No results found</div>';
           resultsDiv.classList.remove("hidden");
           return;
         }
 
-        resultsDiv.innerHTML = posts
-          .map(
-            (post) => `
-            <button
-              type="button"
-              data-action="click->editor#selectPost"
-              data-post='${JSON.stringify(post).replace(/'/g, "&apos;")}'
-              class="block w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-200 last:border-b-0"
-            >
-              ${post.title}
-            </button>
-          `,
-          )
+        const typeColors = {
+          Post: "bg-blue-100 text-blue-700",
+          Page: "bg-green-100 text-green-700",
+          Product: "bg-purple-100 text-purple-700",
+          Doc: "bg-amber-100 text-amber-700",
+        };
+
+        resultsDiv.innerHTML = results
+          .map((item) => {
+            const badge = item.type
+              ? `<span class="text-xs px-1 py-0.5 rounded font-mono ${typeColors[item.type] || "bg-gray-100 text-gray-600"}">${item.type}</span>`
+              : "";
+            return `
+              <button
+                type="button"
+                data-action="click->editor#selectPost"
+                data-post='${JSON.stringify(item).replace(/'/g, "&apos;")}'
+                class="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-200 last:border-b-0"
+              >
+                ${badge}<span>${item.title}</span>
+              </button>
+            `;
+          })
           .join("");
 
         resultsDiv.classList.remove("hidden");
@@ -1226,7 +1236,7 @@ export default class extends Controller {
 
     event.preventDefault();
     const postData = JSON.parse(event.currentTarget.dataset.post);
-    const slug = postData.url.replace(/^\/posts\//, "");
+    const slug = postData.url_name || postData.url.replace(/^\/posts\//, "");
 
     console.log("[SELECT POST] Post data:", postData);
     console.log("[SELECT POST] Saved cursor:", this.savedCursorBeforeModal);
@@ -1264,7 +1274,7 @@ export default class extends Controller {
   insertPostLink(postData) {
     console.log("[INSERT POST LINK] Called with:", postData);
 
-    const slug = postData.url.replace(/^\/posts\//, "");
+    const slug = postData.url_name || postData.url.replace(/^\/posts\//, "");
 
     let cardTemplate = "```card\ntype: post-link\nstyle: small\n";
     cardTemplate += `post: ${slug}\n`;

@@ -499,20 +499,26 @@ class Admin::PostsController < Admin::BaseController
 
   def search
     query = params[:q].to_s.downcase
+    title_match = "%#{query}%"
 
     posts = Post.where("json_extract(metadata, '$.status') = 'published'")
-                .where("LOWER(json_extract(metadata, '$.title')) LIKE ?", "%#{query}%")
-                .limit(10)
+                .where("LOWER(json_extract(metadata, '$.title')) LIKE ?", title_match)
+                .limit(8)
+    pages = Page.where("json_extract(metadata, '$.status') = 'published'")
+                .where("LOWER(json_extract(metadata, '$.title')) LIKE ?", title_match)
+                .limit(5)
+    products = Product.where("json_extract(metadata, '$.status') = 'published'")
+                      .where("LOWER(json_extract(metadata, '$.title')) LIKE ?", title_match)
+                      .limit(5)
+    docs = Documentation.where("json_extract(metadata, '$.status') = 'published'")
+                        .where("LOWER(json_extract(metadata, '$.title')) LIKE ?", title_match)
+                        .where("file_path NOT LIKE '%/roe/%'")
+                        .limit(5)
 
-    results = posts.map do |post|
-      {
-        id: post.id,
-        title: post.title,  # This uses the Post model's title method which extracts from metadata
-        url_name: post.url_name,
-        url: "/posts/#{post.url_name}",
-        metadata: post.metadata
-      }
-    end
+    results = posts.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/posts/#{r.url_name}", type: "Post" } } +
+              pages.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Page" } } +
+              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/store/#{r.url_name}", type: "Product" } } +
+              docs.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/documentation/#{r.url_name}", type: "Doc" } }
 
     render json: results
   rescue => e
