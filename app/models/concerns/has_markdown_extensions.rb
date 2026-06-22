@@ -511,8 +511,7 @@ module HasMarkdownExtensions
       when "products"
         Product.all_tags
       when "documentation"
-        # Documentation doesn't have tags yet, skip validation
-        []
+        Documentation.all_tags
       when "pages"
         # Pages don't have tags yet, skip validation
         []
@@ -670,7 +669,7 @@ module HasMarkdownExtensions
     # All other templates emit Markdown/IAL and need markdown="1".
     output = []
 
-    if template == "compact"
+    if template == "compact" || template == "glossary"
       output << "<div class=\"collection #{template}\">"
       output << "<h2>#{heading}</h2>" if heading.present?
       output << list_markdown
@@ -743,6 +742,8 @@ module HasMarkdownExtensions
       render_product_grid(items, config)
     when "compact"
       render_compact(items, config)
+    when "glossary"
+      render_glossary(items)
     when "links"
       render_links(items)
     when "full"
@@ -973,6 +974,36 @@ module HasMarkdownExtensions
     end
 
     "<ul>\n#{items_html.join("\n")}\n</ul>"
+  end
+
+  # Glossary template: renders definition-style entries with no links.
+  # Each item shows its title as the term and subtitle as the definition,
+  # with an optional excerpt for additional detail.
+  #
+  # Output structure:
+  #   <dl class="glossary-list">
+  #     <div class="glossary-entry">
+  #       <dt class="item-title">Term</dt>
+  #       <dd class="item-subtitle">Short definition</dd>
+  #       <dd class="item-excerpt">Optional detail...</dd>  (when present)
+  #     </div>
+  #   </dl>
+  def render_glossary(items)
+    items_html = items.map do |item|
+      title    = CGI.escapeHTML(item.title.to_s.presence || "Untitled")
+      term_id  = item.title.to_s.downcase.gsub(/[^a-z0-9]+/, "-").sub(/^-+/, "").sub(/-+$/, "")
+      subtitle = item.respond_to?(:subtitle) ? item.subtitle.to_s.strip : ""
+      excerpt  = item.metadata["excerpt"].to_s.strip
+
+      html = "<div class=\"glossary-entry\">\n"
+      html << "  <dt id=\"#{term_id}\" class=\"item-title\">#{title}</dt>\n"
+      html << "  <dd class=\"item-subtitle\">#{CGI.escapeHTML(subtitle)}</dd>\n" if subtitle.present?
+      html << "  <dd class=\"item-excerpt\">#{CGI.escapeHTML(excerpt)}</dd>\n" if excerpt.present?
+      html << "</div>"
+      html
+    end
+
+    "<dl class=\"glossary-list\">\n#{items_html.join("\n")}\n</dl>"
   end
 
   def render_links(items)

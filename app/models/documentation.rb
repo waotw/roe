@@ -65,4 +65,9 @@ class Documentation < ApplicationRecord
   def self.public_documentation
     where("json_extract(metadata, '$.status') = ?", "published")
   end
+
+  # Return all unique tags across all documentation records
+  def self.all_tags
+    all.to_a.flat_map(&:tags).uniq.sort
+  end
 end

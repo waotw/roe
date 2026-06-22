@@ -569,7 +569,7 @@ class Admin::ConfigsController < Admin::BaseController
     when [ "collections", "default_order" ]
       [ "date", "date-asc", "title", "filename" ]
     when [ "collections", "default_template" ]
-      [ "list", "compact", "links", "full" ]
+      [ "list", "compact", "links", "full", "glossary" ]
     when [ "collections", "items_per_page" ]
       [ "5", "10", "20", "25", "50", "100" ]
     when [ "cards", "default_style" ]
@@ -1416,7 +1416,7 @@ class Admin::ConfigsController < Admin::BaseController
       "default_source" => [ "posts", "pages", "documentation" ] + (SiteFeature.store_enabled? ? [ "products" ] : []),
       "default_post_type" => [ "all" ] + existing_post_types,
       "default_order" => [ "date", "date-asc", "title", "filename" ],
-      "default_template" => [ "list", "compact", "links", "full" ],
+      "default_template" => [ "list", "compact", "links", "full", "glossary" ],
       "items_per_page" => [ "10", "20", "25", "50", "100" ]
     }
   end
