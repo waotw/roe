@@ -6,6 +6,9 @@ class MediaController < ApplicationController
     unless File.exist?(file_path)
       file_path = File.join(RoeSitePaths::SITE_PATH, "documentation", "media", params[:path])
     end
+    unless File.exist?(file_path)
+      file_path = File.join(RoeSitePaths::SITE_PATH, "documentation", "roe", "media", params[:path])
+    end
 
     unless File.exist?(file_path)
       head :not_found
