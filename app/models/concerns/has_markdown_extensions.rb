@@ -1492,27 +1492,38 @@ module HasMarkdownExtensions
       referenced_post = find_post_by_slug(config[:post])
 
       if referenced_post
-        # Start with post's actual data - only include image if it exists
+        # Derive the public URL based on the record type
+        record_url = case referenced_post
+        when Page          then referenced_post.public_url
+        when Product       then "/store/#{referenced_post.url_name}"
+        when Documentation then "/documentation/#{referenced_post.url_name}"
+        else "/posts/#{referenced_post.url_name}"
+        end
+
         post_data = {
-          title: referenced_post.title || "Untitled",
-          author: referenced_post.author || "",  # Will be further processed below
-          date: referenced_post.date,
+          title:    referenced_post.title || "Untitled",
           subtitle: referenced_post.metadata["subtitle"] || "",
-          excerpt: referenced_post.metadata["excerpt"] || "",
-          url: "/posts/#{referenced_post.url_name}"
+          excerpt:  referenced_post.metadata["excerpt"] || "",
+          url:      record_url
         }
 
-        # Only add image to post_data if the post has one
-        post_data[:image] = referenced_post.image if referenced_post.image.present?
+        # Author and date are post-only — omit for pages, products, docs
+        if referenced_post.is_a?(Post)
+          post_data[:author] = referenced_post.author || ""
+          post_data[:date]   = referenced_post.date
+        end
+
+        # Only add image if the record has one
+        post_data[:image] = referenced_post.image if referenced_post.respond_to?(:image) && referenced_post.image.present?
 
         # Override with any explicitly provided values
         config = post_data.merge(config.except(:post))
       else
-        # Post not found - render error card in preview, dev warning otherwise
-        return render_error_card("Post not found: #{config[:post]}") if preview
-        return dev_warning("Post not found",
-          "No post with slug '#{config[:post]}' exists.",
-          "Check the url_name in the post's front matter.")
+        # Record not found - render error card in preview, dev warning otherwise
+        return render_error_card("Content not found: #{config[:post]}") if preview
+        return dev_warning("Content not found",
+          "No post, page, product, or documentation with slug '#{config[:post]}' exists.",
+          "Check the url_name in the content's front matter.")
       end
     end
 
@@ -1524,17 +1535,18 @@ module HasMarkdownExtensions
     url = config[:url] || "#"
     link_text = config[:link_text] || SiteConfig.default("cards", "post-link")&.[]("default_link_text") || "Read full story →"
 
-    # Author fallback chain: card config -> post metadata -> site config -> blank
-    author = if config[:author].present?
+    # Author and date are only meaningful for posts. For pages, products,
+    # and docs the keys were intentionally omitted from config above.
+    is_post_record = referenced_post.nil? || referenced_post.is_a?(Post)
+
+    # Author fallback chain (posts only): card config -> post metadata -> site config -> blank
+    author = if !is_post_record
+      ""  # Non-post records never show author
+    elsif config[:author].present?
       config[:author]  # 1. Explicitly provided in card
-    elsif config[:post].present?
-      referenced_post = find_post_by_slug(config[:post])
-      referenced_post&.author.presence  # 2. From post metadata
     else
-      nil
+      SiteConfig.get("author") || ""  # 2. Site-wide fallback
     end
-    author ||= SiteConfig.get("author")  # 3. From site config (FIXED)
-    author ||= ""  # 4. Blank if none found
 
     # Handle image with priority:
     #   1. explicit `image:` in the card (including "none" → no image)
@@ -1568,7 +1580,8 @@ module HasMarkdownExtensions
       SiteConfig.default("cards", "post-link")&.[]("default_image")
     end
 
-    # Format date
+    # Format date (posts only)
+    date_raw = "" unless is_post_record
     date = ""
     if date_raw.present?
       begin
@@ -2004,9 +2017,26 @@ module HasMarkdownExtensions
     "AUTHENTICITY_TOKEN_PLACEHOLDER"
   end
 
+  # Finds a linkable content record by slug or path. Checks posts first
+  # (most common), then pages, products, and user documentation.
+  # Roe's own docs (file_path contains /roe/) are excluded — those are
+  # system docs and not intended as link targets in content.
   def find_post_by_slug(slug_or_path)
-    slug = slug_or_path.to_s.sub(%r{^/posts/}, "").sub(%r{^/}, "")
-    Post.where("json_extract(metadata, '$.url_name') = ?", slug).first
+    raw = slug_or_path.to_s.strip
+
+    # Strip known prefixes to get the bare slug
+    slug = raw
+      .sub(%r{^/posts/}, "")
+      .sub(%r{^/pages/}, "")
+      .sub(%r{^/store/}, "")
+      .sub(%r{^/documentation/}, "")
+      .sub(%r{^/}, "")
+
+    Post.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
+      Page.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
+      Product.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
+      Documentation.where("json_extract(metadata, '$.url_name') = ?", slug)
+                   .where("file_path NOT LIKE '%/roe/%'").first
   end
 
   def render_error_card(message)
