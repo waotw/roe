@@ -77,7 +77,7 @@ module SeoHelper
     override       = SiteConfig.get("social_image_override")
     use_override   = override == true || override == "true"
 
-    candidate = if use_override && social_image
+    candidate = if use_override && social_image.present?
       social_image
     else
       seo_subject&.metadata&.dig("image").to_s.strip.presence ||

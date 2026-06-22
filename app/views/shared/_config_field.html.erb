@@ -25,7 +25,9 @@
              value="true"
              <%= 'checked' if value.to_s == 'true' %>
              class="h-4 w-4 border-gray-300 rounded"
-             data-config-field="<%= field_name %>">
+             data-config-field="<%= field_name %>"
+             <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>
+             <%= 'disabled' if field_depends_on && all_values[field_depends_on].to_s.strip.empty? %>>
       <% if field_hint %>
         <span class="text-xs text-gray-600"><%= field_hint %></span>
       <% end %>

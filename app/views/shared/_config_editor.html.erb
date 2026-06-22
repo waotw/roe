@@ -160,7 +160,7 @@
                 <!-- Themes Section -->
                 <div class="config-section mb-8">
                   <h3 class="text-base font-semibold text-gray-900 mb-1">Themes</h3>
-                  <p class="text-sm text-gray-600 mb-3">Themes that should load these fonts. Leave all unchecked to load for every theme.</p>
+                  <p class="text-sm text-gray-600 mb-3">Themes that should load these fonts.<br> Leave all unchecked to disable custom fonts.</p>
                   <% selected_themes = Array(config_hash['themes']) %>
                   <div class="space-y-1 pl-4 border-l-2 border-gray-200">
                     <% (local_assigns[:available_themes] || []).each do |theme_name| %>
@@ -768,8 +768,13 @@
 
       if (dependencyField) {
         const hasValue = dependencyField.value.trim() !== '';
-        console.log('Has value:', hasValue);
         field.disabled = !hasValue;
+
+        // Uncheck checkboxes when their dependency is cleared so a
+        // stale true value can't be saved against a blank parent field.
+        if (!hasValue && field.type === 'checkbox') {
+          field.checked = false;
+        }
 
         // Visual indication
         const wrapper = field.closest('.config-field-row');
