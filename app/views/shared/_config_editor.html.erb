@@ -619,6 +619,9 @@
                           <% if key == 'default_limit' %>
                             <p class="text-xs text-gray-500 mt-1">Use a number (e.g., 10) or "all" to show everything</p>
                           <% end %>
+                          <% if key == 'items_per_page' %>
+                            <p class="text-xs text-gray-500 mt-1">If <code class="font-mono text-xs">show_more = true</code> this sets the number of items for pagination.</p>
+                          <% end %>
                         </div>
                       <% end %>
                     <% end %>

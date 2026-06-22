@@ -561,13 +561,15 @@ class Admin::ConfigsController < Admin::BaseController
   def field_options_for(config_type, field_name)
     case [ config_type, field_name ]
     when [ "collections", "default_source" ]
-      [ "posts", "pages", "documentation" ]
+      sources = [ "posts", "pages", "documentation" ]
+      sources << "products" if SiteFeature.store_enabled?
+      sources
     when [ "collections", "default_post_type" ]
       [ "all" ] + Post::POST_TYPES.keys.map(&:to_s)
     when [ "collections", "default_order" ]
       [ "date", "date-asc", "title", "filename" ]
     when [ "collections", "default_template" ]
-      [ "list", "compact", "links" ]
+      [ "list", "compact", "links", "full" ]
     when [ "collections", "items_per_page" ]
       [ "5", "10", "20", "25", "50", "100" ]
     when [ "cards", "default_style" ]
@@ -1411,10 +1413,10 @@ class Admin::ConfigsController < Admin::BaseController
     existing_post_types = Post.all.map(&:post_type).compact.uniq.sort
 
     {
-      "default_source" => [ "posts", "pages", "documentation" ],
+      "default_source" => [ "posts", "pages", "documentation" ] + (SiteFeature.store_enabled? ? [ "products" ] : []),
       "default_post_type" => [ "all" ] + existing_post_types,
       "default_order" => [ "date", "date-asc", "title", "filename" ],
-      "default_template" => [ "list", "compact", "links" ],
+      "default_template" => [ "list", "compact", "links", "full" ],
       "items_per_page" => [ "10", "20", "25", "50", "100" ]
     }
   end
