@@ -50,7 +50,7 @@
     <!--<h2 class="text-lg font-semibold text-gray-900">Configuration</h2>-->
     <h2 class="text-xl font-semibold text-gray-900">
       <% if @config_type == 'members' %>
-        Membership & Paid Content Settings
+        Payments, newsletter & paid content
       <% elsif @config_type == 'podcast' %>
         Podcasts
       <% else %>
@@ -486,7 +486,7 @@
                               <p class="text-xs text-gray-500 mt-0.5">Feed: <code>/podcast/<span data-podcast-feed-key="<%= key %>"><%= key %></span>.xml</code></p>
                             </div>
                           <% else %>
-                            <h4 class="text-sm font-semibold text-gray-800 mb-3"><%= key.humanize %></h4>
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3"><%= (local_assigns[:section_labels]&.dig(key) || key.humanize) %></h4>
                           <% end %>
 
                           <div class="space-y-3">
@@ -770,13 +770,7 @@
         const hasValue = dependencyField.value.trim() !== '';
         field.disabled = !hasValue;
 
-        // Uncheck checkboxes when their dependency is cleared so a
-        // stale true value can't be saved against a blank parent field.
-        if (!hasValue && field.type === 'checkbox') {
-          field.checked = false;
-        }
-
-        // Visual indication
+        // Uncheck checkboxes when their dependencyVisual indication
         const wrapper = field.closest('.config-field-row');
         if (wrapper) {
           if (hasValue) {
