@@ -60,8 +60,13 @@ class Admin::ConfigsController < Admin::BaseController
         "social_image" => {
           type: :text,
           label: "Social Image",
-          hint: "Default image shown when your site is shared on social platforms (Facebook, X, LinkedIn, iMessage, Slack). Used as a fallback when a post or page has no `image:` of its own. Recommended size: 1200×630.",
+          hint: "Default image shown when your site is shared on social platforms (Facebook, X, LinkedIn, iMessage, Slack). Recommended size: 1200×630.",
           placeholder: "social-share.jpg"
+        },
+        "social_image_override" => {
+          type: :checkbox,
+          label: "Always use Social Image",
+          hint: "When checked, the Social Image above is used for all pages and posts — even those with their own image. Useful for consistent brand presence on social platforms."
         }
       }
     },
@@ -565,7 +570,7 @@ class Admin::ConfigsController < Admin::BaseController
     when [ "collections", "items_per_page" ]
       [ "5", "10", "20", "25", "50", "100" ]
     when [ "cards", "default_style" ]
-      [ "small", "large" ]
+      [ "small", "medium", "large" ]
     else
       nil
     end
@@ -1415,7 +1420,7 @@ class Admin::ConfigsController < Admin::BaseController
 
   def build_field_options_for_cards
     {
-      "post-link.default_style" => [ "small", "large" ],
+      "post-link.default_style" => [ "small", "medium", "large" ],
       "pullquote.default_position" => [ "center", "left", "right" ]
     }
   end

@@ -62,15 +62,30 @@ module SeoHelper
     subject_author || SiteConfig.get("author").to_s.strip.presence
   end
 
-  # Absolute URL for og:image / twitter:image. Falls through
-  # post/page/product image → site social_image → site logo → nil.
-  # Returns nil rather than emitting a broken tag when nothing's set.
+  # Absolute URL for og:image / twitter:image.
+  #
+  # Default fallback chain:
+  #   post/page/product image → site social_image → site logo → nil
+  #
+  # When social_image_override is true in site.yml, the social_image
+  # takes precedence over any per-post image, giving consistent brand
+  # presence across all shared links.
+  #
+  # Returns nil rather than emitting a broken tag when nothing is set.
   def seo_image_url
-    candidate = seo_subject&.metadata&.dig("image").to_s.strip.presence
-    candidate ||= SiteConfig.get("social_image").to_s.strip.presence
-    candidate ||= SiteConfig.get("logo").to_s.strip.presence
-    return nil if candidate.blank?
+    social_image   = SiteConfig.get("social_image").to_s.strip.presence
+    override       = SiteConfig.get("social_image_override")
+    use_override   = override == true || override == "true"
 
+    candidate = if use_override && social_image
+      social_image
+    else
+      seo_subject&.metadata&.dig("image").to_s.strip.presence ||
+        social_image ||
+        SiteConfig.get("logo").to_s.strip.presence
+    end
+
+    return nil if candidate.blank?
     absolutize(candidate)
   end
 
