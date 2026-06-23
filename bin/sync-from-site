@@ -17,6 +17,12 @@
 #      are left alone (preserves bundled defaults like other starter
 #      themes you haven't installed locally).
 #
+#   3. Docs index page — single file copy.
+#      site/pages/documentation.md → current/app/views/documentation/index.md.
+#      The user-customizable /documentation page in /site is the source
+#      of truth; the bundled copy in /current/app/views/... ships with
+#      Roe and gets installed on first setup.
+#
 # Usage (from anywhere):
 #
 #   bin/sync-from-site            # do it
@@ -57,6 +63,13 @@ echo "    site/theme/  →  current/app/themes/"
 rsync -avc $DRY_RUN --existing \
   site/theme/ \
   current/app/themes/
+echo ""
+
+echo "→ Docs index page (single file copy):"
+echo "    site/pages/documentation.md  →  current/app/views/documentation/index.md"
+rsync -vc $DRY_RUN \
+  site/pages/documentation.md \
+  current/app/views/documentation/index.md
 echo ""
 
 if [[ -n "$DRY_RUN" ]]; then
