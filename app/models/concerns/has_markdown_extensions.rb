@@ -994,9 +994,12 @@ module HasMarkdownExtensions
       term_id  = item.title.to_s.downcase.gsub(/[^a-z0-9]+/, "-").sub(/^-+/, "").sub(/-+$/, "")
       subtitle = item.respond_to?(:subtitle) ? item.subtitle.to_s.strip : ""
       excerpt  = item.metadata["excerpt"].to_s.strip
+      link     = item.metadata["link"].to_s.strip.presence
+
+      title_content = link ? "<a href=\"#{CGI.escapeHTML(link)}\">#{title}</a>" : title
 
       html = "<div class=\"glossary-entry\">\n"
-      html << "  <dt id=\"#{term_id}\" class=\"item-title\">#{title}</dt>\n"
+      html << "  <dt id=\"#{term_id}\" class=\"item-title\">#{title_content}</dt>\n"
       html << "  <dd class=\"item-subtitle\">#{CGI.escapeHTML(subtitle)}</dd>\n" if subtitle.present?
       html << "  <dd class=\"item-excerpt\">#{CGI.escapeHTML(excerpt)}</dd>\n" if excerpt.present?
       html << "</div>"
