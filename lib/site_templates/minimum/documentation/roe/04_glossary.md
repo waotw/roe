@@ -8,14 +8,14 @@ tags: featured
 
 ```collection
 source: documentation/roe
-limit: 1
+limit: 10
 tags: definition
 order: title
 template: glossary
 ```
 ```collection
 source: documentation/roe
-offset: 1
+offset: 10
 tags: definition
 order: title
 template: glossary

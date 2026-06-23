@@ -1,5 +1,5 @@
 ---
-title: Roeanji
+title: Roe-anji
 status: published
 tags: [definition]
 subtitle: A set of Markdown extensions for Roe CMS

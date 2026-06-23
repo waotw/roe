@@ -93,7 +93,7 @@ When you enable [Members](/documentation/members), Roe generates pages for sign 
 
 ## Editing Pages
 
-Use [The Editor](/documentation/the-editor) to write and format page content. Pages support all Roeanji features: [cards](/documentation/cards), [collections](/documentation/collections), [galleries](/documentation/galleries), and more.
+Use [The Editor](/documentation/the-editor) to write and format page content. Pages support all Roe-anji features: [cards](/documentation/cards), [collections](/documentation/collections), [galleries](/documentation/galleries), and more.
 
 ## Navigation
 

@@ -1,7 +1,8 @@
 ---
-title: Roeanji → Cards
+title: Roe-anji → Cards
 status: published
 url_name: cards
+tags: roe-anji
 ---
 
 ##### Related documentation

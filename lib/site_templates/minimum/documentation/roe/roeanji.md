@@ -1,7 +1,8 @@
 ---
-title: Roeanji
+title: Roe-anji
 status: published
 url_name: roeanji
+tags: roe-anji
 related:
   - collections
   - paid-content
@@ -17,7 +18,7 @@ limit: all
 template: links
 ```
 
-# Roeanji
+# Roe-anji
 
 Simple Markdown extensions that are easy to learn and use. They all use the same basic syntax similar to a code block in Markdown and allow you to create rich content beyond standard Markdown.
 

@@ -63,7 +63,7 @@ The <code>F<sup>1</sup></code> button creates a footnote:
 2. Click the button and it will bring you to the bottom of the editor to add your footnote text.
 3. Click `✓ DONE WITH FOOTNOTE` and it will bring you write back to where you insterted the footnote.
 
-### [Roeanji](/documentation/roeanji) Buttons
+### [Roe-anji](/documentation/roeanji) Buttons
 
 You can edit the templates for the `CARD` and `COLLECTION` buttons here: [Settings → Defaults](/admin/configs)
 

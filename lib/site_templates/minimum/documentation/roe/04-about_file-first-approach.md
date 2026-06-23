@@ -1,6 +1,6 @@
 ---
 title: About → File first approach
-status: published
+status: unlisted
 tags: about
 ---
 

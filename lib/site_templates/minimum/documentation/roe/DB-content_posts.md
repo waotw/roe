@@ -120,7 +120,7 @@ Use [The Editor](/documentation/the-editor) to write post content. The editor sh
 ### Common Workflow
 
 1. Create a draft post
-2. Write content using Markdown and [Roeanji](/documentation/roeanji) features
+2. Write content using Markdown and [Roe-anji](/documentation/roeanji) features
 3. Preview with `cmd/ctrl-p`
     - Open this window/tab side-by-side to see the live preview as you save.
 4. Set `status: published` when ready

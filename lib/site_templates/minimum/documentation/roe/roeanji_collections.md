@@ -1,7 +1,8 @@
 ---
-title: Roeanji → Collections
+title: Roe-anji → Collections
 status: published
 url_name: collections
+tags: roe-anji
 related:
   - cards
   - galleries
