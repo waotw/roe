@@ -82,7 +82,7 @@ module AssetsHelper
       logo_path = if logo_url.start_with?("/")
         logo_url
       else
-        system_image_path(logo_url)
+        safe_system_image_path(logo_url) || "/system/images/#{logo_url}"
       end
 
       vars << "  --logo-url: url('#{logo_path}');"
