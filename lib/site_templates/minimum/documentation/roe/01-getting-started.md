@@ -1,6 +1,7 @@
 ---
 title: Getting Started with Roe CMS
 status: published
+tags: guide
 ---
 
 # Getting started with Roe CMS
@@ -17,13 +18,13 @@ This is a great way to learn how things work as you can see the changes live. Tr
 
 ## What is Roe
 
-Roe CMS helps you build a website with nothing but markdown files and changing a few settings. You can dive deeper and edit the CSS if you please but this is not required to build a full/working website with Roe. An understanding of [Markdown Syntax](https://www.markdowntools.io/cheat-sheet) will be helpful but you'll be able to figure out what's going on by working on a Post with a Preview open as suggested [above](#first-steps).
+Roe CMS helps you build a website with nothing but Markdown files and changing a few settings. You can dive deeper and edit the CSS if you please but this is not required to build a full/working website with Roe. An understanding of [Markdown Syntax](https://www.markdowntools.io/cheat-sheet) will be helpful but you'll be able to figure out what's going on by working on a Post with a Preview open as suggested [above](#first-steps).
 
 ## Important things to know
 
 ### Structure of your site
 
-Since Roe is built on markdown files, the basic structure of your site will be:
+Since Roe is built on Markdown files, the basic structure of your site will be:
 
 - **Header/Navigation**
   - Edit the Navigation in Admin > [Layouts](/admin/layouts)
@@ -45,7 +46,7 @@ Collections are generally added to Pages since they're collections of posts but 
 
 ### Cards
 
-Cards allow you to embed styled elements directly in a markdown file: pullquote, post link, aside. [Learn more about Cards →](cards.md)
+Cards allow you to embed styled elements directly in a Markdown file: pullquote, post link, aside. [Learn more about Cards →](cards.md)
 
 ### Image Galleries
 

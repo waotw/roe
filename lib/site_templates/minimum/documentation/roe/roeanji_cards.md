@@ -1,19 +1,46 @@
 ---
-title: Cards
+title: Roeanji → Cards
 status: published
+url_name: cards
 ---
+
+##### Related documentation
+
+```collection
+source: documentation
+related: true
+template: links
+```
 
 # Cards
 
-Cards use a similar syntax to Collections and allow you to embed styled elements directly in a markdown file: [pullquote](#pull-quote), [post link](#post-link), [aside](#aside).
+```card
+type: aside
+text: This is an aside which is adding some helpful info about this paragraph.
+``` 
 
-To keep things simple, each card `type` has it's own defaults. The card defaults can be edited in [Admin/Settings](/admin/configs/cards/edit).
+Cards use a similar syntax to [Collections](/documentation/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside).
+
+To make things a bit easier, each card `type` has it's own defaults. The card defaults can be edited in [Admin/Settings](/admin/configs/cards/edit).
 
 Use the `CARD ▼` button in the editor to insert a card. The `CARD ▼` button templates can be edited as well: [Admin/Settings](/admin/configs/cards/edit).
 
 ## Pull quote
 
 Markdown supports block quotes but not pull quotes. The Pullquote Card allows you to add them easily.
+
+### Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `type` | Yes | Must be `pullquote` |
+| `text` | Yes | The quote content |
+| `attribution` | No | Who said it — displays with em-dash |
+| `position` | No | `center` (default), `left`, or `right` - you can set the default in Settings → Defaults → cards.yml|
+
+To connect a pullquote to a particular paragraph, put it directly above that paragraph with no line between them.
+
+### Examples
 
 ````markdown 
 ```card
@@ -24,14 +51,10 @@ text: There's only one way to find out…
 
 ↑ This code will look like this ↓ :
 
----
-
 ```card
 type: pullquote
 text: There's only one way to find out…
 ```
-
----
 
 You can also add `attribution` if this quote is from someone specific:
 
@@ -44,20 +67,16 @@ attribution: great philosopher
 ````
 ↑ Above looks like this ↓ :
 
----
-
 ```card
 type: pullquote
 text: There's only one way to find out…
 attribution: great philosopher
 ```
 
----
-
 ### position
 (default: `center`)
 
-You can also use a `position` parameter: `left`, `right`, `center`. This allows the pullquote to be amount the text and have the text flow around it. Like this:
+You can also use `position` parameter: `left`, `right`. This allows the pullquote to be amoung the text and have the text flow around it. Like this: (try resizing the window to see how it flows.)
 
 ---
 
@@ -107,13 +126,33 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ## Post Link
 
-Post links are a great way to link to other posts in your site with support for thumbnails. The syntax is this easy and automatically imports the necessary info and image:
+Post links are a great way to link to other posts in your site with support for thumbnails. The syntax is easy and automatically imports the necessary info and image.
+
+### Options
+
+Most of these are not required. You can just use: `type:`, `post:`, these are here if you want to customize. As long as you add a `post:` option, it will pull all the info from the post. But you can override that if you like.
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `type` | Yes | Must be `post-link` |
+| `post` | Yes | Reference a post by its url_name — auto-populates all fields |
+| `style` | No | `small` (default), `medium`, or `large` |
+| `title` | No | Override or provide custom title |
+| `subtitle` | No | Override subtitle (medium/large only) |
+| `excerpt` | No | Override excerpt (medium/large only) |
+| `image` | No | Override image path, or set to `none` to hide image |
+| `author` | No | Override author — falls back to site author |
+| `date` | No | Override date |
+| `url` | No | Custom URL if not using `post` reference |
+| `link_text` | No | Custom call-to-action text — defaults to "Read full story →" |
+
+### Examples
 
 ````markdown
 ```card
 type: post-link
 style: small
-post: url-name-of-post-you-want-to-link
+post: collection-full
 ```
 ````
 
@@ -122,7 +161,25 @@ post: url-name-of-post-you-want-to-link
 ```card
 type: post-link
 style: small
-post: url-name-of-post-you-want-to-link
+post: collection-full
+```
+
+And you can change the size (small/medium/large)
+
+````markdown
+```card
+type: post-link
+style: medium
+post: collection-full
+```
+````
+
+↑ That code will produce this ↓ :
+
+```card
+type: post-link
+style: medium
+post: collection-full
 ```
 
 This simple syntax will pull all the information from the Post itself. You can also override this fully if you want. Just add the fields you'd like to replace ↓ :
@@ -130,12 +187,12 @@ This simple syntax will pull all the information from the Post itself. You can a
 ````markdown
 ```card
 type: post-link
-post: url-name-of-post-you-want-to-link
+post: collection-full
 style: large
-title: This Post has a great Title
-author: Biff Tannen
+title: Collection Full
+author: Benjamin Welch, Esq.
 date: 1983-06-15
-excerpt: Mediocre Literature is coming for us all.
+excerpt: Example of full collection
 link_text: Read more…
 ```
 ````
@@ -144,22 +201,34 @@ link_text: Read more…
 
 ```card
 type: post-link
-post: url-name-of-post-you-want-to-link
+post: collection-full
 style: large
-title: This Post has a great Title
-author: Biff Tannen
-date: 1983-05-15
-excerpt: Mediocre Literature is coming for us all.
-link_text: Read more...
+title: Collection Full
+author: Benjamin Welch, Esq.
+date: 1983-06-15
+excerpt: Example of full collection
+link_text: Read more…
 ```
 
-<mark>Note:</mark> that when you add `style: small` or `style: large` this adds a CSS class to the element so that you can style it however you like. You could use `style: featured` if you like and use CSS to style the `post-link-featured` card.
+<mark>Note:</mark> when you add `style: small`, `style: mediuam` or `style: large` this adds a CSS class to the element so that you can style it however you like. You could use `style: featured` if you like and use CSS to style the `post-link-featured` card.
 
 ## Aside
 
 Asides allow you to add notes "next to" the content of the text. The syntax is similar to other cards. You can create an Aside with: just [text](#just-text), [image](#just-image), [both](#both). You can also add [links](#and-an-aside-can-use-links)
 
-### Just Text
+### Options
+
+You're only required to set: `type:` and then add image, text and links as needed. You can use: image, text, or both and add a link.
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `type` | Yes | Must be `aside` |
+| `text` | No | Body text |
+| `image` | No | Path to image — displays above text |
+| `link` | No | URL to link to |
+| `link_text` | No | Custom link text — if omitted, shows arrow appended to text |
+
+### Just Text (example)
 
 <mark>Note: the aside will be next to the paragraph immediately below it:</mark>
 
@@ -185,13 +254,12 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ↑ <mark>Try different browser widths to see how it interacts</mark>
 
-### Just Image
-
+### Just Image (example)
 
 ````markdown
 ```card
 type: aside
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
@@ -203,14 +271,14 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ```card
 type: aside
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 
 ---
 
-### Both
+### Image + Text (example)
 
 You can use both image and text like so ↓ :
 
@@ -218,7 +286,7 @@ You can use both image and text like so ↓ :
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 ````
@@ -230,13 +298,13 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-image: /media/images/example-blog-2.jpg
+image: /media/images/house-on-ilkley-moore.jpg
 ```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 
 ---
 
-### And an aside can use links
+### Asides can use links (example)
 
 To add a link to an Aside, just do this ↓ :
 

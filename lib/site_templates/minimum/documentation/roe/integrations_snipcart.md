@@ -1,7 +1,8 @@
 ---
-title: Integrations → Snipcart
+title: Snipcart
 status: published
 url_name: snipcart
+tags: integration
 related:
   - "store"
 ---
@@ -17,7 +18,7 @@ template: links
 
 # Setting up Snipcart to work with Roe
 
-The Store feature lets you sell products directly from your site using [Snipcart](https://snipcart.com). Products are markdown files similar to pages/posts with metadata for price, SKU, images, etc.
+The Store feature lets you sell products directly from your site using [Snipcart](https://snipcart.com). Products are Markdown files similar to pages/posts with metadata for price, SKU, images, etc.
 
 #### Before Snipcart
 

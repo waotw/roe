@@ -1,13 +1,14 @@
 ---
-title: "Admin → Layouts"
+title: "Layouts"
 status: published
+tags: admin
 ---
 
 # Layouts
 
 `Admin → Layouts`
 
-Layouts are also just markdown files:
+Layouts are also just Markdown files:
 
 - `navigation` = logo, site links, anything you want at the top of every page
 - `footer` = copywrite, extra links, anything you want at the bottom of every page

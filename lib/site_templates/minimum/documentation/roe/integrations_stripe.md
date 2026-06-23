@@ -1,7 +1,8 @@
 ---
-title: Integrations → Stripe
+title: Stripe
 status: published
 url_name: stripe
+tags: integration
 related:
   - "payments"
 ---

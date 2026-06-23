@@ -1,12 +1,13 @@
 ---
-title: Features → Store
+title: Store
 status: published
+tags: feature
 url_name: store
 ---
 
 # Store
 
-The Store feature lets you sell products directly from your site using [Snipcart](https://snipcart.com). Products are markdown files similar to pages/posts with metadata for price, SKU, images, and more.
+The Store feature lets you sell products directly from your site using [Snipcart](https://snipcart.com). Products are Markdown files similar to pages/posts with metadata for price, SKU, images, and more.
 
 ## Quick Start
 
@@ -164,14 +165,14 @@ Each published product gets a page at `/store/product-url-name`.
 Product pages display:
 
 - Breadcrumbs (`Home > Store > [Category] > Product`)
-- Your markdown content
+- Your Markdown content
 - Any product buttons you've added via the PRODUCT button
 
 Breadcrumbs can be disabled per-product with `breadcrumbs: false` in product/page metadata.
 
 ## Add to Cart Buttons
 
-Add product buttons anywhere in your markdown using the button block syntax:
+Add product buttons anywhere in your Markdown using the button block syntax:
 
 ````
 ```button
@@ -224,7 +225,7 @@ When you add a new category to a Product, it will be added to this list automati
 
 ### Product Button Template
 
-Customize the markdown template inserted by the PRODUCT button. Use these placeholders:
+Customize the Markdown template inserted by the PRODUCT button. Use these placeholders:
 
 - `@image` - Product image
 - `@title` - Product title
@@ -286,7 +287,7 @@ Snipcart charges 2% per transaction (no monthly fee) and handles:
 
 - Short descriptions show in product grids
 - Full content shows on product pages
-- Use markdown for formatting
+- Use Markdown for formatting
 
 **Test Before Going Live**
 

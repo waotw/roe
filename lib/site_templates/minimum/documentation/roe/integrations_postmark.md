@@ -1,7 +1,8 @@
 ---
-title: Integrations → Postmark
+title: Postmark
 status: published
 url_name: postmark
+tags: integration
 ---
 
 ##### Related documentation

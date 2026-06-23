@@ -1,30 +1,34 @@
 ---
-title: "Admin → Members"
+title: "Members"
 status: published
+url_name: admin_members
+tags: admin
+related:
+  - members
 ---
 
-# Admin: Managing Members
+##### Related documentation
 
-Go to **Admin → Members** to:
+```collection
+source: documentation
+related: true
+limit: all
+template: links
+```
 
-- **View all members** with search and filtering
-- **See member details** (tier, status, join date, upgrade date)
-- **Manually upgrade members** (for comps, gifts, etc.)
-- **Cancel memberships** (keeps account, revokes access)
-- **Delete members** (removes account entirely)
-- **Reactivate cancelled members**
+# Manage your Members
 
-### Manual Upgrades
+Members are able to edit their accounts by signing in and going to `/account`
 
-To give someone free paid access:
+## [Admin → Members](/admin/members)
 
-1. Go to **Admin → Members**
-2. Click on the member
-3. Click **"Upgrade to Paid Tier"**
-4. Enter a password or let Roe generate one
-5. Click **"Upgrade"**
+This is the section that allows you to see all members, edit their tier, cancel their membership, delete their account, edit their name/email.
 
-This is perfect for:
-- Giving free access to friends/family
-- Comp subscriptions for reviewers
-- Converting existing supporters
+### Filters
+
+- Use the tabs: `ALL`, `FREE`, `PAID` to see those members only.
+- You can filter by `status`, `newsletter status` and then `sort` or search.
+
+### Payments
+
+For payment-related configuration (price, mode, donation amounts), see: [Settings → Members](/documentation/settings-members).

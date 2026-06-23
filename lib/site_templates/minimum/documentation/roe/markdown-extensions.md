@@ -1,25 +1,36 @@
 ---
-title: Roeanji
-status: published
-url_name: roeanji
-related:
-  - collections
-  - paid-content
-  - cards
+title: "Markdown Extensions"
+post_type: documentation
+status: unlisted
 ---
 
-##### Related documentation
+# Markdown Extensions
 
-```collection
-source: documentation
-related: true
-limit: all
-template: links
-```
+Roe provides a number of custom Markdown extensions that allow you to create rich content beyond standard Markdown.
 
-# Roeanji
+### Products
 
-Simple Markdown extensions that are easy to learn and use. They all use the same basic syntax similar to a code block in Markdown and allow you to create rich content beyond standard Markdown.
+| Option | Required | Description |
+|--------|----------|-------------|
+| `show_description` | No | Show truncated product description (~100 chars) below the title |
+| `groups` | No | `enabled` to group variants together (e.g., Paperback/Hardback/Ebook of same book) |
+| `aspect_ratio` | No | Image aspect ratio: `auto` (default), `portrait`, `square`, or `landscape` |
+
+**Notes:**
+- When `groups: enabled`, the grid uses the **primary** variant's image and links to the primary variant's page
+- Variant names appear in parentheses below the title (e.g., `(Paperback, Hardback)`)
+- Price display for grouped products is controlled by your **store config** (`site/system/features/store.yml`):
+  - `price_display: range` — shows `$10.00 - $25.00` (default)
+  - `price_display: lowest` — shows `$10.00`
+  - `price_display: highest` — shows `$25.00`
+  - `price_separator` — custom separator between range prices (default: `-`)
+- `button_text` in store config controls the "View" button text for grouped products (no button renders if left blank)
+- Individual products show "Add to Cart" button directly in the grid
+The product-specific options are:
+- show_description (boolean-ish: "true" or true)
+- groups ("enabled" or true)
+- aspect_ratio (string, defaults to "auto")
+Everything else (pricing behavior, button text, grouping logic) is controlled at the store config level in site/system/features/store.yml, not at the collection level.
 
 ## Cards
 
@@ -322,27 +333,3 @@ sku: book-ebook
 ```
 
 **Auto-variant detection:** Products with `group:` metadata automatically show all variants in the group as a list with a single button.
-
-## Products
-
-| Option | Required | Description |
-|--------|----------|-------------|
-| `show_description` | No | Show truncated product description (~100 chars) below the title |
-| `groups` | No | `enabled` to group variants together (e.g., Paperback/Hardback/Ebook of same book) |
-| `aspect_ratio` | No | Image aspect ratio: `auto` (default), `portrait`, `square`, or `landscape` |
-
-**Notes:**
-- When `groups: enabled`, the grid uses the **primary** variant's image and links to the primary variant's page
-- Variant names appear in parentheses below the title (e.g., `(Paperback, Hardback)`)
-- Price display for grouped products is controlled by your **store config** (`site/system/features/store.yml`):
-  - `price_display: range` — shows `$10.00 - $25.00` (default)
-  - `price_display: lowest` — shows `$10.00`
-  - `price_display: highest` — shows `$25.00`
-  - `price_separator` — custom separator between range prices (default: `-`)
-- `button_text` in store config controls the "View" button text for grouped products (no button renders if left blank)
-- Individual products show "Add to Cart" button directly in the grid
-The product-specific options are:
-- show_description (boolean-ish: "true" or true)
-- groups ("enabled" or true)
-- aspect_ratio (string, defaults to "auto")
-Everything else (pricing behavior, button text, grouping logic) is controlled at the store config level in site/system/features/store.yml, not at the collection level.

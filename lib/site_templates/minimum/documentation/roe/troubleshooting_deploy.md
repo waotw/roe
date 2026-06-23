@@ -3,7 +3,7 @@ title: "Troubleshooting → Deployment"
 status: published
 url_name: troubleshoot-deployment
 related:
-  - deployment
+  - guide-deploy
 ---
 
 ##### Related documentation
