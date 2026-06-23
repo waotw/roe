@@ -7,6 +7,9 @@
   <% end %>
   <div class="card-content">
     <h4 class="card-title"><%= title %></h4>
+    <% if subtitle.present? %>
+      <p class="card-subtitle"><%= subtitle %></p>
+    <% end %>
     <% if author.present? || date.present? %>
       <p class="card-metadata">
         <% if author.present? %><span class="card-author"><%= author %></span><% end %>

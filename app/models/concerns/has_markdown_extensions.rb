@@ -954,11 +954,20 @@ module HasMarkdownExtensions
   end
 
   def render_compact(items, config = {})
-    show_author = collection_truthy?(config[:show_author])
+    show_author   = collection_truthy?(config[:show_author])
+    show_date     = collection_truthy?(config[:show_date], default: true)
+    show_subtitle = collection_truthy?(config[:show_subtitle], default: false)
 
     items_html = items.map do |item|
-      date_str = item_date(item)
+      date_str   = show_date ? item_date(item) : nil
       author_str = show_author ? item_author(item) : nil
+
+      # Subtitle: explicit config override > item's subtitle field
+      subtitle_str = if config[:subtitle].present?
+        CGI.escapeHTML(config[:subtitle].to_s)
+      elsif show_subtitle
+        item.respond_to?(:subtitle) ? CGI.escapeHTML(item.subtitle.to_s.strip) : nil
+      end
 
       meta_html = ""
       if date_str || author_str
@@ -968,9 +977,11 @@ module HasMarkdownExtensions
         meta_html = " • #{parts.join(" • ")}"
       end
 
+      subtitle_html = subtitle_str.present? ? " — <span class=\"item-subtitle\">#{subtitle_str}</span>" : ""
+
       title_html = decorate_title(item)
       link_html = "<a href=\"#{item_path(item)}\">#{title_html}</a>"
-      "<li><span class=\"item-title\">#{link_html}</span>#{meta_html}</li>"
+      "<li><span class=\"item-title\">#{link_html}</span>#{subtitle_html}#{meta_html}</li>"
     end
 
     "<ul>\n#{items_html.join("\n")}\n</ul>"
@@ -1535,10 +1546,10 @@ module HasMarkdownExtensions
         end
 
         post_data = {
-          title:    referenced_post.title || "Untitled",
-          subtitle: referenced_post.metadata["subtitle"] || "",
-          excerpt:  referenced_post.metadata["excerpt"] || "",
-          url:      record_url
+          title:               referenced_post.title || "Untitled",
+          subtitle_from_record: referenced_post.metadata["subtitle"] || "",
+          excerpt:             referenced_post.metadata["excerpt"] || "",
+          url:                 record_url
         }
 
         # Author and date are post-only — omit for pages, products, docs
@@ -1564,8 +1575,20 @@ module HasMarkdownExtensions
     style = config[:style] || "small"
     title = config[:title] || "Untitled"
     date_raw = config[:date] || ""
-    subtitle = config[:subtitle] || ""
     excerpt = config[:excerpt] || ""
+
+    # Subtitle: explicit override > record's subtitle field.
+    # show_subtitle defaults to true so existing cards and non-post
+    # records (pages, docs) show the subtitle without any config needed.
+    # Set show_subtitle: false to suppress it entirely.
+    show_subtitle = collection_truthy?(config[:show_subtitle], default: true)
+    subtitle = if config[:subtitle].present?
+      config[:subtitle]  # Explicit override in card config
+    elsif show_subtitle
+      config[:subtitle_from_record] || ""
+    else
+      ""
+    end
     url = config[:url] || "#"
     link_text = config[:link_text] || SiteConfig.default("cards", "post-link")&.[]("default_link_text") || "Read full story →"
 
@@ -1674,11 +1697,12 @@ module HasMarkdownExtensions
         },
       )
     else
-      # Small style: image, title, metadata, link (no excerpt)
+      # Small style: image, title, subtitle, metadata, link (no excerpt)
       ApplicationController.renderer.render(
         partial: "cards/post_link_small",
         locals: {
           title:     title,
+          subtitle:  subtitle,
           url:       url,
           image:     image,
           metadata:  metadata,
