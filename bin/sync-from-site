@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+#
+# Mirror selected /site/ subtrees back into the Roe app for release prep.
+# /site is the source of truth (that's where you develop against);
+# /current/lib and /current/app/themes follow.
+#
+# Two sync rules, one per subtree:
+#
+#   1. Docs — exact mirror. site/documentation/roe/ ↔ current/lib/.../roe/.
+#      --delete is on; anything you delete from /site disappears from the
+#      app on the next sync. New files added in /site are propagated.
+#
+#   2. Themes — update-only. site/theme/ → current/app/themes/.
+#      --existing flag means files that exist in BOTH places are updated
+#      from /site; files only in /site are ignored (you wanted to add a
+#      new bundled theme file, move it manually). Files only in the app
+#      are left alone (preserves bundled defaults like other starter
+#      themes you haven't installed locally).
+#
+# Usage (from anywhere):
+#
+#   bin/sync-from-site            # do it
+#   bin/sync-from-site --dry-run  # show what would happen, no changes
+#   bin/sync-from-site -n         # alias for --dry-run
+#
+# Runs idempotently — safe to invoke before every `bin/rails release:bump`.
+set -euo pipefail
+
+# Resolve project root (parent of current/) regardless of cwd.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+DRY_RUN=""
+case "${1:-}" in
+  -n|--dry-run)
+    DRY_RUN="-n"
+    echo "── DRY RUN — no files will be modified ──"
+    echo ""
+    ;;
+  -h|--help)
+    sed -n '3,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+esac
+
+cd "$ROE_ROOT"
+
+echo "→ Docs (exact mirror, --delete on):"
+echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/documentation/roe/"
+rsync -avc $DRY_RUN --delete \
+  site/documentation/roe/ \
+  current/lib/site_templates/minimum/documentation/roe/
+echo ""
+
+echo "→ Themes (update existing files only, --existing on, --delete off):"
+echo "    site/theme/  →  current/app/themes/"
+rsync -avc $DRY_RUN --existing \
+  site/theme/ \
+  current/app/themes/
+echo ""
+
+if [[ -n "$DRY_RUN" ]]; then
+  echo "Dry run complete. Re-run without --dry-run to apply."
+else
+  echo "Done."
+fi
