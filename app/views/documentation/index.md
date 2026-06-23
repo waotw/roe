@@ -1,10 +1,3 @@
----
-title: "Documentation"
-status: "published"
-tags: []
-url_name: "documentation"
-audience: "everyone"
----
 
 ```collection
 heading: Roe CMS Documentation
