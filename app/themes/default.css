@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
    Version: 0.9.4
-   Bundled with: Roe v0.0.32
+   Bundled with: Roe v0.0.33
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -201,6 +201,10 @@ hr {
   width: 100%;
   border: 0;
   border-top: 1px solid var(--color-border);
+  margin: 0 0 0 0;
+}
+
+figure {
   margin: 0 0 0 0;
 }
 
@@ -487,21 +491,21 @@ div.flash mark {
 }
 
 .content h3 {
+  font-size: var(--text-2xl);
+  line-height: 1.25;
+  margin: var(--space-6) 0 var(--space-3) 0;
+  font-weight: 700;
+}
+
+.content h4 {
   font-size: var(--text-xl);
   line-height: 1.25;
   margin: var(--space-6) 0 var(--space-2) 0;
   font-weight: 700;
 }
 
-.content h4 {
-  font-size: var(--text-lg);
-  line-height: 1.25;
-  margin: var(--space-6) 0 var(--space-2) 0;
-  font-weight: 700;
-}
-
 .content h5 {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   line-height: 1.25;
   margin: var(--space-6) 0 var(--space-1) 0;
   font-weight: 700;
@@ -570,7 +574,7 @@ div.flash mark {
 .content pre {
   background-color: var(--color-code-bg);
   padding: var(--space-4);
-  margin-top: 0;
+  margin-top: var(--space-6);
   margin-bottom: var(--space-6);
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -1051,7 +1055,7 @@ p.collection-more a:hover {
 /* Links */
 
 .collection.links .collection-item {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .collection.links .item-title {
@@ -1067,12 +1071,47 @@ p.collection-more a:hover {
   line-height: 1;
 }
 
+/* Collection Glossary */
+
+.collection.glossary dl {
+  margin: 0 0 0 0;
+  max-width: 60%;
+}
+
+.collection.glossary .glossary-entry {
+  margin: 0 0 var(--space-4) 0;
+}
+
+.collection.glossary dd {
+  font-size: var(--text-sm);
+  margin-inline-start: var(--space-0);
+}
+
+.collection.glossary .item-title {
+  font-size: var(--text-lg);
+}
+
+.collection.glossary .item-title a {
+  text-decoration: underline;
+}
+
+.collection.glossary .item-subtitle {
+  font-size: var(--text-base);
+  font-style: italic;
+  line-height: 1.3;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.collection.glossary .item-excerpt {
+  font-size: var(--text-sm);
+}
+
 /* Collection Grids */
 
 .collection-grid {
   display: grid;
   gap: var(--space-8);
-  margin: var(--space-8) 0;
+  margin: var(--space-4) 0;
 }
 
 .collection-grid-2,
@@ -1088,10 +1127,22 @@ p.collection-more a:hover {
   .collection-grid-3 {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .collection.glossary dl {
+    margin: 0 0 0 0;
+    max-width: 100%;
+  }
 }
 
 .collection-grid .collection {
   margin: 0;
+}
+
+@media (max-width: 630px) {
+  .collection.glossary dl {
+    margin: 0 0 0 0;
+    max-width: 100%;
+  }
 }
 
 /* ================ GALLERIES =============== */
@@ -2399,7 +2450,8 @@ p.podcast-audio-fallback {
   display: inline-block;
 }
 
-.content.documentation p mark {
+.content.documentation p mark,
+.documentation mark {
   background-color: var(--color-highlight-text);
   color: var(--color-bg);
   padding: 0 calc(var(--space-1) * 0.8);
@@ -2414,6 +2466,18 @@ p.podcast-audio-fallback {
 .content.documentation li code {
   font-size: var(--text-xs);
   padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.page-documentation .collection-grid,
+.documentation .collection-grid {
+  display: grid;
+  column-gap: var(--space-8);
+  row-gap: var(--space-0);
+  margin: var(--space-4) 0;
+}
+
+.page-documentation .collection-grid h2 {
+  font-size: var(--text-2xl);
 }
 
 /* =============== UTILITIES ================ */
