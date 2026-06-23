@@ -35,11 +35,17 @@ class PerformDeployJob < ApplicationJob
     prepare_version_file
 
     # Auto-commit any pending changes (now including the just-staged
-    # VERSION) so Kamal's git-based build context picks them up. Fly's
-    # builder works from the working directory directly and doesn't
-    # need this, but it's harmless on that path too — auto_commit
-    # short-circuits when there's nothing to commit.
-    auto_commit if target == "kamal"
+    # VERSION). For Kamal this is required — Kamal builds from the
+    # git tree, so uncommitted files are silently absent from the
+    # build context. For Fly it's not required for the deploy itself
+    # (Fly's builder ships the working directory directly), but the
+    # user clicked "Auto-commit and deploy" in the UI expecting their
+    # working tree to be in a clean state after deploy — running it
+    # on the Fly path too honors that intent and keeps git history
+    # aligned with what was deployed. auto_commit no-ops when
+    # `git status --porcelain` is empty, so it's safe to run for
+    # both targets unconditionally.
+    auto_commit
 
     # Fly's release_command runs in an ephemeral VM that can't see the
     # mounted volume, so Roe doesn't use it for migrations. Multi-Machine

@@ -68,7 +68,7 @@ class Documentation < ApplicationRecord
 
   # Docs directly inside site/documentation (not in any subdirectory).
   def self.root
-    where("file_path NOT LIKE ?", "#{RoeSitePaths::SITE_DOCUMENTATION_PATH}/%/%")
+    where("file_path NOT LIKE ?", "#{normalized_documentation_path}/%/%")
   end
 
   # Scope to docs inside a subdirectory of site/documentation.
@@ -77,8 +77,22 @@ class Documentation < ApplicationRecord
   def self.in_directory(dir)
     return root if dir.to_s.blank?
 
-    base = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, dir.to_s, "")
+    base = File.join(normalized_documentation_path, dir.to_s, "")
     where("file_path LIKE ?", "#{base}%")
+  end
+
+  # The documentation path with symlinks resolved — must match what
+  # ContentSync stored in the file_path column at sync time. On Fly,
+  # /rails/site is a symlink to /data/site (the persistent volume),
+  # and ContentSync calls RoeSitePaths.normalize on every doc's path
+  # before saving, so records end up with /data/site/... paths.
+  # If this scope's LIKE pattern were built from the un-normalized
+  # SITE_DOCUMENTATION_PATH constant, the prefix would be
+  # /rails/site/... and would never match the stored paths → empty
+  # collection on every query. Memoized so we don't realpath() per
+  # query; the path doesn't change during the process's lifetime.
+  def self.normalized_documentation_path
+    @normalized_documentation_path ||= RoeSitePaths.normalize(RoeSitePaths::SITE_DOCUMENTATION_PATH)
   end
 
   # Return all unique tags across documentation records, optionally scoped
