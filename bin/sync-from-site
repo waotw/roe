@@ -17,11 +17,14 @@
 #      are left alone (preserves bundled defaults like other starter
 #      themes you haven't installed locally).
 #
-#   3. Docs index page — single file copy.
+#   3. Docs index page — single file copy + YAML frontmatter strip.
 #      site/pages/documentation.md → current/app/views/documentation/index.md.
 #      The user-customizable /documentation page in /site is the source
 #      of truth; the bundled copy in /current/app/views/... ships with
-#      Roe and gets installed on first setup.
+#      Roe and gets installed on first setup. The /site copy needs
+#      frontmatter (it's a Page); the bundled view only needs the
+#      markdown body, so we strip the `---\n…\n---\n` block from the
+#      destination after copy.
 #
 # Usage (from anywhere):
 #
@@ -65,11 +68,33 @@ rsync -avc $DRY_RUN --existing \
   current/app/themes/
 echo ""
 
-echo "→ Docs index page (single file copy):"
+echo "→ Docs index page (single file copy + frontmatter strip):"
 echo "    site/pages/documentation.md  →  current/app/views/documentation/index.md"
 rsync -vc $DRY_RUN \
   site/pages/documentation.md \
   current/app/views/documentation/index.md
+
+# Strip YAML frontmatter from the destination. The /site/pages/
+# source needs `---\n…\n---\n` at the top to be a valid Page, but
+# the bundled view in /current/app/views/ renders only the markdown
+# body — frontmatter would either show as literal text or confuse
+# the markdown parser.
+#
+# awk state machine: on line 1, if it's `---`, enter frontmatter
+# mode. While in frontmatter mode, skip lines until the next `---`
+# (close), then exit. Print everything else. Robust to files that
+# don't start with `---` (no change), files without frontmatter (no
+# change), and `---` horizontal rules later in the body (preserved
+# because in_fm is already 0 by then).
+if [[ -z "$DRY_RUN" ]]; then
+  dest="current/app/views/documentation/index.md"
+  awk '
+    NR == 1 && /^---$/ { in_fm = 1; next }
+    in_fm && /^---$/   { in_fm = 0; next }
+    !in_fm             { print }
+  ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
+  echo "    (stripped YAML frontmatter from destination)"
+fi
 echo ""
 
 if [[ -n "$DRY_RUN" ]]; then
