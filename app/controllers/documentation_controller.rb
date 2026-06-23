@@ -35,15 +35,12 @@ class DocumentationController < ApplicationController
   private
 
   def index_markdown
+    File.read(Rails.root.join("app", "views", "documentation", "index.md"))
+  rescue Errno::ENOENT
     <<~MD
       # Documentation
 
-      ```collection
-      source: documentation
-      template: list
-      order: filename
-      limit: all
-      ```
+      Roe documentation is not available.
     MD
   end
 

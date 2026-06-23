@@ -511,7 +511,9 @@ module HasMarkdownExtensions
       when "products"
         Product.all_tags
       when "documentation"
-        Documentation.all_tags
+        Documentation.all_tags("")
+      when /^documentation\//
+        Documentation.all_tags(source.sub("documentation/", ""))
       when "pages"
         # Pages don't have tags yet, skip validation
         []
@@ -557,7 +559,12 @@ module HasMarkdownExtensions
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "documentation"
-      collection = Documentation.public_documentation
+      collection = Documentation.public_documentation.root
+      collection = apply_tag_filters(collection, tags) if tags
+      collection
+    when /^documentation\//
+      dir = source.sub("documentation/", "")
+      collection = Documentation.public_documentation.in_directory(dir)
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "products"
@@ -567,7 +574,7 @@ module HasMarkdownExtensions
       collection
     else
       if Rails.env.development?
-        valid = %w[posts pages documentation products]
+        valid = %w[posts pages documentation documentation/roe products]
         return dev_warning("Unknown collection source",
           "'#{source}' is not a valid source.",
           "Valid sources: #{valid.join(', ')}")

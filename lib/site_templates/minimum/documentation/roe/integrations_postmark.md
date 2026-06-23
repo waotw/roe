@@ -8,7 +8,7 @@ tags: integration
 ##### Related documentation
 
 ```collection
-source: documentation
+source: documentation/roe
 related: true
 limit: all
 template: links

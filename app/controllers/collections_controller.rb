@@ -65,7 +65,9 @@ class CollectionsController < ApplicationController
     when "pages"
       Page.public_pages
     when "documentation"
-      Documentation.public_documentation
+      Documentation.public_documentation.root
+    when /^documentation\//
+      Documentation.public_documentation.in_directory(@source.sub("documentation/", ""))
     else
       Post.published.regular_posts
     end
@@ -127,6 +129,8 @@ class CollectionsController < ApplicationController
   def generate_heading
     base_heading = case @source
     when "documentation"
+      "Documentation"
+    when /^documentation\//
       "Documentation"
     when "pages"
       "Pages"

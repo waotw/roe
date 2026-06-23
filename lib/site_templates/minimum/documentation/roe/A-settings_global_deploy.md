@@ -10,7 +10,7 @@ related:
 ##### Related documentation
 
 ```collection
-source: documentation
+source: documentation/roe
 related: true
 template: links
 ```

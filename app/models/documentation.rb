@@ -66,8 +66,29 @@ class Documentation < ApplicationRecord
     where("json_extract(metadata, '$.status') = ?", "published")
   end
 
-  # Return all unique tags across all documentation records
-  def self.all_tags
-    all.to_a.flat_map(&:tags).uniq.sort
+  # Docs directly inside site/documentation (not in any subdirectory).
+  def self.root
+    where("file_path NOT LIKE ?", "#{RoeSitePaths::SITE_DOCUMENTATION_PATH}/%/%")
+  end
+
+  # Scope to docs inside a subdirectory of site/documentation.
+  # dir should be a relative path like "roe" or "notes".
+  # Blank dir scopes to root docs.
+  def self.in_directory(dir)
+    return root if dir.to_s.blank?
+
+    base = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, dir.to_s, "")
+    where("file_path LIKE ?", "#{base}%")
+  end
+
+  # Return all unique tags across documentation records, optionally scoped
+  # to a subdirectory. Blank dir scopes to root docs.
+  def self.all_tags(dir = nil)
+    scope = case dir
+    when nil then all
+    when "" then root
+    else in_directory(dir)
+    end
+    scope.to_a.flat_map(&:tags).uniq.sort
   end
 end

@@ -3,12 +3,14 @@ title: Guide → Deploy your site
 status: published
 url_name: guide-deploy
 tags: guide
+related:
+  - site-sync
 ---
 
 ##### Related documentation
 
 ```collection
-source: documentation
+source: documentation/roe
 related: true
 template: links
 ```

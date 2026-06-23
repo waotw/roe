@@ -7,14 +7,14 @@ tags: featured
 # Glossary
 
 ```collection
-source: documentation
+source: documentation/roe
 limit: 1
 tags: definition
 order: title
 template: glossary
 ```
 ```collection
-source: documentation
+source: documentation/roe
 offset: 1
 tags: definition
 order: title

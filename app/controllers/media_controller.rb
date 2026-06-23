@@ -7,7 +7,8 @@ class MediaController < ApplicationController
       file_path = File.join(RoeSitePaths::SITE_PATH, "documentation", "media", params[:path])
     end
     unless File.exist?(file_path)
-      file_path = File.join(RoeSitePaths::SITE_PATH, "documentation", "roe", "media", params[:path])
+      doc_media_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "documentation", "*", "media", params[:path]))
+      file_path = doc_media_paths.first if doc_media_paths.any?
     end
 
     unless File.exist?(file_path)
