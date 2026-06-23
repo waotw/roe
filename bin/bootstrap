@@ -20,7 +20,7 @@ if existing_user
   user = existing_user
   puts "\nResetting password for: #{user.email_address}"
 else
-  puts "\nNo admin user found. Let's create one!"
+  puts "\nNo admin user found. Let's create one…"
 
   print "\nEmail address (default: admin@example.com): "
   email_address = gets.chomp
@@ -76,14 +76,14 @@ end
 # Save user
 if user.save
   puts "\n" + "=" * 60
-  puts "✅ SUCCESS!"
+  puts "✅ SUCCESS…"
   puts "=" * 60
   puts "\nAdmin user #{existing_user ? 'updated' : 'created'}:"
   puts "   📧 Email: #{user.email_address}"
 
   if show_password
     puts "   🔑 Password: #{password}"
-    puts "\n⚠️  SAVE THIS PASSWORD NOW!"
+    puts "\n⚠️  SAVE THIS PASSWORD NOW…"
     puts "   You won't be able to see it again."
   end
 
