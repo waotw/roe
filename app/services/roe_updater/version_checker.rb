@@ -34,6 +34,23 @@ module RoeUpdater
         }
 
         Rails.cache.write(CACHE_KEY, result, expires_in: CACHE_TTL)
+
+        # Maintain the persistent "update available" flag (the one the
+        # nav-bar amber dot reads from). The background CheckForUpdatesJob
+        # writes `true` when an update is available; here we *clear* the
+        # flag when a confirmed-good check finds no update available, so
+        # a user's manual recheck reflects reality.
+        #
+        # Safe to clear only when:
+        #   - fetch_latest_version succeeded (not nil — guarded above)
+        #   - the check definitively says no update is available
+        # i.e. we're not clearing on a network glitch or partial response.
+        if result[:update_available]
+          Rails.cache.write(UPDATE_AVAILABLE_KEY, true)
+        else
+          Rails.cache.delete(UPDATE_AVAILABLE_KEY)
+        end
+
         result
       rescue => e
         Rails.logger.error "Update check failed: #{e.message}"

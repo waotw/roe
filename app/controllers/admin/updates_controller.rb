@@ -7,7 +7,15 @@ class Admin::UpdatesController < Admin::BaseController
   # Block every action here in production so anyone who lands on this
   # route (typed URL, stale bookmark, old link) gets a clear redirect
   # back to the dashboard instead of a stale or broken page.
-  before_action :block_in_production
+  # Block mutating actions in production — the in-app updater swaps files
+  # in current/, which an immutable container image can't do, and deploys
+  # can't be triggered from inside the deployed instance. The page itself
+  # (index + read-only status routes) is still reachable so production
+  # users can see "an update is available" and know to run the update from
+  # their local install. The view surfaces a production-mode notice.
+  before_action :block_in_production, only: %i[
+    start rollback start_deploy reset_and_retry_deploy dismiss_deploy
+  ]
   before_action :block_on_dev_install, only: %i[start rollback]
 
   def index

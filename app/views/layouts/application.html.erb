@@ -139,14 +139,18 @@
                 <% end %>
               <% end %>
             </div>
-            <% unless Rails.env.production? %>
-              <div class="relative inline-flex items-center">
-                <%= link_to "Updates & Deploy", admin_updates_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900 text-nowrap" %>
-                <% if update_available? %>
-                  <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="A Roe update is available"></span>
-                <% end %>
-              </div>
-            <% end %>
+            <%# Updates & Deploy link is visible in every environment so
+                production users see the update-available amber dot. The
+                Updates page itself blocks actions in production (and on
+                dev installs) and surfaces an explanatory notice. %>
+            <div class="relative inline-flex items-center">
+              <%= link_to(Rails.env.production? ? "Updates" : "Updates & Deploy",
+                          admin_updates_path,
+                          class: "text-sm font-medium text-gray-500 hover:text-gray-900 text-nowrap") %>
+              <% if update_available? %>
+                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="A Roe update is available"></span>
+              <% end %>
+            </div>
             <div class="relative inline-flex items-center">
               <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
               <% if any_integration_unconfigured? %>

@@ -9,19 +9,17 @@ class CheckForUpdatesJob < ApplicationJob
   # UpdateOrchestrator#complete_update clears it. This means the dot
   # stays visible across server restarts until the user actually updates.
   #
-  # Skips the check entirely when running on a dev git checkout (branch
-  # HEAD rather than detached tag) — the in-app updater is disabled there.
+  # Runs even on dev installs (branch HEAD). The in-app updater is
+  # disabled for them, but the amber dot is still useful visibility —
+  # tells a Roe maintainer that the public release has moved past their
+  # current VERSION file. The Updates page enforces the action block,
+  # not this background check.
+  #
+  # Flag maintenance lives inside VersionChecker.check_for_updates now:
+  # writes true on confirmed-available, deletes on confirmed-up-to-date,
+  # leaves the flag alone on network errors or partial responses (so a
+  # transient blip doesn't flicker the dot off).
   def perform
-    return if RoeUpdater::VersionChecker.dev_install?
-
-    result = RoeUpdater::VersionChecker.check_for_updates
-    return unless result
-
-    if result[:update_available]
-      Rails.cache.write(RoeUpdater::VersionChecker::UPDATE_AVAILABLE_KEY, true)
-    end
-    # Don't clear the flag on "no update" — only clear it when an update
-    # completes (UpdateOrchestrator#complete_update). This prevents the
-    # dot from flickering off if the check races with a version bump.
+    RoeUpdater::VersionChecker.check_for_updates
   end
 end

@@ -7,6 +7,38 @@
     </p>
   </div>
 
+  <%# Production banner — updates can't run from a deployed instance.
+      Page itself is still useful (current version, latest-available
+      indicator, release notes) so the user knows whether to switch to
+      their local install and run the update from there. %>
+  <% if Rails.env.production? %>
+    <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠ Updates run from your local install</h3>
+      <p class="text-sm text-amber-800">
+        Roe's in-app updater swaps files in <code class="font-mono text-xs bg-amber-100 px-0.5">current/</code>,
+        which a deployed container image can't do. This page is read-only here — the
+        amber dot in the nav tells you when an update is available, but to actually
+        apply it, open your <strong>local</strong> Roe install's Updates & Deploy
+        page and run it there. Then deploy to push the new version to your live site.
+      </p>
+    </div>
+  <% end %>
+
+  <%# Dev-install banner — Roe-maintainer warning. Page loads normally
+      so the maintainer can see the dot/release info, but Start and
+      Rollback buttons are hidden (see render conditions below) because
+      running the in-app updater would clobber the active branch. %>
+  <% if @dev_install %>
+    <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠ Dev install of Roe — updater disabled</h3>
+      <p class="text-sm text-amber-800">
+        You're on a git branch (not a release tag), so the in-app updater is
+        disabled here to avoid clobbering your working tree. Use <code class="font-mono text-xs bg-amber-100 px-0.5">git pull</code>
+        to sync. The page below is informational only.
+      </p>
+    </div>
+  <% end %>
+
   <div class="mt-8 mb-8 py-6 border-t border-b px-4 border-gray-200 flex gap-2">
     <div class="<%= Rails.env.production? ? 'w-full' : 'flex-1' %>">
       <h3 class="text-sm font-semibold text-gray-900 mb-2">About Updates</h3>
@@ -292,7 +324,11 @@
         </div>
 
         <div class="mt-6 flex items-center gap-3">
-          <% unless @dev_install %>
+          <%# Hide the action button on dev installs (would clobber the
+              branch) and in production (the in-app updater can't run
+              inside a deployed image). Both states show their own
+              explanatory banner at the top of the page. %>
+          <% unless @dev_install || Rails.env.production? %>
             <%= button_to "Update Now",
                           admin_start_update_path(version: @update_info[:latest_version]),
                           method: :post,
