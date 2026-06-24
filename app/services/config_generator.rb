@@ -62,7 +62,7 @@ class ConfigGenerator
         payments_enabled:   payments_enabled,
         payment_price:      payment_price,
         newsletter_enabled: newsletter_enabled,
-        show_paid_content:  show_paid_content,
+        show_paid_content:  show_paid_content
       },
     )
 
@@ -102,7 +102,7 @@ class ConfigGenerator
       locals: {
         currency:        currency,
         default_domain:  default_domain,
-        categories_yaml: categories_yaml,
+        categories_yaml: categories_yaml
       },
     )
 
@@ -127,7 +127,7 @@ class ConfigGenerator
         author_email:     author_email,
         site_url:         site_url,
         copyright_holder: copyright_holder,
-        year:             Date.today.year,
+        year:             Date.today.year
       },
     )
   end

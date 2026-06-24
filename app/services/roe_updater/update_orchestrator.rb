@@ -280,12 +280,12 @@ module RoeUpdater
       def write_version_files
         data = {
           "version"      => @version,
-          "release_date" => Date.today.iso8601,
+          "release_date" => Date.today.iso8601
         }
 
         [
           File.join(RoeSitePaths::ROE_ROOT, "VERSION"),
-          File.join(RoeSitePaths::ROE_ROOT, "current", "VERSION"),
+          File.join(RoeSitePaths::ROE_ROOT, "current", "VERSION")
         ].each do |path|
           existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
           File.write(path, existing.merge(data).to_yaml)

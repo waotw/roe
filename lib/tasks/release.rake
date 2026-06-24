@@ -69,7 +69,7 @@ namespace :release do
     puts "VERSION files:"
     [
       File.join(root, "VERSION"),
-      File.join(root, "current", "VERSION"),
+      File.join(root, "current", "VERSION")
     ].each do |path|
       unless File.exist?(path)
         puts "  ! #{relative(path, root)} missing — skipped"
@@ -222,7 +222,7 @@ namespace :release do
       puts "No prior git tag found — first release, stamping all candidate files."
       candidates = Dir.glob([
         File.join(current, "lib", "site_templates", "**", "*.md"),
-        File.join(current, "app", "themes", "*.css"),
+        File.join(current, "app", "themes", "*.css")
       ])
       return candidates.to_set
     end

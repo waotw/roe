@@ -15,7 +15,7 @@ module SubstackImporter
 
     def test_parse_published_posts
       write_csv([
-        { "post_id" => "123.my-post", "title" => "My Post", "is_published" => "true", "post_date" => "2024-01-01" },
+        { "post_id" => "123.my-post", "title" => "My Post", "is_published" => "true", "post_date" => "2024-01-01" }
       ])
 
       parser = CsvParser.new(@csv_path)
@@ -27,7 +27,7 @@ module SubstackImporter
 
     def test_parse_drafts
       write_csv([
-        { "post_id" => "456.my-draft", "title" => "My Draft", "is_published" => "false", "post_date" => "" },
+        { "post_id" => "456.my-draft", "title" => "My Draft", "is_published" => "false", "post_date" => "" }
       ])
 
       parser = CsvParser.new(@csv_path)
@@ -41,7 +41,7 @@ module SubstackImporter
       write_csv([
         { "post_id" => "1.p1", "title" => "Upper TRUE", "is_published" => "TRUE", "post_date" => "2024-01-01" },
         { "post_id" => "2.p2", "title" => "Upper FALSE", "is_published" => "FALSE", "post_date" => "" },
-        { "post_id" => "3.p3", "title" => "Mixed True", "is_published" => "True", "post_date" => "2024-01-01" },
+        { "post_id" => "3.p3", "title" => "Mixed True", "is_published" => "True", "post_date" => "2024-01-01" }
       ])
 
       parser = CsvParser.new(@csv_path)
@@ -56,7 +56,7 @@ module SubstackImporter
     def test_filter_excludes_drafts_by_default
       write_csv([
         { "post_id" => "1.pub", "title" => "Published", "is_published" => "true", "post_date" => "2024-01-01" },
-        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" },
+        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" }
       ])
 
       parser = CsvParser.new(@csv_path)
@@ -70,7 +70,7 @@ module SubstackImporter
     def test_filter_includes_drafts_when_option_is_true
       write_csv([
         { "post_id" => "1.pub", "title" => "Published", "is_published" => "true", "post_date" => "2024-01-01" },
-        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" },
+        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" }
       ])
 
       parser = CsvParser.new(@csv_path)
@@ -84,7 +84,7 @@ module SubstackImporter
       # The UI checkbox sends "1" for checked values.
       write_csv([
         { "post_id" => "1.pub", "title" => "Published", "is_published" => "true", "post_date" => "2024-01-01" },
-        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" },
+        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" }
       ])
 
       parser = CsvParser.new(@csv_path)
@@ -97,7 +97,7 @@ module SubstackImporter
     def test_summary_counts_drafts
       write_csv([
         { "post_id" => "1.pub", "title" => "Published", "is_published" => "true", "post_date" => "2024-01-01" },
-        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" },
+        { "post_id" => "2.draft", "title" => "Draft", "is_published" => "false", "post_date" => "" }
       ])
 
       parser = CsvParser.new(@csv_path)

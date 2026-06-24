@@ -124,7 +124,7 @@ class ProductCategory
 
     lines = [ "product_categories:" ]
     list.each do |cat|
-      escaped = cat.gsub('\\', '\\\\').gsub('"', '\\"')
+      escaped = cat.gsub("\\", "\\\\").gsub('"', '\\"')
       lines << %(  - "#{escaped}")
     end
     lines.join("\n") + "\n"

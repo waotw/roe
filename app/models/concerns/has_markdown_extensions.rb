@@ -1685,7 +1685,7 @@ module HasMarkdownExtensions
           excerpt:   card_excerpt,
           link_text: link_text,
           author:    author,
-          date:      date,
+          date:      date
         },
       )
     elsif style == "medium"
@@ -1700,7 +1700,7 @@ module HasMarkdownExtensions
           metadata:  metadata,
           link_text: link_text,
           author:    author,
-          date:      date,
+          date:      date
         },
       )
     else
@@ -1715,7 +1715,7 @@ module HasMarkdownExtensions
           metadata:  metadata,
           link_text: link_text,
           author:    author,
-          date:      date,
+          date:      date
         },
       )
     end
