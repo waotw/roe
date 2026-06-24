@@ -2,6 +2,8 @@
 
 Roe is a file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store.
 
+> **Beta:** Roe is currently in beta. Download it before 1.0 and you'll be eligible for a free commercial license. See the [license](site/pages/license.md) for details.
+
 ## Installation
 
 **Prerequisites:** Ruby 3.2.2, Git
@@ -12,7 +14,7 @@ cd roe
 ./bin/setup
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed installation instructions and troubleshooting.
+Full installation instructions and troubleshooting are at [go-roe.com/documentation](https://go-roe.com/documentation).
 
 ## Directory Structure
 
@@ -46,10 +48,11 @@ cd current && bin/rails server
 - **Updates**: Use Admin → Updates to check for and install updates
 - **Backups**: Automatic backups stored in `site_backups/`
 
-## Documentation
+## Documentation & Support
 
-See `current/docs/` for full documentation.
+- **Documentation:** [go-roe.com/documentation](https://go-roe.com/documentation)
+- **Support:** [go-roe.com/support](https://go-roe.com/support)
 
 ## License
 
-Roe is free to use in development forever. Deployment requires a license.
+Roe is free for personal and development use. Commercial use requires a license. See [site/pages/license.md](site/pages/license.md) for the full agreement.
