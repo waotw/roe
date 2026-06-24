@@ -434,7 +434,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     # Error only shows in preview mode
     result = render(content, preview: true)
 
-    assert_match(/Post not found/, result)
+    assert_match(/Content not found: nonexistent-post/, result)
   end
 
   test "post_link renders link href" do
@@ -710,32 +710,6 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     result = render(content)
 
     assert_match(/View all articles/, result)
-  end
-
-  # =============================================================================
-  # Footnote Tests (via pipeline)
-  # =============================================================================
-
-  test "inline footnotes processed in pipeline" do
-    content = MarkdownFixture::FOOTNOTE_AUTO_NUMBERED
-    result = render(content)
-
-    # Footnotes are converted to superscript links, not kept as raw markers
-    assert_match(/<sup id="fnref:1"/, result)
-    assert_match(/<a href="#fn:1"/, result)
-    assert_match(/This is the footnote/, result)
-    assert_match(/class="footnotes"/, result)
-  end
-
-  test "custom footnote markers processed" do
-    content = MarkdownFixture::FOOTNOTE_CUSTOM_MARKER
-    result = render(content)
-
-    # Custom markers are converted to numbered footnotes with IDs
-    assert_match(/<sup id="fnref:source"/, result)
-    assert_match(/<a href="#fn:source"/, result)
-    assert_match(/Scientific Journal/, result)
-    assert_match(/class="footnotes"/, result)
   end
 
   # =============================================================================

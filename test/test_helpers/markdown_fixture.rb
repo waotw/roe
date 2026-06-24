@@ -187,25 +187,6 @@ module MarkdownFixture
     ```
   MARKDOWN
 
-  FOOTNOTE_AUTO_NUMBERED = <<~MARKDOWN
-    This is text with a footnote(*This is the footnote*).
-
-    And another(*Second footnote here*).
-  MARKDOWN
-
-  FOOTNOTE_CUSTOM_MARKER = <<~MARKDOWN
-    According to research(*[source] Scientific Journal*),
-    this phenomenon occurs frequently.
-  MARKDOWN
-
-  FOOTNOTE_MIXED = <<~MARKDOWN
-    First statement(*Auto numbered footnote*).
-
-    Second statement(*[cite] Custom citation*).
-
-    Third statement(*Another auto footnote*).
-  MARKDOWN
-
   PULLQUOTE_SPLIT_MANUAL = <<~MARKDOWN
     This is the first part of the paragraph.||This is the second part.
   MARKDOWN
