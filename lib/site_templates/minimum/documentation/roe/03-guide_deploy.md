@@ -25,7 +25,7 @@ Roe splits up your site into 2 parts:
 - `Deploy`: pushes and installs the Roe app to a web host
 - `Site Sync`: pushes/syncs your site content with your web host
 
-Roe CMS supports two deployment options: **[Fly.io](https://fly.io)** (recommended for hands-off deloyment, a littl pricier) and **[Kamal](https://kamal-deploy.org/)** which works on any host that supports VPS like DigitalOcean (recommended for bring-your-own-host, not too much more work).
+Roe supports two deployment options: **[Fly.io](https://fly.io)** (recommended for hands-off deloyment, a littl pricier) and **[Kamal](https://kamal-deploy.org/)** which works on any host that supports VPS like DigitalOcean (recommended for bring-your-own-host, not too much more work).
 
 Both routes use Docker images under the hood, but Fly removes most of the server-side setup work — no SSH keys, no Docker Hub account, no provisioning. If you're not sure which to pick, start with Fly.
 

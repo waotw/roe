@@ -1,5 +1,5 @@
 ```collection
-heading: Roe Documentation
+heading: Roe CMS Documentation
 source: documentation/roe
 order: filename
 template: links

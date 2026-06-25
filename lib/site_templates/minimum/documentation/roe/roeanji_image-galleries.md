@@ -20,7 +20,7 @@ template: links
 
 # Images & Image Galleries
 
-Roe CMS makes it really easy to create image galleries in Posts or Pages with Markdown.
+Roe makes it really easy to create image galleries in Posts or Pages with Markdown.
 
 ## Uploading Images
 

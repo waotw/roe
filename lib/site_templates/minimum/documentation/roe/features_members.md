@@ -19,7 +19,7 @@ template: links
 
 # Members
 
-Roe CMS includes a complete membership system that allows you to:
+Roe includes a complete membership system that allows you to:
 
 - Build an email list with free member (and/or paid) signups
 - Accept one-time payments for lifetime access to premium content

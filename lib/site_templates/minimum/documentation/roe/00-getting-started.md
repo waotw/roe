@@ -1,5 +1,5 @@
 ---
-title: Getting Started with Roe CMS
+title: Getting Started with Roe
 status: published
 tags: guide
 ---
@@ -12,7 +12,7 @@ related: true
 template: links
 ```
 
-# Getting started with Roe CMS
+# Getting started with Roe
 
 #### Before Roe
 
