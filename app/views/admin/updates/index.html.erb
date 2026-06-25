@@ -3,7 +3,7 @@
   <div class="mb-8">
     <h1 class="text-3xl font-bold text-gray-900">Updates<%= " & Deploy" unless Rails.env.production? %></h1>
     <p class="mt-2 text-sm text-gray-700">
-      <%= Rails.env.production? ? "Check and install updates to Roe CMS." : "Check for updates to Roe CMS and deploy the current build to your live server." %>
+      <%= Rails.env.production? ? "Check and install updates to Roe." : "Check for updates to Roe and deploy the current build to your live server." %>
     </p>
   </div>
 
@@ -346,7 +346,7 @@
       <div class="bg-green-50 border border-green-200 rounded-xs p-4 mb-4">
         <h2 class="text-base font-semibold text-green-900">You're Up to Date</h2>
         <p class="text-green-800 mt-2 text-sm">
-          You're running the latest version of Roe CMS (<%= @current_version %>).
+          You're running the latest version of Roe (<%= @current_version %>).
         </p>
       </div>
     <% end %>
@@ -362,7 +362,7 @@
       <div>
         <h2 class="text-lg font-semibold text-gray-900">Current Version</h2>
         <p class="text-2xl font-mono font-bold text-gray-900 mt-1">
-          Roe CMS <%= @current_version %>
+          Roe <%= @current_version %>
         </p>
       </div>
       <div class="flex items-center gap-3">

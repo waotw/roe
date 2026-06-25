@@ -251,7 +251,15 @@ module RoeUpdater
 
         FileUtils.mkdir_p(dest)
 
-        cmd = "rsync -a --delete #{source.shellescape}/ #{dest.shellescape}/ 2>&1"
+        # `-c` makes rsync compare by content checksum rather than the
+        # default size + mtime check. Without it, every doc shows as
+        # "changed" on every update because the release-archive
+        # extraction stamps fresh mtimes on every file — even ones whose
+        # content didn't actually change between releases. With `-c`,
+        # unchanged docs stay untouched on disk (their previous mtime
+        # preserved, no file rewrite). Slight CPU cost — has to hash each
+        # file — but at this doc count it's imperceptible.
+        cmd = "rsync -ac --delete #{source.shellescape}/ #{dest.shellescape}/ 2>&1"
         output = `#{cmd}`
         unless $?.success?
           raise "Doc sync failed (rsync exit #{$?.exitstatus}): #{output}"

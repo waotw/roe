@@ -45,7 +45,7 @@
           Copy all to clipboard
         </button>
         <%
-          download_body = "Roe CMS recovery codes\nGenerated: #{Time.current.utc.iso8601}\nAccount: #{@user.email_address}\n\n" + @plaintext_codes.join("\n") + "\n\nEach code can be used once.\nVisit /recovery/new while signed out to use one.\n"
+          download_body = "Roe recovery codes\nGenerated: #{Time.current.utc.iso8601}\nAccount: #{@user.email_address}\n\n" + @plaintext_codes.join("\n") + "\n\nEach code can be used once.\nVisit /recovery/new while signed out to use one.\n"
           download_data = "data:text/plain;charset=utf-8,#{ERB::Util.url_encode(download_body)}"
         %>
         <a href="<%= download_data %>"

@@ -1,4 +1,4 @@
-# Roe CMS
+# Roe
 
 Roe is a file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store.
 
