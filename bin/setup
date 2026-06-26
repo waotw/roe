@@ -203,7 +203,7 @@ FileUtils.chdir APP_ROOT do
   unless File.exist?(start_command)
     File.write(start_command, <<~SH)
       #!/bin/bash
-      # Double-click this file to start Roe CMS in Terminal.
+      # Double-click this file to start Roe in Terminal.
       cd "$(dirname "$0")"
       ./roe.sh start
     SH

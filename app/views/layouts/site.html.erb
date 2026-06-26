@@ -55,7 +55,7 @@
         etc. Injected verbatim except for nonce attributes added to
         inline <script>/<style> tags via CustomCodeRenderer. Edited
         in Admin → Settings → Custom Code. %>
-    <%= CustomCodeRenderer.render_field("head_html", nonce: request.content_security_policy_nonce) %>
+    <%= CustomCodeRenderer.render_field("head_html", nonce: safe_csp_nonce) %>
   </head>
   <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}" ].compact.join(" ") %>
   <body class="<%= body_classes %>">
@@ -81,7 +81,7 @@
       <%= render_layout_file('footer') %>
     </footer>
     <% if defined?(@preview_mode) && @preview_mode %>
-      <script nonce="<%= request.content_security_policy_nonce %>">
+      <script nonce="<%= safe_csp_nonce %>">
         (function() {
           const previewId = <%= @preview_id.to_json.html_safe %>;
 
@@ -107,8 +107,14 @@
         })();
       </script>
     <% end %>
-    <script src="/theme/checkout.js" nonce="<%= request.content_security_policy_nonce %>"></script>
-    <% if (snipcart_connected? || current_member) && !@static_generation %>
+    <%# Checkout glue script — loads in both dynamic and static so
+        Snipcart can pick up cart events on static product pages. %>
+    <script src="/theme/checkout.js" nonce="<%= safe_csp_nonce %>"></script>
+    <%# Cart icon shows in both dynamic and static — Snipcart is entirely
+        client-side so it works on static product pages. Member icon only
+        appears in dynamic mode (current_member is forced to nil during
+        static rendering, so this short-circuits naturally). %>
+    <% if snipcart_connected? || current_member %>
       <div class="site-actions">
         <% if snipcart_connected? %>
           <a href="#" class="site-action snipcart-link" title="Cart" aria-label="Cart">
@@ -121,13 +127,17 @@
         <% end %>
       </div>
     <% end %>
+    <%# Snipcart snippet — loads in both dynamic and static. Snipcart's
+        cart UI, checkout flow, and payment processing all run client-
+        side via Snipcart's CDN; no Rails backend involvement at
+        runtime. So static product pages are fully functional. %>
     <% if snipcart_connected? %>
       <% snipcart = SnipcartConfig.current %>
 
       <% if snipcart.current_snippet.present? %>
         <%= snipcart.current_snippet_html %>
 
-        <script nonce="<%= request.content_security_policy_nonce %>">
+        <script nonce="<%= safe_csp_nonce %>">
           // Override currency after snippet loads but before Snipcart initializes
           if (window.SnipcartSettings) {
             window.SnipcartSettings.currency = '<%= snipcart.currency.downcase %>';
@@ -139,6 +149,6 @@
     <%# Custom code — user-pasted footer injection (chat widgets,
         late-binding tracking SDKs, etc.). Same nonce + allowlist
         handling as the head_html injection above. %>
-    <%= CustomCodeRenderer.render_field("footer_html", nonce: request.content_security_policy_nonce) %>
+    <%= CustomCodeRenderer.render_field("footer_html", nonce: safe_csp_nonce) %>
   </body>
 </html>

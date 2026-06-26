@@ -1982,6 +1982,22 @@ module HasMarkdownExtensions
   end
 
   def render_signup_form(button_text, upgrade_button_text = nil)
+    # In static-site mode, render a link to the dynamic /sign-up page
+    # instead of an embedded form. The embedded form would need a fresh
+    # CSRF token at submission time, and a token baked in at static
+    # build time would be stale. The link approach lets the user keep
+    # ```form for: signup``` blocks in their content — dynamic mode
+    # renders the real form, static mode renders a button-link that
+    # routes the visitor to the dynamic Rails-served signup page where
+    # CSRF works correctly.
+    if @rendering_static
+      return <<~HTML
+        <div class="signup-link-block">
+          <a href="/sign-up" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+        </div>
+      HTML
+    end
+
     # Check if payments are actually enabled
     payments_enabled = SiteConfig.feature("members", "payments.enabled")
     payments_enabled = (payments_enabled == true || payments_enabled == "true")
@@ -2038,6 +2054,17 @@ module HasMarkdownExtensions
   end
 
   def render_signin_form(button_text = "Send Magic Link")
+    # Same static-mode fallback as render_signup_form — link to the
+    # dynamic /sign-in page, where the CSRF token will be fresh at
+    # submission time.
+    if @rendering_static
+      return <<~HTML
+        <div class="signin-link-block">
+          <a href="/sign-in" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+        </div>
+      HTML
+    end
+
     <<~HTML
       <form action="/signin" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">

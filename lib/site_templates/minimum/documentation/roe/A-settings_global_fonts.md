@@ -36,7 +36,7 @@ Paste the filename into the Settings like so:
 `SAVE CONFIGURATION` and the fonts should update on the site.
 
 ## Fonts roles
-There are 4 font roles in Roe CMS:
+There are 4 font roles in Roe:
 
 | Role      | For                       | CSS variable     |
 | --------- | ------------------------- | ---------------- |

@@ -30,7 +30,7 @@ This is a great way to learn how things work as you can see the changes live. Tr
 
 ## What is Roe
 
-Roe CMS helps you build a website with nothing but [Markdown](/documentation/glossary#markdown) files, media and [YAML](/documentation/glossary#yaml). You can dive deeper and edit the CSS if you please but this is not required to build a full/working website with Roe. An understanding of [Markdown Syntax](https://www.markdowntools.io/cheat-sheet) will be helpful but you'll be able to figure out what's going on by working on a Post with a Preview open as suggested [above](#first-steps).
+Roe helps you build a website with nothing but [Markdown](/documentation/glossary#markdown) files, media and [YAML](/documentation/glossary#yaml). You can dive deeper and edit the CSS if you please but this is not required to build a full/working website with Roe. An understanding of [Markdown Syntax](https://www.markdowntools.io/cheat-sheet) will be helpful but you'll be able to figure out what's going on by working on a Post with a Preview open as suggested [above](#first-steps).
 
 ## Important things to know
 

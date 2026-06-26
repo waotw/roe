@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Roe CMS Deployment"
+echo "🚀 Roe Deployment"
 echo "===================="
 
 # Detect directory structure

@@ -22,7 +22,13 @@ namespace :site do
         puts ""
       end
       puts "=" * 60
-      exit 1
+      # Raise instead of exit 1 so callers invoking this task from a
+      # Rails process (e.g. Admin::StaticSiteController#generate via
+      # Rake::Task["site:generate"].execute) don't get SystemExit and
+      # crash the request. From the CLI, an unhandled raise in a rake
+      # task still aborts with a non-zero status, so the command-line
+      # UX is unchanged.
+      raise "Static site generation completed with #{stats[:errors].count} error(s) — see above"
     end
   end
 
@@ -51,7 +57,13 @@ namespace :site do
         puts ""
       end
       puts "=" * 60
-      exit 1
+      # Raise instead of exit 1 so callers invoking this task from a
+      # Rails process (e.g. Admin::StaticSiteController#generate via
+      # Rake::Task["site:generate"].execute) don't get SystemExit and
+      # crash the request. From the CLI, an unhandled raise in a rake
+      # task still aborts with a non-zero status, so the command-line
+      # UX is unchanged.
+      raise "Static site generation completed with #{stats[:errors].count} error(s) — see above"
     end
   end
 

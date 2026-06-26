@@ -15,6 +15,14 @@ module Admin
 
       flash[:notice] = "Static site generation complete."
       redirect_to admin_static_site_path
+    rescue => e
+      # site:generate raises when generation finishes with non-fatal
+      # errors (e.g. a single post failed to render). The site itself
+      # is still generated and usable — the raise just makes the CLI
+      # exit status reflect partial failure. In the web flow we want
+      # to surface the error count without 500'ing the request.
+      flash[:alert] = "Static site generated with errors: #{e.message}. Check the server log for the per-item details."
+      redirect_to admin_static_site_path
     end
 
     def clean
@@ -24,6 +32,9 @@ module Admin
 
       flash[:notice] = "Static site files cleaned."
       redirect_to admin_static_site_path
+    rescue => e
+      flash[:alert] = "Static site clean failed: #{e.message}"
+      redirect_to admin_static_site_path
     end
 
     def rebuild
@@ -32,6 +43,9 @@ module Admin
       Rake::Task["site:rebuild"].execute
 
       flash[:notice] = "Static site rebuild complete."
+      redirect_to admin_static_site_path
+    rescue => e
+      flash[:alert] = "Static site rebuild completed with errors: #{e.message}"
       redirect_to admin_static_site_path
     end
 

@@ -42,6 +42,25 @@ module ApplicationHelper
     Rails.cache.read(RoeUpdater::VersionChecker::UPDATE_AVAILABLE_KEY) == true
   end
 
+  # Returns a CSP nonce safe to embed in inline <script>/<style> tags,
+  # or nil when CSP isn't active for this render. The nil case matters
+  # for the static-site generator: ApplicationController.render builds
+  # a synthesized request whose middleware stack hasn't computed a
+  # CSP nonce, and calling request.content_security_policy_nonce
+  # there can raise or hang on configuration paths that assume a real
+  # request lifecycle. Returning nil makes downstream HTML emit
+  # <script> tags without a nonce attribute — which is correct for
+  # the static path because the static server doesn't issue a CSP
+  # header to enforce against, so absent nonces are silently allowed.
+  def safe_csp_nonce
+    return nil if @static_generation
+    return nil unless defined?(request) && request.respond_to?(:content_security_policy_nonce)
+    request.content_security_policy_nonce
+  rescue StandardError => e
+    Rails.logger.debug "[ApplicationHelper] safe_csp_nonce returned nil: #{e.class}: #{e.message}"
+    nil
+  end
+
   def safe_system_image_path(filename, **options)
     return nil if filename.blank?
     system_image_path(filename, **options)

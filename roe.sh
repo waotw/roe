@@ -1,6 +1,6 @@
 #!/bin/bash
-# Roe CMS Launcher Script
-# Manages the Roe CMS server, setup, and updates.
+# Roe Launcher Script
+# Manages the Roe server, setup, and updates.
 # Run from the /roe root directory: ./roe.sh {command}
 
 # Detect directory structure
@@ -256,7 +256,7 @@ ensure_rbenv_in_shell() {
     # the user's machine.
     {
         echo ''
-        echo '# Added by Roe CMS (roe.sh) — keeps rbenv-managed Ruby on PATH'
+        echo '# Added by Roe (roe.sh) — keeps rbenv-managed Ruby on PATH'
         echo 'eval "$(rbenv init - '"$shell_name"')"'
     } >> "$rc_file"
 
@@ -296,7 +296,7 @@ check_bundler() { cd "$APP_DIR" && command_exists bundle; }
 # ── Usage ─────────────────────────────────────────────────────────────────────
 
 usage() {
-    echo -e "${BOLD}Roe CMS — Server Management${NC}"
+    echo -e "${BOLD}Roe — Server Management${NC}"
     echo ""
     echo "Usage: roe.sh {command}"
     echo ""
@@ -331,7 +331,7 @@ usage() {
 cmd_check() {
     echo -e "${BOLD}"
     echo "╔════════════════════════════════════════╗"
-    echo "║     Roe CMS — Requirements Check       ║"
+    echo "║     Roe — Requirements Check       ║"
     echo "╚════════════════════════════════════════╝"
     echo -e "${NC}"
     echo "I'll check your system for required dependencies."
@@ -630,7 +630,7 @@ kill_tailwind_watchers() {
 # trace they can't interpret. The helpers below let us recover
 # gracefully:
 #
-#   1. If the thing on the port responds as Roe (HTTP probe → "Roe CMS"
+#   1. If the thing on the port responds as Roe (HTTP probe → "Roe"
 #      in the /admin page title), we kill it. Two Roes on one port is
 #      impossible and starting a new one is what the user asked for.
 #
@@ -652,7 +652,7 @@ port_in_use() {
 }
 
 # Returns 0 if whatever's on the given port responds as a Roe install.
-# Hits /admin (every Roe install serves it) and looks for "Roe CMS" in
+# Hits /admin (every Roe install serves it) and looks for "Roe" in
 # the response body — that's the <title> on the admin layout, so a
 # match is a strong positive. False positives are essentially
 # impossible without someone deliberately mimicking the title.
@@ -661,7 +661,7 @@ is_roe_on_port() {
     command -v curl >/dev/null 2>&1 || return 1
     local body
     body=$(curl -sf --max-time 2 "http://localhost:$port/admin" 2>/dev/null || true)
-    [ -n "$body" ] && echo "$body" | grep -q "Roe CMS"
+    [ -n "$body" ] && echo "$body" | grep -q "Roe"
 }
 
 # Soft-kill (SIGTERM) the process bound to a port. Waits a moment for
@@ -728,7 +728,7 @@ resolve_port_collision() {
 }
 
 cmd_start() {
-    log_info "Starting Roe CMS..."
+    log_info "Starting Roe..."
 
     if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
         PID=$(cat "$APP_DIR/tmp/pids/server.pid")
@@ -759,7 +759,7 @@ cmd_start() {
         kill_tailwind_watchers
 
         echo ""
-        echo -e "  ${BOLD}${GREEN}Roe CMS is ready to start${NC}"
+        echo -e "  ${BOLD}${GREEN}Roe is ready to start${NC}"
         echo -e "  Server: ${CYAN}${URL}${NC}"
         echo -e "  Admin:  ${CYAN}${URL}/admin${NC}"
         echo ""
@@ -839,7 +839,7 @@ cmd_start() {
 # ── Stop command ──────────────────────────────────────────────────────────────
 
 cmd_stop() {
-    log_info "Stopping Roe CMS..."
+    log_info "Stopping Roe..."
 
     # Stop Rails server
     if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
@@ -872,7 +872,7 @@ cmd_stop() {
 # ── Restart command ───────────────────────────────────────────────────────────
 
 cmd_restart() {
-    log_info "Restarting Roe CMS..."
+    log_info "Restarting Roe..."
     cmd_stop
     sleep 1
     cmd_start "$@"
@@ -892,7 +892,7 @@ cmd_status() {
     local required_ruby
     required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
 
-    echo -e "${BOLD}Roe CMS Status${NC}"
+    echo -e "${BOLD}Roe Status${NC}"
     echo "=============="
     echo ""
     echo "Root:    $ROE_ROOT"

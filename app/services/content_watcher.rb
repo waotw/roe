@@ -5,7 +5,15 @@ class ContentWatcher
     File.join(RoeSitePaths::SITE_PATH, "documentation"),
     File.join(RoeSitePaths::SITE_PATH, "products"),
     File.join(RoeSitePaths::SITE_PATH, "system"),
-    File.join(RoeSitePaths::SITE_PATH, "media")
+    File.join(RoeSitePaths::SITE_PATH, "media"),
+    # These don't sync into DB models — process_file falls through with
+    # no work to do — but they DO need to wake the watcher so the
+    # trigger_static_generation call at the end of handle_changes fires.
+    # Without them, edits to navigation.md, theme CSS, or a card
+    # template don't auto-regenerate the static site.
+    File.join(RoeSitePaths::SITE_PATH, "layout"),
+    File.join(RoeSitePaths::SITE_PATH, "theme"),
+    File.join(RoeSitePaths::SITE_PATH, "templates")
   ].freeze
 
     # Define what file types we process

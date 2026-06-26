@@ -142,8 +142,7 @@
 
                 <!-- Static Site Generation Section -->
                 <div class="config-section mb-10">
-                  <h3 class="text-base font-semibold text-gray-900 mb-1">Static Site Settings: <%= link_to "Actions", admin_static_site_path,
-                        class: "uppercase text-xs font-normal px-1 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %></h3>
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Static Site Settings</h3>
 
                   <div class="space-y-3 pl-4 border-l-2 border-gray-200">
                     <% config_schema[:static_generation][:fields].each do |field_name, field_config| %>
@@ -153,6 +152,8 @@
                                value: flattened_config[field_name],
                                all_values: flattened_config %>
                     <% end %>
+                    <%= link_to "Static Site Actions", admin_static_site_path,
+                          class: "uppercase text-sm font-normal px-1.5 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
                   </div>
                 </div>
 

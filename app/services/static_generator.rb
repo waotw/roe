@@ -1,4 +1,4 @@
-# StaticGenerator - Incremental static site generator for Roe CMS
+# StaticGenerator - Incremental static site generator for Roe
 #
 # Generates a complete static HTML site from Markdown content with smart
 # incremental builds that only regenerate changed content.
@@ -59,6 +59,7 @@ class StaticGenerator
       posts: 0,
       pages: 0,
       documentation: 0,
+      products: 0,
       collections: 0,
       collection_pages: 0,
       errors: [],
@@ -110,6 +111,7 @@ class StaticGenerator
     puts "  Posts: #{changes[:posts].count} changed"
     puts "  Pages: #{changes[:pages].count} changed"
     puts "  Documentation: #{changes[:documentation].count} changed"
+    puts "  Products: #{changes[:products].count} changed"
     puts "  Collections: #{changes[:collections] ? 'regenerate' : 'skip'}"
     puts "  Feeds: #{changes[:feeds] ? 'regenerate' : 'skip'}"
     puts "  Assets: #{changes[:assets] ? 'changed' : 'unchanged'}"
@@ -120,6 +122,8 @@ class StaticGenerator
     generate_posts(changes[:posts]) if changes[:posts].any?
     generate_pages(changes[:pages]) if changes[:pages].any?
     generate_documentation(changes[:documentation]) if changes[:documentation].any?
+    generate_documentation_index if changes[:documentation].any? || changes[:home]
+    generate_products(changes[:products]) if changes[:products].any?
     generate_collection_archives if changes[:collections]
     generate_feeds if changes[:feeds]
     generate_podcast_feeds if changes[:podcast_feeds]
@@ -180,6 +184,7 @@ class StaticGenerator
       posts: build_content_manifest(Post),
       pages: build_content_manifest(static_pages_scope),
       documentation: build_content_manifest(Documentation),
+      products: build_content_manifest(Product),
       configs: {
         "site" => SiteConfig.find_by("file_path LIKE ?", "%site.yml")&.updated_at&.iso8601(6),
         "defaults/collections" => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
@@ -203,6 +208,7 @@ class StaticGenerator
     posts = changed_items(Post.not_draft, "posts")
     pages = changed_items(static_pages_scope, "pages")
     docs = changed_items(Documentation.not_draft, "documentation")
+    products = changed_items(Product.published, "products")
 
     podcast_posts = posts.select { |p| p.metadata["post_type"] == "podcast" }
 
@@ -220,7 +226,8 @@ class StaticGenerator
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? static_pages_scope.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
-      collections: collections_config_changed || members_config_changed || posts.any? || pages.any? || @manifest["generated_at"].nil?,
+      products: global_changed ? Product.published.to_a : products,
+      collections: collections_config_changed || members_config_changed || posts.any? || pages.any? || products.any? || @manifest["generated_at"].nil?,
       feeds: site_config_changed || posts.any? || @manifest["generated_at"].nil?,
       podcast_feeds: podcast_config_changed || podcast_posts.any? || @manifest["generated_at"].nil?,
       assets: assets_changed?,
@@ -464,8 +471,98 @@ class StaticGenerator
   end
 
   def generate_documentation_page(doc)
-    html = render_with_layout(template: "documentation/show", assigns: { doc: doc })
+    # Pass a back_path explicitly. The controller's show action sets
+    # @back_path (preferring the user's /documentation page if it
+    # exists, falling back to /roe/documentation), but the static
+    # generator bypasses the controller and renders the template
+    # directly. Without @back_path set, the template's
+    # `link_to "...", @back_path` becomes `link_to(..., nil)`, which
+    # raises ActionController::UrlGenerationError. Use a static-safe
+    # default that works regardless of which page the user has authored.
+    html = render_with_layout(
+      template: "documentation/show",
+      assigns: { doc: doc, back_path: documentation_back_path_for_static }
+    )
     write_file("documentation/#{doc.url_name}.html", html)
+  end
+
+  # Resolves the back-link target for docs in static mode. Mirrors the
+  # controller's logic: prefer the user's /documentation page if a
+  # published Page with that slug exists, otherwise fall back to the
+  # always-available /roe/documentation. Memoized — same answer for
+  # every doc in a single build.
+  def documentation_back_path_for_static
+    @documentation_back_path_for_static ||= begin
+      has_user_page = Page.public_pages.any? { |p| p.url_name == "documentation" }
+      has_user_page ? "/documentation" : "/roe/documentation"
+    end
+  end
+
+  # Generate /roe/documentation/index.html — the system-guaranteed
+  # docs landing page that DocumentationController#index serves
+  # dynamically. Mirrors that controller's logic exactly: reads
+  # the index markdown from app/views/documentation/index.md (the
+  # file synced from /site/pages/documentation.md via bin/sync-
+  # from-site) and runs it through Page#to_html so the
+  # ```collection``` block inside renders the same theme-styled
+  # docs list the dynamic route produces.
+  def generate_documentation_index
+    puts "📚 Generating /roe/documentation/ index..."
+    markdown_path = Rails.root.join("app", "views", "documentation", "index.md")
+    markdown = if File.exist?(markdown_path)
+      File.read(markdown_path)
+    else
+      "# Documentation\n\nRoe documentation is not available.\n"
+    end
+    docs_html = Page.new(content: markdown).to_html
+    html = render_with_layout(
+      template: "documentation/index",
+      assigns: { docs_html: docs_html }
+    )
+    write_file("roe/documentation/index.html", html)
+    puts "  ✓ Generated /roe/documentation/index.html"
+  rescue => e
+    log_error("documentation-index", "roe/documentation", e)
+  end
+
+  # ============================================================================
+  # PRODUCTS (STORE)
+  # ============================================================================
+
+  # Generate static product pages at /store/<url_name>.html. Mirrors
+  # generate_posts / generate_pages — same render-and-write pattern,
+  # change detection via the products manifest, errors logged but
+  # don't abort the whole build.
+  #
+  # Snipcart's cart UI is JS-only and loads from Snipcart's CDN at
+  # runtime, so static product pages are fully functional: the
+  # `data-item-*` attributes ProductButtonRenderer emits are picked
+  # up by Snipcart's snippet when a visitor adds to cart. No
+  # backend round-trip needed for the cart, checkout, or payment
+  # flow — Snipcart handles all of that on their own domain.
+  #
+  # NB: The Snipcart snippet itself is skipped in static output via
+  # the layout's `!@static_generation` guard. So product pages
+  # generate but the cart popup won't appear on the static site
+  # unless a user later wires Snipcart in via their custom head_html
+  # or by extending this generator. Acceptable for the "SSG without
+  # integrations" phase.
+  def generate_products(products)
+    return puts "🛒 No product changes detected" if products.empty?
+
+    puts "🛒 Generating #{products.count} changed products..."
+    products.each do |product|
+      generate_product(product)
+      @stats[:products] += 1
+    rescue => e
+      log_error("product", product.slug, e)
+    end
+    puts "  ✓ Generated #{@stats[:products]} products"
+  end
+
+  def generate_product(product)
+    html = render_with_layout(template: "products/show", assigns: { product: product })
+    write_file("store/#{product.url_name}.html", html)
   end
 
   # ============================================================================
@@ -1057,7 +1154,7 @@ class StaticGenerator
   def add_generator_meta(doc)
     meta = Nokogiri::XML::Node.new("meta", doc)
     meta["name"] = "generator"
-    meta["content"] = "Roe CMS"
+    meta["content"] = "Roe"
     doc.at_css("head")&.add_child(meta)
   end
 
