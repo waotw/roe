@@ -812,7 +812,7 @@ h1.post-title {
   display: flex;
   gap: var(--space-6);
   align-items: center;
-  margin: var(--space-8) 0;
+  margin: var(--space-4) 0;
 }
 
 .collection-page-heading h1 {
@@ -860,7 +860,7 @@ p.collection-more a:hover {
 
 .collection h2 {
   font-size: var(--text-3xl);
-  margin: var(--space-4) 0 var(--space-4) 0;
+  margin: var(--space-2) 0 var(--space-4) 0;
 }
 
 .collection h3 {
