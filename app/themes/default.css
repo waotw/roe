@@ -1119,7 +1119,7 @@ p.collection-more a:hover {
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 700px) {
   .collection-grid-2 {
     grid-template-columns: repeat(2, 1fr);
   }
