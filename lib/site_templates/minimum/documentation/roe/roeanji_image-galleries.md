@@ -4,8 +4,6 @@ status: published
 url_name: galleries
 tags: roe-anji
 related:
-  - cards
-  - collections
   - roeanji
 ---
 

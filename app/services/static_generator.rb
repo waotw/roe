@@ -777,7 +777,13 @@ class StaticGenerator
           items: page_items,
           page: page,
           total_pages: total_pages,
-          base_url: "/#{base_path}"
+          base_url: "/#{base_path}",
+          # Use the same configured pagination_template as the dynamic
+          # controller so static archives match dynamic ones. Falls
+          # back to "list" if the config is missing or unrecognised —
+          # matches the controller's SUPPORTED_PAGINATION_TEMPLATES
+          # safety list.
+          pagination_template: pagination_template_default
         }
       )
 
@@ -1034,6 +1040,17 @@ class StaticGenerator
     body = "User-agent: *\nAllow: /\n\nSitemap: #{host}/sitemap.xml\n"
     write_file("robots.txt", body)
     puts "  ✓ robots.txt"
+  end
+
+  # Resolved pagination template, memoized per build. Mirrors the
+  # controller's resolve_pagination_template: reads
+  # defaults/collections.yml's pagination_template, falls back to
+  # "list" for missing or unrecognised values.
+  def pagination_template_default
+    @pagination_template_default ||= begin
+      value = SiteConfig.default("collections", "pagination_template").to_s
+      %w[list compact links full].include?(value) ? value : "list"
+    end
   end
 
   def site_url_base

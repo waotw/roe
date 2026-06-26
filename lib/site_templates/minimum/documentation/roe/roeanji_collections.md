@@ -4,8 +4,7 @@ status: published
 url_name: collections
 tags: roe-anji
 related:
-  - cards
-  - galleries
+  - roeanji
 ---
 
 ##### Related documentation
@@ -74,18 +73,16 @@ To add a default Collection to your Post/Page, this is all you need:
 
 When left empty like the above ↑, the defaults will be used ↓ :
 
-````markdown
-```collection
+```markdown
 default_source: posts
 default_post_type: all
 default_order: date
 default_limit: 10
 default_template: list
 ```
-````
 
 ↑ The Collections defaults can be edited in [Admin/Settings](/admin/configs/collections/edit).
-↓ Any default can be overwritten by adding that parameter to the Collection:
+Any default can be overwritten by adding that parameter to the Collection ↓ 
 
 ## Create a feed of All Articles
 

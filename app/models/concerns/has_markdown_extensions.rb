@@ -718,7 +718,6 @@ module HasMarkdownExtensions
   def apply_collection_order(items, order_by)
     case order_by
     when "filename"
-      # Convert to array for filename sorting
       items.to_a.sort_by do |item|
         filename = File.basename(item.file_path, ".md")
         # Extract leading number if present
@@ -729,17 +728,23 @@ module HasMarkdownExtensions
         end
       end
     when "title"
-      # Alphabetical by title
-      items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
+      # Alphabetical by title. In-memory sort so this works whether
+      # `items` is an ActiveRecord relation (regular collections) or
+      # a plain Array (which `related: true` produces after its
+      # bidirectional dedup pass). Collection blocks operate on small
+      # N already, so the cost over SQL ORDER BY is negligible.
+      items.to_a.sort_by { |item| item.title.to_s.downcase }
     when "date"
-      # Newest first (default)
-      items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+      # Newest first (default). nil dates sort to the end via a
+      # nil-safe sentinel — matches the NULLS LAST behaviour of the
+      # previous SQL form.
+      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
     when "date-asc"
-      # Oldest first
-      items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
+      # Oldest first. nil dates sort to the end.
+      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
     else
-      # Default to date descending
-      items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+      # Default to date descending — same as the explicit "date" case.
+      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
     end
   end
 

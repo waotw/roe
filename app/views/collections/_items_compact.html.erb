@@ -1,0 +1,17 @@
+<%# Mirrors HasMarkdownExtensions#render_compact: one <ul> with <li>s,
+    each line "<title> — <subtitle> • <date>". Defaults match the inline
+    template (show_date=true, show_subtitle=true on pagination pages
+    because there's room for it; show_author=false to stay terse). %>
+<ul class="collection compact">
+  <% items.each do |item| %>
+    <li>
+      <span class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></span>
+      <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
+        — <span class="item-subtitle"><%= item.subtitle %></span>
+      <% end %>
+      <% if item.respond_to?(:date) && item.date %>
+        • <span class="item-date"><%= item.date.strftime('%B %d, %Y') %></span>
+      <% end %>
+    </li>
+  <% end %>
+</ul>

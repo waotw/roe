@@ -48,7 +48,8 @@
     <%= render 'shared/config_editor',
                form_url: admin_collections_config_path,
                config_content: @config_content,
-               config_hash: @config_hash %>
+               config_hash: @config_hash,
+               extra_field_defaults: @extra_field_defaults %>
   <% elsif @config_type == 'members' %>
     <%= render 'shared/config_editor',
                form_url: admin_members_config_path,

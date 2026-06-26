@@ -1,0 +1,34 @@
+<%# Mirrors HasMarkdownExtensions#render_full: image on the left, body
+    on the right. Image is wrapped in a linked .item-image; body holds
+    title, subtitle, meta, and excerpt with the same class hooks used
+    by render_full so theme CSS carries over to pagination pages. %>
+<div class="collection full">
+  <% items.each do |item| %>
+    <div class="collection-item">
+      <% image_url = item.respond_to?(:image) ? item.image : nil %>
+      <% if image_url.present? %>
+        <a class="item-image" href="<%= item_path(item) %>">
+          <%= ResponsiveImageRenderer.render(image_url, alt: item.title.to_s) %>
+        </a>
+      <% end %>
+
+      <div class="item-body">
+        <h3 class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></h3>
+
+        <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
+          <p class="item-subtitle"><%= item.subtitle %></p>
+        <% end %>
+
+        <% if item.respond_to?(:date) && item.date %>
+          <p class="item-meta">
+            <span class="item-date"><%= item.date.strftime('%B %d, %Y') %></span>
+          </p>
+        <% end %>
+
+        <% if item.respond_to?(:excerpt) && item.excerpt.present? %>
+          <p class="item-excerpt"><%= item.excerpt %></p>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

@@ -2,13 +2,11 @@
 
 Collections dynamically group and display content based on metadata. They can be defined in YAML config or embedded directly in Markdown content.
 
-## Two Collection Systems
-
-### 1. Inline Collections (in Markdown)
+## Collection System
 
 Embed collections anywhere in your content:
 
-```markdown
+````markdown
 ```collection
 heading: Latest Articles
 source: posts
@@ -19,11 +17,11 @@ order: date
 template: list
 show_more: true
 ```
-```
+````
 
-### 2. YAML Collections (site/system/defaults/collections.yml)
+#### Collection Template for Buttons in config/defaults/collection.yml
 
-Define reusable collection presets for navigation and indexes.
+Define reusable collection preset for `COLLECTION` button in The Editor
 
 ---
 
@@ -50,6 +48,36 @@ Define reusable collection presets for navigation and indexes.
 | `exclude_id` | number | — | Exclude specific post by ID |
 | `show_paid` | `true`, `false` | `false` | Show paid content to non-members (overrides default) |
 | `audience` | `everyone`, `free`, `paid` | — | Filter by content audience level |
+
+### Pagination
+
+#### Collection Labels
+
+`CollectionsController#generate_description` (line 166–185):
+
+```ruby
+def generate_description
+  parts = []
+  parts << "All #{@source}" unless @source == "posts"
+  case @order
+  when "filename"  then parts << "ordered by filename"
+  when "title"     then parts << "alphabetically"
+  when "date-asc"  then parts << "oldest"
+  else                  parts << "latest"
+  end
+  parts.join(" • ")
+end
+```
+
+###3 Archive Page/Section
+
+The pagination/archive pages are generally controlled by Roe/Controller. User can create an `archive.md` file to override and show an archive page:
+
+- `/posts` → always `CollectionsController#show` (the auto-generated archive). A user-authored `/site/pages/posts.md` would be **unreachable** because the explicit route at line 342 wins.
+- `/collections` and `/collections/<filters>` → always controller. Same story.
+- `/archive` (or anything else) → falls through to the page catch-all. If a user has `/site/pages/archive.md`, that gets served. They'd link to it manually from nav.
+
+If a user wants a custom archive, they create a page with whatever URL they want (NOT `/posts` or `/collections`) and put a `` ```collection `` block in it. That gives them full template control — but it's manual.
 
 ### Templates
 

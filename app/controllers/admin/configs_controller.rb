@@ -551,6 +551,13 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = File.read(SiteConfig::DEFAULTS_PATH.join("collections.yml"))
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_collections
+    # Fields the partial should render even when the install's YAML
+    # doesn't contain them yet — lets us surface new settings added in
+    # later releases without ever writing to /site/. Each entry maps a
+    # key to its default value; the partial only renders entries whose
+    # key isn't already in @config_hash. The default lands in the YAML
+    # only when the user clicks save.
+    @extra_field_defaults = { "pagination_template" => "list" }
     render :edit
   end
 
@@ -570,6 +577,8 @@ class Admin::ConfigsController < Admin::BaseController
       [ "date", "date-asc", "title", "filename" ]
     when [ "collections", "default_template" ]
       [ "list", "compact", "links", "full", "glossary" ]
+    when [ "collections", "pagination_template" ]
+      [ "list", "compact", "links", "full" ]
     when [ "collections", "items_per_page" ]
       [ "5", "10", "20", "25", "50", "100" ]
     when [ "cards", "default_style" ]
@@ -1417,6 +1426,7 @@ class Admin::ConfigsController < Admin::BaseController
       "default_post_type" => [ "all" ] + existing_post_types,
       "default_order" => [ "date", "date-asc", "title", "filename" ],
       "default_template" => [ "list", "compact", "links", "full", "glossary" ],
+      "pagination_template" => [ "list", "compact", "links", "full" ],
       "items_per_page" => [ "10", "20", "25", "50", "100" ]
     }
   end

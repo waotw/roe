@@ -1,5 +1,5 @@
 ---
-title: Themes
+title: Updates & Deploy
 status: published
 tags: admin
 ---
