@@ -13,6 +13,7 @@ module RoeUpdater
       { name: "syncing_root_files", percent: 87,  description: "Syncing root-level files" },
       { name: "syncing_docs",       percent: 88,  description: "Syncing bundled documentation" },
       { name: "writing_version",    percent: 89,  description: "Updating VERSION files" },
+      { name: "installing_gems",    percent: 90,  description: "Installing required gems" },
       { name: "building_assets",    percent: 92,  description: "Building assets" },
       { name: "restarting",         percent: 95,  description: "Restarting server" },
       { name: "completed",          percent: 100, description: "Update complete" }
@@ -60,6 +61,7 @@ module RoeUpdater
         execute_step(:syncing_root_files) { sync_root_files }
         execute_step(:syncing_docs) { sync_docs }
         execute_step(:writing_version) { write_version_files }
+        execute_step(:installing_gems) { install_gems }
         execute_step(:building_assets) { build_assets }
         execute_step(:restarting) { restart_server }
 
@@ -299,6 +301,31 @@ module RoeUpdater
           File.write(path, existing.merge(data).to_yaml)
           log("✓ Wrote VERSION file: #{path.sub(RoeSitePaths::ROE_ROOT, '')} → #{@version}")
         end
+      end
+
+      # Install any gems the new release added or updated. Runs BEFORE
+      # build_assets because assets:precompile shells out to
+      # `bundle exec rails …`, which forces bundler to resolve the new
+      # current/Gemfile.lock — and that resolution raises
+      # Bundler::GemNotFound if any locked gem isn't installed yet
+      # (typical when a release bumps a dep version or adds a new gem).
+      # `bundle install` is a no-op when every locked gem is already
+      # present, so this step is cheap for releases that didn't change
+      # any deps.
+      def install_gems
+        current_app = File.join(RoeSitePaths::ROE_ROOT, "current")
+        cmd = "cd '#{current_app}' && bundle install 2>&1"
+        output = nil
+
+        Bundler.with_original_env do
+          output = `#{cmd}`
+        end
+
+        unless $?.success?
+          raise "bundle install failed (exit #{$?.exitstatus}): #{output}"
+        end
+
+        log("✓ Installed/updated gems for new release")
       end
 
       # Compile build-time assets (Tailwind CSS, anything else
