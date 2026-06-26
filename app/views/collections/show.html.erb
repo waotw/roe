@@ -4,26 +4,14 @@
     <p class="collection-description"><%= @page_description %></p>
   </div>
 
+  <%# Each template owns its full wrapper because the DOM differs:
+      compact is a <ul> with <li>s, full has per-item image regions,
+      list/links use a <div class="collection-item"> structure. The
+      partials live at app/views/collections/_items_{template}.html.erb
+      and the safety-allowlisted controller value guarantees the
+      partial exists. %>
   <% if @items.any? %>
-    <div class="collection-list">
-      <% @items.each do |item| %>
-        <div class="collection-item">
-          <h3><%= link_to item.title || 'Untitled', item_path(item) %></h3>
-
-          <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
-            <p class="subtitle"><em><%= item.subtitle %></em></p>
-          <% end %>
-
-          <% if item.respond_to?(:date) && item.date %>
-            <p class="date"><%= item.date.strftime('%B %d, %Y') %></p>
-          <% end %>
-
-          <% if item.respond_to?(:excerpt) && item.excerpt.present? %>
-            <p class="excerpt"><%= item.excerpt %></p>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
+    <%= render "collections/items_#{@pagination_template}", items: @items %>
 
     <!-- Pagination -->
     <% if @total_pages > 1 %>

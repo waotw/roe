@@ -1,0 +1,27 @@
+<%# Mirrors HasMarkdownExtensions#render_list class structure so theme
+    CSS targeting `.collection.list .collection-item .item-title` etc.
+    works on pagination pages exactly the way it does on inline
+    ```collection``` blocks. Excerpt isn't in render_list (inline
+    collections are tight) but pagination pages have more vertical room
+    so it's included with a matching item-excerpt class. %>
+<div class="collection list">
+  <% items.each do |item| %>
+    <div class="collection-item">
+      <h3 class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></h3>
+
+      <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
+        <p class="item-subtitle"><%= item.subtitle %></p>
+      <% end %>
+
+      <% if item.respond_to?(:date) && item.date %>
+        <p class="item-meta">
+          <span class="item-date"><%= item.date.strftime('%B %d, %Y') %></span>
+        </p>
+      <% end %>
+
+      <% if item.respond_to?(:excerpt) && item.excerpt.present? %>
+        <p class="item-excerpt"><%= item.excerpt %></p>
+      <% end %>
+    </div>
+  <% end %>
+</div>

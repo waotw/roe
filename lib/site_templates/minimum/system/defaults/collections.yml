@@ -3,7 +3,7 @@ default_post_type: all
 default_order: date
 default_limit: 10
 default_template: list
-show_paid_content: false
+pagination_template: list
 
 button_template: |-
   heading: __PLACEHOLDER__

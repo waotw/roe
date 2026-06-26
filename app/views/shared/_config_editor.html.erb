@@ -446,6 +446,16 @@
                 # Templates end with _button_template or are exactly "button_template"
                 templates = config_hash.select { |k, v| k.to_s.end_with?('_button_template') || k.to_s == 'button_template' }
                 defaults = config_hash.reject { |k, v| templates.key?(k) }
+
+                # Optional `extra_field_defaults` (e.g. pagination_template
+                # added in a later Roe release) — render the form field
+                # with its default value when the YAML doesn't include the
+                # key yet. Existing keys are never overwritten. The value
+                # lands in the YAML only when the user clicks save.
+                extras = local_assigns[:extra_field_defaults] || {}
+                extras.each do |k, v|
+                  defaults[k] = v unless defaults.key?(k)
+                end
               %>
 
               <!-- Defaults Section -->

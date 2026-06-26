@@ -9,6 +9,10 @@ class CollectionsController < ApplicationController
     @order = params[:order] || "date"
     @heading = params[:heading]
     @podcast_key = params[:podcast]
+    # Pagination-page template is global per install (configured in
+    # defaults/collections.yml). Falls back to "list" if the config
+    # is missing or holds an unrecognised value.
+    @pagination_template = resolve_pagination_template
 
     parse_filters
     fetch_items
@@ -21,6 +25,19 @@ class CollectionsController < ApplicationController
   def per_page
     # Use SiteConfig.default() for defaults/collections.yml
     SiteConfig.default("collections", "items_per_page")&.to_i || 20
+  end
+
+  # Templates the pagination page can render. Each value maps to a
+  # partial at app/views/collections/_items_<value>.html.erb. Grid
+  # and glossary are inline-only — they need block-level config (image
+  # sizing, definition-list grouping) that doesn't translate to a
+  # standalone archive page. Anything not in this list falls back to
+  # "list".
+  SUPPORTED_PAGINATION_TEMPLATES = %w[list compact links full].freeze
+
+  def resolve_pagination_template
+    value = SiteConfig.default("collections", "pagination_template").to_s
+    SUPPORTED_PAGINATION_TEMPLATES.include?(value) ? value : "list"
   end
 
   def paginate_items
@@ -128,17 +145,20 @@ class CollectionsController < ApplicationController
 
   def generate_heading
     base_heading = case @source
-    when "documentation"
-      "Documentation"
-    when /^documentation\//
+    when "documentation", /^documentation\//
       "Documentation"
     when "pages"
       "Pages"
     else
-      if @post_type
+      # Priority within posts: tags → post_type → archive.
+      # (`@heading` itself wins at the outer level — `set_page_metadata`
+      # uses `@heading || generate_heading`.)
+      if @tags.any?
+        @tags.map(&:titleize).join(", ")
+      elsif @post_type == "podcast"
+        podcast_heading
+      elsif @post_type
         pluralize_post_type(@post_type)
-      elsif @tags.any?
-        @tags.map(&:titleize).join(", ")  # Changed from ' + ' to ', '
       else
         "Archive"
       end
@@ -152,9 +172,35 @@ class CollectionsController < ApplicationController
     end
   end
 
+  # Podcast pages address a specific show, not a category. Use the
+  # show's title from podcast.yml when we can identify one, otherwise
+  # leave it singular ("Podcast", not "Podcasts" — a cross-show list
+  # is still one form). Two ways to identify a show:
+  #   1. Explicit `?podcast=<key>` filter on the URL.
+  #   2. All items in the (unpaginated) result share the same
+  #      `podcast:` metadata value — no filter needed, the heading
+  #      reflects what's actually on screen.
+  def podcast_heading
+    key = @podcast_key.presence || sole_podcast_key_in_results
+    if key.present?
+      title = PodcastConfig.get(key)&.dig("title")
+      return title if title.present?
+    end
+    "Podcast"
+  end
+
+  def sole_podcast_key_in_results
+    return nil unless @items
+    base = @items.unscope(:limit, :offset)
+    keys = base.pluck(Arel.sql("json_extract(metadata, '$.podcast')"))
+               .compact.map { |k| k.to_s.strip }.reject(&:empty?).uniq
+    keys.size == 1 ? keys.first : nil
+  end
+
   def pluralize_post_type(type)
-    # Media types remain singular
-    uncountable = %w[music audio video]
+    # Mass nouns stay singular ("Audio", "Music"). Countable media
+    # types pluralize ("Videos", "Articles").
+    uncountable = %w[music audio]
 
     if uncountable.include?(type.downcase)
       type.titleize

@@ -1,0 +1,15 @@
+<%# Mirrors HasMarkdownExtensions#render_links: title + optional
+    subtitle only. No date, no meta, no excerpt — the point is the
+    shortest link list possible while keeping the .collection-item
+    hook for theme CSS. %>
+<div class="collection links">
+  <% items.each do |item| %>
+    <div class="collection-item">
+      <h3 class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></h3>
+
+      <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
+        <p class="item-subtitle"><%= item.subtitle %></p>
+      <% end %>
+    </div>
+  <% end %>
+</div>
