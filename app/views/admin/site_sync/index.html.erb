@@ -511,7 +511,7 @@
                                   placeholder: "Type LIVE to confirm",
                                   autocomplete: "off",
                                   class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
-                  <%= form.submit "Push to live now",
+                  <%= form.submit "PUSH TO LIVE NOW",
                               data: { turbo_submits_with: "⏳ Starting push…" },
                               class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
                 </div>
@@ -701,7 +701,7 @@
           <% end %>
 
           <% if @peer_call_configured %>
-            <%= button_to "Pull from live",
+            <%= button_to "PULL FROM LIVE",
                           admin_pull_site_from_live_path,
                           method: :post,
                           data: {
@@ -741,12 +741,12 @@
                                     placeholder: "Type LIVE to confirm",
                                     autocomplete: "off",
                                     class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
-                <%= form.submit "Push to live now",
+                <%= form.submit "PUSH TO LIVE NOW",
                                 data: { turbo_submits_with: "⏳ Starting push…" },
                                 class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
               </div>
             <% end %>
-            <%= button_to "Pull from live",
+            <%= button_to "PULL FROM LIVE",
                           admin_pull_site_from_live_path,
                           method: :post,
                           data: {
@@ -830,7 +830,7 @@
                                     placeholder: "Type LIVE to confirm",
                                     autocomplete: "off",
                                     class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
-                <%= form.submit "Push to live now",
+                <%= form.submit "PUSH TO LIVE NOW",
                                 data: { turbo_submits_with: "⏳ Starting push…" },
                                 class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
               </div>

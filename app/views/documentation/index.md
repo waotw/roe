@@ -69,3 +69,12 @@ template: links
 limit: all
 tags: -tutorial, -definition, system
 ```
+
+```collection
+heading: Troubleshoot
+source: documentation/roe
+order: filename
+template: links
+limit: all
+tags: -tutorial, -definition, troubleshoot
+```

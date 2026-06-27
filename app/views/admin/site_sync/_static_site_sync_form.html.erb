@@ -135,7 +135,7 @@
       Stimulus also rewrites this label live when the user toggles
       protocol radios before saving. %>
   <div class="flex gap-2 pt-2">
-    <%= f.submit (config.protocol_zip? ? "Download ZIP" : "Save"),
+    <%= f.submit (config.protocol_zip? ? "DOWNLOAD ZIP" : "Save"),
                  data: { "static-site-sync-form-target" => "submitButton" },
                  class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono uppercase text-sm rounded-xs cursor-pointer" %>
     <% if config.configured? && !config.protocol_zip? %>

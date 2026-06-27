@@ -123,7 +123,7 @@
           <% if @static_site_sync_config.protocol_zip? %>
             <%# ZIP downloads are always available — no drift gate.
                 Marking the manifest happens after the download is built. %>
-            <%= link_to "Download ZIP",
+            <%= link_to "DOWNLOAD ZIP",
                         admin_download_static_site_zip_path,
                         class: "inline-flex items-center justify-center px-4 py-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
           <% else %>
