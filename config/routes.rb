@@ -45,6 +45,7 @@ Rails.application.routes.draw do
     post "updates/deploy/dismiss",          to: "updates#dismiss_deploy",        as: "dismiss_deploy"
     post "updates/deploy/reset_and_retry",  to: "updates#reset_and_retry_deploy", as: "reset_and_retry_deploy"
     get  "updates/git_status",        to: "updates#git_status",     as: "git_status"
+    post "updates/channel",           to: "updates#update_channel", as: "update_channel"
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"

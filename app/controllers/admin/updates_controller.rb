@@ -19,11 +19,13 @@ class Admin::UpdatesController < Admin::BaseController
   before_action :block_on_dev_install, only: %i[start rollback]
 
   def index
-    @current_version = RoeUpdater::VersionChecker.current_version
-    @dev_install     = RoeUpdater::VersionChecker.dev_install?
-    @update_info     = RoeUpdater::VersionChecker.check_for_updates
-    @last_update     = UpdateStatus.order(created_at: :desc).first
-    @in_progress     = UpdateStatus.where(status: "in_progress").exists?
+    @current_version    = RoeUpdater::VersionChecker.current_version
+    @dev_install        = RoeUpdater::VersionChecker.dev_install?
+    @update_channel     = SiteConfig.get("update_channel").to_s.presence || "stable"
+    @prerelease_channel = RoeUpdater::VersionChecker.prerelease_channel?
+    @update_info        = RoeUpdater::VersionChecker.check_for_updates
+    @last_update        = UpdateStatus.order(created_at: :desc).first
+    @in_progress        = UpdateStatus.where(status: "in_progress").exists?
 
     # Post-update display state. The version-status block at the top
     # of the page picks one of: amber in-progress / blue restart-needed
@@ -298,6 +300,28 @@ class Admin::UpdatesController < Admin::BaseController
     render json: { clean: lines.empty?, changed: changed.first(10), count: lines.size }
   end
 
+  # Flip site.yml's update_channel between "stable" and "nightly".
+  # Read+write site.yml directly so we don't need to round-trip the
+  # whole config through the bigger site-config editor flow. Clears
+  # the version-check cache so the next page render reflects the
+  # change immediately instead of waiting for the hourly recheck.
+  def update_channel
+    new_channel = params[:channel].to_s
+    unless %w[stable nightly].include?(new_channel)
+      redirect_to admin_updates_path, alert: "Unknown channel: #{new_channel}" and return
+    end
+
+    site_path = SiteConfig::SITE_FILE
+    config = File.exist?(site_path) ? (YAML.load_file(site_path) || {}) : {}
+    config["update_channel"] = new_channel
+    File.write(site_path, YAML.dump(config))
+    SiteConfig.sync_from_file("site")
+    RoeUpdater::VersionChecker.clear_cache
+
+    flash[:notice] = "Update channel set to #{new_channel}."
+    redirect_to admin_updates_path
+  end
+
   private
 
   # In production (the live deployed site), the entire Updates & Deploy
@@ -320,6 +344,13 @@ class Admin::UpdatesController < Admin::BaseController
   # would clone a tagged release over an active development tree.
   def block_on_dev_install
     return unless RoeUpdater::VersionChecker.dev_install?
+    # Explicit prerelease opt-in lets a maintainer exercise the updater
+    # end-to-end against a -nightly tag without removing the safety
+    # rails for regular update attempts. The "Test nightly update"
+    # button on the page sets prerelease=true; everything else stays
+    # blocked. The button itself carries a JS confirm so it's an
+    # intentional two-click commit.
+    return if params[:prerelease].to_s == "true" && action_name == "start"
     redirect_to admin_updates_path,
                 alert: "Updates are disabled on a development checkout of Roe. Use git directly to pull changes.",
                 status: :see_other

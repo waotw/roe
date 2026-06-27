@@ -17,6 +17,24 @@ module RoeUpdater
         @dev_install ||= check_dev_install
       end
 
+      # True when this install should see prerelease tags. Two paths
+      # in:
+      #   1. dev_install? — you're on a git branch working on Roe.
+      #      Implicit opt-in, no setting needed.
+      #   2. site.yml's `update_channel: nightly` — explicit opt-in for
+      #      a fresh user install. Lets a maintainer exercise the
+      #      updater end-to-end against a tagged release without
+      #      cloning the repo.
+      # Default site.yml ships `update_channel: stable`, so user
+      # installs that never touch the setting behave exactly as
+      # before — only stable tags reach them.
+      def prerelease_channel?
+        return true if dev_install?
+        SiteConfig.get("update_channel").to_s == "nightly"
+      rescue StandardError
+        dev_install?
+      end
+
       def check_for_updates
         cached = Rails.cache.read(CACHE_KEY)
         return cached if cached
@@ -32,6 +50,23 @@ module RoeUpdater
           release_notes: latest[:notes],
           published_at: latest[:published_at]
         }
+
+        # Prerelease channel — only populated when the install is a dev
+        # clone AND a `-suffix` tag exists. User installs never see
+        # these fields (the inner classifier in parse_git_tags_output
+        # returns nil for non-dev). Hidden also when the prerelease is
+        # ≤ the latest stable (no point testing a tag that's already
+        # superseded by the regular update path).
+        if (pre = latest[:prerelease]) &&
+           compare_versions(pre[:version], latest[:version]) > 0
+          result.merge!(
+            prerelease_version: pre[:version],
+            prerelease_available: update_available?(current_version, pre[:version]),
+            prerelease_url: pre[:url],
+            prerelease_notes: pre[:notes],
+            prerelease_published_at: pre[:published_at]
+          )
+        end
 
         Rails.cache.write(CACHE_KEY, result, expires_in: CACHE_TTL)
 
@@ -165,30 +200,71 @@ module RoeUpdater
         # available update and Downloader would then fail trying to
         # `--branch v0.0.9` on a tag that doesn't exist.
         #
+        # Pre-release suffixes (`-nightly`, `-rc.1`, `-dev.5`, etc.) are
+        # accepted by the regex but treated separately — user installs
+        # filter them out entirely; dev installs see them as an opt-in
+        # secondary update path. SemVer 2.0 grammar for the suffix.
+        #
         # The regex anchor `$` filters out git's dereferenced-tag lines
         # like `v0.1.0^{}` automatically.
         pairs = tags_output.lines.map do |line|
-          match = line.match(/refs\/tags\/(v(\d+\.\d+(?:\.\d+)?))$/)
+          match = line.match(/refs\/tags\/(v(\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9.-]+)?))$/)
           [ match[1], match[2] ] if match
         end.compact
 
         return nil if pairs.empty?
 
-        latest_original, latest_version =
-          pairs.sort { |a, b| compare_versions(a[1], b[1]) }.last
+        stable_pairs    = pairs.reject { |_, ver| tag_is_prerelease?(ver) }
+        prerelease_pairs = pairs.select { |_, ver| tag_is_prerelease?(ver) }
 
-        # Best-effort: enrich with real release metadata from the Codeberg
-        # API. If the tag has no associated release object, the API is
-        # down, or the network fails, we fall back to the bare tag link
-        # and a generic note — the update flow still works.
-        release = fetch_release_metadata(latest_original) || {}
+        latest_stable     = pick_latest(stable_pairs)
+        latest_prerelease = pick_latest(prerelease_pairs)
 
+        # Stable result is the canonical return shape — all existing
+        # callers (CheckForUpdatesJob, the admin UI's primary update
+        # path) keep working unchanged. Prerelease is surfaced as a
+        # nested key only when the install is a dev clone AND a
+        # prerelease exists; otherwise nil so nothing shows up for users.
+        result = build_version_record(latest_stable)
+        return nil if result.nil?
+
+        if prerelease_channel? && latest_prerelease
+          pre_record = build_version_record(latest_prerelease)
+          result = result.merge(prerelease: pre_record) if pre_record
+        end
+
+        result
+      end
+
+      # Picks the highest-precedence tag from a list of [original, stripped]
+      # pairs using Gem::Version, which understands SemVer's pre-release
+      # ordering (0.0.36-nightly.1 < 0.0.36 < 0.0.36-rc.1 is wrong;
+      # 0.0.36-nightly.1 < 0.0.36 is correct). The previous numeric-only
+      # comparator silently put -nightly tags AHEAD of stables — Gem::Version
+      # respects the suffix rules.
+      def pick_latest(pairs)
+        return nil if pairs.empty?
+        pairs.max_by { |_, ver| Gem::Version.new(ver) }
+      end
+
+      def build_version_record(pair)
+        return nil unless pair
+        original, version = pair
+        release = fetch_release_metadata(original) || {}
         {
-          version:      latest_version,
-          url:          release[:html_url] || "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{latest_original}",
+          version:      version,
+          url:          release[:html_url] || "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{original}",
           notes:        build_summary(release[:name], release[:body]),
           published_at: release[:published_at] || Time.now.iso8601
         }
+      end
+
+      # True when the version string carries a SemVer pre-release suffix
+      # (anything after a `-`, e.g. `-nightly`, `-rc.1`, `-dev.5`). The
+      # absence of a suffix marks a stable release that user installs
+      # are allowed to see.
+      def tag_is_prerelease?(version_str)
+        version_str.to_s.include?("-")
       end
 
       # Fetch release metadata for a given tag from the Codeberg (Gitea)
@@ -305,18 +381,25 @@ module RoeUpdater
       end
 
       def compare_versions(a, b)
+        # Gem::Version is SemVer 2.0 aware — knows that 0.0.36-nightly.1
+        # sorts BEFORE 0.0.36, and 0.0.36 sorts before 0.0.37-rc.1. The
+        # old numeric-only comparator silently treated -nightly tags as
+        # later (the hyphen suffix got coerced to 0 by to_i), so they'd
+        # appear "ahead of" stable releases.
+        Gem::Version.new(a.to_s) <=> Gem::Version.new(b.to_s)
+      rescue ArgumentError
+        # Fall back to the old numeric comparator if either input isn't
+        # a valid Gem::Version string — keeps the method total even
+        # when called with garbage.
         a_parts = a.to_s.split(".").map(&:to_i)
         b_parts = b.to_s.split(".").map(&:to_i)
-
         max_length = [ a_parts.length, b_parts.length ].max
         a_parts.fill(0, a_parts.length...max_length)
         b_parts.fill(0, b_parts.length...max_length)
-
         a_parts.zip(b_parts).each do |a_part, b_part|
           return 1 if a_part > b_part
           return -1 if a_part < b_part
         end
-
         0
       end
 

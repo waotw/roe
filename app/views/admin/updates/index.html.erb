@@ -39,26 +39,32 @@
     </div>
   <% end %>
 
-  <div class="mt-8 mb-8 py-6 border-t border-b px-4 border-gray-200 flex gap-2">
-    <div class="<%= Rails.env.production? ? 'w-full' : 'flex-1' %>">
-      <h3 class="text-sm font-semibold text-gray-900 mb-2">About Updates</h3>
-      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-4">
+  <div class="mt-8 mb-8 pt-3 border-t border-b px-4 border-gray-200 flex gap-2">
+    <details class="<%= Rails.env.production? ? 'w-full' : 'flex-1' %> group">
+      <summary class="text-sm font-semibold text-gray-900 mb-2 cursor-pointer select-none flex items-center gap-2 list-none">
+        <span class="inline-block transition-transform group-open:rotate-90 text-gray-500">▸</span>
+        About Updates
+      </summary>
+      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-4 mt-3">
         <li>Updates include new features, bug fixes, and security patches</li>
         <li>Your content in the <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/</code> folder is preserved during updates</li>
         <li>Configuration files are not overwritten</li>
         <li>If an update fails, the system will automatically roll back</li>
       </ul>
-    </div>
+    </details>
     <% unless Rails.env.production? %>
-    <div class="flex-1">
-      <h3 class="text-sm font-semibold text-gray-900 mb-2">About Deploy</h3>
-      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-4">
+    <details class="flex-1 group">
+      <summary class="text-sm font-semibold text-gray-900 mb-2 cursor-pointer select-none flex items-center gap-2 list-none">
+        <span class="inline-block transition-transform group-open:rotate-90 text-gray-500">▸</span>
+        About Deploy
+      </summary>
+      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-4 mt-3">
         <li>Deploys only apply to Roe's codebase, not your site content</li>
         <li>Your content in the <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/</code> folder is always preserved &mdash; it lives on a separate persistent volume</li>
         <li><b>Kamal:</b> if the build fails, your server is untouched. If the container fails to start, run <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">kamal rollback</code> from the terminal to restore the previous image</li>
         <li><b>Fly:</b> Fly starts the new instance before stopping the old one &mdash; if health checks fail, traffic stays on the previous version automatically</li>
       </ul>
-    </div>
+    </details>
     <% end %>
   </div>
 
@@ -72,6 +78,72 @@
         The in-app updater is disabled to prevent overwriting your working tree with a tagged release.
         Use <code class="font-mono text-xs bg-amber-100 px-1 rounded">git pull</code> to bring in changes instead.
       </p>
+    </div>
+  <% end %>
+
+  <%# Update channel toggle — visible to everyone. Stable is the
+      default; Nightly opts the install in to pre-release tags
+      (`-nightly`, `-rc`, `-dev`, etc.) for testing the update flow.
+      Dev checkouts effectively run as Nightly regardless of this
+      setting because the predicate ORs in dev_install?. %>
+  <div class="bg-white border border-gray-200 rounded-xs p-4 mb-6 flex items-start justify-between gap-4">
+    <div class="flex-1 min-w-0">
+      <h3 class="text-sm font-semibold text-gray-900 mb-1">Update channel</h3>
+      <p class="text-xs text-gray-600">
+        <% if @update_channel == "nightly" %>
+          You're on the <strong>Nightly</strong> channel — pre-release tags from Codeberg are visible below. Use only for testing the update flow; nightly builds may be unstable.
+        <% else %>
+          You're on the <strong>Stable</strong> channel — only released versions show up. Switch to Nightly to test the update flow against pre-release tags.
+        <% end %>
+      </p>
+    </div>
+    <div class="shrink-0 flex gap-1">
+      <%= button_to "Stable",
+                    admin_update_channel_path,
+                    method: :post,
+                    params: { channel: "stable" },
+                    disabled: @update_channel == "stable",
+                    class: "uppercase inline-flex items-center px-3 py-1.5 border font-mono text-xs rounded-xs cursor-pointer #{@update_channel == 'stable' ? 'border-green-700 bg-green-200 text-green-900 cursor-default' : 'border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800'}" %>
+      <%= button_to "Nightly",
+                    admin_update_channel_path,
+                    method: :post,
+                    params: { channel: "nightly" },
+                    disabled: @update_channel == "nightly",
+                    data: { confirm: ("Switch to the Nightly channel? Pre-release tags will be offered as updates. Stable channel users never see them." unless @update_channel == "nightly") },
+                    class: "uppercase inline-flex items-center px-3 py-1.5 border font-mono text-xs rounded-xs cursor-pointer #{@update_channel == 'nightly' ? 'border-purple-700 bg-purple-200 text-purple-900 cursor-default' : 'border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800'}" %>
+    </div>
+  </div>
+
+  <%# Pre-release panel — renders when the install can see prereleases
+      (dev clone OR nightly channel) AND VersionChecker found a newer
+      `-suffix` tag. The "Test pre-release update" button posts
+      prerelease=true so the controller's block_on_dev_install allows
+      the update through even on a dev checkout. %>
+  <% if @update_info && @update_info[:prerelease_available] %>
+    <div class="bg-purple-50 border border-purple-300 rounded-xs p-6 mb-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <h3 class="text-sm font-semibold text-purple-900 mb-1">
+            Pre-release available: <code class="font-mono text-xs bg-purple-100 px-1 rounded">v<%= @update_info[:prerelease_version] %></code>
+          </h3>
+          <p class="text-sm text-purple-800 mb-2">
+            A <code class="font-mono text-xs bg-purple-100 px-1 rounded">-nightly</code> tag is available on Codeberg. This panel appears because you're on the <strong>Nightly</strong> release channel — switch to Stable for official releases.
+          </p>
+          <% if @update_info[:prerelease_url].present? %>
+            <p class="text-xs text-purple-700">
+              <a href="<%= @update_info[:prerelease_url] %>" target="_blank" rel="noopener" class="underline hover:text-purple-900">View release notes on Codeberg →</a>
+            </p>
+          <% end %>
+        </div>
+        <div class="shrink-0">
+          <%= button_to "Test pre-release update",
+                        admin_start_update_path,
+                        method: :post,
+                        params: { version: @update_info[:prerelease_version], prerelease: "true" },
+                        data: { confirm: "Run the updater against v#{@update_info[:prerelease_version]}? This will overwrite your install with the tagged release contents." },
+                        class: "uppercase inline-flex items-center px-4 py-2 border border-purple-800 bg-purple-200 hover:bg-purple-300 text-purple-900 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
+        </div>
+      </div>
     </div>
   <% end %>
 

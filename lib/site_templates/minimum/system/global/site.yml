@@ -11,3 +11,4 @@ social_image_override: false
 theme:
   active: "default"
 static_generation_enabled: false
+update_channel: stable
