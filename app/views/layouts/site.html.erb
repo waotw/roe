@@ -117,7 +117,11 @@
     <% if snipcart_connected? || current_member %>
       <div class="site-actions">
         <% if snipcart_connected? %>
-          <a href="#" class="site-action snipcart-link" title="Cart" aria-label="Cart">
+          <%# `snipcart-checkout` is the class Snipcart v3 binds the
+              open-cart click handler to — without it the icon is inert.
+              `snipcart-link` is kept only as a CSS styling hook
+              (themes target it); it carries no behaviour on its own. %>
+          <a href="#" class="site-action snipcart-link snipcart-checkout" title="Cart" aria-label="Cart">
             <%= inline_system_svg("cart-icon.svg") || "Cart" %>
             <sup class="snipcart-items-count"></sup>
           </a>
