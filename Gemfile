@@ -101,3 +101,6 @@ gem "stripe", "~> 19.0"
 gem "premailer-rails", "~> 1.12"
 
 gem "postmark-rails", "~> 0.22.1"
+
+gem "net-sftp", "~> 4.0"
+gem "net-ftp", ">= 0.2"

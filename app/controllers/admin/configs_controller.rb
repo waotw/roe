@@ -823,22 +823,39 @@ class Admin::ConfigsController < Admin::BaseController
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
+    # Local SSH keys for the kamal.ssh picker. Kamal supports an array
+    # of identity files but we only surface single-pick — easier UX,
+    # and 99% of users have one key per host anyway.
+    @ssh_keys            = SshKeyInspector.list
     render :edit_deploy
   end
 
   def update_deploy
     dp = params[:deploy_config] || {}
 
+    # Single SSH-key picker writes to kamal.ssh.keys (Kamal's native
+    # array shape) so `kamal deploy` and our own rsync invocations
+    # both read the same path. Empty selection drops the ssh block
+    # entirely so Kamal falls back to its defaults.
+    kamal_block = {
+      "servers"           => (dp.dig(:kamal, :servers) || []).reject(&:blank?),
+      "registry_username" => dp.dig(:kamal, :registry_username).to_s.strip,
+      "image_name"        => dp.dig(:kamal, :image_name).to_s.strip,
+      "host"              => dp.dig(:kamal, :host).to_s.strip
+    }
+    # SSH key lives in Common Settings (mentally global), serialized
+    # under the kamal block in the YAML because that's where the
+    # generated Kamal deploy.yml expects it.
+    chosen_key = dp[:ssh_key].to_s.strip
+    if chosen_key.present?
+      kamal_block["ssh"] = { "keys" => [ chosen_key ], "keys_only" => true }
+    end
+
     config = {
       "target"   => dp[:target].to_s.presence || "kamal",
       "app_name" => dp[:app_name].to_s.strip,
       "ssl"      => dp[:ssl] == "1",
-      "kamal"    => {
-        "servers"           => (dp.dig(:kamal, :servers) || []).reject(&:blank?),
-        "registry_username" => dp.dig(:kamal, :registry_username).to_s.strip,
-        "image_name"        => dp.dig(:kamal, :image_name).to_s.strip,
-        "host"              => dp.dig(:kamal, :host).to_s.strip
-      },
+      "kamal"    => kamal_block,
       "fly"      => {
         "region"         => dp.dig(:fly, :region).to_s.strip,
         "vm_memory"      => dp.dig(:fly, :vm_memory).to_s.strip,

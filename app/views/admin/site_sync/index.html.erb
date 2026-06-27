@@ -3,22 +3,33 @@
   <div class="mb-8">
     <h1 class="text-3xl font-semibold text-gray-900">Site Sync</h1>
     <p class="mt-2 text-sm text-gray-700">
-      Track changes to your <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder and manage backups.
+      Track changes to your <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder, sync content between local/live sites and manage backups.
     </p>
   </div>
 
   <%# ─── About ────────────────────────────────────────────────────── %>
   <%# Hidden on production — the page on live is for configuration only. %>
   <% unless Rails.env.production? %>
-  <div class="mt-8 py-6 border-t border-gray-200">
-    <h3 class="text-sm font-semibold text-gray-900 mb-2">About Site Sync</h3>
-    <ul class="text-sm text-gray-600 space-y-1 list-disc ml-5">
-      <li>Tracks & syncs every file in your <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">/site</code> folder</li>
-      <li>Excludes databases in <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">db/</code> folder (separate backup system)</li>
-      <li>The local backups use a tool called <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">rsync</code> to create exact copies of your files. For new backups, the system only saves the files that actually changed. For any file that stayed the same, it creates a 'shortcut' (link) to the previous version instead of copying it again. This gives you multiple points in time you can restore from, but saves a massive amount of storage space.</li>
-      <li>If you restore from a backup and wish to <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">UNDO</code>, simply restore from the most recent Local Backup below.</li>
-    </ul>
-  </div>
+    <details class="mt-8 py-4 border-t border-gray-200 group">
+      <summary class="text-lg font-semibold text-gray-900 mb-2 cursor-pointer select-none flex items-center gap-2 list-none">
+        <span class="inline-block transition-transform group-open:rotate-90 text-gray-500">▸</span>
+        About Site Sync
+      </summary>
+      <ul class="text-sm text-gray-600 space-y-1 list-disc ml-5 mt-3">
+        <li>Tracks & syncs every file in your <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">/site</code> folder</li>
+        <li>Excludes databases in <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">db/</code> folder (separate backup system)</li>
+        <li>The local backups use a tool called <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">rsync</code> to create exact copies of your files. For new backups, the system only saves the files that actually changed. For any file that stayed the same, it creates a 'shortcut' (link) to the previous version instead of copying it again. This gives you multiple points in time you can restore from, but saves a massive amount of storage space.</li>
+        <li>If you restore from a backup and wish to <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">UNDO</code>, simply restore from the most recent Local Backup below.</li>
+      </ul>
+
+      <% if SiteConfig.current("site")&.static_generation_enabled %>
+        <h4 class="text-base font-semibold text-gray-900 mt-6 mb-2">Static Site Sync (SFTP)</h4>
+        <ul class="text-sm text-gray-600 space-y-1 list-disc ml-5">
+          <li>Generated HTML, CSS and JS output lives in <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">/static_site</code> as static files.</li>
+          <li>Static Site Sync syncs <code class="text-xs px-1 py-0.5 bg-gray-200 rounded-xs">/static_site</code> directly with your webhost — only changed files are sent on each push.</li>
+        </ul>
+      <% end %>
+    </details>
   <% end %>
 
   <%# ─── Post-restore confirmation panel ─────────────────────────── %>
@@ -26,7 +37,7 @@
       evidence the operation worked. Older restores fall out (no
       reason to surface them — they're history, not current state). %>
   <% if @last_restore && @last_restore[:restored_at] && @last_restore[:restored_at] > 1.hour.ago %>
-    <div class="bg-green-50 border border-green-200 rounded-sm p-6 mb-6">
+    <div class="bg-green-50 border border-green-200 rounded-xs p-6 mb-6">
       <h3 class="text-sm font-semibold text-green-900 mb-2">
         Restore Completed
       </h3>
@@ -41,6 +52,198 @@
     </div>
   <% end %>
 
+  <%# ─── Tabs ────────────────────────────────────────────────────── %>
+  <%# Three sections — live cross-environment sync, SFTP push of the
+      static output, and the backup list — share this page but are
+      independent enough that surfacing them all at once was getting
+      noisy. Uses the shared tabs Stimulus controller (same one the
+      Stripe Test/Live config uses). Static Site Sync tab only renders
+      when SSG is enabled. %>
+  <div data-controller="tabs">
+    <%# ─── Pending changes ───────────────────────────────────────── %>
+    <%# Single at-a-glance panel for both sync flows. Amber when
+        either has drift, green when both are caught up. Each amber
+        line is a button that jumps to its tab — relying on Stimulus
+        action dispatch from inside the same `tabs` controller scope,
+        so the panel must live inside `<div data-controller="tabs">`
+        even though it sits above the nav. Static site row renders
+        only when SSG is enabled (controller-gated). %>
+    <%
+      live_drift_count = if @status[:state] == :local_drift
+                          (@status[:local][:modified].size +
+                           @status[:local][:added].size +
+                           @status[:local][:deleted].size)
+                        else
+                          0
+                        end
+      live_in_error = @status[:state] == :error
+
+      static_visible       = @static_site_sync_config.present?
+      static_protocol_zip  = static_visible && @static_site_sync_config.protocol_zip?
+      static_configured    = static_visible && @static_site_sync_config.configured?
+      static_never_pushed  = static_configured && @static_site_sync_manifest&.empty?
+      static_drift_count   = (@static_site_sync_diff&.count).to_i
+      static_has_drift     = !static_protocol_zip && static_configured && (static_never_pushed || static_drift_count > 0)
+      static_unconfigured  = static_visible && !static_protocol_zip && !static_configured
+      # ZIP "drift" = the user has never downloaded an archive yet.
+      # Once they download once we trust them to keep doing it on
+      # their own cadence — the row reports the timestamp, not drift.
+      static_zip_never_downloaded = static_protocol_zip && @static_site_sync_config.last_pushed_at.nil?
+
+      any_drift = live_drift_count > 0 || live_in_error || static_has_drift || static_unconfigured || static_zip_never_downloaded
+    %>
+
+    <div class="<%= any_drift ? 'bg-amber-50 border border-amber-300' : 'bg-green-50 border border-green-300' %> rounded-xs p-4 mb-6">
+      <h3 class="text-xs font-semibold uppercase tracking-wide <%= any_drift ? 'text-amber-900' : 'text-green-900' %> mb-2">
+        <%= any_drift ? 'Pending changes' : 'All up to date' %>
+      </h3>
+      <ul class="space-y-1 text-sm">
+
+        <%# Live site sync row — always shown. %>
+        <li>
+          <% if live_in_error %>
+            <button type="button"
+                    data-action="click->tabs#show"
+                    data-tabs-panel="live-sync"
+                    class="flex items-center gap-2 text-red-900 hover:text-red-700 cursor-pointer w-full">
+              <span class="inline-block h-2 w-2 rounded-full bg-red-500"></span>
+              <span class="font-medium">Live site sync:</span>
+              <span>status check failed</span>
+              <span class="ml-auto text-xs">→</span>
+            </button>
+          <% elsif live_drift_count > 0 %>
+            <button type="button"
+                    data-action="click->tabs#show"
+                    data-tabs-panel="live-sync"
+                    class="flex items-center gap-2 text-amber-900 hover:text-amber-700 cursor-pointer w-full">
+              <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+              <span class="font-medium">Live site sync:</span>
+              <span><%= live_drift_count %> file<%= "s" unless live_drift_count == 1 %> changed</span>
+              <span class="ml-auto text-xs">→</span>
+            </button>
+          <% else %>
+            <span class="flex items-center gap-2 text-green-900">
+              <span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+              <span class="font-medium">Live site sync:</span>
+              <span>in sync</span>
+            </span>
+          <% end %>
+        </li>
+
+        <%# Static site sync row — only when SSG is enabled. ZIP is a
+            manual download flow, so it doesn't carry a drift state in
+            the way SFTP/FTPS do — it reports "last downloaded …" as
+            an event timestamp instead. %>
+        <% if static_visible %>
+          <% protocol_zip = @static_site_sync_config.protocol_zip? %>
+          <li>
+            <% if static_unconfigured && !protocol_zip %>
+              <button type="button"
+                      data-action="click->tabs#show"
+                      data-tabs-panel="static-sync"
+                      class="flex items-center gap-2 text-amber-900 hover:text-amber-700 cursor-pointer w-full">
+                <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+                <span class="font-medium">Static site:</span>
+                <span>connection not configured</span>
+                <span class="ml-auto text-xs">→</span>
+              </button>
+            <% elsif protocol_zip %>
+              <% last = @static_site_sync_config.last_pushed_at %>
+              <% if last.nil? %>
+                <button type="button"
+                        data-action="click->tabs#show"
+                        data-tabs-panel="static-sync"
+                        class="flex items-center gap-2 text-amber-900 hover:text-amber-700 cursor-pointer w-full">
+                  <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+                  <span class="font-medium">Static site ZIP:</span>
+                  <span>never downloaded</span>
+                  <span class="ml-auto text-xs">→</span>
+                </button>
+              <% else %>
+                <button type="button"
+                        data-action="click->tabs#show"
+                        data-tabs-panel="static-sync"
+                        class="flex items-center gap-2 text-green-900 hover:text-green-700 cursor-pointer w-full">
+                  <span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+                  <span class="font-medium">Static site ZIP:</span>
+                  <span>downloaded on <%= last.strftime("%b %-d, %Y") %> at <%= last.strftime("%-I:%M %p") %></span>
+                  <span class="ml-auto text-xs">→</span>
+                </button>
+              <% end %>
+            <% elsif static_never_pushed %>
+              <button type="button"
+                      data-action="click->tabs#show"
+                      data-tabs-panel="static-sync"
+                      class="flex items-center gap-2 text-amber-900 hover:text-amber-700 cursor-pointer w-full">
+                <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+                <span class="font-medium">Static site:</span>
+                <span>never pushed</span>
+                <span class="ml-auto text-xs">→</span>
+              </button>
+            <% elsif static_drift_count > 0 %>
+              <button type="button"
+                      data-action="click->tabs#show"
+                      data-tabs-panel="static-sync"
+                      class="flex items-center gap-2 text-amber-900 hover:text-amber-700 cursor-pointer w-full">
+                <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+                <span class="font-medium">Static site:</span>
+                <span><%= static_drift_count %> file<%= "s" unless static_drift_count == 1 %> ready to push</span>
+                <span class="ml-auto text-xs">→</span>
+              </button>
+            <% else %>
+              <span class="flex items-center gap-2 text-green-900">
+                <span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+                <span class="font-medium">Static site:</span>
+                <span>up to date</span>
+              </span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex gap-4">
+        <button type="button"
+                data-tabs-target="tab"
+                data-action="click->tabs#show"
+                data-tabs-panel="live-sync"
+                class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+          Site Sync
+        </button>
+        <% if @static_site_sync_config %>
+          <button type="button"
+                  data-tabs-target="tab"
+                  data-action="click->tabs#show"
+                  data-tabs-panel="static-sync"
+                  class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+            Static Site Sync
+          </button>
+        <% end %>
+        <button type="button"
+                data-tabs-target="tab"
+                data-action="click->tabs#show"
+                data-tabs-panel="backups"
+                class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+          Site Backups
+        </button>
+      </nav>
+    </div>
+
+  <div data-tabs-target="panel" data-tabs-panel="live-sync">
+
+      </div><%# /data-tabs-panel="live-sync" %>
+
+      <% if @static_site_sync_config %>
+        <div data-tabs-target="panel" data-tabs-panel="static-sync" class="hidden">
+          <%# Renders only when SSG is enabled — controller gates
+              @static_site_sync_config behind that check. SFTP push of the
+              generated /static_site output to a webhost, plus drift
+              detection and progress UI that mirror the live-sync tab. %>
+          <%= render "static_site_sync_section" %>
+        </div>
+      <% end %>
+
   <%# ─── Transfer status ──────────────────────────────────────────── %>
   <%# Surfaces in-flight or recently-finished push/pull jobs at the
       top of the page so the user gets immediate feedback after
@@ -49,182 +252,189 @@
   <% if @transfer_status %>
     <% kind_label = @transfer_status[:kind] == :push ? "Push to live" : "Pull from live" %>
     <% case @transfer_status[:state] %>
-    <% when :running %>
-      <% progress = @transfer_status[:progress] %>
-      <% progress_pct = progress && progress[:total].to_i.positive? ? (progress[:completed].to_f / progress[:total] * 100).round : 0 %>
-      <div class="bg-blue-50 border border-blue-200 rounded-sm p-6 mb-6"
+      <% when :running %>
+        <% progress = @transfer_status[:progress] %>
+        <% progress_pct = progress && progress[:total].to_i.positive? ? (progress[:completed].to_f / progress[:total] * 100).round : 0 %>
+        <div class="bg-blue-50 border border-blue-200 rounded-xs p-6 mb-6"
            data-controller="site-sync">
-        <div class="flex items-start justify-between gap-4">
-          <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-blue-900 mb-2">⏳ <%= kind_label %> in progress</h3>
-            <p class="text-sm text-blue-900 font-mono mb-2"
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <h3 class="text-sm font-semibold text-blue-900 mb-2">⏳ <%= kind_label %> in progress</h3>
+              <p class="text-sm text-blue-900 font-mono mb-2"
                data-site-sync-target="step">
-              <%= SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] || "Starting…" %>
-            </p>
-            <%# Progress line — hidden until rsync starts emitting
+                <%= SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] || "Starting…" %>
+              </p>
+              <%# Progress line — hidden until rsync starts emitting
                 to-chk lines. The Stimulus controller toggles visibility
                 and rewrites label + bar width as new polls arrive. %>
-            <div class="mb-2" data-site-sync-target="progress" <%= "hidden" unless progress %>>
-              <p class="text-sm text-blue-900 font-mono mb-1" data-site-sync-target="progressLabel">
-                <% if progress %><%= progress[:completed] %> of <%= progress[:total] %> files transferred<% end %>
-              </p>
-              <div class="h-1.5 w-full max-w-sm bg-blue-100 rounded-full overflow-hidden">
-                <div class="h-full bg-blue-600 transition-all"
+              <div class="mb-2" data-site-sync-target="progress" <%= "hidden" unless progress %>>
+                <p class="text-sm text-blue-900 font-mono mb-1" data-site-sync-target="progressLabel">
+                  <% if progress %><%= progress[:completed] %> of <%= progress[:total] %> files transferred<% end %>
+                </p>
+                <div class="h-1.5 w-full max-w-sm bg-blue-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-blue-600 transition-all"
                      style="width: <%= progress_pct %>%;"
                      data-site-sync-target="progressBar"></div>
+                </div>
               </div>
+              <p class="text-sm text-blue-800">
+                Started <%= time_ago_in_words(@transfer_status[:started_at]) %> ago.
+                This page will auto-refresh to show progress.
+              </p>
             </div>
-            <p class="text-sm text-blue-800">
-              Started <%= time_ago_in_words(@transfer_status[:started_at]) %> ago.
-              This page will auto-refresh to show progress.
-            </p>
-          </div>
-          <%# Force-clear the status — useful if the worker died or
+            <%# Force-clear the status — useful if the worker died or
               rsync hung. Only clears the UI flag; doesn't actually
               kill any subprocess that might still be running. %>
-          <%= button_to "Dismiss",
+            <%= button_to "Dismiss",
                         admin_dismiss_site_transfer_status_path,
                         method: :post,
                         data: { confirm: "Clear the running-status flag? Only do this if you've confirmed the job isn't actually running (check Rails logs for SiteSync activity). This won't kill any subprocess that might still be working." },
                         class: "inline-flex items-center px-3 py-1 border border-blue-700 bg-blue-100 hover:bg-blue-200 text-blue-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
-        </div>
-      </div>
-    <% when :completed %>
-      <% if @transfer_status[:completed_at] && @transfer_status[:completed_at] > 5.minutes.ago %>
-        <div class="bg-green-50 border border-green-200 rounded-sm p-6 mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h3 class="text-sm font-semibold text-green-900 mb-1">✓ <%= kind_label %> completed</h3>
-            <p class="text-sm text-green-800">
-              Finished <%= time_ago_in_words(@transfer_status[:completed_at]) %> ago.
-            </p>
           </div>
-          <%= button_to "Dismiss",
+        </div>
+      <% when :completed %>
+        <% if @transfer_status[:completed_at] && @transfer_status[:completed_at] > 5.minutes.ago %>
+          <div class="bg-green-50 border border-green-200 rounded-xs p-6 mb-6 flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-green-900 mb-1">✓ <%= kind_label %> completed</h3>
+              <p class="text-sm text-green-800">
+                Finished <%= time_ago_in_words(@transfer_status[:completed_at]) %> ago.
+              </p>
+            </div>
+            <%= button_to "Dismiss",
                         admin_dismiss_site_transfer_status_path,
                         method: :post,
                         class: "inline-flex items-center px-3 py-1 border border-green-700 bg-green-100 hover:bg-green-200 text-green-800 font-mono text-xs rounded-xs cursor-pointer" %>
-        </div>
-      <% end %>
-    <% when :failed %>
-      <%# Reassessment compares the current local + peer fingerprints
+          </div>
+        <% end %>
+      <% when :failed %>
+        <%# Reassessment compares the current local + peer fingerprints
           to determine whether the transfer's *content* actually went
           through despite the failure (which would mean only the
           bookkeeping step failed). Different copy + actions for each
           case. %>
-      <% reassessment = @transfer_status[:reassessment] %>
-      <% step_label = SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] %>
+        <% reassessment = @transfer_status[:reassessment] %>
+        <% step_label = SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] %>
 
-      <% if reassessment && reassessment[:in_sync] %>
-        <%# Bookkeeping-only failure — content is actually synced. %>
-        <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
-          <div class="flex items-start justify-between gap-4 mb-3">
-            <div>
-              <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠️ <%= kind_label %> hit a bookkeeping issue</h3>
-              <p class="text-sm text-amber-800 mb-1">
-                Both sides report the same content fingerprint, so the actual
-                file transfer succeeded. The error happened in a follow-up step
-                (likely <code class="text-xs"><%= step_label %></code>).
-              </p>
-              <p class="text-xs text-amber-700">
-                The sync status will resolve (within ~60s).
-                You can dismiss this safely.
-              </p>
-            </div>
-            <%= button_to "Dismiss",
+        <% if reassessment && reassessment[:in_sync] %>
+          <%# Bookkeeping-only failure — content is actually synced. %>
+          <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-6">
+            <div class="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠️ <%= kind_label %> hit a bookkeeping issue</h3>
+                <p class="text-sm text-amber-800 mb-1">
+                  Both sides report the same content fingerprint, so the actual
+                  file transfer succeeded. The error happened in a follow-up step
+                  (likely <code class="text-xs"><%= step_label %></code>).
+                </p>
+                <p class="text-xs text-amber-700">
+                  The sync status will resolve (within ~60s).
+                  You can dismiss this safely.
+                </p>
+              </div>
+              <%= button_to "Dismiss",
                           admin_dismiss_site_transfer_status_path,
                           method: :post,
                           class: "inline-flex items-center px-3 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
-          </div>
-          <% if @transfer_status[:error].present? %>
-            <details class="mt-2">
-              <summary class="text-xs text-amber-700 cursor-pointer hover:text-amber-900">Show error details</summary>
-              <pre class="mt-2 p-3 bg-white border border-amber-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
-            </details>
-          <% end %>
-        </div>
-
-      <% else %>
-        <%# Real partial failure — content is NOT in sync (or we
-            couldn't verify). %>
-        <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
-          <div class="flex items-start justify-between gap-4 mb-3">
-            <div>
-              <h3 class="text-sm font-semibold text-red-900 mb-1">❌ <%= kind_label %> didn't complete</h3>
-              <p class="text-sm text-red-700 mb-1">
-                Failed <%= time_ago_in_words(@transfer_status[:completed_at] || @transfer_status[:started_at]) %> ago
-                during <code class="text-xs"><%= step_label %></code>.
-              </p>
-              <% if reassessment && reassessment[:intended_count] %>
-                <%# Per-file detail available — show concrete numbers. %>
-                <p class="text-sm text-red-700">
-                  <strong><%= reassessment[:done_count] %></strong> of
-                  <strong><%= reassessment[:intended_count] %></strong>
-                  files synced.
-                  <strong><%= reassessment[:pending_count] %></strong>
-                  still pending. Click Retry to finish — only the
-                  pending files will be re-sent.
-                </p>
-              <% elsif reassessment && reassessment[:local_fingerprint] && reassessment[:peer_fingerprint] %>
-                <%# Aggregate fingerprint check only — no per-file detail. %>
-                <p class="text-sm text-red-700">
-                  Local and live are out of sync. Click Retry
-                  to re-run — only the still-pending files will be re-sent.
-                </p>
-              <% else %>
-                <%# No reassessment data at all. %>
-                <p class="text-sm text-red-700">
-                  Couldn't reach the live site to verify sync status. Click Retry once the underlying
-                  issue is resolved — only the still-pending files will be
-                  re-sent.
-                </p>
-              <% end %>
             </div>
-            <div class="flex flex-col gap-2 items-end">
-              <%= button_to "Retry",
+            <% if @transfer_status[:error].present? %>
+              <details class="mt-2">
+                <summary class="text-xs text-amber-700 cursor-pointer hover:text-amber-900">Show error details</summary>
+                <pre class="mt-2 p-3 bg-white border border-amber-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
+              </details>
+            <% end %>
+          </div>
+
+        <% else %>
+          <%# Real partial failure — content is NOT in sync (or we
+            couldn't verify). %>
+          <div class="bg-red-50 border border-red-200 rounded-xs p-6 mb-6">
+            <div class="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <h3 class="text-sm font-semibold text-red-900 mb-1">❌ <%= kind_label %> didn't complete</h3>
+                <p class="text-sm text-red-700 mb-1">
+                  Failed <%= time_ago_in_words(@transfer_status[:completed_at] || @transfer_status[:started_at]) %> ago
+                  during <code class="text-xs"><%= step_label %></code>.
+                </p>
+                <% if reassessment && reassessment[:intended_count] %>
+                  <%# Per-file detail available — show concrete numbers. %>
+                  <p class="text-sm text-red-700">
+                    <strong><%= reassessment[:done_count] %></strong> of
+                    <strong><%= reassessment[:intended_count] %></strong>
+                    files synced.
+                    <strong><%= reassessment[:pending_count] %></strong>
+                    still pending. Click Retry to finish — only the
+                    pending files will be re-sent.
+                  </p>
+                <% elsif reassessment && reassessment[:local_fingerprint] && reassessment[:peer_fingerprint] %>
+                  <%# Aggregate fingerprint check only — no per-file detail. %>
+                  <p class="text-sm text-red-700">
+                    Local and live are out of sync. Click Retry
+                    to re-run — only the still-pending files will be re-sent.
+                  </p>
+                <% else %>
+                  <%# No reassessment data at all. %>
+                  <p class="text-sm text-red-700">
+                    Couldn't reach the live site to verify sync status. Click Retry once the underlying
+                    issue is resolved — only the still-pending files will be
+                    re-sent.
+                  </p>
+                <% end %>
+              </div>
+              <div class="flex flex-col gap-2 items-end">
+                <%= button_to "Retry",
                             admin_retry_site_transfer_path,
                             method: :post,
                             data: { turbo_submits_with: "⏳ Retrying…" },
                             class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-200 hover:bg-red-300 text-red-900 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-              <%= button_to "Dismiss",
+                <%= button_to "Dismiss",
                             admin_dismiss_site_transfer_status_path,
                             method: :post,
                             class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+              </div>
             </div>
-          </div>
 
-          <%# Per-file pending list (collapsible). Only renders when
+            <%# Per-file pending list (collapsible). Only renders when
               the reassessment got per-file detail back from the peer. %>
-          <% if reassessment && reassessment[:pending_count].to_i > 0 %>
-            <details class="mt-3">
-              <summary class="text-sm font-semibold text-red-900 cursor-pointer hover:text-red-700">
-                Show pending files
-              </summary>
-              <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                <% [
+            <% if reassessment && reassessment[:pending_count].to_i > 0 %>
+              <details class="mt-3">
+                <summary class="text-sm font-semibold text-red-900 cursor-pointer hover:text-red-700">
+                  Show pending files
+                </summary>
+                <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+                  <% [
                   [ "Modified", reassessment[:pending_modified] ],
                   [ "Added",    reassessment[:pending_added] ],
                   [ "Deleted",  reassessment[:pending_deleted] ]
                 ].each do |label, list| %>
-                  <% next if list.blank? %>
-                  <div>
-                    <h4 class="text-xs font-semibold text-red-900 mb-1">
-                      <%= label %> (<%= list.size %>)
-                    </h4>
-                    <ul class="text-xs font-mono text-red-800 space-y-1">
-                      <% list.each do |path| %>
-                        <li><%= path %></li>
-                      <% end %>
-                    </ul>
-                  </div>
-                <% end %>
-              </div>
-            </details>
-          <% end %>
+                    <% next if list.blank? %>
+                    <div>
+                      <h4 class="text-xs font-semibold text-red-900 mb-1">
+                        <%= label %> (<%= list.size %>)
+                      </h4>
+                      <ul class="text-xs font-mono text-red-800 space-y-1">
+                        <% list.each do |path| %>
+                          <li><%= path %></li>
+                        <% end %>
+                      </ul>
+                    </div>
+                  <% end %>
+                </div>
+              </details>
+            <% end %>
 
-          <% if @transfer_status[:error].present? %>
-            <pre class="mt-3 p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
-          <% end %>
-        </div>
-      <% end %>
+            <% if @transfer_status[:error].present? %>
+              <pre class="mt-3 p-3 bg-white border border-red-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @transfer_status[:error] %></pre>
+            <% end %>
+
+            <%# Troubleshooting docs entry point — shown only on real
+                (non-bookkeeping) failure so it doesn't add noise to
+                the "actually synced, just hiccuped" amber panel. %>
+            <p class="mt-3 text-sm text-red-800">
+              Need help? <%= link_to "Troubleshoot Site Sync →", "/documentation/ts-site-sync", target: "_blank", rel: "noopener", class: "underline hover:text-red-600 font-medium" %>
+            </p>
+          </div>
+        <% end %>
     <% end %>
   <% end %>
 
@@ -232,85 +442,85 @@
   <%# :clean renders nothing — no point shouting "no changes" when
       nothing's wrong. Errors and drift get their own panels. %>
   <% case @status[:state] %>
-  <% when :error %>
-    <div class="bg-red-50 border border-red-200 rounded-sm p-6 mb-6">
-      <h2 class="text-lg font-semibold text-red-900 mb-2">Sync Status Checked Failed</h2>
-      <pre class="p-3 bg-white border border-red-200 rounded-sm font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @status[:error] %></pre>
-    </div>
+    <% when :error %>
+      <div class="bg-red-50 border border-red-200 rounded-xs p-6 mb-6">
+        <h2 class="text-lg font-semibold text-red-900 mb-2">Sync Status Checked Failed</h2>
+        <pre class="p-3 bg-white border border-red-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @status[:error] %></pre>
+      </div>
 
-  <% when :local_drift %>
-    <%# Shown only when peer is unreachable (offline-fallback mode).
+    <% when :local_drift %>
+      <%# Shown only when peer is unreachable (offline-fallback mode).
         When peer is reachable, the same info is folded into the
         cross-env panel below — no need to display it twice. %>
-    <% unless @peer_reachable %>
-    <div class="bg-amber-50 border border-amber-200 rounded-sm p-6 mb-6">
-      <% counts = @status[:local] %>
-      <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
-      <p class="text-amber-800 mb-3">
-        You've made these changes since your last sync:
-      </p>
-      <ul class="list-disc ml-6 mb-4 text-sm text-amber-800 space-y-1">
-        <% if counts[:modified].any? %>
-          <li><strong><%= counts[:modified].size %></strong> file<%= 's' if counts[:modified].size != 1 %> modified</li>
-        <% end %>
-        <% if counts[:added].any? %>
-          <li><strong><%= counts[:added].size %></strong> file<%= 's' if counts[:added].size != 1 %> added</li>
-        <% end %>
-        <% if counts[:deleted].any? %>
-          <li><strong><%= counts[:deleted].size %></strong> file<%= 's' if counts[:deleted].size != 1 %> deleted</li>
-        <% end %>
-      </ul>
-      <% if @status[:recorded_at] %>
-        <p class="text-xs text-amber-700 mb-4 font-mono">
-          Last sync: <%= @status[:recorded_at] %>
-        </p>
-      <% end %>
-
-      <%# Single collapsible "Show changes" containing all three
-          groups. Easier to scan than three separate disclosures. %>
-      <details class="mb-4">
-        <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
-          Show changes
-        </summary>
-        <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-          <% [ [ "Modified", counts[:modified] ], [ "Added", counts[:added] ], [ "Deleted", counts[:deleted] ] ].each do |label, list| %>
-            <% next if list.empty? %>
-            <div>
-              <h4 class="text-xs font-semibold text-amber-900 mb-1">
-                <%= label %> (<%= list.size %>)
-              </h4>
-              <ul class="text-xs font-mono text-amber-800 space-y-1">
-                <% list.each do |path| %>
-                  <li><%= path %></li>
-                <% end %>
-              </ul>
-            </div>
-          <% end %>
-        </div>
-      </details>
-
-      <% if SiteSync::Exchange.can_call_peer? %>
-        <div class="mt-6 pt-4 border-t border-amber-200">
-          <h3 class="text-sm font-semibold text-amber-900 mb-2">Push these changes to live</h3>
-          <p class="text-sm text-amber-800 mb-3">
-            Note: after sync, the live site will reflect the changes mentioned above. Live site is backed up before sync.
+      <% unless @peer_reachable %>
+        <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-6">
+          <% counts = @status[:local] %>
+          <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
+          <p class="text-amber-800 mb-3">
+            You've made these changes since your last sync:
           </p>
-          <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
-            <div class="flex gap-2">
-              <%= form.text_field :confirm,
+          <ul class="list-disc ml-6 mb-4 text-sm text-amber-800 space-y-1">
+            <% if counts[:modified].any? %>
+              <li><strong><%= counts[:modified].size %></strong> file<%= 's' if counts[:modified].size != 1 %> modified</li>
+            <% end %>
+            <% if counts[:added].any? %>
+              <li><strong><%= counts[:added].size %></strong> file<%= 's' if counts[:added].size != 1 %> added</li>
+            <% end %>
+            <% if counts[:deleted].any? %>
+              <li><strong><%= counts[:deleted].size %></strong> file<%= 's' if counts[:deleted].size != 1 %> deleted</li>
+            <% end %>
+          </ul>
+          <% if @status[:recorded_at] %>
+            <p class="text-xs text-amber-700 mb-4 font-mono">
+              Last sync: <%= @status[:recorded_at] %>
+            </p>
+          <% end %>
+
+          <%# Single collapsible "Show changes" containing all three
+          groups. Easier to scan than three separate disclosures. %>
+          <details class="mb-4">
+            <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
+              Show changes
+            </summary>
+            <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+              <% [ [ "Modified", counts[:modified] ], [ "Added", counts[:added] ], [ "Deleted", counts[:deleted] ] ].each do |label, list| %>
+                <% next if list.empty? %>
+                <div>
+                  <h4 class="text-xs font-semibold text-amber-900 mb-1">
+                    <%= label %> (<%= list.size %>)
+                  </h4>
+                  <ul class="text-xs font-mono text-amber-800 space-y-1">
+                    <% list.each do |path| %>
+                      <li><%= path %></li>
+                    <% end %>
+                  </ul>
+                </div>
+              <% end %>
+            </div>
+          </details>
+
+          <% if SiteSync::Exchange.can_call_peer? %>
+            <div class="mt-6 pt-4 border-t border-amber-200">
+              <h3 class="text-sm font-semibold text-amber-900 mb-2">Push these changes to live</h3>
+              <p class="text-sm text-amber-800 mb-3">
+                Note: after sync, the live site will reflect the changes mentioned above. Live site is backed up before sync.
+              </p>
+              <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
+                <div class="flex gap-2">
+                  <%= form.text_field :confirm,
                                   placeholder: "Type LIVE to confirm",
                                   autocomplete: "off",
-                                  class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
-              <%= form.submit "Push to live now",
+                                  class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
+                  <%= form.submit "Push to live now",
                               data: { turbo_submits_with: "⏳ Starting push…" },
                               class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+                </div>
+              <% end %>
             </div>
           <% end %>
+
         </div>
       <% end %>
-
-    </div>
-    <% end %>
   <% end %>
 
   <%# ─── Cross-environment sync status ───────────────────────────── %>
@@ -318,7 +528,7 @@
       Phase 4 will hide most of this once cross-env exchange is
       considered the source of truth; for now it's surfaced explicitly
       so you can verify the wiring is working. %>
-  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
+  <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
     <div class="flex items-center justify-between mb-3 gap-4">
       <h2 class="text-lg font-semibold text-gray-900">Public/Local Site Sync</h2>
       <%# Synchronous exchange ping — handy for testing without
@@ -338,9 +548,9 @@
       <% error_type = @last_exchange_result[:error_type] %>
       <% attempted_at = @last_exchange_result[:attempted_at] %>
 
-        <% if error_type == :auth_error %>
+      <% if error_type == :auth_error %>
         <%# Token mismatch - most critical error %>
-        <div class="p-4 bg-red-50 border border-red-200 rounded-sm mb-4">
+        <div class="p-4 bg-red-50 border border-red-200 rounded-xs mb-4">
           <h3 class="text-sm font-semibold text-red-900 mb-2">
             ⚠️ Token Mismatch — Cannot Connect to Live Site
           </h3>
@@ -366,7 +576,7 @@
 
       <% elsif error_type == :not_found %>
         <%# 404 - endpoint doesn't exist %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-4">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mb-4">
           <h3 class="text-sm font-semibold text-amber-900 mb-2">
             ⚠️ Site Sync Endpoint Not Found
           </h3>
@@ -380,7 +590,7 @@
 
       <% elsif error_type == :network_error %>
         <%# Network issues %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-4">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mb-4">
           <h3 class="text-sm font-semibold text-amber-900 mb-2">
             ⚠️ Cannot Reach Live Site
           </h3>
@@ -396,7 +606,7 @@
 
       <% else %>
         <%# Generic error %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-4">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mb-4">
           <h3 class="text-sm font-semibold text-amber-900 mb-2">
             ⚠️ Connection Issue
           </h3>
@@ -420,7 +630,7 @@
 
     <%# ─── Production-specific: Show if never received contact ────── %>
     <% if Rails.env.production? && !@peer_state %>
-      <div class="p-4 bg-blue-50 border border-blue-200 rounded-sm mb-4">
+      <div class="p-4 bg-blue-50 border border-blue-200 rounded-xs mb-4">
         <h3 class="text-sm font-semibold text-blue-900 mb-2">
           ⏳ Waiting for Local Environment
         </h3>
@@ -442,7 +652,7 @@
         <%= time_ago_in_words(@peer_state[:received_at]) %> ago.
       </p>
       <% if @peer_drift %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mb-2">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mb-2">
           <p class="text-sm text-amber-800 mb-3">
             ⚠️ <%= SiteSync::Exchange.peer_label %> reports unsynced changes — you should pull them in before editing here.
           </p>
@@ -518,7 +728,7 @@
             comes from local-vs-ledger, so it'll be empty — push will
             need to go full-tree. This branch surfaces a push button
             anyway so the user has a recovery path. %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mt-3">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mt-3">
           <p class="text-sm text-amber-800 mb-3">
             ⚠️ Content differs from <%= SiteSync::Exchange.peer_label %>, but neither side reports local drift.
             The ledgers on the two sides have diverged — push (or pull) will realign them.
@@ -530,7 +740,7 @@
                 <%= form.text_field :confirm,
                                     placeholder: "Type LIVE to confirm",
                                     autocomplete: "off",
-                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
+                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
                 <%= form.submit "Push to live now",
                                 data: { turbo_submits_with: "⏳ Starting push…" },
                                 class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
@@ -562,7 +772,7 @@
           Changes here should be pulled to dev, not pushed. %>
       <% if @peer_reachable && @status[:state] == :local_drift %>
         <% local_counts = @status[:local] %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm mt-3">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mt-3">
           <% if Rails.env.production? %>
             <%# Production view: changes on live server need to be pulled to dev %>
             <p class="text-sm text-amber-800 mb-3">
@@ -619,7 +829,7 @@
                 <%= form.text_field :confirm,
                                     placeholder: "Type LIVE to confirm",
                                     autocomplete: "off",
-                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-sm font-mono text-xs" %>
+                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
                 <%= form.submit "Push to live now",
                                 data: { turbo_submits_with: "⏳ Starting push…" },
                                 class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
@@ -687,7 +897,7 @@
                    value="<%= @sync_config.token %>"
                    readonly
                    id="sync-token-field"
-                   class="flex-1 px-3 py-2 border border-gray-300 rounded-sm font-mono text-xs text-gray-800 bg-gray-50"
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800 bg-gray-50"
                    onclick="this.select();">
             <button type="button"
                     onclick="const f=document.getElementById('sync-token-field');f.select();navigator.clipboard.writeText(f.value);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000);"
@@ -700,8 +910,9 @@
             <%= "Paste this into the your live Site Sync settings." if Rails.env.development? %>
           </p>
         <% else %>
-          <% if Rails.env.production? %>
-            <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm">
+          <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs">
+            <% if Rails.env.production? %>
+
               <p class="text-sm text-amber-800 mb-3">
                 ⚠️ No shared token has been set yet. Deploy from your local environment to push the token to this site, or paste your local token below.
               </p>
@@ -710,13 +921,13 @@
                                     placeholder: "Paste local token here",
                                     required: true,
                                     autocomplete: "off",
-                                    class: "flex-1 px-3 py-2 border border-amber-300 rounded-sm font-mono text-xs text-gray-800 bg-white" %>
+                                    class: "flex-1 px-3 py-2 border border-amber-300 rounded-xs font-mono text-xs text-gray-800 bg-white" %>
                 <%= form.submit "Save token",
                                 class: "uppercase inline-flex items-center px-4 py-2 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono text-sm rounded-xs cursor-pointer" %>
               <% end %>
-            </div>
-          <% else %>
-            <div class="p-4 bg-amber-50 border border-amber-200 rounded-sm">
+
+            <% else %>
+
               <p class="text-sm text-amber-800 mb-3">
                 ⚠️ No token has been generated yet. Site Sync requires a shared token to authenticate exchanges between environments.
               </p>
@@ -724,8 +935,9 @@
                             admin_regenerate_site_sync_token_path,
                             method: :post,
                             class: "inline-flex items-center px-4 py-2 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono text-sm rounded-xs cursor-pointer" %>
-            </div>
-          <% end %>
+
+            <% end %>
+          </div>
         <% end %>
       </div>
 
@@ -739,7 +951,7 @@
             <%= form.text_field :peer_url,
                                 value: @sync_config.peer_url,
                                 placeholder: @site_url,
-                                class: "w-full px-3 py-2 border border-gray-300 rounded-sm font-mono text-xs text-gray-800" %>
+                                class: "w-full px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
             <p class="text-xs text-gray-500 mt-1">
               Defaults to your Site URL
               (<code class="text-xs bg-gray-100 px-1"><%= @site_url %></code>) if left blank.
@@ -764,8 +976,9 @@
           Production: Replace (paste local's token as a fallback if deploy didn't sync). %>
       <% if @sync_config.token.present? %>
         <div class="mt-4 pt-4 border-t border-gray-200">
-          <% if Rails.env.production? %>
-            <div>
+          <div>
+            <% if Rails.env.production? %>
+
               <button type="button"
                       onclick="showReplaceTokenModal()"
                       class="uppercase inline-flex items-center px-3 py-1.5 border border-amber-600 bg-amber-200 hover:bg-amber-400 text-amber-900 font-mono text-xs rounded-xs cursor-pointer">
@@ -774,21 +987,24 @@
               <p class="text-xs text-gray-500 mt-1.5">
                 Fallback for when a deploy didn't sync the token. Paste the value shown on your local Site Sync page — both sides must match.
               </p>
-            </div>
-          <% else %>
-            <div>
+
+            <% else %>
+
               <button type="button"
                       onclick="showRegenerateTokenModal()"
                       class="uppercase inline-flex items-center px-3 py-1.5 border border-amber-600 bg-amber-200 hover:bg-amber-400 text-amber-900 font-mono text-xs rounded-xs cursor-pointer">
                 Regenerate token
               </button>
               <p class="text-xs text-gray-500 mt-1.5">Replaces the current token with a fresh random one. The next deploy will push the new value to the live site.</p>
-            </div>
-          <% end %>
+
+            <% end %>
+          </div>
         </div>
       <% end %>
     </div>
   </div>
+
+  <div data-tabs-target="panel" data-tabs-panel="backups" class="hidden">
 
   <%# ─── Local backups ───────────────────────────────────────────── %>
   <%# Hidden in production. Local backups live on whichever machine
@@ -798,51 +1014,51 @@
       backup features land (auto-snapshot before push, scheduled
       backups, etc.). %>
   <% unless Rails.env.production? %>
-  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
-    <div class="flex items-center justify-between mb-4 gap-4">
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900">Local Backups</h2>
-        <p class="text-sm text-gray-600 mb-2">
-          Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/local/</code>
-          <ul class="list-disc ml-6">
-            <li>Each backup is a complete, browsable copy of the <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder</li>
-            <li>Files unchanged between backups share disk space</li>
-            <li>Last <%= SiteSync::BackupManager::BACKUP_RETENTION %> are kept.</li>
-          </ul>
-        </p>
-      </div>
-      <%= button_to "Create backup",
+    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+      <div class="flex items-center justify-between mb-4 gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Local Backups</h2>
+          <p class="text-sm text-gray-600 mb-2">
+            Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/local/</code>
+            <ul class="list-disc ml-6">
+              <li>Each backup is a complete, browsable copy of the <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder</li>
+              <li>Files unchanged between backups share disk space</li>
+              <li>Last <%= SiteSync::BackupManager::BACKUP_RETENTION %> are kept.</li>
+            </ul>
+          </p>
+        </div>
+        <%= button_to "Create backup",
                     admin_create_site_backup_path,
                     method: :post,
                     data: { turbo_submits_with: "⏳ Creating new backup. Please hold…" },
                     class: "uppercase inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
-    </div>
+      </div>
 
-    <% if @local_backups.empty? %>
-      <p class="text-sm text-gray-500 italic">No local backups yet.</p>
-    <% else %>
-      <ol class="divide-y divide-gray-200 list-decimal">
-        <% @local_backups.each do |backup| %>
-          <li class="py-3 flex items-center justify-between">
-            <div>
-              <div class="font-mono text-sm <%= backup[:active] ? 'text-green-900 font-semibold' : 'text-gray-900' %>">
-                <%= backup[:name] %>
-                <% if backup[:active] %>
-                  <span class="ml-2 text-xs font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">matches current /site</span>
-                <% end %>
+      <% if @local_backups.empty? %>
+        <p class="text-sm text-gray-500 italic">No local backups yet.</p>
+      <% else %>
+        <ol class="divide-y divide-gray-200 list-decimal">
+          <% @local_backups.each do |backup| %>
+            <li class="py-3 flex items-center justify-between">
+              <div>
+                <div class="font-mono text-sm <%= backup[:active] ? 'text-green-900 font-semibold' : 'text-gray-900' %>">
+                  <%= backup[:name] %>
+                  <% if backup[:active] %>
+                    <span class="ml-2 text-xs font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">matches current /site</span>
+                  <% end %>
+                </div>
+                <div class="text-xs text-gray-500">
+                  <%= time_ago_in_words(backup[:created_at]) %> ago
+                  <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
+                </div>
               </div>
-              <div class="text-xs text-gray-500">
-                <%= time_ago_in_words(backup[:created_at]) %> ago
-                <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
-              </div>
-            </div>
-            <% if backup[:active] %>
-              <span class="inline-flex items-center px-3 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
+              <% if backup[:active] %>
+                <span class="inline-flex items-center px-3 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
                     title="Backup matches current /site — nothing to restore.">
-                Restore
-              </span>
-            <% else %>
-              <%= button_to "Restore",
+                  Restore
+                </span>
+              <% else %>
+                <%= button_to "Restore",
                             admin_restore_site_backup_path(name: backup[:name]),
                             method: :post,
                             data: {
@@ -850,12 +1066,12 @@
                               turbo_submits_with: "⏳ Restoring from backup. Please hold…"
                             },
                             class: "uppercase inline-flex items-center px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
-            <% end %>
-          </li>
-        <% end %>
-      </ol>
-    <% end %>
-  </div>
+              <% end %>
+            </li>
+          <% end %>
+        </ol>
+      <% end %>
+    </div>
   <% end %>
 
   <%# ─── Production backups ──────────────────────────────────────── %>
@@ -863,159 +1079,162 @@
       live, which live doesn't need to see in its own admin. Live's
       Site Sync page is for token/peer config only. %>
   <% unless Rails.env.production? %>
-  <div class="bg-white border border-gray-200 rounded-sm p-6 mb-6">
-    <div>
-      <h2 class="text-lg font-semibold text-gray-900">Public/Live Site Backups</h2>
-      <p class="text-sm text-gray-600 mb-2">
-        Backups are stored locally in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/production/</code>, these are created when you sync your local site with the hosted site.
-      </p>
-      <p class="text-xs text-gray-500 mb-4">
-        To restore a production backup, run <code class="text-xs bg-gray-100 px-1 rounded">rake site:rollback[&lt;name&gt;]</code> from your terminal.
-        An admin-UI restore button for production is coming with the cross-env sync work.
-      </p>
-    </div>
+    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Public/Live Site Backups</h2>
+        <p class="text-sm text-gray-600 mb-2">
+          Backups are stored locally in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/production/</code>, these are created when you sync your local site with the hosted site.
+        </p>
+        <p class="text-xs text-gray-500 mb-4">
+          To restore a production backup, run <code class="text-xs bg-gray-100 px-1 rounded">rake site:rollback[&lt;name&gt;]</code> from your terminal.
+          An admin-UI restore button for production is coming with the cross-env sync work.
+        </p>
+      </div>
 
-    <% if @production_backups.empty? %>
-      <p class="text-sm text-gray-500 italic">No production backups yet. Run <code class="text-xs bg-gray-100 px-1 rounded">rake site:backup</code> to create one.</p>
-    <% else %>
-      <ul class="divide-y divide-gray-200">
-        <% @production_backups.each do |backup| %>
-          <li class="py-3 flex items-center justify-between">
-            <div>
-              <div class="font-mono text-sm text-gray-900"><%= backup[:name] %></div>
-              <div class="text-xs text-gray-500">
-                <%= time_ago_in_words(backup[:created_at]) %> ago
-                <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
+      <% if @production_backups.empty? %>
+        <p class="text-sm text-gray-500 italic">No production backups yet. Run <code class="text-xs bg-gray-100 px-1 rounded">rake site:backup</code> to create one.</p>
+      <% else %>
+        <ul class="divide-y divide-gray-200">
+          <% @production_backups.each do |backup| %>
+            <li class="py-3 flex items-center justify-between">
+              <div>
+                <div class="font-mono text-sm text-gray-900"><%= backup[:name] %></div>
+                <div class="text-xs text-gray-500">
+                  <%= time_ago_in_words(backup[:created_at]) %> ago
+                  <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
+                </div>
               </div>
-            </div>
-            <code class="text-xs text-gray-500 font-mono">
-              rake site:rollback[<%= backup[:name] %>]
-            </code>
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
-  </div>
+              <code class="text-xs text-gray-500 font-mono">
+                rake site:rollback[<%= backup[:name] %>]
+              </code>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
   <% end %>
+
+  </div><%# /data-tabs-panel="backups" %>
+  </div><%# /data-controller="tabs" %>
 </div>
 
 <%# ─── Replace Token Modal (production only) ──────────────────────── %>
 <% if Rails.env.production? && @sync_config.token.present? %>
-<div id="replace-token-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden" style="background-color: rgba(0,17,52,0.35);">
-  <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
-    <h2 class="text-2xl font-bold text-amber-900 mb-3">Replace shared token?</h2>
-    <p class="text-gray-700 mb-4">
-      Paste the token shown on your local Site Sync page. Both sides must match for Site Sync to authenticate.
-    </p>
-    <%= form_with url: admin_update_site_sync_config_path, method: :patch, local: true, class: "space-y-4" do |form| %>
-      <%= form.text_field :token,
+  <div id="replace-token-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden" style="background-color: rgba(0,17,52,0.35);">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
+      <h2 class="text-2xl font-bold text-amber-900 mb-3">Replace shared token?</h2>
+      <p class="text-gray-700 mb-4">
+        Paste the token shown on your local Site Sync page. Both sides must match for Site Sync to authenticate.
+      </p>
+      <%= form_with url: admin_update_site_sync_config_path, method: :patch, local: true, class: "space-y-4" do |form| %>
+        <%= form.text_field :token,
                           placeholder: "Paste local token here",
                           required: true,
                           autocomplete: "off",
-                          class: "w-full px-3 py-2 border border-gray-300 rounded-sm font-mono text-xs text-gray-800" %>
-      <p class="text-sm text-gray-600">
-        <strong>Note:</strong> Use this only as a fallback when a deploy didn't sync the token. Normally, deploying from local pushes the current token here automatically.
-      </p>
-      <div class="flex gap-3">
-        <%= form.submit "Save token",
+                          class: "w-full px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
+        <p class="text-sm text-gray-600">
+          <strong>Note:</strong> Use this only as a fallback when a deploy didn't sync the token. Normally, deploying from local pushes the current token here automatically.
+        </p>
+        <div class="flex gap-3">
+          <%= form.submit "Save token",
                         class: "uppercase text-sm px-4 py-2.5 border border-amber-800 bg-amber-600 hover:bg-amber-700 text-white font-mono rounded-xs cursor-pointer" %>
-        <button type="button"
+          <button type="button"
                 onclick="hideReplaceTokenModal()"
                 class="uppercase text-sm px-4 py-2.5 border border-gray-400 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono rounded-xs cursor-pointer">
-          Cancel
-        </button>
-      </div>
-    <% end %>
+            Cancel
+          </button>
+        </div>
+      <% end %>
+    </div>
   </div>
-</div>
 <% end %>
 
 <%# ─── Regenerate Token Modal ──────────────────────────────────────── %>
 <% unless Rails.env.production? %>
-<div id="regenerate-token-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden" style="background-color: rgba(0,17,52,0.35);">
-  <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
-    <h2 class="text-2xl font-bold text-amber-900 mb-3">⚠️ Regenerate Token?</h2>
-    <p class="text-gray-700 mb-4">
-      This will <strong>delete the current token</strong> and generate a new one.
-    </p>
-    <div class="bg-red-50 border border-red-200 p-4 mb-6">
-      <p class="text-sm text-amber-800 font-semibold mb-2">You should:</p>
-      <ol class="text-sm text-red-amber list-decimal list-inside space-y-1">
-        <li>Copy the new token</li>
-        <li>Paste it into your live site in: Admin → Site Sync</li>
-      </ol>
-    </div>
-    <p class="text-sm text-gray-600 mb-6">
-      <strong>Warning:</strong> Site Sync will stop working until the local token matches the live/public token.
-    </p>
-    <div class="flex gap-3">
-      <%= button_to "Yes, Regenerate Token",
+  <div id="regenerate-token-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden" style="background-color: rgba(0,17,52,0.35);">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-lg w-full mx-4">
+      <h2 class="text-2xl font-bold text-amber-900 mb-3">⚠️ Regenerate Token?</h2>
+      <p class="text-gray-700 mb-4">
+        This will <strong>delete the current token</strong> and generate a new one.
+      </p>
+      <div class="bg-red-50 border border-red-200 p-4 mb-6">
+        <p class="text-sm text-amber-800 font-semibold mb-2">You should:</p>
+        <ol class="text-sm text-red-amber list-decimal list-inside space-y-1">
+          <li>Copy the new token</li>
+          <li>Paste it into your live site in: Admin → Site Sync</li>
+        </ol>
+      </div>
+      <p class="text-sm text-gray-600 mb-6">
+        <strong>Warning:</strong> Site Sync will stop working until the local token matches the live/public token.
+      </p>
+      <div class="flex gap-3">
+        <%= button_to "Yes, Regenerate Token",
                     admin_regenerate_site_sync_token_path,
                     method: :post,
                     id: "modal-regenerate-confirm",
                     class: "uppercase text-sm px-4 py-2.5 border border-amber-800 bg-amber-600 hover:bg-amber-700 text-white font-mono rounded-xs" %>
-      <button type="button"
+        <button type="button"
               onclick="hideRegenerateTokenModal()"
               class="uppercase text-sm px-4 py-2.5 border border-gray-400 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono rounded-xs">
-        Cancel
-      </button>
+          Cancel
+        </button>
+      </div>
     </div>
   </div>
-</div>
 
-<script>
-  function showRegenerateTokenModal() {
+  <script>
+    function showRegenerateTokenModal() {
     const modal = document.getElementById('regenerate-token-modal');
     modal.classList.remove('hidden');
-  }
+    }
 
-  function hideRegenerateTokenModal() {
+    function hideRegenerateTokenModal() {
     const modal = document.getElementById('regenerate-token-modal');
     modal.classList.add('hidden');
-  }
+    }
 
-  // Close modal when clicking outside
-  document.getElementById('regenerate-token-modal').addEventListener('click', function(e) {
+    // Close modal when clicking outside
+    document.getElementById('regenerate-token-modal').addEventListener('click', function(e) {
     if (e.target === this) {
-      hideRegenerateTokenModal();
+    hideRegenerateTokenModal();
     }
-  });
+    });
 
-  // Close modal on Escape key
-  document.addEventListener('keydown', function(e) {
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      hideRegenerateTokenModal();
+    hideRegenerateTokenModal();
     }
-  });
-</script>
+    });
+  </script>
 <% end %>
 
 <% if Rails.env.production? && @sync_config.token.present? %>
-<script>
-  function showReplaceTokenModal() {
+  <script>
+    function showReplaceTokenModal() {
     const modal = document.getElementById('replace-token-modal');
     modal.classList.remove('hidden');
     const input = modal.querySelector('input[type="text"]');
     if (input) input.focus();
-  }
+    }
 
-  function hideReplaceTokenModal() {
+    function hideReplaceTokenModal() {
     const modal = document.getElementById('replace-token-modal');
     modal.classList.add('hidden');
-  }
+    }
 
-  // Close modal when clicking outside
-  document.getElementById('replace-token-modal').addEventListener('click', function(e) {
+    // Close modal when clicking outside
+    document.getElementById('replace-token-modal').addEventListener('click', function(e) {
     if (e.target === this) {
-      hideReplaceTokenModal();
+    hideReplaceTokenModal();
     }
-  });
+    });
 
-  // Close modal on Escape key
-  document.addEventListener('keydown', function(e) {
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      hideReplaceTokenModal();
+    hideReplaceTokenModal();
     }
-  });
-</script>
+    });
+  </script>
 <% end %>

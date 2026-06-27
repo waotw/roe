@@ -1,0 +1,209 @@
+<%# Static Site Sync — SFTP push of the generated /static_site output
+    to a webhost. Lives between the live cross-environment sync and
+    the Local Backups list on the same Site Sync page. Renders only
+    when SSG is enabled (the controller gates @static_site_sync_config
+    behind that check).
+
+    Three view states, in order of precedence:
+      1. Transfer in progress / recently completed / failed — same
+         blue/green/red panels as the SiteSyncTransferJob's UI so the
+         "watch it happen" affordance is identical across both sync
+         flows.
+      2. Configured + idle — connection summary, drift indicator
+         (orange dot when there are changes since the last push), the
+         changed-files preview, the Push button.
+      3. Not configured — connect form (host, port, user, auth choice,
+         credentials, remote path). %>
+
+<% return unless @static_site_sync_config %>
+
+<div class="mt-12 py-6 border-t border-gray-200">
+  <h2 class="text-lg font-semibold text-gray-900 mb-1">Static Site Sync</h2>
+  <p class="text-sm text-gray-700 mb-6">
+    Push the generated <code class="text-xs bg-gray-100 px-1 rounded">static_site</code> output to your webhost. Static Site Sync only pushes changed files. Zip download includes entire <code class="text-xs bg-gray-100 px-1 rounded">static_site</code> folder.
+  </p>
+
+  <%# ─── Transfer status ─────────────────────────────────────────── %>
+  <% if @static_site_sync_transfer_status %>
+    <% sss = @static_site_sync_transfer_status %>
+    <% case sss[:state] %>
+      <% when :running %>
+        <% progress = sss[:progress] %>
+        <% progress_pct = progress && progress[:total].to_i.positive? ? (progress[:completed].to_f / progress[:total] * 100).round : 0 %>
+        <div class="bg-blue-50 border border-blue-200 rounded-xs p-6 mb-6"
+             data-controller="static-site-sync">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <h3 class="text-sm font-semibold text-blue-900 mb-2">⏳ Push in progress</h3>
+              <p class="text-sm text-blue-900 font-mono mb-2"
+                 data-static-site-sync-target="step">
+                <%= StaticSiteSyncPushJob::STEPS[sss[:step]] || sss[:step] || "Starting…" %>
+              </p>
+              <div class="mb-2" data-static-site-sync-target="progress" <%= "hidden" unless progress %>>
+                <p class="text-sm text-blue-900 font-mono mb-1" data-static-site-sync-target="progressLabel">
+                  <% if progress %><%= progress[:completed] %> of <%= progress[:total] %> files transferred<% end %>
+                </p>
+                <div class="h-1.5 w-full max-w-sm bg-blue-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-blue-600 transition-all"
+                       style="width: <%= progress_pct %>%;"
+                       data-static-site-sync-target="progressBar"></div>
+                </div>
+              </div>
+              <p class="text-sm text-blue-800">
+                Started <%= time_ago_in_words(sss[:started_at]) %> ago.
+                This page will auto-refresh to show progress.
+              </p>
+            </div>
+            <%= button_to "Dismiss",
+                          admin_dismiss_static_site_transfer_status_path,
+                          method: :post,
+                          data: { confirm: "Clear the running-status flag? Only do this if you've confirmed the job isn't actually running." },
+                          class: "inline-flex items-center px-3 py-1 border border-blue-700 bg-blue-100 hover:bg-blue-200 text-blue-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+          </div>
+        </div>
+      <% when :completed %>
+        <% if sss[:completed_at] && sss[:completed_at] > 5.minutes.ago %>
+          <div class="bg-green-50 border border-green-200 rounded-xs p-6 mb-6 flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-green-900 mb-1">✓ Push completed</h3>
+              <p class="text-sm text-green-800">
+                <% if sss[:message].present? %>
+                  <%= sss[:message] %>
+                <% else %>
+                  <%= sss[:uploaded].to_i %> uploaded, <%= sss[:deleted].to_i %> removed. Finished <%= time_ago_in_words(sss[:completed_at]) %> ago.
+                <% end %>
+              </p>
+            </div>
+            <%= button_to "Dismiss",
+                          admin_dismiss_static_site_transfer_status_path,
+                          method: :post,
+                          class: "inline-flex items-center px-3 py-1 border border-green-700 bg-green-100 hover:bg-green-200 text-green-800 font-mono text-xs rounded-xs cursor-pointer" %>
+          </div>
+        <% end %>
+      <% when :failed %>
+        <div class="bg-red-50 border border-red-200 rounded-xs p-6 mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-semibold text-red-900 mb-1">✗ Push failed</h3>
+            <p class="text-sm text-red-800 mb-2">
+              Failed during <code class="text-xs bg-white px-1 rounded font-mono"><%= StaticSiteSyncPushJob::STEPS[sss[:step]] || sss[:step] %></code>
+              <% if sss[:failed_at] %><%= time_ago_in_words(sss[:failed_at]) %> ago<% end %>.
+            </p>
+            <p class="text-xs text-red-700 font-mono break-all"><%= sss[:error] %></p>
+          </div>
+          <%= button_to "Dismiss",
+                        admin_dismiss_static_site_transfer_status_path,
+                        method: :post,
+                        class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+        </div>
+    <% end %>
+  <% end %>
+
+  <%# ─── Configured: summary + push ─────────────────────────────── %>
+  <%# At-a-glance drift signal (dot + count) lives in the Pending
+      Changes panel above the tabs. This panel focuses on the
+      connection summary, push controls, and the detailed expandable
+      file list. %>
+  <% if @static_site_sync_config.configured? %>
+    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-gray-600 font-mono mb-2"><%= @static_site_sync_config.connection_summary %></p>
+
+          <% if @static_site_sync_config.last_pushed_at %>
+            <p class="text-xs text-gray-500">Last push: <%= time_ago_in_words(@static_site_sync_config.last_pushed_at) %> ago</p>
+          <% end %>
+          <% if @static_site_sync_config.last_verification_error.present? %>
+            <p class="text-xs text-red-700 mt-1">Last connection test failed: <%= @static_site_sync_config.last_verification_error %></p>
+          <% elsif @static_site_sync_config.last_verified_at %>
+            <p class="text-xs text-gray-500">Connection verified: <%= time_ago_in_words(@static_site_sync_config.last_verified_at) %> ago</p>
+          <% end %>
+        </div>
+
+        <div class="flex flex-col gap-2 items-stretch shrink-0">
+          <% if @static_site_sync_config.protocol_zip? %>
+            <%# ZIP downloads are always available — no drift gate.
+                Marking the manifest happens after the download is built. %>
+            <%= link_to "Download ZIP",
+                        admin_download_static_site_zip_path,
+                        class: "inline-flex items-center justify-center px-4 py-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
+          <% else %>
+            <%# Always show a Push button when SFTP/FTPS is configured.
+                When there's no drift the job no-ops with "Already in
+                sync" — giving the user the button regardless beats
+                hiding it and making them wonder where it went. %>
+            <%= button_to (@static_site_sync_diff && !@static_site_sync_diff.empty? ? "Push now" : "Push (nothing to push)"),
+                          admin_push_static_site_path,
+                          method: :post,
+                          class: "inline-flex items-center justify-center px-4 py-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
+            <%= button_to "Test connection",
+                          admin_test_static_site_sync_connection_path,
+                          method: :post,
+                          class: "inline-flex items-center justify-center px-3 py-1.5 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Connection settings — always visible (not gated behind a
+          <details>) so the user can see and edit the current host /
+          credentials / remote_path at a glance. %>
+      <div class="mt-4 border-t border-gray-200 pt-4">
+        <h4 class="text-xs font-semibold text-gray-700 mb-3">Settings</h4>
+        <%= render "static_site_sync_form", config: @static_site_sync_config %>
+      </div>
+
+      <% if @static_site_sync_diff && !@static_site_sync_diff.empty? %>
+        <details class="mt-4 border-t border-gray-200 pt-4 group">
+          <summary class="text-xs font-semibold text-gray-700 cursor-pointer select-none flex items-center gap-2 list-none">
+            <span class="inline-block transition-transform group-open:rotate-90 text-gray-500">▸</span>
+            View changed files (<%= @static_site_sync_diff.count %>)
+          </summary>
+          <div class="mt-3 space-y-3 text-xs font-mono text-gray-700">
+            <% if @static_site_sync_diff.added.any? %>
+              <div>
+                <p class="text-green-700 font-semibold mb-1">Added (<%= @static_site_sync_diff.added.size %>)</p>
+                <ul class="space-y-0.5 pl-3">
+                  <% @static_site_sync_diff.added.first(50).each do |path| %>
+                    <li class="text-gray-700">+ <%= path %></li>
+                  <% end %>
+                  <% if @static_site_sync_diff.added.size > 50 %><li class="text-gray-500 italic">… and <%= @static_site_sync_diff.added.size - 50 %> more</li><% end %>
+                </ul>
+              </div>
+            <% end %>
+            <% if @static_site_sync_diff.modified.any? %>
+              <div>
+                <p class="text-blue-700 font-semibold mb-1">Modified (<%= @static_site_sync_diff.modified.size %>)</p>
+                <ul class="space-y-0.5 pl-3">
+                  <% @static_site_sync_diff.modified.first(50).each do |path| %>
+                    <li class="text-gray-700">~ <%= path %></li>
+                  <% end %>
+                  <% if @static_site_sync_diff.modified.size > 50 %><li class="text-gray-500 italic">… and <%= @static_site_sync_diff.modified.size - 50 %> more</li><% end %>
+                </ul>
+              </div>
+            <% end %>
+            <% if @static_site_sync_diff.deleted.any? %>
+              <div>
+                <p class="text-red-700 font-semibold mb-1">Removed (<%= @static_site_sync_diff.deleted.size %>)</p>
+                <ul class="space-y-0.5 pl-3">
+                  <% @static_site_sync_diff.deleted.first(50).each do |path| %>
+                    <li class="text-gray-700">- <%= path %></li>
+                  <% end %>
+                  <% if @static_site_sync_diff.deleted.size > 50 %><li class="text-gray-500 italic">… and <%= @static_site_sync_diff.deleted.size - 50 %> more</li><% end %>
+                </ul>
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
+    </div>
+
+  <%# ─── Not configured: connect form ───────────────────────────── %>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+      <h3 class="text-sm font-semibold text-gray-900 mb-1">Connect to your webhost</h3>
+      <p class="text-sm text-gray-700 mb-4">
+        Enter your SFTP host, login, and the directory where <code class="text-xs bg-gray-100 px-1 rounded">/static_site</code> should land on the host.
+      </p>
+      <%= render "static_site_sync_form", config: @static_site_sync_config %>
+    </div>
+  <% end %>
+</div>

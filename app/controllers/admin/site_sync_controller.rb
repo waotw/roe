@@ -51,6 +51,19 @@ class Admin::SiteSyncController < Admin::BaseController
     # In-progress / recently-completed transfer status for the
     # push/pull buttons. nil when nothing has happened recently.
     @transfer_status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+
+    # Static Site Sync section state — only computed when SSG is
+    # enabled to keep the page render cheap for everyone else. Diff is
+    # only computed when the user has actually configured the sync;
+    # otherwise hashing the full static_site/ tree on every admin load
+    # would be wasted work.
+    if SiteConfig.current("site")&.static_generation_enabled
+      @static_site_sync_config          = StaticSiteSyncConfig.current
+      @static_site_sync_transfer_status = Rails.cache.read(StaticSiteSyncPushJob::STATUS_CACHE_KEY)
+      manifest = StaticSiteSync::PushManifest.new
+      @static_site_sync_manifest = manifest
+      @static_site_sync_diff = manifest.diff if @static_site_sync_config.configured?
+    end
   end
 
   def create_backup

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_19_212000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_120000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -232,6 +232,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_19_212000) do
     t.index ["channel"], name: "index_solid_cable_messages_on_channel"
     t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
     t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
+  end
+
+  create_table "static_site_sync_configs", force: :cascade do |t|
+    t.integer "auth_mode", default: 0
+    t.datetime "created_at", null: false
+    t.string "host"
+    t.datetime "last_pushed_at"
+    t.string "last_verification_error"
+    t.datetime "last_verified_at"
+    t.text "password"
+    t.integer "port", default: 22
+    t.string "remote_path"
+    t.text "ssh_private_key"
+    t.datetime "updated_at", null: false
+    t.string "username"
   end
 
   create_table "stripe_configs", force: :cascade do |t|

@@ -1,0 +1,149 @@
+<%# Connect / edit form for the Static Site Sync destination. Three
+    protocols supported — SFTP, FTPS, and ZIP — selected by radio at
+    the top. Network-credential fields only matter for SFTP/FTPS; they
+    render in the same DOM either way but a Stimulus controller hides
+    the credentials block when ZIP is selected. (Form ships every field
+    regardless — the server ignores host/etc when protocol is ZIP.)
+
+    Password and SSH key fields are intentionally blank on render even
+    when a value is stored — Rails encrypted attributes don't expose
+    plaintext, and pre-filling with "********" placeholders would
+    require special form handling. The controller treats an empty
+    field as "leave existing value alone." %>
+
+<%# `data-turbo="false"` is mandatory here: when protocol is ZIP the
+    submit chains save → redirect-to-download, and Turbo's fetch path
+    eats the binary ZIP response instead of letting the browser fire
+    the download. Skipping Turbo on the whole form keeps both
+    flavours (SFTP/FTPS save + ZIP save-and-download) on the same
+    plain-old-browser-submit path. %>
+<%= form_with model: config,
+              url: admin_update_static_site_sync_config_path,
+              method: :patch,
+              data: { controller: "static-site-sync-form", turbo: false },
+              class: "space-y-4" do |f| %>
+
+  <%# ─── Protocol selector ─────────────────────────────────────── %>
+  <div data-static-site-sync-form-target="protocolGroup">
+    <span class="block text-xs font-semibold text-gray-700 mb-2">Deploy protocol</span>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <label class="flex items-start gap-2 p-3 border border-gray-300 rounded-xs cursor-pointer hover:bg-gray-50">
+        <%= f.radio_button :protocol, "zip",
+                           class: "mt-0.5",
+                           data: { action: "change->static-site-sync-form#protocolChanged" } %>
+        <span>
+          <span class="block text-sm font-medium text-gray-900">ZIP download</span>
+          <span class="block text-xs text-gray-600">Download <code class="font-mono text-gray-700 text-xs">static_site folder</code> to upload to host.</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-2 p-3 border border-gray-300 rounded-xs cursor-pointer hover:bg-gray-50">
+        <%= f.radio_button :protocol, "sftp",
+                           class: "mt-0.5",
+                           data: { action: "change->static-site-sync-form#protocolChanged" } %>
+        <span>
+          <span class="block text-sm font-medium text-gray-900">SFTP</span>
+          <span class="block text-xs text-gray-600">Port 22, SSH-style auth.</span>
+        </span>
+      </label>
+      <label class="flex items-start gap-2 p-3 border border-gray-300 rounded-xs cursor-pointer hover:bg-gray-50">
+        <%= f.radio_button :protocol, "ftps",
+                           class: "mt-0.5",
+                           data: { action: "change->static-site-sync-form#protocolChanged" } %>
+        <span>
+          <span class="block text-sm font-medium text-gray-900">FTPS</span>
+          <span class="block text-xs text-gray-600">FTP over TLS, port 21.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <%# ─── Credentials block — hidden for ZIP ───────────────────── %>
+  <div data-static-site-sync-form-target="credentials" class="space-y-4 <%= 'hidden' if config.protocol_zip? %>">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="sm:col-span-2">
+        <%= f.label :host, "Host", class: "block text-xs font-semibold text-gray-700 mb-1" %>
+        <%= f.text_field :host,
+                         placeholder: "ftp.yourhost.com",
+                         autocomplete: "off",
+                         class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      </div>
+      <div>
+        <%= f.label :port, "Port", class: "block text-xs font-semibold text-gray-700 mb-1" %>
+        <%= f.number_field :port,
+                           placeholder: config.default_port.to_s,
+                           min: 1, max: 65535,
+                           class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      </div>
+    </div>
+
+    <div>
+      <%= f.label :username, "Username", class: "block text-xs font-semibold text-gray-700 mb-1" %>
+      <%= f.text_field :username,
+                       autocomplete: "off",
+                       class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+    </div>
+
+    <div>
+      <span class="block text-xs font-semibold text-gray-700 mb-2">Authentication</span>
+      <div class="flex gap-6 text-sm">
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <%= f.radio_button :auth_mode, "password" %>
+          Password
+        </label>
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <%= f.radio_button :auth_mode, "ssh_key" %>
+          SSH private key
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <%= f.label :password, "Password", class: "block text-xs font-semibold text-gray-700 mb-1" %>
+      <%= f.password_field :password,
+                           value: "",
+                           autocomplete: "new-password",
+                           placeholder: config.password.present? ? "•••••••• (leave blank to keep current)" : "",
+                           class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      <p class="text-xs text-gray-500 mt-1">Stored encrypted. Used only when Authentication is set to Password.</p>
+    </div>
+
+    <div>
+      <%= f.label :ssh_private_key, "SSH private key", class: "block text-xs font-semibold text-gray-700 mb-1" %>
+      <%= f.text_area :ssh_private_key,
+                      value: "",
+                      autocomplete: "off",
+                      rows: 6,
+                      placeholder: config.ssh_private_key.present? ? "(leave blank to keep current)" : "-----BEGIN OPENSSH PRIVATE KEY-----\n...",
+                      class: "w-full font-mono text-xs p-2 border border-gray-300 rounded-xs" %>
+      <p class="text-xs text-gray-500 mt-1">Paste the full PEM contents. Stored encrypted. Used only when Authentication is set to SSH private key.</p>
+    </div>
+
+    <div>
+      <%= f.label :remote_path, "Remote path", class: "block text-xs font-semibold text-gray-700 mb-1" %>
+      <%= f.text_field :remote_path,
+                       placeholder: "/home/yourname/public_html",
+                       autocomplete: "off",
+                       class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      <p class="text-xs text-gray-500 mt-1">Absolute path on the host where <code class="text-xs bg-gray-100 px-1 rounded">/static_site</code> contents should land.</p>
+    </div>
+  </div>
+
+  <%# ─── Save / Test actions ──────────────────────────────────── %>
+  <%# When protocol is ZIP the submit button label flips to
+      "Download ZIP" — the controller saves the config and then
+      redirects straight to the download endpoint in one motion.
+      Stimulus also rewrites this label live when the user toggles
+      protocol radios before saving. %>
+  <div class="flex gap-2 pt-2">
+    <%= f.submit (config.protocol_zip? ? "Download ZIP" : "Save"),
+                 data: { "static-site-sync-form-target" => "submitButton" },
+                 class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono uppercase text-sm rounded-xs cursor-pointer" %>
+    <% if config.configured? && !config.protocol_zip? %>
+      <%= button_to "Test connection",
+                    admin_test_static_site_sync_connection_path,
+                    method: :post,
+                    form: { class: "inline-block" },
+                    class: "inline-flex items-center px-4 py-2 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-sm rounded-xs cursor-pointer" %>
+    <% end %>
+  </div>
+<% end %>

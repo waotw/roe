@@ -351,8 +351,22 @@ module SiteSync
       # specific to fly's wrapper).
       def build_cmd(source:, dest:, flags:, excludes:)
         excludes_str = excludes.join(" ")
-        "rsync #{flags} #{excludes_str} -e ssh " \
+        "rsync #{flags} #{excludes_str} -e #{Shellwords.escape(ssh_transport)} " \
           "#{Shellwords.escape(source)} #{Shellwords.escape(dest)} 2>&1"
+      end
+
+      # The `-e` argument for rsync. Plain "ssh" when no key is pinned
+      # in deploy.yml's kamal.ssh.keys (system defaults: ~/.ssh/config,
+      # agent identities, etc.). When one IS pinned, lock rsync to that
+      # key — IdentitiesOnly=yes stops ssh from offering every other
+      # identity first, which would otherwise blow past the server's
+      # MaxAuthTries before reaching the right key. Mirrors the same
+      # path Kamal itself uses, so `kamal deploy` and Site Sync agree
+      # on which identity to present.
+      def ssh_transport
+        path = Array(kamal_config.dig("ssh", "keys")).first.to_s.strip
+        return "ssh" if path.empty?
+        "ssh -i #{path} -o IdentitiesOnly=yes"
       end
 
       def with_retries(label:, max_retries: 2)

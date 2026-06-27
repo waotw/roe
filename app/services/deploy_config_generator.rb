@@ -164,6 +164,19 @@ class DeployConfigGenerator
 
     host = config.dig("kamal", "host").to_s.strip
 
+    # SSH identity — the picker in /admin/configs/deploy/edit writes
+    # this to Roe's deploy.yml at kamal.ssh.keys. Emit it into the
+    # generated Kamal config so `kamal deploy` AND SiteSync::KamalRsync
+    # both use the same identity. Empty / unset → no ssh block, Kamal
+    # falls back to system defaults.
+    ssh_keys = Array(config.dig("kamal", "ssh", "keys")).map(&:to_s).reject(&:blank?)
+    ssh_block = if ssh_keys.any?
+      keys_yaml = ssh_keys.map { |k| "    - #{k}" }.join("\n")
+      "ssh:\n  keys:\n#{keys_yaml}\n  keys_only: true"
+    else
+      ""
+    end
+
     # When both SSL is enabled and a custom domain is provided, write an
     # active proxy block. Otherwise leave it commented as a reference.
     ssl_value    = ssl ? "true" : "false"
@@ -195,6 +208,8 @@ class DeployConfigGenerator
       servers:
         web:
       #{servers_yaml}
+
+      #{ssh_block}
 
       #{proxy_block}
 

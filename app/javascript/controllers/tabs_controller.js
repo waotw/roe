@@ -14,18 +14,27 @@ export default class extends Controller {
   static targets = ["tab", "panel"];
 
   connect() {
-    // Activate the first non-disabled tab on connect
-    const firstActive = this.tabTargets.find((t) => !t.disabled);
-    if (firstActive) this.activateTab(firstActive);
+    // Read ?tab=panel-name from the URL. Query params survive Turbo
+    // Drive's redirect handling (URL fragments don't — fetch strips
+    // them when following the 302). Server redirects after save / test
+    // include the tab via `redirect_to ..., tab: "panel-name"`.
+    const params = new URLSearchParams(window.location.search);
+    const tabName = params.get("tab");
+    const namedTab = tabName
+      ? this.tabTargets.find((t) => t.dataset.tabsPanel === tabName && !t.disabled)
+      : null;
+
+    const initial = namedTab || this.tabTargets.find((t) => !t.disabled);
+    if (initial) this.activateTab(initial, { updateUrl: false });
   }
 
   show(event) {
     const tab = event.currentTarget;
     if (tab.disabled) return;
-    this.activateTab(tab);
+    this.activateTab(tab, { updateUrl: true });
   }
 
-  activateTab(activeTab) {
+  activateTab(activeTab, { updateUrl } = { updateUrl: false }) {
     const panelName = activeTab.dataset.tabsPanel;
 
     // Update tab styles
@@ -41,5 +50,15 @@ export default class extends Controller {
     this.panelTargets.forEach((panel) => {
       panel.classList.toggle("hidden", panel.dataset.tabsPanel !== panelName);
     });
+
+    // Reflect into the URL as a ?tab= param so a follow-up redirect
+    // can pin the tab. `replaceState` avoids polluting back-button
+    // history every time the user clicks between tabs.
+    if (updateUrl) {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", panelName);
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+    }
   }
 }

@@ -59,6 +59,16 @@ Rails.application.routes.draw do
     post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"
     post "site_sync/transfer_status/retry",   to: "site_sync#retry_transfer",         as: "retry_site_transfer"
 
+    # Static Site Sync — SFTP push of /static_site to a webhost. Lives
+    # under the same /admin/site_sync UI page; separate controller so
+    # the actions stay scoped to their own concerns.
+    patch "site_sync/static/config",           to: "static_site_sync#update_config",        as: "update_static_site_sync_config"
+    post  "site_sync/static/test_connection",  to: "static_site_sync#test_connection",      as: "test_static_site_sync_connection"
+    post  "site_sync/static/push",             to: "static_site_sync#push",                 as: "push_static_site"
+    get   "site_sync/static/download_zip",     to: "static_site_sync#download_zip",         as: "download_static_site_zip"
+    get   "site_sync/static/transfer_status",  to: "static_site_sync#transfer_status",      as: "static_site_transfer_status"
+    post  "site_sync/static/transfer_status/dismiss", to: "static_site_sync#dismiss_transfer_status", as: "dismiss_static_site_transfer_status"
+
     # Account settings — change email/password, regenerate recovery codes.
     get   "account",                to: "account#show",                       as: "account"
     patch "account/email",          to: "account#update_email",               as: "update_account_email"

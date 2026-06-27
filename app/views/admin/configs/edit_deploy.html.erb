@@ -245,6 +245,41 @@
             </p>
           </div>
         </div>
+
+        <%# SSH key — applies to Kamal (Fly's deploy uses Fly's own
+            cert auth). Lives in Common Settings because it's
+            mentally a deploy-wide identity choice; serialized into
+            deploy.yml under kamal.ssh.keys so Kamal picks it up
+            natively. Path-only, not contents: the key file stays
+            under ~/.ssh with whatever passphrase / Keychain
+            protection the user already has. %>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="deploy_ssh_key">
+            SSH key
+            <span class="text-xs font-normal text-gray-500">— used by Site Sync & Deploy</span>
+          </label>
+          <% if Array(@ssh_keys).any? %>
+            <%
+              current_ssh_key = (@config_hash.dig("kamal", "ssh", "keys") || []).first.to_s
+              key_options = @ssh_keys.map do |k|
+                private_key = k.path.sub(/\.pub\z/, "")
+                comment = [ k.key_type, k.comment ].compact_blank.join(" · ")
+                [ "#{File.basename(private_key)} (#{comment})", private_key ]
+              end
+            %>
+            <%= select_tag "deploy_config[ssh_key]",
+                  options_for_select([ [ "System default (~/.ssh/config / agent identities)", "" ] ] + key_options, current_ssh_key),
+                  id: "deploy_ssh_key",
+                  class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs bg-white" %>
+            <p class="mt-1 text-xs text-gray-500">
+              Pick your SSH public key for Kamal deploy & Site Sync
+            </p>
+          <% else %>
+            <div class="text-xs text-amber-700 p-2 border border-amber-300 bg-amber-50 rounded-xs font-mono">
+              No <code>~/.ssh/*.pub</code> files found by Roe (HOME resolved to <code><%= Dir.home %></code>). Set up keys under <code>~/.ssh/</code> and reload this page.
+            </div>
+          <% end %>
+        </div>
       </div>
     </div>
 
@@ -309,6 +344,7 @@
             Make sure you've pointed this domain's A record at your server before deploying.
           </p>
         </div>
+
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1" for="kamal_registry_username">
