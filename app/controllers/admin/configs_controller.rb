@@ -68,6 +68,18 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Always use Social Image",
           hint: "When checked, the Social Image above is used for all pages and posts — even those with their own image. Useful for consistent brand presence on social platforms.",
           depends_on: "social_image"
+        },
+        "social_image_alt" => {
+          type: :text,
+          label: "Social Image Alt Text",
+          hint: "Describes the social image for screen readers + social card previews. Skip when posts/pages set their own image_alt.",
+          placeholder: "Roe — open-source CMS"
+        },
+        "twitter_handle" => {
+          type: :text,
+          label: "Twitter / X handle",
+          hint: "Used for the twitter:site meta tag (\"via @yourhandle\" in embedded cards). Leading @ optional.",
+          placeholder: "@yourhandle"
         }
       }
     },
@@ -388,7 +400,36 @@ class Admin::ConfigsController < Admin::BaseController
     # theme can't be shown as selected, and saving the site config
     # would clear it.
     @available_themes = list_available_themes
+    # Measure the saved social image so the branding section can warn
+    # when its aspect ratio is off (square logos letterbox on
+    # Facebook/LinkedIn/Slack; the recommended 1200×630 is ~1.91:1).
+    @social_image_warning = social_image_ratio_warning(@config_hash["social_image"])
     render :edit
+  end
+
+  # Returns a human-readable warning string when the configured social
+  # image's aspect ratio is outside the recommended landscape window,
+  # or nil when it's fine / unmeasurable / blank. Pure advisory — never
+  # blocks a save.
+  def social_image_ratio_warning(image_ref)
+    ref = image_ref.to_s.strip
+    return nil if ref.empty?
+
+    if ref.downcase.end_with?(".svg")
+      return "This is an SVG. Social platforms reject vector images for cards — use a 1200×630 JPG or PNG instead."
+    end
+
+    dims = ImageDimensions.for_url(ref)
+    return nil unless dims && dims[:height].to_i.positive?
+
+    ratio = dims[:width].to_f / dims[:height]
+    # ~1.91:1 is the target. Allow a generous landscape band; warn
+    # outside it. Square-ish images still work on Twitter (we adapt the
+    # card type) but get letterboxed elsewhere — hence the warning.
+    return nil if ratio.between?(1.7, 2.2)
+
+    shape = ratio < 1.0 ? "portrait" : (ratio.between?(0.8, 1.25) ? "square" : "non-standard")
+    "Your social image is #{dims[:width]}×#{dims[:height]} (#{shape}). For best results across Facebook, LinkedIn, and Slack, use 1200×630. Twitter will still render it as a #{ratio.between?(0.8, 1.25) ? 'compact square' : 'large'} card."
   end
 
   def update_site

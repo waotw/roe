@@ -64,12 +64,19 @@ module SeoHelper
 
   # Absolute URL for og:image / twitter:image.
   #
-  # Default fallback chain:
-  #   post/page/product image → site social_image → site logo → nil
+  # Default fallback chain (first non-nil, non-SVG wins):
+  #   post/page/product metadata["social_image"]   ← per-post override
+  #   post/page/product metadata["image"]          ← hero/featured
+  #   site social_image
+  #   site logo
   #
-  # When social_image_override is true in site.yml, the social_image
-  # takes precedence over any per-post image, giving consistent brand
-  # presence across all shared links.
+  # When social_image_override is true in site.yml, the site
+  # social_image takes precedence over any per-post image — gives
+  # consistent brand presence across all shared links.
+  #
+  # SVG files are skipped at every step: Twitter/Facebook crawlers
+  # silently reject `image/svg+xml` images for cards, so falling
+  # through to the next candidate avoids a broken-looking unfurl.
   #
   # Returns nil rather than emitting a broken tag when nothing is set.
   def seo_image_url
@@ -77,17 +84,106 @@ module SeoHelper
     override       = SiteConfig.get("social_image_override")
     use_override   = override == true || override == "true"
 
-    candidate = if use_override && social_image.present?
-      social_image
+    chain = if use_override && social_image.present? && !svg?(social_image)
+      [ social_image, SiteConfig.get("logo").to_s.strip.presence ]
     else
-      seo_subject&.metadata&.dig("image").to_s.strip.presence ||
-        social_image ||
+      [
+        seo_subject&.metadata&.dig("social_image").to_s.strip.presence,
+        seo_subject&.metadata&.dig("image").to_s.strip.presence,
+        social_image,
         SiteConfig.get("logo").to_s.strip.presence
+      ]
     end
 
+    candidate = chain.compact.find { |c| !svg?(c) }
     return nil if candidate.blank?
     absolutize(candidate)
   end
+
+  # Pixel dimensions of seo_image_url's source file. Returned shape
+  # is { width:, height: }, or nil when the image is remote-hosted,
+  # missing, or an unsupported format. Used by og:image:width /
+  # og:image:height — Twitter / Facebook crawlers downgrade or skip
+  # `summary_large_image` cards when these tags are missing OR when
+  # the declared dimensions don't match what the crawler measures.
+  def seo_image_dimensions
+    return nil unless seo_image_url
+    ImageDimensions.for_url(raw_seo_image_path)
+  end
+
+  # Alt text for og:image:alt / twitter:image:alt.
+  # Fallback: post/page/product metadata["image_alt"] → site
+  # social_image_alt → subject title → site title. Falls through
+  # rather than emitting a tag with nothing meaningful in it.
+  def seo_image_alt
+    candidate =
+      seo_subject&.metadata&.dig("image_alt").to_s.strip.presence ||
+      SiteConfig.get("social_image_alt").to_s.strip.presence ||
+      (seo_subject&.respond_to?(:title) && seo_subject.title.to_s.strip.presence) ||
+      SiteConfig.get("title").to_s.strip.presence
+    candidate
+  end
+
+  # Twitter card type — "summary_large_image" (wide banner above the
+  # title) vs "summary" (small square thumb beside the title). Picked
+  # from the social image's aspect ratio:
+  #   square-ish (0.8–1.25)  → summary       — logos / brand marks
+  #   wider or taller        → summary_large_image
+  # When we have no image, or can't measure it (remote-hosted), default
+  # to summary_large_image — that's the existing behaviour and the
+  # right call for the common case of a 1200×630 social image.
+  SQUARE_RATIO_MIN = 0.8
+  SQUARE_RATIO_MAX = 1.25
+
+  def seo_twitter_card_type
+    return "summary" unless seo_image_url
+    dims = seo_image_dimensions
+    return "summary_large_image" unless dims && dims[:height].to_i.positive?
+
+    ratio = dims[:width].to_f / dims[:height]
+    ratio.between?(SQUARE_RATIO_MIN, SQUARE_RATIO_MAX) ? "summary" : "summary_large_image"
+  end
+
+  # Twitter @handle for twitter:site. Stripped to remove a leading
+  # "@" if the user added one, then re-added — keeps emission
+  # consistent regardless of how the field was filled in.
+  def seo_twitter_handle
+    raw = SiteConfig.get("twitter_handle").to_s.strip
+    return nil if raw.empty?
+    handle = raw.sub(/\A@/, "")
+    "@#{handle}"
+  end
+
+  private
+
+  def svg?(path)
+    path.to_s.downcase.end_with?(".svg")
+  end
+
+  # Recompute the same chain seo_image_url uses, but return the raw
+  # source path (NOT absolutized) so ImageDimensions can map it back
+  # to the filesystem. Kept separate from seo_image_url because the
+  # consumer there needs a URL while the consumer here needs the path.
+  def raw_seo_image_path
+    social_image   = SiteConfig.get("social_image").to_s.strip.presence
+    override       = SiteConfig.get("social_image_override")
+    use_override   = override == true || override == "true"
+
+    chain = if use_override && social_image.present? && !svg?(social_image)
+      [ social_image, SiteConfig.get("logo").to_s.strip.presence ]
+    else
+      [
+        seo_subject&.metadata&.dig("social_image").to_s.strip.presence,
+        seo_subject&.metadata&.dig("image").to_s.strip.presence,
+        social_image,
+        SiteConfig.get("logo").to_s.strip.presence
+      ]
+    end
+
+    chain.compact.find { |c| !svg?(c) }
+  end
+
+  public
 
   # Canonical URL — the absolute version of request.path. We strip
   # query strings because pagination/filter variants are typically

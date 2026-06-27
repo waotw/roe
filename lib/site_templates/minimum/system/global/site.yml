@@ -8,6 +8,8 @@ logo_style: ""
 favicon: ""
 social_image: ""
 social_image_override: false
+social_image_alt: ""
+twitter_handle: ""
 theme:
   active: "default"
 static_generation_enabled: false

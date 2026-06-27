@@ -106,6 +106,14 @@
                                value: flattened_config[field_name],
                                all_values: flattened_config %>
                     <% end %>
+                    <%# Advisory ratio warning computed in edit_site —
+                        the saved social image isn't ~1.91:1. Never
+                        blocks a save; just nudges toward 1200×630. %>
+                    <% if @social_image_warning.present? %>
+                      <div class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xs p-2">
+                        <%= @social_image_warning %>
+                      </div>
+                    <% end %>
                   </div>
                 </div>
 
