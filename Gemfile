@@ -104,3 +104,10 @@ gem "postmark-rails", "~> 0.22.1"
 
 gem "net-sftp", "~> 4.0"
 gem "net-ftp", ">= 0.2"
+
+# Terminal UI for the install-time admin setup (bin/bootstrap) — select
+# menus, masked password input, validated prompts, framed panels. Pure
+# Ruby, small footprint. (pastel ships as a tty-prompt dependency.)
+gem "tty-prompt", "~> 0.23"
+gem "tty-box", "~> 0.7"
+gem "tty-spinner", "~> 0.9"

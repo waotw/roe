@@ -126,11 +126,18 @@ cp "$RAILS_ROOT/roe.sh" "$STAGE_ROOT/roe.sh"
 
 ROOT_FILES=(start.command VERSION README.md LICENSE)
 for f in "${ROOT_FILES[@]}"; do
-  if [[ ! -f "$ROE_ROOT/$f" ]]; then
-    echo "Missing required root file: $f" >&2
+  # Prefer the canonical root copy, but fall back to the one in current/
+  # (the Rails app / git repo) when the root copy hasn't been synced up
+  # yet — LICENSE and README in particular live in both places, so a
+  # missing root copy shouldn't block a build when current/ has it.
+  if [[ -f "$ROE_ROOT/$f" ]]; then
+    cp "$ROE_ROOT/$f" "$STAGE_ROOT/$f"
+  elif [[ -f "$RAILS_ROOT/$f" ]]; then
+    cp "$RAILS_ROOT/$f" "$STAGE_ROOT/$f"
+  else
+    echo "Missing required root file: $f (looked in $ROE_ROOT and $RAILS_ROOT)" >&2
     exit 1
   fi
-  cp "$ROE_ROOT/$f" "$STAGE_ROOT/$f"
 done
 
 # Preserve exec bits on the two user-facing entry scripts (zip will
@@ -186,6 +193,7 @@ RSYNC_EXCLUDES=(
   --exclude='.kamal/secrets'
   --exclude='fly.toml'
   --exclude='bin/build-installer'
+  --exclude='install.sh'
   --exclude='VERSION'
 )
 

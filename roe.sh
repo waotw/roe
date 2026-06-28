@@ -21,6 +21,27 @@ else
     SITE_DIR="$ROE_ROOT/site"
 fi
 
+# Put APP_DIR's pinned Ruby (current/.ruby-version) on PATH for THIS
+# script process and every child it spawns — chdir-proof and, crucially,
+# non-interactive-safe.
+#
+# We deliberately do NOT use `eval "$(mise activate bash)"` for this. That
+# installs a shell *prompt hook* to resolve the version, and the hook
+# never fires in a non-interactive script — so it pins whatever Ruby
+# matches the script's current directory. When roe.sh is run from the
+# /roe root (the normal case), that directory has no .ruby-version, so
+# mise falls back to the GLOBAL Ruby instead of current/.ruby-version.
+# bin/setup would then run `bundle install` under the wrong Ruby and
+# install every gem into the wrong gemset — invisible to the Ruby the app
+# actually boots with. `mise env -C "$APP_DIR"` resolves explicitly for
+# the app directory regardless of CWD, which is exactly what we need.
+# (The `mise activate` we write into the user's *interactive* rc is fine
+# as-is — the prompt hook works there.)
+mise_pin_app_ruby() {
+    command -v mise >/dev/null 2>&1 || return 0
+    eval "$(mise env -C "$APP_DIR" 2>/dev/null)" 2>/dev/null || true
+}
+
 # Put Homebrew on PATH for this script process if it's installed at a
 # standard location but the user's shell hasn't yet picked it up. This
 # makes ./roe.sh self-sufficient on the second invocation after a fresh
@@ -34,11 +55,33 @@ if ! command -v brew >/dev/null 2>&1; then
     fi
 fi
 
-# Activate the correct Ruby version from APP_DIR/.ruby-version
-# Works whether the script is run from /roe or /roe/current
+# Put mise on PATH for this script process if it's installed but the
+# user's shell hasn't picked it up yet (same self-sufficiency trick as
+# Homebrew above — second invocation after a fresh mise install should
+# Just Work without opening a new terminal). mise's standalone
+# installer drops the binary at ~/.local/bin/mise by default.
+if ! command -v mise >/dev/null 2>&1; then
+    for _mise_candidate in "$HOME/.local/bin/mise" /opt/homebrew/bin/mise /usr/local/bin/mise; do
+        if [ -x "$_mise_candidate" ]; then
+            export PATH="$(dirname "$_mise_candidate"):$PATH"
+            break
+        fi
+    done
+fi
+
+# Activate the correct Ruby version from APP_DIR/.ruby-version.
+# Preference order: mise → rbenv → rvm. mise is the modern default
+# (single binary, precompiled rubies, cross-platform); rbenv/rvm stay
+# as fallbacks so installs that already use them aren't disrupted.
+# Works whether the script is run from /roe or /roe/current.
 if [ -f "$APP_DIR/.ruby-version" ]; then
     REQUIRED_RUBY=$(cat "$APP_DIR/.ruby-version")
-    if command -v rbenv >/dev/null 2>&1; then
+    if command -v mise >/dev/null 2>&1; then
+        # Pin ruby/bundle/gem/rails to current/.ruby-version for this
+        # script process (and its children) — see mise_pin_app_ruby's note
+        # for why this isn't `mise activate`.
+        mise_pin_app_ruby
+    elif command -v rbenv >/dev/null 2>&1; then
         export PATH="$(rbenv root)/versions/$REQUIRED_RUBY/bin:$PATH"
     elif command -v rvm >/dev/null 2>&1; then
         # shellcheck disable=SC1090
@@ -53,13 +96,70 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
 
-log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[✓]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
-log_error()   { echo -e "${RED}[✗]${NC} $1"; }
-log_step()    { echo -e "\n${BOLD}${CYAN}▶${NC} ${BOLD}$1${NC}"; }
+# ── Install logging ───────────────────────────────────────────────────────────
+# check/setup tee their progress to a temp log so a failed run leaves a
+# paste-able trace for support. On a CLEAN finish the log is deleted
+# (surgical: only ever `rm -f "$ROE_LOG"`, the exact mktemp path we
+# captured — never a glob). On failure it's kept and its path printed.
+# Only check/setup set ROE_LOG; every other command leaves it empty, so
+# the EXIT trap is a no-op for start/stop/status/etc.
+ROE_LOG=""
+ROE_OK=0
+
+_logfile_append() {
+    [ -n "$ROE_LOG" ] || return 0
+    printf '%s %s\n' "$(date '+%H:%M:%S')" "$1" >> "$ROE_LOG" 2>/dev/null || true
+}
+
+start_install_log() {
+    # Reuse an already-open log when nested (cmd_check → cmd_setup) so
+    # we don't orphan the first log file. Only the outermost caller
+    # creates one; the innermost success marks it OK.
+    [ -n "$ROE_LOG" ] && { _logfile_append "=== roe.sh $* ==="; return 0; }
+    # Full template path (not `mktemp -t`): GNU and BSD/macOS both
+    # substitute the X's when given a complete template, producing a
+    # clean name like roe-install.aB3xY9. `mktemp -t prefix` instead
+    # leaves a literal "XXXXXX" in the name on macOS.
+    ROE_LOG="$(mktemp "${TMPDIR:-/tmp}/roe-install.XXXXXX" 2>/dev/null)" || ROE_LOG=""
+    ROE_OK=0
+    [ -n "$ROE_LOG" ] && _logfile_append "=== roe.sh $* started ==="
+}
+
+# Mark the run successful — the EXIT trap will then delete the log.
+mark_install_ok() { ROE_OK=1; }
+
+_on_exit() {
+    [ -n "$ROE_LOG" ] || return 0
+    if [ "$ROE_OK" = "1" ]; then
+        rm -f "$ROE_LOG"
+    else
+        echo "" >&2
+        echo -e "${YELLOW}A log of this run was kept for troubleshooting:${NC}" >&2
+        echo "  $ROE_LOG" >&2
+    fi
+}
+trap _on_exit EXIT
+
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; _logfile_append "[INFO] $1"; }
+log_success() { echo -e "${GREEN}[✓]${NC} $1"; _logfile_append "[OK]   $1"; }
+log_warning() { echo -e "${YELLOW}[!]${NC} $1"; _logfile_append "[WARN] $1"; }
+log_error()   { echo -e "${RED}[✗]${NC} $1"; _logfile_append "[FAIL] $1"; }
+log_step()    { echo -e "\n${BOLD}${CYAN}▶${NC} ${BOLD}$1${NC}"; _logfile_append "== $1 =="; }
+
+# Give a `read` prompt breathing room below it: print a few blank lines
+# (terminal scrolls up), then move the cursor back up onto the prompt
+# row. Leaves empty space beneath the cursor so prompts never sit flush
+# against the window's bottom edge. Mirrors bin/bootstrap's helper. Only
+# emits cursor control when stdout is a terminal.
+breathing_room() {
+    [ -t 1 ] || return 0
+    local lines="${1:-5}" i
+    for ((i = 0; i < lines; i++)); do printf '\n'; done
+    printf '\033[%sA' "$lines"
+}
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
@@ -76,8 +176,172 @@ is_linux() { [ "$OS" = "linux" ]; }
 # Check if Homebrew is available (macOS only)
 check_brew() { command_exists brew; }
 
+# Are Apple's Command Line Tools actually installed and usable?
+#
+# We can't trust `command -v git` or even `xcode-select -p` alone: a
+# fresh macOS ships *stub* binaries (/usr/bin/git, /usr/bin/clang) that
+# do nothing but pop the CLT installer the first time they're run, and
+# `xcode-select -p` can print a path before the tools finish installing.
+# The reliable signal is the real compiler binary existing inside the
+# selected developer dir — so we resolve that dir and check for clang.
+clt_installed() {
+    is_macos || return 0
+    local dir
+    dir="$(xcode-select -p 2>/dev/null)" || return 1
+    [ -n "$dir" ] && [ -x "$dir/usr/bin/clang" ]
+}
+
+# macOS only: make sure the Command Line Tools (the clang/make toolchain)
+# are installed *before* anything that needs to compile from source —
+# chiefly mise/ruby-build, which builds Ruby and OpenSSL from source.
+#
+# Without this, macOS auto-triggers the CLT installer the moment the
+# compiler is first invoked, but that installer runs asynchronously in a
+# GUI window — so the Ruby build races ahead with no compiler present and
+# dies with a cryptic OpenSSL `make` error. We trigger the installer
+# ourselves, explain what's happening, and then WAIT for it to finish.
+ensure_macos_build_tools() {
+    is_macos || return 0
+    clt_installed && return 0
+
+    # A short guide for anyone who hits trouble with the CLT install.
+    local clt_help_url="https://www.mikegopsill.com/posts/install-xcode-command-line-tools/"
+
+    echo ""
+    echo -e "  ${BOLD}Roe needs Apple's Command Line Tools for Xcode in order to run.${NC}"
+    echo -e "  This is very common when installing open-source software. macOS will"
+    echo -e "  take care of this for you in a separate window — when it's finished,"
+    echo -e "  come back here to continue."
+    echo -e "  ${DIM}This will take around ~5–10 min depending on your download speed…${NC}"
+    echo ""
+    breathing_room
+    read -rp "  [y] install Command Line Tools   [q] quit Roe installation: " REPLY
+    case "${REPLY:-y}" in
+        [Qq]*)
+            echo -e "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
+            exit 0
+            ;;
+    esac
+    echo ""
+
+    # Kick off Apple's installer. This opens a GUI dialog and returns
+    # immediately; the actual download/install happens in the background.
+    # If the tools are already mid-install (or queued), this is a no-op.
+    xcode-select --install 2>/dev/null || true
+
+    log_info "macOS is installing the Command Line Tools in a separate window — this can take several minutes."
+
+    # Wait for completion. We poll for the real compiler, but also pause
+    # on a [c] prompt so the user tells us when Apple's installer says
+    # it's done — then we re-check before trusting it.
+    while ! clt_installed; do
+        echo ""
+        breathing_room
+        read -rp "  When the Command Line Tools have finished installing, press [c] to continue (or [q] to quit): " REPLY
+        case "${REPLY:-}" in
+            [Qq]*)
+                echo -e "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
+                exit 0
+                ;;
+        esac
+        # A fresh CLT install can land tools that only the user's shell rc
+        # puts on PATH — source their profile so the new compiler is
+        # actually visible to this process before we re-check.
+        source_profile
+        if ! clt_installed; then
+            log_warning "The Command Line Tools don't look ready yet. Let the macOS installer finish, then press [c]."
+            echo -e "  ${DIM}Having trouble? This guide walks through it step by step:${NC}"
+            echo -e "  ${CYAN}${clt_help_url}${NC}"
+        fi
+    done
+
+    echo ""
+    log_success "Command Line Tools are installed."
+}
+
+# Are a C compiler and `make` available? Roe's native gem extensions
+# (bcrypt and friends) compile during `bundle install`, which needs both.
+check_build_tools() {
+    command_exists make && { command_exists gcc || command_exists cc; }
+}
+
+# Build the right "install build tools" command for the user's Linux
+# distro by sniffing its package manager. Echoes nothing when none is
+# recognised (the caller falls back to generic guidance).
+linux_build_tools_cmd() {
+    if command_exists apt-get; then
+        echo "sudo apt-get update && sudo apt-get install -y build-essential"
+    elif command_exists dnf; then
+        echo "sudo dnf install -y gcc gcc-c++ make"
+    elif command_exists yum; then
+        echo "sudo yum install -y gcc gcc-c++ make"
+    elif command_exists pacman; then
+        echo "sudo pacman -S --needed --noconfirm base-devel"
+    elif command_exists zypper; then
+        echo "sudo zypper install -y gcc gcc-c++ make"
+    elif command_exists apk; then
+        # Alpine/musl has no precompiled Ruby either, so pull the headers
+        # ruby-build needs (OpenSSL + libyaml) alongside the compiler.
+        echo "sudo apk add build-base openssl-dev yaml-dev"
+    fi
+}
+
+# Linux only: make sure a compiler + make are present before bundle
+# install compiles native gem extensions. Linux system packages need
+# sudo, so — unlike the macOS Command Line Tools step — we can't run the
+# install ourselves. Instead we show the right command for the distro and
+# wait, re-checking until it's there. Same copy/paste/continue shape, tone
+# and colours as the macOS path.
+ensure_linux_build_tools() {
+    is_linux || return 0
+    check_build_tools && return 0
+
+    local cmd
+    cmd="$(linux_build_tools_cmd)"
+
+    echo ""
+    echo -e "  ${BOLD}Roe needs a C compiler and make to finish installing.${NC}"
+    echo -e "  A few of Roe's libraries build small native components the first"
+    echo -e "  time they're installed. Your Linux distribution provides these in a"
+    echo -e "  single package — install it, then come back here to continue."
+    echo ""
+
+    if [ -n "$cmd" ]; then
+        echo -e "  1. Copy this command:"
+        echo -e "     ${CYAN}${cmd}${NC}"
+        echo -e "  2. Run it in another terminal (it'll ask for your password — ${BOLD}sudo${NC})"
+        echo -e "  3. Come back here and press [c] to continue"
+    else
+        log_warning "Couldn't identify your package manager automatically."
+        echo -e "  Install your distro's build tools — a C compiler and make"
+        echo -e "  (often packaged as ${CYAN}build-essential${NC}, ${CYAN}base-devel${NC}, or ${CYAN}\"Development Tools\"${NC})."
+    fi
+    echo ""
+
+    while ! check_build_tools; do
+        breathing_room
+        read -rp "  When the build tools are installed, press [c] to continue (or [q] to quit): " REPLY
+        case "${REPLY:-}" in
+            [Qq]*)
+                echo -e "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
+                exit 0
+                ;;
+        esac
+        # A fresh package install can land binaries the user's rc puts on
+        # PATH — re-source so the compiler is visible before we re-check.
+        source_profile
+        if ! check_build_tools; then
+            log_warning "A C compiler + make still aren't detected. Let the install finish, then press [c]."
+        fi
+    done
+
+    echo ""
+    log_success "Build tools are installed."
+}
+
 wait_for_enter() {
     echo
+    breathing_room
     read -rp "Press Enter when ready to continue..."
     echo
 }
@@ -156,6 +420,7 @@ install_prompt() {
     echo -e "  3. Paste and press Enter — wait for it to finish"
     echo -e "  4. Return here and press [c] to continue"
     echo ""
+    breathing_room
     read -rp "  When done: [c] continue   [q] quit Roe setup: " REPLY
     echo ""
     if [[ $REPLY =~ ^[Qq]$ ]]; then
@@ -201,6 +466,7 @@ ensure_installed() {
         echo "    [i] show the install command again"
         echo "    [q] quit setup — re-run ./roe.sh check later"
         echo ""
+        breathing_room
         read -rp "  Choice [R/i/q]: " REPLY
         echo ""
         case "${REPLY:-r}" in
@@ -264,6 +530,200 @@ ensure_rbenv_in_shell() {
     return 0
 }
 
+# In-place sed that works on regular files AND symlinks (dotfile
+# managers symlink rc files; BSD `sed -i ''` refuses to edit those).
+# Transform to a temp file, then `cat` the result back through the
+# path — that rewrites the symlink's target contents while preserving
+# the link itself, and sidesteps the GNU-vs-BSD `-i` syntax split.
+_sed_inplace() {
+    local expr="$1" file="$2" tmp
+    tmp="$(mktemp 2>/dev/null)" || return 1
+    if sed "$expr" "$file" > "$tmp" 2>/dev/null; then
+        cat "$tmp" > "$file"
+    fi
+    rm -f "$tmp"
+}
+
+# Every shell-startup file we might need to scan or edit, for the
+# user's current shell. zsh honours ZDOTDIR — when it's set, the
+# active .zshrc/.zprofile/.zlogin live there, NOT in $HOME (a very
+# common gotcha with dotfile managers like stow/stash). We list BOTH
+# locations so we catch whichever the user's setup actually sources,
+# plus the login-shell files (.zprofile/.zlogin) where PATH exports
+# usually live, and .zshenv which zsh reads for every shell.
+_rc_candidate_files() {
+    local shell_name; shell_name="$(basename "${SHELL:-}")"
+    case "$shell_name" in
+        zsh)
+            local dirs="$HOME"
+            [ -n "${ZDOTDIR:-}" ] && [ "$ZDOTDIR" != "$HOME" ] && dirs="$HOME $ZDOTDIR"
+            local d
+            for d in $dirs; do
+                echo "$d/.zshenv"; echo "$d/.zprofile"; echo "$d/.zshrc"; echo "$d/.zlogin"
+            done
+            ;;
+        bash)
+            echo "$HOME/.bash_profile"; echo "$HOME/.bashrc"; echo "$HOME/.profile"
+            ;;
+        *)
+            echo "$HOME/.profile"
+            ;;
+    esac
+}
+
+# The single rc file we WRITE `mise activate` into — the interactive
+# rc, ZDOTDIR-aware for zsh.
+_mise_write_target() {
+    local shell_name; shell_name="$(basename "${SHELL:-}")"
+    case "$shell_name" in
+        zsh)  echo "${ZDOTDIR:-$HOME}/.zshrc" ;;
+        bash) echo "$HOME/.bash_profile" ;;
+        *)    return 1 ;;
+    esac
+}
+
+# When an install switches to mise, rbenv must stop managing Ruby — if
+# both are active they fight over .ruby-version and rbenv (which won't
+# have the new version) wins, producing:
+#   rbenv: version `4.0.5' is not installed (set by .../.ruby-version)
+# even though mise has it. rbenv hooks in two independent ways, BOTH of
+# which we neutralize:
+#   1. `eval "$(rbenv init ...)"`           — the shell integration
+#   2. `export PATH=".../.rbenv/shims:..."` — a hardcoded shims path,
+#      which intercepts even when init never runs
+# Comments out any UNcommented occurrence of either, across every
+# candidate startup file (ZDOTDIR-aware). Reversible — the user can
+# un-comment. Lines already starting with `#` are left alone, so it's
+# idempotent.
+disable_rbenv_in_shell() {
+    local rc
+    for rc in $(_rc_candidate_files); do
+        [ -f "$rc" ] || continue
+        if grep -qE '^[[:space:]]*[^#[:space:]].*rbenv init' "$rc" 2>/dev/null; then
+            _sed_inplace 's/^\([[:space:]]*\)\([^#[:space:]].*rbenv init.*\)$/\1# [Roe: disabled — mise manages Ruby now] \2/' "$rc"
+            log_info "Disabled rbenv init in $rc"
+        fi
+        if grep -qE '^[[:space:]]*[^#[:space:]].*\.rbenv/shims' "$rc" 2>/dev/null; then
+            _sed_inplace 's|^\([[:space:]]*\)\([^#[:space:]].*\.rbenv/shims.*\)$|\1# [Roe: disabled — mise manages Ruby now] \2|' "$rc"
+            log_info "Disabled rbenv shims PATH in $rc"
+        fi
+    done
+    return 0
+}
+
+# mise equivalent of ensure_rbenv_in_shell. Writes `mise activate` to
+# the user's interactive rc (ZDOTDIR-aware), AND neutralizes any rbenv
+# integration so the two managers don't conflict. Returns 0 on success
+# / already-present, 1 on unsupported shells.
+# Modern mise (2024+) does NOT read idiomatic version files like
+# `.ruby-version` unless the tool is opted in via this setting — without
+# it, `mise activate` runs but has no Ruby pinned for the project, so
+# `ruby` silently falls through to the system Ruby. Roe keeps a single
+# version file (`.ruby-version`, which rbenv also reads), so we enable
+# mise to honour it. Idempotent — `set` overwrites to the same value.
+configure_mise_for_ruby() {
+    command_exists mise || return 0
+    mise settings set idiomatic_version_file_enable_tools "ruby" 2>/dev/null \
+        && log_info "Configured mise to read .ruby-version" || true
+
+    # Use precompiled Ruby binaries instead of compiling from source.
+    # mise's default (until 2026.8.0) is to build Ruby + OpenSSL from
+    # source via ruby-build — slow (several minutes) and the source path
+    # is where the cryptic OpenSSL `make` failures live. Precompiled
+    # binaries download in seconds and Just Work. This becomes mise's
+    # default soon; we opt in now. (`set` overwrites to the same value,
+    # so this is idempotent.)
+    mise settings set ruby.compile false 2>/dev/null \
+        && log_info "Configured mise to use precompiled Ruby" || true
+}
+
+ensure_mise_in_shell() {
+    local shell_name rc_file
+    shell_name="$(basename "$SHELL")"
+    rc_file="$(_mise_write_target)" || {
+        log_warning "Unsupported shell: $shell_name — can't auto-configure"
+        return 1
+    }
+
+    # Always neutralize rbenv, even when mise activate is already present
+    # — this is the path that fixes installs that added mise earlier but
+    # still have rbenv intercepting via init or a hardcoded shims path.
+    disable_rbenv_in_shell
+
+    # Make mise honour .ruby-version (off by default in modern mise).
+    configure_mise_for_ruby
+
+    # mise's standalone installer puts the binary at ~/.local/bin/mise,
+    # which is NOT on macOS's default login PATH — so a bare
+    # `eval "$(mise activate …)"` line dies with "command not found:
+    # mise" in a fresh shell and Ruby never activates. We instead write a
+    # self-contained block that FIRST puts mise's own directory on PATH,
+    # then activates (guarded, so it's a harmless no-op if mise really is
+    # missing). When mise came from Homebrew its dir is already on PATH
+    # and re-adding it changes nothing.
+    local marker='# Added by Roe — mise (Ruby version manager) activation'
+    if grep -qF "$marker" "$rc_file" 2>/dev/null; then
+        log_info "mise activation already configured in $rc_file"
+        return 0
+    fi
+
+    # Comment out any older bare activate line a previous version wrote
+    # (no PATH guard — the source of the "command not found: mise"
+    # error). The new block below supersedes it.
+    if grep -qE 'eval "\$\(mise activate' "$rc_file" 2>/dev/null; then
+        _sed_inplace 's|^\(.*eval "\$(mise activate.*\)$|# [Roe: superseded] \1|' "$rc_file"
+        log_info "Replaced an older mise activate line in $rc_file"
+    fi
+
+    # Resolve mise's install directory so we can put it on PATH. Prefer a
+    # $HOME-relative entry so the written rc line stays portable.
+    local mise_bin_dir path_frag
+    if command -v mise >/dev/null 2>&1; then
+        mise_bin_dir="$(cd "$(dirname "$(command -v mise)")" 2>/dev/null && pwd)"
+    fi
+    case "$mise_bin_dir" in
+        "$HOME"/*) path_frag='$HOME'"${mise_bin_dir#"$HOME"}" ;;
+        "")        path_frag='$HOME/.local/bin' ;;
+        *)         path_frag="$mise_bin_dir" ;;
+    esac
+
+    {
+        echo ''
+        echo "$marker"
+        echo "export PATH=\"$path_frag:\$PATH\""
+        echo "command -v mise >/dev/null 2>&1 && eval \"\$(mise activate $shell_name)\""
+    } >> "$rc_file"
+
+    log_success "Added mise to PATH + activation in $rc_file (shell: $shell_name)"
+    return 0
+}
+
+# Install mise itself (the version manager), preferring a Homebrew
+# install when brew is already present (clean, managed) and falling
+# back to mise's standalone installer otherwise — which crucially needs
+# NO Homebrew and NO compiler, just curl. After install, put it on PATH
+# for the rest of this script process.
+# Install mise directly (no copy-paste-in-another-terminal). Both
+# install methods are non-interactive and need no sudo. Returns 0 if
+# mise ends up on PATH for this process, non-zero otherwise.
+install_mise() {
+    if is_macos && check_brew; then
+        brew install mise
+    else
+        # The official standalone installer — single self-contained
+        # binary to ~/.local/bin, no Homebrew or compiler needed.
+        curl -fsSL https://mise.run | sh
+    fi
+    # Surface the freshly-installed binary to the current process so the
+    # rest of the script can use it without a new shell.
+    if ! command_exists mise; then
+        for _m in "$HOME/.local/bin/mise" /opt/homebrew/bin/mise /usr/local/bin/mise; do
+            [ -x "$_m" ] && export PATH="$(dirname "$_m"):$PATH" && break
+        done
+    fi
+    command_exists mise
+}
+
 # ── Requirement checks ────────────────────────────────────────────────────────
 
 # Check Ruby — requires minimum version matching APP_DIR/.ruby-version
@@ -303,6 +763,7 @@ usage() {
     echo -e "${BOLD}Setup Commands:${NC}"
     echo "  check         Check system requirements and guide installation"
     echo "  setup         Run the full Roe setup (runs check first)"
+    echo "  setup-mise    Add 'mise activate' to your shell rc file (zsh / bash)"
     echo "  setup-rbenv   Add 'rbenv init' to your shell rc file (zsh / bash)"
     echo ""
     echo -e "${BOLD}Server Commands:${NC}"
@@ -326,12 +787,38 @@ usage() {
     echo "  Site: $SITE_DIR"
 }
 
+# Read-only preflight: scan the boot-essential dependencies and print a
+# one-glance status table BEFORE the interactive install steps. Pure
+# probes — no prompts, no installs, no side effects.
+#
+# This check is deliberately minimal: only what Roe needs to RUN. Ruby
+# is the irreducible floor (everything past this point — gem install,
+# DB setup, the admin TUI — is Ruby). Git is here because the in-app
+# updater needs it. Everything else (gems, database, optional image
+# tooling) is handled in the friendlier setup flow once Ruby is present.
+print_requirements_summary() {
+    local required_ruby
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+
+    log_step "Checking what's already installed"
+
+    if check_ruby; then
+        local r; r=$(cd "$APP_DIR" && ruby --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        log_success "Ruby ${r}"
+    else
+        log_warning "Ruby ${required_ruby} — will install"
+    fi
+    check_git && log_success "Git" || log_warning "Git — will install"
+    echo ""
+}
+
 # ── Check command ─────────────────────────────────────────────────────────────
 
 cmd_check() {
+    start_install_log check
     echo -e "${BOLD}"
     echo "╔════════════════════════════════════════╗"
-    echo "║     Roe — Requirements Check       ║"
+    echo "║        Roe — Requirements Check        ║"
     echo "╚════════════════════════════════════════╝"
     echo -e "${NC}"
     echo "I'll check your system for required dependencies."
@@ -341,102 +828,110 @@ cmd_check() {
     echo ""
 
     local all_good=true
-    local has_optional_missing=false
     local required_ruby
     required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
 
-    # ── Homebrew (macOS only) ─────────────────────────────────────────────
-    if is_macos; then
-        log_step "Checking Homebrew (macOS package manager)"
-        if check_brew; then
-            log_success "Homebrew is installed ($(brew --version | head -1 | cut -d' ' -f2))"
-        else
-            log_warning "Homebrew is not installed"
-            echo -e "  Homebrew makes installing dependencies much easier on macOS."
-            install_prompt "Homebrew" '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
-                "Installing Homebrew is usually the biggest hurdle — after that it's pretty smooth. It can take a few minutes."
-            if check_brew; then
-                log_success "Homebrew is now installed!"
-            else
-                log_warning "Homebrew still not found — continuing without it"
-                echo -e "  ${YELLOW}Note:${NC} Some install commands below may differ without Homebrew."
-            fi
-        fi
-    fi
+    print_requirements_summary
+
+    # The blocks below only engage when something is MISSING — the
+    # summary above already reported what's present, so re-printing
+    # "✓ X is installed" would just be noise.
+    #
+    # Homebrew is no longer installed proactively: mise installs Ruby via
+    # its own standalone installer (no brew needed), and Git falls back
+    # to Xcode CLT. Where a dep CAN use brew it still prefers it when
+    # present — but we never make Homebrew a prerequisite of its own.
 
     # ── Ruby ──────────────────────────────────────────────────────────────────
-    log_step "Checking Ruby ${required_ruby}+ (Required)"
-    if check_ruby; then
-        actual=$(cd "$APP_DIR" && ruby --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-        log_success "Ruby $actual is installed"
-    else
-        log_error "Ruby ${required_ruby}+ is not installed or the wrong version"
+    if ! check_ruby; then
+        log_step "Installing Ruby ${required_ruby} (Required)"
+        log_error "Ruby ${required_ruby}+ is not installedu"
         all_good=false
-        echo -e "  Ruby ${required_ruby} is required. Install via rbenv (recommended):"
-        echo ""
 
-        # Step 1 — rbenv itself
-        if ! command_exists rbenv; then
-            echo -e "  ${BOLD}Step 1${NC} — Install rbenv:"
-            if is_macos && check_brew; then
-                install_prompt "rbenv" "brew install rbenv"
-            elif is_macos; then
-                install_prompt "rbenv" '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install rbenv'
-            else
-                install_prompt "rbenv" 'curl -fsSL https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer | bash'
-            fi
-        else
-            log_success "rbenv is already installed — skipping step 1"
-        fi
-
-        # Step 2 — rbenv shell init (only if not already in profile).
-        # ensure_rbenv_in_shell writes the init line into the right rc
-        # file directly. Earlier versions printed the command for the
-        # user to copy/paste, which broke when their rendered-markdown
-        # viewer substituted smart quotes for ASCII ones — the shell
-        # then sat waiting for an unclosed quote. Writing it ourselves
-        # sidesteps that entire failure mode.
-        if ! grep -q 'rbenv init' "$HOME/.zshrc" 2>/dev/null && \
-           ! grep -q 'rbenv init' "$HOME/.bash_profile" 2>/dev/null && \
-           ! grep -q 'rbenv init' "$HOME/.bashrc" 2>/dev/null; then
-            echo -e "  ${BOLD}Step 2${NC} — Add rbenv to your shell:"
-            if ensure_rbenv_in_shell; then
-                source_profile
-            else
-                # Fallback for shells we don't recognise — print a hint
-                # and keep going so the rest of check still runs.
-                log_warning "Add this line to your shell's rc file manually:"
-                echo "  eval \"\$(rbenv init - \$(basename \"\$SHELL\"))\""
-            fi
-        else
-            log_success "rbenv shell init already in profile — skipping step 2"
-            source_profile
-        fi
-
-        # Step 3 — install the required Ruby version
-        if ! command_exists rbenv || ! rbenv versions 2>/dev/null | grep -q "${required_ruby}"; then
-            echo -e "  ${BOLD}Step 3${NC} — Install Ruby ${required_ruby}:"
-            install_prompt "Ruby ${required_ruby}" \
-                "rbenv install ${required_ruby} && rbenv global ${required_ruby}" \
-                "This takes 5–10 minutes (compiles from source)"
-        else
+        # Two install paths. mise is the default for fresh installs:
+        # one self-contained binary, precompiled rubies (seconds, not a
+        # 5–10 min source compile), no Homebrew or build-tools
+        # prerequisite. rbenv stays as the fallback ONLY for users who
+        # already have it — we don't steer anyone new toward it.
+        if command_exists rbenv && rbenv versions 2>/dev/null | grep -q "${required_ruby}"; then
+            # Existing rbenv user who already has the right Ruby built —
+            # just select it, no reinstall.
             log_success "Ruby ${required_ruby} already installed via rbenv — setting as global"
             rbenv global "${required_ruby}" 2>/dev/null || true
             source_profile
-        fi
+            ensure_installed check_ruby "Ruby ${required_ruby}" \
+                "rbenv install ${required_ruby} && rbenv global ${required_ruby}"
+            log_success "Ruby is now installed!"
+            all_good=true
+        else
+            # ── One-prompt, install-it-for-you path ───────────────────
+            # No copy-paste, no second terminal: with the user's OK, we
+            # run the mise + Ruby installs right here and keep going.
+            echo -e "  ${BOLD}Roe needs Ruby ${required_ruby}.${NC}"
+            echo -e "  I'll install mise (a small version manager) and Ruby ${required_ruby} for you — no extra steps."
+            echo ""
+            breathing_room
+            read -rp "  Install now? [y/q]: " REPLY
+            case "${REPLY:-y}" in
+                [Qq]*)
+                    echo "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
+                    exit 0
+                    ;;
+            esac
+            echo ""
 
-        ensure_installed check_ruby "Ruby ${required_ruby}" \
-            "rbenv install ${required_ruby} && rbenv global ${required_ruby}" \
-            "This takes 5–10 minutes (compiles from source)"
-        log_success "Ruby is now installed!"
-        all_good=true
+            # 1. mise itself
+            if ! command_exists mise; then
+                log_step "Installing mise"
+                if ! install_mise; then
+                    log_error "Couldn't install mise automatically."
+                    echo "  Install it manually, then re-run ./roe.sh check:"
+                    echo "    ${CYAN}curl https://mise.run | sh${NC}"
+                    exit 1
+                fi
+                log_success "mise installed"
+            fi
+
+            # 2. Make mise honour .ruby-version, activate it for THIS
+            #    process, and persist activation to the user's shell rc
+            #    (so future terminals see it too).
+            configure_mise_for_ruby
+            mise_pin_app_ruby
+            ensure_mise_in_shell
+
+            # 3. Native builds need a compiler + make. On macOS that's
+            #    Apple's Command Line Tools; on Linux it's the distro's
+            #    build tools. Make sure they're present BEFORE we install
+            #    Ruby and (later) compile native gems, so nothing races
+            #    ahead of the compiler and fails. Each no-ops off its OS.
+            ensure_macos_build_tools
+            ensure_linux_build_tools
+
+            # 4. Install + pin Ruby. Runs right here — output streams, and
+            #    the first build can take a few minutes.
+            log_step "Installing Ruby ${required_ruby}"
+            log_info "Downloading Ruby — the first build can take a few minutes…"
+            if ! mise use --global "ruby@${required_ruby}"; then
+                log_error "Ruby install failed — see the output above."
+                exit 1
+            fi
+            mise_pin_app_ruby
+
+            # 4. Verify it's now visible.
+            if check_ruby; then
+                log_success "Ruby ${required_ruby} is ready!"
+                all_good=true
+            else
+                log_error "Ruby installed but isn't being detected yet."
+                echo "  Open a new terminal and re-run ${CYAN}./roe.sh check${NC}."
+                exit 1
+            fi
+        fi
     fi
 
     # ── Git ───────────────────────────────────────────────────────────────────
-    log_step "Checking Git (Required)"
-    if check_git; then
-        log_success "Git is installed ($(git --version | cut -d' ' -f3))"
-    else
+    if ! check_git; then
+        log_step "Installing Git (Required)"
         log_error "Git is not installed"
         all_good=false
         local git_desc git_cmd
@@ -452,89 +947,11 @@ cmd_check() {
         log_success "Git is now installed!"
     fi
 
-    # ── Bundler ───────────────────────────────────────────────────────────────
-    log_step "Checking Bundler (Required)"
-    if check_bundler; then
-        log_success "Bundler is installed ($(cd "$APP_DIR" && bundle --version | cut -d' ' -f3))"
-    else
-        log_warning "Bundler not found — installing now..."
-        if cd "$APP_DIR" && gem install bundler 2>/dev/null; then
-            log_success "Bundler installed!"
-        else
-            log_error "Failed to install Bundler."
-            install_prompt "Bundler" "gem install bundler"
-            check_bundler || { all_good=false; log_error "Bundler still not found"; }
-        fi
-    fi
-
-    # ── SQLite3 ───────────────────────────────────────────────────────────────
-    log_step "Checking SQLite3 (Required)"
-    if check_sqlite; then
-        log_success "SQLite3 is installed ($(sqlite3 --version | cut -d' ' -f1))"
-    else
-        log_error "SQLite3 is not installed"
-        all_good=false
-        local sqlite_cmd
-        if is_macos && check_brew; then
-            sqlite_cmd="brew install sqlite3"
-        elif is_macos; then
-            echo -e "  SQLite3 is usually pre-installed on macOS. Install Homebrew first:"
-            sqlite_cmd='/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install sqlite3'
-        else
-            sqlite_cmd="sudo apt-get install sqlite3 libsqlite3-dev   # or: sudo dnf install sqlite sqlite-devel"
-        fi
-        install_prompt "SQLite3" "$sqlite_cmd"
-        ensure_installed check_sqlite "SQLite3" "$sqlite_cmd"
-        log_success "SQLite3 is now installed!"
-    fi
-
-    # ── libvips (optional) ────────────────────────────────────────────────────
-    log_step "Checking libvips (Optional — Roe uses this library to optimize all images in Roe. Highly recommended.)"
-    if check_libvips; then
-        log_success "libvips is installed ($(vips --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1))"
-    else
-        log_warning "libvips is not installed"
-        has_optional_missing=true
-        echo -e "  libvips is ${BOLD}optional${NC} but recommended for image processing (thumbnails, variants)."
-        echo ""
-        read -rp "  Install libvips now? [y/n]: " REPLY
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            # Capture the install command + description once so the
-            # retry loop can re-show the same command without the
-            # OS-detection ladder being duplicated.
-            local vips_desc="libvips" vips_cmd
-            if is_macos && check_brew; then
-                vips_cmd="brew install libvips"
-            elif is_macos; then
-                vips_cmd='/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install libvips'
-            else
-                vips_cmd="sudo apt-get install libvips-dev   # or: sudo dnf install vips-devel"
-            fi
-            install_prompt "$vips_desc" "$vips_cmd"
-
-            # Retry loop. Unlike the required-tool ensure_installed
-            # helper, libvips is optional — so [n] skips and continues
-            # the rest of `check` instead of exiting the script.
-            while ! check_libvips; do
-                echo ""
-                read -rp "  libvips still not found. Try again? [y/n]: " REPLY
-                echo ""
-                if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    install_prompt "$vips_desc" "$vips_cmd"
-                else
-                    log_info "Skipping libvips — you can install it later"
-                    break
-                fi
-            done
-
-            if check_libvips; then
-                log_success "libvips installed!"
-                has_optional_missing=false
-            fi
-        else
-            log_info "Skipping libvips — you can install it later"
-        fi
-    fi
+    # Bundler ships with Ruby (default gem) — no separate check needed.
+    # SQLite3's CLI is not required: the sqlite3 gem bundles its own
+    # library, and backups copy DB files via rsync. Image tooling
+    # (libvips) is optional and offered later in the friendlier setup
+    # flow, not here.
 
     # ── Summary ───────────────────────────────────────────────────────────────
     echo ""
@@ -542,14 +959,21 @@ cmd_check() {
     echo ""
 
     if $all_good; then
-        log_success "All required dependencies are installed!"
-        $has_optional_missing && log_warning "Some optional dependencies are missing (see above)"
+        log_success "Ready — Ruby and Git are in place."
         echo ""
         echo -e "${BOLD}Next step:${NC} Run the Roe setup"
         echo -e "   ${CYAN}./roe.sh setup${NC}"
         echo ""
+        breathing_room
         read -rp "Run setup now? [y/n]: " REPLY
-        [[ $REPLY =~ ^[Yy]$ ]] && ROE_FIRST_RUN=1 cmd_setup
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # cmd_setup reuses this log (nesting guard) and marks the
+            # whole run OK only once the app boots cleanly.
+            cmd_setup
+        else
+            # Check-only success — deps are in place, user deferred setup.
+            mark_install_ok
+        fi
     else
         log_error "Some required dependencies are missing"
         echo ""
@@ -561,6 +985,7 @@ cmd_check() {
 # ── Setup command ─────────────────────────────────────────────────────────────
 
 cmd_setup() {
+    start_install_log setup
     log_step "Checking Requirements"
 
     local all_good=true
@@ -579,7 +1004,26 @@ cmd_setup() {
     log_step "Running Roe Setup"
     echo ""
     cd "$APP_DIR"
-    "$APP_DIR/bin/setup"
+    "$APP_DIR/bin/setup" || { log_error "bin/setup failed — see the log path printed below."; exit 1; }
+
+    # ── Final verification ─────────────────────────────────────────
+    # Confirm the app actually boots (gems load, DB connects, config
+    # parses) rather than just assuming setup worked. A non-interactive
+    # `runner` is a faithful proxy for "the server will start" without
+    # the port/background dance of a full boot.
+    log_step "Verifying installation"
+    if "$APP_DIR/bin/rails" runner 'print "ok"' 2>/dev/null | grep -q "ok"; then
+        log_success "Roe booted cleanly"
+        echo ""
+        echo -e "  ${BOLD}You're ready.${NC} Start Roe with:"
+        echo -e "     ${CYAN}./roe.sh start${NC}"
+        echo -e "  Then open ${CYAN}http://localhost:3000${NC}"
+        mark_install_ok
+    else
+        log_error "Setup ran, but the app failed to boot."
+        echo -e "  Try ${CYAN}./roe.sh start${NC} to see the full error, or check the log path below."
+        exit 1
+    fi
 }
 
 # ── setup-rbenv command ───────────────────────────────────────────────────────
@@ -604,6 +1048,50 @@ cmd_setup_rbenv() {
         case "$(basename "$SHELL")" in
             zsh)  echo "  source ~/.zshrc" ;;
             bash) echo "  source ~/.bash_profile" ;;
+        esac
+    else
+        exit 1
+    fi
+}
+
+# ── setup-mise command ────────────────────────────────────────────────────────
+
+# Standalone command: configure the user's shell to load mise. cmd_check
+# does this in its Step 2 when installing Ruby; this is the targeted
+# command for when you installed mise another way (or trashed your rc
+# file) and just want the activation line written back.
+cmd_setup_mise() {
+    if ! command_exists mise; then
+        log_error "mise isn't installed."
+        echo "Install it first, then re-run this command:"
+        echo "  curl https://mise.run | sh   # or: brew install mise"
+        echo "  mise use --global ruby@\$(cat \"$APP_DIR/.ruby-version\")"
+        exit 1
+    fi
+
+    if ensure_mise_in_shell; then
+        echo ""
+        # A script can't reload its *parent* shell — sourcing the rc in
+        # this short-lived process would change nothing for the terminal
+        # the user is sitting in. The closest thing to "it just works" is
+        # to replace THIS process with a fresh login shell, which sources
+        # the updated rc on startup: the user lands in a working shell
+        # immediately (mise active, `bundle`/`ruby` resolved), and a later
+        # `exit` simply returns them to where they were.
+        local login_shell="${SHELL:-}"
+        if [ -t 1 ] && [ -n "$login_shell" ] && [ -x "$login_shell" ]; then
+            log_success "mise is configured — reloading your shell so it's active now…"
+            echo -e "  ${DIM}(You're in a fresh shell. Type ${NC}${CYAN}exit${NC}${DIM} to return to your previous one.)${NC}"
+            echo ""
+            exec "$login_shell" -l
+        fi
+        # Non-interactive (piped/CI) or no usable $SHELL: fall back to the
+        # manual instruction.
+        log_info "Open a new terminal or run this in the current one:"
+        case "$(basename "$login_shell")" in
+            zsh)  echo "  source ~/.zshrc" ;;
+            bash) echo "  source ~/.bash_profile" ;;
+            *)    echo "  source your shell's startup file" ;;
         esac
     else
         exit 1
@@ -768,7 +1256,8 @@ cmd_start() {
         echo "    [s] Start server only — don't open browser"
         echo "    [q] Quit without starting"
         echo ""
-        read -rp "  Choice [Y/s/q]: " REPLY
+        breathing_room
+        read -rp "  Choice [y/s/q]: " REPLY
         echo ""
 
         # Default (empty input) = launch browser. Anything starting with
@@ -802,24 +1291,26 @@ cmd_start() {
         }
         trap cleanup EXIT INT TERM
 
-        # Determine which URL to open — welcome page on first run, root otherwise
-        if [ "${ROE_FIRST_RUN:-0}" = "1" ]; then
-            OPEN_URL="${URL}/admin"
-        else
-            OPEN_URL="$URL"
-        fi
-
         # Open browser after a short delay to let the server boot.
         # Supports macOS (open) and Linux (xdg-open). Skipped entirely
         # when the user chose [s] (start server only) at the prompt.
+        #
+        # Two tabs: the public site (/) first, then the admin (/admin)
+        # LAST so admin ends up the focused/frontmost tab — the user
+        # lands ready to sign in, with their live site one tab over.
         if [ "$OPEN_BROWSER" = "1" ]; then
             (
                 sleep 3
-                if command -v open >/dev/null 2>&1; then
-                    open "$OPEN_URL"
-                elif command -v xdg-open >/dev/null 2>&1; then
-                    xdg-open "$OPEN_URL"
-                fi
+                _open_url() {
+                    if command -v open >/dev/null 2>&1; then
+                        open "$1"
+                    elif command -v xdg-open >/dev/null 2>&1; then
+                        xdg-open "$1"
+                    fi
+                }
+                _open_url "${URL}/"
+                sleep 1   # let the first tab open before the second steals focus
+                _open_url "${URL}/admin"
             ) &
         fi
 
@@ -963,6 +1454,7 @@ cmd_update() {
 case "${1:-}" in
     check)        cmd_check ;;
     setup)        cmd_setup ;;
+    setup-mise)   cmd_setup_mise ;;
     setup-rbenv)  cmd_setup_rbenv ;;
     start)        shift; cmd_start "$@" ;;
     stop)    cmd_stop ;;

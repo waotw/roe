@@ -1,120 +1,200 @@
 #!/usr/bin/env ruby
 require_relative "../config/environment"
+require "tty-prompt"
+require "tty-box"
+require "tty-spinner"
+require "tty-cursor"
+require "pastel"
+require "io/console"
+require "securerandom"
 
-puts "\n" + "=" * 60
-puts "🔐 ADMIN USER SETUP"
-puts "=" * 60
+pastel = Pastel.new
 
-# Check if admin already exists
+# Read from the real controlling terminal, NOT the inherited $stdin.
+# bin/setup invokes this script via `system(ruby, bootstrap, in: $stdin)`,
+# and that redirected stdin doesn't give tty-prompt's reader the raw-mode
+# control it needs — line editing (backspace, arrow keys, cursor) breaks.
+# IO.console opens /dev/tty directly, sidestepping the redirection so
+# editing works as expected. It's nil only when there's genuinely no
+# terminal (CI, a bare pipe) — in which case we bail cleanly rather than
+# crash deep inside tty-prompt.
+console = IO.console
+unless console
+  warn "Admin setup needs an interactive terminal."
+  warn "Run it in a terminal with:  ./roe.sh setup"
+  exit 1
+end
+
+# input: console → raw-mode line editing works through the process layers.
+# interrupt: :exit → Ctrl-C quits cleanly instead of dumping a backtrace.
+prompt = TTY::Prompt.new(input: console, output: $stdout, interrupt: :exit)
+
+# Give a prompt breathing room below it: print a few blank lines (the
+# terminal scrolls up), then move the cursor back up onto the prompt
+# row. The result is a couple of empty lines beneath the prompt so the
+# cursor never sits flush against the window's bottom edge. Call right
+# before any interactive prompt.
+breathing_room = lambda do |lines = 5|
+  $stdout.print("\n" * lines)
+  $stdout.print(TTY::Cursor.up(lines))
+  $stdout.flush
+end
+
+# Yes/no helper. tty-prompt's own `yes?` always renders its suffix in
+# parens with the default answer capitalized — `(Y/n)` — and won't let
+# you blank it out. We want a plain lowercase `[y/n]` everywhere, so we
+# build it on `ask`: full control of the label, still accepts
+# y/yes/n/no, and `default:` decides what a bare Enter means.
+yes_no = lambda do |message, default: true|
+  loop do
+    breathing_room.call
+    answer = prompt.ask("#{message} [y/n]") { |q| q.modify :strip, :down }
+    answer = (default ? "y" : "n") if answer.to_s.empty?
+    return true  if %w[y yes].include?(answer)
+    return false if %w[n no].include?(answer)
+    prompt.warn("Please answer y or n.")
+  end
+end
+
+puts
+# Note: no emoji INSIDE tty-box frames — they're rendered 2 columns wide
+# by terminals but counted as 1 by tty-box's width math, which drifts
+# the right border. Emoji are fine on plain (non-boxed) lines below.
+puts TTY::Box.frame(
+  pastel.bold("Admin User Setup"),
+  padding: [0, 3],
+  align: :center,
+  border: :thick,
+  style: { border: { fg: :cyan } }
+)
+puts
+
 existing_user = User.first
-if existing_user
-  puts "\n⚠️  Admin user already exists: #{existing_user.email_address}"
-  print "Do you want to reset the password? (y/n): "
-  response = gets.chomp.downcase
 
-  unless response == 'y' || response == 'yes'
-    puts "Skipping admin setup."
+if existing_user
+  prompt.warn("An admin user already exists: #{existing_user.email_address}")
+  unless yes_no.call("Reset this user's password?", default: false)
+    puts pastel.dim("Skipping admin setup.")
     exit 0
   end
-
   user = existing_user
-  puts "\nResetting password for: #{user.email_address}"
 else
-  puts "\nNo admin user found. Let's create one…"
-
-  print "\nEmail address (default: admin@example.com): "
-  email_address = gets.chomp
-  email_address = 'admin@example.com' if email_address.empty?
-
+  # Email with inline validation, plus a confirm step that loops back so
+  # a valid-but-wrong address is one keystroke to fix (replaces the old
+  # manual [b] back-nav with a friendlier yes/no).
+  email_address = nil
+  loop do
+    breathing_room.call
+    email_address = prompt.ask("Admin email address:", default: "admin@example.com") do |q|
+      q.modify :strip
+      q.validate(/\A[^@\s]+@[^@\s]+\.[^@\s]+\z/, "Please enter a valid email address.")
+    end
+    # The address they just typed is on the line above, so this reads
+    # naturally without repeating it inline.
+    break if yes_no.call("Does this look right?", default: true)
+  end
   user = User.new(email_address: email_address)
 end
 
-# Password setup
-puts "\n" + "-" * 60
-puts "PASSWORD SETUP"
-puts "-" * 60
-print "\nGenerate a random password? (Y/n): "
-use_random = gets.chomp.downcase
+# ── Password ───────────────────────────────────────────────────────────
+breathing_room.call
+method = prompt.select("How should the password be set?", cycle: true) do |menu|
+  menu.default 1
+  menu.choice "Generate a strong random password  (recommended)", :random
+  menu.choice "Enter my own password", :own
+end
 
-if use_random == 'n' || use_random == 'no'
-  # Manual password entry
-  require 'io/console'
+password = nil
+show_password = false
 
+if method == :random
+  # Generation is instant; the spinner is purely for feel. `:dots` is
+  # the braille spinner (⠋⠙⠹⠸…) — dots cycling in a small rectangle.
+  # clear: true wipes the line afterwards so the green summary box that
+  # follows starts clean.
+  spinner = TTY::Spinner.new(
+    "[:spinner] Generating super secure password…",
+    format: :dots,
+    clear: true,
+    output: $stdout
+  )
+  spinner.auto_spin
+  sleep 1.2
+  password = SecureRandom.alphanumeric(16)
+  spinner.stop
+
+  user.password = password
+  user.password_confirmation = password
+  show_password = true
+else
   loop do
-    print "Enter password (min 8 characters): "
-    password = STDIN.noecho(&:gets).chomp
-    puts ""
+    breathing_room.call
+    password = prompt.mask("Enter password (min 8 characters):")
+    confirmation = prompt.mask("Confirm password:")
 
-    print "Confirm password: "
-    password_confirmation = STDIN.noecho(&:gets).chomp
-    puts ""
-
-    if password != password_confirmation
-      puts "❌ Passwords don't match. Try again.\n"
+    if password != confirmation
+      prompt.error("Passwords don't match. Try again.")
       next
     end
-
-    if password.length < 8
-      puts "❌ Password must be at least 8 characters. Try again.\n"
+    if password.to_s.length < 8
+      prompt.error("Password must be at least 8 characters. Try again.")
       next
     end
 
     user.password = password
-    user.password_confirmation = password_confirmation
+    user.password_confirmation = confirmation
     break
   end
-
-  show_password = false
-else
-  # Generate random password
-  password = SecureRandom.alphanumeric(16)
-  user.password = password
-  user.password_confirmation = password
-  show_password = true
 end
 
-# Save user
+# ── Save + summary ─────────────────────────────────────────────────────
 if user.save
-  puts "\n" + "=" * 60
-  puts "✅ SUCCESS…"
-  puts "=" * 60
-  puts "\nAdmin user #{existing_user ? 'updated' : 'created'}:"
-  puts "   📧 Email: #{user.email_address}"
+  # Recovery codes only when the user has none — resetting a password
+  # mustn't silently invalidate codes the operator may have saved.
+  recovery_codes = user.recovery_codes.none? ? user.generate_recovery_codes! : nil
 
-  if show_password
-    puts "   🔑 Password: #{password}"
-    puts "\n⚠️  SAVE THIS PASSWORD NOW…"
-    puts "   You won't be able to see it again."
+  summary = []
+  summary << pastel.green.bold("Admin user #{existing_user ? 'updated' : 'created'}")
+  summary << ""
+  summary << "#{pastel.dim('Email:')}     #{user.email_address}"
+  summary << "#{pastel.dim('Password:')}  #{pastel.bold(password)}" if show_password
+
+  puts
+  puts TTY::Box.frame(
+    summary.join("\n"),
+    padding: [0, 3],
+    border: :thick,
+    style: { border: { fg: :green } }
+  )
+
+  prompt.warn("Save this password now — it won't be shown again.") if show_password
+
+  if recovery_codes
+    puts
+    puts pastel.bold("🔒  Recovery codes")
+    puts pastel.dim("Save these somewhere safe. Each works once to reset your password if you lose access.")
+    puts
+    recovery_codes.each { |code| puts "   #{pastel.cyan(code)}" }
+    puts
+    puts pastel.dim("Use one at /recovery/new (the link is on the sign-in page).")
+  elsif existing_user
+    remaining = user.recovery_codes.unconsumed.count
+    puts pastel.dim("Existing recovery codes left untouched (#{remaining} still usable).")
+    puts pastel.dim("Regenerate them from Admin → Account if you've lost them.")
   end
 
-  # Recovery codes — generated only when the user doesn't already have
-  # a set, so resetting a password in the existing_user branch doesn't
-  # silently invalidate codes the operator may have saved earlier.
-  # They can always regenerate from the admin Account page later.
-  if user.recovery_codes.none?
-    recovery_codes = user.generate_recovery_codes!
-    puts "\n" + "-" * 60
-    puts "🔒 RECOVERY CODES"
-    puts "-" * 60
-    puts "\nSave these somewhere safe (password manager, printed sheet)."
-    puts "Each code can be used once to reset your password if you lose access."
-    puts "They won't be shown again unless you regenerate them from the admin Account page.\n\n"
-    recovery_codes.each { |code| puts "   #{code}" }
-    puts "\nUse one at /recovery/new (link is on the sign-in page)."
-  else
-    puts "\nℹ️  Existing recovery codes left untouched (#{user.recovery_codes.unconsumed.count} of #{user.recovery_codes.count} still usable)."
-    puts "   Regenerate them from Admin → Account if you've lost them."
-  end
+  puts
+  puts "Sign in at #{pastel.cyan('http://localhost:3000/admin')}"
+  puts
 
-  puts "\n   🌐 Login at: http://localhost:3000/session/new"
-  puts "\n" + "=" * 60
-
-  if show_password || (defined?(recovery_codes) && recovery_codes)
-    print "\nPress enter after you've saved everything shown above..."
-    gets
+  # Hold the screen so credentials/codes aren't scrolled away by the
+  # server boot that follows.
+  if show_password || recovery_codes
+    breathing_room.call
+    prompt.keypress("Press any key once you've saved everything above…")
   end
 else
-  puts "\n❌ Error creating user:"
+  prompt.error("Could not create the admin user:")
   user.errors.full_messages.each { |msg| puts "   - #{msg}" }
   exit 1
 end

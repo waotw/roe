@@ -6,6 +6,7 @@ module RoeUpdater
       { name: "validating",         percent: 5,   description: "Validating update prerequisites" },
       { name: "backing_up_db",      percent: 15,  description: "Creating database backup" },
       { name: "downloading",        percent: 30,  description: "Downloading new version" },
+      { name: "checking_ruby",      percent: 35,  description: "Checking Ruby compatibility" },
       { name: "testing",            percent: 50,  description: "Testing migrations" },
       { name: "migrating",          percent: 70,  description: "Running database migrations" },
       { name: "switching",          percent: 85,  description: "Switching to new version" },
@@ -54,6 +55,7 @@ module RoeUpdater
         execute_step(:validating) { validate_prerequisites }
         execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
         execute_step(:downloading) { Downloader.download_version(@version, @status) }
+        execute_step(:checking_ruby) { check_ruby_compatibility }
         execute_step(:testing) { MigrationTester.test_migrations(@status) }
         execute_step(:migrating) { run_migrations }
         execute_step(:switching) { SwitchManager.switch_versions(@status) }
@@ -89,6 +91,52 @@ module RoeUpdater
           log("Failed at #{step[:description]}: #{e.message}")
           raise
         end
+      end
+
+      # Preflight: refuse to proceed when the downloaded release pins a
+      # newer Ruby than the one this install is running. Runs right
+      # after download and BEFORE the version swap / migrations, so a
+      # block here is a cheap no-op rollback (only staging exists; the
+      # live site is untouched).
+      #
+      # Why this matters: install_gems later does `bundle install` in
+      # current/, where the user's version manager (rbenv or mise)
+      # reads the new .ruby-version. If it pins a Ruby they don't have
+      # (a major bump, most acutely), bundle dies with a cryptic
+      #   `rbenv: version '4.0.5' is not installed`
+      # and the update fails mid-flight. Catching it here turns that
+      # into a clear, actionable message before anything changes.
+      #
+      # Conservative: only blocks when the running Ruby is strictly
+      # OLDER than the required one. Equal or newer always proceeds, so
+      # routine releases that don't change Ruby pass untouched. Fails
+      # OPEN on an unparseable version string — never blocks a valid
+      # update over a bad comparison.
+      def check_ruby_compatibility
+        required_file = File.join(Downloader::STAGING_PATH, ".ruby-version")
+        return unless File.exist?(required_file)
+
+        required = File.read(required_file).strip
+        return if required.empty?
+
+        running = RUBY_VERSION
+        begin
+          return if Gem::Version.new(running) >= Gem::Version.new(required)
+        rescue ArgumentError
+          return # unparseable — let the normal flow surface any issue
+        end
+
+        raise <<~MSG.strip
+          This update needs Ruby #{required}, but this install is running Ruby #{running}.
+
+          Install the required Ruby first, then run the update again:
+            1. Open a terminal in your Roe folder
+            2. Run:  ./roe.sh check
+               (installs Ruby #{required} and updates your shell)
+            3. Restart Roe, then retry the update.
+
+          Your site was not changed — this update stopped before touching anything.
+        MSG
       end
 
       def validate_prerequisites
