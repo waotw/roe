@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.9.4
-   Bundled with: Roe v0.0.37
+   Version: 0.9.5
+   Bundled with: Roe v0.0.38
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -15,7 +15,7 @@
    You can always download a fresh copy of the newest version of any built in theme.
 */
 
-/* ============ DESIGN VARIABLES ============ */
+/* ============ THEME VARIABLES ============ */
 
 :root {
   /* Light/Dark Mode */
@@ -795,6 +795,12 @@ h1.post-title {
   color: var(--color-text);
 }
 
+@media (prefers-color-scheme: dark) {
+  .post mark {
+    color: var(--color-bg);
+  }
+}
+
 @media (min-width: 601px) {
   .page h1,
   .post-header h1 {
@@ -922,7 +928,7 @@ p.collection-more a:hover {
 
 .collection.list .title-media-icon,
 .collection.list .paid-lock-icon {
-  vertical-align: -2px;
+  vertical-align: -1px;
 }
 
 /* Compact - single line, link, date • author */
@@ -1021,7 +1027,7 @@ p.collection-more a:hover {
 .title-media-icon,
 .paid-lock-icon {
   padding-left: var(--space-1);
-  vertical-align: -4px;
+  vertical-align: -1px;
   opacity: 0.5;
 }
 
@@ -2777,12 +2783,6 @@ hr.clear-floats {
 }
 
 /* Paid-content gate */
-
-.paid-lock-icon {
-  padding-left: var(--space-1);
-  vertical-align: -4px;
-  opacity: 30%;
-}
 
 .paid-content-gate {
   font-size: var(--text-2xl);
