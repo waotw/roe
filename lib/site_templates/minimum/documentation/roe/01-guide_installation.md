@@ -4,7 +4,7 @@ status: published
 url_name: guide-installation
 tags: guide
 related:
-  - getting-started-with-roe-cms
+  - getting-started-with-roe
 ---
 
 ##### Related documentation
@@ -18,11 +18,11 @@ template: links
 
 # Installing Roe
 
-Roe is an application built with [Ruby on Rails](/documentation/glossary#ruby-on-rails). In order to use Roe locally, you'll need to install a few tools on your computer as well as Rails. This is the biggest hurdle to using Roe, well worth it, and once it's done, you can create as many Roe sites as you want without having to reinstall anything.
+Roe is an application built with [Ruby on Rails](/documentation/glossary#ruby-on-rails). In order to use Roe locally, you'll need to install Ruby and a few supporting tools. This is the biggest hurdle to using Roe, well worth it, and once it's done, you can create as many Roe sites as you want without having to reinstall anything.
 
 Currently, I have not tested Roe on Windows. If you're interested in getting it working, I would love the help: [roe@weareontheweb.com](mailto:roe@weareontheweb.com)
 
-## First) [Download Roe](https://codeberg.org/waotw/roe/releases/download/v0.0.36/roe-0.0.36.zip)
+## First) [Download Roe](https://codeberg.org/waotw/roe/releases/download/v0.0.37/roe-0.0.37.zip)
 
 Roe contains two folders: `/current` (the app/code) and `/site` (all your site content, configuration, and databases) as well as a few other files.
 
@@ -30,28 +30,34 @@ Roe contains two folders: `/current` (the app/code) and `/site` (all your site c
 
 ## macOS
 
-1. Find the downloaded zip folder, unzip it, and move it to a folder on your computer where you want to keep your website.
-2. Make sure you have breadcrumbs visible on your Finder window (select `View > Show Path Bar` from the top menu of Finder).
-3. Right-click the Roe folder in the breadcrumb path and choose `Open in Terminal`.
-    - ![Finder Path Bar](/media/images/finder-path-roe.png)
-    - ![Finder Path Bar](/media/images/finder-path-roe-menu.png)
-4. Type `./roe.sh check` into the terminal and press `return`.
-5. **Installing Tools:** follow the prompts, and type `(c)` then `enter/return` to continue.
-    - <mark>Note:</mark> some of these can take a bit. Wait until it finishes. The terminal prompt will be present (`username@computer-name ~ %`) when it's time to move on.
-    - Once the tools are installed, you will see this message: `[✓] All required dependencies are installed!`
-6. **Roe setup:** you'll see `Next step: Run the Roe setup`, type `y` and press `enter/return`.
-    - All required [gems](/documentation/glossary#gems) will be installed, your `/site` folder and other assets will be created.
-7. **Admin user:** Once that's done, you'll see: `No admin user found. Let's create one…`
+1. Find the downloaded zip file, unzip it (this is "Roe folder"), and move it to a folder on your computer where you want to keep your website.
+2. Launch your Terminal app:
+    - hold down `command` + `space`, this will open Spotlight.
+    - type `terminal`, the Terminal app show up, hit `return`
+3. Open the Roe folder in the Terminal
+    - In Terminal, type `cd` and hit `space`, do not press `return` yet.
+    - Drag and drop the Roe Folder onto the Terminal (it will drop the location of that folder into the Terminal)
+    - Hit `return`
+4. In the Terminal type `./roe.sh check` into the terminal and press `return`.
+5. **Installing Ruby:** the script will check what's already installed and then ask to install anything missing.
+    - When you see `Install now? [y/q]`, type `y` and press `return`.
+    - The script installs [mise](/documentation/glossary#mise) (a tool for installing programming languages) and the correct Ruby version for Roe.
+    - <mark>Note:</mark> on a fresh Mac, you may be prompted to install Apple's Command Line Tools. macOS will show a separate installer window; when it finishes, return to the terminal and press `c` to continue.
+    - Some steps take a few minutes the first time. Wait until the terminal prompt is back and you see: `[✓] Ready — Ruby and Git are in place.`
+6. **Roe setup:** you'll see `Next step: Run the Roe setup`, type `y` and press `return`.
+    - The setup runs as an interactive progress screen: it installs [gems](/documentation/glossary#gems), creates your `/site` folder, prepares the database, generates default configuration, and syncs content.
+7. **Admin user:** once setup finishes, you'll see the admin user setup:
     - Enter the email you want to use for Roe
     - Choose whether to use a random or manual password.
-    - <mark>Note:</mark> either way, write this down in a safe place.
-8. Recovery codes: write these down in a safe place, <mark>you won't ever see them again</mark>
+    - <mark>Note:</mark> either way, write this down in a safe place. If you chose a random password, you will only see it once.
+8. Recovery codes: write these down in a safe place, <mark>you won't ever see them again.</mark>
     - These codes are used to reset your password if needed.
-9. Once you've written everything down (or saved it), press `return` to continue.
-10. Type `y` and hit `return` to start the Roe server and open Roe in your browser automatically.
+9. Once you've written everything down (or saved it), press any key to continue.
+10. Press `y` and hit `return`…
+10. The server starts automatically and opens Roe in your browser.
 11. Sign in with the admin user you just created.
 
-Check [Getting Started with Roe](/documentation/getting-started-with-roe-cms) for some help exploring Roe.
+Check [Getting Started with Roe](/documentation/getting-started-with-roe) for some help exploring Roe.
 
 ## Linux
 
@@ -68,23 +74,23 @@ Check [Getting Started with Roe](/documentation/getting-started-with-roe-cms) fo
 
     If your distribution doesn't ship one of these by default, this document is a good general reference: [How to Open a Folder in Linux](https://linuxvox.com/blog/how-to-open-folder-in-linux/).
 3. Type `./roe.sh check` into the terminal and press `enter`.
-4. **Installing Tools:** follow the prompts, and type `(c)` then `enter` to continue.
-    - <mark>Note:</mark> some of these can take a bit. Wait until it finishes.
-    - <mark>Note for Linux:</mark> the script will show install commands for both Debian/Ubuntu (`apt-get`) and Fedora/RHEL (`dnf`) — copy and run the one for your distribution.
-    - This is a helpful article about Linux package managers: [Comparison of major Linux package management systems](https://linuxconfig.org/comparison-of-major-linux-package-management-systems)
-    - Once the tools are installed, you will see this message: `[✓] All required dependencies are installed!`
+4. **Installing Ruby:** the script will check what's already installed and then ask to install anything missing.
+    - When you see `Install now? [y/q]`, type `y` and press `enter`.
+    - The script installs [mise](/documentation/glossary#mise) (a small version manager) and the correct Ruby version for you.
+    - <mark>Note for Linux:</mark> if your system is missing the C compiler and `make` needed to build Ruby's libraries, the script shows the install command for your distribution (Debian/Ubuntu `apt-get`, Fedora/RHEL `dnf`, Arch `pacman`, etc.). Copy it, run it in another terminal, then return here and press `c` to continue.
+    - Some steps take a few minutes the first time. Wait until you see: `[✓] Ready — Ruby and Git are in place.`
 5. **Roe setup:** you'll see `Next step: Run the Roe setup`, type `y` and press `enter`.
-    - All required [gems](/documentation/glossary#gems) will be installed, the databases and other assets will be created.
-6. **Admin user:** Once that's done, you'll see: `No admin user found. Let's create one…`
+    - The setup runs as an interactive progress screen: it installs [gems](/documentation/glossary#gems), creates your `/site` folder, prepares the database, generates default configuration, and syncs content.
+6. **Admin user:** once setup finishes, you'll see the admin user setup:
     - Enter the email you want to use for Roe
     - Choose whether to use a random or manual password.
-    - <mark>Note:</mark> either way, write this down in a safe place.
+    - <mark>Note:</mark> either way, write this down in a safe place. If you chose a random password, the script shows it once.
 7. Recovery codes: write these down in a safe place, <mark>you won't ever see them again</mark>
     - These codes are used to reset your password if needed.
-8. Once you've written everything down (or saved it), press `enter` to continue.
-9. Type `y` and hit `enter` to start the Roe server and open Roe in your browser automatically.
+8. Once you've written everything down (or saved it), press any key to continue.
+9. The server starts automatically and opens Roe in your browser.
 10. Sign in with the admin user you just created.
 
 ## You're done
 
-Check [Getting Started with Roe](/documentation/getting-started-with-roe-cms) for next steps.
+Check [Getting Started with Roe](/documentation/getting-started-with-roe) for next steps.

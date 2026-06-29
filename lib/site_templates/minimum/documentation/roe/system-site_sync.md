@@ -86,6 +86,7 @@ Download content from the live site to your local machine:
 3. Wait for the sync to complete
 
 Use this when:
+
 - You've made changes directly on the live server
 - You're setting up Roe on a new computer
 - You want to create a local backup

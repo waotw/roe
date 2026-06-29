@@ -16,7 +16,7 @@ template: links
 
 #### Before Roe
 
-[Install Roe](/documentation/guide-installation) if you haven't. I have a feeling this is going to be an important step.
+[Install Roe](/documentation/guide-installation) if you haven't.
 
 ## First Steps
 
@@ -59,9 +59,9 @@ A Collection in Roe is similar to a blog feed in other systems but it's much mor
 Collections are generally added to Pages since they're often collections of Posts and Products but you could:
 
 - put a Collection into a Post as well. Perhaps 3 related Posts or 3 featured Posts at the bottom of an article.
-- put a Collection into a Product page, perahps 3 related Products at the bottom of each one.
+- put a Collection into a Product page, perhaps 3 related Products at the bottom of each one.
 
-### Roeajni - Cards
+### Roe-ajni - Cards
 
 Cards allow you to embed styled elements directly in a Markdown file: pullquote, post link, aside. [Learn more about Cards →](cards.md)
 
@@ -71,7 +71,7 @@ Galleries allow you to create complex grids of images with very simple syntax. [
 
 ## Onwards… What could you build with Roe?
 
-Roe supports a full newsletter system, store and memberships with payments through 3 integrations: Postmark, Snipcart and Stripe. It also has a full podcast system, no other hosting required.
+Roe supports a full blog/newsletter system, store and memberships with payments with: Postmark, Snipcart and Stripe. It also has a full podcast system.
 
 If you wanted to, you could replace about 5 other paid services with Roe, save a ton of money and have more fun running your site.
 

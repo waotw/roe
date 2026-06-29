@@ -100,6 +100,7 @@ If you want an image to be full-width, just put it on it's own line like so ↓
 ![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
 ![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
 ```
+
 - Row 1: 1 image (full width)
 - Row 3: 3 images (33% width each)
 
@@ -121,6 +122,7 @@ Add captions to any image using this syntax `(*caption-here*)` immediately after
 ## Combine all these features
 
 Let's create a Gallery with 3 rows and captions. We'll have:
+
 - A hero image on top
 - 3 images in the middle
 - 2 on the bottom

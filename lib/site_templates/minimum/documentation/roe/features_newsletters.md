@@ -140,12 +140,14 @@ The member list shows a **Newsletter** column with status icons:
 ### Filter by Newsletter Status
 
 Use the dropdown to filter:
+
 - All Newsletter Status
 - 📬 Subscribed
 - 🔕 Unsubscribed  
 - ⚠️ Bounced
 
 This helps you:
+
 - See your active newsletter list
 - Clean up bounced addresses
 - Check who's unsubscribed

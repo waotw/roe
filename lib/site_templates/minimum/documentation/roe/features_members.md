@@ -95,6 +95,7 @@ upgrade-button-text: Sign up and become a paid member
 ````
 
 **How it works:**
+
 - **"Sign up free"** → Creates free account, sends magic link
 - **"Sign up and become a paid member"** → Creates account AND redirects to Stripe for payment
 

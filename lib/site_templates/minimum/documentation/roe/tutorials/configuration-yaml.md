@@ -70,6 +70,7 @@ You can configure custom fonts for three roles: heading, body, and mono (code). 
 - **bold_italic** (optional)
 
 Font files should be uploaded to `content/system/assets/fonts/`. Supported formats:
+
 - `.woff2` (recommended for best compression)
 - `.woff`
 - `.ttf`
@@ -131,6 +132,7 @@ Navigate to **Settings** in the admin navigation to manage all configuration fil
 4. Click **Save Configuration**
 
 The editor includes:
+
 - Line counting
 - Tab key support (2-space indentation)
 - YAML syntax validation

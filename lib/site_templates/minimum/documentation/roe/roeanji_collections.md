@@ -17,7 +17,7 @@ template: links
 
 # Collections
 
-Collections are lists of posts, pages, products, or documentation. They can power entire blogs or just add threww "Featured Posts" to your home page.
+Collections are lists of posts, pages, products, or documentation. They can power entire blogs or just add a few "Featured Posts" to your home page.
 
 When writing anything that uses the Markdown editor, use the `COLLECTION` button to insert a Collection at the cursor location. The `COLLECTION` button template can be edited in [Admin/Settings](/admin/configs/collections/edit).
 

@@ -96,14 +96,14 @@ In collections with `groups: enabled`, Roe shows one entry per group and shows o
 
 Use [Collections](/documentation/collections) with `source: products` to display products:
 
-```markdown
+````markdown
 ```collection
 source: products
 category: book
 template: grid
 heading: Books
 ```
-```
+````
 
 Collection options for products:
 

@@ -25,20 +25,20 @@ Simple Markdown extensions that are easy to learn and use. They all use the same
 
 ## Cards
 
-Cards are special content blocks that you can place within your Markdown.
+Cards are special content blocks that you can place within your Mark>down.
 
 ### Pullquote Card
 
 Pullquotes are stylized quotes that can be positioned in different ways.
 
-```markdown
+````markdown
 ```card
 type: pullquote
 text: Your quote text here
 attribution: Author Name
 position: center
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -53,7 +53,7 @@ position: center
 
 Asides are supplementary content blocks that can include images, text, and links.
 
-```markdown
+````markdown
 ```card
 type: aside
 text: Text content
@@ -61,7 +61,7 @@ image: /media/images/photo.jpg
 link: https://example.com
 link_text: Read more
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -77,7 +77,7 @@ link_text: Read more
 
 Post links are cards that reference other posts or external URLs.
 
-```markdown
+````markdown
 ```card
 type: post-link
 post: my-post-url-name
@@ -91,7 +91,7 @@ date: 2024-01-01
 url: https://example.com
 link_text: Custom CTA
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -113,7 +113,7 @@ link_text: Custom CTA
 
 Collections display lists of content from your site.
 
-```markdown
+````markdown
 ```collection
 source: posts
 order: date
@@ -123,7 +123,7 @@ heading: Latest Posts
 tags: featured, -draft
 related: false
 ```
-```
+````
 
 ### Source & Filtering
 
@@ -171,13 +171,13 @@ Consecutive images automatically become galleries:
 
 ### Manual Gallery
 
-```markdown
+````markdown
 ```gallery
 ![alt1](/media/images/photo1.jpg)
 ![alt2](/media/images/photo2.jpg)
 ![alt3](/media/images/photo3.jpg)
 ```
-```
+````
 
 ### With Captions
 
@@ -186,6 +186,7 @@ Consecutive images automatically become galleries:
 ```
 
 **Features:**
+
 - Auto-responsive: 1, 2, or 3 columns based on image count
 - Responsive images with srcset
 - Blank lines separate gallery rows
@@ -197,13 +198,13 @@ Forms provide interactive elements for memberships and payments.
 
 ### Signup
 
-```markdown
+````markdown
 ```form
 for: signup
 button-text: Sign Up
 upgrade-button-text: Upgrade now
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -213,12 +214,12 @@ upgrade-button-text: Upgrade now
 
 ### Signin
 
-```markdown
+````markdown
 ```form
 for: signin
 button-text: Send Magic Link
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -227,13 +228,13 @@ button-text: Send Magic Link
 
 ### Checkout
 
-```markdown
+````markdown
 ```form
 for: checkout
 member-button-text: Upgrade
 non-member-button-text: Sign up to upgrade
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -243,12 +244,12 @@ non-member-button-text: Sign up to upgrade
 
 ### Donate
 
-```markdown
+````markdown
 ```form
 for: donate
 button-text: Donate
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -259,12 +260,12 @@ Uses donation amounts from members.yml config.
 
 ### Unsubscribe
 
-```markdown
+````markdown
 ```form
 for: unsubscribe
 button-text: Unsubscribe
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -273,13 +274,13 @@ button-text: Unsubscribe
 
 ### Paid Content (Paywall)
 
-```markdown
+````markdown
 ```form
 for: paid_content
 text: This is premium content. Upgrade to continue reading.
 button-text: Become a paid member
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -291,14 +292,14 @@ button-text: Become a paid member
 
 Buttons allow you to add product purchase buttons to your content.
 
-```markdown
+````markdown
 ```button
 sku: PRODUCT-SKU
 text: Add to Cart
 style: primary
 quantity: 1
 ```
-```
+````
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -311,7 +312,7 @@ quantity: 1
 
 Place multiple button blocks consecutively (no blank lines) to render as a variant selector list with prices:
 
-```markdown
+````markdown
 ```button
 sku: book-paperback
 ```
@@ -321,7 +322,7 @@ sku: book-hardcover
 ```button
 sku: book-ebook
 ```
-```
+````
 
 **Auto-variant detection:** Products with `group:` metadata automatically show all variants in the group as a list with a single button.
 
@@ -334,6 +335,7 @@ sku: book-ebook
 | `aspect_ratio` | No | Image aspect ratio: `auto` (default), `portrait`, `square`, or `landscape` |
 
 **Notes:**
+
 - When `groups: enabled`, the grid uses the **primary** variant's image and links to the primary variant's page
 - Variant names appear in parentheses below the title (e.g., `(Paperback, Hardback)`)
 - Price display for grouped products is controlled by your **store config** (`site/system/features/store.yml`):
@@ -343,8 +345,3 @@ sku: book-ebook
   - `price_separator` — custom separator between range prices (default: `-`)
 - `button_text` in store config controls the "View" button text for grouped products (no button renders if left blank)
 - Individual products show "Add to Cart" button directly in the grid
-The product-specific options are:
-- show_description (boolean-ish: "true" or true)
-- groups ("enabled" or true)
-- aspect_ratio (string, defaults to "auto")
-Everything else (pricing behavior, button text, grouping logic) is controlled at the store config level in site/system/features/store.yml, not at the collection level.
