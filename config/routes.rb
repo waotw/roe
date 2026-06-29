@@ -47,6 +47,10 @@ Rails.application.routes.draw do
     get  "updates/git_status",        to: "updates#git_status",     as: "git_status"
     post "updates/channel",           to: "updates#update_channel", as: "update_channel"
 
+    # Dependencies — optional external tools (libvips, …): status + the
+    # OS-correct install command. Read-only; installs happen in a terminal.
+    get "dependencies", to: "dependencies#index", as: "dependencies"
+
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
