@@ -3,8 +3,13 @@ class System::ThemesController < ApplicationController
   skip_before_action :verify_authenticity_token
 
   def show
-    filename = params[:filename]
-    format = params[:format] || "css"
+    # Harden this unauthenticated route against path traversal: strip any
+    # path components from the filename and constrain the extension to the
+    # two we serve, so neither param can escape the theme directories.
+    # (The route segment already excludes "/" and "."; this is
+    # defense-in-depth.)
+    filename = File.basename(params[:filename].to_s)
+    format = params[:format] == "js" ? "js" : "css"
 
     # Build full filename with extension
     full_filename = "#{filename}.#{format}"

@@ -1543,10 +1543,14 @@ class Admin::ConfigsController < Admin::BaseController
       old_config = YAML.load_file(file_path) rescue {}
     end
 
-    # Validate YAML syntax
+    # Validate YAML syntax. safe_load (not load) so pasted config can't
+    # instantiate arbitrary Ruby objects. The permitted classes cover the
+    # scalar types YAML auto-converts (an unquoted date/time/symbol in a
+    # config value); aliases stay allowed. Disallowed types raise a
+    # Psych::Exception too, so they surface as a friendly error, not a 500.
     begin
-      new_config = YAML.load(content)
-    rescue Psych::SyntaxError => e
+      new_config = YAML.safe_load(content, permitted_classes: [ Date, Time, Symbol ], aliases: true)
+    rescue Psych::Exception => e
       flash.now[:error] = "Invalid YAML syntax: #{e.message}"
       @config_type = type.split("/").last
       @config_content = content
