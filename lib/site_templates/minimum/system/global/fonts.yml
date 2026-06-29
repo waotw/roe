@@ -1,12 +1,17 @@
-heading:
-  family: "Manrope"
-  source: "google"
-body:
-  family: "Source Serif 4"
-  source: "google"
-mono:
-  family: "Inconsolata"
-  source: "google"
-accent:
-  family: ""
-  source: ""
+fonts:
+  heading:
+    family: ""
+    regular: ""
+  body:
+    family: ""
+    regular: ""
+    italic: ""
+    bold: ""
+    bold_italic: ""
+  mono:
+    family: ""
+    regular: ""
+  accent:
+    family: ""
+    regular: ""
+themes: []
