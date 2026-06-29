@@ -97,6 +97,76 @@ if [[ -z "$DRY_RUN" ]]; then
 fi
 echo ""
 
+# ── Config key drift (advisory, read-only) ────────────────────────────────
+# Configs are NOT synced by this script (their values are per-site), but
+# their KEYS still need to stay in step with the seeded templates. This
+# compares the key STRUCTURE of each /site config against its template and
+# reports keys present in one but not the other — chiefly "new material in
+# /site that isn't in site_templates yet". Advisory only: it never edits or
+# fails (some /site keys are legitimately vestigial), and runs in both modes.
+echo "→ Config key drift (advisory — /site vs site_templates, keys only):"
+if command -v ruby >/dev/null 2>&1; then
+  ruby - "$ROE_ROOT" <<'RUBY' || true
+    require "yaml"
+    require "set"
+
+    root = ARGV[0]
+
+    # /site config  =>  matching seeded template (plain-YAML configs only;
+    # the .erb feature configs are covered by test/lib/site_templates_config_test.rb).
+    pairs = {
+      "site/system/global/site.yml"          => "current/lib/site_templates/minimum/system/global/site.yml",
+      "site/system/global/fonts.yml"         => "current/lib/site_templates/minimum/system/global/fonts.yml",
+      "site/system/global/custom_code.yml"   => "current/lib/site_templates/minimum/system/global/custom_code.yml",
+      "site/system/defaults/cards.yml"       => "current/lib/site_templates/minimum/system/defaults/cards.yml",
+      "site/system/defaults/collections.yml" => "current/lib/site_templates/minimum/system/defaults/collections.yml",
+      "site/system/integrations/postmark.yml" => "current/lib/site_templates/features/postmark/system/integrations/postmark.yml",
+      "site/system/integrations/snipcart.yml" => "current/lib/site_templates/features/snipcart/system/integrations/snipcart.yml",
+      "site/system/integrations/stripe.yml"   => "current/lib/site_templates/features/stripe/system/integrations/stripe.yml",
+    }
+
+    # Recursively collect dotted key paths (keys only; list items are values).
+    def key_paths(obj, prefix = "")
+      return [] unless obj.is_a?(Hash)
+      obj.flat_map do |k, v|
+        path = prefix.empty? ? k.to_s : "#{prefix}.#{k}"
+        [path] + key_paths(v, path)
+      end
+    end
+
+    def load_keys(path)
+      Set.new(key_paths(YAML.safe_load(File.read(path), aliases: true) || {}))
+    rescue => e
+      warn "    (could not parse #{path}: #{e.message})"
+      nil
+    end
+
+    any = false
+    pairs.each do |site_rel, tmpl_rel|
+      site_path = File.join(root, site_rel)
+      tmpl_path = File.join(root, tmpl_rel)
+      next unless File.exist?(site_path) && File.exist?(tmpl_path) # skip disabled features
+
+      site_keys = load_keys(site_path) or next
+      tmpl_keys = load_keys(tmpl_path) or next
+
+      missing = (site_keys - tmpl_keys).sort # in /site, NOT in template ← backport these
+      extra   = (tmpl_keys - site_keys).sort # in template, not in /site (often fine)
+      next if missing.empty? && extra.empty?
+
+      any = true
+      puts "    #{site_rel}"
+      missing.each { |k| puts "      + in /site, missing from template:  #{k}" }
+      extra.each   { |k| puts "      · in template, not in /site:        #{k}" }
+    end
+
+    puts "    ✓ All checked config keys are in sync." unless any
+RUBY
+else
+  echo "    (ruby not found on PATH — skipping config key check)"
+fi
+echo ""
+
 if [[ -n "$DRY_RUN" ]]; then
   echo "Dry run complete. Re-run without --dry-run to apply."
 else
