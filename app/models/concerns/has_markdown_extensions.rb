@@ -1137,7 +1137,10 @@ module HasMarkdownExtensions
 
       output << '  <div class="grid-item">'
 
-      image_url ||= "/media/images/404.png"
+      # Fallback for a missing product image. 404.png ships in the
+      # install kit under site/system/assets/images/ and is served at
+      # /system/images/ — NOT /media/, which only serves user uploads.
+      image_url ||= "/system/images/404.png"
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(display_product)}">)

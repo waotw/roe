@@ -185,16 +185,8 @@ class ConfigGenerator
     FileUtils.mkdir_p(DEFAULTS_PATH)
     FileUtils.mkdir_p(File.join(ASSETS_PATH, "fonts"))
     FileUtils.mkdir_p(File.join(ASSETS_PATH, "images"))
-
-    copy_default_404_image
-  end
-
-  def copy_default_404_image
-    source = Rails.root.join("app", "assets", "images", "404.png")
-    dest   = File.join(ASSETS_PATH, "images", "404.png")
-    return unless File.exist?(source) && !File.exist?(dest)
-
-    FileUtils.cp(source, dest)
-    puts "  ✓ Copied default 404.png to system assets"
+    # Note: 404.png (and the other default system images) ship in the
+    # minimum kit and are seeded by SiteTemplates::Loader in generate_all,
+    # so there's no separate copy step here anymore.
   end
 end
