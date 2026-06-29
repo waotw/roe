@@ -611,6 +611,73 @@ disable_rbenv_in_shell() {
     return 0
 }
 
+# True if any rc candidate file has an ACTIVE (uncommented) rbenv init or
+# .rbenv/shims line — i.e. something disable_rbenv_in_shell would edit.
+# This is exactly what we ask permission before touching.
+_rbenv_lines_in_rc() {
+    local rc
+    for rc in $(_rc_candidate_files); do
+        [ -f "$rc" ] || continue
+        grep -qE '^[[:space:]]*[^#[:space:]].*(rbenv init|\.rbenv/shims)' "$rc" 2>/dev/null && return 0
+    done
+    return 1
+}
+
+# Warn — never edit — about other Ruby managers that can fight mise over
+# .ruby-version / PATH. Their shell integration varies too much to rewrite
+# safely, so we only make the developer aware in case Ruby later resolves
+# to the wrong place.
+_warn_other_ruby_managers() {
+    local found=""
+    if command_exists rvm  || [ -d "$HOME/.rvm" ];  then found="$found rvm";  fi
+    if command_exists asdf || [ -d "$HOME/.asdf" ]; then found="$found asdf"; fi
+    if [ -d "$HOME/.rubies" ] || [ -f /usr/local/share/chruby/chruby.sh ]; then found="$found chruby"; fi
+    found="$(echo "$found" | xargs)"   # trim whitespace
+    [ -z "$found" ] && return 0
+
+    echo ""
+    log_warning "Other Ruby version manager(s) detected: ${found}"
+    echo -e "  Roe uses ${BOLD}mise${NC} and will NOT change your ${found} setup."
+    echo -e "  If Ruby later resolves to the wrong version, disable ${found} for this"
+    echo -e "  project, or make sure mise activates after it in your shell startup files."
+}
+
+# Resolve conflicts with other Ruby managers BEFORE writing mise into the
+# shell. rbenv is the one we can cleanly (and reversibly) neutralize — but
+# we ASK first rather than editing someone's shell config unprompted.
+# Everything else is warn-only. May exit if the user opts to handle rbenv
+# themselves.
+handle_ruby_manager_conflicts() {
+    if _rbenv_lines_in_rc; then
+        echo ""
+        echo -e "  ${BOLD}You have rbenv set up in your shell.${NC} It can conflict with mise —"
+        echo -e "  both manage Ruby, and rbenv can win on PATH."
+        echo ""
+        echo -e "  Roe can comment out rbenv's startup lines for you. This is reversible:"
+        echo -e "  the lines are prefixed with a note, never deleted."
+        echo ""
+        echo "  How would you like to proceed?"
+        echo "    [1] Let Roe handle it      (recommended)"
+        echo "    [2] I'll handle it myself  (quit install for now)"
+        echo ""
+        breathing_room
+        read -rp "  Choose [1/2]: " REPLY
+        case "${REPLY:-1}" in
+            2 | [Qq]*)
+                echo ""
+                echo -e "  No problem. When you're ready, comment out the ${CYAN}rbenv init${NC} and"
+                echo -e "  ${CYAN}.rbenv/shims${NC} lines in your shell startup file, then re-run ${CYAN}./roe.sh check${NC}."
+                exit 0
+                ;;
+            *)
+                disable_rbenv_in_shell
+                ;;
+        esac
+    fi
+
+    _warn_other_ruby_managers
+}
+
 # mise equivalent of ensure_rbenv_in_shell. Writes `mise activate` to
 # the user's interactive rc (ZDOTDIR-aware), AND neutralizes any rbenv
 # integration so the two managers don't conflict. Returns 0 on success
@@ -645,10 +712,11 @@ ensure_mise_in_shell() {
         return 1
     }
 
-    # Always neutralize rbenv, even when mise activate is already present
-    # — this is the path that fixes installs that added mise earlier but
-    # still have rbenv intercepting via init or a hardcoded shims path.
-    disable_rbenv_in_shell
+    # Resolve conflicts with other Ruby managers BEFORE writing mise into
+    # the shell. rbenv is asked-about and only disabled on consent (it's
+    # reversible); rvm/asdf/chruby are warn-only. This may exit if the user
+    # chooses to handle rbenv themselves.
+    handle_ruby_manager_conflicts
 
     # Make mise honour .ruby-version (off by default in modern mise).
     configure_mise_for_ruby
@@ -825,6 +893,9 @@ cmd_check() {
     echo "If anything is missing, I'll guide you through installing it."
     echo ""
     echo -e "  OS detected: ${BOLD}${OS}${NC}"
+    echo ""
+    echo -e "  For the full list of what Roe needs (and the optional extras), see"
+    echo -e "  ${CYAN}README.md${NC} — the ${BOLD}Requirements${NC} section — in this folder."
     echo ""
 
     local all_good=true
