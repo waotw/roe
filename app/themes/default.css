@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.9.5
-   Bundled with: Roe v0.0.38
+   Version: 0.9.6
+   Bundled with: Roe v0.0.39
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -1321,6 +1321,12 @@ figcaption {
   max-width: none;
   object-fit: contain;
 }
+
+.gallery-carousel .gallery-item figcaption {
+  font-size: var(--text-xs);
+  margin-bottom: 0;
+}
+
 .gallery-carousel .gallery-nav {
   display: flex;
   align-items: center;
@@ -1329,17 +1335,24 @@ figcaption {
   margin-top: var(--space-3);
 }
 
+.gallery-carousel:has(figcaption) .gallery-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-0);
+}
+
 .gallery-nav-button {
   font-size: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2rem;
+  height: 1.5rem;
   padding: 0;
   margin: 0;
   border: none;
-  /*border-radius: 50%;*/
   background: var(--color-bg);
   color: var(--color-text);
   line-height: 1;
@@ -2627,10 +2640,17 @@ p.podcast-audio-fallback {
 .content.documentation p mark,
 .documentation mark {
   background-color: var(--color-highlight-text);
-  color: var(--color-bg);
+  color: var(--color-text);
   padding: 0 calc(var(--space-1) * 0.8);
   border-radius: 1px;
   line-height: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .content.documentation p mark,
+  .documentation mark {
+    color: var(--color-bg);
+  }
 }
 
 .content.documentation p code {
@@ -2646,7 +2666,7 @@ p.podcast-audio-fallback {
 .documentation .collection-grid {
   display: grid;
   column-gap: var(--space-8);
-  row-gap: var(--space-0);
+  row-gap: var(--space-4);
   margin: var(--space-4) 0;
 }
 

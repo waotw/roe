@@ -18,7 +18,7 @@ template: links
 
 # Images & Image Galleries
 
-Roe makes it really easy to create image galleries in Posts or Pages with Markdown.
+Roe makes it really easy to create image galleries in Posts or Pages with Markdown. All gallery images have a lightbox feature automatically (click to enlarge) with a [carousel/slideshow](#carousel-slideshow) options as well.
 
 ## Uploading Images
 
@@ -103,6 +103,30 @@ If you want an image to be full-width, just put it on it's own line like so ↓
 
 - Row 1: 1 image (full width)
 - Row 3: 3 images (33% width each)
+
+## Carousel (slideshow)
+
+Instead of a grid, add `slideshow: true` at the bottom of the gallery to make it carousel/slideshow like so ↓
+
+````markdown
+```gallery
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+slideshow: true
+```
+````
+
+↑ that will look like this ↓
+
+```gallery
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+slideshow: true
+```
 
 ## Captions
 

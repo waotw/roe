@@ -1,6 +1,7 @@
 ---
 title: Tools → Substack Imports
 status: published
+tags: tool
 ---
 
 # Importing from Substack

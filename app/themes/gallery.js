@@ -10,7 +10,10 @@
   function el(tag, className, attrs) {
     var node = document.createElement(tag);
     if (className) node.className = className;
-    if (attrs) Object.keys(attrs).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    if (attrs)
+      Object.keys(attrs).forEach(function (k) {
+        node.setAttribute(k, attrs[k]);
+      });
     return node;
   }
 
@@ -18,7 +21,10 @@
     var last = 0;
     return function () {
       var now = Date.now();
-      if (now - last >= ms) { last = now; fn(); }
+      if (now - last >= ms) {
+        last = now;
+        fn();
+      }
     };
   }
 
@@ -26,15 +32,21 @@
   function enhanceCarousel(carousel) {
     var track = carousel.querySelector(".gallery-track");
     if (!track) return;
-    var items = Array.prototype.slice.call(track.querySelectorAll(".gallery-item"));
+    var items = Array.prototype.slice.call(
+      track.querySelectorAll(".gallery-item"),
+    );
     if (items.length < 2) return;
 
     function currentIndex() {
       var center = track.scrollLeft + track.clientWidth / 2;
-      var best = 0, bestDist = Infinity;
+      var best = 0,
+        bestDist = Infinity;
       items.forEach(function (item, i) {
         var dist = Math.abs(item.offsetLeft + item.offsetWidth / 2 - center);
-        if (dist < bestDist) { bestDist = dist; best = i; }
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
       });
       return best;
     }
@@ -42,25 +54,43 @@
     function scrollTo(i) {
       var item = items[Math.max(0, Math.min(items.length - 1, i))];
       if (item) {
-        track.scrollTo({ left: item.offsetLeft - (track.clientWidth - item.offsetWidth) / 2, behavior: "smooth" });
+        track.scrollTo({
+          left: item.offsetLeft - (track.clientWidth - item.offsetWidth) / 2,
+          behavior: "smooth",
+        });
       }
     }
 
-    var prev = el("button", "gallery-nav-button gallery-prev", { type: "button", "aria-label": "Previous image" });
+    var prev = el("button", "gallery-nav-button gallery-prev", {
+      type: "button",
+      "aria-label": "Previous image",
+    });
     prev.textContent = "‹";
-    var next = el("button", "gallery-nav-button gallery-next", { type: "button", "aria-label": "Next image" });
+    var next = el("button", "gallery-nav-button gallery-next", {
+      type: "button",
+      "aria-label": "Next image",
+    });
     next.textContent = "›";
     var dotsWrap = el("div", "gallery-dots");
 
     var dots = items.map(function (_, i) {
-      var dot = el("button", "gallery-dot", { type: "button", "aria-label": "Go to image " + (i + 1) });
-      dot.addEventListener("click", function () { scrollTo(i); });
+      var dot = el("button", "gallery-dot", {
+        type: "button",
+        "aria-label": "Go to image " + (i + 1),
+      });
+      dot.addEventListener("click", function () {
+        scrollTo(i);
+      });
       dotsWrap.appendChild(dot);
       return dot;
     });
 
-    prev.addEventListener("click", function () { scrollTo(currentIndex() - 1); });
-    next.addEventListener("click", function () { scrollTo(currentIndex() + 1); });
+    prev.addEventListener("click", function () {
+      scrollTo(currentIndex() - 1);
+    });
+    next.addEventListener("click", function () {
+      scrollTo(currentIndex() + 1);
+    });
 
     var nav = el("div", "gallery-nav");
     nav.appendChild(prev);
@@ -70,9 +100,13 @@
 
     function updateDots() {
       var idx = currentIndex();
-      dots.forEach(function (dot, i) { dot.setAttribute("aria-current", i === idx ? "true" : "false"); });
+      dots.forEach(function (dot, i) {
+        dot.setAttribute("aria-current", i === idx ? "true" : "false");
+      });
     }
-    track.addEventListener("scroll", throttle(updateDots, 100), { passive: true });
+    track.addEventListener("scroll", throttle(updateDots, 100), {
+      passive: true,
+    });
 
     // Pin to the first slide. As the async images load they grow the track and
     // the browser drifts a horizontal scroller toward the end — leaving the
@@ -84,7 +118,13 @@
     // interacts so we never yank them back.
     var pinning = true;
     ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (ev) {
-      track.addEventListener(ev, function () { pinning = false; }, { passive: true, once: true });
+      track.addEventListener(
+        ev,
+        function () {
+          pinning = false;
+        },
+        { passive: true, once: true },
+      );
     });
     function pinStart() {
       if (!pinning) return;
@@ -97,7 +137,8 @@
     pinStart();
     items.forEach(function (item) {
       var img = item.querySelector("img");
-      if (img && !img.complete) img.addEventListener("load", pinStart, { once: true });
+      if (img && !img.complete)
+        img.addEventListener("load", pinStart, { once: true });
     });
     if (document.readyState !== "complete") {
       window.addEventListener("load", pinStart, { once: true });
@@ -115,7 +156,9 @@
   }
 
   function init() {
-    document.querySelectorAll("[data-gallery-carousel]").forEach(enhanceCarousel);
+    document
+      .querySelectorAll("[data-gallery-carousel]")
+      .forEach(enhanceCarousel);
     document.querySelectorAll(".gallery-zoom").forEach(enhanceZoom);
   }
 

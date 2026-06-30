@@ -20,7 +20,7 @@ module ManagedTools
         yum:    "vips",
         pacman: "libvips",
         zypper: "libvips-tools",
-        apk:    "vips",
+        apk:    "vips"
       }
     end
 

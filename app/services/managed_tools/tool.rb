@@ -50,7 +50,7 @@ module ManagedTools
         version:         (present ? version : nil),
         install_command: install_command(platform),
         platform_label:  platform.label,
-        needs_sudo:      platform.needs_sudo?,
+        needs_sudo:      platform.needs_sudo?
       }
     end
   end

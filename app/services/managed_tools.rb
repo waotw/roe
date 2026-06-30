@@ -11,7 +11,7 @@
 module ManagedTools
   # The known tools, in display order. Add a tool = add its subclass here.
   def self.all
-    [Libvips.new]
+    [ Libvips.new ]
   end
 
   def self.find(key)

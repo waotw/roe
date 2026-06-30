@@ -89,7 +89,7 @@ module ManagedTools
     # depending on how the server was launched.
     def self.command_available?(cmd)
       dirs = ENV.fetch("PATH", "").split(File::PATH_SEPARATOR)
-      dirs += ["/opt/homebrew/bin", "/usr/local/bin"] if cmd == "brew"
+      dirs += [ "/opt/homebrew/bin", "/usr/local/bin" ] if cmd == "brew"
       dirs.any? { |dir| !dir.to_s.empty? && File.executable?(File.join(dir, cmd)) }
     end
   end
