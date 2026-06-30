@@ -111,3 +111,7 @@ gem "net-ftp", ">= 0.2"
 gem "tty-prompt", "~> 0.23"
 gem "tty-box", "~> 0.7"
 gem "tty-spinner", "~> 0.9"
+
+# Pure-Ruby image dimensions from file headers (no native deps) — used to
+# build honest srcset widths and skip redundant variants without libvips.
+gem "fastimage", "~> 2.3"

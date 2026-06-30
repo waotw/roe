@@ -1,10 +1,12 @@
 <% content_for :editor_js, false %>
 <div class="px-4 sm:px-0">
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900">Images</h1>
+    <h1 class="text-3xl font-bold text-gray-900">Images Tools</h1>
     <p class="mt-2 text-sm text-gray-700">
-      Tools that power image optimization. Roe runs fine without them —
-      installing one turns the feature on.
+      If you have `libvips` installed locally, Roe will use it to optimize your images automatically. This will drastically increase the speed at which images load and not waste bandwidth on huge images for thumbnails.
+    </p>
+    <p class="mt-2 text-sm text-gray-700">
+      You can also create variants manually, this works great if you don't have that many images in your site.
     </p>
     <p class="mt-1 text-xs text-gray-500">
       Detected environment: <span class="font-medium text-gray-700"><%= @platform.label %></span>
@@ -44,7 +46,7 @@
           <div class="mt-3">
             <% if tool[:install_command].present? %>
               <p class="text-xs text-gray-500 mb-1">
-                To install on <%= @platform.label %>, run this in a terminal:
+                To install on <%= @platform.label %>, run this in the terminal (doesn't matter where):
               </p>
               <div class="flex items-stretch gap-2"
                    data-controller="clipboard"
