@@ -18,7 +18,7 @@ In Februrary I was looking for a new project to sink into and a writer I read on
 
 4 months later, here we are, the beta is out. And with it, you could replace Substack, WordPress and build an online Store with something you host/own. Roe was built for people that make stuff. It's been a labor of love thus far and I hope it continues for years to come.
 
-If you're interested, [download](/download /bw) it and git it a try.
+If you're interested, [download](https://codeberg.org/waotw/roe/releases/tag/v0.0.38) it and git it a try.
 
 ## Why Roe?
 

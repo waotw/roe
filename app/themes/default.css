@@ -1222,6 +1222,174 @@ figcaption {
   }
 }
 
+/* --- Gallery item wrapper + click-to-zoom --------------------------------
+   Each image is wrapped in .gallery-item (the grid/track cell) and a
+   .gallery-zoom-link (the click target). Zoom is pure CSS: the link points
+   at an overlay's #id and .gallery-zoom:target reveals it — no JS needed.
+   gallery.js only adds keyboard/extra niceties. Restyle freely. */
+
+.gallery-item {
+  margin: 0;
+  min-width: 0;
+}
+
+.gallery-zoom-link {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+/* Native popover lightbox: the browser hides [popover] until open and
+   renders it in the top layer (immune to ancestor transforms/overflow).
+   We only style the open state, the backdrop, and the image. */
+.gallery-zoom {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: var(--space-4);
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  cursor: zoom-out;
+}
+
+.gallery-zoom:popover-open {
+  display: grid;
+  place-items: center;
+}
+
+.gallery-zoom::backdrop {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.gallery-zoom-image {
+  max-width: min(100%, 1600px);
+  max-height: 90vh;
+  width: auto !important;
+  height: auto;
+  object-fit: contain !important;
+  border: 0 !important;
+}
+
+.gallery-zoom-close {
+  position: fixed;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 2rem;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* --- Carousel (slideshow: true) ------------------------------------------
+   CSS scroll-snap does the scrolling/snapping with no JS. gallery.js adds
+   prev/next buttons and dots as progressive enhancement. */
+
+.gallery-carousel {
+  position: relative;
+}
+
+.gallery-carousel .gallery-track {
+  display: flex;
+  gap: var(--space-gallery);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overflow-anchor: none;
+}
+
+.gallery-carousel .gallery-item {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+}
+
+.gallery-carousel .gallery-item img {
+  display: block;
+  height: min(70vh, 32rem);
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+}
+.gallery-carousel .gallery-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.gallery-nav-button {
+  font-size: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  /*border-radius: 50%;*/
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.gallery-nav-button::before {
+  content: "";
+  display: block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+.gallery-prev::before {
+  transform: rotate(-135deg);
+} /* points left  */
+.gallery-next::before {
+  transform: rotate(45deg);
+} /* points right */
+
+.gallery-nav-button:hover {
+  border-color: var(--color-text);
+}
+
+.gallery-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.gallery-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gallery-dot[aria-current="true"] {
+  background: var(--color-text);
+}
+
 /* ================= CARDS ================== */
 
 .card {

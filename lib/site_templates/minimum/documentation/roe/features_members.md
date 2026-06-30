@@ -67,7 +67,7 @@ When you enable members, Roe generates several pages that you can customize. The
 **Notes:**
 
 - All pages use `audience: everyone` so they're accessible to visitors and members alike
-- Pages contain special `form` [code blocks](# add-link /bw) that Roe renders as working forms (signup, signin, checkout, etc.)
+- Pages contain special `form` [code blocks](https://www.markdownlang.com/basic/code.html#markdown-fenced-code-blocks) that Roe renders as working forms (signup, signin, checkout, etc.)
 - The Account page (`/account`) is built into Roe and not customizable as a Markdown file but you can style it with CSS.
 - Store checkout flows (`STORE` is enabled) have their own success/cancel pages separate from these
 
