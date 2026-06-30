@@ -63,7 +63,7 @@ class ImageVariantGenerator
       end
     end
 
-    def generate_variants(source_path, medium_id: nil)
+    def generate_variants(source_path, medium_id: nil, force: false)
       return false unless available?
       return false unless image_file?(source_path)
 
@@ -88,14 +88,16 @@ class ImageVariantGenerator
       variants_dir = File.join(File.dirname(source_path), "variants")
       FileUtils.mkdir_p(variants_dir)
 
-      # Sequential. Per-variant mtime check inside generate_variant skips
-      # work when a variant is already up-to-date relative to the source,
-      # so we don't need an outer "everything fresh?" short-circuit —
-      # always running mark_complete_for at the end self-heals the DB
-      # status column for files whose variants exist but were never
+      # Sequential. Per-variant EXISTENCE check inside generate_variant
+      # skips any variant already on disk, so hand-placed or
+      # externally-generated/synced variants are never overwritten — only
+      # missing ones are filled in. Pass force: true (the admin
+      # "Regenerate Variants" action) to rebuild every variant from the
+      # source. Always running mark_complete_for at the end self-heals the
+      # DB status column for files whose variants exist but were never
       # stamped (older imports, manual file drops).
-      VARIANTS.each do |name, operations|
-        generate_variant(source_path, name, operations)
+      variant_names_for(source_path).each do |name|
+        generate_variant(source_path, name, VARIANTS[name], force: force)
       end
 
       # Only stamp the row "complete" if every native variant (and WebP
@@ -161,7 +163,7 @@ class ImageVariantGenerator
       return false if !force && Rails.cache.exist?(cache_key)
 
       Rails.cache.write(cache_key, true, expires_in: QUEUE_DEDUP_TTL)
-      GenerateImageVariantsJob.perform_later(web_path, nil)
+      GenerateImageVariantsJob.perform_later(web_path, nil, force)
       true
     end
 
@@ -220,10 +222,26 @@ class ImageVariantGenerator
     # stays cheap (8 stat calls vs 4).
     def variants_exist?(source_path)
       source_path = normalize_path(source_path)
-      VARIANTS.keys.all? do |name|
+      variant_names_for(source_path).all? do |name|
         variant_exists?(source_path, name) &&
           (!GENERATE_WEBP || webp_variant_exists?(source_path, name))
       end
+    end
+
+    # Actual pixel width of an image file, read from its header via
+    # FastImage — pure Ruby, so no libvips/ImageMagick is needed (this runs
+    # on the variant-SERVING path). Cached by path + mtime. Returns nil if
+    # the file is missing/unreadable or the format isn't understood.
+    def image_width(path)
+      return nil unless path && File.file?(path)
+
+      Rails.cache.fetch([ "ivg_image_width", path, (File.mtime(path).to_i rescue 0) ], expires_in: 24.hours) do
+        require "fastimage"
+        FastImage.size(path)&.first
+      end
+    rescue StandardError => e
+      Rails.logger.debug { "[ImageVariants] width read failed for #{path}: #{e.message}" }
+      nil
     end
 
     def normalize_path(path)
@@ -259,26 +277,58 @@ class ImageVariantGenerator
 
     private
 
-    def generate_variant(source_path, variant_name, operations)
-      variant_path = variant_path_for(source_path, variant_name)
-      source_mtime = File.mtime(source_path)
+    # Variant names to generate/require for a specific source file. Reads
+    # the source width to drop redundant sizes; falls back to the full set
+    # when the width can't be read (HEIC, unreadable, …) so we never
+    # under-generate. Shared by generate_variants and variants_exist? so
+    # the two always agree on the expected set.
+    def variant_names_for(source_path)
+      width = image_width(source_path)
+      width ? needed_variant_names(width) : VARIANTS.keys
+    end
 
-      # Generate the native-format variant if missing or stale.
-      unless File.exist?(variant_path) && File.mtime(variant_path) >= source_mtime
+    # The variant sizes worth producing/serving for a source of the given
+    # width. thumb is always included (a square crop, size-independent).
+    # For the limit variants (small→xl, ascending) we keep each whose limit
+    # is below the source width, plus the first whose limit reaches it —
+    # that one caps at the source size, and any larger variant would be an
+    # identical (never-upscaled) duplicate, so we stop there.
+    def needed_variant_names(source_width)
+      names = [ :thumb ]
+      limit_variants_ascending.each do |name, limit|
+        names << name
+        break if limit >= source_width
+      end
+      names
+    end
+
+    # [[:small, 400], [:medium, 800], …] — the limit variants, ascending.
+    def limit_variants_ascending
+      VARIANTS.reject { |name, _| name == :thumb }
+              .map { |name, ops| [ name, ops[:resize_to_limit].first ] }
+    end
+
+    def generate_variant(source_path, variant_name, operations, force: false)
+      variant_path = variant_path_for(source_path, variant_name)
+
+      # Generate the native-format variant only when forced or missing. We
+      # deliberately do NOT overwrite a file that already exists, so
+      # hand-placed or externally-generated variants are preserved; a
+      # changed source is rebuilt via the force path (Regenerate Variants).
+      unless !force && File.exist?(variant_path)
         require "image_processing/vips"
         pipeline = ImageProcessing::Vips.source(source_path)
         operations.each { |op, args| pipeline = pipeline.public_send(op, *args) }
         pipeline.call(destination: variant_path)
       end
 
-      # Generate the WebP sibling if enabled, missing, or stale. Checked
-      # independently so a re-run picks up missing WebPs without
-      # regenerating the native variant — that's the on-disk backfill
-      # path for installations that had GENERATE_WEBP off when their
-      # variants were originally created.
+      # WebP sibling — same rule, checked independently so a re-run fills a
+      # missing WebP without touching an existing native variant (the
+      # on-disk backfill path for installs that had GENERATE_WEBP off when
+      # their variants were first created).
       if GENERATE_WEBP
         webp_path = variant_path.sub(File.extname(variant_path), ".webp")
-        unless File.exist?(webp_path) && File.mtime(webp_path) >= source_mtime
+        unless !force && File.exist?(webp_path)
           require "image_processing/vips"
           pipeline = ImageProcessing::Vips.source(source_path)
           operations.each { |op, args| pipeline = pipeline.public_send(op, *args) }

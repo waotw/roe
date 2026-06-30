@@ -13,7 +13,7 @@ class GenerateImageVariantsJob < ApplicationJob
     end
   end
 
-  def perform(file_path, medium_id)
+  def perform(file_path, medium_id, force = false)
     Rails.logger.info "[ImageVariants] Job started: #{file_path}"
 
     normalized_path = ImageVariantGenerator.normalize_path(file_path)
@@ -28,14 +28,16 @@ class GenerateImageVariantsJob < ApplicationJob
       return
     end
 
-    if ImageVariantGenerator.process_mode == :on_demand
+    # On-demand mode skips when a full set already exists — but a forced
+    # run (Regenerate Variants) must rebuild even when files are present.
+    if ImageVariantGenerator.process_mode == :on_demand && !force
       if ImageVariantGenerator.variants_exist?(normalized_path)
         Rails.logger.info "[ImageVariants] Variants already exist, skipping: #{file_path}"
         return
       end
     end
 
-    result = ImageVariantGenerator.generate_variants(normalized_path, medium_id: nil)
+    result = ImageVariantGenerator.generate_variants(normalized_path, medium_id: nil, force: force)
     Rails.logger.info "[ImageVariants] Job #{result ? 'completed' : 'failed'}: #{file_path}"
   rescue => e
     if Rails.env.development?
