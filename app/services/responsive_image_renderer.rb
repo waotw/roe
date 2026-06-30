@@ -32,19 +32,25 @@ class ResponsiveImageRenderer
 
   def render
     return "" if source_path.blank?
-    return simple_img_tag unless ImageVariantGenerator.available?
     return simple_img_tag unless image_file?
 
-    # Check if variants exist
     source_full_path = File.join(RoeSitePaths::SITE_PATH, source_path.sub(%r{^/}, "")).to_s
 
+    # Serve a <picture> whenever a full variant set exists on disk — no
+    # matter how it got there: generated here by libvips, generated on
+    # another machine and synced/deployed, or placed by hand. libvips is
+    # only needed to *create* variants, never to *serve* them, so we check
+    # for the files first and gate generation (not serving) on it.
     html = if ImageVariantGenerator.variants_exist?(source_full_path)
       build_picture_tag
-    else
-      # Queue generation for first view, show original for now. queue! is
-      # idempotent — Rails.cache flag dedups subsequent renders of this
-      # path until the job clears it (or the TTL expires).
+    elsif ImageVariantGenerator.available?
+      # Missing but we can build them: queue and show the original until
+      # ready. queue! is idempotent (Rails.cache flag dedups re-renders
+      # until the job clears it).
       ImageVariantGenerator.queue!(source_path)
+      simple_img_tag
+    else
+      # No variants and no libvips to make them → serve the original.
       simple_img_tag
     end
 
@@ -85,7 +91,7 @@ class ResponsiveImageRenderer
     # CSS background-image consumers see. Per "never serve originals",
     # the original is an on-disk archive only; the picture tag's variant
     # menu is the entire serving menu.
-    fallback_src = variant_web_path(DEFAULT_IMG_VARIANT) || source_path
+    fallback_src = fallback_img_web_path || source_path
     html << "<img src=\"#{ERB::Util.html_escape(fallback_src)}\" "
     html << "alt=\"#{alt_text}\" "
     html << "class=\"#{css_class}\" " if css_class.present?
@@ -130,50 +136,63 @@ class ResponsiveImageRenderer
   # better than serving nothing.
 
   def build_webp_srcset
-    variants = VARIANT_WIDTHS.map do |variant_name, width|
-      webp_path = webp_variant_path(variant_name)
-      next unless webp_path && variant_exists?(webp_path)
-
-      "#{ERB::Util.html_escape(webp_path)} #{width}w"
-    end.compact
-
-    variants.any? ? variants.join(", ") : nil
+    srcset_for(:webp)
   end
 
   def build_fallback_srcset
-    variants = VARIANT_WIDTHS.map do |variant_name, width|
-      web_path = variant_web_path(variant_name)
-      next unless web_path && variant_exists?(web_path)
-
-      "#{ERB::Util.html_escape(web_path)} #{width}w"
-    end.compact
-
-    variants.any? ? variants.join(", ") : nil
+    srcset_for(:native)
   end
 
-  # Web path for a native-format variant of the source.
-  # Returns nil when the variant generator can't produce one (no source).
-  def variant_web_path(variant_name)
-    filesystem_path = ImageVariantGenerator.variant_path_for(source_path, variant_name)
+  # {variant_name => actual pixel width} for the limit variants present on
+  # disk (native measured first, webp as a fallback measurement), read once
+  # per render via FastImage — no native image lib, so it works on the
+  # libvips-less serving path. thumb is excluded (square crop, not a width).
+  def measured_variant_widths
+    @measured_variant_widths ||= ImageVariantGenerator::VARIANTS.keys.each_with_object({}) do |name, acc|
+      next if name == :thumb
+      native = ImageVariantGenerator.variant_path_for(source_path, name)
+      webp   = native.sub(File.extname(native), ".webp")
+      file   = File.exist?(native) ? native : (File.exist?(webp) ? webp : nil)
+      next unless file
+      width = ImageVariantGenerator.image_width(file)
+      acc[name] = width if width
+    end
+  end
+
+  # Build "url widthw" descriptors from existing variants — ascending and
+  # DEDUPED by ACTUAL width. A source smaller than a variant's limit is
+  # never upscaled, so several variants can share one pixel width; we
+  # advertise that width once, with an honest descriptor.
+  def srcset_for(kind)
+    seen = {}
+    measured_variant_widths.sort_by { |_name, width| width }.each do |name, width|
+      next if seen.key?(width)
+      native = ImageVariantGenerator.variant_path_for(source_path, name)
+      fs = kind == :webp ? native.sub(File.extname(native), ".webp") : native
+      next unless File.exist?(fs)
+      seen[width] = web_path_for(fs)
+    end
+    return nil if seen.empty?
+
+    seen.map { |width, web| "#{ERB::Util.html_escape(web)} #{width}w" }.join(", ")
+  end
+
+  # Web path for the <img> fallback inside <picture>: the variant nearest
+  # the default (medium) target, else the largest available — the default
+  # itself may not exist for a small source that skipped it.
+  def fallback_img_web_path
+    return nil if measured_variant_widths.empty?
+
+    target = VARIANT_WIDTHS[DEFAULT_IMG_VARIANT]
+    name   = measured_variant_widths.min_by { |_n, w| (w - target).abs }&.first
+    return nil unless name
+
+    native = ImageVariantGenerator.variant_path_for(source_path, name)
+    File.exist?(native) ? web_path_for(native) : nil
+  end
+
+  def web_path_for(filesystem_path)
     filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
-  end
-
-  def webp_variant_path(variant_name)
-    return nil unless ImageVariantGenerator::GENERATE_WEBP
-
-    web_path = variant_web_path(variant_name)
-    web_path.sub(File.extname(web_path), ".webp")
-  end
-
-  def variant_exists?(path)
-    # Delegate path resolution to ImageVariantGenerator.normalize_path so
-    # this stays correct under the versioned `current/` layout — site
-    # files live under RoeSitePaths::SITE_PATH (/roe/site), not under
-    # Rails.root (/roe/current). The previous start_with?(Rails.root)
-    # check missed every filesystem path coming back from
-    # `variant_path_for`, so build_fallback_srcset treated all variants
-    # as missing and the picture tag silently degraded to the original.
-    File.exist?(ImageVariantGenerator.normalize_path(path))
   end
 
   def image_file?

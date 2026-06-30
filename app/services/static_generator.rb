@@ -886,7 +886,7 @@ class StaticGenerator
   # out-of-box default theme would publish with no stylesheet.
   def copy_bundled_themes
     theme_name = SiteConfig.get("theme.active") || "default"
-    %W[#{theme_name}.css checkout.js].each do |filename|
+    %W[#{theme_name}.css checkout.js gallery.js].each do |filename|
       dest = @output_dir.join("theme", filename)
       next if dest.exist? # site/theme/<file> already won the copy
 

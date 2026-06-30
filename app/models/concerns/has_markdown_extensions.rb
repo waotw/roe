@@ -330,13 +330,11 @@ module HasMarkdownExtensions
   end
 
   def process_galleries(markdown, preview: false)
-    result = markdown.gsub(/```gallery\r?\n(.*?)```/m) do
-      gallery_content = $1
-      html = render_gallery(gallery_content, preview: preview)
-
-      html
+    index = -1
+    markdown.gsub(/```gallery\r?\n(.*?)```/m) do
+      index += 1
+      render_gallery($1, preview: preview, index: index)
     end
-    result
   end
 
   # Converts image+caption syntax into a <figure>/<figcaption> block.
@@ -365,68 +363,135 @@ module HasMarkdownExtensions
     end
   end
 
-  def render_gallery(content, preview: false)
-    # Split by blank lines to get rows
-    rows = content.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
+  # Fenced-gallery directives understood at the top/bottom of a ```gallery```
+  # block (a `key: value` line that isn't a markdown image). Whitelisted so
+  # stray "Word: text" lines stay content, not config.
+  GALLERY_DIRECTIVES = %w[slideshow].freeze
 
-    if rows.empty?
-      return preview ? "<!-- Empty gallery -->" : ""
-    end
+  def render_gallery(content, preview: false, index: 0)
+    config, image_rows = parse_gallery(content)
+    return (preview ? "<!-- Empty gallery -->" : "") if image_rows.flatten.empty?
 
-    output = [ "" ]
-    output << "{::nomarkdown}"
-    output << '<div class="gallery">'
-
-    rows.each do |row_content|
-      images = []
-
-      row_content.scan(/!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*(.*?)\*\))?/) do
-        alt_text = $1
-        src = $2
-        caption = $3&.strip
-
-        images << {
-          alt: alt_text,
-          src: src,
-          caption: caption
-        }
+    body =
+      if truthy_directive?(config["slideshow"])
+        render_gallery_carousel(image_rows.flatten, index)
+      else
+        render_gallery_grid(image_rows, index)
       end
 
-      next if images.empty?
+    # {::nomarkdown} passes the raw HTML through kramdown untouched; the
+    # later process_responsive_images sweep turns each <img data-sizes> into
+    # a responsive <picture> (grid thumbs get small/medium variants, the
+    # zoom overlay's data-sizes="100vw" pulls the largest).
+    [ "", "{::nomarkdown}", body, "{:/nomarkdown}", "" ].join("\n")
+  end
 
+  # Split a gallery body into [config, image_rows]. Directive lines are
+  # pulled out first; the rest is grouped into rows by blank lines (blank
+  # line = new grid row), each row scanned for `![alt](src) (*caption*)`.
+  def parse_gallery(content)
+    config = {}
+    image_lines = []
+
+    content.to_s.each_line do |line|
+      m = line.match(/\A\s*([a-z_]+)\s*:\s*(.+?)\s*\z/i)
+      if m && line !~ /!\[/ && GALLERY_DIRECTIVES.include?(m[1].downcase)
+        config[m[1].downcase] = m[2]
+      else
+        image_lines << line
+      end
+    end
+
+    rows = image_lines.join.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
+    image_rows = rows.map { |row| scan_gallery_images(row) }.reject(&:empty?)
+    [ config, image_rows ]
+  end
+
+  def scan_gallery_images(row)
+    images = []
+    row.scan(/!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*(.*?)\*\))?/) do
+      images << { alt: $1, src: $2, caption: $3&.strip }
+    end
+    images
+  end
+
+  def truthy_directive?(value)
+    %w[true yes 1 on].include?(value.to_s.strip.downcase)
+  end
+
+  # Grid: blank-line rows, up to 3 columns each. Every image is a zoomable
+  # .gallery-item; the matching :target overlays are collected and appended
+  # once at the end of the gallery.
+  def render_gallery_grid(image_rows, index)
+    out = +%(<div class="gallery">)
+    overlays = +""
+    item = 0
+
+    image_rows.each do |images|
       col_count = [ images.length, 3 ].min
-
-      # Set sizes based on column count
-      sizes = case col_count
-      when 1 then "(min-width: 1200px) 1200px, 100vw"  # Featured/full width
-      when 2 then "(min-width: 1024px) 50vw, 100vw"     # 2 columns
-      else "(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"  # 3 columns
-      end
-
-      output << "  <div class=\"gallery-row gallery-col-#{col_count}\">"
-
+      sizes = gallery_grid_sizes(col_count)
+      out << %(<div class="gallery-row gallery-col-#{col_count}">)
       images.each do |img|
-        if img[:caption].present?
-          caption_html = Kramdown::Document.new(img[:caption], input: "GFM").to_html.strip
-          caption_html = caption_html.gsub(%r{^<p>(.*)</p>$}, '\1')
-
-          output << "    <figure>"
-          # Pass sizes as data attribute
-          output << "      <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" data-sizes=\"#{sizes}\">"
-          output << "      <figcaption>#{caption_html}</figcaption>"
-          output << "    </figure>"
-        else
-          output << "    <img src=\"#{escape_html(img[:src])}\" alt=\"#{escape_html(img[:alt])}\" data-sizes=\"#{sizes}\">"
-        end
+        anchor = "gz-#{index}-#{item}"
+        out << gallery_item_html(img, anchor, sizes)
+        overlays << gallery_overlay_html(img, anchor)
+        item += 1
       end
-
-      output << "  </div>"
+      out << "</div>"
     end
 
-    output << "</div>"
-    output << "{:/nomarkdown}"
-    output << ""
-    output.join("\n")
+    out << overlays << "</div>"
+  end
+
+  # Carousel: one scroll-snap track, image order preserved. CSS does the
+  # scrolling/snapping; gallery.js adds arrows/dots as enhancement.
+  def render_gallery_carousel(images, index)
+    sizes = "(min-width: 1024px) 75vw, 100vw"
+    out = +%(<div class="gallery gallery-carousel" data-gallery-carousel><div class="gallery-track">)
+    overlays = +""
+
+    images.each_with_index do |img, i|
+      anchor = "gz-#{index}-#{i}"
+      out << gallery_item_html(img, anchor, sizes)
+      overlays << gallery_overlay_html(img, anchor)
+    end
+
+    out << "</div>" << overlays << "</div>"
+  end
+
+  def gallery_item_html(img, anchor, sizes)
+    # Native popover trigger — opens the matching [popover] overlay in the
+    # browser's top layer. No JS, no URL hash (so no Turbo conflict and no
+    # scroll jump); Esc and click-outside dismiss it for free.
+    link = %(<button type="button" class="gallery-zoom-link" popovertarget="#{anchor}" aria-label="View larger image">) +
+           %(<img src="#{escape_html(img[:src])}" alt="#{escape_html(img[:alt])}" data-sizes="#{sizes}">) +
+           "</button>"
+    if img[:caption].present?
+      caption = Kramdown::Document.new(img[:caption], input: "GFM").to_html.strip.gsub(%r{\A<p>(.*)</p>\z}, '\1')
+      %(<figure class="gallery-item">#{link}<figcaption>#{caption}</figcaption></figure>)
+    else
+      %(<div class="gallery-item">#{link}</div>)
+    end
+  end
+
+  # CSS-only lightbox via the native popover API: the overlay lives in the
+  # top layer (immune to ancestor transforms/overflow), light-dismisses on
+  # outside click, and closes on Esc — all without JS. data-sizes="100vw"
+  # makes process_responsive_images serve the largest variant here.
+  def gallery_overlay_html(img, anchor)
+    alt = escape_html(img[:alt])
+    %(<div id="#{anchor}" class="gallery-zoom" popover role="dialog" aria-label="#{alt}">) +
+      %(<button type="button" class="gallery-zoom-close" popovertarget="#{anchor}" popovertargetaction="hide" aria-label="Close">&times;</button>) +
+      %(<img class="gallery-zoom-image" src="#{escape_html(img[:src])}" alt="#{alt}" data-sizes="100vw" loading="lazy">) +
+      "</div>"
+  end
+
+  def gallery_grid_sizes(col_count)
+    case col_count
+    when 1 then "(min-width: 1200px) 1200px, 100vw"
+    when 2 then "(min-width: 1024px) 50vw, 100vw"
+    else        "(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+    end
   end
 
   def escape_html(text)
