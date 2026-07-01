@@ -11,6 +11,7 @@ export default class extends Controller {
     resourceType: String,
     podcastConfigs: Object,
     productCategories: Array,
+    productGroups: Array,
     mediaPaths: Object,
   };
 
@@ -483,12 +484,22 @@ export default class extends Controller {
           : "";
         const readonlyAttr = config.readonly ? " readonly" : "";
 
-        // Special handling for category field with autocomplete
-        if (fieldName === "category" && this.resourceTypeValue === "product") {
-          const categories = this.hasProductCategoriesValue
-            ? this.productCategoriesValue
-            : [];
-          const escapedCategories = JSON.stringify(categories).replace(
+        // Special handling for category/group fields with autocomplete. Both
+        // reuse the shared autocomplete controller; only the option list differs
+        // (categories vs the group registry from store.yml).
+        if (
+          this.resourceTypeValue === "product" &&
+          (fieldName === "category" || fieldName === "group")
+        ) {
+          const options =
+            fieldName === "group"
+              ? this.hasProductGroupsValue
+                ? this.productGroupsValue
+                : []
+              : this.hasProductCategoriesValue
+                ? this.productCategoriesValue
+                : [];
+          const escapedCategories = JSON.stringify(options).replace(
             /"/g,
             "&quot;",
           );

@@ -341,6 +341,9 @@ class Admin::ProductsController < Admin::BaseController
         image:
         description:
         tags: []
+        group:
+        primary: false
+        variant:
         ---
 
         Product description goes here...

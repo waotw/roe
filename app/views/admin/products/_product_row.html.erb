@@ -14,16 +14,32 @@
   <td class="whitespace-nowrap flex items-center <%= rowpad %> pr-3 text-sm font-medium <%= dimmed ? 'text-gray-400' : 'text-gray-900' %> <%= dimmed ? 'pl-8' : 'pl-4' %>">
     <%= link_to product.title || "Untitled", edit_admin_product_path(product),
           class: "line-clamp-1 #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-blue-600 hover:text-blue-900'}" %>
-    <% if product.primary? %>
-      <span class="ml-1 inline-flex items-center bg-blue-100 px-1.5 text-[10px] font-semibold uppercase text-blue-800 align-middle">Primary</span>
+    <%# Primary / variant badges. Primary: "Primary" on top, variant below.
+        Non-primary: the (gray) variant badge sits in the primary slot. Same
+        badge styling as Primary, greyed. %>
+    <% if product.primary? || product.variant.present? %>
+      <span class="ml-2 inline-flex items-start gap-0.5 align-middle">
+        <% if product.primary? %>
+          <span class="inline-flex items-center bg-blue-100 px-1.5 text-[10px] font-semibold uppercase text-blue-800">Primary</span>
+        <% end %>
+        <% if product.variant.present? %>
+          <span class="inline-flex items-center bg-gray-100 px-1.5 text-[10px] font-semibold uppercase text-gray-600"><%= product.variant %></span>
+        <% end %>
+      </span>
     <% end %>
-    <% if product.needs_attention? %>
-      <%
-        reasons = []
+    <%# Row-level ⚠: this product's OWN issues — published field/media problems
+        plus per-product group warnings (e.g. missing variant). Group-wide
+        issues (no/duplicate primary) are flagged on the group header instead. %>
+    <%
+      reasons = []
+      if product.needs_attention?
         product.missing_required_fields.each { |name| reasons << "missing #{name}" }
         product.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
-      %>
-      <span class="inline-block text-base text-amber-600 font-semibold font-sans"
+      end
+      reasons.concat(product.group_row_issues)
+    %>
+    <% if reasons.any? %>
+      <span class="ml-1 inline-block text-base text-amber-600 font-semibold font-sans leading-0"
             title="<%= reasons.join('; ') %>">⚠</span>
     <% end %>
   </td>

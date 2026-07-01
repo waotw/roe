@@ -30,9 +30,10 @@
 
               <%# Each row-block is its own <tbody> so a future client-side
                   sort/filter/search can reorder or hide whole blocks — a
-                  group's members can never be split apart. Ordering (most
-                  recently edited first, groups floated to their freshest
-                  member, primary on top) is done in ProductGroup. %>
+                  group's members can never be split apart. Default order
+                  (groups first alphabetically, then standalone products
+                  alphabetically, primary on top within a group) is done in
+                  ProductGroup. %>
               <% @rows.each do |row| %>
                 <% if row.is_a?(ProductGroup) %>
                   <% members = row.ordered_members %>
@@ -43,10 +44,10 @@
                          data-updated="<%= ProductGroup.rank(row) %>"
                          data-search="<%= members.map { |m| "#{m.title} #{m.sku}" }.join(' ').downcase %>">
                     <tr>
-                      <td colspan="5" class="pt-2 pb-1 pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-blue-500 font-mono bg-blue-50">
+                      <td colspan="5" class="pt-2 pb-1 pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-blue-400 font-mono bg-blue-50">
                         Group: <%= row.name %>
                         <% if row.warnings.any? %>
-                          <span class="inline-block text-base text-amber-600 align-middle"
+                          <span class="inline-block text-base text-amber-600 font-semibold font-sans leading-0"
                                 title="<%= row.warnings.join('; ') %>">⚠</span>
                         <% end %>
                       </td>

@@ -12,25 +12,24 @@ class ProductGroup
 
   # Turn a collection of products into the ordered list of index "rows".
   # Each row is either a bare Product (ungrouped, or the only one with its
-  # group value) or a ProductGroup (2+ members). Rows are ordered by most
-  # recently edited first; a group ranks by its most recently edited member,
-  # so editing any variant lifts the whole block to the top. Members within a
-  # group are ordered primary-first (see #ordered_members).
+  # group value) or a ProductGroup (2+ members). Default order: groups first,
+  # alphabetical by group name, then standalone products alphabetical by title.
+  # Members within a group are ordered primary-first (see #ordered_members).
   def self.rows_for(products)
     buckets = products.to_a.group_by { |p| group_key(p) }
     standalones = buckets.delete(nil) || []
 
-    rows = []
+    groups = []
     buckets.each do |_key, members|
       if members.size >= 2
-        rows << new(members.first.group.to_s.strip, members)
+        groups << new(members.first.group.to_s.strip, members)
       else
         standalones.concat(members)
       end
     end
-    rows.concat(standalones)
 
-    rows.sort_by { |row| -rank(row) }
+    groups.sort_by { |g| g.name.to_s.downcase } +
+      standalones.sort_by { |p| p.title.to_s.downcase }
   end
 
   # The ProductGroup a single product belongs to, or nil if it's ungrouped or
@@ -48,6 +47,39 @@ class ProductGroup
 
   def self.group_key(product)
     product.group.to_s.strip.downcase.presence
+  end
+
+  # --- Registry side (mirrors ProductCategory) --------------------------------
+  # The global list of known group names, stored in store.yml and populated as
+  # products adopt groups (via Product#register_group). Feeds the editor's
+  # group autocomplete. Distinct from the instance side above, which derives
+  # the live grouping from the current product set.
+  STORE_KEY = "product_groups"
+
+  def self.all
+    StoreConfigList.all(STORE_KEY)
+  end
+
+  def self.register(name)
+    StoreConfigList.add(STORE_KEY, name)
+  end
+
+  # Every group name currently in use across products — de-duplicated
+  # case-insensitively and sorted. The source of truth for the registry.
+  def self.registry_names
+    Product.all.filter_map { |p| p.group.to_s.strip.presence }
+               .uniq { |n| n.downcase }
+               .sort_by(&:downcase)
+  end
+
+  # Rebuild the store.yml registry from the products, then re-sync SiteConfig so
+  # the change is visible immediately. Needed because the store settings form
+  # rewrites store.yml from its own fields and drops product_groups (a derived,
+  # read-only key) — call this right after that save so the group list and the
+  # editor autocomplete survive it.
+  def self.resync_registry
+    StoreConfigList.write(STORE_KEY, registry_names)
+    SiteConfig.sync_from_file("features/store")
   end
 
   # Row rank for the index sort: a group takes its most recently edited
@@ -84,19 +116,50 @@ class ProductGroup
   # while you're still drafting the shop. Returned as human-readable strings so
   # they can drop straight into the product edit page's issues list.
   def warnings
+    msgs = []
+
     if primaries.empty?
-      [ %(This product's group ("#{name}") has no primary product. ) +
-        "Mark one as primary — it's the product used for the product page and in collections." ]
+      msgs << %(This product's group ("#{name}") has no primary product. ) +
+        "Mark one as primary — it's the product used for the product page and in collections."
     elsif primaries.size > 1
-      names = primaries.map { |p| p.title.presence || p.file_path }.join(", ")
-      [ %(This product's group ("#{name}") has more than one primary product ) +
-        "(#{names}). Exactly one should be marked primary." ]
-    else
-      []
+      msgs << %(This product's group ("#{name}") has more than one primary product: ) +
+        "#{primaries.map { |p| label_for(p) }.join(', ')}. Only one should be marked primary."
     end
+
+    # Variant distinguishes products that share a title. Flag it at the group
+    # level only when EVERY member is missing one (a whole-group problem);
+    # partial cases are flagged per-row instead (see #row_warnings).
+    if members.all? { |m| variant_missing?(m) }
+      msgs << %(No product in group "#{name}" has a variant set. Variants distinguish products that share a title (e.g. Paperback vs Hardback).)
+    end
+
+    msgs
+  end
+
+  # Per-member warnings — shown on that member's own row (index) and its edit
+  # page, as opposed to #warnings, which are group-wide. A missing variant only
+  # lands here when SOME (not all) members lack one; if all lack it, that's the
+  # group-level warning above.
+  def row_warnings(product)
+    msgs = []
+    if variant_missing?(product) && members.any? { |m| !variant_missing?(m) }
+      msgs << "This product is missing a variant — its group has others, so a variant is needed to tell them apart."
+    end
+    msgs
   end
 
   private
+
+  # "Title (Variant)", or just the title when there's no variant — so warnings
+  # can tell apart products that share a title.
+  def label_for(product)
+    base = product.title.presence || product.file_path
+    variant_missing?(product) ? base : "#{base} (#{product.variant.to_s.strip})"
+  end
+
+  def variant_missing?(product)
+    product.variant.to_s.strip.empty?
+  end
 
   def primaries
     @primaries ||= members.select(&:primary?)

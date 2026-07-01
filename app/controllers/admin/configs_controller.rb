@@ -838,6 +838,10 @@ class Admin::ConfigsController < Admin::BaseController
 
   def update_store
     update_config("features/store", SiteConfig::FEATURES_PATH.join("store.yml"))
+    # The store form rebuilds store.yml from its own fields, dropping
+    # product_groups (a read-only, derived registry). Re-derive it from the
+    # products so the group list and the editor autocomplete survive the save.
+    ProductGroup.resync_registry
   end
 
   def delete_store

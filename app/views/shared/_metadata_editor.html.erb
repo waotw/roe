@@ -118,7 +118,7 @@
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' },
       'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
       'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
-      'primary' => { type: :select, label: 'primary', options: ['true', 'false'], hint: 'Show this variant in collections (default: false)' }
+      'primary' => { type: :select, label: 'primary', options: ['false', 'true'], hint: 'Only the group\'s primary should be true (default: false)' }
     }
   else # pages
     {
@@ -202,6 +202,7 @@
      data-metadata-editor-media-paths-value="<%= ERB::Util.html_escape(autocomplete_paths_by_kind.to_json) %>"
      <% if resource_type == 'product' %>
      data-metadata-editor-product-categories-value="<%= (ProductCategory.all rescue []).to_json %>"
+     data-metadata-editor-product-groups-value="<%= (ProductGroup.all rescue []).to_json %>"
      <% end %>
      class="mb-5">
   <div class="flex items-center justify-between mb-2">
@@ -263,11 +264,14 @@
                     value.to_s
                   end
                 %>
-                <% if field_name == 'category' && resource_type == 'product' %>
-                  <!-- Autocomplete wrapper for category -->
+                <% if (field_name == 'category' || field_name == 'group') && resource_type == 'product' %>
+                  <%# Autocomplete for category and group — both reuse the shared
+                      `autocomplete` controller, differing only in the option list
+                      (category names vs the group registry from store.yml). %>
+                  <% autocomplete_options = field_name == 'group' ? (ProductGroup.all rescue []) : (ProductCategory.all rescue []) %>
                   <div class="flex-1 relative"
                         data-controller="autocomplete"
-                        data-autocomplete-options-value="<%= (ProductCategory.all rescue []).to_json %>">
+                        data-autocomplete-options-value="<%= autocomplete_options.to_json %>">
                     <input type="text"
                             id="metadata-field-<%= field_name %>"
                             name="metadata_fields[<%= field_name %>]"

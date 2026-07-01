@@ -23,6 +23,7 @@ class Product < ApplicationRecord
   MEDIA_FIELDS = %w[image].freeze
 
   after_save :register_category
+  after_save :register_group
 
   # Scopes — SQLite uses json_extract, NOT the PostgreSQL `metadata->>'key'` syntax.
   scope :published, -> { where("json_extract(metadata, '$.status') = ?", "published") }
@@ -275,11 +276,19 @@ class Product < ApplicationRecord
     product_group&.warnings || []
   end
 
+  # Per-product group warnings (e.g. this product is missing a variant while its
+  # siblings have one). Shown on this product's own index row and edit page —
+  # as opposed to #group_issues, which are group-wide (shown on the group header).
+  def group_row_issues
+    product_group&.row_warnings(self) || []
+  end
+
   # Single UI trigger for the amber ⚠ (index) and the issues box (edit page):
-  # the union of the published-content check and the always-on group check.
-  # Kept separate from needs_attention? because the two gate differently.
+  # the published-content check plus the always-on group checks. `primary` is an
+  # ordinary optional field: unset/blank reads as false, and only one product
+  # in a group needs it true, so there's no "all three must be set" rule.
   def flagged?
-    needs_attention? || group_issues.any?
+    needs_attention? || group_issues.any? || group_row_issues.any?
   end
 
   private
@@ -289,5 +298,13 @@ class Product < ApplicationRecord
 
     category = metadata["category"].strip.downcase
     ProductCategory.add(category)
+  end
+
+  # Populate the global group list in store.yml as products adopt groups —
+  # mirrors #register_category. The list feeds the editor's group autocomplete.
+  def register_group
+    return if group.blank?
+
+    ProductGroup.register(group)
   end
 end

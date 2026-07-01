@@ -21,7 +21,7 @@
       always-on structural group-setup problems (no/duplicate primary). %>
   <% if @product.flagged? %>
     <div class="bg-red-50 border border-amber-400 px-3 py-2 mb-5 text-sm">
-      <strong class="text-amber-700">⚠ <%= @product.needs_attention? ? "This product is published but has issues:" : "This product's group needs attention:" %></strong>
+      <strong class="text-amber-700">⚠ <%= @product.needs_attention? ? "This product is published but has issues:" : "This product needs attention:" %></strong>
       <ul class="list-disc ml-5 mt-1 text-amber-700">
         <% if @product.needs_attention? %>
           <% @product.missing_required_fields.each do |name| %>
@@ -32,6 +32,9 @@
           <% end %>
         <% end %>
         <% @product.group_issues.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+        <% @product.group_row_issues.each do |msg| %>
           <li><%= msg %></li>
         <% end %>
       </ul>
