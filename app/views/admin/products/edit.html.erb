@@ -16,15 +16,23 @@
     <div class="px-2.5 py-1 mb-5 border border-gray-300 bg-yellow-50"><%= flash[:warning] %></div>
   <% end %>
 
-  <% if @product.needs_attention? %>
+  <%# Shared issues box (same paradigm as posts). Two concerns unioned here:
+      needs_attention? = published-only missing fields/media; group_issues =
+      always-on structural group-setup problems (no/duplicate primary). %>
+  <% if @product.flagged? %>
     <div class="bg-red-50 border border-amber-400 px-3 py-2 mb-5 text-sm">
-      <strong class="text-amber-700">⚠ This product is published but has issues:</strong>
+      <strong class="text-amber-700">⚠ <%= @product.needs_attention? ? "This product is published but has issues:" : "This product's group needs attention:" %></strong>
       <ul class="list-disc ml-5 mt-1 text-amber-700">
-        <% @product.missing_required_fields.each do |name| %>
-          <li>Missing required field: <code><%= name %></code></li>
+        <% if @product.needs_attention? %>
+          <% @product.missing_required_fields.each do |name| %>
+            <li>Missing required field: <code><%= name %></code></li>
+          <% end %>
+          <% @product.missing_media_refs.each do |ref| %>
+            <li>File not found: <code><%= ref[:path] %></code> (<%= ref[:field] %>)</li>
+          <% end %>
         <% end %>
-        <% @product.missing_media_refs.each do |ref| %>
-          <li>File not found: <code><%= ref[:path] %></code> (<%= ref[:field] %>)</li>
+        <% @product.group_issues.each do |msg| %>
+          <li><%= msg %></li>
         <% end %>
       </ul>
       <p class="text-xs text-amber-600 mt-2 italic">Save your changes to refresh this list.</p>

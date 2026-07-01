@@ -1,0 +1,49 @@
+<%#
+  One product row — used both for standalone products and for members inside a
+  group. Locals:
+    product     — the Product
+    dimmed      — grey a non-primary group member (buttons LOOK disabled but
+                  stay real, clickable links); default false. Also tightens the
+                  row's vertical padding so non-primary members read as smaller.
+  The per-row ⚠ reflects this product's OWN published-content issues
+  (needs_attention?); group-level issues are flagged on the group header.
+%>
+<% dimmed = local_assigns.fetch(:dimmed, false) %>
+<% rowpad = dimmed ? "py-1.5" : "py-4" %>
+<tr>
+  <td class="whitespace-nowrap flex items-center <%= rowpad %> pr-3 text-sm font-medium <%= dimmed ? 'text-gray-400' : 'text-gray-900' %> <%= dimmed ? 'pl-8' : 'pl-4' %>">
+    <%= link_to product.title || "Untitled", edit_admin_product_path(product),
+          class: "line-clamp-1 #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-blue-600 hover:text-blue-900'}" %>
+    <% if product.primary? %>
+      <span class="ml-1 inline-flex items-center bg-blue-100 px-1.5 text-[10px] font-semibold uppercase text-blue-800 align-middle">Primary</span>
+    <% end %>
+    <% if product.needs_attention? %>
+      <%
+        reasons = []
+        product.missing_required_fields.each { |name| reasons << "missing #{name}" }
+        product.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
+      %>
+      <span class="inline-block text-base text-amber-600 font-semibold font-sans"
+            title="<%= reasons.join('; ') %>">⚠</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap px-1.5 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
+    $<%= sprintf('%.2f', product.price) %>
+  </td>
+  <td class="whitespace-nowrap px-1.5 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
+    <%= product.sku || '—' %>
+  </td>
+  <td class="whitespace-nowrap px-1.5 <%= rowpad %> text-sm">
+    <% if product.status == 'published' %>
+      <span class="inline-flex <%= dimmed ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-800' %> px-2 text-xs font-semibold leading-5">Published</span>
+    <% else %>
+      <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Draft</span>
+    <% end %>
+  </td>
+  <td class="relative whitespace-nowrap <%= rowpad %> pl-3 pr-4 text-right text-sm font-medium">
+    <%= link_to "Edit", edit_admin_product_path(product),
+          class: "mr-4 text-xs #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-blue-600 hover:text-blue-900'}" %>
+    <%= link_to "View", product.public_url, target: "_blank",
+          class: "text-xs #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-gray-600 hover:text-gray-900'}" %>
+  </td>
+</tr>

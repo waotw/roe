@@ -260,6 +260,28 @@ class Product < ApplicationRecord
     missing_required_fields.any? || missing_media_refs.any?
   end
 
+  # The ProductGroup this product belongs to (2+ products sharing a `group:`
+  # value), or nil when it's ungrouped or the lone holder of its group value.
+  # Memoized so the edit page doesn't rescan products more than once.
+  def product_group
+    return @product_group if defined?(@product_group)
+    @product_group = ProductGroup.for(self)
+  end
+
+  # Structural group-setup warnings (no/duplicate primary). Unlike
+  # needs_attention?, these are NOT gated on publish status — they're setup
+  # guidance meant to help configure the shop correctly, draft or live.
+  def group_issues
+    product_group&.warnings || []
+  end
+
+  # Single UI trigger for the amber ⚠ (index) and the issues box (edit page):
+  # the union of the published-content check and the always-on group check.
+  # Kept separate from needs_attention? because the two gate differently.
+  def flagged?
+    needs_attention? || group_issues.any?
+  end
+
   private
 
   def register_category

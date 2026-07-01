@@ -4,7 +4,11 @@ class Admin::ProductsController < Admin::BaseController
   before_action :set_product, only: [ :edit, :update, :show, :destroy ]
 
   def index
-    @products = Product.by_newest
+    # Ordered "rows" for the table: each is either a bare Product (standalone)
+    # or a ProductGroup (2+ products sharing a `group:` value), most-recently-
+    # edited first, groups kept together with their primary on top. Grouping is
+    # derived from front-matter, not stored — see ProductGroup.
+    @rows = ProductGroup.rows_for(Product.all)
   end
 
   def new
