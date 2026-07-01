@@ -112,8 +112,14 @@ class CollectionsController < ApplicationController
       )
     end
 
-    # Apply paid content filter (before ordering!)
-    filter_config = { show_paid: params[:show_paid], current_member: current_member }
+    # Apply paid content filter (before ordering!). Only include :show_paid when
+    # the URL actually carries it — its mere presence (even as nil) makes
+    # CollectionMembersFilter take the per-request override branch and suppress
+    # paid content, ignoring the members.yml `everyone.show_paid_content` default
+    # that the inline collection block honors. Omitting the key keeps the archive
+    # page and the inline block consistent.
+    filter_config = { current_member: current_member }
+    filter_config[:show_paid] = params[:show_paid] if params[:show_paid].present?
     @items = CollectionMembersFilter.filter(@items, filter_config)
 
     # Apply ordering

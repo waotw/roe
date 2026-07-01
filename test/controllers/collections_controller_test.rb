@@ -224,4 +224,50 @@ class CollectionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
   end
+
+  # Regression: the archive page must honor the global `everyone.show_paid_content`
+  # default (like the inline collection block) when the URL has no ?show_paid.
+  # The controller used to always pass :show_paid (nil), forcing the filter's
+  # per-request override branch and hiding all paid content — so an archive of a
+  # paid series (e.g. /collections/journal) came back empty even though the
+  # inline block showed it.
+  test "archive shows paid posts when the global show-paid default is on and no show_paid param" do
+    SiteConfig.stubs(:feature_enabled?).returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(true)
+
+    create(:post, metadata: {
+      "title" => "Paid Journal Entry",
+      "status" => "published",
+      "date" => "2024-05-01",
+      "tags" => [ "journal" ],
+      "audience" => "paid"
+    })
+
+    get "/collections/journal"
+
+    assert_response :success
+    assert_includes response.body, "Paid Journal Entry"
+  end
+
+  test "archive still hides paid posts when the global default is off" do
+    SiteConfig.stubs(:feature_enabled?).returns(false)
+    SiteConfig.stubs(:feature_enabled?).with("members").returns(true)
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns(false)
+
+    create(:post, metadata: {
+      "title" => "Paid Journal Entry",
+      "status" => "published",
+      "date" => "2024-05-01",
+      "tags" => [ "journal" ],
+      "audience" => "paid"
+    })
+
+    get "/collections/journal"
+
+    assert_response :success
+    refute_includes response.body, "Paid Journal Entry"
+  end
 end
