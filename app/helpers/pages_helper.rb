@@ -41,7 +41,20 @@ module PagesHelper
   end
 
   def strip_paywall_gate(html)
-    # Remove the gate comment and its div entirely for paid members/admins
+    # Paid members/admins see everything, so the gate is removed entirely.
+    # When the gate split a list in two (a paywall in the middle of an
+    # ordered/unordered list), merge the halves back into one list first —
+    # otherwise the second <ol> restarts at 1. This joins them so the list
+    # renders continuously, as if the paywall had never been there. Done
+    # before the plain strip so the gate marker is still there to key off.
+    html = merge_paywall_split_lists(html)
     html.gsub(/<!-- PAID_CONTENT_GATE -->.*?<\/div>/m, "")
+  end
+
+  # Join a list that a paid-content gate split into two same-type lists by
+  # dropping the closing tag, gate, and reopening tag between them. The \1
+  # backreference keeps ol↔ol and ul↔ul from cross-merging.
+  def merge_paywall_split_lists(html)
+    html.gsub(%r{</(ol|ul)>\s*<!-- PAID_CONTENT_GATE -->.*?</div>\s*<\1[^>]*>}m, "")
   end
 end
