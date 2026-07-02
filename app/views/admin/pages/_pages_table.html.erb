@@ -58,22 +58,22 @@
               <% end %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 md:pr-4 pr-6 text-right text-xs font-medium">
-              <div class="flex items-center justify-end gap-3">
-                <%= link_to icon_svg("edit", class: "w-4 h-4"), edit_admin_page_path(page),
-                      class: "text-slate-500 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
-                <%= link_to icon_svg("view", class: "w-4 h-4"), page_path(url_name: page.url_name), target: "_blank",
-                      class: "text-slate-500 hover:text-gray-900", title: "View", "aria-label": "View" %>
-                <%= button_to icon_svg("duplicate", class: "w-4 h-4"), duplicate_admin_page_path(page), method: :post,
+              <div class="flex items-center justify-end gap-2">
+                <%= link_to icon_svg("edit", class: "w-[1.1rem] h-[1.1rem]"), edit_admin_page_path(page),
+                      class: "text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
+                <%= link_to icon_svg("view", class: "w-[1.1rem] h-[1.1rem]"), page_path(url_name: page.url_name), target: "_blank",
+                      class: "text-slate-400 hover:text-slate-600", title: "View", "aria-label": "View" %>
+                <%= button_to icon_svg("duplicate", class: "w-[1.1rem] h-[1.1rem]"), duplicate_admin_page_path(page), method: :post,
                       form: { class: "inline-flex" },
-                      class: "text-slate-500 hover:text-blue-700 cursor-pointer", title: "Duplicate", "aria-label": "Duplicate" %>
+                      class: "text-slate-400 hover:text-blue-700 cursor-pointer", title: "Duplicate", "aria-label": "Duplicate" %>
                 <button type="button"
                         data-action="delete"
                         data-resource-id="<%= page.id %>"
                         data-resource-title="<%= page.title || 'Untitled' %>"
                         data-resource-type="page"
                         data-delete-url="<%= admin_page_path(page) %>"
-                        class="text-slate-500 hover:text-red-700 cursor-pointer" title="Delete" aria-label="Delete">
-                  <%= icon_svg("delete", class: "w-4 h-4") %>
+                        class="text-slate-400 hover:text-red-700 cursor-pointer" title="Delete" aria-label="Delete">
+                  <%= icon_svg("delete", class: "w-[1.1rem] h-[1.1rem]") %>
                 </button>
               </div>
             </td>

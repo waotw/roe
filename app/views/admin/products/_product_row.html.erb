@@ -59,12 +59,12 @@
     <% end %>
   </td>
   <td class="relative w-full whitespace-nowrap <%= rowpad %> pl-3 md:pr-4 pr-6 text-right text-sm font-medium">
-    <div class="flex items-center justify-end gap-3">
-      <%= link_to icon_svg("edit", class: "w-4 h-4"), edit_admin_product_path(product),
+    <div class="flex items-center justify-end gap-2">
+      <%= link_to icon_svg("edit", class: "w-[1.1rem] h-[1.1rem]"), edit_admin_product_path(product),
             class: (dimmed ? "text-slate-300 hover:text-slate-400" : "text-slate-400 hover:text-blue-700"), title: "Edit", "aria-label": "Edit" %>
-      <%= link_to icon_svg("view", class: "w-4 h-4"), product.public_url, target: "_blank",
-            class: (dimmed ? "text-slate-300 hover:text-slate-400" : "text-slate-400 hover:text-gray-900"), title: "View", "aria-label": "View" %>
-      <%= button_to icon_svg("duplicate", class: "w-4 h-4"), duplicate_admin_product_path(product), method: :post,
+      <%= link_to icon_svg("view", class: "w-[1.1rem] h-[1.1rem]"), product.public_url, target: "_blank",
+            class: (dimmed ? "text-slate-300 hover:text-slate-400" : "text-slate-400 hover:text-slate-600"), title: "View", "aria-label": "View" %>
+      <%= button_to icon_svg("duplicate", class: "w-[1.1rem] h-[1.1rem]"), duplicate_admin_product_path(product), method: :post,
             form: { class: "inline-flex" },
             class: "cursor-pointer #{dimmed ? 'text-slate-300 hover:text-slate-400' : 'text-slate-400 hover:text-blue-700'}", title: "Duplicate", "aria-label": "Duplicate" %>
       <button type="button"
@@ -75,7 +75,7 @@
               data-delete-url="<%= admin_product_path(product) %>"
               class="cursor-pointer <%= dimmed ? 'text-slate-300 hover:text-slate-400' : 'text-slate-400 hover:text-red-700' %>"
               title="Delete" aria-label="Delete">
-        <%= icon_svg("delete", class: "w-4 h-4") %>
+        <%= icon_svg("delete", class: "w-[1.1rem] h-[1.1rem]") %>
       </button>
     </div>
   </td>
