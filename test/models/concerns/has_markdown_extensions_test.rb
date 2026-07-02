@@ -793,6 +793,41 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert result.blank?
   end
 
+  # =============================================================================
+  # Media embed tests (Obsidian-style `![](file.mp3|mp4)`)
+  # =============================================================================
+
+  test "audio file embed renders a native audio player" do
+    result = render("![Episode 1](/media/audio/audio-abc.mp3)")
+
+    assert_match(%r{<audio[^>]*controls}, result)
+    assert_match(%r{src="/media/audio/audio-abc\.mp3"}, result)
+    assert_match(/aria-label="Episode 1"/, result)
+    refute_match(/<img/, result)
+  end
+
+  test "video file embed renders a native video player" do
+    result = render("![Clip](/media/video/clip.mp4)")
+
+    assert_match(%r{<video[^>]*controls}, result)
+    assert_match(%r{src="/media/video/clip\.mp4"}, result)
+    refute_match(/<img/, result)
+  end
+
+  test "audio embed without alt omits aria-label but still plays" do
+    result = render("![](/media/audio/audio-xyz.m4a)")
+
+    assert_match(%r{<audio[^>]*controls}, result)
+    refute_match(/aria-label=/, result)
+  end
+
+  test "image embeds are unaffected by media embed handling" do
+    result = render("![A photo](/media/images/pic.jpg)")
+
+    refute_match(/<audio/, result)
+    refute_match(/<video/, result)
+  end
+
   test "basic markdown still processed" do
     content = <<~MARKDOWN
       # Header

@@ -107,6 +107,26 @@ module HasMarkdownExtensions
     @rendering_static = nil
   end
 
+  # Media extensions that an `![](…)` embed should render as a native
+  # HTML5 player rather than an image. Kept broad but conservative to
+  # widely browser-supported container/codec combos.
+  AUDIO_EMBED_EXTENSIONS = %w[.mp3 .m4a .aac .ogg .oga .wav .flac].freeze
+  VIDEO_EMBED_EXTENSIONS = %w[.mp4 .m4v .webm .ogv .mov].freeze
+
+  def render_audio_embed(src, alt)
+    label = alt.to_s.strip
+    aria = label.empty? ? "" : %( aria-label="#{escape_html(label)}")
+    fallback = %(Your browser does not support the audio element. <a href="#{escape_html(src)}">Download the audio</a>.)
+    %(<audio class="audio-embed" controls preload="metadata" src="#{escape_html(src)}"#{aria}>#{fallback}</audio>)
+  end
+
+  def render_video_embed(src, alt)
+    label = alt.to_s.strip
+    aria = label.empty? ? "" : %( aria-label="#{escape_html(label)}")
+    fallback = %(Your browser does not support the video element. <a href="#{escape_html(src)}">Download the video</a>.)
+    %(<video class="video-embed" controls preload="metadata" src="#{escape_html(src)}"#{aria}>#{fallback}</video>)
+  end
+
   def process_responsive_images(html)
     html.gsub(/<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/i) do
       match_str = $~.to_s
@@ -134,7 +154,15 @@ module HasMarkdownExtensions
                     ""
       end
 
-      next match_str unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(File.extname(src).downcase)
+      # Obsidian-style media embeds: `![label](/path/file.mp3)` renders a
+      # native player in place instead of a broken <img>. Extensionless
+      # native controls mean it works with no JS and is styleable via the
+      # `audio`/`video` element selectors.
+      ext = File.extname(src).downcase
+      next render_audio_embed(src, alt) if AUDIO_EMBED_EXTENSIONS.include?(ext)
+      next render_video_embed(src, alt) if VIDEO_EMBED_EXTENSIONS.include?(ext)
+
+      next match_str unless ImageVariantGenerator::IMAGE_EXTENSIONS.include?(ext)
 
       # Skip imgs whose src already points into the variants directory.
       # render_product_grid / render_full emit `<picture><img src=/media/
