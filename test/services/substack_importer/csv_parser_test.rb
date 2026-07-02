@@ -37,6 +37,36 @@ module SubstackImporter
       assert_equal false, posts.first.is_published
     end
 
+    def test_blank_title_falls_back_to_slug_derived_title
+      write_csv([
+        { "post_id" => "201119115.a-new-metaphysics-of-being-4", "title" => "", "is_published" => "false", "post_date" => "" }
+      ])
+
+      posts = CsvParser.new(@csv_path).parse
+
+      assert_equal "A New Metaphysics Of Being 4", posts.first.title
+    end
+
+    def test_present_title_is_kept_verbatim
+      write_csv([
+        { "post_id" => "1.some-slug", "title" => "Real Title", "is_published" => "true", "post_date" => "2024-01-01" }
+      ])
+
+      posts = CsvParser.new(@csv_path).parse
+
+      assert_equal "Real Title", posts.first.title
+    end
+
+    def test_whitespace_only_title_falls_back
+      write_csv([
+        { "post_id" => "9.draft-slug", "title" => "   ", "is_published" => "false", "post_date" => "" }
+      ])
+
+      posts = CsvParser.new(@csv_path).parse
+
+      assert_equal "Draft Slug", posts.first.title
+    end
+
     def test_parse_case_insensitive_is_published
       write_csv([
         { "post_id" => "1.p1", "title" => "Upper TRUE", "is_published" => "TRUE", "post_date" => "2024-01-01" },

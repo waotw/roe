@@ -19,7 +19,7 @@ module SubstackImporter
         @posts << Post.new(
           id: id,
           slug: slug,
-          title: row["title"].to_s,
+          title: title_or_fallback(row["title"], slug),
           subtitle: row["subtitle"].to_s,
           date: parse_date(row["post_date"]),
           type: row["type"].to_s,
@@ -91,6 +91,18 @@ module SubstackImporter
       else
         [ post_id, "" ]
       end
+    end
+
+    # Substack sometimes exports an empty `title` column for drafts. Fall
+    # back to a readable title derived from the post_id slug (the part after
+    # the dot, e.g. "a-new-metaphysics-of-being-4") so drafts don't import
+    # untitled. Hyphens become spaces and each word is capitalized — good
+    # enough for a draft the author will likely rename anyway.
+    def title_or_fallback(raw_title, slug)
+      title = raw_title.to_s.strip
+      return title unless title.empty?
+
+      slug.to_s.split("-").reject(&:empty?).map(&:capitalize).join(" ")
     end
 
     def parse_date(value)

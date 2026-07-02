@@ -151,7 +151,11 @@ class PodcastConfigSeeder
     ext = File.extname(URI.parse(url).path).downcase
     ext = ".jpg" if ext.empty?
     filename = "#{@podcast_key}-artwork#{ext}"
-    dest = ARTWORK_DIR.join(filename)
+    # ARTWORK_DIR is a String (File.join), so use File.join here — String has
+    # no #join, and the previous ARTWORK_DIR.join(filename) raised
+    # NoMethodError that the rescue below swallowed, silently skipping the
+    # download and leaving artwork blank.
+    dest = File.join(ARTWORK_DIR, filename)
 
     FileUtils.mkdir_p(ARTWORK_DIR)
     URI.open(url) { |io| File.binwrite(dest, io.read) }

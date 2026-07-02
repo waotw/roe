@@ -5,6 +5,7 @@ module SubstackImporter
     def initialize(verbose: false, insert_paywalls: true, paywall_text: nil, paywall_button_text: nil, substack_url: nil)
       @verbose = verbose
       @images = []
+      @audio_embeds = []
       @footnotes = {}
       @insert_paywalls = insert_paywalls
       @paywall_text = paywall_text || "Upgrade to continue reading."
@@ -20,6 +21,7 @@ module SubstackImporter
       return "" if html.nil? || html.empty?
 
       @images = []
+      @audio_embeds = []
       @footnotes = {}
 
       doc = Nokogiri::HTML.fragment(html)
@@ -41,6 +43,20 @@ module SubstackImporter
 
     def collected_images
       @images
+    end
+
+    # Native inline audio embeds discovered during conversion. Each entry is
+    # { media_id:, filename: } — the filename matches the local path emitted
+    # into the markdown, so MediaHandler downloads to the same place.
+    def collected_audio
+      @audio_embeds
+    end
+
+    # Local filename an inline audio embed's file is written to. Keyed on the
+    # Substack mediaUploadId so it's stable across re-runs (dedup) and unique
+    # per embed. Shared by the converter (emit) and MediaHandler (download).
+    def self.audio_embed_filename(media_id)
+      "audio-#{media_id}.mp3"
     end
 
     private
@@ -299,12 +315,22 @@ module SubstackImporter
     def process_audio_embed(node)
       data = parse_data_attrs(node["data-attrs"]) || {}
       media_id = data["mediaUploadId"].to_s
-      duration = data["duration"]
-      downloadable = data["downloadable"] || false
 
-      duration_str = duration ? "#{duration}s" : "unknown"
+      # Without a media id there's nothing to fetch or link — drop the embed
+      # rather than emit a dangling player.
+      return "" if media_id.empty?
 
-      "[AUDIO: mediaUploadId=#{media_id}, duration=#{duration_str}, downloadable=#{downloadable}]\n\n"
+      filename = self.class.audio_embed_filename(media_id)
+      local_path = "/media/audio/#{filename}"
+      label = data["label"].to_s.strip
+      label = "Audio" if label.empty?
+
+      # Record for MediaHandler to download the actual file into local_path,
+      # and emit an Obsidian-style embed that the renderer turns into a
+      # native <audio> player pointing at the same local path.
+      @audio_embeds << { media_id: media_id, filename: filename }
+
+      "![#{label}](#{local_path})\n\n"
     end
 
     def process_video_embed(node)
@@ -381,9 +407,12 @@ module SubstackImporter
 
     def process_button(node)
       data = parse_data_attrs(node["data-attrs"]) || {}
-      url = rewrite_internal_url(data["url"].to_s)
+      raw_url = data["url"].to_s
       text = data["text"].to_s
 
+      return share_card(raw_url) if share_button?(raw_url, text)
+
+      url = rewrite_internal_url(raw_url)
       if text.downcase.include?("subscribe")
         "[SUBSCRIBE](#{url})\n\n"
       else
@@ -404,13 +433,15 @@ module SubstackImporter
 
       if button_el
         data = parse_data_attrs(button_el["data-attrs"]) || {}
-        url = rewrite_internal_url(data["url"].to_s)
+        raw_url = data["url"].to_s
         text = data["text"].to_s
 
-        if text.downcase.include?("subscribe")
-          parts << "[SUBSCRIBE](#{url})"
+        if share_button?(raw_url, text)
+          parts << share_card(raw_url).strip
+        elsif text.downcase.include?("subscribe")
+          parts << "[SUBSCRIBE](#{rewrite_internal_url(raw_url)})"
         else
-          parts << "[BUTTON: #{text}](#{url})"
+          parts << "[BUTTON: #{text}](#{rewrite_internal_url(raw_url)})"
         end
       end
 
@@ -523,13 +554,59 @@ module SubstackImporter
     end
 
     def process_link(node, depth: 0)
-      href = rewrite_internal_url(node["href"].to_s)
+      raw_href = node["href"].to_s
       text = process_children(node, depth: depth).strip
 
+      # Live-fetched share buttons arrive as a bare styled anchor
+      # (<a class="button …" href="…action=share">Share</a>) rather than the
+      # ButtonCreateButton wrapper the zip export uses. Catch those here so
+      # both import paths produce the same share card.
+      if node["class"].to_s.include?("button") && share_button?(raw_href, text)
+        return share_card(raw_href)
+      end
+
+      href = rewrite_internal_url(raw_href)
       return href if text.empty?
       return text if href.empty?
 
       "[#{text}](#{href})"
+    end
+
+    # A Substack "Share" button — identified by its share action or label.
+    # The URL carries `action=share`; the label is "Share".
+    def share_button?(url, text)
+      return true if text.to_s.strip.downcase == "share"
+
+      url.to_s.include?("action=share")
+    end
+
+    # Fenced share card mirroring the post-link card shape. `type: share`
+    # isn't a rendered card type yet, so it's inert on the live site until
+    # implemented — cleaner than leaking a tokenised Substack share URL.
+    def share_card(raw_url)
+      link = rewrite_internal_url(strip_tracking_params(raw_url))
+
+      lines = [ "card", "type: share" ]
+      lines << "link: #{link}" unless link.to_s.strip.empty?
+
+      "```#{lines.join("\n")}\n```\n\n"
+    end
+
+    # Drop Substack tracking/query cruft (utm_*, share token, action) from a
+    # URL. rewrite_internal_url already discards the query on a same-host
+    # rewrite; this handles the case where the host doesn't match and the URL
+    # is left as-is.
+    def strip_tracking_params(url)
+      uri = URI.parse(url.to_s)
+      return url if uri.query.nil?
+
+      kept = URI.decode_www_form(uri.query).reject do |k, _|
+        k.start_with?("utm_") || %w[action token].include?(k)
+      end
+      uri.query = kept.empty? ? nil : URI.encode_www_form(kept)
+      uri.to_s
+    rescue URI::InvalidURIError
+      url
     end
 
     def process_list(node, ordered:, depth:)
@@ -537,10 +614,23 @@ module SubstackImporter
       lines = items.each_with_index.map do |li, i|
         prefix = ordered ? "#{i + 1}." : "-"
         content = process_children(li, depth: depth + 1).strip
-        "#{prefix} #{content}"
+        "#{prefix} #{indent_continuation(content, prefix.length + 1)}"
       end
 
       "#{lines.join("\n")}\n\n"
+    end
+
+    # Indent every line of a list item's content after the first by the marker
+    # width (e.g. 2 for "- ", 3 for "1. "). Block-level children — blockquotes,
+    # nested lists, second paragraphs — must be indented to stay part of the
+    # item; at column 0 they terminate the list (and can even swallow the next
+    # item as plain text). Blank lines stay empty so paragraph/blockquote
+    # separators survive.
+    def indent_continuation(content, width)
+      pad = " " * width
+      content.split("\n", -1).each_with_index.map do |line, idx|
+        idx.zero? || line.empty? ? line : "#{pad}#{line}"
+      end.join("\n")
     end
 
     def process_blockquote(node, depth: 0)
@@ -657,9 +747,17 @@ module SubstackImporter
     # as "no rewriting", so an importer caller that doesn't pass
     # substack_url: just gets the old pass-through behaviour.
     def extract_substack_host(url)
-      return nil if url.to_s.strip.empty?
+      raw = url.to_s.strip
+      return nil if raw.empty?
 
-      host = URI.parse(url.to_s.strip).host
+      # Tolerate a base URL entered without a scheme ("foo.substack.com").
+      # Without one, URI.parse treats the whole string as a path and .host
+      # comes back nil, which silently disables ALL internal-link rewriting
+      # (the rewriter reads nil as "no publication to match against"). Add a
+      # scheme so the host parses.
+      raw = "https://#{raw}" unless raw.match?(%r{\A[a-z][a-z0-9+.\-]*://}i)
+
+      host = URI.parse(raw).host
       host&.sub(/\Awww\./i, "")&.downcase
     rescue URI::InvalidURIError
       nil

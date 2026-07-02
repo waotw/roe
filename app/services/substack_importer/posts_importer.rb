@@ -300,6 +300,7 @@ module SubstackImporter
         @stats[:media_downloaded] += 1 if local_media[:cover_image]
         @stats[:media_downloaded] += 1 if local_media[:audio]
         @stats[:media_downloaded] += 1 if local_media[:video]
+        @stats[:media_downloaded] += local_media[:audio_embeds].to_a.count
       end
 
       # Duration is left blank at import time. The metadata-editor

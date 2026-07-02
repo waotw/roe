@@ -34,6 +34,7 @@ module SubstackImporter
       local_media[:cover_image] = download_cover_image(post, local_media[:missing])
       local_media[:audio] = download_audio(post, local_media[:missing])
       local_media[:video] = download_video(post, local_media[:missing])
+      local_media[:audio_embeds] = download_audio_embeds(post, local_media[:missing])
 
       local_media
     end
@@ -350,6 +351,92 @@ module SubstackImporter
         missing << { type: "video", url: url, mux_id: mux_id, slug: post.slug, expected_path: expected_path }
         nil
       end
+    end
+
+    # Inline native-audio embeds (AudioPlaceholder) carry only a
+    # mediaUploadId, so the download URL is reconstructed from the
+    # publication host. Substack serves the file at /api/v1/audio/upload/
+    # <id>/src, which 302-redirects to the real asset (download_file follows
+    # redirects). The Converter already emitted the local /media/audio path
+    # into the markdown, so there's nothing to rewrite here — we just need
+    # the file to land at that path. Returns the local paths downloaded.
+    def download_audio_embeds(post, missing)
+      return [] unless post.html_content
+
+      host = substack_media_host
+      # Without a publication host we can't build the fetch URL. Flag each
+      # embed as missing so it surfaces in the resolution UI rather than
+      # silently leaving a dead player.
+      converter = Converter.new
+      converter.convert(post.html_content)
+      embeds = converter.collected_audio
+      return [] if embeds.empty?
+
+      downloaded = []
+
+      embeds.each do |embed|
+        filename = embed[:filename]
+        dest = File.join(@site_root, "media", "audio", filename)
+        file_path = "/media/audio/#{filename}"
+        url = host ? "https://#{host}/api/v1/audio/upload/#{embed[:media_id]}/src" : nil
+
+        if @ignore_media
+          # Dry run: the markdown already points at file_path; a later
+          # backfill re-run downloads it. Create no Medium row.
+          downloaded << file_path
+          next
+        end
+
+        if url.nil?
+          missing << { type: "audio_embed", url: nil, media_id: embed[:media_id], slug: post.slug, expected_path: file_path }
+          next
+        end
+
+        # Reuse a previously-downloaded file (tracked by source_url).
+        if (existing = Medium.find_by(source_url: url))
+          Rails.logger.debug "  Reusing tracked audio embed: #{filename}" if @verbose
+          downloaded << existing.file_path
+          next
+        end
+
+        # Already on disk (prior import / manual upload) — track without
+        # associating to this import so rollback can't delete it.
+        if File.exist?(dest)
+          medium = Medium.find_or_initialize_by(file_path: file_path)
+          if medium.new_record?
+            medium.source_url = url
+            medium.import = nil
+            medium.uploaded_at = File.mtime(dest)
+            medium.save!
+            Rails.logger.info "  Tracked pre-existing audio embed: #{filename}"
+          end
+          downloaded << file_path
+          next
+        end
+
+        result = download_file(url, dest)
+        if result
+          upsert_medium!(file_path: file_path, source_url: url, uploaded_at: Time.current)
+          downloaded << file_path
+        else
+          missing << { type: "audio_embed", url: url, media_id: embed[:media_id], slug: post.slug, expected_path: file_path }
+        end
+      end
+
+      downloaded
+    end
+
+    # Bare hostname of the publication being imported (e.g. "foo.substack.com"),
+    # derived from the configured base URL. Tolerates a missing scheme the same
+    # way the Converter does. Returns nil when no usable base URL is set.
+    def substack_media_host
+      raw = @import&.base_url.to_s.strip
+      return nil if raw.empty?
+
+      raw = "https://#{raw}" unless raw.match?(%r{\A[a-z][a-z0-9+.\-]*://}i)
+      URI.parse(raw).host
+    rescue URI::InvalidURIError
+      nil
     end
 
     # Upsert a Medium row for a freshly-downloaded file. Replaces plain

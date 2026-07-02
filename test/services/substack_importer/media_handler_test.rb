@@ -50,5 +50,26 @@ module SubstackImporter
       assert_includes rewritten, "/media/images/my-post-1.jpg"
       refute_includes rewritten, "https://cdn.substack.com/image/pic.jpg"
     end
+
+    ImportDouble = Struct.new(:base_url, keyword_init: true)
+
+    def test_ignore_media_records_audio_embed_path_without_downloading
+      audio_html = %(<div class="native-audio-embed" data-component-name="AudioPlaceholder" ) +
+                   %(data-attrs="{&quot;mediaUploadId&quot;:&quot;abc-123&quot;,&quot;duration&quot;:10}"></div>)
+      post = PostDouble.new(id: 2, slug: "audio-post", html_content: audio_html)
+
+      handler = MediaHandler.new(
+        site_root: @tmp_dir,
+        import: ImportDouble.new(base_url: "foo.substack.com"),
+        ignore_media: true
+      )
+
+      local_media = handler.download_post_media(post)
+
+      assert_equal [ "/media/audio/audio-abc-123.mp3" ], local_media[:audio_embeds]
+      assert_empty local_media[:missing]
+      assert_empty Dir.glob(File.join(@tmp_dir, "media", "**", "*")).select { |p| File.file?(p) }
+      assert_equal 0, Medium.count
+    end
   end
 end
