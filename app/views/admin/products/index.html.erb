@@ -18,11 +18,11 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Product</th>
-                  <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Price</th>
-                  <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">SKU</th>
-                  <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
-                  <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
+                  <th scope="col" class="py-2 px-6 md:px-4 text-left text-sm font-semibold text-gray-900 uppercase">Product</th>
+                  <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Price</th>
+                  <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">SKU</th>
+                  <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+                  <th scope="col" class="relative w-full py-1.5 pl-3 pr-4 sm:pr-6">
                     <span class="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -44,7 +44,7 @@
                          data-updated="<%= ProductGroup.rank(row) %>"
                          data-search="<%= members.map { |m| "#{m.title} #{m.sku}" }.join(' ').downcase %>">
                     <tr>
-                      <td colspan="5" class="pt-2 pb-1 pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-blue-400 font-mono bg-blue-50">
+                      <td colspan="5" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-blue-400 font-mono bg-blue-50">
                         Group: <%= row.name %>
                         <% if row.warnings.any? %>
                           <span class="inline-block text-base text-amber-600 font-semibold font-sans leading-0"
@@ -85,4 +85,10 @@
       </div>
     </div>
   </div>
+
+  <%# One delete modal for the table; delete_modal.js retargets its form to the
+      clicked row's product via data-delete-url. %>
+  <% if Product.any? %>
+    <%= render "shared/delete_file_modal", resource: Product.first, resource_type: "product" %>
+  <% end %>
 </div>

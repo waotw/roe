@@ -3,11 +3,15 @@
   rename_url = case resource_type
                when 'post' then rename_admin_post_path(resource)
                when 'page' then rename_admin_page_path(resource)
+               when 'product' then rename_admin_product_path(resource)
                end
+  # Optional extra classes for the filename display (e.g. truncation on index
+  # tables). Editor headers pass none, so their filename never truncates.
+  display_class = local_assigns[:display_class]
 %>
 
 <div class="inline-rename-container" data-resource-id="<%= resource.id %>" data-resource-type="<%= resource_type %>">
-  <span class="filename-display font-mono text-xs cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded"
+  <span class="filename-display font-mono text-xs text-gray-600 bg-gray-200 cursor-pointer hover:text-white hover:bg-gray-400 px-1 py-0.5 rounded-xs <%= display_class %>"
         ondblclick="startRename(this)"
         title="Double-click to rename">
     <%= filename %>.md
@@ -15,6 +19,12 @@
 
   <div class="filename-edit hidden">
     <%= form_with url: rename_url, method: :patch, class: "inline-flex items-center gap-1" do |f| %>
+      <%# Where to return after saving. On the editor we pass the editor path so
+          rename stays put; on the index there's no return_to and it falls back
+          to the index. Referer-independent, so it survives strict policies. %>
+      <% if local_assigns[:return_to].present? %>
+        <input type="hidden" name="return_to" value="<%= return_to %>">
+      <% end %>
       <%= f.text_field :new_filename,
           value: filename,
           class: "font-mono text-xs px-1 py-0.5 border border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white",

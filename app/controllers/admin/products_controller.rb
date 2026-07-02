@@ -161,6 +161,74 @@ class Admin::ProductsController < Admin::BaseController
     render json: results
   end
 
+  # Copy a product's file into a numbered sibling — "-N" on the filename, " N"
+  # on the title (from 2, skipping any that exist). Product file_paths are
+  # relative, so every File op joins SITE_PATH. Redirects into the new copy.
+  def duplicate
+    @product = Product.find(params[:id])
+    parsed = FrontMatterParser::Parser.new(:md).call(File.read(File.join(RoeSitePaths::SITE_PATH, @product.file_path)))
+    metadata = parsed.front_matter
+
+    rel_dir = File.dirname(@product.file_path)
+    base_name = File.basename(@product.file_path, ".md").sub(/-\d+\z/, "")
+    base_title = metadata["title"].to_s.sub(/\s+\d+\z/, "").strip
+
+    n = 2
+    n += 1 while File.exist?(File.join(RoeSitePaths::SITE_PATH, rel_dir, "#{base_name}-#{n}.md"))
+    new_rel = File.join(rel_dir, "#{base_name}-#{n}.md")
+
+    metadata["title"] = base_title.present? ? "#{base_title} #{n}" : "Untitled #{n}"
+    File.write(File.join(RoeSitePaths::SITE_PATH, new_rel),
+               "---\n#{Product.format_metadata_yaml(metadata)}\n---\n#{parsed.content}")
+    ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, new_rel))
+
+    new_product = Product.find_by(file_path: new_rel)
+    if new_product
+      redirect_to edit_admin_product_path(new_product), notice: "Product duplicated"
+    else
+      redirect_to admin_products_path, alert: "Duplicated the file but couldn't load the new product."
+    end
+  end
+
+  def rename
+    @product = Product.find(params[:id])
+    new_filename = sanitize_filename(params[:new_filename])
+
+    # Return to wherever rename was submitted from (editor/index); only same-site
+    # absolute paths are honored.
+    return_to = lambda do
+      target = params[:return_to].to_s
+      safe = target.start_with?("/") && !target.start_with?("//")
+      redirect_to(safe ? target : admin_products_path, allow_other_host: false)
+    end
+
+    if new_filename.blank?
+      flash[:error] = "Filename cannot be empty"
+      return_to.call and return
+    end
+
+    old_rel = @product.file_path
+    new_rel = File.join(File.dirname(old_rel), "#{new_filename}.md")
+    old_full = File.join(RoeSitePaths::SITE_PATH, old_rel)
+    new_full = File.join(RoeSitePaths::SITE_PATH, new_rel)
+
+    if File.exist?(new_full) && new_full != old_full
+      flash[:error] = "A file with that name already exists"
+      return_to.call and return
+    end
+
+    begin
+      File.rename(old_full, new_full)
+      @product.update(file_path: new_rel)
+      ContentSync.sync_file(new_full)
+      flash[:notice] = "Renamed to #{new_filename}.md"
+    rescue => e
+      flash[:error] = "Failed to rename: #{e.message}"
+    end
+
+    return_to.call
+  end
+
   def destroy
     @product = Product.find(params[:id])
     file_path = File.join(RoeSitePaths::SITE_PATH, @product.file_path)

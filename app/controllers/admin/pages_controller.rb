@@ -2,12 +2,10 @@ class Admin::PagesController < Admin::BaseController
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
-    all_pages = Page.order(:created_at)
-
-    # Separate member-related pages from content pages
-    @member_pages, @content_pages = all_pages.partition do |page|
-      member_page?(page)
-    end
+    # Default order: follow layout/navigation.md when it exists (pages listed in
+    # the nav come first, in nav order); otherwise alphabetical by title. Pages
+    # not in the nav fall to the end, alphabetically.
+    @member_pages, @content_pages = ordered_pages.partition { |page| member_page?(page) }
 
     @title = "Pages"
     @description = "All pages on your site."
@@ -117,13 +115,50 @@ class Admin::PagesController < Admin::BaseController
     redirect_to edit_admin_page_path(@page)
   end
 
+  # Copy a page's file into a numbered sibling — "-N" on the filename, " N" on
+  # the title (from 2, skipping any that exist). Redirects into the new copy.
+  def duplicate
+    @page = Page.find(params[:id])
+    raw = File.read(@page.file_path)
+    parsed = FrontMatterParser::Parser.new(:md).call(raw)
+    metadata = parsed.front_matter
+
+    dir = Pathname.new(@page.file_path).dirname
+    base_name = File.basename(@page.file_path, ".md").sub(/-\d+\z/, "")
+    base_title = metadata["title"].to_s.sub(/\s+\d+\z/, "").strip
+
+    n = 2
+    n += 1 while File.exist?(dir.join("#{base_name}-#{n}.md"))
+    new_path = dir.join("#{base_name}-#{n}.md")
+
+    metadata["title"] = base_title.present? ? "#{base_title} #{n}" : "Untitled #{n}"
+    yaml_content = Page.format_metadata_yaml(metadata)
+    normalize_and_write(new_path, "---\n#{yaml_content}\n---\n#{parsed.content}")
+    ContentSync.sync_file(new_path)
+
+    new_page = Page.find_by(file_path: new_path.to_s)
+    if new_page
+      redirect_to edit_admin_page_path(new_page), notice: "Page duplicated"
+    else
+      redirect_to admin_pages_path, alert: "Duplicated the file but couldn't load the new page."
+    end
+  end
+
   def rename
     @page = Page.find(params[:id])
     new_filename = sanitize_filename(params[:new_filename])
 
+    # Return to wherever rename was submitted from (editor stays on the editor,
+    # index on the index); only same-site absolute paths are honored.
+    return_to = lambda do
+      target = params[:return_to].to_s
+      safe = target.start_with?("/") && !target.start_with?("//")
+      redirect_to(safe ? target : admin_pages_path, allow_other_host: false)
+    end
+
     if new_filename.blank?
       flash[:error] = "Filename cannot be empty"
-      redirect_to admin_pages_path and return
+      return_to.call and return
     end
 
     old_path = Pathname.new(@page.file_path)
@@ -131,7 +166,7 @@ class Admin::PagesController < Admin::BaseController
 
     if File.exist?(new_path) && new_path != old_path
       flash[:error] = "A file with that name already exists"
-      redirect_to admin_pages_path and return
+      return_to.call and return
     end
 
     begin
@@ -144,7 +179,7 @@ class Admin::PagesController < Admin::BaseController
       flash[:error] = "Failed to rename: #{e.message}"
     end
 
-    redirect_to admin_pages_path
+    return_to.call
   end
 
   def publish_modal
@@ -251,6 +286,29 @@ class Admin::PagesController < Admin::BaseController
   # end
 
   private
+
+  # Pages sorted for the index: by layout/navigation.md order when that file
+  # exists, else alphabetically by title. Best-effort — a page is placed by its
+  # public_url appearing among the nav's link hrefs; pages absent from the nav
+  # fall to the end, alphabetically.
+  def ordered_pages
+    nav = navigation_order
+    pages = Page.all.to_a
+    if nav
+      pages.sort_by { |p| [ nav.index(p.public_url) || nav.size, p.title.to_s.downcase ] }
+    else
+      pages.sort_by { |p| p.title.to_s.downcase }
+    end
+  end
+
+  # Link hrefs from layout/navigation.md, in order — or nil when the file is
+  # absent, so #ordered_pages falls back to alphabetical.
+  def navigation_order
+    path = File.join(RoeSitePaths::SITE_PATH, "layout", "navigation.md")
+    return nil unless File.exist?(path)
+
+    File.read(path).scan(/\]\(([^)]+)\)/).flatten.map(&:strip)
+  end
 
   # Pages have a much smaller publish gate than posts: just audience
   # (when payments are configured) and any media files that don't

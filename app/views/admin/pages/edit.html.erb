@@ -6,8 +6,13 @@
 </head>
 <body class="bg-white text-black p-5" data-turbo-action="replace" data-md-editor>
 
-  <div class="flex justify-between items-center pb-2.5 relative ">
-    <h1 class="text-xl font-bold">Edit Page: <%= @page.title %></h1>
+  <div class="flex justify-between gap-3 items-start pb-2.5 relative">
+    <div class="">
+      <h1 class="text-xl font-bold leading-none">Edit Page: <%= @page.title %></h1>
+      <div class="flex items-center">
+      <%= render 'shared/inline_rename', resource: @page, resource_type: 'page', return_to: edit_admin_page_path(@page) %>
+      </div>
+    </div>
     <div class="flex items-center gap-2">
     <%= link_to "← Back to Pages", admin_pages_path, class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     </div>
@@ -76,15 +81,15 @@
         <% end %>
       </div>
 
-      <!-- Right: Delete button -->
-      <button type="button"
-              data-action="delete"
-              data-resource-id="<%= @page.id %>"
-              data-resource-title="<%= @page.title || @page.filename %>"
-              data-resource-type="page"
-              class="uppercase text-xs px-1.5 py-0 border border-red-600 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
-        Delete
-      </button>
+      <!-- Right: Duplicate + Delete -->
+      <div class="flex items-center gap-1">
+        <%= button_to "Duplicate", duplicate_admin_page_path(@page), method: :post,
+              form: { class: "inline" },
+              class: "uppercase text-xs px-1.5 py-0 border border-gray-600 bg-gray-50 hover:bg-gray-100 text-gray-700 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer" %>
+        <%= button_to "Delete", admin_page_path(@page), method: :delete,
+              form: { class: "inline", data: { turbo_confirm: "Delete “#{@page.title || 'this page'}”? This cannot be undone." } },
+              class: "uppercase text-xs px-1.5 py-0 border border-red-600 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer" %>
+      </div>
     </div>
 
     <%= render 'shared/editor',

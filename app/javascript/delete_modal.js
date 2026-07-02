@@ -5,7 +5,8 @@ document.addEventListener("turbo:load", function () {
       const id = this.dataset.resourceId;
       const title = this.dataset.resourceTitle;
       const resourceType = this.dataset.resourceType;
-      showDeleteConfirmation(id, title, resourceType);
+      const deleteUrl = this.dataset.deleteUrl;
+      showDeleteConfirmation(id, title, resourceType, deleteUrl);
     });
   });
 
@@ -41,7 +42,7 @@ document.addEventListener("turbo:load", function () {
   });
 });
 
-function showDeleteConfirmation(id, title, resourceType) {
+function showDeleteConfirmation(id, title, resourceType, deleteUrl) {
   document.getElementById("delete-item-title-" + resourceType).textContent =
     title;
   document
@@ -52,7 +53,15 @@ function showDeleteConfirmation(id, title, resourceType) {
   );
   input.value = "";
   input.focus();
-  document.getElementById("delete-confirm-btn-" + resourceType).disabled = true;
+  const btn = document.getElementById("delete-confirm-btn-" + resourceType);
+  btn.disabled = true;
+
+  // Index pages render one modal for many rows: retarget its delete form to the
+  // clicked row's resource. Single-resource pages omit data-delete-url and keep
+  // the form action they were rendered with.
+  if (deleteUrl && btn && btn.form) {
+    btn.form.action = deleteUrl;
+  }
 }
 
 function hideDeleteConfirmation(resourceType) {

@@ -11,7 +11,8 @@
 <% dimmed = local_assigns.fetch(:dimmed, false) %>
 <% rowpad = dimmed ? "py-1.5" : "py-4" %>
 <tr>
-  <td class="whitespace-nowrap flex items-center <%= rowpad %> pr-3 text-sm font-medium <%= dimmed ? 'text-gray-400' : 'text-gray-900' %> <%= dimmed ? 'pl-8' : 'pl-4' %>">
+  <td class="whitespace-nowrap <%= rowpad %> pr-4 text-sm font-medium <%= dimmed ? 'text-gray-400' : 'text-gray-900' %> <%= dimmed ? 'pl-10 md:pl-8' : 'pl-6 md:pl-4' %>">
+    <div class="flex items-center">
     <%= link_to product.title || "Untitled", edit_admin_product_path(product),
           class: "line-clamp-1 #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-blue-600 hover:text-blue-900'}" %>
     <%# Primary / variant badges. Primary: "Primary" on top, variant below.
@@ -42,24 +43,40 @@
       <span class="ml-1 inline-block text-base text-amber-600 font-semibold font-sans leading-0"
             title="<%= reasons.join('; ') %>">⚠</span>
     <% end %>
+    </div>
   </td>
-  <td class="whitespace-nowrap px-1.5 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
+  <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
     $<%= sprintf('%.2f', product.price) %>
   </td>
-  <td class="whitespace-nowrap px-1.5 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
-    <%= product.sku || '—' %>
+  <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
+    <%= product.sku.presence || '—' %>
   </td>
-  <td class="whitespace-nowrap px-1.5 <%= rowpad %> text-sm">
+  <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm">
     <% if product.status == 'published' %>
       <span class="inline-flex <%= dimmed ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-800' %> px-2 text-xs font-semibold leading-5">Published</span>
     <% else %>
       <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Draft</span>
     <% end %>
   </td>
-  <td class="relative whitespace-nowrap <%= rowpad %> pl-3 pr-4 text-right text-sm font-medium">
-    <%= link_to "Edit", edit_admin_product_path(product),
-          class: "mr-4 text-xs #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-blue-600 hover:text-blue-900'}" %>
-    <%= link_to "View", product.public_url, target: "_blank",
-          class: "text-xs #{dimmed ? 'text-gray-400 hover:text-gray-500' : 'text-gray-600 hover:text-gray-900'}" %>
+  <td class="relative w-full whitespace-nowrap <%= rowpad %> pl-3 md:pr-4 pr-6 text-right text-sm font-medium">
+    <div class="flex items-center justify-end gap-3">
+      <%= link_to icon_svg("edit", class: "w-4 h-4"), edit_admin_product_path(product),
+            class: (dimmed ? "text-slate-300 hover:text-slate-400" : "text-slate-400 hover:text-blue-700"), title: "Edit", "aria-label": "Edit" %>
+      <%= link_to icon_svg("view", class: "w-4 h-4"), product.public_url, target: "_blank",
+            class: (dimmed ? "text-slate-300 hover:text-slate-400" : "text-slate-400 hover:text-gray-900"), title: "View", "aria-label": "View" %>
+      <%= button_to icon_svg("duplicate", class: "w-4 h-4"), duplicate_admin_product_path(product), method: :post,
+            form: { class: "inline-flex" },
+            class: "cursor-pointer #{dimmed ? 'text-slate-300 hover:text-slate-400' : 'text-slate-400 hover:text-blue-700'}", title: "Duplicate", "aria-label": "Duplicate" %>
+      <button type="button"
+              data-action="delete"
+              data-resource-id="<%= product.id %>"
+              data-resource-title="<%= product.title || 'Untitled' %>"
+              data-resource-type="product"
+              data-delete-url="<%= admin_product_path(product) %>"
+              class="cursor-pointer <%= dimmed ? 'text-slate-300 hover:text-slate-400' : 'text-slate-400 hover:text-red-700' %>"
+              title="Delete" aria-label="Delete">
+        <%= icon_svg("delete", class: "w-4 h-4") %>
+      </button>
+    </div>
   </td>
 </tr>

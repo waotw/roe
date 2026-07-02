@@ -5,7 +5,11 @@
   # delete_message: replaces the "permanently delete the file from
   #   content/<type>s/" sentence — useful for layouts, configs, etc.
   delete_path    = local_assigns[:delete_path] ||
-                   (resource_type == 'post' ? admin_post_path(resource) : admin_page_path(resource))
+                   case resource_type
+                   when 'post'    then admin_post_path(resource)
+                   when 'product' then admin_product_path(resource)
+                   else admin_page_path(resource)
+                   end
   delete_message = local_assigns[:delete_message] ||
                    "This will permanently delete the file from <code class=\"bg-gray-100 px-1\">content/#{resource_type}s/</code>.".html_safe
 %>

@@ -101,6 +101,7 @@ Rails.application.routes.draw do
         post :preview
         get :preview
         patch :rename
+        post :duplicate
         post :send_test_email
         get :resend_modal
         post :confirm_resend
@@ -117,6 +118,7 @@ Rails.application.routes.draw do
         post :preview
         get :preview
         patch :rename
+        post :duplicate
       end
     end
 
@@ -152,6 +154,8 @@ Rails.application.routes.draw do
         post :preview
         get :preview
         get :sku_generator
+        patch :rename
+        post :duplicate
       end
     end
 

@@ -89,10 +89,10 @@
           <table class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Title</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Filename</th>
+                <th scope="col" class="py-2 pl-6 md:pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Title</th>
+                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase text-nowrap">Filename <span class="ml-1 text-[10px] text-gray-400 text-nowrap">(double-click to edit)</span></th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
-                <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
+                <th scope="col" class="relative py-1.5 pl-3 md:pr-4 pr-6">
                   <span class="sr-only">Actions</span>
                 </th>
               </tr>
@@ -112,26 +112,29 @@
                       post.metadata['tags']&.join(' '),
                       post.status
                     ].compact.join(' ').downcase %>">
-                  <td class="py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
-                    <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "line-clamp-1 text-blue-600 hover:text-blue-900 mr-4" %>
-                    <% if post.needs_attention? %>
-                      <%
-                        reasons = []
-                        post.missing_type_required_fields.each { |f| reasons << "missing #{f[:name]}" unless f[:name].to_s == 'guid' }
-                        post.missing_site_gated_fields.each { |name| reasons << "missing #{name}" }
-                        post.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
-                        if (orphan = post.invalid_podcast_reference)
-                          reasons << "podcast reference invalid: #{orphan}"
-                        end
-                      %>
-                      <span class="inline-block text-base text-amber-600 font-semibold font-sans"
-                            title="<%= reasons.join(', ') %>">
-                        ⚠
-                      </span>
-                    <% end %>
+                  <td class="max-w-[16rem] py-1.5 pl-6 md:pl-4 pr-3 text-sm font-medium text-gray-900">
+                    <div class="flex items-center gap-1.5">
+                      <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "min-w-0 truncate text-blue-600 hover:text-blue-900" %>
+                      <% if post.needs_attention? %>
+                        <%
+                          reasons = []
+                          post.missing_type_required_fields.each { |f| reasons << "missing #{f[:name]}" unless f[:name].to_s == 'guid' }
+                          post.missing_site_gated_fields.each { |name| reasons << "missing #{name}" }
+                          post.missing_media_refs.each { |ref| reasons << "file not found: #{ref[:path]}" }
+                          if (orphan = post.invalid_podcast_reference)
+                            reasons << "podcast reference invalid: #{orphan}"
+                          end
+                        %>
+                        <span class="shrink-0 inline-block text-base text-amber-600 font-semibold font-sans"
+                              title="<%= reasons.join(', ') %>">
+                          ⚠
+                        </span>
+                      <% end %>
+                    </div>
                   </td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
-                    <%= render 'shared/inline_rename', resource: post, resource_type: 'post' %>
+                  <td class="max-w-0 px-1.5 py-4 text-sm text-gray-500">
+                    <%= render 'shared/inline_rename', resource: post, resource_type: 'post',
+                          display_class: "inline-block max-w-full truncate align-bottom" %>
                   </td>
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                     <% case post.status %>
@@ -143,9 +146,26 @@
                       <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Draft</span>
                     <% end %>
                   </td>
-                  <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-                    <%= link_to "Edit", edit_admin_post_path(post), class: "text-blue-600 hover:text-blue-900 mr-4 text-xs" %>
-                    <%= link_to "View", post_path(url_name: post.url_name), class: "text-gray-600 hover:text-gray-900 text-xs", target: "_blank" %>
+                  <td class="relative whitespace-nowrap py-4 pl-3 md:pr-4 pr-6 text-right text-sm font-medium">
+                    <div class="flex items-center justify-end gap-3">
+                      <%= link_to icon_svg("edit", class: "w-5 h-5"), edit_admin_post_path(post),
+                            class: "text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
+                      <%= link_to icon_svg("view", class: "w-5 h-5"), post_path(url_name: post.url_name), target: "_blank",
+                            class: "text-slate-400 hover:text-gray-900", title: "View", "aria-label": "View" %>
+                      <%= button_to icon_svg("duplicate", class: "w-5 h-5"), duplicate_admin_post_path(post), method: :post,
+                            form: { class: "inline-flex" },
+                            class: "text-slate-400 hover:text-blue-700 cursor-pointer", title: "Duplicate", "aria-label": "Duplicate" %>
+                      <button type="button"
+                              data-action="delete"
+                              data-resource-id="<%= post.id %>"
+                              data-resource-title="<%= post.title || post.filename %>"
+                              data-resource-type="post"
+                              data-delete-url="<%= admin_post_path(post) %>"
+                              class="text-slate-400 hover:text-red-700 cursor-pointer"
+                              title="Delete" aria-label="Delete">
+                        <%= icon_svg("delete", class: "w-5 h-5") %>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               <% end %>
@@ -155,4 +175,10 @@
       </div>
     </div>
   </div>
+
+  <%# One delete modal for the whole table; delete_modal.js retargets its form
+      to the clicked row's post via data-delete-url. %>
+  <% if @posts.any? %>
+    <%= render "shared/delete_file_modal", resource: @posts.first, resource_type: "post" %>
+  <% end %>
 </div>

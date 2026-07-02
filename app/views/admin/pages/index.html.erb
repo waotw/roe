@@ -42,4 +42,11 @@
       <%= render 'pages_table', pages: @member_pages, show_member_badge: true %>
     </div>
   <% end %>
+
+  <%# One delete modal for the whole page; delete_modal.js retargets its form to
+      the clicked row's page via data-delete-url. %>
+  <% all_pages = @content_pages + (@member_pages || []) %>
+  <% if all_pages.any? %>
+    <%= render "shared/delete_file_modal", resource: all_pages.first, resource_type: "page" %>
+  <% end %>
 </div>

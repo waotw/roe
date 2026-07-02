@@ -287,13 +287,54 @@ class Admin::PostsController < Admin::BaseController
     redirect_to edit_admin_post_path(@post)
   end
 
+  # Copy a post's file verbatim into a numbered sibling — same directory, an
+  # incrementing "-N" suffix on the filename and " N" on the title (starting at
+  # 2, skipping any that already exist). Everything else in the file is copied
+  # as-is. Redirects into the editor for the new copy.
+  def duplicate
+    @post = Post.find(params[:id])
+    raw = File.read(@post.file_path)
+    parsed = FrontMatterParser::Parser.new(:md).call(raw)
+    metadata = parsed.front_matter
+
+    dir = Pathname.new(@post.file_path).dirname
+    base_name = File.basename(@post.file_path, ".md").sub(/-\d+\z/, "")
+    base_title = metadata["title"].to_s.sub(/\s+\d+\z/, "").strip
+
+    n = 2
+    n += 1 while File.exist?(dir.join("#{base_name}-#{n}.md"))
+    new_path = dir.join("#{base_name}-#{n}.md")
+
+    metadata["title"] = base_title.present? ? "#{base_title} #{n}" : "Untitled #{n}"
+    yaml_content = Post.format_metadata_yaml(metadata)
+    normalize_and_write(new_path, "---\n#{yaml_content}\n---\n#{parsed.content}")
+    ContentSync.sync_file(new_path)
+
+    new_post = Post.find_by(file_path: new_path.to_s)
+    if new_post
+      redirect_to edit_admin_post_path(new_post), notice: "Post duplicated"
+    else
+      redirect_to admin_posts_path, alert: "Duplicated the file but couldn't load the new post."
+    end
+  end
+
   def rename
     @post = Post.find(params[:id])
     new_filename = sanitize_filename(params[:new_filename])
 
+    # Return to wherever the rename was submitted from — the editor passes its
+    # own path as return_to (so it stays put), the index passes none and falls
+    # back to the index. Only same-site absolute paths are allowed (no "//host"
+    # or off-site URLs), so this can't be turned into an open redirect.
+    return_to = lambda do
+      target = params[:return_to].to_s
+      safe = target.start_with?("/") && !target.start_with?("//")
+      redirect_to(safe ? target : admin_posts_path, allow_other_host: false)
+    end
+
     if new_filename.blank?
       flash[:error] = "Filename cannot be empty"
-      redirect_to admin_posts_path and return
+      return_to.call and return
     end
 
     old_path = Pathname.new(@post.file_path)
@@ -301,7 +342,7 @@ class Admin::PostsController < Admin::BaseController
 
     if File.exist?(new_path) && new_path != old_path
       flash[:error] = "A file with that name already exists"
-      redirect_to admin_posts_path and return
+      return_to.call and return
     end
 
     begin
@@ -314,7 +355,7 @@ class Admin::PostsController < Admin::BaseController
       flash[:error] = "Failed to rename: #{e.message}"
     end
 
-    redirect_to admin_posts_path
+    return_to.call
   end
 
   def resend_newsletter
