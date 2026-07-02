@@ -68,6 +68,21 @@ module ApplicationHelper
     nil
   end
 
+  # Resolve a config-stored image reference (logo, favicon, podcast artwork,
+  # …) to a usable URL. These fields historically held a bare filename served
+  # from /site/system/assets/images via /system/images/<name>. They may now
+  # also hold an absolute path — e.g. /media/images/logo.svg uploaded through
+  # the main Media browser — or a full URL, which is used as-is. This lets an
+  # image uploaded to /media work in config without moving it into the
+  # global-images folder. Returns nil for blank / "none".
+  def config_image_path(value, **options)
+    v = value.to_s.strip
+    return nil if v.empty? || v == "none"
+    return v if v.start_with?("http://", "https://", "/")
+
+    safe_system_image_path(v, **options)
+  end
+
   def safe_system_image_url(filename, **options)
     return nil if filename.blank?
     system_image_url(filename, **options)

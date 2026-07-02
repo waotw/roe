@@ -90,8 +90,39 @@ class MediaUsageIndexTest < ActiveSupport::TestCase
     assert_includes usage[:url], "focus=logo"
   end
 
+  test "nested config media focuses the leaf field, not the top-level key" do
+    # Mirrors podcast.yml: media lives under <slug>.artwork, not at top level.
+    podcast_yml = SiteConfig::FEATURES_PATH.join("podcast.yml").to_s
+    FileUtils.mkdir_p(File.dirname(podcast_yml))
+    existed = File.exist?(podcast_yml)
+    backup = File.read(podcast_yml) if existed
+    File.write(podcast_yml, { "my-show" => { "title" => "My Show", "artwork" => "/media/images/art.jpg" } }.to_yaml)
+
+    usage = MediaUsageIndex.new.build["/media/images/art.jpg"].first
+
+    assert usage, "expected the nested artwork path to be indexed"
+    assert_includes usage[:label], "artwork"
+    refute_includes usage[:label], "my-show"
+    assert_includes usage[:url], "focus=artwork"
+  ensure
+    if existed
+      File.write(podcast_yml, backup)
+    elsif File.exist?(podcast_yml)
+      File.delete(podcast_yml)
+    end
+  end
+
   test "an unreferenced path returns an empty list" do
     assert_empty MediaUsageIndex.new.build["/media/images/nobody-uses-me.jpg"]
+  end
+
+  test "config backlinks are scanned by default" do
+    assert MediaUsageIndex.config_backlinks_enabled?, "expected config scanning on by default"
+    File.write(@site_yml, { "logo" => "/media/images/on.svg" }.to_yaml)
+
+    usages = MediaUsageIndex.new.build["/media/images/on.svg"]
+    assert_equal 1, usages.size
+    assert usages.first[:global]
   end
 
   test "a file referenced from multiple sources lists all of them" do

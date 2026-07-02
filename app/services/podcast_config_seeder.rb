@@ -4,7 +4,7 @@ require "open-uri"
 # Seeds an entry in site/system/features/podcast.yml from RSS channel
 # data, and downloads the podcast artwork to /site/system/assets/images/
 # — the canonical location for system-level images, the same place the
-# admin "Manage Global Images" UI uploads to.
+# admin "Manage GLOBAL IMAGES" UI uploads to.
 #
 # Two modes:
 # - mode: :create  — only adds the entry if missing (default; safe for

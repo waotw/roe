@@ -19,6 +19,11 @@ class Admin::MediumController < Admin::BaseController
     # pages, documentation, products, and config files — keyed by path.
     @media_usages = MediaUsageIndex.fetch
 
+    # Only surface the Global tab when there's actually global (config-
+    # referenced) media to show — same "show if it exists" rule as the
+    # type tabs.
+    @has_global_media = @media.any? { |m| @media_usages[m.file_path].any? { |u| u[:global] } }
+
     # Get distinct media types that exist
     @existing_types = Medium.distinct.pluck(:media_type).compact
 

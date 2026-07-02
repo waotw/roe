@@ -21,6 +21,17 @@ class MediaUsageIndex
   # Only cache once scanning is worth avoiding on every browse load.
   CACHE_THRESHOLD = 200
 
+  # Whether config files are scanned so config-referenced media (e.g. the
+  # site logo) gets a backlink in the normal "Used in" badge.
+  CONFIG_BACKLINKS_ENABLED = true
+
+  # Whether the standalone "Global" filter tab is shown on the browse page.
+  # Deferred for now — config backlinks appear inline in the badge and the
+  # System Images link covers global-image management, so the tab isn't
+  # needed yet. Flip to true to bring it back (it still only shows when
+  # global media actually exists).
+  GLOBAL_TAB_ENABLED = false
+
   # Any /media/... reference: path-safe chars only, so trailing quotes,
   # parens, or whitespace in markdown/HTML/YAML don't get captured.
   MEDIA_PATH = %r{/media/[\w./\-]+}
@@ -66,6 +77,14 @@ class MediaUsageIndex
     def invalidate!
       Rails.cache.delete(CACHE_KEY)
     end
+
+    def config_backlinks_enabled?
+      CONFIG_BACKLINKS_ENABLED
+    end
+
+    def global_tab_enabled?
+      GLOBAL_TAB_ENABLED
+    end
   end
 
   # => { "/media/..." => [ { kind:, label:, url:, global: Boolean } ] }
@@ -73,7 +92,7 @@ class MediaUsageIndex
     index = Hash.new { |h, k| h[k] = [] }
 
     scan_content_sources(index)
-    scan_config_sources(index)
+    scan_config_sources(index) if self.class.config_backlinks_enabled?
 
     # Freeze into a plain hash so callers get [] for misses without mutating.
     index.default = [].freeze
@@ -106,11 +125,10 @@ class MediaUsageIndex
       data = YAML.safe_load(File.read(file)) rescue nil
       next unless data.is_a?(Hash)
 
-      # top-level key => Set of media paths reachable under it
-      each_media_value(data) do |top_key, path|
+      each_media_value(data) do |field_key, path|
         base = public_send(source[:path_helper])
-        label = top_key ? "#{source[:label]} → #{top_key}" : source[:label]
-        index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, top_key), global: true }
+        label = field_key ? "#{source[:label]} → #{field_key}" : source[:label]
+        index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, field_key), global: true }
       end
     end
   end
@@ -138,13 +156,20 @@ class MediaUsageIndex
     found.uniq
   end
 
-  # Yield [top_level_key, media_path] for every /media/ value in the config,
-  # tracking which top-level key it lives under (for editor focus).
-  def each_media_value(config)
-    config.each do |top_key, subtree|
-      walk_strings(subtree) do |s|
-        value_paths(s).each { |path| yield top_key.to_s, path }
-      end
+  # Yield [field_key, media_path] for every /media/ value in the config,
+  # where field_key is the *leaf* key whose value holds the path — e.g.
+  # "artwork" for podcast.<slug>.artwork, "logo" for site.logo. That's the
+  # field the editor should focus and the clearest thing to name in the
+  # backlink label (the old top-level key sent podcast artwork to the slug,
+  # which the editor focus then resolved to the wrong field).
+  def each_media_value(node, key = nil, &block)
+    case node
+    when String
+      value_paths(node).each { |path| yield key, path } if key
+    when Hash
+      node.each { |k, v| each_media_value(v, k.to_s, &block) }
+    when Array
+      node.each { |v| each_media_value(v, key, &block) }
     end
   end
 

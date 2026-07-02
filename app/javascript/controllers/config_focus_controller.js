@@ -9,11 +9,14 @@ export default class extends Controller {
     const field = new URLSearchParams(window.location.search).get("focus")
     if (!field) return
 
-    // Config inputs are named config_fields[<field>]. Try an exact match
-    // first, then a prefix match so nested keys (theme.x) still resolve.
+    // Config editors name inputs differently: the shared editor uses
+    // config_fields[<field>]; others (e.g. podcast) use <prefix>[<field>]
+    // like podcast[artwork]. Match the leaf field across those forms —
+    // exact flat name, then any name ending in [<field>], then a bare name.
     const input =
       this.element.querySelector(`[name="config_fields[${field}]"]`) ||
-      this.element.querySelector(`[name^="config_fields[${field}"]`)
+      this.element.querySelector(`[name$="[${field}]"]`) ||
+      this.element.querySelector(`[name="${field}"]`)
     if (!input) return
 
     // Defer so layout/toggles settle before we scroll into view.

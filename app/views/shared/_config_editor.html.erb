@@ -93,7 +93,7 @@
 
                   <div class="mb-3 flex gap-2 items-center">
                     <p class="text-base font-medium text-gray-700">Manage:</p>
-                    <%= link_to "Global Images", browse_images_admin_system_assets_path,
+                    <%= link_to "GLOBAL IMAGES", browse_images_admin_system_assets_path,
                       target: "_blank",
                       class: "uppercase text-sm px-1.5 py-1.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
                   </div>
@@ -588,7 +588,7 @@
                                   <%# Image-upload Stimulus widget in verify-only
                                       mode. show_upload: false hides the inline
                                       Upload button because podcast artwork is
-                                      uploaded via the "Global Images" link
+                                      uploaded via the "GLOBAL IMAGES" link
                                       rendered beside this field (browse_url:),
                                       which opens browse_images in a new tab —
                                       the user can upload there without losing
@@ -598,7 +598,7 @@
                                       shows the inline warning.
 
                                       flex-1 min-w-0 (not w-full) on the input
-                                      so the inline Global Images button can
+                                      so the inline GLOBAL IMAGES button can
                                       sit beside it without getting pushed
                                       off-row. %>
                                   <%= render "shared/image_upload_field",
@@ -844,8 +844,9 @@
 
   if (!errorMsg) return;
 
-  // User only types filename (e.g., "logo.svg"), prepend the system images path
-  let imageUrl = '/system/images/' + value;
+  // A bare filename (e.g. "logo.svg") resolves under the system images path;
+  // an absolute path (/media/..., /system/images/...) or full URL is used as-is.
+  let imageUrl = /^(https?:\/\/|\/)/.test(value) ? value : '/system/images/' + value;
 
   // Create a temporary image to test if it loads
   const img = new Image();

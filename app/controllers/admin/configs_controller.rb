@@ -46,7 +46,7 @@ class Admin::ConfigsController < Admin::BaseController
         "logo" => {
           type: :text,
           label: "Logo Image Path",
-          hint: "Copy logo url from Global Images."
+          hint: "Copy logo url from GLOBAL IMAGES."
         },
         "logo_style" => {
           type: :select,
@@ -58,7 +58,7 @@ class Admin::ConfigsController < Admin::BaseController
         "favicon" => {
           type: :text,
           label: "Favicon",
-          hint: "Copy logo url from Global Images.",
+          hint: "Copy logo url from GLOBAL IMAGES.",
           placeholder: "favicon.ico"
         },
         "social_image" => {

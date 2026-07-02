@@ -1,7 +1,7 @@
 <% podcast_config ||= nil %>
 <% prev_episode ||= nil %>
 <% next_episode ||= nil %>
-<% podcast_artwork = podcast_config&.dig('artwork').present? ? "/system/images/#{podcast_config['artwork']}" : nil %>
+<% podcast_artwork = config_image_path(podcast_config&.dig('artwork')) %>
 <%# Branch order doesn't matter — the conditions are mutually exclusive for %>
 <%# podcasts: video wins if present, audio is the fallback. The audio branch %>
 <%# carries the full podcast UI (chapters, episode nav); the video branch is %>

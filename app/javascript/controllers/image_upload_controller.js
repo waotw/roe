@@ -61,7 +61,9 @@ export default class extends Controller {
     const img = new Image()
     img.onload  = () => this.hideWarning()
     img.onerror = () => this.showWarning()
-    img.src = this.baseUrlValue + value
+    // An absolute path (/media/..., /system/images/...) or full URL is used
+    // as-is; a bare filename is resolved against the global-images base URL.
+    img.src = /^(https?:\/\/|\/)/.test(value) ? value : this.baseUrlValue + value
   }
 
   hideWarning() {

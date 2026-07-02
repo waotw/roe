@@ -39,13 +39,13 @@
     </style>
     <!-- Favicon -->
     <% if SiteConfig.get('favicon').present? %>
-      <link rel="icon" type="image/x-icon" href="<%= system_image_path(SiteConfig.get('favicon')) %>">
+      <link rel="icon" type="image/x-icon" href="<%= config_image_path(SiteConfig.get('favicon')) %>">
     <% end %>
     <!-- Apple touch icon — uses social_image when set (Apple prefers
          square art with margin); falls back to logo. -->
     <% touch_icon = SiteConfig.get('social_image').presence || SiteConfig.get('logo').presence %>
     <% if touch_icon %>
-      <link rel="apple-touch-icon" href="<%= system_image_path(touch_icon) %>">
+      <link rel="apple-touch-icon" href="<%= config_image_path(touch_icon) %>">
     <% end %>
     <!-- Turbo / Import maps -->
     <%= javascript_importmap_tags %>

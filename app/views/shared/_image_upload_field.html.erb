@@ -12,7 +12,7 @@
                      surfaces a separate upload path (e.g. a "Global
                      Images" link to browse_images) and you just want
                      the verify-on-blur behaviour.
-      browse_url   — URL for an inline "Global Images" link rendered
+      browse_url   — URL for an inline "GLOBAL IMAGES" link rendered
                      beside the input, opens in a new tab. Useful in
                      verify-only mode where there's no inline Upload
                      button but the user still needs a way to reach
@@ -58,7 +58,7 @@
            <% extra_input_data.each do |k, v| %>data-<%= k %>="<%= v %>" <% end %>
            class="<%= input_class %>">
     <% if browse_url.present? %>
-      <%= link_to "Global Images", browse_url,
+      <%= link_to "GLOBAL IMAGES", browse_url,
                   target: "_blank",
                   class: "uppercase text-xs px-2 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs whitespace-nowrap flex items-center" %>
     <% end %>

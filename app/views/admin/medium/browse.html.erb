@@ -1,20 +1,10 @@
 <div class="mb-5 pb-2 border-b border-gray-300">
-  <h1 class="text-2xl font-bold mb-2.5">Media Browser</h1>
+  <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">Media Browser</h1>
+      <%= link_to "SYSTEM IMAGES", browse_images_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+  </div>
   <%= render 'image_optimization' %>
 </div>
-<!-- Upload Form -->
-<%= form_with url: admin_medium_index_path, method: :post, multipart: true, local: true do |f| %>
-  <%= f.file_field :files,
-      accept: 'image/*,audio/*,video/*',
-      multiple: true,
-      class: "hidden",
-      id: "file-upload-input",
-      name: "files[]" %>
-
-  <label for="file-upload-input" class="cursor-pointer inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">
-    Upload Media
-  </label>
-<% end %>
 
 <script>
   document.getElementById('file-upload-input').addEventListener('change', function() {
@@ -29,41 +19,58 @@
 
   <!-- Tabs for Media Types -->
   <div class="mb-4 border-b border-gray-200">
-    <nav class="-mb-px flex space-x-8">
-      <!-- Always show 'All' -->
-      <button
-        data-action="click->media-filter#filterByType"
-        data-type="all"
-        data-media-filter-target="tab"
-        class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-        All
-      </button>
+      <div class="flex justify-between items-center">
+      <nav class="-mb-px flex space-x-8">
+        <!-- Always show 'All' -->
+        <button
+          data-action="click->media-filter#filterByType"
+          data-type="all"
+          data-media-filter-target="tab"
+          class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          All
+        </button>
 
-      <!-- Show tabs for types that exist -->
-      <% if @existing_types.include?('images') %>
-        <button data-action="click->media-filter#filterByType" data-type="images" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-          Images
-        </button>
-      <% end %>
+        <!-- Show tabs for types that exist -->
+        <% if @existing_types.include?('images') %>
+          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Images
+          </button>
+        <% end %>
 
-      <% if @existing_types.include?('audio') %>
-        <button data-action="click->media-filter#filterByType" data-type="audio" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-          Audio
-        </button>
-      <% end %>
+        <% if @existing_types.include?('audio') %>
+          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Audio
+          </button>
+        <% end %>
 
-      <% if @existing_types.include?('video') %>
-        <button data-action="click->media-filter#filterByType" data-type="video" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-          Video
-        </button>
+        <% if @existing_types.include?('video') %>
+          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Video
+          </button>
+        <% end %>
+        <% if @has_global_media && MediaUsageIndex.global_tab_enabled? %>
+          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Global
+          </button>
+        <% end %>
+          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Unused
+          </button>
+      </nav>
+      <!-- Upload Form -->
+      <%= form_with url: admin_medium_index_path, method: :post, multipart: true, local: true do |f| %>
+        <%= f.file_field :files,
+            accept: 'image/*,audio/*,video/*',
+            multiple: true,
+            class: "hidden",
+            id: "file-upload-input",
+            name: "files[]" %>
+
+        <label for="file-upload-input" class="cursor-pointer inline-flex items-center uppercase text-base text-white px-3 py-1 border border-lime-900 bg-lime-700 hover:bg-lime-600 font-mono rounded-xs">
+          UPLOAD
+        </label>
       <% end %>
-        <button data-action="click->media-filter#filterByType" data-type="global" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-          Global
-        </button>
-        <button data-action="click->media-filter#filterByType" data-type="unused" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-          Unused
-        </button>
-    </nav>
+    </div>
   </div>
 
   <!-- Bulk Action Toolbar -->
@@ -131,7 +138,7 @@
       Showing <span data-media-filter-target="count"><%= @media.count %></span> of <%= @media.count %> files
     </p>
     <p class="mb-4 text-xs text-gray-500 font-sans">
-      <span class="bg-amber-400 text-white px-1.5 py-0.5 rounded">⏳</span> = Processing variants &nbsp;|&nbsp;&nbsp;<span class="bg-green-500 text-white px-1.5 py-0.5 rounded">✓</span> = All variants processed
+      <span class="bg-amber-400 text-white px-1.5 py-[0.2rem] rounded">⏳</span> = Processing variants &nbsp;|&nbsp;&nbsp;<span class="bg-lime-600 text-white px-1.5 py-[0.2rem] rounded">✓</span> = All variants processed
     </p>
   </div>
 
@@ -183,7 +190,7 @@
                                   title: "Generate variants",
                                   data: { turbo: false } %>
                   <% elsif variant_stats && variant_stats[:ready] %>
-                    <div class="absolute top-1 right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded" title="Variants ready: <%= ImageVariantGenerator::VARIANTS.keys.join(', ') %>">
+                    <div class="absolute top-1 right-1 border border-mist-300 bg-lime-600 text-white text-xs px-1.5 py-0.5 rounded" title="Variants ready: <%= ImageVariantGenerator::VARIANTS.keys.join(', ') %>">
                       ✓
                     </div>
                   <% end %>
@@ -218,15 +225,15 @@
 
             <!-- Usage Badge: posts, pages, docs, products, and config files -->
             <% if usages.any? %>
-              <div class="text-xs text-gray-600 mt-2">
-                Used in:
-                <span class="text-gray-400 uppercase tracking-wide text-[10px]"><%= usages.first[:type] %></span>
+              <div class="text-xs text-gray-600 mt-2 flex items-baseline gap-1">
+                <span class="shrink-0">Used in:</span>
+                <span class="text-gray-400 uppercase tracking-wide text-[10px] shrink-0"><%= usages.first[:type] %></span>
                 <%= link_to usages.first[:label],
                                      usages.first[:url],
-                                     class: "text-blue-600 hover:text-blue-800 hover:underline text-nowrap",
+                                     class: "text-blue-600 hover:text-blue-800 hover:underline truncate min-w-0",
                                      onclick: "event.stopPropagation()" %>
                 <% if usages.size > 1 %>
-                  <span class="relative group/uses inline-block">
+                  <span class="relative group/uses inline-block shrink-0">
                     <span class="text-gray-400 cursor-help">(+<%= usages.size - 1 %> more)</span>
 
                     <!-- Popover with other usages -->
