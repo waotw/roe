@@ -69,6 +69,12 @@
           <%= label_tag "import[options][include_drafts]", "Include draft posts", class: "ml-2 block text-sm text-gray-900" %>
         </div>
         <p class="mt-1 text-sm text-gray-500 ml-6">By default, only published posts are imported</p>
+
+        <div class="flex items-center mt-3">
+          <%= check_box_tag "import[options][ignore_media]", "1", @import.options["ignore_media"], class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %>
+          <%= label_tag "import[options][ignore_media]", "Ignore all media", class: "ml-2 block text-sm text-gray-900" %>
+        </div>
+        <p class="mt-1 text-sm text-gray-500 ml-6">Imports posts, members and deliveries only — no images, audio or video are downloaded. Links still point at the expected local paths, so you can re-run this same import later without this option checked to backfill the media into existing posts.</p>
       </div>
 
       <div class="mb-6">

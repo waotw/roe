@@ -133,7 +133,8 @@ module SubstackImporter
         site_root: site_root,
         import: @import,
         verbose: Rails.env.development?,
-        rss_items: rss_items
+        rss_items: rss_items,
+        ignore_media: @import.options["ignore_media"] == "1"
       )
 
       # Setup frontmatter builder
@@ -215,9 +216,20 @@ module SubstackImporter
 
       Rails.logger.info "[SubstackImporter] Rolling back import #{@import.id}"
 
-      # Delete posts created by this import
+      # Delete posts created by this import. Remove the markdown file from
+      # disk alongside destroying the DB row: destroy_all on its own leaves
+      # the .md on disk, and the content watcher would then re-import it
+      # straight back into the database. Delete the file first so the
+      # watcher can't recreate the record mid-rollback.
       posts_deleted = @import.posts.count
-      @import.posts.destroy_all
+      site_root = File.expand_path(RoeSitePaths::SITE_PATH)
+      @import.posts.find_each do |post|
+        path = post.file_path
+        if path.present? && File.expand_path(path).start_with?(site_root + "/") && File.exist?(path)
+          FileUtils.rm_f(path)
+        end
+        post.destroy
+      end
 
       # Delete media created by this import
       media_deleted = @import.media.count
@@ -279,12 +291,16 @@ module SubstackImporter
       # Convert HTML to Markdown
       markdown_body = converter.convert(post.html_content.to_s)
 
-      # Download media for this post
+      # Download media for this post. When "Ignore all media" is set the
+      # handler writes expected local URLs without downloading anything, so
+      # the downloaded stat should stay at zero (a later re-run backfills).
       local_media = media_handler.download_post_media(post)
-      @stats[:media_downloaded] += local_media[:images].count
-      @stats[:media_downloaded] += 1 if local_media[:cover_image]
-      @stats[:media_downloaded] += 1 if local_media[:audio]
-      @stats[:media_downloaded] += 1 if local_media[:video]
+      unless @import.options["ignore_media"] == "1"
+        @stats[:media_downloaded] += local_media[:images].count
+        @stats[:media_downloaded] += 1 if local_media[:cover_image]
+        @stats[:media_downloaded] += 1 if local_media[:audio]
+        @stats[:media_downloaded] += 1 if local_media[:video]
+      end
 
       # Duration is left blank at import time. The metadata-editor
       # controller auto-extracts it from the audio file via the browser's

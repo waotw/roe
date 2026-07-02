@@ -4,11 +4,15 @@ module SubstackImporter
   class MediaHandler
     attr_reader :site_root, :downloaded, :url_mappings, :existing_media
 
-    def initialize(site_root:, import: nil, verbose: false, rss_items: nil)
+    def initialize(site_root:, import: nil, verbose: false, rss_items: nil, ignore_media: false)
       @site_root = site_root
       @import = import
       @verbose = verbose
       @rss_items = rss_items
+      # Dry run: rewrite URLs to the expected local paths (body + frontmatter)
+      # but download nothing and create no Medium rows, so a later re-run with
+      # this off backfills the real files into those exact paths.
+      @ignore_media = ignore_media
       @downloaded = []
       @url_mappings = {} # remote_url => local_path
       @existing_media = {} # remote_url => medium record
@@ -144,6 +148,17 @@ module SubstackImporter
     end
 
     def download_image(url, filename)
+      dest = File.join(@site_root, "media", "images", filename)
+      file_path = "/media/images/#{filename}"
+
+      # Ignore-media dry run: map the URL to its expected local path (so the
+      # body is rewritten and the frontmatter points local) but download
+      # nothing and write no Medium row.
+      if @ignore_media
+        @url_mappings[url] = dest
+        return file_path
+      end
+
       # Check if we already have this image from a previous import (database record)
       if @existing_media.key?(url)
         medium = @existing_media[url]
@@ -151,9 +166,6 @@ module SubstackImporter
         Rails.logger.debug "  Reusing tracked image: #{filename}" if @verbose
         return medium.file_path
       end
-
-      dest = File.join(@site_root, "media", "images", filename)
-      file_path = "/media/images/#{filename}"
 
       # Skip if already exists on disk (from old CLI import or manual upload)
       if File.exist?(dest)
@@ -253,6 +265,11 @@ module SubstackImporter
       dest = File.join(@site_root, "media", "audio", filename)
       file_path = "/media/audio/#{filename}"
 
+      if @ignore_media
+        @url_mappings[url] = dest
+        return file_path
+      end
+
       # Check if we already have this audio in database
       existing = Medium.find_by(source_url: url)
       if existing
@@ -298,6 +315,11 @@ module SubstackImporter
       filename = "#{post.slug}.mp4"
       dest = File.join(@site_root, "media", "video", filename)
       file_path = "/media/video/#{filename}"
+
+      if @ignore_media
+        @url_mappings[url] = dest
+        return file_path
+      end
 
       # Check if we already have this video in database
       existing = Medium.find_by(source_url: url)
