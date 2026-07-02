@@ -5,6 +5,13 @@ class Admin::BaseController < ApplicationController
 
   private
 
+  # Drop the media-usage backlink cache after any mutating request. Used by
+  # controllers that change what references media (config saves, media
+  # upload/delete/rename) but don't go through a content model's after_commit.
+  def invalidate_media_usage_index
+    MediaUsageIndex.invalidate! unless request.get? || request.head?
+  end
+
   # Ensure integration config files exist whenever a feature is enabled.
   # This covers the case where a user deletes an integration file manually —
   # it gets recreated with blank keys on the next admin page load.

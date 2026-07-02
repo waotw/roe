@@ -5,6 +5,7 @@ class Documentation < ApplicationRecord
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
+  include TouchesMediaUsageIndex
 
   def self.create_or_update_from_file(file_path)
     # Resolve symlinks (notably /rails/site → /data/site on prod) so

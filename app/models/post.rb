@@ -5,6 +5,7 @@ class Post < ApplicationRecord
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
+  include TouchesMediaUsageIndex
 
   scope :for_newsletter, -> {
     where("json_extract(metadata, '$.published_to') IN ('newsletter', 'both')")

@@ -2,6 +2,7 @@ class Product < ApplicationRecord
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
+  include TouchesMediaUsageIndex
 
   # Validations
   validates :file_path, presence: true, uniqueness: true

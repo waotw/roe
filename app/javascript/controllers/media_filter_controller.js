@@ -55,9 +55,11 @@ export default class extends Controller {
     this.itemTargets.forEach((item) => {
       let matches = true;
 
-      // Filter by type or unused status
+      // Filter by type, unused, or global (referenced by a config file) status
       if (this.currentType === "unused") {
         matches = item.dataset.hasReferences === "false";
+      } else if (this.currentType === "global") {
+        matches = item.dataset.usageGlobal === "true";
       } else if (this.currentType !== "all") {
         matches = item.dataset.mediaType === this.currentType;
       }

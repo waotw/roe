@@ -1,4 +1,7 @@
 class Admin::MediumController < Admin::BaseController
+  # Uploading, deleting, or renaming media changes the browse-page backlinks.
+  after_action :invalidate_media_usage_index, only: %i[create destroy bulk_destroy rename]
+
   def picker
     @media_type = params[:media_type] || "images"
     @media = Medium.originals_only
@@ -10,8 +13,11 @@ class Admin::MediumController < Admin::BaseController
   def browse
     # Load only original media files (exclude variants)
     @media = Medium.originals_only
-                   .includes(:posts)
                    .order(created_at: :desc)
+
+    # Reverse index of everything that references each media file — posts,
+    # pages, documentation, products, and config files — keyed by path.
+    @media_usages = MediaUsageIndex.fetch
 
     # Get distinct media types that exist
     @existing_types = Medium.distinct.pluck(:media_type).compact

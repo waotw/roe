@@ -1,4 +1,8 @@
 class Admin::ConfigsController < Admin::BaseController
+  # A config save may add/remove a /media/ reference (e.g. the site logo),
+  # so any non-GET config action busts the media-usage backlink cache.
+  after_action :invalidate_media_usage_index
+
   # Site Config Schema Definition
   SITE_CONFIG_SCHEMA = {
     site_info: {

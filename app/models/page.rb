@@ -3,6 +3,7 @@ class Page < ApplicationRecord
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
+  include TouchesMediaUsageIndex
 
   # Public URL for the page on the live site. The `home` page renders
   # at the root path (per config/routes.rb → root to: "pages#show",
