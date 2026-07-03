@@ -29,6 +29,7 @@ export default class extends Controller {
     this.facets = this.pageFacets;
     this.entries = null;
     this.loading = null;
+    this.activeIndex = -1;
     this.onDocKeydown = (e) => {
       if (e.key === "Escape") this.close();
     };
@@ -98,7 +99,52 @@ export default class extends Controller {
   }
 
   onKeydown(event) {
-    if (event.key === "Escape") this.close();
+    switch (event.key) {
+      case "Escape":
+        this.close();
+        break;
+      case "ArrowDown":
+        event.preventDefault();
+        this.moveActive(1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        this.moveActive(-1);
+        break;
+      case "Enter": {
+        const link = this.activeLink();
+        if (link) {
+          event.preventDefault();
+          link.click();
+        }
+        break;
+      }
+    }
+  }
+
+  resultLinks() {
+    return Array.from(
+      this.resultsTarget.querySelectorAll(".site-search-result-link"),
+    );
+  }
+
+  // Move the highlight; wraps around. From the initial -1, Down → first,
+  // Up → last.
+  moveActive(delta) {
+    const links = this.resultLinks();
+    if (!links.length) return;
+    this.activeIndex =
+      (this.activeIndex + delta + links.length) % links.length;
+    links.forEach((link, i) => {
+      const active = i === this.activeIndex;
+      link.classList.toggle("site-search-result-link--active", active);
+      if (active) link.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  activeLink() {
+    const links = this.resultLinks();
+    return this.activeIndex >= 0 ? links[this.activeIndex] : null;
   }
 
   load() {
@@ -131,6 +177,7 @@ export default class extends Controller {
     // unless the site opts in to results-on-open.
     if (tokens.length === 0 && !this.resultsWhenOpenedValue) {
       this.resultsTarget.innerHTML = "";
+      this.activeIndex = -1;
       this.emptyTarget.hidden = true;
       return;
     }
@@ -244,6 +291,7 @@ export default class extends Controller {
 
   render(entries) {
     this.resultsTarget.innerHTML = "";
+    this.activeIndex = -1;
     this.emptyTarget.hidden = entries.length > 0;
 
     const frag = document.createDocumentFragment();
