@@ -828,6 +828,42 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     refute_match(/<video/, result)
   end
 
+  # =============================================================================
+  # Search triggers (```search block + collection search: true)
+  # =============================================================================
+
+  test "search block renders a scoped search trigger with sources and tags" do
+    result = render("```search\nscope: documentation/products\ntags: ruby, -news\n```")
+
+    assert_match(/class="site-search-trigger"/, result)
+    assert_match(/data-search-trigger-scope-value=/, result)
+    assert_match(/documentation/, result)
+    assert_match(/products/, result)
+    assert_match(/tagsInclude/, result)
+    assert_match(/tagsExclude/, result)
+  end
+
+  test "search block treats a non-directory token as a post type" do
+    result = render("```search\nscope: podcast\n```")
+
+    assert_match(/data-search-trigger-scope-value=/, result)
+    assert_match(/postTypes/, result)
+    assert_match(/podcast/, result)
+  end
+
+  test "collection with search true renders the trigger inside a collection header" do
+    result = render("```collection\nsource: documentation\nsearch: true\n```")
+
+    assert_match(%r{<div class="collection-header">.*site-search-trigger}m, result)
+    assert_match(/documentation/, result)
+  end
+
+  test "collection without search does not render a trigger" do
+    result = render("```collection\nsource: documentation\n```")
+
+    refute_match(/site-search-trigger/, result)
+  end
+
   test "basic markdown still processed" do
     content = <<~MARKDOWN
       # Header

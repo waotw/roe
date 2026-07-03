@@ -118,8 +118,11 @@
         client-side so it works on static product pages. Member icon only
         appears in dynamic mode (current_member is forced to nil during
         static rendering, so this short-circuits naturally). %>
-    <% if snipcart_connected? || current_member %>
-      <div class="site-actions">
+    <%# site-wide search is always available, so .site-actions always renders;
+        cart/member remain conditional within it. %>
+    <div class="site-actions">
+      <%= render "shared/site_search", search_scope: site_search_scope %>
+      <% if snipcart_connected? || current_member %>
         <% if snipcart_connected? %>
           <%# `snipcart-checkout` is the class Snipcart v3 binds the
               open-cart click handler to — without it the icon is inert.
@@ -133,8 +136,8 @@
         <% if current_member %>
           <%= link_to inline_system_svg("member-icon.svg") || "Account", account_path, class: "site-action member-link", title: "My Account", aria_label: "My Account" %>
         <% end %>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
     <%# Snipcart snippet — loads in both dynamic and static. Snipcart's
         cart UI, checkout flow, and payment processing all run client-
         side via Snipcart's CDN; no Rails backend involvement at

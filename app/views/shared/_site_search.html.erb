@@ -1,0 +1,32 @@
+<%# Public site search: a header icon that opens a top-anchored overlay.
+    Works dynamic + static (fetches the prebuilt /search-index.json). The
+    scope (a content directory and/or post types) auto-derives from the page
+    via site_search_scope; the controller renders each facet as a removable
+    pill. All classes are semantic so the active theme's CSS styles it. %>
+<div class="site-search"
+     data-controller="site-search"
+     data-site-search-index-url-value="<%= search_index_path %>"
+     data-site-search-results-when-opened-value="<%= SiteConfig.get("results_when_opened") ? true : false %>"
+     data-site-search-scope-value="<%= (local_assigns[:search_scope] || {}).to_json %>">
+  <button type="button" class="site-action site-search-toggle"
+          data-action="site-search#open" aria-label="Search" title="Search">
+    <%= inline_system_svg("search.svg") || "Search" %>
+  </button>
+
+  <div class="site-search-overlay" data-site-search-target="panel" hidden>
+    <div class="site-search-box">
+      <%# Active scope facets (removable pills) are rendered here by the controller. %>
+      <div class="site-search-context" data-site-search-target="context" hidden></div>
+      <div class="site-search-field">
+        <input type="search" class="site-search-input" placeholder="Search…"
+               autocomplete="off" spellcheck="false"
+               data-site-search-target="input"
+               data-action="input->site-search#filter keydown->site-search#onKeydown">
+        <button type="button" class="site-search-close"
+                data-action="site-search#close" aria-label="Close search">&times;</button>
+      </div>
+      <ul class="site-search-results" data-site-search-target="results"></ul>
+      <p class="site-search-empty" data-site-search-target="empty" hidden>No results found.</p>
+    </div>
+  </div>
+</div>

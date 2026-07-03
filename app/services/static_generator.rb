@@ -134,6 +134,7 @@ class StaticGenerator
     generate_404 if changes[:config]
     generate_sitemap
     generate_robots
+    generate_search_index
 
     save_manifest
     @stats[:end_time] = Time.current
@@ -1040,6 +1041,14 @@ class StaticGenerator
     body = "User-agent: *\nAllow: /\n\nSitemap: #{host}/sitemap.xml\n"
     write_file("robots.txt", body)
     puts "  ✓ robots.txt"
+  end
+
+  # Bake the public search index so client-side site search works with no
+  # backend. Same JSON the dynamic /search-index.json endpoint serves.
+  def generate_search_index
+    puts "🔎 Generating search-index.json..."
+    write_file("search-index.json", SearchIndexGenerator.build.to_json)
+    puts "  ✓ search-index.json"
   end
 
   # Resolved pagination template, memoized per build. Mirrors the

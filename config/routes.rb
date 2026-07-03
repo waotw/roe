@@ -364,6 +364,10 @@ Rails.application.routes.draw do
   get "collections", to: "collections#show", defaults: { filters: "all" }
   get "collections/*filters", to: "collections#show", as: :collection
 
+  # Public search index (client-side site search). Static builds bake the
+  # same JSON to /search-index.json so search works with no backend.
+  get "search-index.json", to: "search#index", as: :search_index, defaults: { format: "json" }
+
   # Feeds
   get "feed", to: "feeds#rss", defaults: { format: "xml" }, as: :feed
   get "feed.xml", to: "feeds#rss", defaults: { format: "xml" }

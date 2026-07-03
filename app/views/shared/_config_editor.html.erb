@@ -87,6 +87,20 @@
                   </div>
                 </div>
 
+                <!-- Search Section -->
+                <div class="config-section mb-10">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Search</h3>
+                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                    <% config_schema[:search][:fields].each do |field_name, field_config| %>
+                      <%= render 'shared/config_field',
+                               field_name: field_name,
+                               field_config: field_config,
+                               value: flattened_config[field_name],
+                               all_values: flattened_config %>
+                    <% end %>
+                  </div>
+                </div>
+
                 <!-- Branding Section -->
                 <div class="config-section mb-10">
                   <h3 class="text-base font-semibold text-gray-900 mb-1">Branding</h3>
@@ -145,6 +159,20 @@
                       </select>
                       <p class="text-xs text-gray-500 mt-1">Select the theme for your site</p>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Updates Section -->
+                <div class="config-section mb-10">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Updates</h3>
+                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                    <% config_schema[:updates][:fields].each do |field_name, field_config| %>
+                      <%= render 'shared/config_field',
+                               field_name: field_name,
+                               field_config: field_config,
+                               value: flattened_config[field_name],
+                               all_values: flattened_config %>
+                    <% end %>
                   </div>
                 </div>
 
@@ -1164,9 +1192,13 @@
       const fieldName = input.dataset.configField;
       let value;
 
-      // Handle checkboxes specially
+      // Handle checkboxes specially. A checkbox may map to arbitrary string
+      // values (e.g. stable/nightly) via data-on-value / data-off-value;
+      // otherwise it's the usual true/false.
       if (input.type === 'checkbox') {
-        value = input.checked ? 'true' : 'false';
+        value = input.checked
+          ? (input.dataset.onValue ?? 'true')
+          : (input.dataset.offValue ?? 'false');
       } else {
         value = input.value;
       }

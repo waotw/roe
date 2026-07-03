@@ -40,6 +40,27 @@ class Admin::ConfigsController < Admin::BaseController
       }
     },
 
+    search: {
+      label: "Search",
+      fields: {
+        "search_all_pages" => {
+          type: :checkbox,
+          label: "Include all pages in search",
+          hint: "By default only pages linked in the navigation or footer are searchable. Turn on to index every published page."
+        },
+        "search_roe_docs" => {
+          type: :checkbox,
+          label: "Include bundled Roe documentation in search",
+          hint: "Roe's own documentation (documentation/roe) is excluded from search by default. Turn on to include it."
+        },
+        "results_when_opened" => {
+          type: :checkbox,
+          label: "Show results before typing",
+          hint: "By default, search doesn't show results until you type but if you want results to show up before typing, enable this option."
+        }
+      }
+    },
+
     branding: {
       label: "Branding",
       fields: {
@@ -96,6 +117,19 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Active Theme",
           options: [ "egg", "default" ],
           hint: "Select the theme for your site"
+        }
+      }
+    },
+
+    updates: {
+      label: "Updates",
+      fields: {
+        "update_channel" => {
+          type: :checkbox,
+          on_value: "nightly",
+          off_value: "stable",
+          label: "Nightly updates",
+          hint: "Receive pre-release (nightly) versions instead of stable releases. Off = stable."
         }
       }
     },

@@ -41,7 +41,7 @@ module HasMarkdownExtensions
       code = $2
 
       # Skip special blocks
-      if [ "collection", "card", "gallery", "form", "button" ].include?(lang)
+      if [ "collection", "card", "gallery", "form", "button", "search" ].include?(lang)
         next $~.to_s
       end
 
@@ -64,6 +64,7 @@ module HasMarkdownExtensions
     processed_content = process_auto_galleries(processed_content)
     processed_content = process_galleries(processed_content, preview: preview)
     processed_content = process_collections(processed_content, preview: preview)
+    processed_content = process_search(processed_content)
     processed_content = process_cards(processed_content, preview: preview)
     processed_content = process_forms(processed_content, preview: preview)
     processed_content = process_buttons(processed_content, preview: preview)
@@ -87,6 +88,10 @@ module HasMarkdownExtensions
 
     # Restore pullquote splits
     html.gsub!("PULLQUOTE_SPLIT_END", "||")
+
+    # Swap search-trigger icon placeholders for the inline SVG AFTER Kramdown
+    # (Kramdown mangles inline SVG, so triggers carry a token instead).
+    html.gsub!(SEARCH_ICON_TOKEN, search_icon_svg) if html.include?(SEARCH_ICON_TOKEN)
 
     # Add footnote backlinks
     html = add_footnote_backlinks(html)
@@ -533,8 +538,102 @@ module HasMarkdownExtensions
     markdown.gsub(/```collection\r?\n(.*?)```/m) do
       config_text = $1
       config = parse_collection_config(config_text)
+      # A `search: true` collection renders a search icon (inside the
+      # collection, beside the heading) — see render_collection/collection_header.
       render_collection(config)
     end
+  end
+
+  # The four content directories usable as a search scope; anything else in a
+  # scope token is a post type.
+  SEARCH_SCOPE_SOURCES = %w[posts pages documentation products].freeze
+
+  # ```search block — renders a search icon that opens the global search
+  # pre-scoped to the given filters:
+  #   scope: documentation/products   (sources and/or post types)
+  #   tags: ruby, -news               (include / exclude)
+  def process_search(markdown)
+    markdown.gsub(/```search\r?\n(.*?)```/m) do
+      config = parse_collection_config($1)
+      tokens = (config[:scope] || config[:source]).to_s.split(%r{[\s,/]+}).map(&:strip).reject(&:empty?)
+      scope = {}
+      sources = tokens & SEARCH_SCOPE_SOURCES
+      post_types = tokens - SEARCH_SCOPE_SOURCES
+      scope[:sources] = sources if sources.any?
+      scope[:postTypes] = post_types if post_types.any?
+      scope.merge!(parse_search_tag_scope(config[:tags]))
+      search_trigger_html(scope)
+    end
+  end
+
+  # Trigger for a collection with `search: true`; "" when not enabled.
+  def collection_search_trigger(config)
+    return "" unless truthy_directive?(config[:search])
+
+    scope = {}
+    base = (config[:source] || "posts").to_s.split("/").first
+    scope[:sources] = [ base ] if SEARCH_SCOPE_SOURCES.include?(base)
+    post_type = config[:post_type] || config[:"post-type"]
+    scope[:postTypes] = [ post_type.to_s ] if post_type.present? && post_type != "all"
+    scope.merge!(parse_search_tag_scope(config[:tags]))
+    search_trigger_html(scope)
+  end
+
+  # tag string ("ruby, -news") → { tagsInclude:, tagsExclude: }
+  def parse_search_tag_scope(tags_str)
+    return {} if tags_str.blank?
+
+    list = tags_str.to_s.split(",").map(&:strip).reject(&:empty?)
+    include_tags = list.reject { |t| t.start_with?("-") }
+    exclude_tags = list.select { |t| t.start_with?("-") }.map { |t| t[1..] }
+    out = {}
+    out[:tagsInclude] = include_tags if include_tags.any?
+    out[:tagsExclude] = exclude_tags if exclude_tags.any?
+    out
+  end
+
+  # A search icon that opens the global search overlay pre-scoped. The
+  # search-trigger controller dispatches a `site-search:open` event with the
+  # scope; the header site-search controller listens and opens.
+  def search_trigger_html(scope)
+    %(<button type="button" class="site-search-trigger" data-controller="search-trigger" ) +
+      %(data-search-trigger-scope-value='#{CGI.escapeHTML((scope || {}).to_json)}' ) +
+      %(data-action="search-trigger#open" aria-label="Search">#{search_trigger_icon}</button>)
+  end
+
+  # Placeholder emitted inside the trigger button; swapped for the inline SVG
+  # after Kramdown runs (Kramdown mangles inline SVG mid-pipeline). Inlining
+  # the SVG — rather than an <img> — lets the theme recolor it via currentColor.
+  SEARCH_ICON_TOKEN = "SEARCHTRIGGERICONSVG".freeze
+
+  def search_trigger_icon
+    search_icon_svg.present? ? SEARCH_ICON_TOKEN : "Search"
+  end
+
+  # Raw contents of the site's search.svg (memoized), or "" when absent.
+  def search_icon_svg
+    @search_icon_svg ||= begin
+      path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images", "search.svg")
+      File.exist?(path) ? File.read(path).strip : ""
+    end
+  end
+
+  # Collection heading row. When `search: true`, wrap the heading + trigger in
+  # a raw header div (passes through Kramdown untouched) so the icon sits
+  # beside the heading; otherwise keep the plain markdown/HTML heading.
+  def collection_header(config, heading, markdown:)
+    trigger = collection_search_trigger(config)
+    has_heading = heading.present?
+
+    if trigger.empty?
+      return "" unless has_heading
+      return markdown ? "## #{heading}" : "<h2>#{heading}</h2>"
+    end
+
+    parts = []
+    parts << "<h2>#{heading}</h2>" if has_heading
+    parts << trigger
+    %(<div class="collection-header">#{parts.join}</div>)
   end
 
   def parse_collection_config(text)
@@ -771,7 +870,7 @@ module HasMarkdownExtensions
 
     if template == "compact" || template == "glossary"
       output << "<div class=\"collection #{template}\">"
-      output << "<h2>#{heading}</h2>" if heading.present?
+      output << collection_header(config, heading, markdown: false)
       output << list_markdown
 
       if show_more && total_count > display_items.count && source == "posts"
@@ -785,8 +884,9 @@ module HasMarkdownExtensions
       output << "<div class=\"collection #{template}\" markdown=\"1\">"
       output << ""
 
-      if heading.present?
-        output << "## #{heading}"
+      header = collection_header(config, heading, markdown: true)
+      unless header.empty?
+        output << header
         output << ""
       end
 

@@ -6,58 +6,74 @@
   field_placeholder = field_config[:placeholder]
   field_depends_on = field_config[:depends_on]
   field_options = field_config[:options]
+  # A checkbox can map to arbitrary string values (e.g. stable/nightly)
+  # instead of true/false via on_value / off_value.
+  field_on_value = field_config[:on_value]
+  field_off_value = field_config[:off_value]
+  checkbox_on = field_on_value || "true"
+  checkbox_off = field_off_value || "false"
+  field_id = "config-field-#{field_name}"
 %>
 
 <div class="config-field-row <%= 'depends-on-field' if field_depends_on %>">
-  <label class="block text-sm font-medium text-gray-700 mb-1">
-    <%= field_label %>
-    <% if field_required %>
-      <span class="text-red-500">*</span>
-    <% end %>
-  </label>
-
   <% if field_type == :checkbox %>
+    <%# Toggle: checkbox sits inline with its label, hint below both. %>
     <div class="flex items-center gap-2">
-      <!-- Hidden field ensures 'false' is sent when unchecked -->
-      <input type="hidden" name="config_fields[<%= field_name %>]" value="false">
+      <!-- Hidden field ensures the "off" value is sent when unchecked -->
+      <input type="hidden" name="config_fields[<%= field_name %>]" value="<%= checkbox_off %>">
       <input type="checkbox"
+             id="<%= field_id %>"
              name="config_fields[<%= field_name %>]"
-             value="true"
-             <%= 'checked' if value.to_s == 'true' %>
+             value="<%= checkbox_on %>"
+             <%= 'checked' if value.to_s == checkbox_on %>
              class="h-4 w-4 border-gray-300 rounded"
              data-config-field="<%= field_name %>"
+             <% if field_on_value %>data-on-value="<%= field_on_value %>"<% end %>
+             <% if field_off_value %>data-off-value="<%= field_off_value %>"<% end %>
              <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>
              <%= 'disabled' if field_depends_on && all_values[field_depends_on].to_s.strip.empty? %>>
-      <% if field_hint %>
-        <span class="text-xs text-gray-600"><%= field_hint %></span>
-      <% end %>
+      <label for="<%= field_id %>" class="text-sm font-medium text-gray-700">
+        <%= field_label %>
+        <% if field_required %><span class="text-red-500">*</span><% end %>
+      </label>
     </div>
+    <% if field_hint %>
+      <p class="text-xs text-gray-600 mt-1 max-w-96"><%= field_hint %></p>
+    <% end %>
 
-    <% elsif field_type == :select %>
+  <% else %>
+    <label class="block text-sm font-medium text-gray-700 mb-1">
+      <%= field_label %>
+      <% if field_required %>
+        <span class="text-red-500">*</span>
+      <% end %>
+    </label>
+
+    <% if field_type == :select %>
       <select name="config_fields[<%= field_name %>]"
               class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
               data-config-field="<%= field_name %>"
               <%= 'disabled' if field_depends_on %>
               <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>>
-      <option value="">Select...</option>
-      <% field_options.each do |option| %>
-        <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
+        <option value="">Select...</option>
+        <% field_options.each do |option| %>
+          <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
+        <% end %>
+      </select>
+      <% if field_hint %>
+        <p class="text-xs text-gray-500 mt-1"><%= field_hint %></p>
       <% end %>
-    </select>
-    <% if field_hint %>
-      <p class="text-xs text-gray-500 mt-1"><%= field_hint %></p>
-    <% end %>
 
-  <% elsif field_type == :textarea %>
-    <textarea name="config_fields[<%= field_name %>]"
-              rows="<%= field_config[:rows] || 3 %>"
-              class="w-full font-mono text-sm p-2 border border-gray-300"
-              placeholder="<%= field_placeholder %>"
-              data-config-field="<%= field_name %>"
-              <%= 'required' if field_required %>><%= value %></textarea>
-    <% if field_hint %>
-      <p class="text-xs text-gray-500 mt-1"><%= field_hint %></p>
-    <% end %>
+    <% elsif field_type == :textarea %>
+      <textarea name="config_fields[<%= field_name %>]"
+                rows="<%= field_config[:rows] || 3 %>"
+                class="w-full font-mono text-sm p-2 border border-gray-300"
+                placeholder="<%= field_placeholder %>"
+                data-config-field="<%= field_name %>"
+                <%= 'required' if field_required %>><%= value %></textarea>
+      <% if field_hint %>
+        <p class="text-xs text-gray-500 mt-1"><%= field_hint %></p>
+      <% end %>
 
     <% else # text input %>
       <input type="text"
@@ -69,8 +85,9 @@
              <%= 'required' if field_required %>
              <%= 'disabled' if field_depends_on %>
              <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>>
-    <% if field_hint %>
-      <p class="text-xs text-gray-500 mt-1"><%= field_hint %></p>
+      <% if field_hint %>
+        <p class="text-xs text-gray-500 mt-1"><%= field_hint %></p>
+      <% end %>
     <% end %>
   <% end %>
 </div>
