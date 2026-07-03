@@ -149,7 +149,9 @@ current/                          # Rails application (versioned)
                                     # ProductButtonRenderer, ProductCategory,
                                     # CollectionGridProcessor,
                                     # CollectionMembersFilter,
-                                    # MediaDurationExtractor
+                                    # MediaDurationExtractor,
+                                    # MediaUsageIndex (media backlinks),
+                                    # MediaReferenceRewriter (rename fixups)
     mailers/                        # ApplicationMailer, MemberMailer,
                                     # FallbackMailer, PasswordsMailer
     jobs/                           # Image variants, newsletter batches,
@@ -327,6 +329,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - JSON metadata stored as a text column, queried with SQLite `json_extract`
 - File-backed models (Post, Page, Documentation, Medium, Product) round-trip from `site/` via `ContentSync`
 - **Path handling**: Use `RoeSitePaths::SITE_PATH` for site content, `RoeSitePaths::ROE_ROOT` for root-level access
+- **`file_path` storage is inconsistent** (known issue, slated to unify on relative): `Post`/`Page`/`Documentation` store an **absolute** realpath; `Product` stores a path **relative** to `SITE_PATH`. Never assume `record.file_path` is absolute — resolve it (prepend `SITE_PATH` when it doesn't start with `/`) before any `File.read`/`File.file?`. This gap silently skipped products in `MediaReferenceRewriter` until fixed.
 
 ### Controllers
 - Admin controllers inherit `Admin::BaseController`
@@ -371,7 +374,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Importmap (no Node/Webpack)
 - Stimulus controllers in `app/javascript/controllers/`
 - Pins defined in `config/importmap.rb`
-- Notable controllers: `audio_player`, `editor`, `metadata_editor`, `media_picker`, `media_bulk_select`, `css_editor`, `footnote_tooltip`
+- Notable controllers: `audio_player`, `editor`, `metadata_editor`, `media_picker`, `media_bulk_select`, `media_filter` (media browse tabs/search), `image_upload` (config image field verify/preview), `config_focus` (focuses a config field from `?focus=`), `css_editor`, `footnote_tooltip`
 
 ### CSS
 - Tailwind CSS (via `tailwindcss-rails`) for the application UI
@@ -381,6 +384,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
   - Media Players: `.player`, `.player-header`, `.player-controls`, `.video-controls`
   - Post Headers: `.post-header-top`, `.feed-link`, `.header-image`
 - System fonts and images are served from `/system/...`
+- **Config image fields** (logo, favicon, social image, podcast artwork) accept either a bare filename (resolved to `/system/images/<name>`, i.e. `site/system/assets/images/`) or an absolute `/media/...` path uploaded via the main Media browser. Resolve config image values through the `config_image_path` helper so both forms work
 
 ## Site Path Configuration
 
