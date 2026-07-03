@@ -19,6 +19,17 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     )
   end
 
+  def grouped_product(title, variant:, primary: false, group: "book")
+    Product.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "products", "#{title.parameterize}.md"),
+      content: "A great book.",
+      metadata: {
+        "title" => title, "status" => "published", "price" => 10,
+        "group" => group, "variant" => variant, "primary" => primary
+      }
+    )
+  end
+
   def write_nav(content)
     dir = RoeSitePaths::SITE_LAYOUT_PATH
     FileUtils.mkdir_p(dir)
@@ -156,6 +167,15 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     assert e, "product should be indexed"
     assert_equal "products", e[:type]
     assert_equal false, e[:paid]
+  end
+
+  test "indexes only the primary of a grouped product (variants collapse)" do
+    grouped_product("Book Paperback", variant: "Paperback", primary: true)
+    grouped_product("Book Hardback", variant: "Hardback")
+
+    product_titles = entries.select { |e| e[:type] == "products" }.map { |e| e[:title] }
+    assert_equal ["Book Paperback"], product_titles,
+                 "grouped variants should collapse to just the primary"
   end
 
   test "carries tags and post_type for scoping" do

@@ -36,7 +36,7 @@ class SearchIndexGenerator
     out.concat(collect(Post.published, type: "posts"))
     out.concat(collect(searchable_pages, type: "pages"))
     out.concat(collect(searchable_documentation, type: "documentation"))
-    out.concat(collect(Product.published, type: "products"))
+    out.concat(collect(searchable_products, type: "products"))
     out
   end
 
@@ -74,6 +74,17 @@ class SearchIndexGenerator
   def search_roe_docs?
     value = SiteConfig.get("search_roe_docs")
     value == true || value == "true"
+  end
+
+  # Grouped products (2+ sharing a `group:`) are variants of one item, so index
+  # only one representative per group — the primary — matching how product
+  # collections list one row per group. Ungrouped products (and lone `group:`
+  # holders) index as themselves. `ordered_members.first` is the primary when
+  # one is set, otherwise the most recently edited member.
+  def searchable_products
+    ProductGroup.rows_for(Product.published).map do |row|
+      row.is_a?(ProductGroup) ? row.ordered_members.first : row
+    end
   end
 
   # Set of root-relative paths linked from navigation.md / footer.md.

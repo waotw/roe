@@ -19,6 +19,8 @@ class SearchController < ApplicationController
   def cache_key
     stamp = [ Post, Page, Documentation, Product ].filter_map { |m| m.maximum(:updated_at) }.max
     paid = SiteConfig.feature("members", "everyone.show_paid_content")
-    [ "search_index", "v1", stamp, paid ]
+    # Bump the version whenever the index's shape/contents logic changes
+    # (content timestamps alone won't invalidate a code-only change).
+    [ "search_index", "v2", stamp, paid ]
   end
 end
