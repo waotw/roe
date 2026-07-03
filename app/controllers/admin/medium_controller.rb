@@ -309,13 +309,17 @@ class Admin::MediumController < Admin::BaseController
       redirect_to browse_admin_medium_index_path and return
     end
 
-    relative_path = @medium.file_path.delete_prefix("/")
+    old_file_path = @medium.file_path                       # e.g. "/media/images/foo.jpg"
+    relative_path = old_file_path.delete_prefix("/")
     old_path = File.join(RoeSitePaths::SITE_PATH, relative_path)
     extension = File.extname(old_path)
-
-    # Keep same media type folder
     media_type = determine_media_type(extension.delete_prefix("."))
-    new_path = old_path.dirname.join("#{new_filename}#{extension}")
+
+    # Keep the file in its current directory (File.join, not the String's
+    # non-existent #dirname). Derive the new web path from the old one's
+    # directory so it works regardless of folder.
+    new_path = File.join(File.dirname(old_path), "#{new_filename}#{extension}")
+    new_file_path = File.join(File.dirname(old_file_path), "#{new_filename}#{extension}")
 
     if File.exist?(new_path) && new_path != old_path
       flash[:error] = "A file with that name already exists"
@@ -324,16 +328,44 @@ class Admin::MediumController < Admin::BaseController
 
     begin
       File.rename(old_path, new_path)
-      new_file_path = "/media/#{media_type}/#{new_filename}#{extension}"
+      # Images carry responsive variants (variants/<base>-<size>.<ext> plus
+      # .webp siblings) that must move with the original or they orphan.
+      rename_image_variants(old_path, new_path) if media_type == "images"
       @medium.update(file_path: new_file_path)
 
-      flash[:notice] = "Renamed to #{new_filename}#{extension}"
+      # A rename would otherwise break every link to the old path, so rewrite
+      # references across content and config to point at the new name.
+      rewritten = MediaReferenceRewriter.rewrite(old_file_path, new_file_path)
+      MediaUsageIndex.invalidate!
+
+      notice = "Renamed to #{new_filename}#{extension}"
+      notice += ". Updated #{rewritten} #{'reference'.pluralize(rewritten)}." if rewritten.positive?
+      flash[:notice] = notice
     rescue => e
       flash[:error] = "Failed to rename: #{e.message}"
     end
 
     redirect_to browse_admin_medium_index_path(type: media_type)
   end
+
+  # Rename an image's generated variant files to match the new base name.
+  def rename_image_variants(old_path, new_path)
+    ImageVariantGenerator::VARIANTS.each_key do |variant|
+      old_variant = ImageVariantGenerator.variant_path_for(old_path, variant)
+      new_variant = ImageVariantGenerator.variant_path_for(new_path, variant)
+      rename_if_present(old_variant, new_variant)
+      # WebP sibling emitted alongside each variant.
+      rename_if_present(
+        old_variant.sub(File.extname(old_variant), ".webp"),
+        new_variant.sub(File.extname(new_variant), ".webp")
+      )
+    end
+  end
+
+  def rename_if_present(from, to)
+    File.rename(from, to) if File.exist?(from)
+  end
+  private :rename_image_variants, :rename_if_present
 
   def duration
     media_path = params[:path]

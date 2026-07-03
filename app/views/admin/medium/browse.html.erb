@@ -225,13 +225,15 @@
 
             <!-- Usage Badge: posts, pages, docs, products, and config files -->
             <% if usages.any? %>
-              <div class="text-xs text-gray-600 mt-2 flex items-baseline gap-1">
-                <span class="shrink-0">Used in:</span>
-                <span class="text-gray-400 uppercase tracking-wide text-[10px] shrink-0"><%= usages.first[:type] %></span>
-                <%= link_to usages.first[:label],
-                                     usages.first[:url],
-                                     class: "text-blue-600 hover:text-blue-800 hover:underline truncate min-w-0",
-                                     onclick: "event.stopPropagation()" %>
+              <div class="text-xs text-gray-600 mt-2 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+                <div class="flex items-baseline gap-1 min-w-0 max-w-full">
+                  <span class="shrink-0">Used in:</span>
+                  <span class="text-gray-400 uppercase tracking-wide text-[10px] shrink-0"><%= usages.first[:type] %></span>
+                  <%= link_to usages.first[:label],
+                                       usages.first[:url],
+                                       class: "text-blue-600 hover:text-blue-800 hover:underline truncate min-w-[3rem]",
+                                       onclick: "event.stopPropagation()" %>
+                </div>
                 <% if usages.size > 1 %>
                   <span class="relative group/uses inline-block shrink-0">
                     <span class="text-gray-400 cursor-help">(+<%= usages.size - 1 %> more)</span>
@@ -242,7 +244,7 @@
                         Also used in:
                       </div>
                       <% usages[1..-1].each do |usage| %>
-                        <div class="flex items-baseline gap-1.5 py-1 px-1 -mx-1 rounded hover:bg-blue-50">
+                        <div class="flex items-baseline gap-1 py-1 px-1 -mx-1 rounded hover:bg-blue-50">
                           <span class="text-gray-400 uppercase tracking-wide text-[10px] shrink-0"><%= usage[:type] %></span>
                           <%= link_to usage[:label],
                                       usage[:url],
