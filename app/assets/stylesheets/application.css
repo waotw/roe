@@ -61,3 +61,9 @@ body {
     opacity: 0;
   }
 }*/
+
+/* Collection builder: dim fields that have no value yet, so authors can see
+   at a glance which options they've actually set (only those get written). */
+.cb-input.cb-empty {
+  color: #9ca3af;
+}
