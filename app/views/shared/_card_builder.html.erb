@@ -1,0 +1,134 @@
+<%# Card builder modal. Mounted via the `card-builder` controller on the editor
+    root (alongside `editor`), so the Card dropdown, this modal, and the
+    textarea share its scope. Opens pre-set to the type chosen in the dropdown;
+    the type selector at the top can change it, which swaps the visible field
+    group. Options come from CardBuilderSchema and pre-fill from each type's
+    button_template. Only non-empty fields of the active type get written. %>
+<%# Down-chevron styling used by selects across Roe's forms. %>
+<% select_chevron = "appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" %>
+<div data-card-builder-target="modal"
+     data-action="keydown->card-builder#onKeydown"
+     class="fixed inset-0 z-50 items-center justify-center"
+     style="display: none;">
+  <div class="absolute inset-0 bg-black/50"
+       data-action="click->card-builder#close"></div>
+
+  <div class="relative bg-white border border-gray-300 shadow-xl flex flex-col"
+       style="width: 90vw; max-width: 560px; max-height: 85vh;">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-300">
+      <div>
+        <h2 class="font-mono text-sm font-semibold text-gray-900">Insert card</h2>
+        <p class="text-xs text-gray-500">Pick a card type, then fill in the fields. Required fields are marked <span class="text-red-500">*</span>.</p>
+      </div>
+      <button type="button" data-action="click->card-builder#close"
+              class="w-7 h-7 flex items-center justify-center border border-gray-400 bg-white hover:bg-gray-100 text-gray-600 text-sm font-mono rounded-xs">×</button>
+    </div>
+
+    <div class="overflow-y-auto p-4 space-y-3">
+      <%# Card type — swaps the visible field group. %>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Card type</label>
+        <select data-card-builder-target="typeSelect"
+                data-action="change->card-builder#typeChanged"
+                class="w-full font-mono text-sm p-2 border border-gray-800 bg-gray-50 <%= select_chevron %>">
+          <% CardBuilderSchema.types.each do |t| %>
+            <option value="<%= t[:value] %>"><%= t[:label] %></option>
+          <% end %>
+        </select>
+      </div>
+
+      <% CardBuilderSchema.types.each do |t| %>
+        <% type = t[:value] %>
+        <% defaults = CardBuilderSchema.default_values(type) %>
+        <% fields = CardBuilderSchema.fields_for(type) %>
+        <% required = CardBuilderSchema.required_for(type) %>
+        <% required_all = Array(required[:all]) %>
+        <% required_any = Array(required[:any]) %>
+        <% core_keys = CardBuilderSchema.core_for(type) %>
+        <% divider_shown = false %>
+        <div data-card-builder-target="group" data-cb-type="<%= type %>"
+             data-cb-required-all="<%= required_all.join(',') %>"
+             data-cb-required-any="<%= required_any.join(',') %>"
+             class="space-y-3" hidden>
+          <% if required_any.any? %>
+            <% any_labels = required_any.map { |k| fields.find { |f| f[:key] == k }&.dig(:label) || k } %>
+            <p class="text-xs text-gray-600">Provide at least one of these: <%= any_labels.join(" or ") %>. <span class="text-red-500">*</span> </p>
+          <% end %>
+          <% fields.each do |field| %>
+            <% key = field[:key] %>
+            <% value = defaults[key].to_s %>
+            <% if core_keys.any? && !divider_shown && !core_keys.include?(key) %>
+              <div class="border-t border-gray-200 pt-3">
+                <p class=" p-1.5 border border-aborder-amber-700 text-xs text-amber-700 bg-amber-100">Everything below is pulled from the post chosen above ↑<br>
+                 Fill a field below in order to override what comes from the post.<br>
+                 To just use what comes from the post, ignore everything below.</p>
+              </div>
+              <% divider_shown = true %>
+            <% end %>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1"><%= field[:label] %><% if required_all.include?(key) %> <span class="text-red-500">*</span><% end %></label>
+
+              <% case field[:type] %>
+              <% when :post_search %>
+                <div class="relative">
+                  <input type="text" data-cb-field="<%= key %>"
+                         value="<%= value %>" autocomplete="off"
+                         placeholder="Type to search posts, pages, products, docs…"
+                         data-card-builder-target="postSearch"
+                         data-action="input->card-builder#postSearchInput keydown->card-builder#postSearchKeydown"
+                         class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">
+                  <ul data-card-builder-target="postResults"
+                      class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 shadow-lg z-10 max-h-56 overflow-y-auto text-sm"></ul>
+                </div>
+
+              <% when :select %>
+                <select data-cb-field="<%= key %>"
+                        data-action="change->card-builder#fieldChanged"
+                        class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
+                  <option value="">—</option>
+                  <% field[:options].each do |opt| %>
+                    <option value="<%= opt %>"<%= ' selected' if value == opt %>><%= opt %></option>
+                  <% end %>
+                </select>
+
+              <% when :boolean %>
+                <select data-cb-field="<%= key %>"
+                        data-action="change->card-builder#fieldChanged"
+                        class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
+                  <option value="">— (default)</option>
+                  <option value="true"<%= ' selected' if value == 'true' %>>true</option>
+                  <option value="false"<%= ' selected' if value == 'false' %>>false</option>
+                </select>
+
+              <% when :textarea %>
+                <textarea data-cb-field="<%= key %>" rows="3"
+                          data-action="input->card-builder#fieldChanged"
+                          class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>"><%= value %></textarea>
+
+              <% else %>
+                <input type="text" data-cb-field="<%= key %>"
+                       value="<%= value %>"
+                       data-action="input->card-builder#fieldChanged"
+                       class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">
+              <% end %>
+
+              <% if field[:hint] %>
+                <p class="text-xs text-gray-500 mt-1"><%= field[:hint] %></p>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-gray-300">
+      <p data-card-builder-target="error" class="text-xs text-red-600" hidden></p>
+      <div class="flex items-center gap-2 ml-auto">
+        <button type="button" data-action="click->card-builder#close"
+                class="uppercase text-xs px-3 py-1 border border-gray-400 bg-white hover:bg-gray-100 font-mono rounded-xs">Cancel</button>
+        <button type="button" data-action="click->card-builder#insert"
+                class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs">Insert</button>
+      </div>
+    </div>
+  </div>
+</div>

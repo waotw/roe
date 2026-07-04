@@ -301,6 +301,7 @@ Rails.application.routes.draw do
     get "settings/post_template", to: "settings#edit_post_template"
     patch "settings/post_template", to: "settings#update_post_template"
     get "posts/search", to: "posts#search"
+    get "posts/card_fields", to: "posts#card_fields"
   end
 
   # Health check

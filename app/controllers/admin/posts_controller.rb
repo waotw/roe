@@ -567,6 +567,17 @@ class Admin::PostsController < Admin::BaseController
     render json: { error: e.message }, status: :internal_server_error
   end
 
+  # The values a post-link card would inherit from `params[:post]` (title,
+  # excerpt, author, date, image, url, subtitle) — the card builder shows them
+  # as live placeholders on the override fields. Returns {} when unresolved.
+  def card_fields
+    fields = PostLinkPreview.for(params[:post])
+    render json: fields || {}
+  rescue => e
+    Rails.logger.error "Post card_fields error: #{e.message}"
+    render json: {}, status: :internal_server_error
+  end
+
   private
 
   def calculate_new_members_count
