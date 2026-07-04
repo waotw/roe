@@ -45,6 +45,23 @@ export default class extends Controller {
     // pre-scoped by dispatching this event.
     this.onExternalOpen = (e) => this.openWithScope(e.detail && e.detail.scope);
     window.addEventListener("site-search:open", this.onExternalOpen);
+
+    // Turbo caches the page with the overlay left open, then restores that DOM
+    // snapshot on back/forward — but this is a fresh controller with no loaded
+    // index, so typing would hit filter() before this.entries exists and do
+    // nothing ("frozen"). If we connect into an already-open panel, re-hydrate
+    // it so it's live again.
+    if (this.hasPanelTarget && !this.panelTarget.hidden) {
+      this.element.classList.add("site-search--open");
+      this.activate();
+      // Focus so they can keep typing without reaching for the mouse. The
+      // input is pinned to the top, so this doesn't fight the restored scroll.
+      requestAnimationFrame(() => {
+        this.inputTarget.focus();
+        const end = this.inputTarget.value.length;
+        this.inputTarget.setSelectionRange(end, end);
+      });
+    }
   }
 
   disconnect() {
@@ -78,6 +95,15 @@ export default class extends Controller {
   showPanel() {
     this.panelTarget.hidden = false;
     this.element.classList.add("site-search--open");
+    this.activate();
+    requestAnimationFrame(() => this.inputTarget.focus());
+  }
+
+  // Wire up an open panel: document listeners, context pills, and the index.
+  // Shared by showPanel() and the Turbo-restore rehydration in connect().
+  // addEventListener de-dupes by function reference, so calling this twice is
+  // safe.
+  activate() {
     document.addEventListener("keydown", this.onDocKeydown);
     // Defer so the click that opened the panel doesn't immediately close it.
     // Capture phase: run before a clicked pill's handler rebuilds the DOM and
@@ -88,7 +114,6 @@ export default class extends Controller {
     );
     this.renderContext();
     this.load().then(() => this.filter());
-    requestAnimationFrame(() => this.inputTarget.focus());
   }
 
   close() {
