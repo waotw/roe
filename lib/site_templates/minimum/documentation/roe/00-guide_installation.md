@@ -2,7 +2,7 @@
 title: Guide → Installation
 status: published
 url_name: guide-installation
-tags: guide
+tags: guide, getting-started
 related:
   - getting-started-with-roe
 ---

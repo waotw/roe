@@ -51,7 +51,7 @@ Use the `MEDIA ▼` button in The Editor to open the media browser and drop an i
 When you place 2 or more images consecutively (without blank lines between them), they automatically become a gallery:
 
 ```markdown
-![Image 1](/media/images/photo1.jpg)
+![pet_sounds_-color_corrected.jpg](/media/images/pet_sounds_-color_corrected.jpg)
 ![Image 2](/media/images/photo2.jpg)
 ![Image 3](/media/images/photo3.jpg)
 ```

@@ -1,7 +1,7 @@
 ---
 title: Glossary
 status: published
-tags: featured
+tags: getting-started
 ---
 
 # Glossary

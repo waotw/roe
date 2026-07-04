@@ -1,7 +1,7 @@
 ---
 title: Getting Started with Roe
 status: published
-tags: guide
+tags: guide, getting-started
 ---
 
 ##### Related documentation
