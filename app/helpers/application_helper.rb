@@ -3,15 +3,19 @@ module ApplicationHelper
     SiteConfig.get("title").presence || "(set site title in Settings → site)"
   end
 
-  # Reads an SVG from site/system/assets/images/ and returns it as inline
-  # HTML so CSS (currentColor, width/height via class) can style it directly.
-  # Falls back to an <img> tag via system_image_path if the file isn't found
-  # or isn't an SVG, and returns nil if the filename is blank.
+  # Reads an SVG and returns it as inline HTML so CSS (currentColor, width/
+  # height via class) can style it directly. Resolution: the site's own copy
+  # at site/system/assets/images/ wins; otherwise fall back to the icon Roe
+  # ships in app/assets/images/icons/ so bundled icons (e.g. search.svg) work
+  # out of the box. Returns nil if the filename is blank or nothing is found.
   def inline_system_svg(filename, **html_options)
     return nil if filename.blank?
     return nil unless filename.end_with?(".svg")
 
     path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images", filename)
+    unless File.exist?(path)
+      path = Rails.root.join("app", "assets", "images", "icons", filename).to_s
+    end
     return nil unless File.exist?(path)
 
     svg = File.read(path)

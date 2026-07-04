@@ -610,10 +610,14 @@ module HasMarkdownExtensions
     search_icon_svg.present? ? SEARCH_ICON_TOKEN : "Search"
   end
 
-  # Raw contents of the site's search.svg (memoized), or "" when absent.
+  # Raw contents of search.svg (memoized), or "" when absent. The site's own
+  # copy at system/assets/images/ wins; otherwise fall back to the icon Roe
+  # ships in app/assets/images/icons/ so the trigger has an icon out of the box.
   def search_icon_svg
     @search_icon_svg ||= begin
-      path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images", "search.svg")
+      site_path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images", "search.svg")
+      bundled   = Rails.root.join("app", "assets", "images", "icons", "search.svg").to_s
+      path = File.exist?(site_path) ? site_path : bundled
       File.exist?(path) ? File.read(path).strip : ""
     end
   end

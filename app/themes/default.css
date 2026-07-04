@@ -70,6 +70,7 @@
   --color-logo: #000000;
   --color-nav-active: #000000;
   --color-muted: #666666;
+  --color-really-muted: #e6e6e6;
   --color-link: #0000ee;
   --color-hover: var(--color-text);
   --color-visited: #0000ee;
@@ -345,6 +346,259 @@ p:has(.site-logo) {
   font-size: var(--text-xs);
 }
 
+/* ================ SITE SEARCH ================= */
+
+/* Toggle: sits with the cart/member icons. It carries `.site-action` too,
+   so it inherits their color + svg sizing; this just resets the <button>. */
+.site-actions .site-search svg {
+  height: var(--space-4);
+  width: var(--space-4);
+}
+
+.site-search-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-link);
+}
+
+/* In-content trigger (```search block / collection `search: true`). It sits in
+   a .collection-header row beside the heading (or alone, pushed right). */
+
+.collection-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.collection-header h2 {
+  margin: var(--space-2) 0 var(--space-4) 0;
+}
+
+.site-search-trigger {
+  margin: var(--space-3) 0 0 0;
+  background: none;
+  border: none;
+  padding: var(--space-1);
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0.4;
+}
+
+.site-search-trigger:hover {
+  opacity: 0.8;
+}
+
+.content .site-search-trigger img,
+.site-search-trigger svg {
+  margin: 0 0 0 0;
+  color: var(--color-muted);
+  height: var(--space-4);
+  width: var(--space-4);
+}
+
+/* Top-anchored panel — reads like an extension of the nav. */
+.site-search-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background-color: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: var(--space-4) var(--space-6);
+}
+
+.site-search-box {
+  max-width: var(--container-width);
+  margin: 0 auto;
+}
+
+.site-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Active scope facets — removable pills on their own line above the input,
+   so they never eat into the input width. */
+.site-search-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+/* An explicit `display` overrides the `hidden` attribute, so restore it —
+   otherwise the empty container shows on unscoped (site-wide) search. */
+.site-search-context[hidden] {
+  display: none;
+}
+
+/* Each active facet: rectangular (rounded-xs), muted, with an × to remove. */
+.site-search-context-label {
+  background-color: var(--color-really-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: calc(var(--space-1) * 0.2) calc(var(--space-1) * 1.1);
+  border: 1px solid var(--color-border);
+  border-radius: 1px;
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.site-search-context-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: var(--color-muted);
+  font-size: var(--text-base);
+  line-height: 1;
+  position: relative;
+  top: -1px;
+}
+
+.site-search-context-remove:hover {
+  color: var(--color-text);
+}
+
+/* Input mirrors the member-form fields. */
+.site-search-input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.site-search-input:focus {
+  outline: 2px solid var(--color-link);
+  outline-offset: -1px;
+}
+
+.site-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.9em;
+  width: 0.9em;
+  cursor: pointer;
+  /* SVG × as a mask so `background-color` sets the color */
+  background-color: currentColor; /* or any color you want */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6 6 18M6 6l12 12' stroke='black' stroke-width='2' fill='none'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6 6 18M6 6l12 12' stroke='black' stroke-width='2' fill='none'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.site-search-close {
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  color: var(--color-muted);
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+.site-search-close:hover {
+  color: var(--color-text);
+}
+
+.site-search-results {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.site-search-results:empty {
+  height: 0;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.site-search-result {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-search-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.site-search-result-link {
+  color: var(--color-link);
+  text-decoration: none;
+  font-size: var(--text-base);
+}
+
+.site-search-result-link:hover {
+  text-decoration: underline;
+}
+
+.site-search-result-link--active {
+  background-color: var(--color-really-muted);
+}
+
+/* Clickable type / post-type pill (with +) — click adds that facet to scope. */
+.site-search-result-type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: calc(var(--space-1) * 0.4) calc(var(--space-1) * 0.8);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background: var(--color-bg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-muted);
+  line-height: 1;
+}
+
+.site-search-result-type:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+.site-search-result-type-add {
+  font-weight: 600;
+}
+
+.site-search-result-paid {
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-muted);
+}
+
+.site-search-result-excerpt {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.site-search-empty {
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted);
+}
+
 /* ============ LAYOUT — SIDEBAR ============ */
 
 body:not(.has-sidebar) article {
@@ -574,7 +828,7 @@ div.flash mark {
 .content pre {
   background-color: var(--color-code-bg);
   padding: var(--space-4);
-  margin-top: var(--space-6);
+  margin-top: var(--space-2);
   margin-bottom: var(--space-6);
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -627,6 +881,10 @@ div.flash mark {
 }
 
 /* Footnotes */
+
+a.footnote {
+  text-decoration: none;
+}
 
 .content .footnotes,
 .footnotes {
@@ -866,7 +1124,7 @@ p.collection-more a:hover {
 
 .collection h2 {
   font-size: var(--text-3xl);
-  margin: var(--space-2) 0 var(--space-4) 0;
+  /*margin: var(--space-2) 0 var(--space-4) 0;*/
 }
 
 .collection h3 {
@@ -2672,6 +2930,11 @@ p.podcast-audio-fallback {
 
 .page-documentation .collection-grid h2 {
   font-size: var(--text-2xl);
+}
+
+.content.documentation table {
+  font-size: var(--text-sm);
+  line-height: 2;
 }
 
 /* =============== UTILITIES ================ */
