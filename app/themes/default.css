@@ -599,6 +599,20 @@ p:has(.site-logo) {
   color: var(--color-muted);
 }
 
+/* Site actions - responsive CSS */
+
+@media (min-width: 1100px) {
+  .site-action svg {
+    height: calc(var(--space-5) * 1.2);
+    width: calc(var(--space-5) * 1.2);
+  }
+
+  .site-actions .site-search svg {
+    height: calc(var(--space-4) * 1.2);
+    width: calc(var(--space-4) * 1.2);
+  }
+}
+
 /* ============ LAYOUT — SIDEBAR ============ */
 
 body:not(.has-sidebar) article {
@@ -1402,6 +1416,11 @@ p.collection-more a:hover {
   margin: 0;
 }
 
+.collection-grid h2 {
+  font-size: var(--text-3xl);
+  margin-top: 0;
+}
+
 @media (max-width: 630px) {
   .collection.glossary dl {
     margin: 0 0 0 0;
@@ -1796,6 +1815,11 @@ figcaption {
   font-style: italic;
 }
 
+.card .card-price {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+
 /* Excerpt typography — applies to all post-link sizes (small / medium /
    large) since they all use .card-excerpt now. */
 /*.card[class*="post-link-"] .card-excerpt {
@@ -1828,6 +1852,34 @@ figcaption {
 .card.post-link-small .card-metadata {
   margin: 0 0 var(--space-1) 0;
   color: var(--color-muted);
+}
+
+/* Product Link - Small */
+
+.product-link-small .card-header {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.product-variant {
+  font-size: var(--text-xs);
+  background-color: var(--color-muted);
+  color: var(--color-bg);
+  line-height: 1;
+  padding: var(--space-1) var(--space-1);
+}
+
+.product-link-small .card-excerpt {
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-0);
+}
+
+.product-link-small .card-price {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1;
 }
 
 /* Post Link - Medium */
@@ -1869,6 +1921,27 @@ figcaption {
   color: var(--color-text);
 }
 
+/* Product Link - Medium */
+
+.product-link-medium .card-header {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.card.product-link-medium .card-title {
+  font-size: var(--text-xl);
+}
+
+.product-link-medium .card-excerpt {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-1);
+}
+
+.post-link-medium.product-link-medium .card-link {
+  font-size: var(--text-base);
+}
+
 /* Post Link - Large
    Grid layout with template areas. Mobile-first single column where
    the image sits between metadata and excerpt. Desktop (≥960px) uses
@@ -1886,8 +1959,7 @@ figcaption {
     "subtitle"
     "metadata"
     "image"
-    "excerpt"
-    "link";
+    "excerpt-link";
   padding: var(--space-4);
   margin: var(--space-4) 0 var(--space-6) 0;
 }
@@ -1895,7 +1967,10 @@ figcaption {
 /* Map each direct child to its named area. Direct-child (>)
    selectors so anything nested inside (e.g. <a> in .card-title)
    isn't accidentally caught. */
-.card.post-link-large > .card-title {
+/* title cell: the bare <h4> on posts/variant-less cards, or the .card-header
+   wrapper (title + variant) on product cards that have a variant. */
+.card.post-link-large > .card-title,
+.card.post-link-large > .card-header {
   grid-area: title;
 }
 .card.post-link-large > .card-subtitle {
@@ -1908,11 +1983,21 @@ figcaption {
 .card.post-link-large > img.card-image {
   grid-area: image;
 }
-.card.post-link-large > .card-excerpt {
-  grid-area: excerpt;
+/* Excerpt + link share one grid cell and lay out as a flex row. The nested
+   .card-excerpt / .card-link are flex children here, not grid items. */
+.card.post-link-large > .large-card-excerpt-link {
+  grid-area: excerpt-link;
+  display: flex;
+  gap: var(--space-4);
+  align-items: last baseline;
 }
-.card.post-link-large > .card-link {
-  grid-area: link;
+.card.post-link-large > .large-card-excerpt-link > .card-excerpt {
+  flex: 1;
+  min-width: 0;
+}
+.card.post-link-large > .large-card-excerpt-link > .card-link {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Image sizing — fills its grid cell width and keeps proportions.
@@ -2042,6 +2127,33 @@ figcaption {
   .card.post-link-large.no-image {
     grid-template-columns: 1fr;
   }
+}
+
+/* Product Link - Large */
+
+.product-link-large .card-header {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.product-link-large .card-price {
+  font-size: var(--text-lg);
+}
+
+.post-link-large.product-link-large .card-excerpt {
+  font-size: var(--text-lg);
+}
+
+.post-link-large.product-link-large .card-link {
+  font-size: var(--text-base);
+  margin-top: 0;
+}
+
+.large-card-excerpt-link {
+  display: flex;
+  justify-content: space-between;
 }
 
 /* Asides */
@@ -2915,6 +3027,14 @@ p.podcast-audio-fallback {
   padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
 }
 
+.content.documentation a code {
+  color: var(--color-link);
+}
+
+.content.documentation a:hover code {
+  color: var(--color-text);
+}
+
 .content.documentation li code {
   font-size: var(--text-xs);
   padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
@@ -2930,6 +3050,7 @@ p.podcast-audio-fallback {
 
 .page-documentation .collection-grid h2 {
   font-size: var(--text-2xl);
+  margin-top: 0;
 }
 
 .content.documentation table {
@@ -3387,7 +3508,7 @@ article.page-store h2 {
 
 @media (min-width: 901px) {
   .product-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
 }
 
@@ -3402,7 +3523,7 @@ article.page-store h2 {
   align-items: center;
   justify-content: center;
   background: var(--color-bg);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
   overflow: hidden;
 }
 
@@ -3447,7 +3568,7 @@ article.page-store h2 {
 .grid-item-title {
   font-size: var(--text-lg);
   font-weight: 700;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .grid-item-title a {
@@ -3477,8 +3598,9 @@ article.page-store h2 {
 }
 
 .grid-item-price {
-  font-size: var(--text-base);
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 400;
   color: var(--color-heading);
 }
 
@@ -3520,7 +3642,7 @@ article.page-store h2 {
 /* Grid button modifier */
 
 .btn-grid {
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-1) var(--space-1);
   font-size: var(--text-sm);
 }
 

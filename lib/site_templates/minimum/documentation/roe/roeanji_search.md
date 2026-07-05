@@ -24,7 +24,7 @@ Roe has built-in site search[^1]. There are two ways search shows up on your sit
 
 ## Options
 
-You *do not* have to configure any of these. Search works out of the box. These options just give you control over what's searchable and and the context (scope) for search itself.
+You *do not* have to configure any of these. Search works out of the box. These options just give you control over what's searchable and the context (scope) for search itself.
 
 ### Site-wide settings
 

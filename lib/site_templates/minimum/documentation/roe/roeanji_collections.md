@@ -33,8 +33,8 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 | `tags` | No | Comma-separated, use `-tag` to exclude |
 | `category` | No | Filter products by category |
 | `podcast` | No | Filter posts by podcast key |
-| `post_type` | No | Filter posts by type: `article`, `audio`, `video`, or `podcast` |
-| `related` | No | `true` shows items linked via frontmatter `related:`|
+| `post_type` | No | Filter posts by type: `article`, `audio`, `video`, `podcast` or `all`|
+| [`related`](#show-related-content) | No | `true` shows items linked via frontmatter `related:`|
 
 ### Ordering
 
@@ -46,14 +46,16 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, or `full` |
-| `limit` | No | Number or `all` — defaults to site config or 10 |
-| `offset` | No | Skip first N items |
+| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, `full` or `glossary` |
+| `limit` | No | Number or `all` — defaults to [collection config](/admin/configs/collections/edit) or 10 |
+| `offset` | No | Skip first `N` items, e.g., `offset: 10` |
 | `heading` | No | Section heading above collection |
-| `show_author` | No | Show author name in list items |
-| `show_excerpt` | No | Show excerpt in list items |
-| `show_more` | No | Add "View all" link to full collection page (posts only) |
-| `show_more_text` | No | Custom text for show_more link |
+| `show_author` | No | `true` = show author name |
+| `show_date` | No | `true` = show date |
+| `show_subtitle` | No | `true` = show subtitle |
+| `show_excerpt` | No | `true` = show excerpt |
+| `show_more` | No | Add "View all" link to full [collection pagination](/documentation/collections_pagination) (posts only) |
+| `show_more_text` | No | Custom text for `show_more link` |
 
 ### Products
 
@@ -84,9 +86,9 @@ default_template: list
 ↑ The Collections defaults can be edited in [Admin/Settings](/admin/configs/collections/edit).
 Any default can be overwritten by adding that parameter to the Collection ↓ 
 
-## Create a feed of All Articles
+## Create a feed (Collection) of All Articles
 
-To create a feed of all articles with the `compact` template, you can do this:
+Try the `compact` template:
 
 ````
 ```collection
@@ -108,6 +110,29 @@ template: compact
 post_type: article
 ```
 ````
+
+## Show `related` content
+
+I'm using a `related` collection at the top of this document in [Related documentation](#related-documentation). Here's how `related` works:
+
+On a product page for a blue t-shirt, you add this ↓
+
+````markdown
+```collection
+heading: You might also like…
+source: products
+template: links
+related: true
+```
+````
+
+↑ this filters the Collection results to just the `related` results. But how do you make something `related`?
+
+Add a `related` entry for any Post, Product, Page and those two pieces of content are now "related". I'll add the `url_name` for Blue T-shirt ↓ to my Yellow T-shirt Product metadata and now they are "related". 
+
+![Related field in metadata for Yellow T-shirt Product](/media/images/related_product_metadata.png)
+
+This is `bi-directional`, meaning you only have to add `related` to one item and then both are connected. Notice I added `blue-tshirt` to the **Yellow T-shirt**'s metadata, and it shows up in the `related: true` Collection I'm adding to **Blue T-shirt**'s product page — that's what `bi-directional` means. Once they're related by one connection, they're ***related***.
 
 ## Add Pagination/View All
 
