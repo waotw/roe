@@ -151,7 +151,9 @@ current/                          # Rails application (versioned)
                                     # CollectionMembersFilter,
                                     # MediaDurationExtractor,
                                     # MediaUsageIndex (media backlinks),
-                                    # MediaReferenceRewriter (rename fixups)
+                                    # MediaReferenceRewriter (rename fixups),
+                                    # SearchIndexGenerator (client-side search
+                                    # index), PostLinkPreview (live card fields)
     mailers/                        # ApplicationMailer, MemberMailer,
                                     # FallbackMailer, PasswordsMailer
     jobs/                           # Image variants, newsletter batches,
@@ -209,7 +211,7 @@ Updates the developer's local Roe install to a new tagged release from Codeberg.
 
 Orchestrated by `RoeUpdater::UpdateOrchestrator`, run inside `PerformUpdateJob`. Components:
 
-- **VersionChecker**: Reads root `/VERSION` for the installed version; queries Codeberg (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.0.17`); bare-numbered tags are ignored.
+- **VersionChecker**: Reads root `/VERSION` for the installed version; queries Codeberg (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.1.0`); bare-numbered tags are ignored. Suffixed tags (`-nightly.N`, `-rc.N`) are pre-releases — shown only to dev installs / the `nightly` channel, and ordered via `Gem::Version`. Tag & release scheme: `docs/21-development-workflow.md`.
 - **BackupManager**: Snapshots dev + prod SQLite to `site_backups/` with a timestamp stamped onto the `UpdateStatus` so rollback restores the right one.
 - **Downloader**: `git clone --branch <tag>` into `staging/`.
 - **MigrationTester**: Rsyncs migrations from `staging/` into a throwaway copy of `current/` and dry-runs them against a cloned dev DB.
@@ -289,6 +291,11 @@ Products are Markdown files in `site/products/` with front-matter defining price
 
 ### Static site generation
 `StaticGenerator` builds a static HTML mirror of the public site using a manifest for incremental rebuilds. It coordinates with `ImageVariantGenerator` / `ResponsiveImageRenderer` for responsive image output. Outputs to `static_site/` at root level (outside versioned directory). Triggered via `bin/rails static_site:build` or the admin static-site controller.
+
+### Content builders & search
+**Editor block builders**: Toolbar modals turn form fields into fenced blocks — `collection_builder`, `card_builder`, `gallery_builder` (Stimulus). Options come from `CollectionBuilderSchema` / `CardBuilderSchema` (single source of truth: labels, types, hints, `depends_on` field visibility). Card builders show live inherited placeholders via `PostLinkPreview`, which derives a referenced item's fields (post-link / product-link card types, rendered by `HasMarkdownExtensions`).
+
+**Public search**: `SearchIndexGenerator` builds a JSON index served at `/search-index.json` (`SearchController`) and baked into static builds, so search works with no backend. The `site_search` (overlay) and `search_trigger` (content-embedded) Stimulus controllers filter it client-side, scoped by source / post_type / tags.
 
 ## Testing Conventions
 
@@ -374,7 +381,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Importmap (no Node/Webpack)
 - Stimulus controllers in `app/javascript/controllers/`
 - Pins defined in `config/importmap.rb`
-- Notable controllers: `audio_player`, `editor`, `metadata_editor`, `media_picker`, `media_bulk_select`, `media_filter` (media browse tabs/search), `image_upload` (config image field verify/preview), `config_focus` (focuses a config field from `?focus=`), `css_editor`, `footnote_tooltip`
+- Notable controllers: `audio_player`, `editor`, `metadata_editor`, `media_picker`, `media_bulk_select`, `media_filter` (media browse tabs/search), `image_upload` (config image field verify/preview), `config_focus` (focuses a config field from `?focus=`), `css_editor`, `footnote_tooltip`, `site_search`, `search_trigger`, `collection_builder`, `card_builder`, `gallery_builder`
 
 ### CSS
 - Tailwind CSS (via `tailwindcss-rails`) for the application UI

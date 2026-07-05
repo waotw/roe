@@ -98,7 +98,7 @@
     <!-- Admin Navigation -->
     <nav class="bg-white border-b border-gray-200 min-w-185.5">
       <div class="px-8">
-        <div class="flex justify-between items-center h-16">
+        <div class="flex justify-between items-center h-13">
           <!-- Left: Roe Title + env badge so dev and prod are visually distinct -->
           <div class="shrink-0 flex items-center gap-2">
             <%= icon_svg("roe-icon", class: "w-7 h-auto") %>
@@ -162,7 +162,7 @@
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>
         </div>
-        <div class="flex flex-wrap justify-between gap-x-6 gap-y-2 pb-3 border-t border-gray-100 pt-3">
+        <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 pb-2 border-t border-gray-100 pt-2">
           <!-- Left side: Main navigation -->
           <div class="flex flex-wrap gap-x-6 gap-y-2">
             <%= link_to "Dashboard", admin_root_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
@@ -175,15 +175,15 @@
             <%= link_to "Layout", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
           </div>
-          <% if members_enabled? %>
-            <div class="flex gap-x-6">
-              <%= link_to "Members", admin_members_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-              <%= link_to "Emails", admin_emails_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-            </div>
-          <% end %>
 
           <%# Tools dropdown %>
           <div class="flex gap-x-4 items-center">
+            <% if members_enabled? %>
+              <div class="flex gap-x-6">
+                <%= link_to "Members", admin_members_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+                <%= link_to "Emails", admin_emails_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              </div>
+            <% end %>
             <div class="relative p-0 m-0 leading-0" data-controller="dropdown">
               <button type="button" data-action="click->dropdown#toggle" class="text-base font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1 cursor-pointer" title="Tools">
                 <%# icon_svg('tools', class: 'w-4.5 h-4.5 text-gray-500 hover:text-gray-900') %>🛠️
