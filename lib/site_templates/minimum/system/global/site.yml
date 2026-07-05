@@ -6,6 +6,7 @@ author_email: ""
 search_all_pages: false
 results_when_opened: false
 search_roe_docs: false
+soft_line_breaks: false
 logo: ""
 logo_style: ""
 favicon: ""

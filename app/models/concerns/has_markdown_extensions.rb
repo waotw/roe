@@ -72,13 +72,16 @@ module HasMarkdownExtensions
     processed_content = process_strikethrough(processed_content)
     processed_content = escape_inline_pipes(processed_content)
 
-    # Convert to HTML with standard Kramdown
+    # Convert to HTML with Kramdown. hard_wrap only takes effect under the GFM
+    # parser, so opting into soft line breaks switches to GFM (a superset that
+    # also enables e.g. bare-URL autolinking); the default is standard kramdown.
+    soft_breaks = soft_line_breaks?
     html = Kramdown::Document.new(
       processed_content,
-      input: "kramdown",
+      input: soft_breaks ? "GFM" : "kramdown",
       footnote_backlink: "",
       footnote_backlinks_inline: true,
-      hard_wrap: false
+      hard_wrap: soft_breaks
     ).to_html
 
     # Restore code blocks (now as HTML)
@@ -450,6 +453,13 @@ module HasMarkdownExtensions
 
   def truthy_directive?(value)
     %w[true yes 1 on].include?(value.to_s.strip.downcase)
+  end
+
+  # When on (site.yml `soft_line_breaks: true`), a single newline renders as a
+  # <br> — no trailing-two-spaces needed. Off by default (standard Markdown).
+  def soft_line_breaks?
+    value = SiteConfig.get("soft_line_breaks")
+    value == true || value == "true"
   end
 
   # Grid: blank-line rows, up to 3 columns each. Every image is a zoomable

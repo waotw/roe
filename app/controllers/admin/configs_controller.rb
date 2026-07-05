@@ -61,6 +61,17 @@ class Admin::ConfigsController < Admin::BaseController
       }
     },
 
+    content: {
+      label: "Content",
+      fields: {
+        "soft_line_breaks" => {
+          type: :checkbox,
+          label: "Respect single line breaks",
+          hint: "By default Markdown needs two trailing spaces (or a blank line) to start a new line. Turn on to make every single line break in your content show as a line break."
+        }
+      }
+    },
+
     branding: {
       label: "Branding",
       fields: {
