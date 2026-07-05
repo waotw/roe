@@ -131,11 +131,11 @@ Rails.application.routes.draw do
         post :clear_failed_jobs
         post :queue_missing_variants
         post :bulk_destroy
-        get "upload_progress/:batch_id", action: :upload_progress, as: :upload_progress
       end
       member do
         patch :rename
         post :regenerate_variants
+        get :card
       end
     end
 

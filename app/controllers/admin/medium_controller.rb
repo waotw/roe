@@ -30,12 +30,15 @@ class Admin::MediumController < Admin::BaseController
     render layout: "admin"
   end
 
+  # Uploads run one file per request from the browse page (see the
+  # media-upload Stimulus controller), which keeps the user on the page and
+  # surfaces per-file results. Each single-file upload is fast (write + async
+  # variant queue), so there's no batch job / progress page anymore. The HTML
+  # branch is a synchronous no-JS fallback.
   def create
     files = params[:files]
-
-    # Handle both single file and multiple files
     uploaded_files = if files.is_a?(Array)
-      files.reject(&:blank?)  # Add this to filter out empty strings
+      files.reject(&:blank?)
     elsif files.present?
       [ files ]
     elsif params[:file].present?
@@ -45,158 +48,52 @@ class Admin::MediumController < Admin::BaseController
     end
 
     if uploaded_files.empty?
-      redirect_to browse_admin_medium_index_path, alert: "No files selected"
-      return
-    end
-
-    # If more than one file, go to bulk upload page
-    if uploaded_files.length > 1
-      limit = Rails.env.production? ? 20 : 50
-      if uploaded_files.length > limit
-        redirect_to browse_admin_medium_index_path, alert: "Maximum #{limit} files allowed"
-        return
-      end
-
-      # Resolve the batch's media type early. determine_media_type now
-      # raises on unsupported extensions instead of misclassifying as
-      # "images" — catch that here so the user gets a clear flash
-      # instead of a stack trace, and so we abort before writing any
-      # temp files or queueing a job for files we can't actually use.
-      begin
-        batch_media_type = determine_media_type_from_files(uploaded_files)
-      rescue => e
-        redirect_to browse_admin_medium_index_path, alert: "Upload failed: #{e.message}"
-        return
-      end
-
-      # Create batch and save files to temp directory
-      batch_id = SecureRandom.uuid
-      temp_dir = Rails.root.join("tmp", "uploads", batch_id)
-      FileUtils.mkdir_p(temp_dir)
-
-      # Save uploaded files temporarily and track their info
-      temp_files = uploaded_files.map do |file|
-        temp_path = temp_dir.join(file.original_filename)
-        File.open(temp_path, "wb") { |f| f.write(file.read) }
-
-        {
-          temp_path: temp_path.to_s,
-          original_filename: file.original_filename,
-          size: file.size
-        }
-      end
-
-      # Store file data in session for the progress page
-      session[:upload_batch] = {
-        id: batch_id,
-        files: temp_files.map { |f| { filename: f[:original_filename], size: f[:size] } },
-        total: uploaded_files.length,
-        media_type: batch_media_type
-      }
-
-      # Queue the uploads with temp file paths
-      BulkUploadJob.perform_later(batch_id, temp_files)
-
-      redirect_to upload_progress_admin_medium_index_path(batch_id: batch_id)
-      return
-    end
-
-    # Single file - use existing logic
-    uploaded_file = uploaded_files.first
-
-    begin
-      medium = process_single_upload(uploaded_file)
-      media_type = medium.media_type
-
-      # Generate variants if needed
-      if medium.image? && ImageVariantGenerator.queue!(medium.file_path)
-        notice_message = "#{media_type.singularize.capitalize} uploaded (optimizing in background)"
-      else
-        notice_message = "#{media_type.singularize.capitalize} uploaded"
-      end
-
       respond_to do |format|
-        format.json { render json: { success: true, path: medium.file_path, filename: File.basename(medium.file_path, ".*") } }
-        format.html { redirect_to browse_admin_medium_index_path(type: media_type), notice: notice_message }
+        format.json { render json: { success: false, error: "No files selected" }, status: :unprocessable_entity }
+        format.html { redirect_to browse_admin_medium_index_path, alert: "No files selected" }
       end
-    rescue => e
-      respond_to do |format|
-        format.json { render json: { success: false, error: e.message }, status: :unprocessable_entity }
-        format.html { redirect_to browse_admin_medium_index_path, alert: "Upload failed: #{e.message}" }
-      end
-    end
-  end
-
-  def upload_progress
-    @batch_id = params[:batch_id]
-    @batch = session[:upload_batch]
-
-    Rails.logger.info "=== UPLOAD PROGRESS DEBUG ==="
-    Rails.logger.info "Params batch_id: #{@batch_id.inspect}"
-    Rails.logger.info "Session upload_batch: #{@batch.inspect}"
-    Rails.logger.info "Session keys: #{session.keys.inspect}"
-    Rails.logger.info "Match? #{@batch && @batch[:id] == @batch_id}"
-
-    unless @batch && @batch["id"] == @batch_id
-      redirect_to browse_admin_medium_index_path, alert: "Upload session not found"
       return
     end
 
-    # Check if uploads are already complete (fallback when Turbo Streams miss updates)
-    @upload_status = check_upload_completion_status
-  end
+    respond_to do |format|
+      # JS path: one file per request → return the rendered card (or a clear error).
+      format.json do
+        @conversion_notice = nil
+        begin
+          medium = process_single_upload(uploaded_files.first)
+          ImageVariantGenerator.queue!(medium.file_path) if medium.image?
+          render json: {
+            success: true,
+            media_id: medium.id,
+            filename: File.basename(medium.file_path),
+            path: medium.file_path,
+            message: @conversion_notice,
+            card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: [] })
+          }
+        rescue => e
+          render json: { success: false, error: e.message, filename: uploaded_files.first&.original_filename }, status: :unprocessable_entity
+        end
+      end
 
-  # Checks if the batch upload job has completed by looking at:
-  # 1. Whether the job is still in the queue
-  # 2. Whether the expected media files exist in the database
-  def check_upload_completion_status
-    filenames = @batch["files"].map { |f| f["filename"] }
-
-    # Build list of possible paths for each file (different media types + counter suffixes)
-    possible_paths = []
-    filename_patterns = []
-
-    filenames.each do |name|
-      base = File.basename(name, File.extname(name))
-      ext = File.extname(name)
-      # Match exact name or name with counter suffix (e.g., image.jpg or image-1.jpg)
-      filename_patterns << "#{base}%#{ext}"
-
-      # Also add exact paths for all media types
-      possible_paths.concat([
-        "/media/images/#{name}",
-        "/media/audio/#{name}",
-        "/media/video/#{name}"
-      ])
-    end
-
-    # Check for exact matches first
-    existing_exact = Medium.where(file_path: possible_paths).count
-
-    # Check for files with counter suffixes using LIKE patterns
-    existing_pattern = 0
-    filename_patterns.each do |pattern|
-      existing_pattern += 1 if Medium.where("file_path LIKE ?", "/media/%/#{pattern}").exists?
-    end
-
-    existing_count = [ existing_exact, existing_pattern ].max
-
-    # Check if the bulk upload job is still running
-    job_running = SolidQueue::Job.exists?(
-      class_name: "BulkUploadJob",
-      finished_at: nil
-    )
-
-    # Determine status
-    if existing_count >= filenames.length && !job_running
-      :complete
-    elsif existing_count > 0
-      :partial
-    else
-      :pending
+      # No-JS fallback: process each synchronously, redirect with a summary.
+      format.html do
+        notices, errors = [], []
+        uploaded_files.first(50).each do |file|
+          @conversion_notice = nil
+          begin
+            medium = process_single_upload(file)
+            ImageVariantGenerator.queue!(medium.file_path) if medium.image?
+            notices << (@conversion_notice || "#{File.basename(medium.file_path)} uploaded")
+          rescue => e
+            errors << "#{file.original_filename}: #{e.message}"
+          end
+        end
+        flash[:notice] = notices.join(" · ") if notices.any?
+        flash[:alert]  = errors.join(" · ") if errors.any?
+        redirect_to browse_admin_medium_index_path
+      end
     end
   end
-  private :check_upload_completion_status
 
   def clear_failed_jobs
     if Rails.env.development?
@@ -412,19 +309,47 @@ class Admin::MediumController < Admin::BaseController
     render json: { exists: File.exist?(file_path), checked: true, path: media_path }
   end
 
+  # Re-render a single media card so the browse page can live-update a card
+  # whose image variants are still processing (the media-upload controller
+  # polls this until `pending` is false, then stops).
+  def card
+    medium = Medium.find(params[:id])
+    usages = MediaUsageIndex.fetch[medium.file_path] || []
+    pending = medium.image? && ImageVariantGenerator.available? &&
+              medium.variant_stats.present? && !medium.variant_stats[:ready]
+    render json: {
+      pending: !!pending,
+      card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: usages })
+    }
+  end
+
   private
 
+  # Formats that aren't web-friendly but that we can transcode to WebP on the
+  # way in (so the stored original is web-ready). Requires libvips; if it's not
+  # available we reject with a clear message instead of storing something the
+  # browser can't render.
+  CONVERT_TO_WEBP = %w[tiff tif heic heif].freeze
+
   def process_single_upload(uploaded_file)
-    # Your existing upload logic, extracted to a method
-    extension = File.extname(uploaded_file.original_filename).delete_prefix(".")
-    media_type = determine_media_type(extension)
+    original_ext = File.extname(uploaded_file.original_filename).delete_prefix(".").downcase
+    convert = CONVERT_TO_WEBP.include?(original_ext)
+
+    if convert
+      unless ImageVariantGenerator.available?
+        raise "#{original_ext.upcase} images aren't well supported on the web. Please upload a JPG, PNG, WebP, or GIF instead."
+      end
+      media_type = "images"
+      extension_with_dot = ".webp"
+    else
+      media_type = determine_media_type(original_ext)
+      extension_with_dot = File.extname(uploaded_file.original_filename)
+    end
 
     folder_path = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "media/#{media_type}"))
     FileUtils.mkdir_p(folder_path)
 
-    extension_with_dot = File.extname(uploaded_file.original_filename)
-    base_name = File.basename(uploaded_file.original_filename, extension_with_dot)
-
+    base_name = File.basename(uploaded_file.original_filename, File.extname(uploaded_file.original_filename))
     sanitized_base = sanitize_media_filename(base_name)
     filename = "#{sanitized_base}#{extension_with_dot}"
 
@@ -437,9 +362,21 @@ class Admin::MediumController < Admin::BaseController
 
     file_path = folder_path.join(filename)
 
-    # Save file
-    File.open(file_path, "wb") do |file|
-      file.write(uploaded_file.read)
+    if convert
+      begin
+        require "image_processing/vips"
+        ImageProcessing::Vips
+          .source(uploaded_file.tempfile.path)
+          .convert("webp")
+          .saver(quality: ImageVariantGenerator::WEBP_QUALITY)
+          .call(destination: file_path.to_s)
+      rescue => e
+        Rails.logger.error "[Upload] #{original_ext} → webp failed: #{e.class} #{e.message}"
+        raise "#{original_ext.upcase} images aren't well supported on the web, and this one couldn't be converted. Please upload a JPG, PNG, WebP, or GIF instead."
+      end
+      @conversion_notice = "Converted #{base_name}.#{original_ext} → #{filename} for better web support."
+    else
+      File.open(file_path, "wb") { |file| file.write(uploaded_file.read) }
     end
 
     # Create database record
@@ -449,12 +386,6 @@ class Admin::MediumController < Admin::BaseController
       media_type: media_type,
       uploaded_at: Time.current
     )
-  end
-
-  def determine_media_type_from_files(files)
-    # Use the first file's extension to determine type
-    first_ext = File.extname(files.first.original_filename).delete_prefix(".")
-    determine_media_type(first_ext)
   end
 
   def determine_media_type(extension)
