@@ -141,25 +141,39 @@ class Admin::ProductsController < Admin::BaseController
 
   def search
     query = params[:query].to_s.downcase
+    matched = Product.published
+                     .select { |p| p.title.to_s.downcase.include?(query) }
+                     .first(40)
 
-    products = Product.published
-                      .select { |p| p.title.to_s.downcase.include?(query) }
-                      .first(10)
-
-    results = products.map do |product|
-      {
-        id: product.id,
-        title: product.title,
-        sku: product.sku,
-        price: product.price,
-        image: product.image,
-        description: product.description,
-        url_name: product.url_name
-      }
+    # Group variants under their primary (mirrors the product index): primary
+    # first, then variants (flagged for indenting), then standalone products.
+    # The typeahead links either the group's primary or a specific variant.
+    results = []
+    ProductGroup.rows_for(matched).each do |row|
+      if row.is_a?(ProductGroup)
+        row.ordered_members.each_with_index do |member, i|
+          results << product_search_result(member, primary: member.primary?, indent: i.positive?)
+        end
+      else
+        results << product_search_result(row, primary: false, indent: false)
+      end
     end
 
-    render json: results
+    render json: results.first(20)
   end
+
+  def product_search_result(product, primary:, indent:)
+    {
+      id: product.id,
+      title: product.title,
+      url_name: product.url_name,
+      price: product.price,
+      variant: product.variant,
+      primary: primary,
+      indent: indent
+    }
+  end
+  private :product_search_result
 
   # Copy a product's file into a numbered sibling — "-N" on the filename, " N"
   # on the title (from 2, skipping any that exist). Product file_paths are

@@ -35,6 +35,7 @@ export default class extends Controller {
     "status",
     "author",
     "tags",
+    "related",
     "url_name",
     "image",
     "excerpt",
@@ -663,8 +664,8 @@ export default class extends Controller {
   // ========== YAML CONVERSION ==========
 
   formatYamlValue(value, fieldName = null) {
-    // Special handling for tags field - convert comma-separated to array
-    if (fieldName === "tags") {
+    // List fields (tags, related) — convert comma-separated to a YAML array.
+    if (fieldName === "tags" || fieldName === "related") {
       if (value === null || value === undefined || value === "") {
         return "[]";
       }
@@ -797,8 +798,8 @@ export default class extends Controller {
       let key = line.substring(0, colonIndex).trim();
       let value = line.substring(colonIndex + 1).trim();
 
-      // Special handling for tags array
-      if (key === "tags") {
+      // List fields (tags, related) — parse the YAML array back to comma-separated.
+      if (key === "tags" || key === "related") {
         if (value === "[]" || value === "") {
           fields[key] = "";
           return;

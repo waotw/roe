@@ -1,9 +1,19 @@
 <%# Large post-link card — flat grid layout.
     All children are direct grid items so the responsive layout can
     place the image anywhere in the sequence (between text elements
-    on mobile, alongside them on desktop). Locals: same as before. %>
-<div class="card post-link-large<%= ' no-image' if image.blank? %>">
-  <h4 class="card-title"><%= title %></h4>
+    on mobile, alongside them on desktop). %>
+<div class="card post-link-large<%= ' product-link-large' if kind == 'product-link' %><%= ' no-image' if image.blank? %>">
+  <% if variant.present? %>
+    <div class="card-header">
+      <h4 class="card-title"><%= title %></h4>
+      <span class="product-variant"><%= variant %></span>
+      <% if price.present? %>
+        <span class="card-price"> - <%= price %></span>
+      <% end %>
+    </div>
+  <% else %>
+    <h4 class="card-title"><%= title %></h4>
+  <% end %>
 
   <% if subtitle.present? %>
     <p class="card-subtitle"><%= subtitle %></p>
@@ -24,9 +34,10 @@
          data-sizes="(min-width: 768px) 600px, 100vw">
   <% end %>
 
-  <% if excerpt.present? %>
-    <p class="card-excerpt"><%= excerpt %></p>
-  <% end %>
-
-  <a href="<%= url %>" class="card-link"><%= link_text %></a>
+  <div class="large-card-excerpt-link">
+    <% if show_excerpt && excerpt.present? %>
+      <p class="card-excerpt"><%= excerpt %></p>
+    <% end %>
+    <a href="<%= url %>" class="card-link"><%= link_text %></a>
+  </div>
 </div>

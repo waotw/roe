@@ -1630,9 +1630,28 @@ module HasMarkdownExtensions
       render_aside(config, preview: preview)
     when "post-link"
       render_post_link(config, preview: preview)
+    when "product-link"
+      render_product_link(config, preview: preview)
     else
       preview ? "<!-- Unknown card type -->" : ""
     end
+  end
+
+  # A product-link is a live post-link card pointed at a product. post-link
+  # already resolves products (find_post_by_slug → /store/<slug>, title,
+  # excerpt, image), so we just alias `product:` → `post:` and give it a
+  # product-appropriate default link text, then reuse render_post_link. Any
+  # explicit override (title, image, link_text, …) still wins.
+  def render_product_link(config, preview: false)
+    cfg = config.dup
+    cfg[:post] = cfg[:product] if cfg[:product].present? && cfg[:post].blank?
+    cfg[:link_text] ||= SiteConfig.default("cards", "product-link")&.[]("default_link_text") || "View product →"
+    # Products use `description`, posts use `excerpt` — same card slot. Map it,
+    # and show it by default (all styles) unless explicitly turned off.
+    cfg[:excerpt] = cfg[:description] if cfg[:description].present? && cfg[:excerpt].blank?
+    cfg[:show_excerpt] = cfg[:show_description] if cfg.key?(:show_description)
+    cfg[:show_excerpt] = "true" unless cfg.key?(:show_excerpt)
+    render_post_link(cfg, preview: preview, kind: "product-link")
   end
 
   ### PULLQUOTE
@@ -1743,7 +1762,7 @@ module HasMarkdownExtensions
 
   ### POST LINKS
 
-  def render_post_link(config, preview: false)
+  def render_post_link(config, preview: false, kind: "post-link")
     # If a post reference is provided, look it up and merge its data
     if config[:post].present?
       referenced_post = find_post_by_slug(config[:post])
@@ -1760,7 +1779,8 @@ module HasMarkdownExtensions
         post_data = {
           title:               referenced_post.title || "Untitled",
           subtitle_from_record: referenced_post.metadata["subtitle"] || "",
-          excerpt:             referenced_post.metadata["excerpt"] || "",
+          # Products carry `description`; posts/pages carry `excerpt`. Same slot.
+          excerpt:             (referenced_post.is_a?(Product) ? referenced_post.description : referenced_post.metadata["excerpt"]).to_s,
           url:                 record_url
         }
 
@@ -1803,6 +1823,11 @@ module HasMarkdownExtensions
     end
     url = config[:url] || "#"
     link_text = config[:link_text] || SiteConfig.default("cards", "post-link")&.[]("default_link_text") || "Read full story →"
+
+    # Whether the excerpt/description shows. Large shows it by default (existing
+    # behaviour); small/medium only when explicitly enabled. product-link maps
+    # its show_description onto this and defaults it on for all styles.
+    show_excerpt = collection_truthy?(config[:show_excerpt], default: style == "large")
 
     # Author and date are only meaningful for posts. For pages, products,
     # and docs the keys were intentionally omitted from config above.
@@ -1866,6 +1891,18 @@ module HasMarkdownExtensions
     metadata_parts = [ author, date ].reject(&:blank?)
     metadata = metadata_parts.join(" • ")
 
+    # Products show their price in the metadata slot (author/date are blank for
+    # non-post records). One concrete product → one real price.
+    price = if referenced_post.is_a?(Product) && referenced_post.price.present?
+      "#{get_currency_symbol}#{format('%.2f', referenced_post.price)}"
+    else
+      ""
+    end
+
+    # A product's variant (e.g. Vinyl, Ebook) shows next to the title; blank
+    # for posts and for products without a variant.
+    variant = referenced_post.is_a?(Product) ? referenced_post.variant.to_s : ""
+
     # Excerpt resolution + truncation. Shared resolver so any post-link
     # size can use it — large passes 200, medium would pass 120 if/when
     # its partial starts rendering excerpts. The resolver handles the
@@ -1882,12 +1919,16 @@ module HasMarkdownExtensions
       ApplicationController.renderer.render(
         partial: "cards/post_link_large",
         locals: {
+          kind:      kind,
+          variant:   variant,
           title:     title,
           url:       url,
           image:     image,
           metadata:  metadata,
+          price:     price,
           subtitle:  subtitle,
           excerpt:   card_excerpt,
+          show_excerpt: show_excerpt,
           link_text: link_text,
           author:    author,
           date:      date
@@ -1898,11 +1939,16 @@ module HasMarkdownExtensions
       ApplicationController.renderer.render(
         partial: "cards/post_link_medium",
         locals: {
+          kind:      kind,
+          variant:   variant,
           title:     title,
           subtitle: subtitle,
           url:       url,
           image:     image,
           metadata:  metadata,
+          price:     price,
+          excerpt:   card_excerpt,
+          show_excerpt: show_excerpt,
           link_text: link_text,
           author:    author,
           date:      date
@@ -1913,11 +1959,16 @@ module HasMarkdownExtensions
       ApplicationController.renderer.render(
         partial: "cards/post_link_small",
         locals: {
+          kind:      kind,
+          variant:   variant,
           title:     title,
           subtitle:  subtitle,
           url:       url,
           image:     image,
           metadata:  metadata,
+          price:     price,
+          excerpt:   card_excerpt,
+          show_excerpt: show_excerpt,
           link_text: link_text,
           author:    author,
           date:      date

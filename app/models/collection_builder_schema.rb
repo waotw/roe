@@ -14,7 +14,12 @@
 #   label       — form label
 #   hint        — tooltip / helper text
 #   options     — for :select, the allowed values
-#   depends_on  — { field:, value: } — only show when another field equals value
+#   depends_on  — visibility condition(s): one { field:, value: } (equals) or
+#                 { field:, in: [...] } (one of), or an array of those (all must
+#                 hold). A hidden field's value is never written to the block.
+#   docs        — optional path/URL to fuller docs; rendered as a "Learn more"
+#                 link after the hint (opens in a new tab). For options the hint
+#                 can't fully explain on its own.
 #
 # Booleans are tri-state on purpose: "unset" (blank) omits the key so the
 # engine's own default applies, while true/false force the value. This matches
@@ -49,15 +54,22 @@ module CollectionBuilderSchema
 
     { key: "podcast", type: :text, label: "Podcast",
       hint: "Show only episodes for this podcast key. Posts only.",
-      depends_on: { field: "source", value: "posts" } },
+      # Only relevant when the post type can include podcasts — i.e. podcast,
+      # all, or unset (blank defaults to all).
+      depends_on: [
+        { field: "source", value: "posts" },
+        { field: "post_type", in: ["", "all", "podcast"] }
+      ] },
 
     { key: "tags", type: :text, label: "Tags",
       hint: "Comma-separated tags to include. Prefix a tag with - to exclude it." },
 
-    { key: "related", type: :boolean, label: "Related only",
-      hint: "Show only items linked from this page's frontmatter `related:` list." },
+    { key: "related", type: :boolean, label: "Related",
+      hint: "When set to \"true\", only items connected through metadata will be in results",
+      docs: "/documentation/collections#show-related-content" },
 
     { key: "show_author", type: :boolean, label: "Show author",
+
       hint: "Show each item's author." },
 
     { key: "show_excerpt", type: :boolean, label: "Show excerpt",
@@ -70,11 +82,15 @@ module CollectionBuilderSchema
       hint: "Show each item's subtitle." },
 
     { key: "show_more", type: :boolean, label: "\"View all\" link",
-      hint: "Add a link to the full listing below the collection. Posts only." },
+      hint: "Add a link to the full listing below the collection. Posts only.",
+      depends_on: { field: "source", value: "posts" } },
 
     { key: "show_more_text", type: :text, label: "\"View all\" text",
       hint: "Custom label for the View all link.",
-      depends_on: { field: "show_more", value: "true" } },
+      depends_on: [
+        { field: "source", value: "posts" },
+        { field: "show_more", value: "true" }
+      ] },
 
     # --- Products only -------------------------------------------------------
     { key: "category", type: :text, label: "Category",

@@ -49,16 +49,30 @@ export default class extends Controller {
     this.applyDependencies();
   }
 
-  // Show a dependent row only when its controlling field equals the required
-  // value; otherwise hide it (and its value is excluded from the output).
+  // Show a dependent row only when all of its conditions hold; otherwise hide
+  // it (and its value is excluded from the output). Conditions are a JSON array
+  // rendered from the schema's depends_on.
   applyDependencies() {
     this.rowTargets.forEach((row) => {
-      const depField = row.dataset.cbDependsField;
-      if (!depField) return;
-      const controller = this.fieldEl(depField);
-      const current = controller ? controller.value : "";
-      row.hidden = current !== row.dataset.cbDependsValue;
+      const raw = row.dataset.cbDepends;
+      if (!raw) return;
+      let conditions;
+      try {
+        conditions = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      row.hidden = !conditions.every((c) => this.conditionMet(c));
     });
+  }
+
+  // One condition: the field's value equals `value`, or is one of `in`.
+  // A missing field is treated as empty string.
+  conditionMet(condition) {
+    const el = this.fieldEl(condition.field);
+    const value = el ? el.value : "";
+    if (Array.isArray(condition.in)) return condition.in.includes(value);
+    return value === condition.value;
   }
 
   insert(event) {

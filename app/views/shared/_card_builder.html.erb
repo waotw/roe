@@ -58,10 +58,11 @@
             <% key = field[:key] %>
             <% value = defaults[key].to_s %>
             <% if core_keys.any? && !divider_shown && !core_keys.include?(key) %>
+              <% noun = type == "product-link" ? "product" : "post" %>
               <div class="border-t border-gray-200 pt-3">
-                <p class=" p-1.5 border border-aborder-amber-700 text-xs text-amber-700 bg-amber-100">Everything below is pulled from the post chosen above ↑<br>
-                 Fill a field below in order to override what comes from the post.<br>
-                 To just use what comes from the post, ignore everything below.</p>
+                <p class="p-1.5 border border-amber-700 text-xs text-amber-700 bg-amber-100">Everything below is pulled from the <%= noun %> chosen above ↑<br>
+                 Fill a field below in order to override what comes from the <%= noun %>.<br>
+                 To just use what comes from the <%= noun %>, ignore everything below.</p>
               </div>
               <% divider_shown = true %>
             <% end %>
@@ -69,15 +70,17 @@
               <label class="block text-xs font-medium text-gray-700 mb-1"><%= field[:label] %><% if required_all.include?(key) %> <span class="text-red-500">*</span><% end %></label>
 
               <% case field[:type] %>
-              <% when :post_search %>
+              <% when :post_search, :product_search %>
+                <% is_product = field[:type] == :product_search %>
                 <div class="relative">
                   <input type="text" data-cb-field="<%= key %>"
                          value="<%= value %>" autocomplete="off"
-                         placeholder="Type to search posts, pages, products, docs…"
-                         data-card-builder-target="postSearch"
-                         data-action="input->card-builder#postSearchInput keydown->card-builder#postSearchKeydown"
+                         placeholder="<%= is_product ? 'Type to search products…' : 'Type to search posts, pages, products, docs…' %>"
+                         data-cb-search-url="<%= is_product ? '/admin/products/search' : '/admin/posts/search' %>"
+                         data-cb-search-param="<%= is_product ? 'query' : 'q' %>"
+                         data-action="input->card-builder#refSearchInput keydown->card-builder#refSearchKeydown"
                          class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">
-                  <ul data-card-builder-target="postResults"
+                  <ul data-cb-results
                       class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 shadow-lg z-10 max-h-56 overflow-y-auto text-sm"></ul>
                 </div>
 

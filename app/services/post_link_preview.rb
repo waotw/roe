@@ -26,6 +26,9 @@ class PostLinkPreview
       title:    record.title.presence || "Untitled",
       subtitle: record.metadata["subtitle"].to_s,
       excerpt:  excerpt_for(record),
+      # Products carry `description` (posts/pages don't) — surfaced so the
+      # product-link builder can placeholder its Description field.
+      description: (record.is_a?(Product) ? record.description.to_s : ""),
       url:      url_for(record),
       author:   "",
       date:     "",

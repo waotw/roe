@@ -88,7 +88,8 @@
       'season' => { type: :text, label: 'season', hint: 'Season number' },
       'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' },
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this post?' },
-      'image_in_header' => { type: :select, label: 'image_in_header', options: ['true', 'false'], hint: 'Show post image in the header?' }
+      'image_in_header' => { type: :select, label: 'image_in_header', options: ['true', 'false'], hint: 'Show post image in the header?' },
+      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   elsif resource_type == 'product'
     {
@@ -118,7 +119,8 @@
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' },
       'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
       'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
-      'primary' => { type: :select, label: 'primary', options: ['false', 'true'], hint: 'Only the group\'s primary should be true (default: false)' }
+      'primary' => { type: :select, label: 'primary', options: ['false', 'true'], hint: 'Only the group\'s primary should be true (default: false)' },
+      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   else # pages
     {
@@ -136,7 +138,8 @@
       },
       'image' => { type: :text, label: 'image' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
-      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this page?' }
+      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this page?' },
+      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   end
 
@@ -253,8 +256,8 @@
             <% case config[:type] %>
               <% when :text %>
                 <%
-                  # Special handling for tags - show as comma-separated, not array notation
-                  display_value = if field_name == 'tags'
+                  # List fields (tags, related) show as comma-separated, not array notation
+                  display_value = if %w[tags related].include?(field_name)
                     if value.is_a?(Array)
                       value.join(', ')
                     else

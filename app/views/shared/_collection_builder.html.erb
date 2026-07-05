@@ -22,7 +22,8 @@
     <div class="flex items-center justify-between px-4 py-3 border-b border-gray-300">
       <div>
       <h2 class="font-mono text-sm font-semibold text-gray-900">Insert collection</h2>
-      <p class="text-xs text-gray-500">There are a lot of options here but none are required.<br>Add as many as you need or none at all.<br>You can edit the <a href="/admin/configs/collections/edit" class="underline">button template</a> which controls the defaults for this form.</p>
+      <p class="text-xs text-gray-500">There are a lot of options here but none are required for a working Collection</a><br>
+        Check out some <a href="/documentation/collections#collection-examples" target="_blank" class="underline">Collection examples</a><br>You can edit the <a href="/admin/configs/collections/edit" class="underline" target="_blank">button template</a> which controls the defaults for this form.</p>
       </div>
       <button type="button" data-action="click->collection-builder#close"
               class="w-7 h-7 flex items-center justify-center border border-gray-400 bg-white hover:bg-gray-100 text-gray-600 text-sm font-mono rounded-xs">×</button>
@@ -32,10 +33,10 @@
       <% CollectionBuilderSchema.fields.each do |field| %>
         <% key = field[:key] %>
         <% value = defaults[key].to_s %>
-        <% dep = field[:depends_on] %>
+        <% deps = Array.wrap(field[:depends_on]) %>
         <div class="cb-row"
              data-collection-builder-target="row"
-             <% if dep %>data-cb-depends-field="<%= dep[:field] %>" data-cb-depends-value="<%= dep[:value] %>"<% end %>>
+             <% if deps.any? %>data-cb-depends="<%= deps.to_json %>"<% end %>>
           <label class="block text-xs font-medium text-gray-700 mb-1"><%= field[:label] %></label>
 
           <% case field[:type] %>
@@ -67,8 +68,8 @@
                    class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">
           <% end %>
 
-          <% if field[:hint] %>
-            <p class="text-xs text-gray-500 mt-1"><%= field[:hint] %></p>
+          <% if field[:hint] || field[:docs] %>
+            <p class="text-xs text-gray-500 mt-1"><%= field[:hint] %><% if field[:docs] %> <a href="<%= field[:docs] %>" target="_blank" rel="noopener" class="text-blue-600 underline">Learn more →</a><% end %></p>
           <% end %>
         </div>
       <% end %>

@@ -7,19 +7,26 @@ import { Controller } from "@hotwired/stimulus";
 // then serialises its non-empty fields into a ```card block (type first) and
 // drops it at the cursor.
 //
-// The post-link `post` field is a typeahead over /admin/posts/search — the
-// same endpoint the editor's old post-link prompt used.
+// Reference fields (post-link's `post`, product-link's `product`) are
+// typeaheads; each field carries its own search endpoint via data attributes,
+// so one generic handler serves both. Choosing a reference shows the linked
+// item's live values as placeholders on the override fields.
 //
 // Deliberately isolated from editor_controller: it reads/writes the shared
 // textarea directly rather than reaching into that controller's state.
 export default class extends Controller {
-  static targets = [
-    "modal",
-    "typeSelect",
-    "group",
-    "error",
-    "postSearch",
-    "postResults",
+  static targets = ["modal", "typeSelect", "group", "error"];
+
+  // Override fields whose placeholders mirror the referenced item's values.
+  static PLACEHOLDER_KEYS = [
+    "title",
+    "subtitle",
+    "excerpt",
+    "description",
+    "url",
+    "author",
+    "date",
+    "image",
   ];
 
   connect() {
@@ -27,10 +34,10 @@ export default class extends Controller {
       '[data-editor-target="textarea"]',
     );
     this.savedPos = null;
-    this.activeResult = -1;
   }
 
-  // Opened from a Card dropdown item carrying data-card-type.
+  // Opened from a Card dropdown item (or the Product button) carrying
+  // data-card-type.
   open(event) {
     event?.preventDefault();
     const type = event?.currentTarget?.dataset?.cardType || "pullquote";
@@ -39,16 +46,12 @@ export default class extends Controller {
     this.typeSelectTarget.value = type;
     this.showActiveGroup();
     this.clearError();
-    this.hidePostResults();
+    this.hideAllResults();
 
-    // Restore live placeholders if reopening with a post already chosen.
-    if (
-      type === "post-link" &&
-      this.hasPostSearchTarget &&
-      this.postSearchTarget.value.trim()
-    ) {
-      this.applyPostPlaceholders(this.postSearchTarget.value.trim());
-    }
+    // Restore live placeholders if reopening with a reference already chosen.
+    const group = this.activeGroup();
+    const ref = group?.querySelector("[data-cb-search-url]");
+    if (ref && ref.value.trim()) this.applyPlaceholders(group, ref.value.trim());
 
     const menu = this.element.querySelector('[data-editor-target="cardMenu"]');
     if (menu) menu.classList.add("hidden");
@@ -64,7 +67,7 @@ export default class extends Controller {
   typeChanged() {
     this.showActiveGroup();
     this.clearError();
-    this.hidePostResults();
+    this.hideAllResults();
   }
 
   fieldChanged(event) {
@@ -145,155 +148,166 @@ export default class extends Controller {
     if (this.hasErrorTarget) this.errorTarget.hidden = true;
   }
 
-  // --- post-link typeahead -------------------------------------------------
+  // --- reference typeahead (post-link / product-link) ----------------------
 
-  postSearchInput(event) {
+  refSearchInput(event) {
     const input = event.target;
     input.classList.toggle("cb-empty", !input.value);
     this.clearError();
 
+    const group = input.closest("[data-cb-type]");
+    const ul = input.parentElement.querySelector("[data-cb-results]");
     const q = input.value.trim();
     clearTimeout(this.searchTimer);
     if (q.length < 1) {
-      this.hidePostResults();
-      this.clearPostPlaceholders(); // no post → no inherited values to show
+      this.hideResults(ul);
+      this.clearPlaceholders(group); // no reference → no inherited values
       return;
     }
-    this.searchTimer = setTimeout(() => this.fetchPosts(q), 250);
+    this.searchTimer = setTimeout(
+      () => this.fetchRefs(input, ul, group, q),
+      250,
+    );
   }
 
-  fetchPosts(q) {
-    fetch(`/admin/posts/search?q=${encodeURIComponent(q)}`)
+  fetchRefs(input, ul, group, q) {
+    const url = input.dataset.cbSearchUrl;
+    const param = input.dataset.cbSearchParam || "q";
+    fetch(`${url}?${param}=${encodeURIComponent(q)}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((items) =>
-        this.renderPostResults(Array.isArray(items) ? items : []),
+        this.renderRefs(input, ul, group, Array.isArray(items) ? items : []),
       )
-      .catch(() => this.hidePostResults());
+      .catch(() => this.hideResults(ul));
   }
 
-  renderPostResults(items) {
-    const ul = this.postResultsTarget;
+  renderRefs(input, ul, group, items) {
     ul.innerHTML = "";
     if (!items.length) {
-      this.hidePostResults();
+      this.hideResults(ul);
       return;
     }
-    this.activeResult = -1;
+    ul.dataset.active = "-1";
     items.slice(0, 20).forEach((item) => {
       const li = document.createElement("li");
       li.className =
-        "px-2 py-1 cursor-pointer hover:bg-gray-100 flex justify-between gap-2";
+        "px-2 py-1 cursor-pointer hover:bg-gray-100 flex justify-between gap-2 items-center";
+      // Products come grouped: variants are indented under their primary.
+      if (item.indent) li.classList.add("pl-6");
       li.dataset.urlName = item.url_name;
 
       const title = document.createElement("span");
       title.textContent = item.title;
-      const type = document.createElement("span");
-      type.className = "text-gray-400";
-      type.textContent = item.type;
 
-      li.append(title, type);
+      // Badge: post/page/doc type, or for products the primary/variant marker.
+      const badge = document.createElement("span");
+      badge.className = "text-gray-400 text-xs whitespace-nowrap";
+      if (item.primary) badge.textContent = "primary";
+      else if (item.variant) badge.textContent = item.variant;
+      else badge.textContent = item.type || "";
+
+      li.append(title, badge);
       // mousedown (not click) so selection fires before the input blurs.
       li.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        this.selectPost(item.url_name);
+        this.selectRef(input, ul, group, item.url_name);
       });
       ul.append(li);
     });
     ul.classList.remove("hidden");
   }
 
-  selectPost(urlName) {
-    const input = this.postSearchTarget;
+  selectRef(input, ul, group, urlName) {
     input.value = urlName;
     input.classList.toggle("cb-empty", !urlName);
-    this.hidePostResults();
+    this.hideResults(ul);
     input.focus();
-    // Show the chosen post's values as live placeholders on the override
+    // Show the chosen item's values as live placeholders on the override
     // fields (empty → still inherited/live; typed → an explicit override).
-    this.applyPostPlaceholders(urlName);
+    this.applyPlaceholders(group, urlName);
   }
 
-  // The override fields whose placeholders mirror the linked post's values.
-  static PLACEHOLDER_KEYS = [
-    "title",
-    "subtitle",
-    "excerpt",
-    "url",
-    "author",
-    "date",
-    "image",
-  ];
+  refSearchKeydown(event) {
+    const input = event.target;
+    const ul = input.parentElement.querySelector("[data-cb-results]");
+    const open = ul && !ul.classList.contains("hidden");
+    const items = ul ? Array.from(ul.children) : [];
+    if (!open || !items.length) return; // let the modal handler take Enter/Esc
 
-  applyPostPlaceholders(slug) {
+    let active = parseInt(ul.dataset.active ?? "-1", 10);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      active = Math.min(active + 1, items.length - 1);
+      ul.dataset.active = active;
+      this.highlight(items, active);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      active = Math.max(active - 1, 0);
+      ul.dataset.active = active;
+      this.highlight(items, active);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      const idx = active >= 0 ? active : 0;
+      this.selectRef(
+        input,
+        ul,
+        input.closest("[data-cb-type]"),
+        items[idx].dataset.urlName,
+      );
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation(); // close the list, not the whole modal
+      this.hideResults(ul);
+    }
+  }
+
+  highlight(items, active) {
+    items.forEach((li, i) => li.classList.toggle("bg-gray-100", i === active));
+  }
+
+  hideResults(ul) {
+    if (ul) ul.classList.add("hidden");
+  }
+
+  hideAllResults() {
+    this.element
+      .querySelectorAll("[data-cb-results]")
+      .forEach((ul) => ul.classList.add("hidden"));
+  }
+
+  // --- live placeholders ---------------------------------------------------
+
+  applyPlaceholders(group, slug) {
+    if (!group) return;
     if (!slug) {
-      this.clearPostPlaceholders();
+      this.clearPlaceholders(group);
       return;
     }
+    // card_fields resolves posts, pages, products, and docs by slug.
     fetch(`/admin/posts/card_fields?post=${encodeURIComponent(slug)}`)
       .then((r) => (r.ok ? r.json() : {}))
-      .then((data) => this.setPlaceholders(data || {}))
+      .then((data) => this.setPlaceholders(group, data || {}))
       .catch(() => {});
   }
 
-  placeholderFields() {
-    const group = this.groupTargets.find(
-      (g) => g.dataset.cbType === "post-link",
-    );
+  placeholderFields(group) {
     if (!group) return [];
     return this.constructor.PLACEHOLDER_KEYS.map((k) =>
       group.querySelector(`[data-cb-field="${k}"]`),
     ).filter(Boolean);
   }
 
-  setPlaceholders(data) {
-    this.placeholderFields().forEach((el) => {
+  setPlaceholders(group, data) {
+    this.placeholderFields(group).forEach((el) => {
       el.placeholder = (data[el.dataset.cbField] ?? "").toString();
     });
   }
 
-  clearPostPlaceholders() {
-    this.placeholderFields().forEach((el) => {
+  clearPlaceholders(group) {
+    this.placeholderFields(group).forEach((el) => {
       el.placeholder = "";
     });
-  }
-
-  postSearchKeydown(event) {
-    const ul = this.postResultsTarget;
-    const open = !ul.classList.contains("hidden");
-    const items = Array.from(ul.children);
-
-    if (event.key === "ArrowDown" && open && items.length) {
-      event.preventDefault();
-      this.activeResult = Math.min(this.activeResult + 1, items.length - 1);
-      this.highlightResult(items);
-    } else if (event.key === "ArrowUp" && open && items.length) {
-      event.preventDefault();
-      this.activeResult = Math.max(this.activeResult - 1, 0);
-      this.highlightResult(items);
-    } else if (event.key === "Enter" && open && items.length) {
-      // Choose the highlighted (or first) result; keep it from bubbling to the
-      // modal's Enter guard / the form.
-      event.preventDefault();
-      event.stopPropagation();
-      const idx = this.activeResult >= 0 ? this.activeResult : 0;
-      this.selectPost(items[idx].dataset.urlName);
-    } else if (event.key === "Escape" && open) {
-      // Close the results list first, not the whole modal.
-      event.preventDefault();
-      event.stopPropagation();
-      this.hidePostResults();
-    }
-  }
-
-  highlightResult(items) {
-    items.forEach((li, i) =>
-      li.classList.toggle("bg-gray-100", i === this.activeResult),
-    );
-  }
-
-  hidePostResults() {
-    if (this.hasPostResultsTarget)
-      this.postResultsTarget.classList.add("hidden");
   }
 
   // --- helpers -------------------------------------------------------------

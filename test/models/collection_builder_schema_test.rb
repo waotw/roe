@@ -30,13 +30,12 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
     end
   end
 
-  test "depends_on references an existing field" do
+  test "depends_on conditions reference existing fields" do
     keys = CollectionBuilderSchema.fields.map { |f| f[:key] }
     CollectionBuilderSchema.fields.each do |field|
-      dep = field[:depends_on]
-      next unless dep
-
-      assert_includes keys, dep[:field], "#{field[:key]} depends on unknown field #{dep[:field]}"
+      Array.wrap(field[:depends_on]).each do |cond|
+        assert_includes keys, cond[:field], "#{field[:key]} depends on unknown field #{cond[:field]}"
+      end
     end
   end
 

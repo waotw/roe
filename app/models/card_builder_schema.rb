@@ -16,9 +16,10 @@
 module CardBuilderSchema
   # Ordered for the type selector at the top of the modal.
   TYPES = [
-    { value: "pullquote", label: "Pull quote" },
-    { value: "aside",     label: "Aside" },
-    { value: "post-link", label: "Post link" }
+    { value: "pullquote",    label: "Pull quote" },
+    { value: "aside",        label: "Aside" },
+    { value: "post-link",    label: "Post link" },
+    { value: "product-link", label: "Product link" }
   ].freeze
 
   FIELDS_BY_TYPE = {
@@ -57,6 +58,8 @@ module CardBuilderSchema
         hint: "Show the subtitle. On by default." },
       { key: "excerpt", type: :textarea, label: "Excerpt",
         hint: "Override the excerpt pulled from the linked item." },
+      { key: "show_excerpt", type: :boolean, label: "Show excerpt",
+        hint: "Show the excerpt on small/medium cards too — large always shows it." },
       { key: "url", type: :text, label: "URL",
         hint: "Override the link target (defaults to the linked item's URL)." },
       { key: "link_text", type: :text, label: "Link text",
@@ -67,6 +70,28 @@ module CardBuilderSchema
         hint: "Override the date (posts only)." },
       { key: "image", type: :text, label: "Image",
         hint: "Override the featured image. Use “none” to suppress it." }
+    ],
+
+    # Product-link renders as a live post-link card pointed at a product, so
+    # its fields mirror post-link's (minus author/date, which products lack).
+    "product-link" => [
+      { key: "product", type: :product_search, label: "Product",
+        hint: "Search for a product to link. Its title, price, image, and description are pulled in automatically." },
+      { key: "style", type: :select, label: "Style",
+        options: %w[small medium large],
+        hint: "Card layout. Defaults to small." },
+      { key: "title", type: :text, label: "Title",
+        hint: "Override the title pulled from the product." },
+      { key: "description", type: :textarea, label: "Description",
+        hint: "Override the description pulled from the product." },
+      { key: "show_description", type: :boolean, label: "Show description",
+        hint: "Show the product's description on the card. On by default." },
+      { key: "url", type: :text, label: "URL",
+        hint: "Override the link target (defaults to the product's page)." },
+      { key: "link_text", type: :text, label: "Link text",
+        hint: "Label for the link. Defaults to “View product →”." },
+      { key: "image", type: :text, label: "Image",
+        hint: "Override the product image. Use “none” to suppress it." }
     ]
   }.freeze
 
@@ -75,24 +100,27 @@ module CardBuilderSchema
   # otherwise pulled live from the linked post — so the builder shows a divider
   # and note between them. Empty for types with no referenced source.
   CORE = {
-    "post-link" => %w[post style]
+    "post-link"    => %w[post style],
+    "product-link" => %w[product style]
   }.freeze
 
   # What each type needs to render something meaningful. `all` keys must all be
   # present; `any` means at least one of them must be. Drives the required
   # markers in the form and the insert-time validation.
   REQUIRED = {
-    "pullquote" => { all: %w[text] },
-    "aside"     => { any: %w[text image] },
-    "post-link" => { all: %w[post] }
+    "pullquote"    => { all: %w[text] },
+    "aside"        => { any: %w[text image] },
+    "post-link"    => { all: %w[post] },
+    "product-link" => { all: %w[product] }
   }.freeze
 
   # cards.yml key holding each type's button_template (the author-editable
   # defaults). post-link's key uses an underscore.
   TEMPLATE_KEYS = {
-    "pullquote" => "pullquote_button_template",
-    "aside"     => "aside_button_template",
-    "post-link" => "post_link_button_template"
+    "pullquote"    => "pullquote_button_template",
+    "aside"        => "aside_button_template",
+    "post-link"    => "post_link_button_template",
+    "product-link" => "product_link_button_template"
   }.freeze
 
   def self.types

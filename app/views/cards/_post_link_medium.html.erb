@@ -1,4 +1,4 @@
-<div class="card post-link-medium">
+<div class="card post-link-medium<%= ' product-link-medium' if kind == 'product-link' %>">
   <% if image.present? %>
     <img src="<%= image %>"
          alt="<%= title %>"
@@ -6,7 +6,14 @@
          data-sizes="(min-width: 768px) 400px, 100vw">
   <% end %>
   <div class="card-content">
-    <h4 class="card-title"><%= title %></h4>
+    <% if variant.present? %>
+      <div class="card-header">
+        <h4 class="card-title"><%= title %></h4>
+        <span class="product-variant"><%= variant %></span>
+      </div>
+    <% else %>
+      <h4 class="card-title"><%= title %></h4>
+    <% end %>
     <% if subtitle.present? %>
       <p class="card-subtitle"><%= subtitle %></p>
     <% end %>
@@ -16,6 +23,12 @@
         <% if date.present? && author.present? %> • <% end %>
         <% if date.present? %><span class="card-date"><%= date %></span><% end %>
       </p>
+    <% end %>
+    <% if show_excerpt && excerpt.present? %>
+      <p class="card-excerpt"><%= excerpt %></p>
+    <% end %>
+    <% if price.present? %>
+      <span class="card-price"><%= price %></span>
     <% end %>
     <a href="<%= url %>" class="card-link"><%= link_text %></a>
   </div>

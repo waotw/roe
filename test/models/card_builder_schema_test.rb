@@ -7,13 +7,14 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
   # method actually reads (see HasMarkdownExtensions). A typo produces a dead
   # option, so guard each type's set.
   SUPPORTED_KEYS = {
-    "pullquote" => %w[text attribution position],
-    "aside"     => %w[text image link link_text],
-    "post-link" => %w[post style title subtitle show_subtitle excerpt url link_text author date image]
+    "pullquote"    => %w[text attribution position],
+    "aside"        => %w[text image link link_text],
+    "post-link"    => %w[post style title subtitle show_subtitle excerpt show_excerpt url link_text author date image],
+    "product-link" => %w[product style title description show_description url link_text image]
   }.freeze
 
   test "types match the renderer's dispatch values" do
-    assert_equal %w[pullquote aside post-link], CardBuilderSchema.types.map { |t| t[:value] }
+    assert_equal %w[pullquote aside post-link product-link], CardBuilderSchema.types.map { |t| t[:value] }
   end
 
   test "every field is well-formed and a real option for its type" do
@@ -21,7 +22,7 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
       type = t[:value]
       CardBuilderSchema.fields_for(type).each do |field|
         assert field[:key].present?, "#{type} field missing key"
-        assert_includes %i[text textarea select boolean post_search], field[:type], "#{type}/#{field[:key]} bad type"
+        assert_includes %i[text textarea select boolean post_search product_search], field[:type], "#{type}/#{field[:key]} bad type"
         assert field[:label].present?, "#{type}/#{field[:key]} missing label"
         assert field[:hint].present?, "#{type}/#{field[:key]} missing hint"
         assert field[:options].present?, "#{type}/#{field[:key]} select needs options" if field[:type] == :select
@@ -30,7 +31,7 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
     end
   end
 
-  test "core fields are real fields, and only post-link has them" do
+  test "core fields are real fields; only the reference types have them" do
     CardBuilderSchema.types.each do |t|
       type = t[:value]
       keys = CardBuilderSchema.fields_for(type).map { |f| f[:key] }
@@ -39,6 +40,7 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
       end
     end
     assert_equal %w[post style], CardBuilderSchema.core_for("post-link")
+    assert_equal %w[product style], CardBuilderSchema.core_for("product-link")
     assert_empty CardBuilderSchema.core_for("pullquote")
     assert_empty CardBuilderSchema.core_for("aside")
   end
