@@ -124,6 +124,7 @@ export default class extends Controller {
     "tocArrow",
     "saveDot",
     "saveMessage",
+    "leaveModal",
   ];
 
   static values = {
@@ -143,6 +144,10 @@ export default class extends Controller {
 
   connect() {
     console.log("Editor controller connected");
+
+    // Leave-guard modal state (see handleTurboBeforeVisit).
+    this.confirmedLeave = false;
+    this.pendingVisitUrl = null;
     this.isSaving = false;
 
     // Initialize TOC
@@ -535,34 +540,77 @@ export default class extends Controller {
     });
   }
 
-  // The "leave anyway?" prompt for in-app navigation (links + Back/Forward).
-  // Centralised so it can later be swapped for a styled modal. Returns true if
-  // the user chose to leave. (Hard unloads — tab close/reload — can only use the
-  // native beforeunload prompt; see handleBeforeUnload.)
+  // Fallback native prompt for pages that don't render the styled leave modal
+  // (e.g. content types not yet migrated). Returns true if the user chose to
+  // leave.
   askLeave() {
     return window.confirm(
       "You have unsaved changes. Are you sure you want to leave?",
     );
   }
 
+  // In-app navigation (link clicks / "Back to Posts"). Note: the browser
+  // Back/Forward button does NOT fire turbo:before-visit — that path stays
+  // guarded by the native beforeunload prompt (browsers won't allow a custom
+  // modal for a real unload).
   handleTurboBeforeVisit(event) {
+    if (this.confirmedLeave) return; // user already chose to leave; let it go
     if (!this.isDirty()) return;
 
-    if (!this.askLeave()) {
-      event.preventDefault();
-
-      // Restore focus to the last input that was focused, or default to main textarea
-      const elementToFocus = this.lastFocusedInput || this.textareaTarget;
-      const cursorPosition = elementToFocus.selectionStart || 0;
-
-      requestAnimationFrame(() => {
-        elementToFocus.focus({ preventScroll: true });
-
-        if (elementToFocus.selectionStart !== undefined) {
-          elementToFocus.setSelectionRange(cursorPosition, cursorPosition);
-        }
-      });
+    // No styled modal on this page: fall back to the native confirm.
+    if (!this.hasLeaveModalTarget) {
+      if (!this.askLeave()) {
+        event.preventDefault();
+        this.restoreEditorFocus();
+      }
+      return;
     }
+
+    // Stop the visit and ask via the modal; resumed in confirmLeaveNavigation.
+    event.preventDefault();
+    this.pendingVisitUrl = event.detail.url;
+    this.leaveModalTarget.classList.remove("hidden");
+  }
+
+  // "Leave without saving" — resume the pending navigation. confirmedLeave lets
+  // the re-issued visit pass the guard above.
+  confirmLeaveNavigation() {
+    this.confirmedLeave = true;
+    if (this.hasLeaveModalTarget) {
+      this.leaveModalTarget.classList.add("hidden");
+    }
+
+    if (this.pendingVisitUrl && window.Turbo) {
+      window.Turbo.visit(this.pendingVisitUrl);
+    } else if (this.pendingVisitUrl) {
+      window.location.href = this.pendingVisitUrl;
+    }
+  }
+
+  // "Stay" — dismiss the modal and return focus to the editor.
+  cancelLeaveNavigation() {
+    if (this.hasLeaveModalTarget) {
+      this.leaveModalTarget.classList.add("hidden");
+    }
+    this.pendingVisitUrl = null;
+    this.restoreEditorFocus();
+  }
+
+  // Clicking the dimmed backdrop (but not the dialog card) is treated as "Stay".
+  leaveModalBackdrop(event) {
+    if (event.target === this.leaveModalTarget) this.cancelLeaveNavigation();
+  }
+
+  restoreEditorFocus() {
+    const elementToFocus = this.lastFocusedInput || this.textareaTarget;
+    const cursorPosition = elementToFocus.selectionStart || 0;
+
+    requestAnimationFrame(() => {
+      elementToFocus.focus({ preventScroll: true });
+      if (elementToFocus.selectionStart !== undefined) {
+        elementToFocus.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    });
   }
 
   // Self-heal the saving flag. save()/publish/unpublish set isSaving=true and
@@ -1801,6 +1849,18 @@ export default class extends Controller {
   }
 
   handleKeydown(event) {
+    // Escape closes the leave-guard modal (= "Stay"), and takes priority over
+    // the editor's other shortcuts while it's open.
+    if (
+      event.key === "Escape" &&
+      this.hasLeaveModalTarget &&
+      !this.leaveModalTarget.classList.contains("hidden")
+    ) {
+      event.preventDefault();
+      this.cancelLeaveNavigation();
+      return;
+    }
+
     // Only process shortcuts when textarea has focus
     const isTextareaFocused = document.activeElement === this.textareaTarget;
 

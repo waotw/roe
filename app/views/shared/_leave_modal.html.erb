@@ -1,0 +1,27 @@
+<%# Unsaved-changes guard modal. Shown by the editor controller when the user
+    tries to navigate away (in-app link click / "← Back to Posts") with unsaved
+    edits. Clicking a button — no typing. The native beforeunload prompt still
+    covers hard closes (tab close / reload / Back-Forward), which browsers won't
+    let us replace with custom UI. Must sit inside a data-controller="editor". %>
+<div data-editor-target="leaveModal"
+     data-action="click->editor#leaveModalBackdrop"
+     class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Unsaved changes</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      You have unsaved changes. If you leave now, they'll be lost.
+    </p>
+    <div class="flex gap-3 justify-end">
+      <button type="button"
+              data-action="click->editor#cancelLeaveNavigation"
+              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+        Stay
+      </button>
+      <button type="button"
+              data-action="click->editor#confirmLeaveNavigation"
+              class="px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+        Leave without saving
+      </button>
+    </div>
+  </div>
+</div>

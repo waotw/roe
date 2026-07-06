@@ -25,6 +25,7 @@ class Admin::PostsEditRenderTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, 'id="primary-actions"'
     assert_includes response.body, 'data-controller="editor-drawer"'
+    assert_includes response.body, 'data-editor-target="leaveModal"'
     # Indicator + publish container appear twice (top row + drawer).
     assert_equal 2, response.body.scan('data-editor-target="saveDot"').size
     assert_equal 2, response.body.scan("publish-button-container").size
