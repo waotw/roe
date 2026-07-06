@@ -366,6 +366,12 @@ export default class extends Controller {
     this.globalKeydownHandler = this.handleKeydown.bind(this);
     document.addEventListener("keydown", this.globalKeydownHandler);
 
+    // Save/restore cursor state on tab switch — registered here for all content
+    // types (was previously a per-view data-action on pages only, which also
+    // double-bound keydown and broke Cmd/Ctrl+S there).
+    this.visibilityChangeHandler = this.handleVisibilityChange.bind(this);
+    document.addEventListener("visibilitychange", this.visibilityChangeHandler);
+
     document.addEventListener("click", this.cardMenuClickHandler);
     document.addEventListener("keydown", this.cardMenuKeyHandler);
 
@@ -444,6 +450,10 @@ export default class extends Controller {
 
     // Remove global keyboard handler
     document.removeEventListener("keydown", this.globalKeydownHandler);
+    document.removeEventListener(
+      "visibilitychange",
+      this.visibilityChangeHandler,
+    );
 
     // Clean up event listeners
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
@@ -709,6 +719,11 @@ export default class extends Controller {
       this.leaveModalTarget.classList.add("hidden");
     }
 
+    // The user chose to leave via the modal, so drop the native beforeunload
+    // guard — otherwise a full navigation (or the location.href fallback) would
+    // pop the browser's prompt on top of our modal.
+    window.removeEventListener("beforeunload", this.beforeUnloadHandler);
+
     if (this.pendingVisitUrl && window.Turbo) {
       window.Turbo.visit(this.pendingVisitUrl);
     } else if (this.pendingVisitUrl) {
@@ -795,9 +810,11 @@ export default class extends Controller {
     if (currentlyShowingPublish === shouldShowPublish) return; // no change
 
     const postId =
-      publishButton?.dataset.editorPostId ||
-      unpublishButton?.closest("form")?.action.match(/\/posts\/(\d+)\//)?.[1];
+      publishButton?.dataset.editorPostId || this.resourceIdValue;
     if (!postId) return;
+
+    // Type-generic base path: post -> /admin/posts, page -> /admin/pages, etc.
+    const basePath = `/admin/${this.resourceTypeValue}s`;
 
     const authToken =
       document.querySelector('meta[name="csrf-token"]')?.content || "";
@@ -811,7 +828,7 @@ export default class extends Controller {
                 class="uppercase text-xs px-1.5 py-0 border border-slate-800 bg-slate-200 hover:bg-slate-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
           Publish
         </button>`
-      : `<form action="/admin/posts/${postId}/unpublish"
+      : `<form action="${basePath}/${postId}/unpublish"
               method="post"
               data-turbo="false"
               data-action="submit->editor#confirmUnpublish">

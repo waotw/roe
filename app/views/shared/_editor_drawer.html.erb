@@ -1,0 +1,16 @@
+<%# Sticky action drawer — peeks up from the bottom while the primary actions
+    (#primary-actions) are scrolled out of view, so Save / Preview / (Un)publish
+    + the save-state dot stay reachable in long content. Lives inside the editor
+    controller so the buttons' actions and the saveDot/saveMessage targets
+    resolve to it.
+
+    translate-y-full = hidden by default; the editor-drawer controller adds the
+    transition after the first paint so the on-load restore is instant (no slide
+    flash on save/refresh).
+
+    Locals: resource, resource_type. %>
+<div data-controller="editor-drawer"
+     data-editor-drawer-anchor-value="#primary-actions"
+     class="fixed inset-x-0 bottom-0 z-40 translate-y-full bg-white border-t border-gray-800 px-8 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
+  <%= render "shared/editor_primary_actions", resource: resource, resource_type: resource_type %>
+</div>
