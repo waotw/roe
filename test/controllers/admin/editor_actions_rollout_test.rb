@@ -56,6 +56,23 @@ class Admin::EditorActionsRolloutTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Duplicate"
   end
 
+  test "published item renders the unpublish confirmation modal" do
+    path = File.join(RoeSitePaths::SITE_PATH, "pages", "actions-page.md")
+    File.write(path, "---\ntitle: \"Live Page\"\nstatus: published\nurl_name: actions-page\n---\nBody.\n")
+    record = Page.create!(
+      file_path: path,
+      content: "Body.",
+      metadata: { "title" => "Live Page", "status" => "published", "url_name" => "actions-page" }
+    )
+
+    get edit_admin_page_path(record)
+
+    assert_response :success
+    assert_includes response.body, 'data-editor-target="unpublishModal"'
+    assert_includes response.body, "Unpublish Page"
+    assert_includes response.body, "Live Page" # content-appropriate
+  end
+
   test "email edit renders shared bar but no publish/duplicate (not publishable)" do
     path = File.join(RoeSitePaths::SITE_PATH, "emails", "actions-email.md")
     File.write(path, "Hello @member_name.\n")

@@ -47,6 +47,12 @@
     <% end %>
   </div>
 
+  <%# Unpublish confirmation modal — only present when there's a published
+      item to take down (the Unpublish button is showing). %>
+  <% if type_actions && resource.published? %>
+    <%= render "shared/unpublish_modal", resource: resource, resource_type: resource_type %>
+  <% end %>
+
   <!-- Right: Duplicate + Delete -->
   <% if type_actions %>
     <div class="flex items-center gap-1">

@@ -2,15 +2,24 @@
   media_field_kinds = { 'audio' => 'audio', 'video' => 'video', 'image' => 'image', 'captions' => 'file' }
   resource_label = local_assigns[:resource_label] || @resource_label || 'Post'
   show_postmark_warning = local_assigns.fetch(:show_postmark_warning) { @show_postmark_warning }
+
+  # Filename/category autocomplete options — safe sources the metadata editor
+  # uses, so the modal's inputs suggest the same things.
+  media_autocomplete_paths = {
+    'audio' => (Medium.originals_only.where(media_type: 'audio').pluck(:file_path).sort rescue []),
+    'video' => (Medium.originals_only.where(media_type: 'video').pluck(:file_path).sort rescue []),
+    'image' => (Medium.originals_only.where(media_type: 'images').pluck(:file_path).sort rescue [])
+  }
+  product_categories = (ProductCategory.all rescue [])
 %>
   <div class="fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50"
        data-publish-modal>
-    <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl mx-auto">
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
       <h2 class="text-2xl font-bold text-gray-900 mb-4">Publish <%= resource_label %></h2>
 
       <p class="text-gray-700 mb-6">
         <% if @missing_requirements.any? %>
-          Before publishing, fill in the fields below.
+          Confirm the details below and fill in anything that's missing.
         <% else %>
           Are you ready to publish this <%= resource_label.downcase %>? Your current edits will be saved.
         <% end %>
@@ -26,6 +35,21 @@
         </div>
       <% end %>
 
+      <%# Present required fields — read-only confirmation bullets (products set
+          @present_requirements; posts leave it unset). The metadata editor is
+          the source of truth, so these just reflect what's already set. %>
+      <% if @present_requirements.present? %>
+        <ul class="mb-6 space-y-1.5">
+          <% @present_requirements.each do |r| %>
+            <li class="flex items-baseline gap-2 text-sm">
+              <span class="text-green-600 font-bold">✓</span>
+              <span class="font-medium text-gray-900"><%= r[:label] %></span>
+              <span class="text-gray-500 font-mono text-xs truncate max-w-xs"><%= r[:value] %></span>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+
       <%# No form wrapper — Confirm injects these values into the main editor %>
       <%# form and submits that, so the post's content + metadata save in one %>
       <%# go (along with status: published). %>
@@ -35,6 +59,14 @@
             kind = media_field_kinds[req[:name].to_s]
             is_media = kind.present?
             has_paired_duration = is_media && @paired_duration_for == req[:name]
+            # Autocomplete: category list for the category field, media file
+            # paths for media fields — same as the metadata editor.
+            ac_options = if req[:name].to_s == 'category'
+                           product_categories
+                         elsif is_media
+                           media_autocomplete_paths[kind]
+                         end
+            ac_enabled = ac_options.present?
           %>
           <div class="bg-gray-50 border border-gray-300 p-6"
                <% if is_media %>
@@ -82,16 +114,39 @@
                 <% end %>
               </select>
 
-            <% else # :text and media types %>
-              <input type="text"
+            <% when :date %>
+              <input type="date"
                      name="metadata_fields[<%= req[:name] %>]"
                      value="<%= req[:current] %>"
-                     class="w-full font-mono text-sm p-2 border border-gray-300"
-                     <% if is_media %>
-                       data-media-field-target="input"
-                       data-action="input->media-field#checkDebounced blur->media-field#check change->media-field#check"
-                     <% end %>
-                     <% if req[:hint] && !req[:missing_file] %>placeholder="<%= req[:hint] %>"<% end %>>
+                     data-action="change->editor#syncModalField"
+                     class="w-full font-mono text-sm p-2 border border-gray-300">
+
+            <% else # :text, category, and media types %>
+              <%# change->editor#syncModalField writes the value straight to the
+                  metadata editor (the source of truth). The relative wrapper
+                  carries the autocomplete controller (category list / media
+                  paths) so the dropdown positions under the input; the media-
+                  field controller stays on the card (its warning target). The
+                  input can be a target of both. %>
+              <div class="relative"
+                   <% if ac_enabled %>
+                     data-controller="autocomplete"
+                     data-autocomplete-options-value="<%= ERB::Util.html_escape(ac_options.to_json) %>"
+                   <% end %>>
+                <input type="text"
+                       name="metadata_fields[<%= req[:name] %>]"
+                       value="<%= req[:current] %>"
+                       class="w-full font-mono text-sm p-2 border border-gray-300"
+                       <% if ac_enabled %>autocomplete="off"<% end %>
+                       <% if is_media %>data-media-field-target="input"<% end %>
+                       <% if ac_enabled %>data-autocomplete-target="input"<% end %>
+                       data-action="change->editor#syncModalField<% if is_media %> input->media-field#checkDebounced blur->media-field#check change->media-field#check<% end %><% if ac_enabled %> input->autocomplete#filter focus->autocomplete#showDropdown keydown->autocomplete#navigate<% end %>"
+                       <% if req[:hint] && !req[:missing_file] %>placeholder="<%= req[:hint] %>"<% end %>>
+                <% if ac_enabled %>
+                  <div data-autocomplete-target="dropdown"
+                       class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto"></div>
+                <% end %>
+              </div>
 
               <% if is_media %>
                 <p class="text-xs text-red-600 mt-2 <%= req[:missing_file] ? '' : 'hidden' %>"
@@ -101,11 +156,14 @@
               <% end %>
 
               <% if req[:name] == 'sku' && @sku_generator_path %>
-                <%# Closes the publish modal first (cancelPublish) and then
-                    Turbo loads the generator into its sku-generator-modal frame. %>
+                <%# Loads the SKU generator into its sku-generator-modal frame as
+                    an overlay ON TOP of this publish modal — no cancelPublish, so
+                    we don't detach this link mid-click (which made Turbo fall back
+                    to a full-page visit → unstyled + the unsaved-changes guard).
+                    Insert writes the SKU into the metadata editor, which this
+                    modal's Save & Publish then reads. Stays in the publish flow. %>
                 <a href="<%= @sku_generator_path %>"
                    data-turbo-frame="sku-generator-modal"
-                   data-action="click->editor#cancelPublish"
                    class="text-xs text-blue-600 hover:text-blue-800 underline mt-2 inline-block">
                   Generate SKU →
                 </a>
@@ -150,7 +208,10 @@
           </div>
         <% end %>
 
-        <div class="flex items-center gap-3 pt-2">
+        <%# Sticky footer so the actions stay visible while the modal body
+            scrolls. Negative margins let it span the card padding and sit flush
+            with the card's bottom edge. %>
+        <div class="sticky bottom-0 bg-white flex items-center gap-3 -mx-8 px-8 mb-0 py-4 border-t border-b border-gray-200">
           <button type="button"
                   data-action="click->editor#completePublish"
                   class="uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer">

@@ -298,6 +298,12 @@ class Admin::ProductsController < Admin::BaseController
     end
 
     @missing_requirements = build_publish_requirements(@product)
+    # Required fields that are already set — shown as read-only "✓" confirmation
+    # bullets. The metadata editor is the source of truth, so the modal just
+    # reflects it: present → confirm, missing → fill in.
+    @present_requirements = Product::REQUIRED_FIELDS
+      .select { |name| @product.metadata[name].to_s.strip.present? }
+      .map { |name| { name: name, label: name.humanize, value: @product.metadata[name] } }
     @resource_label = "Product"
     @show_postmark_warning = false  # products don't go to newsletter
     @paired_duration_for = nil       # no audio/video pairing for products
@@ -381,6 +387,13 @@ class Admin::ProductsController < Admin::BaseController
         current: ref[:path],
         missing_file: true
       }
+    end
+
+    # Generating a SKU requires picking a category, and that category becomes the
+    # product's category on publish — so don't ask for it separately while the
+    # SKU is still missing. (When only the category is missing it stays.)
+    if requirements.any? { |r| r[:name] == "sku" }
+      requirements.reject! { |r| r[:name] == "category" }
     end
 
     requirements

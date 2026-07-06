@@ -513,6 +513,11 @@ class Admin::PostsController < Admin::BaseController
     end
 
     @missing_requirements = build_publish_requirements(@post)
+    # Present title/date → read-only "✓" confirmation bullets (audience and
+    # distribution stay explicit radios in @missing_requirements).
+    @present_requirements = %w[title date]
+      .select { |name| @post.metadata[name].to_s.strip.present? }
+      .map { |name| { name: name, label: name.humanize, value: @post.metadata[name] } }
     @resource_label = "Post"
     @show_postmark_warning = helpers.newsletters_enabled? && !helpers.postmark_configured?
 
@@ -621,6 +626,28 @@ class Admin::PostsController < Admin::BaseController
   #   { name:, type:, label:, hint:, options:, current: }
   def build_publish_requirements(post)
     requirements = []
+
+    # Title + date are required on every post. Missing → inputs here (date
+    # prefilled with today, editable); present → read-only confirmation bullets
+    # (see @present_requirements). Audience/distribution stay explicit radios.
+    if post.metadata["title"].to_s.strip.blank?
+      requirements << {
+        name: "title",
+        type: :text,
+        label: "Title",
+        hint: nil,
+        current: post.metadata["title"]
+      }
+    end
+    if post.metadata["date"].to_s.strip.blank?
+      requirements << {
+        name: "date",
+        type: :date,
+        label: "Date",
+        hint: nil,
+        current: Date.today.iso8601
+      }
+    end
 
     # Site-gated: audience (always shown when paid memberships are
     # configured, so the user confirms who the post is going to every

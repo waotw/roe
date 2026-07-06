@@ -125,6 +125,7 @@ export default class extends Controller {
     "saveDot",
     "saveMessage",
     "leaveModal",
+    "unpublishModal",
   ];
 
   static values = {
@@ -148,6 +149,10 @@ export default class extends Controller {
     // Leave-guard modal state (see handleTurboBeforeVisit).
     this.confirmedLeave = false;
     this.pendingVisitUrl = null;
+
+    // Unpublish-confirm modal state (see confirmUnpublish).
+    this.confirmedUnpublish = false;
+    this.pendingUnpublishForm = null;
     this.isSaving = false;
 
     // Initialize TOC
@@ -267,6 +272,15 @@ export default class extends Controller {
       "metadata-editor:publish-requested",
       this.publishRequestHandler,
     );
+
+    // The SKU generator writes to the metadata editor then fires this so the
+    // publish modal (if open) rebuilds from the updated editor state.
+    this.publishRefreshHandler = () => this.refreshPublishModal();
+    document.addEventListener(
+      "publish-modal:refresh",
+      this.publishRefreshHandler,
+    );
+
 
     // Just saved (server redirected back with this marker): if a preview tab is
     // live, push the freshly-saved content into it in place.
@@ -461,6 +475,12 @@ export default class extends Controller {
       document.removeEventListener(
         "metadata-editor:publish-requested",
         this.publishRequestHandler,
+      );
+    }
+    if (this.publishRefreshHandler) {
+      document.removeEventListener(
+        "publish-modal:refresh",
+        this.publishRefreshHandler,
       );
     }
     if (this.metadataPreviewHandler) {
@@ -2008,6 +2028,26 @@ export default class extends Controller {
       this.cancelLeaveNavigation();
       return;
     }
+    if (
+      event.key === "Escape" &&
+      this.hasUnpublishModalTarget &&
+      !this.unpublishModalTarget.classList.contains("hidden")
+    ) {
+      event.preventDefault();
+      this.cancelUnpublish();
+      return;
+    }
+    // Escape closes the publish modal — unless the SKU generator is open on top
+    // of it (that keeps its own Cancel button).
+    if (
+      event.key === "Escape" &&
+      document.querySelector("[data-publish-modal]") &&
+      !document.getElementById("sku-generator-modal")?.innerHTML.trim()
+    ) {
+      event.preventDefault();
+      this.cancelPublish();
+      return;
+    }
 
     // Only process shortcuts when textarea has focus
     const isTextareaFocused = document.activeElement === this.textareaTarget;
@@ -2015,6 +2055,16 @@ export default class extends Controller {
     // Cmd/Ctrl+S to save
     if ((event.metaKey || event.ctrlKey) && event.key === "s") {
       event.preventDefault();
+      // When the publish modal is open, Cmd/Ctrl+S means "Save & Publish"
+      // (completePublish applies the modal's fields) — NOT the plain save,
+      // which would submit without them. Skip while the SKU generator is up.
+      if (
+        document.querySelector("[data-publish-modal]") &&
+        !document.getElementById("sku-generator-modal")?.innerHTML.trim()
+      ) {
+        this.completePublish();
+        return;
+      }
       console.log("[KEYBOARD] Cmd/Ctrl+S pressed, submitting form");
       this.formTarget.requestSubmit();
     }
@@ -2122,11 +2172,77 @@ export default class extends Controller {
       })
       .then((html) => {
         modalContainer.innerHTML = html;
+        this.setScrollLock(true);
       })
       .catch((err) => {
         console.error("Failed to load publish modal:", err);
         modalContainer.innerHTML = "";
+        this.setScrollLock(false);
       });
+  }
+
+  // Write a value to the metadata editor (the source of truth). Updates the
+  // existing [data-metadata-field] input, or appends a hidden one so formToYaml
+  // picks it up on submit.
+  applyMetadataField(name, value) {
+    const metadataEditor = document.querySelector(
+      '[data-controller~="metadata-editor"]',
+    );
+    if (!metadataEditor) return;
+
+    const field = metadataEditor.querySelector(
+      `[data-metadata-field="${name}"]`,
+    );
+    if (field) {
+      let v = value;
+      // A date-only value ("2026-07-05") into a datetime-local field is rejected
+      // by the browser (the field goes blank). Give it the current time, to
+      // match what the metadata editor does when you set a date there.
+      if (field.type === "datetime-local" && v && !v.includes("T")) {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        v = `${v}T${hh}:${mm}`;
+      }
+      field.value = v;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+    const fieldsContainer = metadataEditor.querySelector(
+      '[data-metadata-editor-target="fieldsContainer"]',
+    );
+    if (fieldsContainer) {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.dataset.metadataField = name;
+      hidden.name = `metadata_fields[${name}]`;
+      hidden.value = value;
+      fieldsContainer.appendChild(hidden);
+    }
+  }
+
+  // A publish-modal input changed — mirror it straight into the metadata editor.
+  syncModalField(event) {
+    const input = event.target;
+    const name = this._extractMetadataFieldName(input.name);
+    if (name) this.applyMetadataField(name, input.value.trim());
+  }
+
+  // Rebuild the publish modal from the metadata editor. Since the editor is the
+  // source of truth, a plain rebuild is correct — no field preservation needed.
+  // No-op when the modal isn't open. Fired by the SKU generator after it writes.
+  refreshPublishModal() {
+    const modal = document.getElementById("publish-modal-container");
+    if (!modal || !modal.innerHTML.trim()) return;
+    this.showPublishModal(this.resourceIdValue);
+  }
+
+  // Lock/unlock background scroll while a modal is open. Locks both <html> and
+  // <body> since either can be the viewport's scroll container.
+  setScrollLock(locked) {
+    const value = locked ? "hidden" : "";
+    document.documentElement.style.overflow = value;
+    document.body.style.overflow = value;
   }
 
   // Triggered by the Publish button OR by the metadata-editor when the
@@ -2171,7 +2287,7 @@ export default class extends Controller {
       });
       modal
         .querySelectorAll(
-          'input[type="text"][name^="metadata_fields"], select[name^="metadata_fields"]',
+          'input[name^="metadata_fields"]:not([type="radio"]):not([type="checkbox"]), select[name^="metadata_fields"]',
         )
         .forEach((input) => {
           const name = this._extractMetadataFieldName(input.name);
@@ -2180,26 +2296,9 @@ export default class extends Controller {
         });
     }
 
-    // Apply each value to the main metadata editor. If a corresponding
-    // [data-metadata-field] input already exists, update it. Otherwise
-    // append a hidden input so formToYaml picks it up on submit.
-    const fieldsContainer = metadataEditor.querySelector(
-      '[data-metadata-editor-target="fieldsContainer"]',
-    );
+    // Apply each value to the main metadata editor (source of truth).
     Object.entries(values).forEach(([fieldName, value]) => {
-      let field = metadataEditor.querySelector(
-        `[data-metadata-field="${fieldName}"]`,
-      );
-      if (field) {
-        field.value = value;
-      } else if (fieldsContainer) {
-        const hidden = document.createElement("input");
-        hidden.type = "hidden";
-        hidden.dataset.metadataField = fieldName;
-        hidden.name = `metadata_fields[${fieldName}]`;
-        hidden.value = value;
-        fieldsContainer.appendChild(hidden);
-      }
+      this.applyMetadataField(fieldName, value);
     });
 
     // Force status to 'published' (matters when the trigger was the
@@ -2217,6 +2316,7 @@ export default class extends Controller {
 
     // Close modal and submit the main Save form.
     if (modal) modal.innerHTML = "";
+    this.setScrollLock(false);
 
     const form = document.getElementById(`${this.resourceTypeValue}-form`);
     if (form) {
@@ -2241,6 +2341,7 @@ export default class extends Controller {
 
     const modal = document.getElementById("publish-modal-container");
     if (modal) modal.innerHTML = "";
+    this.setScrollLock(false);
 
     // Restore the unsaved-changes warning since we're not actually saving.
     this.isSaving = false;
@@ -2252,18 +2353,47 @@ export default class extends Controller {
     return match ? match[1] : null;
   }
 
+  // The Unpublish button is a form submit. Intercept it, confirm via the styled
+  // modal, and submit the stashed form on "Unpublish". confirmedUnpublish lets
+  // the re-issued submit through.
   confirmUnpublish(event) {
-    if (
-      !confirm(
-        "Unpublishing this post will save your changes and remove it from your site. Continue?",
-      )
-    ) {
-      event.preventDefault();
-      return;
-    }
+    if (this.confirmedUnpublish) return; // already confirmed via the modal
+    event.preventDefault();
+    this.pendingUnpublishForm = event.currentTarget;
 
-    this.isSaving = true;
+    if (this.hasUnpublishModalTarget) {
+      this.unpublishModalTarget.classList.remove("hidden");
+    } else {
+      // Fallback for any page without the modal.
+      if (
+        window.confirm(
+          "Unpublish this item? Your changes will be saved and it will be removed from your site.",
+        )
+      ) {
+        this.submitUnpublish();
+      }
+    }
+  }
+
+  submitUnpublish() {
+    this.confirmedUnpublish = true;
+    this.isSaving = true; // save + navigate; don't trip the dirty guard
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
+    if (this.hasUnpublishModalTarget) {
+      this.unpublishModalTarget.classList.add("hidden");
+    }
+    if (this.pendingUnpublishForm) this.pendingUnpublishForm.requestSubmit();
+  }
+
+  cancelUnpublish() {
+    if (this.hasUnpublishModalTarget) {
+      this.unpublishModalTarget.classList.add("hidden");
+    }
+    this.pendingUnpublishForm = null;
+  }
+
+  unpublishModalBackdrop(event) {
+    if (event.target === this.unpublishModalTarget) this.cancelUnpublish();
   }
 
   // ========== HELPER METHODS ==========

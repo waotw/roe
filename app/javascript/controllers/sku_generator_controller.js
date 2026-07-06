@@ -132,7 +132,7 @@ export default class extends Controller {
   }
 
   insertToMetadata() {
-    const sku = this.previewTarget.textContent;
+    const sku = this.previewTarget.textContent.trim();
     const category = this.categoryTarget.value.trim();
 
     if (sku === "---" || !sku) {
@@ -140,14 +140,14 @@ export default class extends Controller {
       return;
     }
 
-    // Insert SKU into metadata field
+    // Write to the metadata editor — the source of truth. Both when opened from
+    // the metadata editor and from the publish flow. If the publish modal is
+    // open, the refresh below rebuilds it so SKU + category show as confirmed.
     const skuField = document.getElementById("metadata-field-sku");
     if (skuField) {
       skuField.value = sku;
       skuField.dispatchEvent(new Event("input", { bubbles: true }));
     }
-
-    // Update category if it was changed
     if (category) {
       const categoryField = document.getElementById("metadata-field-category");
       if (categoryField) {
@@ -156,7 +156,12 @@ export default class extends Controller {
       }
     }
 
-    // Close modal
+    // Close the generator overlay.
     document.getElementById("sku-generator-modal").innerHTML = "";
+
+    // Rebuild the publish modal (if open) from the updated metadata editor.
+    document.dispatchEvent(
+      new CustomEvent("publish-modal:refresh", { bubbles: true }),
+    );
   }
 }

@@ -1,5 +1,8 @@
 <turbo-frame id="sku-generator-modal">
-  <div class="fixed inset-0  bg-blue-200/35 flex items-center justify-center z-50">
+  <%# z-[60] so it layers above the publish modal (z-50) when opened from the
+      publish flow; still the topmost overlay when opened from the metadata
+      editor (nothing else at this level there). %>
+  <div class="fixed inset-0  bg-blue-200/35 flex items-center justify-center z-[60]">
     <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl w-full mx-4"
          data-controller="sku-generator"
          data-sku-generator-product-id-value="<%= product.id %>">
