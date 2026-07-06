@@ -211,6 +211,23 @@ export default class extends Controller {
     };
     document.addEventListener("metadata:changed", this.metadataPreviewHandler);
 
+    // Keep the caret in view. The textarea grows to fit its content (no inner
+    // scroll), so when the caret moves out of frame the *window* must scroll to
+    // it. Throttled to one measure per frame, and it runs after the input
+    // handlers above (so it sees the post-autoExpand height).
+    this.caretScrollScheduled = false;
+    this.caretScrollHandler = () => {
+      if (this.caretScrollScheduled) return;
+      this.caretScrollScheduled = true;
+      requestAnimationFrame(() => {
+        this.caretScrollScheduled = false;
+        this.scrollCaretIntoView();
+      });
+    };
+    this.textareaTarget.addEventListener("input", this.caretScrollHandler);
+    this.textareaTarget.addEventListener("keyup", this.caretScrollHandler);
+    this.textareaTarget.addEventListener("click", this.caretScrollHandler);
+
     // Restore EditorState
     window.EditorState.restore("content-textarea");
 
@@ -474,6 +491,17 @@ export default class extends Controller {
       this.textareaTarget.removeEventListener("keydown", this.tabHandler);
     }
 
+    // Remove caret-into-view handlers + the mirror div
+    if (this.caretScrollHandler) {
+      this.textareaTarget.removeEventListener("input", this.caretScrollHandler);
+      this.textareaTarget.removeEventListener("keyup", this.caretScrollHandler);
+      this.textareaTarget.removeEventListener("click", this.caretScrollHandler);
+    }
+    if (this.caretMirror) {
+      this.caretMirror.remove();
+      this.caretMirror = null;
+    }
+
     // Remove footnote done button if it exists
     this.removeFootnoteDoneButton();
 
@@ -538,6 +566,107 @@ export default class extends Controller {
     this.saveMessageTargets.forEach((el) => {
       el.textContent = message;
     });
+  }
+
+  // Scroll the window so the caret is visible when it moves out of frame.
+  // Only scrolls when the caret is above the (sticky-toolbar-aware) top edge or
+  // below the bottom edge — an in-view caret never moves the page. Instant, no
+  // animation.
+  scrollCaretIntoView() {
+    const ta = this.textareaTarget;
+    if (document.activeElement !== ta) return;
+
+    const caret = this.caretCoordinates();
+    const taRect = ta.getBoundingClientRect();
+    const caretTop = taRect.top + caret.top - ta.scrollTop;
+    const caretBottom = caretTop + caret.height;
+
+    // Top edge clears the sticky toolbar while it's pinned to the top.
+    let topEdge = 24;
+    const toolbar = this.element.querySelector(
+      '[data-controller~="sticky-toolbar"]',
+    );
+    if (toolbar) {
+      const tb = toolbar.getBoundingClientRect();
+      if (tb.top <= 0) topEdge = tb.bottom + 8;
+    }
+    const bottomEdge = window.innerHeight - 60;
+
+    if (caretBottom > bottomEdge) {
+      window.scrollBy({ top: caretBottom - bottomEdge, behavior: "instant" });
+    } else if (caretTop < topEdge) {
+      window.scrollBy({ top: caretTop - topEdge, behavior: "instant" });
+    }
+  }
+
+  // Caret position within the textarea's border box, via a hidden mirror div
+  // that replicates the textarea's text layout (font, width, padding, wrapping)
+  // up to the caret. Returns { top, height } in pixels. Standard technique —
+  // textareas expose no caret geometry directly.
+  caretCoordinates() {
+    const ta = this.textareaTarget;
+    const pos = ta.selectionStart;
+    const computed = window.getComputedStyle(ta);
+
+    if (!this.caretMirror) {
+      this.caretMirror = document.createElement("div");
+      this.caretMirror.setAttribute("aria-hidden", "true");
+      document.body.appendChild(this.caretMirror);
+    }
+    const div = this.caretMirror;
+    const style = div.style;
+    style.position = "absolute";
+    style.top = "0";
+    style.left = "-9999px";
+    style.visibility = "hidden";
+    style.whiteSpace = "pre-wrap";
+    style.overflowWrap = "break-word";
+
+    [
+      "boxSizing",
+      "width",
+      "borderTopWidth",
+      "borderRightWidth",
+      "borderBottomWidth",
+      "borderLeftWidth",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft",
+      "fontStyle",
+      "fontVariant",
+      "fontWeight",
+      "fontStretch",
+      "fontSize",
+      "lineHeight",
+      "fontFamily",
+      "textAlign",
+      "textTransform",
+      "textIndent",
+      "letterSpacing",
+      "wordSpacing",
+      "tabSize",
+    ].forEach((prop) => {
+      style[prop] = computed[prop];
+    });
+
+    // A run of spaces right before the caret hangs/collapses at a line edge in
+    // pre-wrap, so a just-typed trailing space wouldn't advance the measured
+    // caret. Swap that trailing run for non-breaking spaces (same width, no
+    // collapse) so the caret advances/wraps like it does in the real textarea.
+    // Only the trailing run is touched, so wrapping of the rest is unaffected.
+    const before = ta.value
+      .substring(0, pos)
+      .replace(/ +$/, (run) => "\u00a0".repeat(run.length));
+    div.textContent = before;
+    const marker = document.createElement("span");
+    // Non-empty so the marker has a box even at a line start / end of text.
+    marker.textContent = ta.value.substring(pos) || ".";
+    div.appendChild(marker);
+
+    const top = marker.offsetTop + parseInt(computed.borderTopWidth, 10);
+    const height = parseInt(computed.lineHeight, 10) || marker.offsetHeight;
+    return { top, height };
   }
 
   // Fallback native prompt for pages that don't render the styled leave modal
@@ -650,7 +779,9 @@ export default class extends Controller {
     // There can be more than one container now (top row + bottom drawer), so
     // update them all. Read current state + the post id from whichever button
     // is currently rendered.
-    const containers = this.element.querySelectorAll(".publish-button-container");
+    const containers = this.element.querySelectorAll(
+      ".publish-button-container",
+    );
     if (!containers.length) return;
 
     const publishButton = this.element.querySelector(
