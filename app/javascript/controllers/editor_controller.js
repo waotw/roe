@@ -256,12 +256,17 @@ export default class extends Controller {
     };
     this.textareaTarget.addEventListener("keydown", this.enterHandler);
 
-    // Add Turbo navigation warning
+    // Add Turbo navigation warning (in-app link clicks)
     this.turboBeforeVisitHandler = this.handleTurboBeforeVisit.bind(this);
     document.addEventListener(
       "turbo:before-visit",
       this.turboBeforeVisitHandler,
     );
+
+    // Re-arm the guard if a save submission fails/errors (no reconnect happens
+    // in that case). See handleSubmitEnd.
+    this.submitEndHandler = this.handleSubmitEnd.bind(this);
+    document.addEventListener("turbo:submit-end", this.submitEndHandler);
 
     // Close card menu on escape or click outside
     this.cardMenuClickHandler = (e) => {
@@ -428,6 +433,9 @@ export default class extends Controller {
       this.turboBeforeVisitHandler,
     );
 
+    // Remove save-heal handler
+    document.removeEventListener("turbo:submit-end", this.submitEndHandler);
+
     // Remove metadata change listener
     document.removeEventListener(
       "metadata:changed",
@@ -467,40 +475,62 @@ export default class extends Controller {
     }
   }
 
-  handleTurboBeforeVisit(event) {
-    // If we're in the middle of saving, don't show warning
-    if (this.isSaving) {
-      console.log("[TURBO] Saving in progress, skipping dirty check");
-      return;
-    }
+  // Single source of truth for "are there unsaved changes?". Compares both the
+  // content and the metadata against the baselines captured in connect() (and
+  // reset on save). A save in flight is never dirty.
+  isDirty() {
+    if (this.isSaving) return false;
 
     const currentContent = this.textareaTarget.value;
     const currentMetadata = this.hasMetadataTarget
       ? this.metadataTarget.value
       : "";
 
-    if (
+    return (
       currentContent !== this.originalContent ||
       currentMetadata !== this.originalMetadata
-    ) {
-      if (
-        !confirm("You have unsaved changes. Are you sure you want to leave?")
-      ) {
-        event.preventDefault();
+    );
+  }
 
-        // Restore focus to the last input that was focused, or default to main textarea
-        const elementToFocus = this.lastFocusedInput || this.textareaTarget;
-        const cursorPosition = elementToFocus.selectionStart || 0;
+  // The "leave anyway?" prompt for in-app navigation (links + Back/Forward).
+  // Centralised so it can later be swapped for a styled modal. Returns true if
+  // the user chose to leave. (Hard unloads — tab close/reload — can only use the
+  // native beforeunload prompt; see handleBeforeUnload.)
+  askLeave() {
+    return window.confirm(
+      "You have unsaved changes. Are you sure you want to leave?",
+    );
+  }
 
-        requestAnimationFrame(() => {
-          elementToFocus.focus({ preventScroll: true });
+  handleTurboBeforeVisit(event) {
+    if (!this.isDirty()) return;
 
-          if (elementToFocus.selectionStart !== undefined) {
-            elementToFocus.setSelectionRange(cursorPosition, cursorPosition);
-          }
-        });
-      }
+    if (!this.askLeave()) {
+      event.preventDefault();
+
+      // Restore focus to the last input that was focused, or default to main textarea
+      const elementToFocus = this.lastFocusedInput || this.textareaTarget;
+      const cursorPosition = elementToFocus.selectionStart || 0;
+
+      requestAnimationFrame(() => {
+        elementToFocus.focus({ preventScroll: true });
+
+        if (elementToFocus.selectionStart !== undefined) {
+          elementToFocus.setSelectionRange(cursorPosition, cursorPosition);
+        }
+      });
     }
+  }
+
+  // Self-heal the saving flag. save()/publish/unpublish set isSaving=true and
+  // drop the beforeunload guard; a successful save redirects and reconnects
+  // (resetting everything). But if the submission FAILS or errors, no reconnect
+  // happens — without this the guard would stay disabled until a manual reload.
+  handleSubmitEnd(event) {
+    if (event.detail && event.detail.success) return;
+    this.isSaving = false;
+    window.removeEventListener("beforeunload", this.beforeUnloadHandler);
+    window.addEventListener("beforeunload", this.beforeUnloadHandler);
   }
 
   handleMetadataChange(event) {
@@ -2049,15 +2079,7 @@ export default class extends Controller {
   }
 
   handleBeforeUnload(event) {
-    const currentContent = this.textareaTarget.value;
-    const currentMetadata = this.hasMetadataTarget
-      ? this.metadataTarget.value
-      : "";
-
-    if (
-      currentContent !== this.originalContent ||
-      currentMetadata !== this.originalMetadata
-    ) {
+    if (this.isDirty()) {
       event.preventDefault();
       event.returnValue = "";
     }

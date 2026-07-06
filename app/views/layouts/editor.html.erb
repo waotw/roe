@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%# Load the editor as a standalone document (full reload on every visit)
+        rather than a Turbo snapshot swap. This makes leaving via Back/Forward/
+        close/reload a real page unload, so the beforeunload unsaved-changes
+        guard fires reliably. In-page links (e.g. "Back to Posts") still route
+        through Turbo + the turbo:before-visit guard. %>
+    <meta name="turbo-visit-control" content="reload">
+    <meta name="turbo-cache-control" content="no-cache">
+
     <% if SiteConfig.get('favicon').present? %>
       <link rel="icon" type="image/x-icon" href="<%= config_image_path(SiteConfig.get('favicon')) %>">
     <% end %>
