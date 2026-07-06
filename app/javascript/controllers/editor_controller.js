@@ -178,6 +178,21 @@ export default class extends Controller {
       this.lastCursorPosition = null;
     });
 
+    // Live preview auto-refresh. Once the preview tab has been opened, edits
+    // are pushed to it — debounced — so it updates its <main> in place without
+    // a reload (scroll position preserved). See preview(), pushPreviewUpdate(),
+    // and the @preview_mode receiver in layouts/site.html.erb.
+    // "Opened" survives the post-save reload so edits stay live afterwards.
+    this.previewStateKey = `roe-preview-open-${this.resourceTypeValue}-${this.resourceIdValue}`;
+    this.previewOpened =
+      sessionStorage.getItem(this.previewStateKey) === "1";
+    this.previewUpdateTimer = null;
+    this.textareaTarget.addEventListener("input", () =>
+      this.schedulePreviewUpdate(),
+    );
+    this.metadataPreviewHandler = () => this.schedulePreviewUpdate();
+    document.addEventListener("metadata:changed", this.metadataPreviewHandler);
+
     // Restore EditorState
     window.EditorState.restore("content-textarea");
 
@@ -218,10 +233,11 @@ export default class extends Controller {
       this.publishRequestHandler,
     );
 
-    // Check for saved trigger and broadcast refresh
+    // Just saved (server redirected back with this marker): if a preview tab is
+    // live, push the freshly-saved content into it in place.
     const savedTrigger = document.querySelector('[data-trigger="refresh"]');
-    if (savedTrigger) {
-      this.previewChannel.postMessage({ action: "refresh" });
+    if (savedTrigger && this.previewOpened) {
+      this.pushPreviewUpdate();
     }
 
     // Prevent scroll restoration
@@ -393,6 +409,13 @@ export default class extends Controller {
         this.publishRequestHandler,
       );
     }
+    if (this.metadataPreviewHandler) {
+      document.removeEventListener(
+        "metadata:changed",
+        this.metadataPreviewHandler,
+      );
+    }
+    clearTimeout(this.previewUpdateTimer);
 
     // Close broadcast channel
     if (this.previewChannel) {
@@ -1567,15 +1590,92 @@ export default class extends Controller {
   // ========== PREVIEW ACTION ==========
 
   preview(event) {
-    event.preventDefault();
+    event?.preventDefault();
     if (!this.previewPathValue) {
       console.error("Preview path not defined");
       return;
     }
 
-    const url = new URL(this.previewPathValue, window.location.origin);
     const previewId = `${this.resourceTypeValue}-${this.resourceIdValue}`;
-    window.open(url.toString(), previewId);
+
+    // From here on, debounced edits will keep this tab live (see
+    // schedulePreviewUpdate / pushPreviewUpdate). Persist so it stays live
+    // across the post-save reload.
+    this.previewOpened = true;
+    sessionStorage.setItem(this.previewStateKey, "1");
+
+    // POST the CURRENT (possibly unsaved) content so the preview reflects the
+    // editor as it is right now, not the last-saved file. The preview endpoints
+    // render params[:content] (+ params[:metadata] where applicable). Targeting
+    // the named window means the first Preview opens a tab and later ones
+    // refresh that same tab in the background.
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = this.previewPathValue;
+    form.target = previewId;
+    form.style.display = "none";
+
+    const addField = (name, value) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (token) addField("authenticity_token", token);
+    addField("content", this.textareaTarget.value);
+    const metadataField = this.element.querySelector('[name="metadata"]');
+    if (metadataField) addField("metadata", metadataField.value);
+
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+  }
+
+  // Debounce edits before pushing to the open preview tab, so we render at most
+  // once per typing pause rather than per keystroke. No-op until the preview has
+  // actually been opened.
+  schedulePreviewUpdate() {
+    if (!this.previewOpened) return;
+    clearTimeout(this.previewUpdateTimer);
+    this.previewUpdateTimer = setTimeout(() => this.pushPreviewUpdate(), 800);
+  }
+
+  // Render the current (unsaved) content server-side and hand the resulting
+  // <main> HTML to the preview tab over the BroadcastChannel. The receiver swaps
+  // it in place, preserving scroll — no reload. Fire-and-forget; failures are
+  // silent (the tab may simply be closed).
+  pushPreviewUpdate() {
+    if (!this.previewPathValue || !this.previewChannel) return;
+
+    const body = new FormData();
+    body.append("content", this.textareaTarget.value);
+    const metadataField = this.element.querySelector('[name="metadata"]');
+    if (metadataField) body.append("metadata", metadataField.value);
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+
+    fetch(this.previewPathValue, {
+      method: "POST",
+      headers: { "X-CSRF-Token": token || "" },
+      body,
+    })
+      .then((response) => (response.ok ? response.text() : null))
+      .then((html) => {
+        if (!html) return;
+        const main = new DOMParser()
+          .parseFromString(html, "text/html")
+          .querySelector("main");
+        if (main) {
+          this.previewChannel.postMessage({
+            action: "render",
+            html: main.innerHTML,
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   // ========== FORM ACTIONS ==========
@@ -1612,8 +1712,9 @@ export default class extends Controller {
     // Remove beforeunload handler
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
 
-    // Broadcast refresh to preview
-    this.previewChannel.postMessage({ action: "refresh" });
+    // The preview is kept current by the debounced live updates; the post-save
+    // reload re-pushes the saved content (see the data-trigger="refresh" path
+    // in connect). No pre-submit broadcast needed here.
 
     console.log("[SAVE] Dirty state cleared, form will submit");
   }

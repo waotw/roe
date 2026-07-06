@@ -62,7 +62,9 @@
     <header class="site-nav <%= logo_classes %>">
       <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
-    <main data-controller="footnote-tooltip">
+    <% preview_live = defined?(@preview_mode) && @preview_mode %>
+    <main data-controller="footnote-tooltip<%= " preview-receiver" if preview_live %>"
+          <% if preview_live %>data-preview-receiver-id-value="<%= @preview_id %>"<% end %>>
       <% flash.each do |type, message| %>
         <% flash_classes = "flash flash-#{type}" %>
         <div class="<%= flash_classes %>">
@@ -80,33 +82,6 @@
     <footer class="site-footer">
       <%= render_layout_file('footer') %>
     </footer>
-    <% if defined?(@preview_mode) && @preview_mode %>
-      <script nonce="<%= safe_csp_nonce %>">
-        (function() {
-          const previewId = <%= @preview_id.to_json.html_safe %>;
-
-          // Listen on broadcast channel
-          window.previewChannel = new BroadcastChannel(`preview-${previewId}`);
-
-          window.previewChannel.onmessage = (event) => {
-            if (event.data.action === 'refresh') {
-              // Save current scroll position before reload
-              sessionStorage.setItem('previewScrollPosition', window.scrollY);
-              window.location.reload();
-            }
-          };
-
-          // Restore scroll position after reload
-          const savedScroll = sessionStorage.getItem('previewScrollPosition');
-          if (savedScroll !== null) {
-            window.scrollTo(0, parseInt(savedScroll));
-            sessionStorage.removeItem('previewScrollPosition');
-          }
-
-          window.name = previewId;
-        })();
-      </script>
-    <% end %>
     <%# Checkout glue script — loads in both dynamic and static so
         Snipcart can pick up cart events on static product pages. %>
     <script src="/theme/checkout.js" nonce="<%= safe_csp_nonce %>"></script>
