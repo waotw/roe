@@ -122,6 +122,8 @@ export default class extends Controller {
     "tocPanel",
     "tocContent",
     "tocArrow",
+    "saveDot",
+    "saveMessage",
   ];
 
   static values = {
@@ -184,13 +186,24 @@ export default class extends Controller {
     // and the @preview_mode receiver in layouts/site.html.erb.
     // "Opened" survives the post-save reload so edits stay live afterwards.
     this.previewStateKey = `roe-preview-open-${this.resourceTypeValue}-${this.resourceIdValue}`;
-    this.previewOpened =
-      sessionStorage.getItem(this.previewStateKey) === "1";
+    this.previewOpened = sessionStorage.getItem(this.previewStateKey) === "1";
     this.previewUpdateTimer = null;
-    this.textareaTarget.addEventListener("input", () =>
-      this.schedulePreviewUpdate(),
-    );
-    this.metadataPreviewHandler = () => this.schedulePreviewUpdate();
+
+    // Whether a save happened immediately before this (full-reload) load. save()
+    // sets this marker and we consume it here so the indicator can distinguish a
+    // just-saved page ("changes saved") from a plain load (pristine, blank).
+    // Cleared on read, so leaving and re-entering the editor shows pristine.
+    this.savedKey = `roe-just-saved-${this.resourceTypeValue}-${this.resourceIdValue}`;
+    this.savedThisSession = sessionStorage.getItem(this.savedKey) === "1";
+    sessionStorage.removeItem(this.savedKey);
+    this.textareaTarget.addEventListener("input", () => {
+      this.updateSaveState();
+      this.schedulePreviewUpdate();
+    });
+    this.metadataPreviewHandler = () => {
+      this.updateSaveState();
+      this.schedulePreviewUpdate();
+    };
     document.addEventListener("metadata:changed", this.metadataPreviewHandler);
 
     // Restore EditorState
@@ -319,6 +332,10 @@ export default class extends Controller {
     // Listen for metadata changes from metadata_editor_controller
     this.metadataChangeHandler = this.handleMetadataChange.bind(this);
     document.addEventListener("metadata:changed", this.metadataChangeHandler);
+
+    // Paint the save-state indicator now that baselines + savedThisSession are
+    // set (shows "changes saved" after a save-reload, otherwise pristine/dirty).
+    this.updateSaveState();
 
     // CHECK BUTTON ON INITIAL LOAD
     this.checkInitialButtonState();
@@ -492,6 +509,32 @@ export default class extends Controller {
     );
   }
 
+  // Reflect editor state in the save-state indicator, three ways:
+  //   dirty              → amber dot, "unsaved changes"
+  //   clean, just saved  → green dot, "changes saved"  (persists across the
+  //                        save-reload via savedThisSession)
+  //   clean, pristine    → green dot, no text  (as it was when loaded)
+  updateSaveState() {
+    if (!this.saveDotTargets.length) return;
+
+    const dirty = this.isDirty();
+    this.saveDotTargets.forEach((dot) => {
+      dot.classList.toggle("bg-amber-500", dirty);
+      dot.classList.toggle("bg-green-500", !dirty);
+    });
+
+    // pristine (blank) vs just-saved vs dirty — mirrored to every instance
+    // (top row + drawer).
+    const message = dirty
+      ? "unsaved changes"
+      : this.savedThisSession
+        ? "changes saved"
+        : "";
+    this.saveMessageTargets.forEach((el) => {
+      el.textContent = message;
+    });
+  }
+
   // The "leave anyway?" prompt for in-app navigation (links + Back/Forward).
   // Centralised so it can later be swapped for a styled modal. Returns true if
   // the user chose to leave. (Hard unloads — tab close/reload — can only use the
@@ -551,7 +594,17 @@ export default class extends Controller {
     const statusMatch = yaml.match(/^status:\s*["']?(\w+)["']?$/m);
     const newStatus = statusMatch ? statusMatch[1] : "draft";
 
-    // Find the button
+    // Publish button is shown when the post isn't fully published yet — that
+    // includes both 'draft' and 'unlisted'. Unpublish only makes sense once the
+    // post is actually 'published'.
+    const shouldShowPublish = newStatus !== "published";
+
+    // There can be more than one container now (top row + bottom drawer), so
+    // update them all. Read current state + the post id from whichever button
+    // is currently rendered.
+    const containers = this.element.querySelectorAll(".publish-button-container");
+    if (!containers.length) return;
+
     const publishButton = this.element.querySelector(
       '[data-action*="confirmPublish"]',
     );
@@ -559,58 +612,41 @@ export default class extends Controller {
       '[data-action*="confirmUnpublish"]',
     );
 
-    // Determine current button state.
-    // Publish button is shown when the post isn't fully published yet —
-    // that includes both 'draft' and 'unlisted'. Unpublish only makes
-    // sense once the post is actually 'published'.
     const currentlyShowingPublish = publishButton !== null;
-    const shouldShowPublish = newStatus !== "published";
+    if (currentlyShowingPublish === shouldShowPublish) return; // no change
 
-    // Only update if state changed
-    if (currentlyShowingPublish === shouldShowPublish) return;
-
-    // Get the button container
-    const buttonContainer =
-      publishButton?.parentElement || unpublishButton?.parentElement;
-    if (!buttonContainer) return;
-
-    // Get post ID from existing button
     const postId =
       publishButton?.dataset.editorPostId ||
       unpublishButton?.closest("form")?.action.match(/\/posts\/(\d+)\//)?.[1];
     if (!postId) return;
 
-    // Build new button HTML
     const authToken =
       document.querySelector('meta[name="csrf-token"]')?.content || "";
 
-    if (shouldShowPublish) {
-      // Show Publish button — opens the publish modal; the actual save
-      // happens via the main form when the user confirms.
-      buttonContainer.innerHTML = `
-        <button type="button"
+    const html = shouldShowPublish
+      ? // Publish — opens the publish modal; the save happens via the main
+        // form when the user confirms.
+        `<button type="button"
                 data-action="click->editor#confirmPublish"
                 data-editor-post-id="${postId}"
-                class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+                class="uppercase text-xs px-1.5 py-0 border border-slate-800 bg-slate-200 hover:bg-slate-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
           Publish
-        </button>
-      `;
-    } else {
-      // Show Unpublish button
-      buttonContainer.innerHTML = `
-        <form action="/admin/posts/${postId}/unpublish"
+        </button>`
+      : `<form action="/admin/posts/${postId}/unpublish"
               method="post"
               data-turbo="false"
               data-action="submit->editor#confirmUnpublish">
           <input type="hidden" name="_method" value="patch">
           <input type="hidden" name="authenticity_token" value="${authToken}">
           <button type="submit"
-                  class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+                  class="uppercase text-xs text-white px-1.5 py-0 border border-slate-800 bg-slate-400 hover:bg-slate-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
             Unpublish
           </button>
-        </form>
-      `;
-    }
+        </form>`;
+
+    containers.forEach((container) => {
+      container.innerHTML = html;
+    });
   }
 
   checkInitialButtonState() {
@@ -1715,6 +1751,10 @@ export default class extends Controller {
 
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
+
+    // Leave a marker so the indicator shows "changes saved" after the reload
+    // (dirty state still wins, so a failed save that stays dirty won't mislabel).
+    sessionStorage.setItem(this.savedKey, "1");
 
     // Save the currently focused element
     const elementToSave = this.lastFocusedInput || this.textareaTarget;
