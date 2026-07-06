@@ -22,13 +22,6 @@ if (!window.EditorState || !window.EditorState.saveElement) {
     saveElement(element) {
       if (!element || !element.id) return;
 
-      console.log(
-        "SAVE ELEMENT:",
-        element.id,
-        "Cursor:",
-        element.selectionStart,
-      );
-
       const state = {
         elementId: element.id,
         cursorPosition: element.selectionStart || 0,
@@ -36,47 +29,28 @@ if (!window.EditorState || !window.EditorState.saveElement) {
         url: window.location.pathname,
       };
 
-      console.log("SAVING STATE:", state);
-
       sessionStorage.setItem(
         `editorState:${window.location.pathname}`,
         JSON.stringify(state),
       );
 
-      console.log(
-        "SAVED TO SESSION:",
-        sessionStorage.getItem(`editorState:${window.location.pathname}`),
-      );
     },
 
     restore(textareaId) {
       const stateKey = `editorState:${window.location.pathname}`;
       const savedState = sessionStorage.getItem(stateKey);
 
-      console.log("RESTORE - Key:", stateKey);
-      console.log("RESTORE - Saved state:", savedState);
-
       if (!savedState) {
-        console.log("RESTORE - No saved state found");
         return;
       }
 
       const state = JSON.parse(savedState);
-      console.log("RESTORE - Parsed state:", state);
 
       const elementToRestore = state.elementId
         ? document.getElementById(state.elementId)
         : document.getElementById(textareaId);
 
-      console.log(
-        "RESTORE - Element to restore:",
-        elementToRestore?.id,
-        "Expected cursor:",
-        state.cursorPosition,
-      );
-
       if (!elementToRestore) {
-        console.log("RESTORE - Element not found!");
         return;
       }
 
@@ -91,14 +65,9 @@ if (!window.EditorState || !window.EditorState.saveElement) {
           elementToRestore.selectionStart !== undefined &&
           state.cursorPosition !== undefined
         ) {
-          console.log("RESTORE - Setting cursor to:", state.cursorPosition);
           elementToRestore.setSelectionRange(
             state.cursorPosition,
             state.cursorPosition,
-          );
-          console.log(
-            "RESTORE - Cursor actually at:",
-            elementToRestore.selectionStart,
           );
         }
 
@@ -144,7 +113,6 @@ export default class extends Controller {
   };
 
   connect() {
-    console.log("Editor controller connected");
 
     // Leave-guard modal state (see handleTurboBeforeVisit).
     this.confirmedLeave = false;
@@ -182,11 +150,9 @@ export default class extends Controller {
 
     this.textareaTarget.addEventListener("blur", () => {
       this.lastCursorPosition = this.textareaTarget.selectionStart;
-      console.log("[BLUR] Saved cursor position:", this.lastCursorPosition);
     });
 
     this.textareaTarget.addEventListener("input", () => {
-      console.log("[INPUT] Clearing saved position");
       this.lastCursorPosition = null;
     });
 
@@ -280,7 +246,6 @@ export default class extends Controller {
       "publish-modal:refresh",
       this.publishRefreshHandler,
     );
-
 
     // Just saved (server redirected back with this marker): if a preview tab is
     // live, push the freshly-saved content into it in place.
@@ -460,7 +425,6 @@ export default class extends Controller {
   }
 
   disconnect() {
-    console.log("Editor controller disconnected");
 
     // Remove global keyboard handler
     document.removeEventListener("keydown", this.globalKeydownHandler);
@@ -909,7 +873,6 @@ export default class extends Controller {
       footnoteNumbers.length > 0 ? Math.max(...footnoteNumbers) + 1 : 1;
 
     const originalPos = this.textareaTarget.selectionStart;
-    console.log("[FOOTNOTE] Original position:", originalPos);
 
     this.textareaTarget.focus({ preventScroll: true });
     this.textareaTarget.setSelectionRange(originalPos, originalPos);
@@ -1015,7 +978,6 @@ export default class extends Controller {
       const indent = "    "; // Always 4 spaces for Kramdown compatibility
 
       document.execCommand("insertText", false, "\n" + indent);
-      console.log("[FOOTNOTE] Auto-indented with 4 spaces (Kramdown standard)");
       return true;
     }
 
@@ -1054,7 +1016,6 @@ export default class extends Controller {
   }
 
   returnFromFootnote(returnPosition) {
-    console.log("[FOOTNOTE] Returning to position:", returnPosition);
 
     let targetPosition = returnPosition;
     const pending = this.pendingFootnote;
@@ -1081,7 +1042,6 @@ export default class extends Controller {
         content.substring(pending.footnoteContentStart).trim() === "";
 
       if (inlineRefIntact && footnoteEmpty) {
-        console.log("[FOOTNOTE] Empty footnote — removing both anchors");
         this.textareaTarget.focus({ preventScroll: true });
 
         // Remove the footnote block (separator + `[^N]: `). We delete
@@ -1273,7 +1233,6 @@ export default class extends Controller {
       this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
         cursorPos - spacesToRemove;
 
-      console.log(`[OUTDENT] Removed ${spacesToRemove} spaces`);
     }
   }
 
@@ -1338,10 +1297,6 @@ export default class extends Controller {
 
     // Save cursor position FIRST (for both paths)
     this.savedCursorBeforeModal = this.textareaTarget.selectionStart;
-    console.log(
-      "[PRODUCT] Saved cursor position:",
-      this.savedCursorBeforeModal,
-    );
 
     // Check if we're on a product page
     const resourceType = this.resourceTypeValue;
@@ -1503,8 +1458,6 @@ export default class extends Controller {
   }
 
   insertProductTemplate(product) {
-    console.log("[INSERT PRODUCT] Called with:", product);
-    console.log("[INSERT PRODUCT] Saved cursor:", this.savedCursorBeforeModal);
 
     // Get template and currency symbol
     const template = this.productTemplateValue || "";
@@ -1539,7 +1492,6 @@ export default class extends Controller {
         this.savedCursorBeforeModal,
         this.savedCursorBeforeModal,
       );
-      console.log("[PRODUCT] Restored cursor to:", this.savedCursorBeforeModal);
     }
 
     // Insert template
@@ -1550,7 +1502,6 @@ export default class extends Controller {
 
     this.closeProductModal();
 
-    console.log("[INSERT PRODUCT] Template inserted");
   }
 
   closeProductModal() {
@@ -1963,7 +1914,6 @@ export default class extends Controller {
   // ========== FORM ACTIONS ==========
 
   save(event) {
-    console.log("[SAVE] Starting save...");
 
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
@@ -2002,7 +1952,6 @@ export default class extends Controller {
     // reload re-pushes the saved content (see the data-trigger="refresh" path
     // in connect). No pre-submit broadcast needed here.
 
-    console.log("[SAVE] Dirty state cleared, form will submit");
   }
 
   restoreScrollPosition() {
@@ -2065,14 +2014,12 @@ export default class extends Controller {
         this.completePublish();
         return;
       }
-      console.log("[KEYBOARD] Cmd/Ctrl+S pressed, submitting form");
       this.formTarget.requestSubmit();
     }
 
     // Cmd/Ctrl+P to preview
     if ((event.metaKey || event.ctrlKey) && event.key === "p") {
       event.preventDefault();
-      console.log("[KEYBOARD] Cmd/Ctrl+P pressed, opening preview");
       this.preview(event);
     }
 
@@ -2081,22 +2028,18 @@ export default class extends Controller {
       switch (event.key.toLowerCase()) {
         case "b":
           event.preventDefault();
-          console.log("[KEYBOARD] Cmd/Ctrl+B pressed - Bold");
           this.insertBold(event);
           break;
         case "i":
           event.preventDefault();
-          console.log("[KEYBOARD] Cmd/Ctrl+I pressed - Italic");
           this.insertItalic(event);
           break;
         case "~":
           event.preventDefault();
-          console.log("[KEYBOARD] Cmd/Ctrl+S pressed - Strikethrough");
           this.insertStrike(event);
           break;
         case "k":
           event.preventDefault();
-          console.log("[KEYBOARD] Cmd/Ctrl+K pressed - Link");
           this.insertLink(event);
           break;
       }
@@ -2404,14 +2347,11 @@ export default class extends Controller {
   }
 
   wrapSelectionWithSavedPosition(prefix, suffix, placeholder = "") {
-    console.log("[WRAP] START - savedPos:", this.lastCursorPosition);
 
     // Check if textarea currently has focus and a selection
     const hasFocus = document.activeElement === this.textareaTarget;
     const hasSelection =
       this.textareaTarget.selectionStart !== this.textareaTarget.selectionEnd;
-
-    console.log("[WRAP] Has focus:", hasFocus, "Has selection:", hasSelection);
 
     // Only use saved position if textarea doesn't have focus AND no selection
     const shouldUseSavedPosition =
@@ -2426,19 +2366,16 @@ export default class extends Controller {
         this.lastCursorPosition,
         this.lastCursorPosition,
       );
-      console.log("[WRAP] Restored position to:", this.lastCursorPosition);
     }
 
     const start = this.textareaTarget.selectionStart;
     const end = this.textareaTarget.selectionEnd;
-    console.log("[WRAP] Selection range:", start, "-", end);
 
     const selectedText = this.textareaTarget.value.substring(start, end);
     const content = selectedText || placeholder;
     const insertion = prefix + content + suffix;
 
     document.execCommand("insertText", false, insertion);
-    console.log("[WRAP] Inserted:", insertion);
 
     if (!selectedText && placeholder) {
       const selectStart = start + prefix.length;
@@ -2448,7 +2385,6 @@ export default class extends Controller {
 
     // Clear saved position
     this.lastCursorPosition = null;
-    console.log("[WRAP] END");
   }
 
   // Keep the old method for backwards compatibility if needed elsewhere
@@ -2537,7 +2473,6 @@ export default class extends Controller {
         once: true,
       });
 
-      console.log("[HIGHLIGHT] Found in content at position:", position);
       return;
     }
 
@@ -2575,12 +2510,10 @@ export default class extends Controller {
         // Scroll the input into view
         input.scrollIntoView({ behavior: "smooth", block: "center" });
 
-        console.log("[HIGHLIGHT] Found in metadata field:", fieldName);
         return;
       }
     }
 
-    console.log("[HIGHLIGHT] Media not found in content or metadata");
   }
 
   // ========== TEST EMAIL METHODS ==========
