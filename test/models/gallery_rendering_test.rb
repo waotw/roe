@@ -34,6 +34,16 @@ class GalleryRenderingTest < ActiveSupport::TestCase
     assert_includes html, %(data-sizes="100vw"), "zoom overlay pulls the largest variant"
   end
 
+  test "two blank-line rows of two render as a 2x2 grid" do
+    # This is the shape the Substack importer emits for a 4-image gallery.
+    html = render_gallery(
+      "![a](/media/images/a.jpg)\n![b](/media/images/b.jpg)\n\n" \
+      "![c](/media/images/c.jpg)\n![d](/media/images/d.jpg)"
+    )
+    assert_equal 2, html.scan("gallery-col-2").size, "two rows, each two columns"
+    refute_includes html, "gallery-col-3", "must not fall back to the 3+1 wrap"
+  end
+
   test "slideshow: true renders a carousel and consumes the directive" do
     html = render_gallery("![a](/media/images/a.jpg)\n![b](/media/images/b.jpg)\nslideshow: true")
 
@@ -64,5 +74,37 @@ class GalleryRenderingTest < ActiveSupport::TestCase
 
   test "an empty gallery renders nothing" do
     assert_equal "", render_gallery("\n\n")
+  end
+
+  test "caption: wraps the whole gallery in a figure and consumes the directive" do
+    html = render_gallery(
+      "![a](/media/images/a.jpg)\n![b](/media/images/b.jpg)\ncaption: A day on the moor"
+    )
+
+    assert_includes html, %(<figure class="gallery-figure">)
+    assert_includes html, %(<figcaption class="gallery-caption">A day on the moor</figcaption>)
+    refute_includes html, "caption:", "directive must not leak into the output"
+  end
+
+  test "gallery caption renders inline markdown" do
+    html = render_gallery("![a](/media/images/a.jpg)\ncaption: House on *Ilkley* Moor")
+    assert_includes html, %(<figcaption class="gallery-caption">House on <em>Ilkley</em> Moor</figcaption>)
+  end
+
+  test "gallery caption works alongside slideshow, sitting outside the carousel" do
+    html = render_gallery(
+      "![a](/media/images/a.jpg)\n![b](/media/images/b.jpg)\nslideshow: true\ncaption: On tour"
+    )
+
+    assert_includes html, "gallery-carousel"
+    # The gallery-level figcaption must be a sibling of .gallery, not nested
+    # inside it, so the per-image caption CSS rules leave it alone.
+    assert_match %r{</div>\s*<figcaption class="gallery-caption">On tour</figcaption></figure>}, html
+  end
+
+  test "no caption directive means no wrapping figure" do
+    html = render_gallery("![a](/media/images/a.jpg)")
+    refute_includes html, "gallery-figure"
+    refute_includes html, "gallery-caption"
   end
 end

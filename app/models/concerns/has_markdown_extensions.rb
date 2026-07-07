@@ -402,7 +402,7 @@ module HasMarkdownExtensions
   # Fenced-gallery directives understood at the top/bottom of a ```gallery```
   # block (a `key: value` line that isn't a markdown image). Whitelisted so
   # stray "Word: text" lines stay content, not config.
-  GALLERY_DIRECTIVES = %w[slideshow].freeze
+  GALLERY_DIRECTIVES = %w[slideshow caption].freeze
 
   def render_gallery(content, preview: false, index: 0)
     config, image_rows = parse_gallery(content)
@@ -415,11 +415,29 @@ module HasMarkdownExtensions
         render_gallery_grid(image_rows, index)
       end
 
+    body = wrap_gallery_caption(body, config["caption"])
+
     # {::nomarkdown} passes the raw HTML through kramdown untouched; the
     # later process_responsive_images sweep turns each <img data-sizes> into
     # a responsive <picture> (grid thumbs get small/medium variants, the
     # zoom overlay's data-sizes="100vw" pulls the largest).
     [ "", "{::nomarkdown}", body, "{:/nomarkdown}", "" ].join("\n")
+  end
+
+  # A gallery-level `caption:` directive wraps the whole gallery in a
+  # <figure> with a single <figcaption> — a caption for the gallery as a
+  # whole, distinct from the per-image `(*caption*)` figcaptions. The text
+  # runs through kramdown (like image captions) so inline markdown works,
+  # then the wrapping <p> is stripped for a clean inline figcaption. The
+  # figcaption sits outside the .gallery div so it never trips the
+  # `.gallery figcaption` / `.gallery-carousel:has(figcaption)` rules meant
+  # for per-image captions.
+  def wrap_gallery_caption(body, caption)
+    return body if caption.blank?
+
+    html = Kramdown::Document.new(caption.strip, input: "GFM").to_html.strip
+                            .gsub(%r{\A<p>(.*)</p>\z}, '\1')
+    %(<figure class="gallery-figure">#{body}<figcaption class="gallery-caption">#{html}</figcaption></figure>)
   end
 
   # Split a gallery body into [config, image_rows]. Directive lines are

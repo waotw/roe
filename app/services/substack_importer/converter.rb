@@ -294,22 +294,40 @@ module SubstackImporter
 
       gallery = data["gallery"] || {}
       images = gallery["images"] || []
-      caption = gallery["caption"].to_s
+      caption = gallery["caption"].to_s.strip
 
-      lines = images.each_with_index.map do |img, i|
+      lines = images.map do |img|
         src = img["src"].to_s
         alt = (img["alt"].to_s.presence || data["alt"].to_s).strip
 
         @images << { src: src, alt: alt }
-
-        if i == 0 && !caption.empty?
-          "![#{alt}](#{src})(*#{caption}*)"
-        else
-          "![#{alt}](#{src})"
-        end
+        "![#{alt}](#{src})"
       end
+      return "" if lines.empty?
 
-      "#{lines.join("\n")}\n\n"
+      # A 4-image gallery reads better as a balanced 2×2 than the renderer's
+      # default 3-then-1 wrap, so split it into two rows of two (a blank line
+      # starts a new grid row). Every other count keeps the single-run layout
+      # the renderer already handles well: 6 → 3×2, 5 → 3+2, etc.
+      rows = lines.size == 4 ? [ lines[0..1], lines[2..3] ] : [ lines ]
+      body = rows.map { |row| row.join("\n") }.join("\n\n")
+
+      # A Substack gallery caption describes the gallery as a whole, so it maps
+      # to the renderer's `caption:` directive (collapsed to one line — the
+      # directive is line-based).
+      directive = "caption: #{caption.gsub(/\s+/, ' ')}" if caption.present?
+
+      # Both the row split and the `caption:` directive only work inside an
+      # explicit ```gallery``` fence — bare image lines with a blank between
+      # them would be flushed as two separate auto-galleries, and a stray
+      # `caption:` line would render as text. Fall back to bare lines (letting
+      # auto-gallery group them) only when neither is in play.
+      if rows.size == 1 && directive.nil?
+        "#{body}\n\n"
+      else
+        inner = [ body, directive ].compact.join("\n")
+        "```gallery\n#{inner}\n```\n\n"
+      end
     end
 
     def process_audio_embed(node)

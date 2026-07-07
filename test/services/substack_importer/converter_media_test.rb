@@ -28,6 +28,82 @@ module SubstackImporter
       assert_equal "audio-34fd1f0e-b9f1-4ee8-a994-b5e8bf86af35.mp3", embed[:filename]
     end
 
+    # --- Image galleries -----------------------------------------------------
+
+    def gallery_html(caption:)
+      cap = caption.nil? ? "null" : %("#{caption}")
+      attrs = %({&quot;gallery&quot;:{&quot;images&quot;:[) +
+              %({&quot;src&quot;:&quot;https://x/a.jpg&quot;,&quot;alt&quot;:&quot;a&quot;},) +
+              %({&quot;src&quot;:&quot;https://x/b.jpg&quot;,&quot;alt&quot;:&quot;b&quot;}],) +
+              %(&quot;caption&quot;:#{cap.gsub('"', "&quot;")}}})
+      %(<div class="image-gallery-embed" data-attrs="#{attrs}"></div>)
+    end
+
+    # N images with src/alt = 1..N, optional gallery caption.
+    def gallery_html_n(count, caption: nil)
+      imgs = (1..count).map do |i|
+        %({&quot;src&quot;:&quot;https://x/#{i}.jpg&quot;,&quot;alt&quot;:&quot;#{i}&quot;})
+      end.join(",")
+      cap = caption.nil? ? "null" : %("#{caption}").gsub('"', "&quot;")
+      attrs = %({&quot;gallery&quot;:{&quot;images&quot;:[#{imgs}],&quot;caption&quot;:#{cap}}})
+      %(<div class="image-gallery-embed" data-attrs="#{attrs}"></div>)
+    end
+
+    def test_four_image_gallery_splits_into_two_by_two_rows
+      md = Converter.new.convert(gallery_html_n(4))
+
+      assert_includes md, "```gallery", "row split requires an explicit fence"
+      # Row 1 = images 1,2 on adjacent lines; blank line; row 2 = images 3,4.
+      assert_includes md, "![1](https://x/1.jpg)\n![2](https://x/2.jpg)"
+      assert_includes md, "![2](https://x/2.jpg)\n\n![3](https://x/3.jpg)"
+      assert_includes md, "![3](https://x/3.jpg)\n![4](https://x/4.jpg)"
+    end
+
+    def test_four_image_gallery_keeps_caption_with_the_grid
+      md = Converter.new.convert(gallery_html_n(4, caption: "Weekend away"))
+
+      assert_includes md, "```gallery"
+      assert_includes md, "![2](https://x/2.jpg)\n\n![3](https://x/3.jpg)"
+      assert_includes md, "caption: Weekend away"
+    end
+
+    def test_six_image_gallery_stays_a_simple_single_run
+      md = Converter.new.convert(gallery_html_n(6))
+
+      refute_includes md, "```gallery", "6 images ⇒ default 3×2, no forced rows"
+      (1..6).each { |i| assert_includes md, "![#{i}](https://x/#{i}.jpg)" }
+      refute_includes md, "\n\n![", "no blank-line row break in a simple run"
+    end
+
+    def test_gallery_caption_becomes_fenced_gallery_directive
+      md = Converter.new.convert(gallery_html(caption: "A day on the moor"))
+
+      assert_includes md, "```gallery"
+      assert_includes md, "![a](https://x/a.jpg)"
+      assert_includes md, "![b](https://x/b.jpg)"
+      assert_includes md, "caption: A day on the moor"
+      # The caption must no longer be hung off the first image.
+      refute_includes md, "(*A day on the moor*)"
+    end
+
+    def test_gallery_without_caption_emits_bare_image_lines
+      md = Converter.new.convert(gallery_html(caption: nil))
+
+      assert_includes md, "![a](https://x/a.jpg)"
+      assert_includes md, "![b](https://x/b.jpg)"
+      refute_includes md, "```gallery", "no caption ⇒ rely on auto-gallery grouping"
+      refute_includes md, "caption:"
+    end
+
+    def test_gallery_images_are_collected_for_download
+      converter = Converter.new
+      converter.convert(gallery_html(caption: "cap"))
+
+      srcs = converter.collected_images.map { |i| i[:src] }
+      assert_includes srcs, "https://x/a.jpg"
+      assert_includes srcs, "https://x/b.jpg"
+    end
+
     # --- Share buttons -------------------------------------------------------
 
     def share_card?(md)
