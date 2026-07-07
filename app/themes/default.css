@@ -1475,12 +1475,11 @@ p.collection-more a:hover {
 }
 
 .gallery-col-1 img {
-  max-height: 70vh;
-  object-fit: contain;
+  aspect-ratio: auto;
 }
 
 .gallery-col-2 img {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 1;
 }
 
 .gallery-col-3 img {
@@ -1585,6 +1584,20 @@ figcaption {
   line-height: 1;
   color: #fff;
   cursor: pointer;
+}
+
+.gallery-ratio-square .gallery-row img {
+  aspect-ratio: 1 / 1;
+}
+.gallery-ratio-cinema .gallery-row img {
+  aspect-ratio: 21 / 9;
+}
+.gallery-ratio-tv .gallery-row img {
+  aspect-ratio: 4 / 3;
+}
+.gallery-ratio-original .gallery-row img {
+  aspect-ratio: auto;
+  object-fit: contain;
 }
 
 /* --- Carousel (slideshow: true) ------------------------------------------
@@ -1820,6 +1833,10 @@ figcaption {
   text-decoration: underline;
   font-size: var(--text-xs);
   margin: auto 0 0 0;
+}
+
+.card.post-link-large .card-link {
+  margin: 0 0 0 0;
 }
 
 .card[class*="post-link-"] .card-link:hover {

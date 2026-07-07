@@ -14,7 +14,7 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
   }.freeze
 
   test "types match the renderer's dispatch values" do
-    assert_equal %w[pullquote aside post-link product-link], CardBuilderSchema.types.map { |t| t[:value] }
+    assert_equal %w[pullquote post-link aside product-link], CardBuilderSchema.types.map { |t| t[:value] }
   end
 
   test "every field is well-formed and a real option for its type" do

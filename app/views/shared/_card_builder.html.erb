@@ -32,12 +32,14 @@
                 data-action="change->card-builder#typeChanged"
                 class="w-full font-mono text-sm p-2 border border-gray-800 bg-gray-50 <%= select_chevron %>">
           <% CardBuilderSchema.types.each do |t| %>
+            <% next if t[:value] == "product-link" && !store_enabled? %>
             <option value="<%= t[:value] %>"><%= t[:label] %></option>
           <% end %>
         </select>
       </div>
 
       <% CardBuilderSchema.types.each do |t| %>
+        <% next if t[:value] == "product-link" && !store_enabled? %>
         <% type = t[:value] %>
         <% defaults = CardBuilderSchema.default_values(type) %>
         <% fields = CardBuilderSchema.fields_for(type) %>

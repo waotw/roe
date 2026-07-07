@@ -17,8 +17,8 @@ module CardBuilderSchema
   # Ordered for the type selector at the top of the modal.
   TYPES = [
     { value: "pullquote",    label: "Pull quote" },
-    { value: "aside",        label: "Aside" },
     { value: "post-link",    label: "Post link" },
+    { value: "aside",        label: "Aside" },
     { value: "product-link", label: "Product link" }
   ].freeze
 
