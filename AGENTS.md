@@ -297,6 +297,14 @@ Products are Markdown files in `site/products/` with front-matter defining price
 
 **Public search**: `SearchIndexGenerator` builds a JSON index served at `/search-index.json` (`SearchController`) and baked into static builds, so search works with no backend. The `site_search` (overlay) and `search_trigger` (content-embedded) Stimulus controllers filter it client-side, scoped by source / post_type / tags.
 
+### The editor
+`editor_controller` + `shared/_editor` power the admin editor for posts/pages/products/emails. A few non-obvious pieces:
+
+- **Standalone document / unsaved-changes guard**: `layouts/editor.html.erb` sets `turbo-visit-control: reload` so the editor is a full document, not a Turbo snapshot — leaving via Back/Forward/close/reload is a real unload and the `beforeunload` dirty guard fires. **Don't remove that meta tag.** In-app link clicks are caught via `turbo:before-visit` and confirmed with `shared/_leave_modal`.
+- **Live preview**: the editor POSTs the current (unsaved) content to the type's `preview` action and pushes the rendered `<main>` to the open preview tab over a `BroadcastChannel("preview-<type>-<id>")`; the preview page's `preview_receiver` controller swaps it in place (scroll preserved).
+- **Shared action bar**: Save/Preview/(Un)publish + the save-state dot live in `shared/_editor_primary_actions` (rendered in-flow *and* inside the sticky `editor_drawer`); the full header lives in `shared/_editor_actions`, driven by `resource` + `resource_type`. Edit the shared partials, not per-type copies.
+- **Publish modal = metadata editor is the source of truth**: `admin/posts/_publish_modal` (shared) reflects the editor — present required fields are read-only "✓" bullets, missing ones are inputs that write straight into the editor via `editor#syncModalField` → `applyMetadataField`. The SKU generator writes to the editor and fires `publish-modal:refresh` to rebuild; `completePublish` submits the editor form.
+
 ## Testing Conventions
 
 - Framework: **Minitest** (Rails default), NOT RSpec
@@ -381,7 +389,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Importmap (no Node/Webpack)
 - Stimulus controllers in `app/javascript/controllers/`
 - Pins defined in `config/importmap.rb`
-- Notable controllers: `audio_player`, `editor`, `metadata_editor`, `media_picker`, `media_bulk_select`, `media_filter` (media browse tabs/search), `image_upload` (config image field verify/preview), `config_focus` (focuses a config field from `?focus=`), `css_editor`, `footnote_tooltip`, `site_search`, `search_trigger`, `collection_builder`, `card_builder`, `gallery_builder`
+- Notable controllers: `audio_player`, `editor`, `editor_drawer` (sticky action bar), `preview_receiver` (in-place preview swap, runs in the preview tab), `metadata_editor`, `media_picker`, `media_bulk_select`, `media_filter` (media browse tabs/search), `image_upload` (config image field verify/preview), `config_focus` (focuses a config field from `?focus=`), `css_editor`, `footnote_tooltip`, `site_search`, `search_trigger`, `collection_builder`, `card_builder`, `gallery_builder`
 
 ### CSS
 - Tailwind CSS (via `tailwindcss-rails`) for the application UI
