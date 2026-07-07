@@ -402,17 +402,19 @@ module HasMarkdownExtensions
   # Fenced-gallery directives understood at the top/bottom of a ```gallery```
   # block (a `key: value` line that isn't a markdown image). Whitelisted so
   # stray "Word: text" lines stay content, not config.
-  GALLERY_DIRECTIVES = %w[slideshow caption].freeze
+  GALLERY_DIRECTIVES = %w[slideshow caption aspect_ratio].freeze
 
   def render_gallery(content, preview: false, index: 0)
     config, image_rows = parse_gallery(content)
     return (preview ? "<!-- Empty gallery -->" : "") if image_rows.flatten.empty?
 
+    ratio_class = gallery_ratio_class(config["aspect_ratio"])
+
     body =
       if truthy_directive?(config["slideshow"])
-        render_gallery_carousel(image_rows.flatten, index)
+        render_gallery_carousel(image_rows.flatten, index, ratio_class)
       else
-        render_gallery_grid(image_rows, index)
+        render_gallery_grid(image_rows, index, ratio_class)
       end
 
     body = wrap_gallery_caption(body, config["caption"])
@@ -473,6 +475,16 @@ module HasMarkdownExtensions
     %w[true yes 1 on].include?(value.to_s.strip.downcase)
   end
 
+  # `aspect_ratio: square` (or original/cinema/tv/…) becomes a
+  # `gallery-ratio-<value>` class on the .gallery container so a theme can set
+  # the image aspect-ratio however it likes — no fixed whitelist, just add the
+  # matching CSS. The value is author content, so keep only a safe CSS-token
+  # subset ([a-z0-9-]); anything empty or unusable yields no class.
+  def gallery_ratio_class(value)
+    slug = value.to_s.strip.downcase.gsub(/[^a-z0-9-]/, "")
+    "gallery-ratio-#{slug}" unless slug.empty?
+  end
+
   # When on (site.yml `soft_line_breaks: true`), a single newline renders as a
   # <br> — no trailing-two-spaces needed. Off by default (standard Markdown).
   def soft_line_breaks?
@@ -483,8 +495,8 @@ module HasMarkdownExtensions
   # Grid: blank-line rows, up to 3 columns each. Every image is a zoomable
   # .gallery-item; the matching :target overlays are collected and appended
   # once at the end of the gallery.
-  def render_gallery_grid(image_rows, index)
-    out = +%(<div class="gallery">)
+  def render_gallery_grid(image_rows, index, ratio_class = nil)
+    out = +%(<div class="#{[ "gallery", ratio_class ].compact.join(' ')}">)
     overlays = +""
     item = 0
 
@@ -506,9 +518,9 @@ module HasMarkdownExtensions
 
   # Carousel: one scroll-snap track, image order preserved. CSS does the
   # scrolling/snapping; gallery.js adds arrows/dots as enhancement.
-  def render_gallery_carousel(images, index)
+  def render_gallery_carousel(images, index, ratio_class = nil)
     sizes = "(min-width: 1024px) 75vw, 100vw"
-    out = +%(<div class="gallery gallery-carousel" data-gallery-carousel><div class="gallery-track">)
+    out = +%(<div class="#{[ "gallery", "gallery-carousel", ratio_class ].compact.join(' ')}" data-gallery-carousel><div class="gallery-track">)
     overlays = +""
 
     images.each_with_index do |img, i|

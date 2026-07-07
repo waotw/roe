@@ -2,14 +2,15 @@ import { Controller } from "@hotwired/stimulus";
 
 // Gallery insert popover. Mounted on the editor root alongside `editor`. The
 // Gallery toolbar button opens a small dropdown with a "Display as carousel?"
-// checkbox and an optional caption; Insert drops a ```gallery block at the
-// cursor — plain (grid) when unchecked, plus `slideshow: true` when checked,
-// plus `caption: ...` when a caption is given — with the image placeholder
-// selected so the author can type/paste paths or use the media picker.
+// checkbox, an optional aspect-ratio select, and an optional caption; Insert
+// drops a ```gallery block at the cursor — plain (grid) when unchecked, plus
+// `slideshow: true`, `aspect_ratio: ...`, and/or `caption: ...` as chosen —
+// with the image placeholder selected so the author can type/paste paths or
+// use the media picker.
 //
 // Isolated from editor_controller: it reads/writes the shared textarea itself.
 export default class extends Controller {
-  static targets = ["wrap", "menu", "carousel", "caption"];
+  static targets = ["wrap", "menu", "carousel", "aspect", "ratioNote", "caption"];
 
   connect() {
     this.textarea = this.element.querySelector(
@@ -48,25 +49,39 @@ export default class extends Controller {
     document.removeEventListener("click", this.onOutside, true);
   }
 
+  // Carousels size images by height, so the aspect-ratio class is a no-op
+  // there. Warn when both are set rather than silently dropping one.
+  updateRatioNote() {
+    if (!this.hasRatioNoteTarget) return;
+    const carousel = this.hasCarouselTarget && this.carouselTarget.checked;
+    const aspect = this.hasAspectTarget && this.aspectTarget.value;
+    this.ratioNoteTarget.classList.toggle("hidden", !(carousel && aspect));
+  }
+
   insert(event) {
     event?.preventDefault();
     const carousel = this.hasCarouselTarget && this.carouselTarget.checked;
+    const aspect = this.hasAspectTarget ? this.aspectTarget.value : "";
     const caption = this.hasCaptionTarget ? this.captionTarget.value.trim() : "";
 
-    // Directives follow the image placeholder, one per line. `caption:` is
-    // line-based, so collapse any stray whitespace to keep it on one line.
+    // Directives follow the image placeholder, one per line. Each is optional;
+    // an unset control emits nothing. `caption:` is line-based, so collapse any
+    // stray whitespace to keep it on one line.
     const directives = [];
     if (carousel) directives.push("slideshow: true");
+    if (aspect) directives.push("aspect_ratio: " + aspect);
     if (caption) directives.push("caption: " + caption.replace(/\s+/g, " "));
 
     const inner = ["__PLACEHOLDER__", ...directives].join("\n");
     const block = "```gallery\n" + inner + "\n```";
 
-    // Clear both inputs on insert so the next gallery starts fresh. Closing
+    // Clear the controls on insert so the next gallery starts fresh. Closing
     // the menu without inserting leaves them as-is (hide() doesn't reset);
     // a page reload clears them anyway since they're plain form fields.
     if (this.hasCarouselTarget) this.carouselTarget.checked = false;
+    if (this.hasAspectTarget) this.aspectTarget.value = "";
     if (this.hasCaptionTarget) this.captionTarget.value = "";
+    this.updateRatioNote();
 
     this.hide();
     if (!this.textarea) return;
