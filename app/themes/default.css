@@ -209,6 +209,10 @@ figure {
   margin: 0 0 0 0;
 }
 
+li > p {
+  margin: 0 0 0 0;
+}
+
 /* =========== LAYOUT — SITE NAV ============ */
 
 .site-nav {
@@ -865,7 +869,7 @@ div.flash mark {
 
 .content figure img,
 .content figure picture {
-  margin-bottom: var(--space-1);
+  /*margin-bottom: var(--space-1);*/
 }
 
 .content hr {
@@ -923,6 +927,10 @@ a.footnote {
 
 .footnotes p {
   margin: 0 0 0 0;
+}
+
+.footnotes blockquote {
+  margin: var(--space-1) 0 var(--space-1) 0;
 }
 
 a.footnote-backlink-number {
@@ -1479,6 +1487,14 @@ p.collection-more a:hover {
   aspect-ratio: 1 / 1;
 }
 
+.gallery-figure .gallery {
+  margin-bottom: 0;
+}
+
+.gallery-figure .gallery-caption {
+  margin-top: 0;
+}
+
 .gallery figure {
   margin: 0;
 }
@@ -1508,6 +1524,10 @@ figcaption {
 .gallery-item {
   margin: 0;
   min-width: 0;
+}
+
+.gallery-item picture {
+  display: block;
 }
 
 .gallery-zoom-link {
