@@ -205,11 +205,14 @@ class Product < ApplicationRecord
     # Get next number if not provided
     number ||= self.class.next_number_for_category(category)
 
-    # Generate title slug (limit to 20 chars, uppercase)
-    title_slug = title.to_s.parameterize.gsub("-", "").upcase.first(30)
+    # Name from the title (single segment); details from the variant when set,
+    # keeping any parameterized hyphens so e.g. "Red / L" → "RED-L".
+    name    = title.to_s.parameterize.gsub("-", "").upcase.first(30)
+    details = variant.to_s.parameterize.upcase.first(20)
 
-    # Format: CATEGORY-NUMBER-TITLESLUG
-    "#{category.upcase}-#{number.to_s.rjust(3, '0')}-#{title_slug}"
+    # Format: CATEGORY-NUMBER-NAME[-DETAILS]
+    [ category.upcase, number.to_s.rjust(3, "0"), name, details ]
+      .reject(&:blank?).join("-")
   end
 
   def self.duplicate_skus

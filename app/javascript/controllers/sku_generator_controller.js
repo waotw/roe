@@ -4,6 +4,7 @@ export default class extends Controller {
   static targets = [
     "category",
     "number",
+    "name",
     "details",
     "preview",
     "skuField",
@@ -24,9 +25,13 @@ export default class extends Controller {
   updatePreview() {
     const category = this.categoryTarget.value.toUpperCase() || "PROD";
     const number = this.numberTarget.value.padStart(3, "0");
+    const name = this.nameTarget.value.toUpperCase();
     const details = this.detailsTarget.value.toUpperCase();
 
     let sku = `${category}-${number}`;
+    if (name) {
+      sku += `-${name}`;
+    }
     if (details) {
       sku += `-${details}`;
     }

@@ -3,7 +3,7 @@
       publish flow; still the topmost overlay when opened from the metadata
       editor (nothing else at this level there). %>
   <div class="fixed inset-0  bg-blue-200/35 flex items-center justify-center z-[60]">
-    <div class="bg-white border-2 border-gray-900 p-8 max-w-2xl w-full mx-4"
+    <div class="bg-white border-2 border-gray-900 p-8 max-w-3xl w-full mx-4"
          data-controller="sku-generator"
          data-sku-generator-product-id-value="<%= product.id %>">
 
@@ -19,14 +19,14 @@
           <div><span class="text-blue-600">Poster:</span> POSTER-001-POSTERTITLE</div>
           <div><span class="text-blue-600">T-Shirt:</span> TSHIRT-001-SHIRTNAME-RED-L</div>
         </div>
-        <p class="mt-2 text-blue-700 font-sans text-xs">Suggested Pattern: <code class="bg-blue-100 px-1">{CATEGORY}-{NUMBER}-{TITLE/NAME}-{SPECIFIC}-{DETAILS}</code></p>
+        <p class="mt-2 text-blue-700 font-sans text-xs">Suggested Pattern: <code class="bg-blue-100 px-1">{CATEGORY}-{NUMBER}-{NAME}-{DETAILS}</code></p>
       </div>
 
       <!-- SKU Generator -->
       <div class="bg-gray-50 border border-gray-300 p-6 mb-6">
         <h3 class="font-semibold text-gray-900 mb-3">SKU Generator</h3>
 
-        <div class="grid grid-cols-3 gap-4 mb-4">
+        <div class="grid grid-cols-4 gap-4 mb-4">
           <!-- Category -->
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Category</label>
@@ -60,16 +60,28 @@
             <p class="text-xs text-gray-500 mt-1">Next: <%= sprintf('%03d', Product.next_number_for_category(product.metadata['category'])) %></p>
           </div>
 
+          <!-- Name -->
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Name</label>
+            <input type="text"
+                   data-sku-generator-target="name"
+                   data-action="input->sku-generator#updatePreview"
+                   value="<%= product.title.to_s.parameterize.upcase.gsub('-', '').first(30) %>"
+                   placeholder="TITLESLUG"
+                   class="w-full px-2 py-1.5 border border-gray-300 font-mono text-xs uppercase">
+            <p class="text-xs text-gray-500 mt-1">From title</p>
+          </div>
+
           <!-- Details -->
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1 uppercase">Details</label>
             <input type="text"
                    data-sku-generator-target="details"
                    data-action="input->sku-generator#updatePreview"
-                   value="<%= product.title.to_s.parameterize.upcase.gsub('-', '').first(20) %>"
-                   placeholder="TITLESLUG"
+                   value="<%= product.variant.to_s.parameterize.upcase.first(20) %>"
+                   placeholder="VARIANT"
                    class="w-full px-2 py-1.5 border border-gray-300 font-mono text-xs uppercase">
-            <p class="text-xs text-gray-500 mt-1">From title (optional)</p>
+            <p class="text-xs text-gray-500 mt-1">From variant</p>
           </div>
         </div>
 
