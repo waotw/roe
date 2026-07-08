@@ -16,7 +16,7 @@ Before using newsletters, you need to: **Enable Members**: Go to `Admin` → `Se
 
 ## Setting Up Postmark
 
-Roe has intregrated with Postmark to send member and newsletter emails. Follow the instructions below to set things up.
+Roe has integrated with Postmark to send member and newsletter emails. Follow the instructions below to set things up.
 
 ### 1. Basic Postmark Setup
 
@@ -199,6 +199,6 @@ Every send is recorded in the database:
 
 ## Best Practices
 
-The newsletter system is designed to be reliable and hands-off - set it up once, and it handles sending, tracking, and list management automatically. When you send a newsletter to your full audience, check: Admin → Members and check the Bounced Newletter Status to see if you're getting more bounces than expected.
+The newsletter system is designed to be reliable and hands-off - set it up once, and it handles sending, tracking, and list management automatically. When you send a newsletter to your full audience, check: Admin → Members and check the Bounced Newsletter Status to see if you're getting more bounces than expected.
 
 Always a good idea to check Postmark from time to time. You can check on specific email deliveries, make sure your domain is setup correctly, etc.

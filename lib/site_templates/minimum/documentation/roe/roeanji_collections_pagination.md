@@ -37,7 +37,7 @@ show_more: true
 
 ## Settings for Pagination
 
-You can edit the settings for pagination at [Settings → Defaults → collection.yml](/admin/configs/collections/edit). There are 2 settings for pagination:
+You can edit the settings for pagination at [Settings → Defaults → collections.yml](/admin/configs/collections/edit). There are 2 settings for pagination:
 
 - `Items per page` - sets the number of items for pagination (default = `20`)
 - `Pagination template` - sets the Collection template specifically for pagination (default = `list`)

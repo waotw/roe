@@ -18,7 +18,7 @@ template: links
 
 # Images & Image Galleries
 
-Roe makes it really easy to create image galleries in Posts or Pages with Markdown. All gallery images have a lightbox feature automatically (click to enlarge) with a [carousel/slideshow](#carousel-slideshow) options as well.
+Roe makes it really easy to create image galleries in Posts or Pages with Markdown. All gallery images have a light-box feature automatically (click to enlarge) with a [carousel/slideshow](#carousel-slideshow) options as well.
 
 ## Uploading Images
 

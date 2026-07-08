@@ -11,7 +11,7 @@ tags: admin
 Layouts are also just Markdown files:
 
 - `navigation` = logo, site links, anything you want at the top of every page
-- `footer` = copywrite, extra links, anything you want at the bottom of every page
+- `footer` = copyright, extra links, anything you want at the bottom of every page
 - `sidebar` = enable the sidebar by creating this file
 
 ## Editing a layout
@@ -24,7 +24,7 @@ At the top of the Layout edit page, you'll see a `SHOW LINKS` button. This will 
 
 ## Footer
 
-Nothing special here. Just add the links and copywrite notice if needed.
+Nothing special here. Just add the links and copyright notice if needed.
 
 ## Sidebar
 

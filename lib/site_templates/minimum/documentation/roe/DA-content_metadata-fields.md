@@ -58,7 +58,7 @@ These fields work across posts, pages, and products.
 
 ### Status Values
 
-| Value | Behaviour |
+| Value | Behavior |
 |-------|-----------|
 | `draft` | Not visible to the public. Default when `status` is missing. |
 | `published` | Visible to all (or to members, depending on `audience`). |
@@ -141,7 +141,7 @@ A podcast episode with RSS feed support. Adds:
 
 ## Pages
 
-Pages use the shared fields. The only page-specific behaviour is:
+Pages use the shared fields. The only page-specific behavior is:
 
 | Field | Values | Description |
 |-------|--------|-------------|

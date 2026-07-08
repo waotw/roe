@@ -58,7 +58,7 @@ In your Stripe dashboard, go to **Developers (bottom left of window) → Webhook
 2. Select: `Your account` for **Event destination scope**
 3. Search for and check these 4 events: `checkout.session.completed`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`
 4. Click `Continue →` and choose: `Webhook endpoint`
-5. You'll need the Enpoint URL from Roe ↓
+5. You'll need the Endpoint URL from Roe ↓
 
 **Open Roe [Admin → Settings → Payments](/admin/configs/payments/edit) in a new tab:**
 

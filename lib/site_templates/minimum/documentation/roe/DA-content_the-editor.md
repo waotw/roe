@@ -67,7 +67,7 @@ The <code>F<sup>1</sup></code> button creates a footnote:
 
 1. Put the cursor where you want the foot note added.
 2. Click the button and it will bring you to the bottom of the editor to add your footnote text.
-3. Click `✓ DONE WITH FOOTNOTE` and it will bring you write back to where you insterted the footnote.
+3. Click `✓ DONE WITH FOOTNOTE` and it will bring you write back to where you inserted the footnote.
 
 ### [Roe-anji](/documentation/roeanji) Buttons
 

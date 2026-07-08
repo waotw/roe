@@ -200,7 +200,7 @@ Consecutive images automatically become galleries:
 **Features:**
 
 - Auto-responsive: 1, 2, or 3 columns based on image count
-- Responsive images with srcset
+- Responsive images with `srcset`
 - Blank lines separate gallery rows
 - Captions supported with `(*Caption*)` syntax after image
 

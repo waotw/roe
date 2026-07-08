@@ -86,4 +86,4 @@ Originals can be `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`.
 
 ### How Roe works with variants
 
-Roe switches to the optimized `<picture>` as soon as the **complete** set for an image is present - every required size _and_ its `.webp` sibling. If anything is missing it serves your original instead (and, if libvips is installed, quietly fills in the rest). Hand-placed files are never overwritten, so you can mix manual and automatic freely - Roe only generates what's missing, and picks up your files the next time the page renders.
+Roe switches to the optimized `<picture>` as soon as the **complete** set for an image is present - every required size _and_ its `.webp` sibling. If anything is missing it serves your original instead (and, if `libvips` is installed, quietly fills in the rest). Hand-placed files are never overwritten, so you can mix manual and automatic freely - Roe only generates what's missing, and picks up your files the next time the page renders.

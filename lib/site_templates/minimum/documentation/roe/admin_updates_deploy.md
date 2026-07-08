@@ -16,7 +16,7 @@ Updates in Roe are handled delicately. The system:
 
 1. makes a full backup of your site before anything else happens
 2. makes a copy of your database to test any changes there before moving forward
-3. if anything fails, it rollsback automatically, your site is exactly as it was
+3. if anything fails, it rollback automatically, your site is exactly as it was
 4. if database changes work, it runs those changes on your database
 5. it finishes by removing the old code and replacing it with the new code
 

@@ -50,7 +50,7 @@ Since Roe is built on Markdown files, the basic structure of your site will be:
   
 ## Unique features of Roe
 
-Roe was built with the idea of taking simple/modular building blocks and combining them to create more complex sites. For this reason Roe does not use a templating language. Instead it uses [Roe-anji](/documentation/roeanji), simple markdown exentions and syntax that allow you to do all kinds of cool things: Collections, Cards, Galleries, and more.
+Roe was built with the idea of taking simple/modular building blocks and combining them to create more complex sites. For this reason Roe does not use a templating language. Instead it uses [Roe-anji](/documentation/roeanji), simple markdown extensions and syntax that allow you to do all kinds of cool things: Collections, Cards, Galleries, and more.
 
 ### Roe-anji - Collections
 

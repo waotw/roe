@@ -73,7 +73,7 @@ When you enable members, Roe generates several pages that you can customize. The
 
 ## How Members Sign In (Magic Links)
 
-Roe uses *passwordless authentication* for members. When someone signs in:
+Roe uses *password-less authentication* for members. When someone signs in:
 
 1. They enter their email address
 2. They receive an email with a "magic link"

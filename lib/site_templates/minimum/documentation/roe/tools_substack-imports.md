@@ -149,7 +149,7 @@ The following Substack features will not be supported:
 - Notes/Embedded notes
 - Polls
 - Comments
-- Finacial chart
+- Financial chart
 
 ---
 
@@ -159,17 +159,17 @@ Each imported post gets YAML frontmatter with these fields:
 
 | Substack Field | Roe Frontmatter | Notes |
 |---|---|---|
-| post_id | `substack_post_id` | Stored in metadata for deduplication |
-| slug | `url_name` | Used as filename |
-| title | `title` | |
-| subtitle | `subtitle` | |
-| post_date | `date` | ISO 8601 format |
-| type | `post_type` | See mapping below |
-| is_published | `status` | `published` or `draft` |
-| audience | `audience` | See mapping below |
-| cover_image | `image` | Local path: `/media/images/slug-cover.ext` |
-| podcast_url | `audio` | Local path: `/media/audio/slug.mp3` |
-| video mux id | `video` | Local path: `/media/video/slug.mp4` |
+| `post_id` | `substack_post_id` | Stored in metadata for deduplication |
+| `slug` | `url_name` | Used as filename |
+| `title` | `title` | |
+| `subtitle` | `subtitle` | |
+| `post_date` | `date` | ISO 8601 format |
+| `type` | `post_type` | See mapping below |
+| `is_published` | `status` | `published` or `draft` |
+| `audience` | `audience` | See mapping below |
+| `cover_image` | `image` | Local path: `/media/images/slug-cover.ext` |
+| `podcast_url` | `audio` | Local path: `/media/audio/slug.mp3` |
+| `video mux id` | `video` | Local path: `/media/video/slug.mp4` |
 
 ### Post Type Mapping
 
@@ -220,7 +220,7 @@ For podcast posts, additional frontmatter is added:
 
 ### Missing Media
 
-Some media can't be downloaded automatically — typically paywalled content, Mux-hosted videos, or files behind authentication. These are tracked in the import stats and can be resolved later via the **Resolve Missing Media** interface.
+Some media can't be downloaded automatically — typically paywalled content, some videos, or files behind authentication. These are tracked in the import stats and can be resolved later via the **Resolve Missing Media** interface.
 
 ---
 

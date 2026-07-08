@@ -114,7 +114,7 @@ The generator:
 
 ## Displaying Products
 
-Details found in the [Store](/documentation/store#displaying-products-with-collections) aritcle.
+Details found in the [Store](/documentation/store#displaying-products-with-collections) article.
 
 ## Product Pages
 
