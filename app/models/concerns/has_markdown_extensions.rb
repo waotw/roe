@@ -108,11 +108,31 @@ module HasMarkdownExtensions
     # Process images to make them responsive
     html = process_responsive_images(html)
 
+    # Keep content off ids that belong to injected third-party mount points.
+    html = reserve_mount_ids(html)
+
     html.html_safe
   ensure
     # Clear render context to prevent data leaking between requests
     @render_context = nil
     @rendering_static = nil
+  end
+
+  # IDs that belong to injected third-party mount points and must never be
+  # claimed by content. kramdown's auto_ids turns a heading (or collection-item
+  # title) named e.g. "Snipcart" into id="snipcart", which then collides with
+  # Snipcart's cart container (<div id="snipcart">) — the widget mounts into the
+  # heading and wipes it out. Rewrite any such content id to a namespaced form
+  # so the heading stays anchorable without clobbering the mount. Extend the
+  # list as other embeds reserve their own ids.
+  RESERVED_MOUNT_IDS = %w[snipcart].freeze
+
+  def reserve_mount_ids(html)
+    RESERVED_MOUNT_IDS.reduce(html) do |acc, reserved|
+      acc.gsub(/(\sid=["'])#{Regexp.escape(reserved)}(["'])/) do
+        "#{Regexp.last_match(1)}#{reserved}-section#{Regexp.last_match(2)}"
+      end
+    end
   end
 
   # Media extensions that an `![](…)` embed should render as a native
