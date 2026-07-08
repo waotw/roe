@@ -54,8 +54,8 @@ Roe contains two folders: `/current` (the app/code) and `/site` (all your site c
     - These codes are used to reset your password if needed.
 9. Once you've written everything down (or saved it), press any key to continue.
 10. Press `y` and hit `return`…
-10. The server starts automatically and opens Roe in your browser.
-11. Sign in with the admin user you just created.
+11. The server starts automatically and opens Roe in your browser.
+12. Sign in with the admin user you just created.
 
 Check [Getting Started with Roe](/documentation/getting-started-with-roe) for some help exploring Roe.
 

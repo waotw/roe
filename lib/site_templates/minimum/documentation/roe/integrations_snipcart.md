@@ -62,4 +62,4 @@ When it's time to make the store public, it's important that the domain set on S
 
 ---
 
-That's it for the Snipcart settings. Check these aritcles for further setup: [Store](/documentation/store), [Products](http://localhost:3000/documentation/products)
+That's it for the Snipcart settings. Check these aritcles for further setup: [Store](/documentation/store), [Products](/documentation/products)

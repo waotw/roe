@@ -33,7 +33,7 @@ This document has instructions for setting things up on the Roe side. Follow [Sn
 On the Roe side:
 
 1. **Enable the Store** - Go to [Admin/Settings](/admin/configs/store/edit) and configure your store
-2. **Connect Snipcart** - Add your Test Snipcart API keys in [Admin/Snipcart](/admin/snipcart_config/edit)
+2. **Connect Snipcart** - Add your Test Snipcart API keys in [Admin/Snipcart](/admin/snipcart_config/edit
 3. **Create Products** - Use the [Products](/admin/products) page to add items
     - Make sure to add [SKUs](#sku-generator) to the Product metadata
 4. **Display Products** - Use collections with `source: products` to show your catalog on any page.
@@ -207,7 +207,7 @@ Taxes can be set up in Snipcart as needed: [Settings → TAXES](https://app.snip
 
 Snipcart validates orders by checking product data on your site. For this to work:
 
-1. **Set Default Domain** - Add your Default Domain to [Admin → Settings → store.yml](http://localhost:3000/admin/configs/store/edit#default-domain)
+1. **Set Default Domain** - Add your Default Domain to [Admin → Settings → store.yml](/admin/configs/store/edit#default-domain)
 2. **Publish Products** - In Roe, make sure your product is published so Snipcart can verify it
 3. **Add Domain to Snipcart** - In your Snipcart dashboard, add your domain to allowed domains: [Domains & URLs](https://docs.snipcart.com/v3/dashboard/domains-urls)
 

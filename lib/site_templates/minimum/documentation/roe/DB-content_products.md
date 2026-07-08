@@ -35,7 +35,7 @@ Create products in [Admin → Products](/admin/products) or add `.md` files to `
 
 The Admin shows product metadata as a simple form; you can also edit it directly in the `.md` file.
 
-![Product Metadata Form UI](/media/images/product-metadata.png)
+![Product Metadata Form UI](/media/images/product-metadata.png){: .screenshot}
 
 ```yaml
 ---
@@ -99,7 +99,7 @@ Roe includes a SKU generator that suggests standardized codes.
 
 When creating a product, the SKU Generator is available in the metadata editor on any product page. This helps to create standardized SKUs:
 
-![](/media/images/sku_metadata.png)
+![](/media/images/sku_metadata.png){: .screenshot}
 
 Suggested Pattern: `{CATEGORY}`-`{NUMBER}`-`{TITLE/NAME}`-`{VARIANT-DETAILS}`
 
