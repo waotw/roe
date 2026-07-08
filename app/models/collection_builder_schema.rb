@@ -58,7 +58,7 @@ module CollectionBuilderSchema
       # all, or unset (blank defaults to all).
       depends_on: [
         { field: "source", value: "posts" },
-        { field: "post_type", in: ["", "all", "podcast"] }
+        { field: "post_type", in: [ "", "all", "podcast" ] }
       ] },
 
     { key: "tags", type: :text, label: "Tags",

@@ -174,7 +174,7 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     grouped_product("Book Hardback", variant: "Hardback")
 
     product_titles = entries.select { |e| e[:type] == "products" }.map { |e| e[:title] }
-    assert_equal ["Book Paperback"], product_titles,
+    assert_equal [ "Book Paperback" ], product_titles,
                  "grouped variants should collapse to just the primary"
   end
 

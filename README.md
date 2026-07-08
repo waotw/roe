@@ -1,22 +1,22 @@
 # Roe
 
-Roe is a file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store.
+Roe is a file-backed CMS with first-class support for blogs, podcasts, paid memberships, newsletters, and a built-in store — plus image galleries, built-in search, and automatic SEO & social images.
 
-> **Beta:** Roe is currently in beta. Download it before 1.0 and you'll be eligible for a free commercial license. See the [license](site/pages/license.md) for details.
+> **Beta:** Roe is in beta until 1.0 is released. Commercial use is not permitted until 1.0. See the [license](https://go-roe.com/license) for details.
 
 ## Installation
 
 Only install Roe with `git` if you plan on developing Roe itself. To build sites with Roe, download it [here](https://go-roe.com) and follow this document: [Installing Roe](https://go-roe.com/documentation/guide-installation)
 
-If you plan to delelop Roe: use the following command and it will install all dependencies.
+If you plan to develop Roe: use the following command and it will install all dependencies.
 
 ```bash
-git clone git@codeberg.org:waotw/roe.git
+git clone https://codeberg.org/waotw/roe.git
 cd roe
 ./bin/setup
 ```
 
-~Full documentation, instructions and troubleshooting are at [go-roe.com/documentation](https://go-roe.com/documentation).
+Full documentation, instructions and troubleshooting are at [go-roe.com/documentation](https://go-roe.com/documentation).
 
 ## Requirements
 
@@ -78,4 +78,4 @@ Install these to turn on extra features. Roe runs fine without them.
 
 ## License
 
-Roe is open-source software with commercial-use restrictions. During the beta period (versions < 1.0), commercial use is not licensed unless permission is given in writing from licensor. See [License](https://go-roe.com/license) for the full agreement.
+Roe is open-source software with commercial-use restrictions. During the beta period (versions < 1.0), commercial use is not licensed unless permission is given in writing from the licensor. See [License](https://go-roe.com/license) for the full agreement.

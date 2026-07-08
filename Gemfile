@@ -115,3 +115,5 @@ gem "tty-spinner", "~> 0.9"
 # Pure-Ruby image dimensions from file headers (no native deps) — used to
 # build honest srcset widths and skip redundant variants without libvips.
 gem "fastimage", "~> 2.3"
+
+gem "mini_magick", "~> 5.3"

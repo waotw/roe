@@ -504,6 +504,7 @@ DEPENDENCIES
   kramdown-parser-gfm (~> 1.1)
   letter_opener
   listen (~> 3.8)
+  mini_magick (~> 5.3)
   mocha
   net-ftp (>= 0.2)
   net-sftp (~> 4.0)

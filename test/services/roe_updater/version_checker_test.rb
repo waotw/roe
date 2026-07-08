@@ -39,10 +39,10 @@ module RoeUpdater
       ]
       assert_equal "0.1.0-rc.1", VC.send(:pick_latest, pre).last
 
-      nightlies = [%w[v0.1.0-nightly.2 0.1.0-nightly.2], %w[v0.1.0-nightly.10 0.1.0-nightly.10]]
+      nightlies = [ %w[v0.1.0-nightly.2 0.1.0-nightly.2], %w[v0.1.0-nightly.10 0.1.0-nightly.10] ]
       assert_equal "0.1.0-nightly.10", VC.send(:pick_latest, nightlies).last
 
-      stable = [%w[v0.0.39 0.0.39], %w[v0.1.0 0.1.0]]
+      stable = [ %w[v0.0.39 0.0.39], %w[v0.1.0 0.1.0] ]
       assert_equal "0.1.0", VC.send(:pick_latest, stable).last
 
       assert_nil VC.send(:pick_latest, [])
