@@ -19,7 +19,7 @@ template: links
 
 Collections are lists of posts, pages, products, or documentation. They can power entire blogs or just add a few "Featured Posts" to your home page.
 
-When writing anything that uses the Markdown editor, use the `COLLECTION` button to insert a Collection at the cursor location. The `COLLECTION` button template can be edited in [Admin/Settings](/admin/configs/collections/edit).
+When writing anything that uses the Markdown editor, use the `COLLECTION` button to add a Collection without writing the block by hand. It opens a form with all the options below; the relevant fields appear as you go (for example, the product options only show once you set the source to `products`), and only the fields you fill in get written. It then drops the finished `collection` block at your cursor. The Collection defaults are editable in [Admin/Settings](/admin/configs/collections/edit).
 
 ## Options
 

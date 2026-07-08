@@ -1,5 +1,5 @@
 ---
-title: Tools → Image Optimization
+title: Image Optimization
 status: published
 tags: tool
 ---
@@ -82,7 +82,7 @@ For the `.webp` copies, quality **85** matches what Roe uses.
 
 Originals can be `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`.
 
-- **HEIC / HEIF** - best to steer clear of these formats. Browsers will not render them. Stick with 
+- **HEIC / HEIF** - best to steer clear of these formats. Browsers will not render them. Stick with `.jpg`, `.png`, or `.webp`. (During a Substack import Roe will convert HEIC to JPEG for you if `libvips` is installed.)
 
 ### How Roe works with variants
 

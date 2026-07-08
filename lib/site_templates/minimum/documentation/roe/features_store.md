@@ -3,7 +3,18 @@ title: Store
 status: published
 tags: feature
 url_name: store
+related:
+  - products
 ---
+
+##### Related documentation
+
+```collection
+source: documentation/roe
+related: true
+limit: all
+template: links
+```
 
 # Store
 
@@ -11,82 +22,25 @@ The Store feature lets you sell products directly from your site using [Snipcart
 
 ## Quick Start
 
-These are instructions for setting things up on the Roe side. There are instructions for setting up Snipcart on your Store edit page:
+There are 3 key pieces that must be in place for Snipcart & Roe to work together:
+
+1. Roe needs the API Keys from Snipcart (covered here: [Snipcart](documentation/snipcart))
+2. Your Store settings need to be set up (covered in this article)
+3. You need at least one product (covered here: [Products](/documentation/products))
+
+This document has instructions for setting things up on the Roe side. Follow [Snipcart's documentation](https://docs.snipcart.com/v3/dashboard/store-configuration) for setting up things on their side. It's very good.
+
+On the Roe side:
 
 1. **Enable the Store** - Go to [Admin/Settings](/admin/configs/store/edit) and configure your store
 2. **Connect Snipcart** - Add your Test Snipcart API keys in [Admin/Snipcart](/admin/snipcart_config/edit)
 3. **Create Products** - Use the [Products](/admin/products) page to add items
-    - Make sure to add SKUs to the Product metadata
-4. **Display Products** - Use collections with `source: products` to show your catalog
+    - Make sure to add [SKUs](#sku-generator) to the Product metadata
+4. **Display Products** - Use collections with `source: products` to show your catalog on any page.
 
-## Creating Products
+## Store Page
 
-Products are created in the [Admin/Products](/admin/products) section. Each Product page has metadata and content:
-
-### Metadata
-
-The Admin will show metadata as a simple form. You can also edit the metadata directly in the file if you like.
-
-![Product Metadata Form UI](/media/images/product-metadata.png)
-
-```yaml
----
-title: The First Book
-status: published
-url_name: my-first-book
-sku: BOOK-001-MYFIRSTBOOK 
-price: 10.00
-category: book
-tags: fiction, poetry
-image: /media/images/my-first-book.jpg
-description: A lyrical meditation on memory and place
----
-```
-
-#### Required Fields
-
-- **title** - Product name
-- **sku** - Unique product identifier (required for publishing)
-- **price** - Price as a number (e.g., `10.00`)
-- **category** - Product category (for filtering)
-- **image** - Product image path
-- **status** - `draft` or `published`
-
-#### Optional Fields
-
-- **url_name** - Custom URL (auto-generated from title if not set)
-- **tags** - Tags for filtering and organization
-- **description** - Short description (used in product grids)
-
-## SKU Generator
-
-When creating a product, you can use the SKU Generator to create standardized SKUs:
-
-- **Book Example:** `BOOK-001-MYFIRSTBOOK`
-- **Shirt Example:** `TSHIRT-001-SHIRTNAME-RED-L`
-- **Suggested Pattern:** `{CATEGORY}-{NUMBER}-{TITLE/NAME}-{SPECIFIC}-{DETAILS}`
-
-The generator:
-
-- Uses the category and title from your Product
-- Auto-increments numbers within each category
-- Makes sure that the SKU is unique
-
-## Product page and the `PRODUCT` button
-
-Use the `PRODUCT` button in the editor to insert the product template:
-
-**On a product page:**
-
-- Inserts a full product card with image, title, price, description, and "Add to Cart" button
-- Uses the current product's metadata automatically
-
-**On other pages:**
-
-- Opens a search modal to find products
-- Inserts the same product template for the selected product
-
-The product template can be customized in [Admin/Settings/store.yml](/admin/configs/store/edit).
+There is no Store page be default. Since Roe is modular, you can build a Store page easily. Create a page called: `Store`, and add a product [Collection](/documentation/collections#products) to it.
 
 ## Displaying Products with Collections
 
@@ -140,19 +94,24 @@ category: poster
 
 **Aspect ratio options:**
 
-- `auto` - Natural sizing (default)
-- `square` - 1:1 (good for album covers, wallpapers)
-- `portrait` - 3:4 (good for books, posters)
-- `landscape` - 4:3 (good for prints)
-- `wide` - 16:9 (good for banners)
+These options are provided by Roe out of the box.
+
+- `original` - Natural sizing (default)
+- `square` - (good for album covers, wallpapers)
+- `portrait` - (good for books, posters)
+- `tv` - 4:3
+- `wide` - 16:9
+- `cinema` - 21:9 (super wide)
+
+<mark>Note:</mark> When you assign an `aspect-ratio`, this adds a CSS class to the product grid so you can target it. Any of Roe's built in themes will work without having to edit any CSS.
 
 ### Show Descriptions
 
 ````
 ```collection
 source: products
-show_description: true
 heading: Featured Products
+show_description: true
 ```
 ````
 
@@ -170,9 +129,9 @@ Product pages display:
 
 Breadcrumbs can be disabled per-product with `breadcrumbs: false` in product/page metadata.
 
-## Add to Cart Buttons
+## `Add to Cart` Buttons
 
-Add product buttons anywhere in your Markdown using the button block syntax:
+Add product add-to-cart buttons anywhere (pages/posts) using the button block syntax:
 
 ````
 ```button
@@ -198,9 +157,11 @@ style: primary
 ```
 ````
 
-## Store Configuration
+## Store settings
 
-Configure your store in [Admin/Settings/store.yml](/admin/configs/store/edit):
+The Store integrates with Snipcart.  [Setting up Snipcart to work with Roe](/documentation/snipcart)
+
+Configure your store in [Admin → Settings → store.yml](/admin/configs/store/edit):
 
 ### Currency
 
@@ -210,7 +171,7 @@ Set your default currency (USD, EUR, GBP, CAD, AUD, JPY). This affects:
 - Product button templates
 - Snipcart checkout
 
-Make sure to add your currency to Snipcart as well under [Settings/REGIONAL SETTINGS](https://app.snipcart.com/dashboard/settings/regional): 
+Make sure to add your currency to Snipcart as well under [Settings → REGIONAL SETTINGS](https://app.snipcart.com/dashboard/settings/regional): 
 
 ### Product Categories
 
@@ -221,11 +182,11 @@ book, ebook, poster, pin, tshirt
 ```
 
 When you add a new category to a Product, it will be added to this list automatically.  
-<mark>Note: only use one category per Product</mark>.
+<mark>Note:</mark> only use one category per Product.
 
 ### Product Button Template
 
-Customize the Markdown template inserted by the PRODUCT button. Use these placeholders:
+Customize the Markdown template inserted by the `PRODUCT` button. Use these placeholders:
 
 - `@image` - Product image
 - `@title` - Product title
@@ -236,27 +197,29 @@ Customize the Markdown template inserted by the PRODUCT button. Use these placeh
 ### Snipcart Settings
 
 - **Load Strategy** - How Snipcart loads (`on-user-interaction` recommended)
-- **Modal Style** - Cart display style (`side` or `full`)
+- **Modal Style** - How the cart displays when open (`side` or `full`)
 - **Show Taxes** - Display taxes in cart
 - **Show Quantity** - Allow quantity changes in cart
 
-Taxes can be set up in Snipcart as needed: [Settings/TAXES](https://app.snipcart.com/dashboard/taxes)
+Taxes can be set up in Snipcart as needed: [Settings → TAXES](https://app.snipcart.com/dashboard/taxes)
 
 ## Order Validation
 
 Snipcart validates orders by checking product data on your site. For this to work:
 
-1. **Set Default Domain** - Add your domain in store settings
-2. **Publish Products** - Only published products can be purchased
-3. **Add Domain to Snipcart** - In your Snipcart dashboard, add your domain to allowed domains
+1. **Set Default Domain** - Add your Default Domain to [Admin → Settings → store.yml](http://localhost:3000/admin/configs/store/edit#default-domain)
+2. **Publish Products** - In Roe, make sure your product is published so Snipcart can verify it
+3. **Add Domain to Snipcart** - In your Snipcart dashboard, add your domain to allowed domains: [Domains & URLs](https://docs.snipcart.com/v3/dashboard/domains-urls)
 
 The domain of your site has to be registered with Snipcart for this to work.
 
 ## Going Live
 
+In order to add a Live API key to Roe, you'll need to deploy your site to a web host: [Guide → Deploy](/documentation/guide-deploy)
+
 1. **Add a credit card to Snipcart** - required to use LIVE mode.
 2. **Get Live API Key** - From your Snipcart dashboard
-3. **Add to Snipcart Config** - In [Admin/Snipcart](/admin/snipcart_config/edit)
+3. **Add to Snipcart Config** - On your Live site (hosted) [Admin → Settings → snipcart.yml](/admin/snipcart_config/edit)
 4. **Switch to Live Mode** - Toggle from Test to Live
 5. **Configure Domain** - Set your production domain in store settings
 6. **Test Checkout** - Complete a test order
@@ -268,33 +231,3 @@ Snipcart charges 2% per transaction (no monthly fee) and handles:
 - Payment processing
 - Order emails
 - Customer management
-
-## Tips
-
-**Use Categories for Organization**
-
-- Group similar products: books, ebooks, prints, etc.
-- Makes SKU generation cleaner
-- Enables category-based collections
-
-**Add Good Images**
-
-- Products without images show a 404 placeholder
-- Images are displayed at `/media/images/404.png` by default
-- Upload custom images via the Media browser
-
-**Write Good Descriptions**
-
-- Short descriptions show in product grids
-- Full content shows on product pages
-- Use Markdown for formatting
-
-**Test Before Going Live**
-
-- Use Snipcart test mode and test credit cards
-- Verify order emails are working
-- Check mobile responsiveness
-
-## Related Documentation
-
-- [Collections](/documentation/collections) - Learn about collection options

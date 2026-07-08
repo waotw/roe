@@ -1,5 +1,5 @@
 ---
-title: Tools → Substack Imports
+title: Substack Imports
 status: published
 tags: tool
 ---

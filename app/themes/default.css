@@ -876,7 +876,7 @@ div.flash mark {
   border: 0;
   border-top: 1px solid var(--color-border);
   margin-top: 0;
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-6);
 }
 
 .content table {
@@ -1475,12 +1475,11 @@ p.collection-more a:hover {
 }
 
 .gallery-col-1 img {
-  max-height: 70vh;
-  object-fit: contain;
+  aspect-ratio: auto;
 }
 
 .gallery-col-2 img {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 1;
 }
 
 .gallery-col-3 img {
@@ -1585,6 +1584,33 @@ figcaption {
   line-height: 1;
   color: #fff;
   cursor: pointer;
+}
+
+/* Explicit gallery ratios (grids only — carousels size by height).
+   Images crop to fill; `object-fit: cover` comes from `.content .gallery img`.
+   `auto`/`original` keep the image's natural shape instead. */
+
+.gallery-ratio-square .gallery-row img {
+  aspect-ratio: 1 / 1;
+}
+.gallery-ratio-portrait .gallery-row img {
+  aspect-ratio: 3 / 4;
+}
+.gallery-ratio-landscape .gallery-row img,
+.gallery-ratio-tv .gallery-row img {
+  aspect-ratio: 4 / 3;
+}
+.gallery-ratio-wide .gallery-row img {
+  aspect-ratio: 16 / 9;
+}
+.gallery-ratio-cinema .gallery-row img,
+.gallery-ratio-film .gallery-row img {
+  aspect-ratio: 21 / 9;
+}
+.gallery-ratio-auto .gallery-row img,
+.gallery-ratio-original .gallery-row img {
+  aspect-ratio: auto;
+  object-fit: contain;
 }
 
 /* --- Carousel (slideshow: true) ------------------------------------------
@@ -1820,6 +1846,10 @@ figcaption {
   text-decoration: underline;
   font-size: var(--text-xs);
   margin: auto 0 0 0;
+}
+
+.card.post-link-large .card-link {
+  margin: 0 0 0 0;
 }
 
 .card[class*="post-link-"] .card-link:hover {
@@ -3036,6 +3066,10 @@ p.podcast-audio-fallback {
   line-height: 1;
 }
 
+.documentation img.screenshot {
+  border: 1px solid var(--color-muted);
+}
+
 @media (prefers-color-scheme: dark) {
   .content.documentation p mark,
   .documentation mark {
@@ -3561,24 +3595,36 @@ article.page-store h2 {
 
 /* Aspect-ratio containers driven by class on the image */
 
+/* Aspect-ratio containers driven by the class on the image. Product images
+   are never cropped (object-fit: contain) — they sit inside the ratio box. */
 .grid-item-image:has(.img-square) {
   aspect-ratio: 1 / 1;
 }
 .grid-item-image:has(.img-portrait) {
   aspect-ratio: 3 / 4;
 }
-.grid-item-image:has(.img-landscape) {
+.grid-item-image:has(.img-landscape),
+.grid-item-image:has(.img-tv) {
   aspect-ratio: 4 / 3;
 }
 .grid-item-image:has(.img-wide) {
   aspect-ratio: 16 / 9;
 }
+.grid-item-image:has(.img-cinema),
+.grid-item-image:has(.img-film) {
+  aspect-ratio: 21 / 9;
+}
+/* img-auto / img-original: no container ratio → natural sizing */
 
 .img-auto,
+.img-original,
 .img-square,
 .img-portrait,
 .img-landscape,
-.img-wide {
+.img-tv,
+.img-wide,
+.img-cinema,
+.img-film {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;

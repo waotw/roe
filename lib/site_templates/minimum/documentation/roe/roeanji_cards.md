@@ -20,11 +20,11 @@ type: aside
 text: This is an aside which is adding some helpful info about this paragraph.
 ``` 
 
-Cards use a similar syntax to [Collections](/documentation/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside).
+Cards use a similar syntax to [Collections](/documentation/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside), [product link ↓](#product-link).
 
 To make things a bit easier, each card `type` has it's own defaults. The card defaults can be edited in [Admin/Settings](/admin/configs/cards/edit).
 
-Use the `CARD ▼` button in the editor to insert a card. The `CARD ▼` button templates can be edited as well: [Admin/Settings](/admin/configs/cards/edit).
+Use the `CARD ▼` button in The Editor to add a card without writing the block by hand. Choose a card type and its fields appear — fill in the ones you want (blanks are left out) and it drops the finished `card` block at your cursor. It won't insert until the required fields are filled, helps avoid broken cards. For `post-link` and `product-link` cards, the `post`/`product` field is a search box: start typing, pick the item, and the card pulls in its title, image, and other details automatically; shown as the placeholders which can be overwritten.
 
 ## Pull quote
 
@@ -329,3 +329,35 @@ link: https://en.wikipedia.org/wiki/Back_to_the_Future
 link_text: Quoted from →
 ``` 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
+
+## Product Link
+
+<mark>Store only:</mark> Product Link cards need the **Store** feature turned on. If you haven't enabled it yet, go to [Admin → Settings](/admin/configs) and click **Enable Store** — until then, `product-link` won't show up in the `CARD ▼` menu.
+
+A Product Link works just like a [Post Link](#post-link), but points at a product in your store. Add a `product` and the card pulls in its title, price, image, and description automatically — you only fill in what you want to override.
+
+### Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `type` | Yes | Must be `product-link` |
+| `product` | Yes | Reference a product by its url_name — auto-populates all fields |
+| `style` | No | `small` (default), `medium`, or `large` |
+| `title` | No | Override the title pulled from the product |
+| `description` | No | Override the description pulled from the product |
+| `show_description` | No | `true`/`false` — show the product's description (on by default) |
+| `url` | No | Override the link target (defaults to the product's page) |
+| `link_text` | No | Custom call-to-action — defaults to "View product →" |
+| `image` | No | Override the product image, or set to `none` to hide it |
+
+### Example
+
+````markdown
+```card
+type: product-link
+product: blue-tshirt
+style: medium
+```
+````
+
+↑ That pulls the Blue T-shirt's title, price, image, and description into a medium card. Like Post Links, add any field above to override what's pulled in.

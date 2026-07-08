@@ -68,13 +68,20 @@ By wrapping the images in a `gallery` block, you can:
 
 - control the layout of the images
 - feature images
-- add captions to images
+- add captions to individual images
+- add a single caption for the whole gallery
+- set the aspect ratio of the images
+- display them as a carousel/slideshow
 
 ````markdown
 ```gallery
 ![Image 1](/media/images/photo1.jpg)
 ```
 ````
+
+Rather than typing the block out by hand, click the `GALLERY` button in The Editor. It opens a little menu where you can switch on a carousel, choose an aspect ratio, and add a gallery caption — then it drops the finished block in at your cursor with a placeholder ready for your images.
+
+Use the `MEDIA ▼` button in The Editor to add your images where `__PLACEHOLDER__` is.
 
 This allows you to do some fancy things such as…
 
@@ -142,6 +149,61 @@ Add captions to any image using this syntax `(*caption-here*)` immediately after
 ```gallery
 ![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
 ```
+
+## Gallery Caption
+
+The `(*...*)` syntax above captions a single image. To add one caption for the **whole gallery** instead, put a `caption:` line inside the block ↓
+
+````markdown
+```gallery
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+caption: A weekend on the moor
+```
+````
+
+↑ That adds a single caption beneath the whole gallery ↓
+
+```gallery
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+caption: A weekend on the moor
+```
+
+You can use both kinds at once — per-image `(*...*)` captions and a gallery `caption:` — in the same block.
+
+## Aspect Ratio
+
+By default, each image takes the shape your theme gives that layout. Add an `aspect_ratio:` line to give every image in the gallery the same shape ↓
+
+````markdown
+```gallery
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+aspect_ratio: square
+```
+````
+
+↑ That crops each image to a square ↓
+
+```gallery
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+aspect_ratio: square
+```
+
+The default theme gives you:
+
+- `square` — 1:1
+- `portrait` — 3:4
+- `tv` — 4:3 (alias: `landscape`)
+- `wide` — 16:9
+- `cinema` — 21:9 super wide (alias: `film`)
+- `original` — keep each image's natural shape (alias: `auto`)
+
+These match the ratios used by [product collections](/documentation/store#displaying-products-with-collections), so the same names work in both places. Which ratios are available comes from your theme's CSS, so a theme can offer its own.
+
+**Note:** aspect ratio doesn't apply to a carousel (`slideshow: true`) — those images are sized by height instead.
 
 ## Combine all these features
 
