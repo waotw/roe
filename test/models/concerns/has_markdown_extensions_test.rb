@@ -557,6 +557,40 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_match(/Links Post/, result)
   end
 
+  test "a content id colliding with a reserved mount (snipcart) is namespaced, not dropped" do
+    # Body heading: keeps an anchor id, just not the reserved one.
+    html = render("## Snipcart")
+    refute_match(/id="snipcart"/, html, "must not claim Snipcart's #snipcart cart mount id")
+    assert_match(/id="snipcart-section"/, html, "heading stays anchorable under a namespaced id")
+
+    # Collection item title (same auto_id path) — id kept, reserved word dodged.
+    create(:post, metadata: {
+      "title" => "Snipcart",
+      "status" => "published",
+      "date" => "2024-01-01",
+      "tags" => [ "collide-check" ]
+    })
+
+    %w[links list full].each do |template|
+      result = render(<<~MARKDOWN)
+        ```collection
+        template: #{template}
+        tags: collide-check
+        ```
+      MARKDOWN
+
+      assert_match(/class="item-title"/, result, "#{template}: .item-title hook present")
+      assert_match(/Snipcart/, result, "#{template}: title still rendered")
+      # Whatever the parser slugs the title to, the output must never carry the
+      # bare reserved id that Snipcart's cart mount claims.
+      refute_match(/id="snipcart"/, result, "#{template}: reserved mount id dodged")
+    end
+  end
+
+  test "ordinary heading ids are unaffected by the reserved-mount guard" do
+    assert_match(/id="getting-started"/, render("## Getting Started"))
+  end
+
   test "collection respects limit" do
     3.times do |i|
       create(:post, metadata: {

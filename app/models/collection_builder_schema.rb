@@ -102,7 +102,9 @@ module CollectionBuilderSchema
       depends_on: { field: "source", value: "products" } },
 
     { key: "aspect_ratio", type: :select, label: "Image ratio",
-      options: %w[auto portrait square landscape],
+      # Offered set only; `auto`, `landscape`, and `film` are accepted aliases
+      # that resolve to the same ratios in CSS (original/tv/cinema).
+      options: %w[square portrait tv wide cinema original],
       hint: "Product image aspect ratio.",
       depends_on: { field: "source", value: "products" } },
 

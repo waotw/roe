@@ -76,6 +76,32 @@ class GalleryRenderingTest < ActiveSupport::TestCase
     assert_equal "", render_gallery("\n\n")
   end
 
+  test "aspect_ratio adds a gallery-ratio-<value> class and consumes the directive" do
+    html = render_gallery("![a](/media/images/a.jpg)\naspect_ratio: square")
+
+    assert_match %r{<div class="gallery gallery-ratio-square">}, html
+    refute_includes html, "aspect_ratio:", "directive must not leak into the output"
+  end
+
+  test "aspect_ratio applies to carousels too" do
+    html = render_gallery("![a](/media/images/a.jpg)\nslideshow: true\naspect_ratio: cinema")
+    assert_match %r{<div class="gallery gallery-carousel gallery-ratio-cinema"}, html
+  end
+
+  test "aspect_ratio value is sanitised to a safe css token" do
+    html = render_gallery(%(![a](/media/images/a.jpg)\naspect_ratio: "16:9"; DROP))
+    # Colons, quotes, spaces and semicolons are stripped to a bare lowercase token.
+    assert_includes html, %(class="gallery gallery-ratio-169drop")
+    refute_includes html, "16:9"
+    refute_includes html, "DROP"
+  end
+
+  test "no aspect_ratio means a plain gallery class" do
+    html = render_gallery("![a](/media/images/a.jpg)")
+    assert_includes html, %(<div class="gallery">)
+    refute_includes html, "gallery-ratio-"
+  end
+
   test "caption: wraps the whole gallery in a figure and consumes the directive" do
     html = render_gallery(
       "![a](/media/images/a.jpg)\n![b](/media/images/b.jpg)\ncaption: A day on the moor"
