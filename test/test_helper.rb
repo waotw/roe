@@ -81,6 +81,15 @@ module ActiveSupport
         File.delete(f)
       end
 
+      # Rewrite site.yml to the clean default — SiteConfig.get reads
+      # directly from the file on disk (not DB/cache), so a test that
+      # writes a non-default site.yml (e.g. search_all_pages: true)
+      # would pollute every subsequent test in random order.
+      File.write(
+        SiteConfig::SITE_FILE,
+        { "static_generation_enabled" => false }.to_yaml.sub(/\A---\s*\n/, "")
+      )
+
       # Sync the seeded site.yml into a SiteConfig record. Uses the same
       # path production does (find_by(file_path:) → create_from_file)
       # rather than constructing a record by hand.
