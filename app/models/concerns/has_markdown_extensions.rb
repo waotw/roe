@@ -1,6 +1,13 @@
 module HasMarkdownExtensions
   extend ActiveSupport::Concern
 
+  # `sizes` for product-grid card images — mirrors the default theme's
+  # .product-grid breakpoints so the browser fetches a card-sized variant
+  # (small/medium) instead of assuming a full-width slot. See the grid
+  # render in render_product_grid.
+  PRODUCT_GRID_IMAGE_SIZES =
+    "(min-width: 901px) 220px, (min-width: 769px) 30vw, (min-width: 401px) 45vw, 100vw".freeze
+
   def to_html(preview: false, context: nil, static: false)
     # Store context for use by form renderers
     @render_context = context
@@ -1401,7 +1408,12 @@ module HasMarkdownExtensions
 
       output << %Q(    <div class="grid-item-image">)
       output << %Q(      <a href="#{item_path(display_product)}">)
-      output << "        #{ResponsiveImageRenderer.render(image_url, alt: (display_product.title || 'Product'), class: image_class)}"
+      # Product grid columns (default theme .product-grid): 1 up to 400px,
+      # 2 to 768px, 3 to 900px, then auto-fit minmax(200px) → ~200-330px
+      # cards on desktop. Without an accurate `sizes` the browser assumes a
+      # near-full-width slot and pulls large/xl for a ~220px card; this maps
+      # each breakpoint to its real card width so it picks small/medium.
+      output << "        #{ResponsiveImageRenderer.render(image_url, alt: (display_product.title || 'Product'), class: image_class, sizes: PRODUCT_GRID_IMAGE_SIZES)}"
       output << %Q(      </a>)
       output << %Q(    </div>)
 
