@@ -374,8 +374,12 @@ class PerformDeployJob < ApplicationJob
         completed_at: completed_time,
         error:        nil
       )
-      # Persist last deploy timestamp so it survives cache dismissal
-      File.write(LAST_DEPLOY_FILE, { completed_at: completed_time.iso8601, target: target }.to_yaml)
+      # Persist last deploy timestamp so it survives cache dismissal.
+      # String keys (so load_last_deploy_time can read them back — symbol
+      # keys don't survive the reader's safe-load), and drop to_yaml's
+      # leading "---\n" document marker to keep the file clean.
+      yaml = { "completed_at" => completed_time.iso8601, "target" => target.to_s }.to_yaml.delete_prefix("---\n")
+      File.write(LAST_DEPLOY_FILE, yaml)
       Rails.logger.info "[PerformDeployJob] #{target} deploy completed successfully"
     else
       write_status(

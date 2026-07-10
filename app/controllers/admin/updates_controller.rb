@@ -410,10 +410,16 @@ class Admin::UpdatesController < Admin::BaseController
     file_path = PerformDeployJob::LAST_DEPLOY_FILE
     return nil unless File.exist?(file_path)
 
-    data = YAML.load_file(file_path)
-    return nil unless data.is_a?(Hash) && data["completed_at"]
+    # Tolerate legacy files written with symbol keys (older deploys ran
+    # to_yaml on a symbol-keyed hash), so an existing .last_deploy.yml
+    # still reads until the next deploy rewrites it with string keys.
+    data = YAML.safe_load_file(file_path, permitted_classes: [ Symbol, Time, Date ])
+    return nil unless data.is_a?(Hash)
 
-    Time.parse(data["completed_at"])
+    completed = data["completed_at"] || data[:completed_at]
+    return nil unless completed
+
+    completed.is_a?(Time) ? completed : Time.parse(completed.to_s)
   rescue => e
     Rails.logger.error "Error loading last deploy time: #{e.message}"
     nil
