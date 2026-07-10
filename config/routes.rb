@@ -16,6 +16,7 @@ Rails.application.routes.draw do
       post "refresh_ledger",            to: "exchange#refresh_ledger"
       post "reconcile_content",         to: "exchange#reconcile_content"
       post "file_states",               to: "exchange#file_states"
+      post "file_hashes",               to: "exchange#file_hashes"
       get "manifest",                   to: "exchange#manifest"
       post "download",                  to: "exchange#download"
       post "upload",                    to: "exchange#upload"

@@ -176,6 +176,20 @@
                   </div>
                 </div>
 
+                <!-- Site Sync Section -->
+                <div class="config-section mb-10">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Site Sync</h3>
+                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                    <% config_schema[:site_sync][:fields].each do |field_name, field_config| %>
+                      <%= render 'shared/config_field',
+                               field_name: field_name,
+                               field_config: field_config,
+                               value: flattened_config[field_name],
+                               all_values: flattened_config %>
+                    <% end %>
+                  </div>
+                </div>
+
                 <!-- Updates Section -->
                 <div class="config-section mb-10">
                   <h3 class="text-base font-semibold text-gray-900 mb-1">Updates</h3>

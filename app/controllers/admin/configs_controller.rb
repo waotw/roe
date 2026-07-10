@@ -132,6 +132,18 @@ class Admin::ConfigsController < Admin::BaseController
       }
     },
 
+    site_sync: {
+      label: "Site Sync",
+      fields: {
+        "sync_transport" => {
+          type: :select,
+          label: "Transport",
+          options: [ "http", "rsync" ],
+          hint: "Protocol that Site Sync uses to sync files to/from a live site. HTTP (recommended) works over HTTPS with a shared token. rsync requires SSH to host."
+        }
+      }
+    },
+
     updates: {
       label: "Updates",
       fields: {

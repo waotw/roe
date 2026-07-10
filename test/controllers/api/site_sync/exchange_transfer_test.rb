@@ -121,6 +121,29 @@ module Api
              headers: auth
         assert_response :bad_request
       end
+
+      # ------------------------------------------------------- file_hashes
+
+      test "file_hashes returns SHA256 per path and filters excluded/unsafe ones" do
+        site_write("posts/fh.md", "hash me")
+
+        post "/api/site_sync/file_hashes",
+             params: { paths: [ "posts/fh.md", "system/secrets/master.key", "../etc/passwd" ] }.to_json,
+             headers: auth.merge("Content-Type" => "application/json")
+
+        assert_response :success
+        hashes = JSON.parse(response.body)["hashes"]
+        assert_equal Digest::SHA256.hexdigest("hash me"), hashes["posts/fh.md"]
+        refute hashes.key?("system/secrets/master.key"), "must not hash an excluded secret"
+        refute hashes.key?("../etc/passwd")
+      end
+
+      test "file_hashes rejects an unauthenticated request" do
+        post "/api/site_sync/file_hashes",
+             params: { paths: [ "site.yml" ] }.to_json,
+             headers: { "Content-Type" => "application/json" }
+        assert_response :unauthorized
+      end
     end
   end
 end

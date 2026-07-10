@@ -87,6 +87,29 @@ module Api
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # POST /api/site_sync/file_hashes
+      #
+      # Body:    { paths: [ "posts/foo.md", ... ] }
+      # Returns: { hashes: { "posts/foo.md": "<sha256>", ... } }
+      #
+      # Content hashes for the reconciler to confirm real conflicts — an
+      # edit/edit pair whose bytes actually match (mtime skew) isn't a
+      # conflict. Excluded/traversal paths are filtered, same as download.
+      def file_hashes
+        payload = JSON.parse(request.body.read)
+        paths = Array(payload["paths"]).first(MAX_DOWNLOAD_PATHS).select do |p|
+          p.is_a?(String) && !p.include?("..") && !p.start_with?("/") &&
+            !::SiteSync::Ledger.excluded?(p)
+        end
+
+        render json: { hashes: ::SiteSync::Reconciler.hashes_for(paths) }
+      rescue JSON::ParserError => e
+        render json: { error: "invalid json: #{e.message}" }, status: :bad_request
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] file_hashes FAILED: #{e.class} #{e.message}"
+        render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
       # POST /api/site_sync/reconcile_content
       #
       # Called by the peer right after it pushes content to us, so our
