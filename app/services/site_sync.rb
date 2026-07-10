@@ -13,6 +13,32 @@ module SiteSync
   #   4. Nothing detected → raise on use; SyncConfig form will show
   #      "no deploy target configured"
   def self.transport
+    case sync_transport
+    when :http then SiteSync::HttpTransport
+    else            rsync_transport
+    end
+  end
+
+  # Which transport moves the bytes: :http (host-agnostic, over the same
+  # HTTPS + bearer-token channel as the state exchange) or :rsync (over
+  # SSH, via the detected deploy target).
+  #
+  #   site.yml `sync_transport: http`   → :http
+  #   site.yml `sync_transport: rsync`  → :rsync
+  #   (unset)                           → :rsync, preserving the behaviour
+  #     of installs created before the HTTP transport existed. New installs
+  #     ship `sync_transport: http` in their site.yml template.
+  def self.sync_transport
+    case SiteConfig.get("sync_transport").to_s.strip.downcase
+    when "http"         then :http
+    when "rsync", "ssh" then :rsync
+    else                     :rsync
+    end
+  end
+
+  # The SSH/rsync transport for the detected deploy target. Used when
+  # sync_transport resolves to :rsync.
+  def self.rsync_transport
     case deploy_target
     when :kamal then SiteSync::KamalRsync
     when :fly   then SiteSync::FlyRsync

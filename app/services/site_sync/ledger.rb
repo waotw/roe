@@ -89,6 +89,18 @@ module SiteSync
       def fingerprint_for(path)
         fingerprint_of(new(site_path: path).current_manifest)
       end
+
+      # Whether a /site-relative path is excluded from tracking/transfer.
+      # Public (and the single source of truth) so the tar unpacker can
+      # refuse to write excluded paths — e.g. system/secrets/ — from an
+      # untrusted uploaded archive.
+      def excluded?(relative_path)
+        parts = relative_path.split("/")
+        return true if EXCLUDED_DIRS.include?(parts.first)
+        return true if EXCLUDED_FILES.include?(parts.last)
+
+        EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
+      end
     end
 
     def initialize(site_path: RoeSitePaths::SITE_PATH)
@@ -162,11 +174,7 @@ module SiteSync
     private
 
     def excluded?(relative_path)
-      parts = relative_path.split("/")
-      return true if EXCLUDED_DIRS.include?(parts.first)
-      return true if EXCLUDED_FILES.include?(parts.last)
-      return true if EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
-      false
+      self.class.excluded?(relative_path)
     end
   end
 end

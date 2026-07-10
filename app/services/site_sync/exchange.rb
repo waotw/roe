@@ -1,5 +1,6 @@
 require "net/http"
 require "json"
+require "stringio"
 
 module SiteSync
   # Cross-environment state exchange. The communication is
@@ -33,6 +34,12 @@ module SiteSync
     PEER_REACHABLE_WINDOW    = 2.hours          # peer counts as "reachable" if we
     # heard from them within this window
     HTTP_TIMEOUT_SECONDS     = 5
+
+    # Read timeout for bulk file transfers (download/upload of a gzip'd
+    # tar). Much larger than the 5s/30s used for state pings — a batch
+    # transfer of changed media can take a while, and we'd rather wait
+    # than fail a legitimate sync.
+    TRANSFER_TIMEOUT_SECONDS = 300
 
     # Cap for the per-category drift file list we ship in the
     # exchange payload. A pathological case (e.g. a fresh push that
@@ -311,6 +318,68 @@ module SiteSync
         }
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] fetch_peer_manifest failed: #{e.class} #{e.message}"
+        nil
+      end
+
+      # Download a set of /site files from the peer as a gzip'd tar.
+      # POSTs the requested relative paths; the peer packs them (dropping
+      # anything excluded/unsafe) and streams the tar back. Returns the
+      # raw tar bytes, or nil on any failure. Used by HttpTransport's pull
+      # and hardlink backup. Callers must not pass an empty list — an
+      # empty set means "nothing to fetch," which the transport handles
+      # before calling here.
+      def download_files(paths)
+        return nil unless can_call_peer?
+        paths = Array(paths).reject(&:blank?).uniq
+        return nil if paths.empty?
+
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/download"))
+        response = post_to_peer(uri, { paths: paths }.to_json, read_timeout: TRANSFER_TIMEOUT_SECONDS)
+        return nil unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] download_files failed: #{e.class} #{e.message}"
+        nil
+      end
+
+      # Upload a batch of changed /site files to the peer as a multipart
+      # POST: the gzip'd tar (`archive`), a JSON per-file manifest
+      # (`manifest`, so the peer can restore mtimes), and a JSON list of
+      # paths to delete (`deleted`). The peer unpacks into its /site,
+      # restores mtimes, and applies the deletions. Returns the parsed
+      # response hash on success, nil on any failure. Used by
+      # HttpTransport's push.
+      def upload_files(archive_bytes:, manifest:, deleted:)
+        return nil unless can_call_peer?
+
+        uri  = URI.parse(File.join(peer_url, "/api/site_sync/upload"))
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl      = (uri.scheme == "https")
+        http.read_timeout = TRANSFER_TIMEOUT_SECONDS
+        http.open_timeout = HTTP_TIMEOUT_SECONDS
+
+        request = Net::HTTP::Post.new(uri.request_uri)
+        request["Authorization"] = "Bearer #{token}"
+        request.set_form(
+          [
+            [ "manifest", manifest.to_json ],
+            [ "deleted",  Array(deleted).to_json ],
+            [ "archive",  StringIO.new(archive_bytes.to_s),
+              { filename: "site-sync.tar.gz", content_type: "application/gzip" } ]
+          ],
+          "multipart/form-data"
+        )
+
+        response = http.request(request)
+        return nil unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)
+      rescue JSON::ParserError
+        # 2xx but unparseable body — the transfer landed; treat as success.
+        { "ok" => true }
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] upload_files failed: #{e.class} #{e.message}"
         nil
       end
 

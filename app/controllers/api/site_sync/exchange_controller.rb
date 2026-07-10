@@ -4,6 +4,11 @@ module Api
     # (bearer token via Authorization header) is handled by
     # Api::SiteSync::BaseController.
     class ExchangeController < BaseController
+      # Upper bound on the number of paths a single download request may
+      # name — a sanity cap so a malformed/hostile body can't ask us to
+      # stat+pack an unbounded list.
+      MAX_DOWNLOAD_PATHS = 50_000
+
       # POST /api/site_sync/exchange
       # Body:    { fingerprint, recorded_fingerprint, env, version }
       # Returns: { fingerprint, recorded_fingerprint, env, version }
@@ -120,6 +125,82 @@ module Api
       rescue => e
         Rails.logger.error "[Api::SiteSync::ExchangeController] manifest FAILED: #{e.class} #{e.message}"
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
+      # POST /api/site_sync/download
+      #
+      # Body:    { paths: [ "posts/foo.md", "media/img.jpg", ... ] }
+      # Returns: application/gzip — a tar of the requested files.
+      #
+      # Requested paths are filtered before packing: anything with `..`,
+      # an absolute path, or a Ledger-excluded prefix (system/secrets/,
+      # db/, …) is dropped. So this endpoint can never be used to
+      # exfiltrate a production key or read outside /site — it only ever
+      # serves syncable content. Used by the peer's HttpTransport pull
+      # and hardlink backup.
+      def download
+        payload = JSON.parse(request.body.read)
+        paths = Array(payload["paths"]).first(MAX_DOWNLOAD_PATHS).select do |p|
+          p.is_a?(String) && !p.include?("..") && !p.start_with?("/") &&
+            !::SiteSync::Ledger.excluded?(p)
+        end
+
+        tar = ::SiteSync::TarArchive.pack(root: ::RoeSitePaths::SITE_PATH, paths: paths)
+        send_data tar, type: "application/gzip", disposition: "attachment",
+                       filename: "site-sync.tar.gz"
+      rescue JSON::ParserError => e
+        render json: { error: "invalid json: #{e.message}" }, status: :bad_request
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] download FAILED: #{e.class} #{e.message}"
+        render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
+      # POST /api/site_sync/upload   (multipart/form-data)
+      #
+      # Parts:
+      #   archive  — gzip'd tar of changed files (SiteSync::TarArchive)
+      #   manifest — JSON { "path" => {size, mtime} } for mtime restore
+      #   deleted  — JSON [ "path", ... ] to remove from /site
+      #
+      # Unpacks the archive into /site (TarArchive refuses excluded or
+      # traversal entries — a hostile archive can't write system/secrets/
+      # or escape the root), restores each file's mtime from the manifest,
+      # then applies the deletions (SiteWriter, equally guarded). The
+      # peer's HttpTransport push calls refresh_ledger + reconcile_content
+      # afterwards, so we don't do that bookkeeping here.
+      def upload
+        archive = params[:archive]
+        unless archive.respond_to?(:read)
+          return render json: { error: "missing archive part" }, status: :bad_request
+        end
+
+        manifest = parse_json_param(params[:manifest], default: {})
+        deleted  = parse_json_param(params[:deleted],  default: [])
+
+        written = ::SiteSync::TarArchive.unpack(archive.read, dest: ::RoeSitePaths::SITE_PATH)
+        ::SiteSync::SiteWriter.restore_mtimes(root: ::RoeSitePaths::SITE_PATH, manifest: manifest)
+        removed = ::SiteSync::SiteWriter.delete_paths(root: ::RoeSitePaths::SITE_PATH, paths: deleted)
+
+        render json: { ok: true, written: written.size, deleted: removed.size }
+      rescue ::SiteSync::TarArchive::UnsafeEntry => e
+        Rails.logger.warn "[Api::SiteSync::ExchangeController] upload rejected unsafe archive: #{e.message}"
+        render json: { ok: false, error: "unsafe archive: #{e.message}" }, status: :unprocessable_entity
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] upload FAILED: #{e.class} #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+        render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
+      private
+
+      # Multipart non-file parts arrive as strings. Parse leniently:
+      # blank → default, malformed → default (never 500 the whole upload
+      # over a bad metadata blob; the archive itself is the source of
+      # truth for what to write).
+      def parse_json_param(value, default:)
+        return default if value.blank?
+        JSON.parse(value)
+      rescue JSON::ParserError
+        default
       end
     end
   end

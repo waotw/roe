@@ -17,6 +17,8 @@ Rails.application.routes.draw do
       post "reconcile_content",         to: "exchange#reconcile_content"
       post "file_states",               to: "exchange#file_states"
       get "manifest",                   to: "exchange#manifest"
+      post "download",                  to: "exchange#download"
+      post "upload",                    to: "exchange#upload"
       post "publish_members",           to: "imports#publish_members"
       post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"
     end
