@@ -27,6 +27,24 @@ export default class extends Controller {
   connect() {
     if (this.hasInProgressPanelTarget) this.startPolling();
     if (this.hasDeployInProgressPanelTarget) this.startDeployPolling();
+    this.maybeScrollToDeployResult();
+  }
+
+  // After a successful deploy the poller reloads the page; the success
+  // card renders down in the deploy section, so scroll to it once (a flag
+  // set right before that reload). Cleared immediately so plain revisits
+  // don't scroll.
+  maybeScrollToDeployResult() {
+    let flag = null;
+    try {
+      flag = sessionStorage.getItem("roeScrollToDeployResult");
+      if (flag) sessionStorage.removeItem("roeScrollToDeployResult");
+    } catch (e) {
+      return;
+    }
+    if (!flag) return;
+    const el = document.getElementById("deploy-result");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   disconnect() {
@@ -112,6 +130,16 @@ export default class extends Controller {
       } else {
         // completed or failed — reload to render the server-side card
         this.stopDeployPolling();
+        // On success, ask the reloaded page to scroll to the result card
+        // (it lives in the deploy section below the fold). Failures show
+        // in the pinned top box, so no scroll needed there.
+        if (data.state === "completed") {
+          try {
+            sessionStorage.setItem("roeScrollToDeployResult", "1");
+          } catch (e) {
+            /* sessionStorage unavailable — skip the scroll */
+          }
+        }
         window.location.reload();
       }
     } catch (e) {

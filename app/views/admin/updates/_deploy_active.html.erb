@@ -1,0 +1,60 @@
+<%# The in-progress / failed deploy panel, pinned to the top of the
+    Updates page so the log isn't below the fold. Rendered only when a
+    deploy is running or has failed (see the active-operation box at the
+    top of index.html.erb). The Stimulus `updates` controller polls and
+    updates the deployLog target wherever it lives on the page. %>
+<% deploy_state = @deploy_status&.dig(:state) %>
+
+<% if deploy_state == :running %>
+  <div class="bg-amber-50 border border-amber-200 rounded-xs p-4"
+       data-updates-target="deployInProgressPanel">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+      </span>
+      <h3 class="text-sm font-semibold text-amber-900">Deploy in progress</h3>
+      <% if @deploy_status[:started_at] %>
+        <span class="text-xs text-amber-700 ml-auto">
+          Started <%= time_ago_in_words(@deploy_status[:started_at]) %> ago
+        </span>
+      <% end %>
+    </div>
+    <p class="text-xs text-amber-800 mb-3">Please don't close this window. The page updates automatically.</p>
+    <div class="bg-white border border-amber-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
+         data-updates-target="deployLog">
+      <%= simple_format(@deploy_status[:log].presence || "") %>
+    </div>
+  </div>
+
+<% elsif deploy_state == :failed %>
+  <div class="bg-red-50 border border-red-200 rounded-xs p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
+      <div class="flex gap-2">
+        <%# Single retry button — clears the remote build cache, then
+            re-runs the deploy. For Kamal it SSHes into the deploy server
+            and runs docker buildx prune; for Fly it appends --no-cache.
+            Cache contamination is the most common recoverable failure,
+            so making it the default retry path is the right tradeoff. %>
+        <%= button_to "Clear deploy cache + retry",
+                      admin_reset_and_retry_deploy_path,
+                      method: :post,
+                      data: { turbo_confirm: "This will clear the remote build cache and re-deploy. The first build will take a few extra minutes (no cache hits). Continue?" },
+                      class: "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
+        <%= button_to "Dismiss",
+                      admin_dismiss_deploy_path,
+                      method: :post,
+                      class: "uppercase text-xs font-mono px-3 py-1.5 border border-red-400 bg-red-100 hover:bg-red-200 text-red-800 rounded-xs" %>
+      </div>
+    </div>
+    <% if @deploy_status[:error].present? %>
+      <p class="text-xs text-red-700 mb-3"><%= @deploy_status[:error] %></p>
+    <% end %>
+    <% if @deploy_status[:log].present? %>
+      <div class="bg-white border border-red-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
+        <%= simple_format(@deploy_status[:log]) %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

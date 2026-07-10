@@ -7,6 +7,17 @@
     </p>
   </div>
 
+  <%# ─── Active deploy, pinned to the top so the progress log isn't below
+      the fold. Dev-only (deploy is dev-only). Shows only while running or
+      after a failure; a successful deploy renders in the section below and
+      the page scrolls to it. The Stimulus `updates` controller finds its
+      deployLog/deployInProgressPanel targets here just as well. %>
+  <% unless Rails.env.production? %>
+    <% if @deploy_status&.dig(:state).in?([ :running, :failed ]) %>
+      <div class="mb-6"><%= render "deploy_active" %></div>
+    <% end %>
+  <% end %>
+
   <%# Production banner — updates can't run from a deployed instance.
       Page itself is still useful (current version, latest-available
       indicator, release notes) so the user knows whether to switch to
@@ -491,32 +502,13 @@
                     class: "text-xs text-gray-400 hover:text-gray-700 underline" %>
       </div>
 
-      <%# ── Running state — Stimulus polls deployLog target ── %>
-      <% if deploy_state == :running %>
-        <div class="bg-amber-50 border border-amber-200 rounded-xs p-4"
-             data-updates-target="deployInProgressPanel">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-            </span>
-            <h3 class="text-sm font-semibold text-amber-900">Deploy in progress</h3>
-            <% if @deploy_status[:started_at] %>
-              <span class="text-xs text-amber-700 ml-auto">
-                Started <%= time_ago_in_words(@deploy_status[:started_at]) %> ago
-              </span>
-            <% end %>
-          </div>
-          <p class="text-xs text-amber-800 mb-3">Please don’t close this window. The page updates automatically.</p>
-          <div class="bg-white border border-amber-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
-               data-updates-target="deployLog">
-            <%= simple_format(@deploy_status[:log].presence || '') %>
-          </div>
-        </div>
+      <%# ── Running / failed are shown in the active-deploy box pinned to
+          the top of the page — nothing to render here. ── %>
+      <% if deploy_state == :running || deploy_state == :failed %>
 
       <%# ── Completed state (only show if not dismissed) ── %>
       <% elsif deploy_state == :completed && !@deploy_status[:dismissed] %>
-        <div class="bg-green-50 border border-green-200 rounded-xs p-4">
+        <div id="deploy-result" class="bg-green-50 border border-green-200 rounded-xs p-4">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-sm font-semibold text-green-900">Deploy completed successfully</h3>
@@ -541,42 +533,6 @@
                 <%= simple_format(@deploy_status[:log]) %>
               </div>
             </details>
-          <% end %>
-        </div>
-
-      <%# ── Failed state ── %>
-      <% elsif deploy_state == :failed %>
-        <div class="bg-red-50 border border-red-200 rounded-xs p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
-            <div class="flex gap-2">
-              <%# Single retry button — clears the remote build cache,
-                  then re-runs the deploy. For Kamal it SSHes into the
-                  deploy server (same connection Kamal already uses)
-                  and runs docker buildx prune; for Fly it appends
-                  --no-cache to the next deploy. Cache contamination is
-                  the most common recoverable failure here, so making
-                  it the default retry path is the right tradeoff —
-                  costs ~3-5 min of extra build time and bypasses the
-                  whole class of stale-cache errors. %>
-              <%= button_to "Clear deploy cache + retry",
-                            admin_reset_and_retry_deploy_path,
-                            method: :post,
-                            data: { turbo_confirm: "This will clear the remote build cache and re-deploy. The first build will take a few extra minutes (no cache hits). Continue?" },
-                            class: "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
-              <%= button_to "Dismiss",
-                            admin_dismiss_deploy_path,
-                            method: :post,
-                            class: "uppercase text-xs font-mono px-3 py-1.5 border border-red-400 bg-red-100 hover:bg-red-200 text-red-800 rounded-xs" %>
-            </div>
-          </div>
-          <% if @deploy_status[:error].present? %>
-            <p class="text-xs text-red-700 mb-3"><%= @deploy_status[:error] %></p>
-          <% end %>
-          <% if @deploy_status[:log].present? %>
-            <div class="bg-white border border-red-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
-              <%= simple_format(@deploy_status[:log]) %>
-            </div>
           <% end %>
         </div>
 
