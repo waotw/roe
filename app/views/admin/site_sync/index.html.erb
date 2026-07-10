@@ -690,67 +690,100 @@
         <strong><%= SiteSync::Exchange.peer_label || @peer_state[:env] %></strong>:
         <%= time_ago_in_words(@peer_state[:received_at]) %> ago.
       </p>
-      <% if @peer_drift %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mb-2">
-          <p class="text-sm text-amber-800 mb-3">
-            ⚠️ <%= SiteSync::Exchange.peer_label %> reports unsynced changes — you should pull them in before editing here.
-          </p>
+      <%
+        # One panel for both directions. Live changes come from the peer's
+        # drift payload; local changes from our own ledger diff. Either or
+        # both may be present — a single Sync reconciles it all.
+        live_changes  = @peer_drift ? (@peer_state && @peer_state[:drift]) : nil
+        local_changes = (@peer_reachable && @status[:state] == :local_drift) ? @status[:local] : nil
+        # Neither side reports drift but the fingerprints still differ:
+        # the ledgers diverged and a sync realigns them.
+        ledger_diverged = @peer_drift.blank? && local_changes.nil? &&
+                          @status[:state] == :clean && !@in_sync_with_peer
+        has_changes = @peer_drift || local_changes.present? || ledger_diverged
+      %>
+      <% if has_changes %>
+        <div class="p-4 bg-amber-50 border border-amber-300 rounded-xs mb-2">
+          <h3 class="text-sm font-semibold text-amber-900 mb-3">Changes to sync</h3>
 
-          <%# Peer's drift detail (file counts + lists), if shipped
-              in the exchange payload. Older peers may not include
-              this — the bullet/details block just doesn't render. %>
-          <% peer_drift_detail = @peer_state && @peer_state[:drift] %>
-          <% if peer_drift_detail %>
-            <% peer_counts = peer_drift_detail[:counts] || {} %>
-            <ul class="list-disc ml-6 mb-3 text-sm text-amber-800 space-y-1">
-              <% if peer_counts[:modified].to_i > 0 %>
-                <li><strong><%= peer_counts[:modified] %></strong> file<%= 's' if peer_counts[:modified] != 1 %> modified</li>
-              <% end %>
-              <% if peer_counts[:added].to_i > 0 %>
-                <li><strong><%= peer_counts[:added] %></strong> file<%= 's' if peer_counts[:added] != 1 %> added</li>
-              <% end %>
-              <% if peer_counts[:deleted].to_i > 0 %>
-                <li><strong><%= peer_counts[:deleted] %></strong> file<%= 's' if peer_counts[:deleted] != 1 %> deleted</li>
-              <% end %>
-            </ul>
-
-            <details class="mb-3">
-              <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
-                Show changes
-                <% if peer_drift_detail[:truncated] %>
-                  <span class="text-xs font-normal text-amber-700">(showing first <%= SiteSync::Exchange::DRIFT_LIST_CAP %> per group)</span>
-                <% end %>
-              </summary>
-              <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                <% [ [ "Modified", peer_drift_detail[:modified] ], [ "Added", peer_drift_detail[:added] ], [ "Deleted", peer_drift_detail[:deleted] ] ].each do |label, list| %>
-                  <% next if list.blank? %>
-                  <div>
-                    <h4 class="text-xs font-semibold text-amber-900 mb-1">
-                      <%= label %> (<%= list.size %>)
-                    </h4>
-                    <ul class="text-xs font-mono text-amber-800 space-y-1">
-                      <% list.each do |path| %>
-                        <li><%= path %></li>
-                      <% end %>
-                    </ul>
+          <%# ── Live changes (from the peer's drift payload) ── %>
+          <% if @peer_drift %>
+            <div class="mb-3">
+              <p class="text-sm text-amber-800 mb-1">
+                ⬇️ <strong><%= SiteSync::Exchange.peer_label %></strong> has changes to pull in.
+              </p>
+              <% if live_changes %>
+                <% live_counts = live_changes[:counts] || {} %>
+                <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
+                  <% if live_counts[:modified].to_i > 0 %><li><strong><%= live_counts[:modified] %></strong> modified</li><% end %>
+                  <% if live_counts[:added].to_i > 0 %><li><strong><%= live_counts[:added] %></strong> added</li><% end %>
+                  <% if live_counts[:deleted].to_i > 0 %><li><strong><%= live_counts[:deleted] %></strong> deleted</li><% end %>
+                </ul>
+                <details class="mt-1">
+                  <summary class="text-xs font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
+                    Show live changes<% if live_changes[:truncated] %> <span class="font-normal text-amber-700">(first <%= SiteSync::Exchange::DRIFT_LIST_CAP %> per group)</span><% end %>
+                  </summary>
+                  <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+                    <% [ [ "Modified", live_changes[:modified] ], [ "Added", live_changes[:added] ], [ "Deleted", live_changes[:deleted] ] ].each do |label, list| %>
+                      <% next if list.blank? %>
+                      <div>
+                        <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
+                        <ul class="text-xs font-mono text-amber-800 space-y-1">
+                          <% list.each do |path| %><li><%= path %></li><% end %>
+                        </ul>
+                      </div>
+                    <% end %>
                   </div>
-                <% end %>
-              </div>
-            </details>
+                </details>
+              <% end %>
+            </div>
           <% end %>
 
+          <%# ── Local changes (from our own ledger diff) ── %>
+          <% if local_changes %>
+            <div class="mb-3">
+              <p class="text-sm text-amber-800 mb-1">
+                ⬆️ <strong>This <%= Rails.env.production? ? "server" : "machine" %></strong> has local changes<%= Rails.env.production? ? " to pull to dev" : " to push to live" %>.
+              </p>
+              <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
+                <% if local_changes[:modified].any? %><li><strong><%= local_changes[:modified].size %></strong> modified</li><% end %>
+                <% if local_changes[:added].any? %><li><strong><%= local_changes[:added].size %></strong> added</li><% end %>
+                <% if local_changes[:deleted].any? %><li><strong><%= local_changes[:deleted].size %></strong> deleted</li><% end %>
+              </ul>
+              <details class="mt-1">
+                <summary class="text-xs font-semibold text-amber-900 cursor-pointer hover:text-amber-700">Show local changes</summary>
+                <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
+                  <% [ [ "Modified", local_changes[:modified] ], [ "Added", local_changes[:added] ], [ "Deleted", local_changes[:deleted] ] ].each do |label, list| %>
+                    <% next if list.empty? %>
+                    <div>
+                      <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
+                      <ul class="text-xs font-mono text-amber-800 space-y-1">
+                        <% list.each do |path| %><li><%= path %></li><% end %>
+                      </ul>
+                    </div>
+                  <% end %>
+                </div>
+              </details>
+            </div>
+          <% end %>
+
+          <%# ── Ledger divergence recovery ── %>
+          <% if ledger_diverged %>
+            <p class="text-sm text-amber-800 mb-3">
+              ⚠️ Content differs from <%= SiteSync::Exchange.peer_label %>, but neither side reports drift — the ledgers diverged. A sync will realign them.
+            </p>
+          <% end %>
+
+          <%# ── One action for everything above ── %>
           <% if @peer_call_configured %>
             <%= button_to "SYNC WITH LIVE",
                           admin_sync_site_path,
                           method: :post,
                           data: { turbo_submits_with: "⏳ Starting sync…" },
-                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+                          class: "mt-1 inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
           <% else %>
-            <%# Prod can't initiate — point user at the local admin
-                where Push lives. No deep-link since we don't have
-                local's URL on this side. %>
-            <p class="text-xs text-amber-700 mt-2">
-              Visit your <strong>local</strong> admin Site Sync page and click <strong>Push to live</strong> to bring these changes here.
+            <p class="text-xs text-amber-700 mt-1">
+              Sync is controlled from your <strong>local</strong> development environment — visit your local admin Site Sync page.
             </p>
           <% end %>
         </div>
@@ -758,105 +791,6 @@
         <p class="text-sm text-green-800">
           ✓ Local content matches <%= SiteSync::Exchange.peer_label %>.
         </p>
-      <% elsif @status[:state] == :clean %>
-        <%# Both sides clean against their own ledgers but content
-            doesn't actually match. The diff that selective push uses
-            comes from local-vs-ledger, so it'll be empty — push will
-            need to go full-tree. This branch surfaces a push button
-            anyway so the user has a recovery path. %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mt-3">
-          <p class="text-sm text-amber-800 mb-3">
-            ⚠️ Content differs from <%= SiteSync::Exchange.peer_label %>, but neither side reports local drift.
-            The ledgers on the two sides have diverged — push (or pull) will realign them.
-          </p>
-
-          <% if @peer_call_configured %>
-            <%= button_to "SYNC WITH LIVE",
-                          admin_sync_site_path,
-                          method: :post,
-                          data: { turbo_submits_with: "⏳ Starting sync…" },
-                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-          <% else %>
-            <p class="text-xs text-amber-700">
-              Push from this side isn't configured. Visit your <strong>local</strong> admin Site Sync page.
-            </p>
-          <% end %>
-        </div>
-      <% end %>
-
-      <%# Local-side drift, folded into the cross-env panel when the
-          peer is reachable. The standalone local-drift panel above
-          this one is hidden in that case (avoids showing the same
-          info twice). When peer is unreachable, the standalone panel
-          shows instead — this section just doesn't render.
-
-          NOTE: On production, "local" means the production server itself.
-          Changes here should be pulled to dev, not pushed. %>
-      <% if @peer_reachable && @status[:state] == :local_drift %>
-        <% local_counts = @status[:local] %>
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xs mt-3">
-          <% if Rails.env.production? %>
-            <%# Production view: changes on live server need to be pulled to dev %>
-            <p class="text-sm text-amber-800 mb-3">
-              ⬆️ You have unsynced changes on this server — pull them to your local site before they accumulate.
-            </p>
-          <% else %>
-            <%# Development view: local changes need to be pushed to live %>
-            <p class="text-sm text-amber-800 mb-3">
-              ⬆️ You have unsynced local changes — push them to live before they accumulate.
-            </p>
-          <% end %>
-          <ul class="list-disc ml-6 mb-3 text-sm text-amber-800 space-y-1">
-            <% if local_counts[:modified].any? %>
-              <li><strong><%= local_counts[:modified].size %></strong> file<%= 's' if local_counts[:modified].size != 1 %> modified</li>
-            <% end %>
-            <% if local_counts[:added].any? %>
-              <li><strong><%= local_counts[:added].size %></strong> file<%= 's' if local_counts[:added].size != 1 %> added</li>
-            <% end %>
-            <% if local_counts[:deleted].any? %>
-              <li><strong><%= local_counts[:deleted].size %></strong> file<%= 's' if local_counts[:deleted].size != 1 %> deleted</li>
-            <% end %>
-          </ul>
-
-          <details class="mb-3">
-            <summary class="text-sm font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
-              Show changes
-            </summary>
-            <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-              <% [ [ "Modified", local_counts[:modified] ], [ "Added", local_counts[:added] ], [ "Deleted", local_counts[:deleted] ] ].each do |label, list| %>
-                <% next if list.empty? %>
-                <div>
-                  <h4 class="text-xs font-semibold text-amber-900 mb-1">
-                    <%= label %> (<%= list.size %>)
-                  </h4>
-                  <ul class="text-xs font-mono text-amber-800 space-y-1">
-                    <% list.each do |path| %>
-                      <li><%= path %></li>
-                    <% end %>
-                  </ul>
-                </div>
-              <% end %>
-            </div>
-          </details>
-
-          <% if Rails.env.production? %>
-            <%# On production, direct users to their local dev environment %>
-            <p class="text-xs text-amber-700">
-              Site sync is controlled from your local development environment.
-              Visit your <strong>local</strong> admin Site Sync page to pull these changes.
-            </p>
-          <% elsif @peer_call_configured %>
-            <%= button_to "SYNC WITH LIVE",
-                          admin_sync_site_path,
-                          method: :post,
-                          data: { turbo_submits_with: "⏳ Starting sync…" },
-                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-          <% else %>
-            <p class="text-xs text-amber-700">
-              Push from this side isn't configured. Visit your <strong>local</strong> admin to push.
-            </p>
-          <% end %>
-        </div>
       <% end %>
 
       <details class="mt-3">
