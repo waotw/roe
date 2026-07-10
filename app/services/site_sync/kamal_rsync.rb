@@ -41,7 +41,11 @@ module SiteSync
       "--exclude=.git",
       "--exclude=.sync-backups",
       "--exclude=.DS_Store",
-      "--exclude=system/global/.last_deploy.yml"
+      "--exclude=system/global/.last_deploy.yml",
+      # Generated image renditions — a rebuildable cache each side makes
+      # on-demand from originals. Syncing them is noise (and needless
+      # bandwidth), so keep them out of push/pull/backup like the Ledger.
+      "--exclude=media/images/variants/"
     ].freeze
 
     # system/secrets/ is excluded from PUSH and PULL so dev and prod each

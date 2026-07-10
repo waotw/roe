@@ -22,7 +22,14 @@ module SiteSync
     #                       so dev and prod each have their own keys
     #                       and an accidental sync can never overwrite
     #                       the production key with a dev one.
-    EXCLUDED_PATHS = %w[system/secrets].freeze
+    #   - media/images/variants/  generated image renditions. They're a
+    #                       rebuildable cache — each side generates them
+    #                       on-demand from the originals — so syncing them
+    #                       is pure noise: any variant lazily created on
+    #                       one side reads as drift against the other.
+    #                       BackupManager already excludes them for the
+    #                       same reason.
+    EXCLUDED_PATHS = %w[system/secrets media/images/variants].freeze
 
     # Filenames excluded wherever they appear in the tree:
     #   - .DS_Store       macOS noise that appears in every browsed dir
