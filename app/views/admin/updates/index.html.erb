@@ -39,9 +39,9 @@
     </div>
   <% end %>
 
-  <div class="mt-8 mb-8 pt-3 border-t border-b px-4 border-gray-200 flex gap-2">
+  <div class="mt-8 mb-8 py-3 border-t border-b px-4 border-gray-200 flex gap-2">
     <details class="<%= Rails.env.production? ? 'w-full' : 'flex-1' %> group">
-      <summary class="text-sm font-semibold text-gray-900 mb-2 cursor-pointer select-none flex items-center gap-2 list-none">
+      <summary class="text-sm font-semibold text-gray-900 cursor-pointer select-none flex items-center gap-2 list-none">
         <span class="inline-block transition-transform group-open:rotate-90 text-gray-500">▸</span>
         About Updates
       </summary>
@@ -54,7 +54,7 @@
     </details>
     <% unless Rails.env.production? %>
     <details class="flex-1 group">
-      <summary class="text-sm font-semibold text-gray-900 mb-2 cursor-pointer select-none flex items-center gap-2 list-none">
+      <summary class="text-sm font-semibold text-gray-900 cursor-pointer select-none flex items-center gap-2 list-none">
         <span class="inline-block transition-transform group-open:rotate-90 text-gray-500">▸</span>
         About Deploy
       </summary>
