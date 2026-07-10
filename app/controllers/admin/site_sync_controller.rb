@@ -166,6 +166,44 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # Apply the admin's choices for a sync that was blocked by conflicts.
+  # Each conflict resolves to "local" (keep mine), "live" (keep theirs),
+  # or — the default for a blank/`recent` choice — most-recent by mtime.
+  # A top-level `resolve_all` overrides every conflict at once.
+  def resolve_conflicts
+    if transfer_in_progress?
+      flash[:alert] = "Another sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+    conflicts = status && status[:state] == :conflicts ? Array(status[:conflicts]) : []
+    if conflicts.empty?
+      flash[:alert] = "No conflicts to resolve."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    choices     = params[:resolutions] || {}
+    resolve_all = params[:resolve_all].to_s
+    resolutions = conflicts.each_with_object({}) do |c, acc|
+      path   = c["path"]
+      choice = resolve_all.presence || choices[path].to_s
+      acc[path] = case choice
+      when "local" then "local"
+      when "live"  then "live"
+      else # "recent" or blank → most-recent by the newer hint (ties → local)
+                        c["newer"] == "live" ? "live" : "local"
+      end
+    end
+
+    seed_running_status(:resolve)
+    SiteSyncConflictResolutionJob.perform_later(resolutions, conflicts)
+    flash[:notice] = "Applying #{resolutions.size} resolution(s) in the background. Refresh to check progress."
+    redirect_to admin_site_sync_path
+  end
+
   # Clear a completed/failed status notice from the UI without
   # waiting for the cache TTL.
   def dismiss_transfer_status
