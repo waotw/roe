@@ -31,6 +31,7 @@ module SiteSync
       # ─── Push (local → live) ──────────────────────────────────────
 
       def push_local_to_live!(diff: nil, on_progress: nil)
+        Rails.logger.info "[SiteSync::HttpTransport] push over HTTP → #{Exchange.peer_url}"
         diff ||= full_diff_for_push
         changed = changed_files(diff)
         deleted = Array(diff[:deleted])
@@ -58,6 +59,7 @@ module SiteSync
       # ─── Pull (live → local) ──────────────────────────────────────
 
       def pull_live_to_local!(diff: nil, on_progress: nil)
+        Rails.logger.info "[SiteSync::HttpTransport] pull over HTTP ← #{Exchange.peer_url}"
         diff ||= full_diff_for_pull
         changed = changed_files(diff)
         deleted = Array(diff[:deleted])
@@ -94,6 +96,7 @@ module SiteSync
       # that actually differ are pulled over the wire.
 
       def backup_live_to_local!(files: nil, on_progress: nil)
+        Rails.logger.info "[SiteSync::HttpTransport] backup over HTTP ← #{Exchange.peer_url}"
         peer = Exchange.fetch_peer_manifest
         raise HttpTransportError, "cannot back up live: peer manifest unavailable" unless peer
 
