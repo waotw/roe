@@ -27,23 +27,23 @@ export default class extends Controller {
   connect() {
     if (this.hasInProgressPanelTarget) this.startPolling();
     if (this.hasDeployInProgressPanelTarget) this.startDeployPolling();
-    this.maybeScrollToDeployResult();
+    // After a successful deploy/update the poller reloads; the result card
+    // renders in its section below, so scroll to it once (a flag set right
+    // before that reload). Failures stay pinned at the top, so no scroll.
+    this.scrollToResultIfFlagged("roeScrollToUpdateResult", "update-result");
+    this.scrollToResultIfFlagged("roeScrollToDeployResult", "deploy-result");
   }
 
-  // After a successful deploy the poller reloads the page; the success
-  // card renders down in the deploy section, so scroll to it once (a flag
-  // set right before that reload). Cleared immediately so plain revisits
-  // don't scroll.
-  maybeScrollToDeployResult() {
+  scrollToResultIfFlagged(flagKey, elementId) {
     let flag = null;
     try {
-      flag = sessionStorage.getItem("roeScrollToDeployResult");
-      if (flag) sessionStorage.removeItem("roeScrollToDeployResult");
+      flag = sessionStorage.getItem(flagKey);
+      if (flag) sessionStorage.removeItem(flagKey); // one-shot: don't scroll on plain revisits
     } catch (e) {
       return;
     }
     if (!flag) return;
-    const el = document.getElementById("deploy-result");
+    const el = document.getElementById(elementId);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -79,6 +79,15 @@ export default class extends Controller {
         this.updateProgress(data);
       } else {
         this.stopPolling();
+        // On success, scroll to the result card (restart-needed / updated)
+        // after the reload. Failures stay pinned at the top.
+        if (data.status === "completed") {
+          try {
+            sessionStorage.setItem("roeScrollToUpdateResult", "1");
+          } catch (e) {
+            /* sessionStorage unavailable — skip the scroll */
+          }
+        }
         window.location.reload();
       }
     } catch (e) {

@@ -1,0 +1,71 @@
+<%# In-progress / failed / rolled-back update panels, pinned to the top of
+    the Updates page so the progress log and any failure aren't below the
+    fold. Rendered only when one applies (see the active-operation box at
+    the top of index.html.erb). The Stimulus `updates` controller finds its
+    inProgressPanel / progressBar / currentStep / log targets here. %>
+<% if @in_progress %>
+  <div class="bg-amber-50 border border-amber-200 rounded-xs p-6"
+       data-updates-target="inProgressPanel">
+    <h2 class="text-lg font-semibold text-amber-900 mb-2">Update in Progress</h2>
+    <p class="text-amber-800 mb-4">
+      An update is currently being applied to your site.
+      Please do not close this window.
+    </p>
+
+    <div class="mb-4">
+      <div class="w-full bg-amber-200 rounded-full h-2.5">
+        <div class="bg-amber-600 h-2.5 rounded-full"
+             style="width: <%= @last_update&.progress_percent || 0 %>%"
+             data-updates-target="progressBar"></div>
+      </div>
+      <p class="text-sm text-amber-700 mt-2"
+         data-updates-target="currentStep">
+        <%= @last_update&.current_step || 'Starting...' %>
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xs p-4 font-mono text-xs text-gray-600 h-48 overflow-y-auto"
+         data-updates-target="log">
+      <%= simple_format(@last_update&.log || '') %>
+    </div>
+  </div>
+
+<% elsif @last_update && @last_update.status == "failed" %>
+  <div class="bg-red-50 border border-red-200 rounded-xs p-6">
+    <h3 class="text-sm font-semibold text-red-900 mb-2">Last Update Failed</h3>
+    <p class="text-sm text-red-700 mb-2">
+      Both the update AND the automatic rollback failed. Manual
+      intervention may be required.
+    </p>
+    <% if @last_update.error_message.present? %>
+      <pre class="mb-4 p-3 bg-white border border-red-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @last_update.error_message %></pre>
+    <% end %>
+    <%= button_to "Attempt Rollback",
+                  admin_rollback_update_path,
+                  method: :post,
+                  data: { confirm: "This will restore the previous version. Continue?" },
+                  class: "inline-flex items-center px-4 py-2 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono text-xs rounded-xs" %>
+  </div>
+
+<% elsif @last_update && @last_update.status == "rolled_back" %>
+  <div class="bg-amber-50 border border-amber-200 rounded-xs p-6">
+    <h3 class="text-sm font-semibold text-amber-900 mb-2">
+      Last Update Rolled Back
+    </h3>
+    <p class="text-sm text-amber-800 mb-2">
+      Update from <span class="font-mono"><%= @last_update.from_version %></span>
+      → <span class="font-mono"><%= @last_update.to_version %></span>
+      was attempted <%= time_ago_in_words(@last_update.completed_at || @last_update.updated_at) %> ago
+      and was automatically rolled back. Your site is running normally on
+      <span class="font-mono"><%= @current_version %></span>.
+    </p>
+    <% if @last_update.error_message.present? %>
+      <details class="mt-3">
+        <summary class="text-xs text-amber-700 cursor-pointer hover:text-amber-900">
+          Show failure details
+        </summary>
+        <pre class="mt-2 p-3 bg-white border border-amber-200 rounded-xs font-mono text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap"><%= @last_update.error_message %></pre>
+      </details>
+    <% end %>
+  </div>
+<% end %>
