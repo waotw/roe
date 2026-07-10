@@ -67,7 +67,8 @@ class Medium < ApplicationRecord
     ImageVariantGenerator.queue_baseline!(file_path)
   end
 
-  # True once the upload-time baseline (see BASELINE_VARIANTS) is on disk.
+  # True once the upload-time baseline (ImageVariantGenerator
+  # .baseline_variant_names — small + largest non-upscaled size) is on disk.
   # The admin grid serves that preview and gates on this rather than the
   # full ladder, so an image that's only ever a baseline (never rendered
   # on the site) still shows a proper thumbnail instead of the original.
@@ -77,9 +78,8 @@ class Medium < ApplicationRecord
     # so trust the column and skip the filesystem stat on the common case.
     return true if variants_status == "complete"
 
-    ImageVariantGenerator.variants_exist?(
-      File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, "")).to_s,
-      only: ImageVariantGenerator::BASELINE_VARIANTS
+    ImageVariantGenerator.baseline_exists?(
+      File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, "")).to_s
     )
   end
 

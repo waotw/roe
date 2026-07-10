@@ -36,17 +36,29 @@ class ResponsiveImageRenderer
 
     source_full_path = File.join(RoeSitePaths::SITE_PATH, source_path.sub(%r{^/}, "")).to_s
 
-    # Serve a <picture> whenever a full variant set exists on disk — no
-    # matter how it got there: generated here by libvips, generated on
-    # another machine and synced/deployed, or placed by hand. libvips is
-    # only needed to *create* variants, never to *serve* them, so we check
-    # for the files first and gate generation (not serving) on it.
-    html = if ImageVariantGenerator.variants_exist?(source_full_path)
+    # Serving gate. libvips is only needed to *create* variants, never to
+    # *serve* them, so we check the files on disk first.
+    #
+    #   - Static build: nothing fills variants in after this HTML is baked
+    #     (no server, no on-demand), so generate the FULL needed set
+    #     synchronously here and bake the complete srcset.
+    #   - Full set already present → serve it, no work.
+    #   - Only the baseline present → serve a <picture> from whatever's on
+    #     disk (small + largest is a valid responsive set) AND queue the
+    #     rest so the next render gets a richer srcset. This is the "first
+    #     render pays, everyone after benefits" on-demand path.
+    #   - Nothing yet → queue and show the original until ready.
+    html = if Current.static_generation && ImageVariantGenerator.available?
+      ImageVariantGenerator.generate_variants(source_full_path) unless ImageVariantGenerator.variants_exist?(source_full_path)
+      ImageVariantGenerator.variants_exist?(source_full_path) ? build_picture_tag : simple_img_tag
+    elsif ImageVariantGenerator.variants_exist?(source_full_path)
+      build_picture_tag
+    elsif ImageVariantGenerator.baseline_exists?(source_full_path)
+      # queue! is idempotent (Rails.cache flag dedups re-renders); no-op
+      # when libvips is unavailable, so we still serve the baseline picture.
+      ImageVariantGenerator.queue!(source_path)
       build_picture_tag
     elsif ImageVariantGenerator.available?
-      # Missing but we can build them: queue and show the original until
-      # ready. queue! is idempotent (Rails.cache flag dedups re-renders
-      # until the job clears it).
       ImageVariantGenerator.queue!(source_path)
       simple_img_tag
     else

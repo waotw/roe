@@ -103,4 +103,32 @@ class ResponsiveImageRendererTest < ActiveSupport::TestCase
     refute_includes html, "<picture>"
     assert_includes html, "<img"
   end
+
+  test "serves a <picture> from just the baseline and queues the rest to enrich" do
+    # Only the baseline (small + xl) on disk — the middle sizes aren't built yet.
+    setup_variants(source_width: 2000, variants: { small: 400, xl: 1800 })
+    ImageVariantGenerator.stubs(:available?).returns(true)
+    ImageVariantGenerator.expects(:queue!).with(WEB_PATH).at_least_once # enrich next render
+
+    html = ResponsiveImageRenderer.render(WEB_PATH)
+
+    assert_includes html, "<picture>", "baseline is enough to serve a responsive picture"
+    assert_includes html, "photo-small.png 400w"
+    assert_includes html, "photo-xl.png 1800w"
+    refute_includes html, "photo-medium.png", "middle sizes aren't built yet"
+  end
+
+  test "static build generates the full needed set synchronously, not via a queued job" do
+    write_png(File.join(DIR, "photo.png"), 2000)
+    ImageVariantGenerator.stubs(:available?).returns(true)
+    ImageVariantGenerator.expects(:generate_variants).at_least_once   # inline
+    ImageVariantGenerator.expects(:queue!).never                      # never async during a bake
+
+    Current.static_generation = true
+    begin
+      ResponsiveImageRenderer.render(WEB_PATH)
+    ensure
+      Current.static_generation = nil
+    end
+  end
 end

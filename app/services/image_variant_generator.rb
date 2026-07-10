@@ -9,14 +9,6 @@ class ImageVariantGenerator
     xl:     { resize_to_limit: [ 1800, 1800 ] }    # hero / full-bleed / OG image
   }.freeze
 
-  # The single variant generated proactively when an image first appears
-  # (upload / import / sync-detect). It's the cheap, always-useful preview
-  # the admin grid serves; the rest of the ladder is built on-demand when
-  # the image is actually rendered on the site. `small` is the admin
-  # grid's own target and never upscales a small source, so a tiny favicon
-  # gets just this one modest file. See generate_variants(only:).
-  BASELINE_VARIANTS = %i[small].freeze
-
   WEBP_QUALITY = 85  # Quality for WebP conversion
   # Generate `.webp` siblings alongside each native-format variant. The
   # ResponsiveImageRenderer emits a `<source type="image/webp">` first
@@ -71,8 +63,8 @@ class ImageVariantGenerator
       end
     end
 
-    # `only:` restricts generation to a subset of variant names (e.g.
-    # BASELINE_VARIANTS on upload) — intersected with the size-appropriate
+    # `only:` restricts generation to a subset of variant names (e.g. the
+    # baseline on upload) — intersected with the size-appropriate
     # needed set so we still never generate a variant larger than the
     # source. nil means "the full needed set" (the on-demand render path).
     def generate_variants(source_path, medium_id: nil, force: false, only: nil)
@@ -186,11 +178,35 @@ class ImageVariantGenerator
       true
     end
 
-    # Proactive, first-appearance generation: just the cheap baseline
-    # preview (see BASELINE_VARIANTS). The rest of the ladder is built
+    # Proactive, first-appearance generation: just the per-image baseline
+    # (see baseline_variant_names). The intermediate sizes are filled
     # on-demand by the renderer when the image is actually displayed.
     def queue_baseline!(web_path, force: false)
-      queue!(web_path, force: force, only: BASELINE_VARIANTS)
+      names = baseline_variant_names(web_path)
+      return false if names.empty?
+      queue!(web_path, force: force, only: names)
+    end
+
+    # The proactive baseline set for a source: `small` (the admin grid's
+    # preview, and the mobile end of the srcset) plus the largest size
+    # that doesn't upscale the source (a crisp, web-sized default capped
+    # at xl). For a tiny image the largest IS small, so the set collapses
+    # to just small. This 2-point set already serves a valid responsive
+    # <picture> — the renderer fills the middle sizes on-demand for dynamic
+    # pages, and the static build fills the full set synchronously so baked
+    # pages ship the complete srcset.
+    def baseline_variant_names(source_path)
+      limits = variant_names_for(normalize_path(source_path)).reject { |n| n == :thumb }
+      return [] if limits.empty?
+      [ :small, limits.last ].uniq
+    end
+
+    # Whether the proactive baseline for a source is already on disk.
+    def baseline_exists?(source_path)
+      source_path = normalize_path(source_path)
+      names = baseline_variant_names(source_path)
+      return false if names.empty?
+      variants_exist?(source_path, only: names)
     end
 
     # Cleared by the job (success or failure) so the next renderer hit

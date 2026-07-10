@@ -74,6 +74,14 @@ class StaticGenerator
 
     puts "🚀 Starting static site generation..."
 
+    # Static output can't fill image variants in later (no server, no
+    # on-demand), so the renderer generates each image's full needed set
+    # synchronously as pages bake. The first build after adding images is
+    # therefore slower; subsequent builds only fill what's missing.
+    if ImageVariantGenerator.available?
+      puts "  🖼️  Generating image variants inline (first build may take longer)…"
+    end
+
     prepare_output_directory
 
     # Check what changed
