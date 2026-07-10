@@ -184,15 +184,16 @@ class ContentSync
 
     puts "  ✓ Added: #{inserted} new media files" if inserted.positive?
 
-    # Variant queueing is dev-only (mirrors Medium#after_create's guard).
-    # Production generates variants on upload and on-demand from the
-    # renderer, not in bulk at boot.
+    # Dev-only, and only the cheap baseline preview (mirrors
+    # Medium#after_create — bulk insert_all skips that callback, so we
+    # queue here instead). The rest of the ladder builds on-demand from
+    # the renderer; production stays fully lazy.
     if Rails.env.development? && image_paths_for_queue.any?
       image_count = 0
       image_paths_for_queue.each do |web_path|
-        image_count += 1 if ImageVariantGenerator.queue!(web_path)
+        image_count += 1 if ImageVariantGenerator.queue_baseline!(web_path)
       end
-      puts "🖼️  Queued #{image_count} images for variant generation" if image_count.positive?
+      puts "🖼️  Queued #{image_count} images for baseline variant" if image_count.positive?
     end
 
     puts "=" * 60

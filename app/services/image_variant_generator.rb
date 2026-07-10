@@ -9,6 +9,14 @@ class ImageVariantGenerator
     xl:     { resize_to_limit: [ 1800, 1800 ] }    # hero / full-bleed / OG image
   }.freeze
 
+  # The single variant generated proactively when an image first appears
+  # (upload / import / sync-detect). It's the cheap, always-useful preview
+  # the admin grid serves; the rest of the ladder is built on-demand when
+  # the image is actually rendered on the site. `small` is the admin
+  # grid's own target and never upscales a small source, so a tiny favicon
+  # gets just this one modest file. See generate_variants(only:).
+  BASELINE_VARIANTS = %i[small].freeze
+
   WEBP_QUALITY = 85  # Quality for WebP conversion
   # Generate `.webp` siblings alongside each native-format variant. The
   # ResponsiveImageRenderer emits a `<source type="image/webp">` first
@@ -63,7 +71,11 @@ class ImageVariantGenerator
       end
     end
 
-    def generate_variants(source_path, medium_id: nil, force: false)
+    # `only:` restricts generation to a subset of variant names (e.g.
+    # BASELINE_VARIANTS on upload) — intersected with the size-appropriate
+    # needed set so we still never generate a variant larger than the
+    # source. nil means "the full needed set" (the on-demand render path).
+    def generate_variants(source_path, medium_id: nil, force: false, only: nil)
       return false unless available?
       return false unless image_file?(source_path)
 
@@ -96,19 +108,24 @@ class ImageVariantGenerator
       # source. Always running mark_complete_for at the end self-heals the
       # DB status column for files whose variants exist but were never
       # stamped (older imports, manual file drops).
-      variant_names_for(source_path).each do |name|
+      targeted = variant_names_for(source_path)
+      targeted &= Array(only).map(&:to_sym) if only
+
+      targeted.each do |name|
         generate_variant(source_path, name, VARIANTS[name], force: force)
       end
 
-      # Only stamp the row "complete" if every native variant (and WebP
-      # sibling, when GENERATE_WEBP is on) actually exists on disk. The
-      # per-variant rescue inside generate_variant swallows individual
-      # failures so the loop keeps going — without this verify step we'd
-      # falsely mark partially-generated images as complete and the next
-      # backfill_status sweep would have to silently undo the lie.
+      # Stamp the row "complete" only when the FULL needed set exists on
+      # disk — never for a baseline-only run, or the renderer's fast path
+      # would think the whole ladder is present and build a srcset from
+      # variants that were never generated. Success of THIS run is judged
+      # against what it targeted (so a baseline run isn't logged "partial").
       if variants_exist?(source_path)
         Rails.logger.info "[ImageVariants] ✓ Complete: #{File.basename(source_path)}"
         mark_complete_for(source_path)
+      end
+
+      if variants_exist?(source_path, only: targeted)
         true
       else
         Rails.logger.warn "[ImageVariants] ⚠ Partial: some variants missing for #{File.basename(source_path)} — leaving status pending"
@@ -151,7 +168,7 @@ class ImageVariantGenerator
     # Pass `force: true` to bypass the dedup check — used by user-
     # initiated rake/admin actions where "queue this now" must not be
     # silently swallowed by a stale cache flag from a prior crashed run.
-    def queue!(web_path, force: false)
+    def queue!(web_path, force: false, only: nil)
       return false unless available?
       # Same boundary as #generate_variants: never queue a variant path.
       # The job would happily process it and produce variants/variants/.
@@ -163,8 +180,17 @@ class ImageVariantGenerator
       return false if !force && Rails.cache.exist?(cache_key)
 
       Rails.cache.write(cache_key, true, expires_in: QUEUE_DEDUP_TTL)
-      GenerateImageVariantsJob.perform_later(web_path, nil, force)
+      # Symbols don't survive ActiveJob serialization — pass variant names
+      # as strings; the job symbolizes them back.
+      GenerateImageVariantsJob.perform_later(web_path, nil, force, only&.map(&:to_s))
       true
+    end
+
+    # Proactive, first-appearance generation: just the cheap baseline
+    # preview (see BASELINE_VARIANTS). The rest of the ladder is built
+    # on-demand by the renderer when the image is actually displayed.
+    def queue_baseline!(web_path, force: false)
+      queue!(web_path, force: force, only: BASELINE_VARIANTS)
     end
 
     # Cleared by the job (success or failure) so the next renderer hit
@@ -220,9 +246,11 @@ class ImageVariantGenerator
     # GENERATE_WEBP on automatically routes every image through the
     # queue once until WebP siblings are filled in. After backfill, this
     # stays cheap (8 stat calls vs 4).
-    def variants_exist?(source_path)
+    def variants_exist?(source_path, only: nil)
       source_path = normalize_path(source_path)
-      variant_names_for(source_path).all? do |name|
+      names = variant_names_for(source_path)
+      names &= Array(only).map(&:to_sym) if only
+      names.all? do |name|
         variant_exists?(source_path, name) &&
           (!GENERATE_WEBP || webp_variant_exists?(source_path, name))
       end

@@ -82,4 +82,43 @@ class ImageVariantGeneratorTest < ActiveSupport::TestCase
     refute_equal "MANUAL", File.read(sentinel), "force must overwrite"
     assert_operator dims(sentinel).max, :<=, 400, "rebuilt small variant is correctly sized"
   end
+
+  # ---------------------------------------------------------------- baseline
+
+  test "only: restricts generation to the requested variant (the upload baseline)" do
+    src = make_source("baseline.png", 2000, 2000)
+    assert ImageVariantGenerator.generate_variants(src, only: [ :small ])
+
+    assert File.exist?(variant(src, :small)), "the baseline (small) is generated"
+    assert File.exist?(variant(src, :small).sub(/\.png\z/, ".webp")), "small webp too"
+    refute File.exist?(variant(src, :medium)), "medium is NOT built for a baseline-only run"
+    refute File.exist?(variant(src, :large))
+    refute File.exist?(variant(src, :xl))
+    refute File.exist?(variant(src, :thumb)), "thumb is NOT part of the baseline"
+  end
+
+  test "queue_baseline! targets exactly BASELINE_VARIANTS" do
+    assert_equal [ :small ], ImageVariantGenerator::BASELINE_VARIANTS
+  end
+
+  test "variants_exist? respects only:, and a baseline run is not the full ladder" do
+    src = make_source("partial.png", 2000, 2000)
+    ImageVariantGenerator.generate_variants(src, only: [ :small ])
+
+    assert ImageVariantGenerator.variants_exist?(src, only: [ :small ]), "baseline present"
+    refute ImageVariantGenerator.variants_exist?(src), "the full ladder is not present"
+  end
+
+  test "a baseline-only run does not stamp the Medium row complete; the full run does" do
+    src = make_source("stamp.png", 2000, 2000)
+    medium = Medium.create!(file_path: "/media/images/ivg_test/stamp.png",
+                            media_type: "images", uploaded_at: Time.current)
+
+    ImageVariantGenerator.generate_variants(src, only: [ :small ])
+    refute_equal "complete", medium.reload.variants_status,
+                 "baseline isn't the full set — must not mark the row complete"
+
+    ImageVariantGenerator.generate_variants(src) # fill the full ladder
+    assert_equal "complete", medium.reload.variants_status
+  end
 end

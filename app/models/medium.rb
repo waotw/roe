@@ -62,7 +62,25 @@ class Medium < ApplicationRecord
   def queue_variant_generation
     return unless image?
 
-    ImageVariantGenerator.queue!(file_path)
+    # Proactively build only the cheap baseline preview; the rest of the
+    # ladder is generated on-demand when the image is actually rendered.
+    ImageVariantGenerator.queue_baseline!(file_path)
+  end
+
+  # True once the upload-time baseline (see BASELINE_VARIANTS) is on disk.
+  # The admin grid serves that preview and gates on this rather than the
+  # full ladder, so an image that's only ever a baseline (never rendered
+  # on the site) still shows a proper thumbnail instead of the original.
+  def baseline_ready?
+    return false unless image?
+    # Fast path: a "complete" full ladder trivially includes the baseline,
+    # so trust the column and skip the filesystem stat on the common case.
+    return true if variants_status == "complete"
+
+    ImageVariantGenerator.variants_exist?(
+      File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, "")).to_s,
+      only: ImageVariantGenerator::BASELINE_VARIANTS
+    )
   end
 
   def self.remove_by_file_path(file_path)
