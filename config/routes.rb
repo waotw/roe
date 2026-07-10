@@ -63,6 +63,7 @@ Rails.application.routes.draw do
     post "site_sync/refresh_exchange", to: "site_sync#refresh_exchange", as: "refresh_site_sync_exchange"
     post "site_sync/push_to_live",     to: "site_sync#push_to_live",    as: "push_site_to_live"
     post "site_sync/pull_from_live",   to: "site_sync#pull_from_live",  as: "pull_site_from_live"
+    post "site_sync/sync",             to: "site_sync#sync",            as: "sync_site"
     post "site_sync/resolve_conflicts", to: "site_sync#resolve_conflicts", as: "resolve_site_sync_conflicts"
     get  "site_sync/transfer_status",         to: "site_sync#transfer_status",        as: "site_transfer_status"
     post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"

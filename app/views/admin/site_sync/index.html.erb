@@ -125,7 +125,7 @@
             <span class="flex items-center gap-2 text-green-900">
               <span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
               <span class="font-medium">Live site sync:</span>
-              <span>in sync</span>
+              <span>in sync<% if @last_synced_at %> · last synced <%= time_ago_in_words(@last_synced_at) %> ago<% end %></span>
             </span>
           <% end %>
         </li>
@@ -292,21 +292,9 @@
                         class: "inline-flex items-center px-3 py-1 border border-blue-700 bg-blue-100 hover:bg-blue-200 text-blue-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
           </div>
         </div>
-      <% when :completed %>
-        <% if @transfer_status[:completed_at] && @transfer_status[:completed_at] > 5.minutes.ago %>
-          <div class="bg-green-50 border border-green-200 rounded-xs p-6 mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-semibold text-green-900 mb-1">✓ <%= kind_label %> completed</h3>
-              <p class="text-sm text-green-800">
-                Finished <%= time_ago_in_words(@transfer_status[:completed_at]) %> ago.
-              </p>
-            </div>
-            <%= button_to "Dismiss",
-                        admin_dismiss_site_transfer_status_path,
-                        method: :post,
-                        class: "inline-flex items-center px-3 py-1 border border-green-700 bg-green-100 hover:bg-green-200 text-green-800 font-mono text-xs rounded-xs cursor-pointer" %>
-          </div>
-        <% end %>
+      <%# :completed intentionally renders nothing — the always-on status
+          panel above ("in sync · last synced …") is the success signal, so
+          there's no transient banner to dismiss. %>
       <% when :conflicts %>
         <% conflicts = Array(@transfer_status[:conflicts]) %>
         <div class="bg-amber-50 border border-amber-300 rounded-xs p-6 mb-6">
@@ -346,17 +334,17 @@
             <div class="flex flex-wrap gap-2">
               <button type="submit"
                       class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs rounded-xs cursor-pointer">
-                Apply resolutions
+                APPLY RESOLUTIONS
               </button>
               <button type="submit" name="resolve_all" value="recent"
                       class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer">
-                Resolve all by most-recent
+                RESOLVE ALL BY MOST-RECENT
               </button>
             </div>
           <% end %>
 
           <div class="mt-2">
-            <%= button_to "Dismiss",
+            <%= button_to "CANCEL",
                         admin_dismiss_site_transfer_status_path,
                         method: :post,
                         data: { confirm: "Clear the conflict notice without resolving? The files stay diverged until you sync again." },
@@ -558,21 +546,15 @@
 
           <% if SiteSync::Exchange.can_call_peer? %>
             <div class="mt-6 pt-4 border-t border-amber-200">
-              <h3 class="text-sm font-semibold text-amber-900 mb-2">Push these changes to live</h3>
+              <h3 class="text-sm font-semibold text-amber-900 mb-2">Sync with live</h3>
               <p class="text-sm text-amber-800 mb-3">
-                Note: after sync, the live site will reflect the changes mentioned above. Live site is backed up before sync.
+                Syncs changes both ways. Any file changed on <em>both</em> sides pauses for you to resolve — nothing is overwritten — and both sides are backed up first.
               </p>
-              <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
-                <div class="flex gap-2">
-                  <%= form.text_field :confirm,
-                                  placeholder: "Type LIVE to confirm",
-                                  autocomplete: "off",
-                                  class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
-                  <%= form.submit "PUSH TO LIVE NOW",
-                              data: { turbo_submits_with: "⏳ Starting push…" },
-                              class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-                </div>
-              <% end %>
+              <%= button_to "SYNC WITH LIVE",
+                            admin_sync_site_path,
+                            method: :post,
+                            data: { turbo_submits_with: "⏳ Starting sync…" },
+                            class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
             </div>
           <% end %>
 
@@ -758,14 +740,11 @@
           <% end %>
 
           <% if @peer_call_configured %>
-            <%= button_to "PULL FROM LIVE",
-                          admin_pull_site_from_live_path,
+            <%= button_to "SYNC WITH LIVE",
+                          admin_sync_site_path,
                           method: :post,
-                          data: {
-                            confirm: "Pull live's content over your local /site? Your current local /site will be backed up first to site_backups/local/.",
-                            turbo_submits_with: "⏳ Starting pull…"
-                          },
-                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-200 hover:bg-amber-300 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+                          data: { turbo_submits_with: "⏳ Starting sync…" },
+                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
           <% else %>
             <%# Prod can't initiate — point user at the local admin
                 where Push lives. No deep-link since we don't have
@@ -792,25 +771,11 @@
           </p>
 
           <% if @peer_call_configured %>
-            <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
-              <div class="flex gap-2">
-                <%= form.text_field :confirm,
-                                    placeholder: "Type LIVE to confirm",
-                                    autocomplete: "off",
-                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
-                <%= form.submit "PUSH TO LIVE NOW",
-                                data: { turbo_submits_with: "⏳ Starting push…" },
-                                class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-              </div>
-            <% end %>
-            <%= button_to "PULL FROM LIVE",
-                          admin_pull_site_from_live_path,
+            <%= button_to "SYNC WITH LIVE",
+                          admin_sync_site_path,
                           method: :post,
-                          data: {
-                            confirm: "Pull live's content over your local /site? Your current local /site will be backed up first.",
-                            turbo_submits_with: "⏳ Starting pull…"
-                          },
-                          class: "mt-2 inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 font-mono text-xs rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait" %>
+                          data: { turbo_submits_with: "⏳ Starting sync…" },
+                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
           <% else %>
             <p class="text-xs text-amber-700">
               Push from this side isn't configured. Visit your <strong>local</strong> admin Site Sync page.
@@ -881,17 +846,11 @@
               Visit your <strong>local</strong> admin Site Sync page to pull these changes.
             </p>
           <% elsif @peer_call_configured %>
-            <%= form_with url: admin_push_site_to_live_path, method: :post, local: true do |form| %>
-              <div class="flex gap-2">
-                <%= form.text_field :confirm,
-                                    placeholder: "Type LIVE to confirm",
-                                    autocomplete: "off",
-                                    class: "flex-1 px-3 py-2 border border-amber-400 rounded-xs font-mono text-xs" %>
-                <%= form.submit "PUSH TO LIVE NOW",
-                                data: { turbo_submits_with: "⏳ Starting push…" },
-                                class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
-              </div>
-            <% end %>
+            <%= button_to "SYNC WITH LIVE",
+                          admin_sync_site_path,
+                          method: :post,
+                          data: { turbo_submits_with: "⏳ Starting sync…" },
+                          class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
           <% else %>
             <p class="text-xs text-amber-700">
               Push from this side isn't configured. Visit your <strong>local</strong> admin to push.

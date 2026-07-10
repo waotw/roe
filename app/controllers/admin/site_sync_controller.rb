@@ -40,6 +40,16 @@ class Admin::SiteSyncController < Admin::BaseController
     peer_fp         = @peer_state&.dig(:fingerprint)
     @in_sync_with_peer = local_fp.present? && peer_fp.present? && local_fp == peer_fp
 
+    # When the local ledger was last written = the last successful sync.
+    # Persists across cache expiry (unlike the transient transfer status),
+    # so the always-on status line can show "last synced …".
+    @last_synced_at = begin
+      version = SiteSync::Ledger.recorded&.dig("version")
+      version.present? ? Time.parse(version.to_s) : nil
+    rescue StandardError
+      nil
+    end
+
     # Live config for the form (token + peer_url). first_or_create!
     # auto-generates a token on first access, so the form always has
     # something to show.
@@ -166,6 +176,28 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # Bi-directional sync: reconcile with live and apply the safe changes
+  # both ways in one pass. Conflicts stop it (nothing overwritten), so no
+  # typed confirmation is needed — both sides are backed up first anyway.
+  def sync
+    if transfer_in_progress?
+      flash[:alert] = "A sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "Sync requires a peer URL set on this side (dev only)."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    seed_running_status(:sync)
+    SiteSyncTransferJob.perform_later(:sync)
+    flash[:notice] = "Syncing with live in the background. Refresh the page to check progress."
+    redirect_to admin_site_sync_path
+  end
+
   # Apply the admin's choices for a sync that was blocked by conflicts.
   # Each conflict resolves to "local" (keep mine), "live" (keep theirs),
   # or — the default for a blank/`recent` choice — most-recent by mtime.
@@ -242,7 +274,7 @@ class Admin::SiteSyncController < Admin::BaseController
     last = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
     kind = last && last[:kind]
 
-    unless [ :push, :pull ].include?(kind)
+    unless [ :push, :pull, :sync ].include?(kind)
       flash[:alert] = "Can't retry — no recent transfer status to retry from."
       redirect_to admin_site_sync_path
       return

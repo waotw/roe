@@ -94,4 +94,40 @@ class SiteSyncTransferConflictTest < ActiveSupport::TestCase
     assert_equal :failed, status[:state]
     assert_match(/reach the live site/i, status[:error])
   end
+
+  test "sync applies safe changes both ways in one pass" do
+    base = { "keep.md" => e(1, 100) }
+    SiteSync::Ledger.stubs(:recorded).returns("files" => base)
+    SiteSync::Ledger.stubs(:current).returns("keep.md" => e(1, 100), "localnew.md" => e(1, 100)) # local-only add
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => base.merge("livenew.md" => e(1, 100))) # peer-only add
+
+    push_diff = nil
+    pull_diff = nil
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.stubs(:push_local_to_live!).with { |diff:, on_progress:| push_diff = diff; true }
+    transport.stubs(:pull_live_to_local!).with { |diff:, on_progress:| pull_diff = diff; true }
+    SiteSync.stubs(:transport).returns(transport)
+
+    SiteSyncTransferJob.perform_now(:sync)
+
+    assert_equal :completed, status[:state]
+    assert_equal [ "localnew.md" ], push_diff[:added]
+    assert_equal [ "livenew.md" ], pull_diff[:added]
+  end
+
+  test "sync blocks on a conflict without transferring either way" do
+    SiteSync::Ledger.stubs(:recorded).returns("files" => { "a.md" => e(1, 100) })
+    SiteSync::Ledger.stubs(:current).returns("a.md" => e(2, 200))
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => { "a.md" => e(3, 300) })
+
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.expects(:push_local_to_live!).never
+    transport.expects(:pull_live_to_local!).never
+    SiteSync.stubs(:transport).returns(transport)
+
+    SiteSyncTransferJob.perform_now(:sync)
+    assert_equal :conflicts, status[:state]
+  end
 end

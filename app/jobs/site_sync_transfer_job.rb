@@ -56,16 +56,17 @@ class SiteSyncTransferJob < ApplicationJob
 
   def perform(kind)
     kind = kind.to_sym
-    raise ArgumentError, "kind must be :push or :pull" unless [ :push, :pull ].include?(kind)
+    raise ArgumentError, "kind must be :push, :pull or :sync" unless [ :push, :pull, :sync ].include?(kind)
 
     @started_at = Time.current
     @kind = kind
-    @original_diff = nil  # set during perform_push/perform_pull when computed
+    @original_diff = nil  # set during perform_push/pull/sync when computed
     update_step(:starting)
 
     case kind
     when :push then perform_push
     when :pull then perform_pull
+    when :sync then perform_sync
     end
 
     # /site is now in a known-good state matching the other side.
@@ -83,10 +84,13 @@ class SiteSyncTransferJob < ApplicationJob
     # ghost rows for deleted files and missing rows for new files
     # until the app restarts.
     update_step(:reconciling_content)
-    if @kind == :push
-      SiteSync::Exchange.reconcile_peer_content!
-    else
-      ContentSync.sync_all
+    case @kind
+    when :push then SiteSync::Exchange.reconcile_peer_content!
+    when :pull then ContentSync.sync_all
+    when :sync
+      # Reconcile whichever side(s) actually received writes.
+      SiteSync::Exchange.reconcile_peer_content! if @pushed
+      ContentSync.sync_all if @pulled
     end
 
     # Tell the peer to refresh its ledger too — for both push and
@@ -207,6 +211,40 @@ class SiteSyncTransferJob < ApplicationJob
 
     update_step(:pulling_from_live)
     SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
+  end
+
+  # Bi-directional: apply the safe changes BOTH ways in one pass. The push
+  # set (local-only changes) and pull set (peer-only changes) are disjoint
+  # — a path changed on both sides is a conflict and aborts before we get
+  # here — so order doesn't matter and nothing is double-handled.
+  def perform_sync
+    update_step(:computing_diff)
+    result = reconcile_or_abort!
+    raise ConflictsDetected, result.conflicts if result.any_conflicts?
+
+    push_diff = { modified: [], added: result.push, deleted: result.push_delete }
+    pull_diff = { modified: [], added: result.pull, deleted: result.pull_delete }
+    @pushed = !diff_empty?(push_diff)
+    @pulled = !diff_empty?(pull_diff)
+    @original_diff = {
+      modified: [],
+      added:    push_diff[:added] + pull_diff[:added],
+      deleted:  push_diff[:deleted] + pull_diff[:deleted]
+    }
+
+    if @pushed
+      update_step(:backing_up_live)
+      SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
+      update_step(:pushing_to_live)
+      SiteSync.transport.push_local_to_live!(diff: push_diff, on_progress: progress_proc)
+    end
+
+    if @pulled
+      update_step(:backing_up_local)
+      SiteSync::BackupManager.create
+      update_step(:pulling_from_live)
+      SiteSync.transport.pull_live_to_local!(diff: pull_diff, on_progress: progress_proc)
+    end
   end
 
   # Three-way reconcile against the peer, with edit/edit conflicts confirmed
