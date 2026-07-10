@@ -121,6 +121,14 @@ namespace :images do
     puts "\n✓ Removed #{removed} orphaned variant files"
   end
 
+  desc "Prune the variant cache: unused images → baseline, orphans removed, in-use kept"
+  task prune: :environment do
+    deleted = ImageVariantGenerator.prune_all!
+    puts "✓ Pruned #{deleted} variant file(s)"
+    puts "  Unused images reduced to their baseline; orphaned variants removed."
+    puts "  In-use images keep the full ladder; anything pruned rebuilds on demand."
+  end
+
   desc "Backfill variants_status from filesystem (run once after enabling DB-backed status)"
   task backfill_status: :environment do
     fixed = 0

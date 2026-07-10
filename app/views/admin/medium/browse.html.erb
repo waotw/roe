@@ -1,7 +1,16 @@
 <div class="mb-5 pb-2 border-b border-gray-300">
-  <div class="flex items-center justify-between">
+  <div class="flex items-start justify-between">
       <h1 class="text-2xl font-bold">Media Browser</h1>
-      <%= link_to "SYSTEM IMAGES", browse_images_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+      <div class="flex flex-col items-end gap-1">
+        <%= link_to "SYSTEM IMAGES", browse_images_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+        <%= button_to "PRUNE VARIANTS",
+                      prune_variants_admin_medium_index_path,
+                      method: :post,
+                      form: { data: { turbo: false },
+                              onsubmit: "return confirm('Reduce variants for unused images and delete variants for images that have been deleted? In-use variants and original images are untouched.');" },
+                      class: "uppercase text-[.65rem] text-amber-700 px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
+        <%= link_to "About variants ↗", "https://go-roe.com/documentation/image-optimization", target: "_blank", class: "text-xs text-gray-400 hover:text-gray-600 underline" %>
+      </div>
   </div>
   <%= render 'image_optimization' %>
 </div>
@@ -125,15 +134,10 @@
     </div>
   </div>
 
-  <div class="flex justify-between items-center"
-    <!-- Results Counter -->
-    <p class="mb-4 text-xs text-gray-500 font-sans">
-      Showing <span data-media-filter-target="count"><%= @media.count %></span> of <%= @media.count %> files
-    </p>
-    <p class="mb-4 text-xs text-gray-500 font-sans">
-      <span class="bg-amber-400 text-white px-1.5 py-[0.2rem] rounded">⏳</span> = Processing variants &nbsp;|&nbsp;&nbsp;<span class="bg-lime-600 text-white px-1.5 py-[0.2rem] rounded">✓</span> = All variants processed
-    </p>
-  </div>
+  <!-- Results Counter -->
+  <p class="mb-4 text-xs text-gray-500 font-sans">
+    Showing <span data-media-filter-target="count"><%= @media.count %></span> of <%= @media.count %> files
+  </p>
 
   <!-- Media Grid -->
   <div class="grid grid-cols-4 gap-4" data-media-filter-target="grid" data-media-upload-target="grid">

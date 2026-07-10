@@ -209,6 +209,56 @@ class ImageVariantGenerator
       variants_exist?(source_path, only: names)
     end
 
+    # Prune the variant cache down to what's actually needed:
+    #   - in-use images (referenced in content) keep their full set
+    #   - unused images are reduced to just the baseline (small + largest),
+    #     so the admin grid still has a preview but the ladder is dropped
+    #   - orphaned variant files (whose source original is gone) are removed
+    #
+    # Safe to run anytime — variants regenerate on demand, so a wrongly
+    # pruned file just comes back on the next render (this is why usage-
+    # based pruning is fine for variants but never for originals). Returns
+    # the number of files deleted. Consulted by ContentSync, the rake task,
+    # and the admin "Prune variants" button.
+    def prune_all!
+      images_root = File.join(RoeSitePaths::SITE_PATH, "media", "images")
+      return 0 unless Dir.exist?(images_root)
+
+      originals = Dir.glob(File.join(images_root, "**", "*.{jpg,jpeg,png,gif,webp,heic,heif}"))
+                     .reject { |p| variant_path?(p) }
+      usage = MediaUsageIndex.fetch
+
+      # The set of variant files worth keeping. An in-use image keeps the
+      # full ladder; an unused one keeps only its baseline. Anything on disk
+      # not in this set (including variants of a since-deleted original) is
+      # pruned.
+      keep = originals.each_with_object(Set.new) do |source, set|
+        web_path = source.sub(RoeSitePaths::SITE_PATH.to_s, "")
+        names = usage[web_path].present? ? VARIANTS.keys : baseline_variant_names(source)
+        names.each do |name|
+          native = variant_path_for(source, name)
+          set << native
+          set << native.sub(File.extname(native), ".webp")
+        end
+      end
+
+      deleted = 0
+      Dir.glob(File.join(images_root, "**", "variants", "*")).each do |vf|
+        next unless File.file?(vf)
+        next if keep.include?(vf)
+
+        begin
+          File.delete(vf)
+          deleted += 1
+        rescue => e
+          Rails.logger.warn "[ImageVariants] prune: could not delete #{vf}: #{e.message}"
+        end
+      end
+
+      Rails.logger.info "[ImageVariants] prune removed #{deleted} variant file(s)" if deleted.positive?
+      deleted
+    end
+
     # Cleared by the job (success or failure) so the next renderer hit
     # for a still-missing variant can re-queue without waiting for the
     # TTL to expire.

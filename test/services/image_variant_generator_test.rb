@@ -138,4 +138,31 @@ class ImageVariantGeneratorTest < ActiveSupport::TestCase
     ImageVariantGenerator.generate_variants(src) # fill the full ladder
     assert_equal "complete", medium.reload.variants_status
   end
+
+  # ------------------------------------------------------------------- prune
+
+  test "prune_all! keeps in-use full sets, reduces unused to baseline, drops orphans" do
+    used   = make_source("used.png", 2000, 2000)
+    unused = make_source("unused.png", 2000, 2000)
+    ImageVariantGenerator.generate_variants(used)   # full ladder
+    ImageVariantGenerator.generate_variants(unused) # full ladder
+
+    # An orphan: a variant file whose source original doesn't exist.
+    orphan = File.join(DIR, "variants", "ghost-medium.jpg")
+    FileUtils.mkdir_p(File.dirname(orphan))
+    File.write(orphan, "x")
+
+    used_web = used.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    MediaUsageIndex.stubs(:fetch).returns(used_web => [ { kind: :post } ])
+
+    ImageVariantGenerator.prune_all!
+
+    assert ImageVariantGenerator.variants_exist?(used), "in-use image keeps its full set"
+
+    assert ImageVariantGenerator.baseline_exists?(unused), "unused keeps its baseline (small + xl)"
+    refute ImageVariantGenerator.variants_exist?(unused), "unused loses the rest of the ladder"
+    refute File.exist?(ImageVariantGenerator.variant_path_for(unused, :medium)), "unused medium pruned"
+
+    refute File.exist?(orphan), "orphaned variant removed"
+  end
 end

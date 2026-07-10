@@ -11,6 +11,22 @@ class ContentSync
     sync_documentation
     sync_media
     sync_products
+    prune_variant_cache
+  end
+
+  # Reconcile the image-variant cache against reality after content +
+  # media have synced: unused images drop to their baseline, in-use ones
+  # keep the full ladder, orphans are removed. Safe (variants regenerate),
+  # so it runs on every sync in every env — this is how manual file drops
+  # and sync-in-either-direction get their variant cache tidied without a
+  # manual step. Skipped under test to avoid deleting fixtures' variants;
+  # prune_all! is exercised directly by the generator spec.
+  def prune_variant_cache
+    return if Rails.env.test?
+
+    ImageVariantGenerator.prune_all!
+  rescue => e
+    Rails.logger.warn "[ContentSync] variant prune skipped: #{e.class} #{e.message}"
   end
 
   def sync_posts
@@ -184,11 +200,13 @@ class ContentSync
 
     puts "  ✓ Added: #{inserted} new media files" if inserted.positive?
 
-    # Dev-only, and only the cheap baseline preview (mirrors
-    # Medium#after_create — bulk insert_all skips that callback, so we
-    # queue here instead). The rest of the ladder builds on-demand from
-    # the renderer; production stays fully lazy.
-    if Rails.env.development? && image_paths_for_queue.any?
+    # Only the cheap baseline preview (mirrors Medium#after_create — bulk
+    # insert_all skips that callback, so we queue here instead). Runs in
+    # every env: ContentSync is the chokepoint every new image funnels
+    # through (upload, manual drop, sync in either direction, boot), so
+    # this is what warms the baseline on prod too. The rest of the ladder
+    # still builds on-demand from the renderer.
+    if image_paths_for_queue.any?
       image_count = 0
       image_paths_for_queue.each do |web_path|
         image_count += 1 if ImageVariantGenerator.queue_baseline!(web_path)

@@ -28,24 +28,14 @@
        class="cursor-pointer">
     <% if media.media_type == 'images' %>
       <div class="relative">
+        <%# Serve the small baseline preview once it exists, else the
+            original. No status badge — variants are automatic and the
+            grid silently swaps to the preview when ready (the card still
+            carries data-variants-pending so media-upload polls the swap). %>
         <% if ImageVariantGenerator.available? && media.baseline_ready? %>
           <%= image_tag image_variant_path(media.file_path, :small), alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
         <% else %>
           <%= image_tag media.file_path, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
-        <% end %>
-
-        <%# While the baseline preview is still being generated, show a
-            transient spinner plus a manual "build variants" affordance.
-            Once the baseline lands the badge clears — the rest of the
-            ladder is built on-demand at render and isn't surfaced here. %>
-        <% if ImageVariantGenerator.available? && !media.baseline_ready? %>
-          <div class="absolute top-1 right-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded" title="Generating preview…">⏳</div>
-          <%= button_to "⚡",
-                        regenerate_variants_admin_medium_path(media),
-                        method: :post,
-                        class: "absolute top-7 right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded hover:bg-blue-600",
-                        title: "Generate variants",
-                        data: { turbo: false } %>
         <% end %>
       </div>
     <% elsif media.media_type == 'audio' %>

@@ -128,6 +128,17 @@ class Admin::MediumController < Admin::BaseController
     redirect_to browse_admin_medium_index_path, notice: "Queued #{queued} #{'image'.pluralize(queued)} for optimization"
   end
 
+  # Reclaim disk by reducing the variant cache to what's needed: unused
+  # images drop to their baseline, orphaned variants are removed, in-use
+  # images keep their full set. Safe — anything pruned regenerates on
+  # demand. Runs against the current environment's filesystem, so on prod
+  # it prunes prod.
+  def prune_variants
+    deleted = ImageVariantGenerator.prune_all!
+    redirect_to browse_admin_medium_index_path,
+                notice: "Pruned #{deleted} variant #{'file'.pluralize(deleted)}. Unused images reduced to baseline; in-use kept (rebuilds on demand)."
+  end
+
   def regenerate_variants
     medium = Medium.find(params[:id])
 

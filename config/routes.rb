@@ -130,6 +130,7 @@ Rails.application.routes.draw do
         get :exists
         post :clear_failed_jobs
         post :queue_missing_variants
+        post :prune_variants
         post :bulk_destroy
       end
       member do
