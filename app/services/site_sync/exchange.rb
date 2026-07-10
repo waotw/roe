@@ -297,6 +297,26 @@ module SiteSync
         {}
       end
 
+      # Ask the peer for the SHA256 of a specific set of paths. Returns a
+      # hash of `{ "path" => "<sha256>" }` (missing files omitted). Used by
+      # the reconciler to confirm real conflicts — an edit/edit pair whose
+      # content actually matches (mtime skew) isn't one. Returns {} on any
+      # failure, so the caller treats candidates as real conflicts (safe).
+      def fetch_peer_file_hashes(paths)
+        return {} unless can_call_peer?
+        paths = Array(paths).reject(&:blank?).uniq
+        return {} if paths.empty?
+
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/file_hashes"))
+        response = post_to_peer(uri, { paths: paths }.to_json)
+        return {} unless response.is_a?(Net::HTTPSuccess)
+
+        JSON.parse(response.body)["hashes"] || {}
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] fetch_peer_file_hashes failed: #{e.class} #{e.message}"
+        {}
+      end
+
       # Fetch the complete file manifest from the peer. Returns a hash
       # of `{ "path" => {size, mtime}, ... }` suitable for diffing against
       # the local manifest. Used for accurate cross-site comparison.
