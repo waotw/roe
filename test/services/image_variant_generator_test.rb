@@ -82,4 +82,87 @@ class ImageVariantGeneratorTest < ActiveSupport::TestCase
     refute_equal "MANUAL", File.read(sentinel), "force must overwrite"
     assert_operator dims(sentinel).max, :<=, 400, "rebuilt small variant is correctly sized"
   end
+
+  # ---------------------------------------------------------------- baseline
+
+  test "only: restricts generation to exactly the requested variants" do
+    src = make_source("only.png", 2000, 2000)
+    assert ImageVariantGenerator.generate_variants(src, only: [ :small ])
+
+    assert File.exist?(variant(src, :small)), "small is generated"
+    assert File.exist?(variant(src, :small).sub(/\.png\z/, ".webp")), "small webp too"
+    refute File.exist?(variant(src, :medium)), "medium is NOT built for an only:[:small] run"
+    refute File.exist?(variant(src, :large))
+    refute File.exist?(variant(src, :xl))
+    refute File.exist?(variant(src, :thumb))
+  end
+
+  test "baseline_variant_names is small + the largest non-upscaled size" do
+    big = make_source("big_base.png", 2000, 2000)
+    tiny = make_source("tiny_base.png", 200, 200)
+
+    # 2000px reaches xl (1800) without upscaling → small + xl.
+    assert_equal [ :small, :xl ], ImageVariantGenerator.baseline_variant_names(big)
+    # 200px: the largest that fits IS small → the set collapses to just small.
+    assert_equal [ :small ], ImageVariantGenerator.baseline_variant_names(tiny)
+  end
+
+  test "baseline_exists? reflects the per-image baseline on disk" do
+    src = make_source("be.png", 2000, 2000)
+    refute ImageVariantGenerator.baseline_exists?(src)
+
+    ImageVariantGenerator.queue_baseline!(src.sub(RoeSitePaths::SITE_PATH.to_s, "")) # enqueues, not run inline
+    ImageVariantGenerator.generate_variants(src, only: ImageVariantGenerator.baseline_variant_names(src))
+
+    assert ImageVariantGenerator.baseline_exists?(src), "small + xl present → baseline ready"
+    refute ImageVariantGenerator.variants_exist?(src), "but the full ladder (medium/large) isn't"
+  end
+
+  test "variants_exist? respects only:, and a baseline run is not the full ladder" do
+    src = make_source("partial.png", 2000, 2000)
+    ImageVariantGenerator.generate_variants(src, only: [ :small ])
+
+    assert ImageVariantGenerator.variants_exist?(src, only: [ :small ]), "baseline present"
+    refute ImageVariantGenerator.variants_exist?(src), "the full ladder is not present"
+  end
+
+  test "a baseline-only run does not stamp the Medium row complete; the full run does" do
+    src = make_source("stamp.png", 2000, 2000)
+    medium = Medium.create!(file_path: "/media/images/ivg_test/stamp.png",
+                            media_type: "images", uploaded_at: Time.current)
+
+    ImageVariantGenerator.generate_variants(src, only: [ :small ])
+    refute_equal "complete", medium.reload.variants_status,
+                 "baseline isn't the full set — must not mark the row complete"
+
+    ImageVariantGenerator.generate_variants(src) # fill the full ladder
+    assert_equal "complete", medium.reload.variants_status
+  end
+
+  # ------------------------------------------------------------------- prune
+
+  test "prune_all! keeps in-use full sets, reduces unused to baseline, drops orphans" do
+    used   = make_source("used.png", 2000, 2000)
+    unused = make_source("unused.png", 2000, 2000)
+    ImageVariantGenerator.generate_variants(used)   # full ladder
+    ImageVariantGenerator.generate_variants(unused) # full ladder
+
+    # An orphan: a variant file whose source original doesn't exist.
+    orphan = File.join(DIR, "variants", "ghost-medium.jpg")
+    FileUtils.mkdir_p(File.dirname(orphan))
+    File.write(orphan, "x")
+
+    used_web = used.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    MediaUsageIndex.stubs(:fetch).returns(used_web => [ { kind: :post } ])
+
+    ImageVariantGenerator.prune_all!
+
+    assert ImageVariantGenerator.variants_exist?(used), "in-use image keeps its full set"
+
+    assert ImageVariantGenerator.baseline_exists?(unused), "unused keeps its baseline (small + xl)"
+    refute ImageVariantGenerator.variants_exist?(unused), "unused loses the rest of the ladder"
+    refute File.exist?(ImageVariantGenerator.variant_path_for(unused, :medium)), "unused medium pruned"
+
+    refute File.exist?(orphan), "orphaned variant removed"
+  end
 end

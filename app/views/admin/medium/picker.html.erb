@@ -82,7 +82,7 @@
 
             <!-- Thumbnail -->
             <% if media.media_type == 'images' %>
-              <% if ImageVariantGenerator.available? && media.variants_ready? %>
+              <% if ImageVariantGenerator.available? && media.baseline_ready? %>
                 <%= image_tag image_variant_path(media.file_path, :small),
                               alt: File.basename(media.file_path),
                               class: "w-full h-24 object-cover mb-1",

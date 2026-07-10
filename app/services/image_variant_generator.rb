@@ -63,7 +63,11 @@ class ImageVariantGenerator
       end
     end
 
-    def generate_variants(source_path, medium_id: nil, force: false)
+    # `only:` restricts generation to a subset of variant names (e.g. the
+    # baseline on upload) — intersected with the size-appropriate
+    # needed set so we still never generate a variant larger than the
+    # source. nil means "the full needed set" (the on-demand render path).
+    def generate_variants(source_path, medium_id: nil, force: false, only: nil)
       return false unless available?
       return false unless image_file?(source_path)
 
@@ -96,19 +100,24 @@ class ImageVariantGenerator
       # source. Always running mark_complete_for at the end self-heals the
       # DB status column for files whose variants exist but were never
       # stamped (older imports, manual file drops).
-      variant_names_for(source_path).each do |name|
+      targeted = variant_names_for(source_path)
+      targeted &= Array(only).map(&:to_sym) if only
+
+      targeted.each do |name|
         generate_variant(source_path, name, VARIANTS[name], force: force)
       end
 
-      # Only stamp the row "complete" if every native variant (and WebP
-      # sibling, when GENERATE_WEBP is on) actually exists on disk. The
-      # per-variant rescue inside generate_variant swallows individual
-      # failures so the loop keeps going — without this verify step we'd
-      # falsely mark partially-generated images as complete and the next
-      # backfill_status sweep would have to silently undo the lie.
+      # Stamp the row "complete" only when the FULL needed set exists on
+      # disk — never for a baseline-only run, or the renderer's fast path
+      # would think the whole ladder is present and build a srcset from
+      # variants that were never generated. Success of THIS run is judged
+      # against what it targeted (so a baseline run isn't logged "partial").
       if variants_exist?(source_path)
         Rails.logger.info "[ImageVariants] ✓ Complete: #{File.basename(source_path)}"
         mark_complete_for(source_path)
+      end
+
+      if variants_exist?(source_path, only: targeted)
         true
       else
         Rails.logger.warn "[ImageVariants] ⚠ Partial: some variants missing for #{File.basename(source_path)} — leaving status pending"
@@ -151,7 +160,7 @@ class ImageVariantGenerator
     # Pass `force: true` to bypass the dedup check — used by user-
     # initiated rake/admin actions where "queue this now" must not be
     # silently swallowed by a stale cache flag from a prior crashed run.
-    def queue!(web_path, force: false)
+    def queue!(web_path, force: false, only: nil)
       return false unless available?
       # Same boundary as #generate_variants: never queue a variant path.
       # The job would happily process it and produce variants/variants/.
@@ -163,8 +172,91 @@ class ImageVariantGenerator
       return false if !force && Rails.cache.exist?(cache_key)
 
       Rails.cache.write(cache_key, true, expires_in: QUEUE_DEDUP_TTL)
-      GenerateImageVariantsJob.perform_later(web_path, nil, force)
+      # Symbols don't survive ActiveJob serialization — pass variant names
+      # as strings; the job symbolizes them back.
+      GenerateImageVariantsJob.perform_later(web_path, nil, force, only&.map(&:to_s))
       true
+    end
+
+    # Proactive, first-appearance generation: just the per-image baseline
+    # (see baseline_variant_names). The intermediate sizes are filled
+    # on-demand by the renderer when the image is actually displayed.
+    def queue_baseline!(web_path, force: false)
+      names = baseline_variant_names(web_path)
+      return false if names.empty?
+      queue!(web_path, force: force, only: names)
+    end
+
+    # The proactive baseline set for a source: `small` (the admin grid's
+    # preview, and the mobile end of the srcset) plus the largest size
+    # that doesn't upscale the source (a crisp, web-sized default capped
+    # at xl). For a tiny image the largest IS small, so the set collapses
+    # to just small. This 2-point set already serves a valid responsive
+    # <picture> — the renderer fills the middle sizes on-demand for dynamic
+    # pages, and the static build fills the full set synchronously so baked
+    # pages ship the complete srcset.
+    def baseline_variant_names(source_path)
+      limits = variant_names_for(normalize_path(source_path)).reject { |n| n == :thumb }
+      return [] if limits.empty?
+      [ :small, limits.last ].uniq
+    end
+
+    # Whether the proactive baseline for a source is already on disk.
+    def baseline_exists?(source_path)
+      source_path = normalize_path(source_path)
+      names = baseline_variant_names(source_path)
+      return false if names.empty?
+      variants_exist?(source_path, only: names)
+    end
+
+    # Prune the variant cache down to what's actually needed:
+    #   - in-use images (referenced in content) keep their full set
+    #   - unused images are reduced to just the baseline (small + largest),
+    #     so the admin grid still has a preview but the ladder is dropped
+    #   - orphaned variant files (whose source original is gone) are removed
+    #
+    # Safe to run anytime — variants regenerate on demand, so a wrongly
+    # pruned file just comes back on the next render (this is why usage-
+    # based pruning is fine for variants but never for originals). Returns
+    # the number of files deleted. Consulted by ContentSync, the rake task,
+    # and the admin "Prune variants" button.
+    def prune_all!
+      images_root = File.join(RoeSitePaths::SITE_PATH, "media", "images")
+      return 0 unless Dir.exist?(images_root)
+
+      originals = Dir.glob(File.join(images_root, "**", "*.{jpg,jpeg,png,gif,webp,heic,heif}"))
+                     .reject { |p| variant_path?(p) }
+      usage = MediaUsageIndex.fetch
+
+      # The set of variant files worth keeping. An in-use image keeps the
+      # full ladder; an unused one keeps only its baseline. Anything on disk
+      # not in this set (including variants of a since-deleted original) is
+      # pruned.
+      keep = originals.each_with_object(Set.new) do |source, set|
+        web_path = source.sub(RoeSitePaths::SITE_PATH.to_s, "")
+        names = usage[web_path].present? ? VARIANTS.keys : baseline_variant_names(source)
+        names.each do |name|
+          native = variant_path_for(source, name)
+          set << native
+          set << native.sub(File.extname(native), ".webp")
+        end
+      end
+
+      deleted = 0
+      Dir.glob(File.join(images_root, "**", "variants", "*")).each do |vf|
+        next unless File.file?(vf)
+        next if keep.include?(vf)
+
+        begin
+          File.delete(vf)
+          deleted += 1
+        rescue => e
+          Rails.logger.warn "[ImageVariants] prune: could not delete #{vf}: #{e.message}"
+        end
+      end
+
+      Rails.logger.info "[ImageVariants] prune removed #{deleted} variant file(s)" if deleted.positive?
+      deleted
     end
 
     # Cleared by the job (success or failure) so the next renderer hit
@@ -220,9 +312,11 @@ class ImageVariantGenerator
     # GENERATE_WEBP on automatically routes every image through the
     # queue once until WebP siblings are filled in. After backfill, this
     # stays cheap (8 stat calls vs 4).
-    def variants_exist?(source_path)
+    def variants_exist?(source_path, only: nil)
       source_path = normalize_path(source_path)
-      variant_names_for(source_path).all? do |name|
+      names = variant_names_for(source_path)
+      names &= Array(only).map(&:to_sym) if only
+      names.all? do |name|
         variant_exists?(source_path, name) &&
           (!GENERATE_WEBP || webp_variant_exists?(source_path, name))
       end

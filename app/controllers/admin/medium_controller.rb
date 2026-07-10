@@ -61,7 +61,7 @@ class Admin::MediumController < Admin::BaseController
         @conversion_notice = nil
         begin
           medium = process_single_upload(uploaded_files.first)
-          ImageVariantGenerator.queue!(medium.file_path) if medium.image?
+          ImageVariantGenerator.queue_baseline!(medium.file_path) if medium.image?
           render json: {
             success: true,
             media_id: medium.id,
@@ -82,7 +82,7 @@ class Admin::MediumController < Admin::BaseController
           @conversion_notice = nil
           begin
             medium = process_single_upload(file)
-            ImageVariantGenerator.queue!(medium.file_path) if medium.image?
+            ImageVariantGenerator.queue_baseline!(medium.file_path) if medium.image?
             notices << (@conversion_notice || "#{File.basename(medium.file_path)} uploaded")
           rescue => e
             errors << "#{file.original_filename}: #{e.message}"
@@ -126,6 +126,17 @@ class Admin::MediumController < Admin::BaseController
     end
 
     redirect_to browse_admin_medium_index_path, notice: "Queued #{queued} #{'image'.pluralize(queued)} for optimization"
+  end
+
+  # Reclaim disk by reducing the variant cache to what's needed: unused
+  # images drop to their baseline, orphaned variants are removed, in-use
+  # images keep their full set. Safe — anything pruned regenerates on
+  # demand. Runs against the current environment's filesystem, so on prod
+  # it prunes prod.
+  def prune_variants
+    deleted = ImageVariantGenerator.prune_all!
+    redirect_to browse_admin_medium_index_path,
+                notice: "Pruned #{deleted} variant #{'file'.pluralize(deleted)}. Unused images reduced to baseline; in-use kept (rebuilds on demand)."
   end
 
   def regenerate_variants
@@ -315,8 +326,10 @@ class Admin::MediumController < Admin::BaseController
   def card
     medium = Medium.find(params[:id])
     usages = MediaUsageIndex.fetch[medium.file_path] || []
-    pending = medium.image? && ImageVariantGenerator.available? &&
-              medium.variant_stats.present? && !medium.variant_stats[:ready]
+    # "Pending" tracks the cheap baseline preview, not the whole ladder —
+    # so the grid's poll stops as soon as the thumbnail is servable
+    # (the rest of the variants build on-demand at render).
+    pending = medium.image? && ImageVariantGenerator.available? && !medium.baseline_ready?
     render json: {
       pending: !!pending,
       card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: usages })
