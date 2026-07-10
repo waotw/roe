@@ -37,6 +37,23 @@ class SiteSyncTransferJob < ApplicationJob
     notifying_peer:      "Notifying peer to refresh its ledger…"
   }.freeze
 
+  # Raised when the three-way reconcile finds files changed on BOTH sides
+  # (diverged from the last-synced baseline). The sync stops rather than
+  # overwrite either side; the conflicts ride out on the status for the
+  # admin to resolve.
+  class ConflictsDetected < StandardError
+    attr_reader :conflicts
+
+    def initialize(conflicts)
+      @conflicts = conflicts
+      super("#{conflicts.size} unresolved conflict(s)")
+    end
+  end
+
+  # Raised when we can't fetch the peer's manifest — without it there's no
+  # way to check for conflicts, so we refuse to sync blind.
+  class PeerUnreachable < StandardError; end
+
   def perform(kind)
     kind = kind.to_sym
     raise ArgumentError, "kind must be :push or :pull" unless [ :push, :pull ].include?(kind)
@@ -102,6 +119,27 @@ class SiteSyncTransferJob < ApplicationJob
     # internally — returns nil on failure rather than raising — so
     # this won't flip the just-completed push to "failed."
     SiteSync::Exchange.call_peer if SiteSync::Exchange.can_call_peer?
+  rescue ConflictsDetected => e
+    # Not a failure — the sync stopped on purpose so nothing is
+    # overwritten. Surface the conflicts for the admin to resolve; don't
+    # re-raise (retrying blindly won't help).
+    Rails.logger.warn "[SiteSyncTransferJob #{kind}] blocked: #{e.message}"
+    write_status(
+      state:        :conflicts,
+      kind:         @kind,
+      started_at:   @started_at,
+      completed_at: Time.current,
+      conflicts:    serialize_conflicts(e.conflicts)
+    )
+  rescue PeerUnreachable
+    write_status(
+      state:        :failed,
+      kind:         @kind,
+      step:         @last_step,
+      started_at:   @started_at,
+      completed_at: Time.current,
+      error:        "Couldn't reach the live site to check for conflicts. Try again when it's reachable."
+    )
   rescue => e
     Rails.logger.error "[SiteSyncTransferJob #{kind}] #{e.class}: #{e.message}"
 
@@ -128,40 +166,37 @@ class SiteSyncTransferJob < ApplicationJob
 
   def perform_push
     update_step(:computing_diff)
-    diff = cross_site_diff
-    @original_diff = diff  # preserve for failure reassessment
+    result = reconcile_or_abort!
+    raise ConflictsDetected, result.conflicts if result.any_conflicts?
 
-    if diff && diff_empty?(diff)
-      Rails.logger.info "[SiteSyncTransferJob push] no local changes — nothing to push"
+    # Push only the local-only changes (add/modify) and deletions the peer
+    # hasn't touched. Peer-only changes are left alone — a push never
+    # clobbers an independent edit on live; that's what pull is for.
+    diff = { modified: [], added: result.push, deleted: result.push_delete }
+    @original_diff = diff
+    if diff_empty?(diff)
+      Rails.logger.info "[SiteSyncTransferJob push] nothing safe to push"
       return
     end
 
-    if diff
-      # Selective: backup only the files we're about to overwrite/
-      # delete on prod, then push only the changed files.
-      files_to_back_up = diff[:modified] + diff[:deleted]
-      update_step(:backing_up_live)
-      SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
+    files_to_back_up = diff[:added] + diff[:deleted]
+    update_step(:backing_up_live)
+    SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
 
-      update_step(:pushing_to_live)
-      SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
-    else
-      # Fallback: full-tree backup + push.
-      update_step(:backing_up_live_full)
-      SiteSync.transport.backup_live_to_local!(on_progress: progress_proc)
-
-      update_step(:pushing_to_live_full)
-      SiteSync.transport.push_local_to_live!(on_progress: progress_proc)
-    end
+    update_step(:pushing_to_live)
+    SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
   end
 
   def perform_pull
     update_step(:computing_diff)
-    diff = peer_diff
-    @original_diff = diff
+    result = reconcile_or_abort!
+    raise ConflictsDetected, result.conflicts if result.any_conflicts?
 
-    if diff && diff_empty?(diff)
-      Rails.logger.info "[SiteSyncTransferJob pull] no remote changes — nothing to pull"
+    # Pull only the peer-only changes; local-only changes stay put.
+    diff = { modified: [], added: result.pull, deleted: result.pull_delete }
+    @original_diff = diff
+    if diff_empty?(diff)
+      Rails.logger.info "[SiteSyncTransferJob pull] nothing safe to pull"
       return
     end
 
@@ -170,12 +205,53 @@ class SiteSyncTransferJob < ApplicationJob
     update_step(:backing_up_local)
     SiteSync::BackupManager.create
 
-    if diff
-      update_step(:pulling_from_live)
-      SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
-    else
-      update_step(:pulling_from_live_full)
-      SiteSync.transport.pull_live_to_local!(on_progress: progress_proc)
+    update_step(:pulling_from_live)
+    SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
+  end
+
+  # Three-way reconcile against the peer, with edit/edit conflicts confirmed
+  # by content hash. Raises PeerUnreachable if we can't fetch the peer's
+  # manifest (no manifest → no way to check for conflicts → refuse to sync
+  # blind). Returns a confirmed SiteSync::Reconciler::Result.
+  def reconcile_or_abort!
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    raise PeerUnreachable if peer.nil?
+
+    baseline = SiteSync::Ledger.recorded&.dig("files") || {}
+    result = SiteSync::Reconciler.reconcile(
+      baseline: baseline,
+      local:    SiteSync::Ledger.current,
+      peer:     peer["files"] || {}
+    )
+
+    candidates = SiteSync::Reconciler.hash_candidates(result)
+    if candidates.any?
+      result = SiteSync::Reconciler.confirm(
+        result,
+        local_hashes: SiteSync::Reconciler.hashes_for(candidates),
+        peer_hashes:  SiteSync::Exchange.fetch_peer_file_hashes(candidates)
+      )
+    end
+
+    result
+  end
+
+  # Flatten conflicts for the status cache: which side is newer (by mtime,
+  # UTC seconds) drives the "resolve all by most-recent" default in the UI.
+  def serialize_conflicts(conflicts)
+    conflicts.map do |c|
+      lm = c.local && c.local["mtime"]
+      pm = c.peer && c.peer["mtime"]
+      newer = if lm && pm
+        lm == pm ? "same" : (lm > pm ? "local" : "live")
+      elsif lm
+        "local"
+      elsif pm
+        "live"
+      else
+        "same"
+      end
+      { "path" => c.path, "type" => c.type.to_s, "local" => c.local, "peer" => c.peer, "newer" => newer }
     end
   end
 
