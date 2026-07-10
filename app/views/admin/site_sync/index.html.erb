@@ -334,7 +334,7 @@
             <div class="flex flex-wrap gap-2">
               <button type="submit"
                       class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs rounded-xs cursor-pointer">
-                APPLY RESOLUTIONS
+                APPLY CHOICES
               </button>
               <button type="submit" name="resolve_all" value="recent"
                       class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer">
@@ -701,8 +701,15 @@
         ledger_diverged = @peer_drift.blank? && local_changes.nil? &&
                           @status[:state] == :clean && !@in_sync_with_peer
         has_changes = @peer_drift || local_changes.present? || ledger_diverged
+
+        # While a sync is actively running, the status panel up top owns the
+        # display — hide the changes/in-sync section so it doesn't contradict
+        # it. It comes back on its own once the run ends: a completed sync
+        # clears drift, and conflicts/failed/cancelled aren't "running" so
+        # the section reappears for the user to act on.
+        sync_running = @transfer_status.present? && @transfer_status[:state].to_s == "running"
       %>
-      <% if has_changes %>
+      <% if has_changes && !sync_running %>
         <div class="p-4 bg-amber-50 border border-amber-300 rounded-xs mb-2">
           <h3 class="text-sm font-semibold text-amber-900 mb-3">Changes to sync</h3>
 
@@ -787,7 +794,7 @@
             </p>
           <% end %>
         </div>
-      <% elsif @in_sync_with_peer %>
+      <% elsif @in_sync_with_peer && !sync_running %>
         <p class="text-sm text-green-800">
           ✓ Local content matches <%= SiteSync::Exchange.peer_label %>.
         </p>
