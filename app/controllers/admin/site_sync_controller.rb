@@ -1,3 +1,5 @@
+require "tmpdir"
+
 class Admin::SiteSyncController < Admin::BaseController
   LAST_RESTORE_CACHE_KEY = "site_sync:last_restore".freeze
   LAST_RESTORE_TTL       = 7.days  # outlives the user's work session;
@@ -102,6 +104,90 @@ class Admin::SiteSyncController < Admin::BaseController
   rescue => e
     flash[:alert] = "Couldn't save sync config: #{e.message}"
   ensure
+    redirect_to admin_site_sync_path
+  end
+
+  # Set or clear the backup passphrase that encrypts the live database
+  # inside full-site backups. Stored (AR-encrypted) on this install's
+  # SyncConfig. The passphrase lives where staging happens — production —
+  # so the UI only shows the form there; this action just persists what
+  # it's given. A blank value clears it (the DB then drops out of backups;
+  # plaintext never ships either way).
+  def update_backup_passphrase
+    passphrase   = params[:backup_passphrase].to_s
+    confirmation = params[:backup_passphrase_confirmation].to_s
+
+    if passphrase.present? && passphrase != confirmation
+      flash[:alert] = "Passphrases didn't match. Nothing was changed."
+    else
+      SyncConfig.current.update!(backup_passphrase: passphrase.presence)
+      flash[:notice] =
+        if passphrase.present?
+          "Backup passphrase saved. Save it somewhere safe — it's the only way to open your encrypted database backups."
+        else
+          "Backup passphrase cleared. Backups will no longer include the database."
+        end
+    end
+  rescue => e
+    flash[:alert] = "Couldn't update backup passphrase: #{e.message}"
+  ensure
+    redirect_to admin_site_sync_path
+  end
+
+  # Decrypt the encrypted database inside a local backup and stream it back
+  # as a download. Non-destructive: it never touches the live/dev DB — it
+  # decrypts to a temp file, sends it, and the temp dir is cleaned up. For
+  # inspecting production data locally or verifying a backup opens.
+  def decrypt_backup_database
+    name       = params[:name].to_s
+    passphrase = params[:passphrase].to_s
+
+    Dir.mktmpdir("roe-decrypt") do |dir|
+      dest = File.join(dir, "production.sqlite3")
+      SiteSync::BackupManager.restore_db(name, passphrase, dest: dest)
+      send_data File.binread(dest),
+                filename:    "#{name}-production.sqlite3",
+                type:        "application/x-sqlite3",
+                disposition: "attachment"
+    end
+  rescue SiteSync::BackupManager::BackupError => e
+    flash[:alert] = e.message
+    redirect_to admin_site_sync_path
+  end
+
+  # Worst-case DB restore for the LIVE site. Admin uploads an encrypted
+  # backup blob + passphrase over HTTPS; we decrypt it and stage it to be
+  # swapped in on the next boot (never overwrite the DB the running app
+  # holds open). Production-only, and heavily confirmed in the UI.
+  def restore_database
+    unless Rails.env.production?
+      flash[:alert] = "Database restore runs on the live site only. Locally, use “Decrypt database” to download a copy."
+      return redirect_to admin_site_sync_path
+    end
+    unless params[:confirm_understood].present?
+      flash[:alert] = "Please confirm you understand this overwrites the live database."
+      return redirect_to admin_site_sync_path
+    end
+
+    upload = params[:database]
+    unless upload.respond_to?(:read)
+      flash[:alert] = "Choose an encrypted backup database file to upload."
+      return redirect_to admin_site_sync_path
+    end
+
+    case SiteSync::PendingRestore.stage_from_upload(upload, params[:passphrase].to_s)
+    when :staged
+      flash[:notice] = "Database restore staged. Redeploy or restart the live app to apply it — the restored database loads on the next boot. Your current database is kept as a .pre-restore copy."
+    when :wrong_passphrase
+      flash[:alert] = "That passphrase can't open this backup (or the file is corrupt). Nothing was changed."
+    when :not_a_blob
+      flash[:alert] = "That file isn't an encrypted Roe database backup. Nothing was changed."
+    else
+      flash[:alert] = "Couldn't stage the restore. Nothing was changed."
+    end
+    redirect_to admin_site_sync_path
+  rescue => e
+    flash[:alert] = "Restore failed: #{e.message}"
     redirect_to admin_site_sync_path
   end
 

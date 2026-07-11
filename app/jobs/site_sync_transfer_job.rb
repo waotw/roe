@@ -34,7 +34,8 @@ class SiteSyncTransferJob < ApplicationJob
     pulling_from_live_full: "Pulling from live (full tree)…",
     refreshing_baseline: "Refreshing sync baseline…",
     reconciling_content: "Updating the database to match new files…",
-    notifying_peer:      "Notifying peer to refresh its ledger…"
+    notifying_peer:      "Notifying peer to refresh its ledger…",
+    backing_up_database: "Backing up live database (encrypted)…"
   }.freeze
 
   # Raised when the three-way reconcile finds files changed on BOTH sides
@@ -105,6 +106,22 @@ class SiteSyncTransferJob < ApplicationJob
     #     sides agree they're in sync now.
     update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
+
+    # Phase ②: pull a fresh encrypted copy of the live database so the
+    # local /site always carries a current, restorable DB blob. Distinct
+    # from the content sync above, best-effort, and isolated — the content
+    # transfer already succeeded, so a DB-backup hiccup (peer busy, no
+    # passphrase set) must never fail the sync. Only the side that can call
+    # the peer pulls (production never initiates), so this is a no-op on
+    # the live side.
+    if SiteSync::Exchange.can_call_peer?
+      update_step(:backing_up_database)
+      begin
+        SiteSync::DatabaseBackup.pull!
+      rescue => e
+        Rails.logger.warn "[SiteSyncTransferJob #{@kind}] database backup pull failed: #{e.class} #{e.message}"
+      end
+    end
 
     write_status(
       state:        :completed,

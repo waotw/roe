@@ -254,6 +254,29 @@ rescue => e
 end
 end # unless ENV["FLY_APP_NAME"].present?
 
+# ── Pending database restore (staged via the admin upload) ─────────────
+# If an admin staged a database restore (SiteSync::PendingRestore), swap
+# the decrypted DB into place HERE — at boot, before ActiveRecord opens
+# the file — so we never overwrite the live database while it's in use.
+# The current DB is preserved as a .pre-restore-<ts> copy for undo. Runs
+# on every host (outside the Fly guard). Mirrors
+# SiteSync::PendingRestore.apply_if_present! (which the tests cover) — the
+# logic is inlined because autoloading isn't available this early in boot.
+begin
+  require "fileutils"
+  __roe_db   = File.join(RoeSitePaths::SITE_DB_PATH, Rails.env, "#{Rails.env}.sqlite3")
+  __roe_pend = "#{__roe_db}.restore-pending"
+  if File.exist?(__roe_pend)
+    FileUtils.mkdir_p(File.dirname(__roe_db))
+    FileUtils.mv(__roe_db, "#{__roe_db}.pre-restore-#{Time.now.strftime('%Y%m%d%H%M%S')}") if File.exist?(__roe_db)
+    FileUtils.mv(__roe_pend, __roe_db)
+    [ "#{__roe_db}-wal", "#{__roe_db}-shm" ].each { |f| FileUtils.rm_f(f) }
+    warn "[RoeRestore] Applied staged database restore → #{__roe_db}"
+  end
+rescue => e
+  warn "[RoeRestore] pending restore swap warning: #{e.class}: #{e.message}"
+end
+
 module Roe
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

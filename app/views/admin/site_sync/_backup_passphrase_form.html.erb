@@ -1,0 +1,31 @@
+<%# Set / change / clear the backup passphrase. `change` toggles labels and
+    exposes the Clear button. Fields are never prefilled — the current
+    value is revealed separately via the "Reveal passphrase" disclosure. %>
+<%= form_with url: admin_update_site_sync_backup_passphrase_path, method: :patch, local: true, class: "space-y-3" do |form| %>
+  <div>
+    <label class="block text-xs font-mono text-gray-600 mb-1"><%= change ? "New passphrase" : "Passphrase" %></label>
+    <%= form.password_field :backup_passphrase,
+          autocomplete: "new-password",
+          placeholder: "Choose a strong passphrase",
+          class: "w-full px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
+  </div>
+  <div>
+    <label class="block text-xs font-mono text-gray-600 mb-1">Confirm passphrase</label>
+    <%= form.password_field :backup_passphrase_confirmation,
+          autocomplete: "new-password",
+          placeholder: "Re-enter to confirm",
+          class: "w-full px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
+  </div>
+  <div class="flex items-center gap-3">
+    <%= form.submit(change ? "Update passphrase" : "Enable encrypted backups",
+          class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer") %>
+    <% if change %>
+      <%= button_to "Clear passphrase",
+            admin_update_site_sync_backup_passphrase_path,
+            method: :patch,
+            params: { backup_passphrase: "", backup_passphrase_confirmation: "" },
+            data: { confirm: "Clear the passphrase? Future backups won't include the database until you set one again." },
+            class: "uppercase text-xs px-3 py-2 border border-red-300 bg-red-50 hover:bg-red-100 text-red-800 font-mono rounded-xs cursor-pointer" %>
+    <% end %>
+  </div>
+<% end %>

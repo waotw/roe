@@ -191,6 +191,26 @@ module Api
       # then applies the deletions (SiteWriter, equally guarded). The
       # peer's HttpTransport push calls refresh_ledger + reconcile_content
       # afterwards, so we don't do that bookkeeping here.
+      # POST /api/site_sync/database
+      #
+      # Stage a fresh encrypted copy of THIS host's primary DB and stream
+      # the ciphertext blob. This is the ONE endpoint that emits database
+      # bytes, and it can only ever emit ciphertext — the plaintext DB
+      # never crosses this channel. 200 + blob when a backup passphrase is
+      # set; 204 (no body) when none is, so the caller skips cleanly.
+      def database
+        blob_path = ::SiteSync::BackupManager.stage_encrypted_db!
+        return head(:no_content) if blob_path.nil?
+
+        send_file blob_path,
+                  type:        "application/octet-stream",
+                  disposition: "attachment",
+                  filename:    File.basename(blob_path)
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] database FAILED: #{e.class} #{e.message}"
+        render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
       def upload
         archive = params[:archive]
         unless archive.respond_to?(:read)

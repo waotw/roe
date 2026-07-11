@@ -12,6 +12,17 @@
 class SyncConfig < ApplicationRecord
   before_create :generate_token
 
+  # The passphrase that encrypts the SQLite DB inside full-site backups.
+  # Native AR encryption (master.key) — mirrors PostmarkConfig/StripeConfig.
+  # (The `token` accessors below predate this and hand-roll MessageEncryptor;
+  # they're left as-is. New secrets use `encrypts`.)
+  #
+  # This is a *convenience* copy so scheduled/unattended backups can encrypt
+  # without prompting. It is NOT the recovery key: to open a backup the admin
+  # must have saved the passphrase externally (the DB copy is locked inside
+  # the very backup it would unlock). See SiteSync::BackupCrypto.
+  encrypts :backup_passphrase
+
   def self.current
     first_or_create!
   end
@@ -32,6 +43,24 @@ class SyncConfig < ApplicationRecord
 
   def regenerate_token!
     update!(token: SecureRandom.hex(32))
+  end
+
+  # ── Backup passphrase ──────────────────────────────────────────────────
+
+  # True when a backup passphrase has been set. Uses the safe read so a
+  # config restored onto a box with different AR encryption keys reports
+  # "not set" instead of raising.
+  def backup_passphrase_set?
+    read_backup_passphrase.present?
+  end
+
+  # Decrypt the stored passphrase, returning nil (not raising) if the keys
+  # can't decrypt it. This is what the backup pipeline reads to auto-encrypt.
+  def read_backup_passphrase
+    self[:backup_passphrase]
+  rescue ActiveRecord::Encryption::Errors::Decryption => e
+    Rails.logger.warn "SyncConfig#backup_passphrase decryption failed: #{e.message}"
+    nil
   end
 
   private

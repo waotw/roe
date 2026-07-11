@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_000000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -268,6 +268,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000000) do
   end
 
   create_table "sync_configs", force: :cascade do |t|
+    t.text "backup_passphrase"
     t.datetime "created_at", null: false
     t.string "peer_url"
     t.string "ssh_key_path"

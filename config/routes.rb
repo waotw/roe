@@ -20,6 +20,7 @@ Rails.application.routes.draw do
       get "manifest",                   to: "exchange#manifest"
       post "download",                  to: "exchange#download"
       post "upload",                    to: "exchange#upload"
+      post "database",                  to: "exchange#database"
       post "publish_members",           to: "imports#publish_members"
       post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"
     end
@@ -59,6 +60,9 @@ Rails.application.routes.draw do
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
     patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
+    patch "site_sync/backup_passphrase", to: "site_sync#update_backup_passphrase", as: "update_site_sync_backup_passphrase"
+    post  "site_sync/backups/decrypt_db", to: "site_sync#decrypt_backup_database", as: "decrypt_backup_database"
+    post  "site_sync/restore_database",   to: "site_sync#restore_database", as: "restore_database"
     post "site_sync/config/regenerate_token", to: "site_sync#regenerate_token", as: "regenerate_site_sync_token"
     post "site_sync/refresh_exchange", to: "site_sync#refresh_exchange", as: "refresh_site_sync_exchange"
     post "site_sync/push_to_live",     to: "site_sync#push_to_live",    as: "push_site_to_live"

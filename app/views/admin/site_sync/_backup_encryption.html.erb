@@ -1,0 +1,79 @@
+<%# Database backup encryption. The live DB is only ever included in a
+    full-site backup encrypted with this passphrase — the plaintext DB
+    never leaves the host. The passphrase lives where staging happens
+    (production), so the form shows there; local just gets a note pointing
+    at the live site plus a status line for what's already in backups. %>
+<% passphrase_set = @sync_config.backup_passphrase_set? %>
+
+<div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+  <div class="flex items-center gap-2 mb-1">
+    <h2 class="text-lg font-semibold text-gray-900">Database backup encryption</h2>
+    <% if passphrase_set %>
+      <span class="text-xs font-normal text-green-800 bg-green-100 px-2 py-0.5 rounded">ON</span>
+    <% else %>
+      <span class="text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Off</span>
+    <% end %>
+  </div>
+
+  <p class="text-sm text-gray-600 mb-4">
+    Your live database is included in full-site backups only when a passphrase is set, and it's
+    always encrypted with that passphrase <em>before it leaves the server</em>. The plaintext
+    database never travels and never sits in your local backups.
+  </p>
+
+  <% if Rails.env.production? %>
+    <%# ── Production: manage the passphrase that encrypts the DB ── %>
+    <% if passphrase_set %>
+      <div class="bg-green-50 border border-green-200 rounded-xs p-4 mb-4">
+        <p class="text-sm text-green-900 mb-2">
+          ✓ Encrypted database backups are active — each sync pulls a fresh, encrypted copy of this
+          database into your local backups.
+        </p>
+        <details class="text-sm">
+          <summary class="cursor-pointer text-green-800 hover:text-green-900">Reveal passphrase (to save it)</summary>
+          <code class="mt-2 block bg-white border border-green-200 rounded-xs px-3 py-2 font-mono text-xs text-gray-800 break-all"><%= @sync_config.read_backup_passphrase %></code>
+        </details>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-xs p-3 mb-4 text-xs text-amber-900">
+        <strong>Save this passphrase somewhere safe (a password manager).</strong>
+        It is the only way to open your encrypted backups — it cannot be recovered from them.
+        Lose it and the database inside those backups is unrecoverable.
+      </div>
+
+      <details>
+        <summary class="cursor-pointer text-sm text-gray-700 hover:text-gray-900 mb-2">Change or clear the passphrase</summary>
+        <div class="mt-2">
+          <%= render "backup_passphrase_form", change: true %>
+        </div>
+      </details>
+    <% else %>
+      <div class="bg-amber-50 border border-amber-200 rounded-xs p-4 mb-4 text-sm text-amber-900">
+        No passphrase set — backups currently <strong>do not include the database</strong>
+        (safe: nothing plaintext leaves). Set one to include an encrypted copy of your live database.
+      </div>
+      <%= render "backup_passphrase_form", change: false %>
+    <% end %>
+  <% else %>
+    <%# ── Local/dev: the passphrase must be set on the LIVE site ── %>
+    <div class="bg-blue-50 border border-blue-200 rounded-xs p-4 text-sm text-blue-900">
+      <p class="mb-2">
+        <strong>Set the backup passphrase on your live site.</strong> The live database is encrypted
+        on the server before it's pulled down here, so the passphrase lives on the live site's admin.
+        Open <span class="font-mono text-xs">Site Sync → Site Backups</span> on your live site to set it.
+      </p>
+      <p class="text-xs text-blue-800">
+        Once it's set on live, every sync pulls a fresh encrypted database into your backups below.
+      </p>
+    </div>
+
+    <% latest_encrypted = @local_backups.find { |b| b[:encrypted_db] } %>
+    <div class="mt-3 text-xs <%= latest_encrypted ? 'text-green-800' : 'text-gray-500' %>">
+      <% if latest_encrypted %>
+        🔒 Your backups include an encrypted database (latest: <span class="font-mono"><%= latest_encrypted[:name] %></span>).
+      <% else %>
+        No encrypted database in your backups yet — it appears here after the passphrase is set on live and you sync.
+      <% end %>
+    </div>
+  <% end %>
+</div>

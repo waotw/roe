@@ -230,19 +230,11 @@
       </nav>
     </div>
 
+  <%# Live-sync tab. The transfer status + all cross-env sync status below
+      is the CONTENT of this panel (it used to sit outside every panel, so
+      it leaked onto the Backups tab). Static-sync + Backups are siblings,
+      rendered after this panel closes. %>
   <div data-tabs-target="panel" data-tabs-panel="live-sync">
-
-      </div><%# /data-tabs-panel="live-sync" %>
-
-      <% if @static_site_sync_config %>
-        <div data-tabs-target="panel" data-tabs-panel="static-sync" class="hidden">
-          <%# Renders only when SSG is enabled — controller gates
-              @static_site_sync_config behind that check. SFTP push of the
-              generated /static_site output to a webhost, plus drift
-              detection and progress UI that mirror the live-sync tab. %>
-          <%= render "static_site_sync_section" %>
-        </div>
-      <% end %>
 
   <%# ─── Transfer status ──────────────────────────────────────────── %>
   <%# Surfaces in-flight or recently-finished push/pull jobs at the
@@ -960,8 +952,28 @@
       <% end %>
     </div>
   </div>
+  </div><%# /data-tabs-panel="live-sync" %>
+
+  <% if @static_site_sync_config %>
+    <div data-tabs-target="panel" data-tabs-panel="static-sync" class="hidden">
+      <%# Renders only when SSG is enabled — controller gates
+          @static_site_sync_config behind that check. SFTP push of the
+          generated /static_site output to a webhost, plus drift
+          detection and progress UI that mirror the live-sync tab. %>
+      <%= render "static_site_sync_section" %>
+    </div>
+  <% end %>
 
   <div data-tabs-target="panel" data-tabs-panel="backups" class="hidden">
+
+  <%# ─── Database backup encryption ──────────────────────────────── %>
+  <%# Shows on both sides: the passphrase form on production (where the DB
+      is staged + encrypted), an explainer note on local. Sits above the
+      local backups list. %>
+  <%= render "backup_encryption" %>
+
+  <%# ─── Restore database to live (production only, worst-case) ───── %>
+  <%= render "restore_database" %>
 
   <%# ─── Local backups ───────────────────────────────────────────── %>
   <%# Hidden in production. Local backups live on whichever machine
@@ -1003,11 +1015,32 @@
                   <% if backup[:active] %>
                     <span class="ml-2 text-xs font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">matches current /site</span>
                   <% end %>
+                  <% if backup[:encrypted_db] %>
+                    <span class="ml-2 text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded" title="Includes an encrypted copy of the live database">🔒 encrypted DB</span>
+                  <% end %>
                 </div>
                 <div class="text-xs text-gray-500">
                   <%= time_ago_in_words(backup[:created_at]) %> ago
                   <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
                 </div>
+
+                <% if backup[:encrypted_db] %>
+                  <%# Local, non-destructive: decrypt this backup's DB and
+                      download it. Never touches the live/dev database. %>
+                  <details class="mt-2">
+                    <summary class="cursor-pointer text-xs text-gray-600 hover:text-gray-900">🔓 Decrypt database…</summary>
+                    <%= form_with url: admin_decrypt_backup_database_path, method: :post, local: true, class: "mt-2 flex flex-wrap items-center gap-2" do |f| %>
+                      <%= f.hidden_field :name, value: backup[:name] %>
+                      <%= f.password_field :passphrase,
+                            placeholder: "Backup passphrase",
+                            autocomplete: "off",
+                            class: "px-2 py-1 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
+                      <%= f.submit "Decrypt & download",
+                            class: "uppercase text-xs px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs cursor-pointer" %>
+                    <% end %>
+                    <p class="text-xs text-gray-400 mt-1">Downloads a decrypted copy. Nothing plaintext is left on disk here.</p>
+                  </details>
+                <% end %>
               </div>
               <% if backup[:active] %>
                 <span class="inline-flex items-center px-3 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
@@ -1055,7 +1088,12 @@
           <% @production_backups.each do |backup| %>
             <li class="py-3 flex items-center justify-between">
               <div>
-                <div class="font-mono text-sm text-gray-900"><%= backup[:name] %></div>
+                <div class="font-mono text-sm text-gray-900">
+                  <%= backup[:name] %>
+                  <% if backup[:encrypted_db] %>
+                    <span class="ml-2 text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded" title="Includes an encrypted copy of the live database">🔒 encrypted DB</span>
+                  <% end %>
+                </div>
                 <div class="text-xs text-gray-500">
                   <%= time_ago_in_words(backup[:created_at]) %> ago
                   <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>

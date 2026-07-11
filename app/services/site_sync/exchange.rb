@@ -363,6 +363,30 @@ module SiteSync
         nil
       end
 
+      # Pull a fresh encrypted DB blob from the peer (the live site). The
+      # peer stages a current encrypted copy and streams the ciphertext.
+      # Returns the blob bytes, or nil when there's nothing to pull — the
+      # peer has no backup passphrase set (HTTP 204) or is unreachable.
+      # One-directional by design: we only ever pull the DB, never push it.
+      def pull_peer_database
+        return nil unless can_call_peer?
+
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/database"))
+        response = post_to_peer(uri, "{}", read_timeout: TRANSFER_TIMEOUT_SECONDS)
+        return nil if response.nil?
+
+        if response.is_a?(Net::HTTPNoContent)
+          Rails.logger.info "[SiteSync::Exchange] peer has no backup passphrase set; skipping DB backup"
+          return nil
+        end
+        return nil unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] pull_peer_database failed: #{e.class} #{e.message}"
+        nil
+      end
+
       # Upload a batch of changed /site files to the peer as a multipart
       # POST: the gzip'd tar (`archive`), a JSON per-file manifest
       # (`manifest`, so the peer can restore mtimes), and a JSON list of
