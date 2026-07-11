@@ -52,6 +52,14 @@ module RoeUpdater
         @status = status_record
         @version = to_version
 
+        # HARD SAFETY NET — refuse on a developer checkout before ANY
+        # destructive step. The controller blocks the web button, but this
+        # guards every entry point (rake tasks, a direct PerformUpdateJob
+        # enqueue, future callers): nothing can clone a release tag over an
+        # active working tree and wipe uncommitted work. See
+        # refuse_on_dev_checkout!.
+        return if refuse_on_dev_checkout!
+
         execute_step(:validating) { validate_prerequisites }
         execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
         execute_step(:downloading) { Downloader.download_version(@version, @status) }
@@ -73,6 +81,30 @@ module RoeUpdater
       end
 
       private
+
+      # HARD SAFETY NET: refuse to run the updater on a developer checkout of
+      # Roe — HEAD on a named git branch — because the version swap clones a
+      # release over current/ and would destroy the working tree (and any
+      # uncommitted work). A normal user install is a detached release tag
+      # and passes straight through, so users update normally. Marks the
+      # update failed and returns true so start_update bails before touching
+      # anything. Override only with ROE_ALLOW_DEV_UPDATE=1, for a maintainer
+      # exercising the updater on a throwaway install — never via the UI.
+      def refuse_on_dev_checkout!
+        return false unless RoeUpdater::VersionChecker.dev_install?
+        return false if ENV["ROE_ALLOW_DEV_UPDATE"] == "1"
+
+        msg = "Update refused: this is a development checkout of Roe (HEAD is on a git branch). " \
+              "The in-app updater clones a release over current/ and would destroy your working tree. " \
+              "Change versions with git instead."
+        log(msg)
+        @status.update!(
+          status:        "failed",
+          current_step:  "Refused — development checkout",
+          error_message: msg
+        )
+        true
+      end
 
       def execute_step(step_name)
         step = STEPS.find { |s| s[:name] == step_name.to_s }
