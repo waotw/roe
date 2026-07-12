@@ -14,12 +14,21 @@ class RecoveryCodesController < ApplicationController
     confirmation = params[:password_confirmation].to_s
 
     user    = User.find_by(email_address: email)
-    matched = user&.find_unconsumed_recovery_code(code)
+    matched = user&.find_recovery_code(code)
 
-    unless matched
-      # Generic copy so attackers can't probe which emails exist.
+    if matched.nil?
+      # Generic copy so attackers can't probe which emails exist: a wrong
+      # email (no user) or a non-matching code both land here.
       redirect_to new_recovery_code_path(email_address: email),
                   alert: "That email + recovery code combination didn't match."
+      return
+    elsif matched.consumed?
+      # Reaching here means the email is real AND this is a genuine code that's
+      # already been spent. Only someone holding a real (high-entropy) code can
+      # trigger this — i.e. the legitimate user fumbling through their list — so
+      # the specific hint is safe and far more helpful than "didn't match".
+      redirect_to new_recovery_code_path(email_address: email),
+                  alert: "That recovery code has already been used. Try one of your other saved codes."
       return
     end
 

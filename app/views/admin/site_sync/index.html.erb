@@ -1108,11 +1108,12 @@
                   <%= f.password_field :passphrase,
                         placeholder: "Backup passphrase",
                         autocomplete: "off",
+                        data: { "1p-ignore": true, lpignore: "true", bwignore: true, "form-type": "other" },
                         class: "px-2 py-1 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
                   <%= f.submit "Decrypt & download",
                         class: "uppercase text-xs px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs cursor-pointer" %>
                 <% end %>
-                <p class="text-xs text-gray-400 mt-1">Downloads a decrypted SQLite copy. Nothing plaintext is left on disk here.</p>
+                <p class="text-xs text-gray-400 mt-1">Downloads a decrypted database file. Inspect and delete as needed.</p>
               </details>
             </li>
           <% end %>

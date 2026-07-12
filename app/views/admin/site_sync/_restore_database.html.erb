@@ -25,21 +25,24 @@
         <div class="bg-red-100 border border-red-300 rounded-xs p-3 mb-4 text-sm text-red-900">
           <strong>⚠️ This is destructive and irreversible.</strong>
           It <strong>overwrites the live database</strong>, discarding <em>everything</em> that has
-          changed since this backup — new members, orders, and newsletter history. Only use this on a
+          changed since this backup was created — new members, orders, and newsletter history. Only use this on a
           <strong>fresh deploy</strong> or a site you <strong>can't otherwise recover</strong>.
           The current database is kept as a <span class="font-mono text-xs">.pre-restore</span> copy.
-          <br>
-          <span class="text-xs">Note: restoring onto <strong>this same server</strong> (the usual case) keeps its encryption keys unchanged — no one is signed out. On a <strong>fresh server</strong> whose keys differ, the backup's keys are restored so the database's secrets stay readable, the old keys are renamed to <span class="font-mono">.pre-restore</span> copies, and everyone is signed out. Either way, DB-resident config (the sync token, backup passphrase) reverts to this backup's values, so you may need to re-paste the token afterward.</span>
         </div>
 
         <%= form_with url: admin_restore_database_path, method: :post, local: true, html: { multipart: true }, class: "space-y-3" do |f| %>
           <div>
             <label class="block text-xs font-mono text-gray-700 mb-1">Encrypted backup file (<span class="font-mono">.enc</span>)</label>
-            <%= f.file_field :database, required: true, class: "block w-full text-sm text-gray-700" %>
+            <%= f.file_field :database, required: true,
+                  class: "block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:border file:border-gray-800 file:bg-gray-100 hover:file:bg-gray-200 file:text-gray-800 file:font-mono file:uppercase file:text-xs file:rounded-xs file:cursor-pointer" %>
           </div>
           <div>
             <label class="block text-xs font-mono text-gray-700 mb-1">Backup passphrase</label>
-            <%= f.password_field :passphrase, required: true, autocomplete: "off",
+            <%# Opt this field out of password managers: it only *opens* a backup,
+                it doesn't set a credential, so there's nothing to save/autofill. %>
+            <%= f.password_field :passphrase, required: true,
+                  autocomplete: "off",
+                  data: { "1p-ignore": true, lpignore: "true", bwignore: true, "form-type": "other" },
                   placeholder: "The passphrase this backup was encrypted with",
                   class: "w-full px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
           </div>

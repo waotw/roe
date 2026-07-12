@@ -254,75 +254,16 @@ unless ENV["FLY_APP_NAME"].present?
 # resolves to — each container restart is starting with an empty
 # /site and regenerating, which means encrypted data written by a
 # previous boot is no longer decryptable. Fix the volume mount.
+# Extracted to a tested helper (see lib/roe_secrets/bootstrap.rb) so its
+# "never overwrite credentials we can't decrypt" guard is regression-covered.
+# require_relative (not autoload) because this runs before Zeitwerk is ready.
+require_relative "../lib/roe_secrets/bootstrap"
 begin
-  require "active_support"
-  require "active_support/encrypted_configuration"
-  require "securerandom"
-  require "yaml"
-  require "fileutils"
-
-  secrets_dir      = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
-  master_key_path  = File.join(secrets_dir, "master.key")
-  credentials_path = File.join(secrets_dir, "credentials.yml.enc")
-
-  unless File.directory?(secrets_dir)
-    FileUtils.mkdir_p(secrets_dir)
-    File.chmod(0o700, secrets_dir)
-  end
-
-  master_key_was_generated = false
-  unless File.exist?(master_key_path)
-    File.write(master_key_path, SecureRandom.hex(16))
-    File.chmod(0o600, master_key_path)
-    master_key_was_generated = true
-  end
-
-  enc_config = ActiveSupport::EncryptedConfiguration.new(
-    config_path: credentials_path,
-    key_path:    master_key_path,
-    env_key:     "RAILS_MASTER_KEY",
-    raise_if_missing_key: false
+  RoeSecrets::Bootstrap.run!(
+    secrets_dir: RoeSitePaths::SITE_SYSTEM_SECRETS_PATH,
+    roe_root:    RoeSitePaths::ROE_ROOT,
+    site_path:   RoeSitePaths::SITE_PATH
   )
-
-  existing            = enc_config.config rescue {}
-  raw                 = enc_config.read   rescue ""
-  hash                = raw.blank? ? {} : (YAML.safe_load(raw) || {})
-  credentials_existed = File.exist?(credentials_path)
-  seeded              = []
-
-  if existing[:secret_key_base].to_s.empty?
-    hash["secret_key_base"] = SecureRandom.hex(64)
-    seeded << "secret_key_base"
-  end
-
-  # Seed AR encryption keys ONLY when we generated master.key in
-  # the same run. Anything else (existing master.key, existing
-  # credentials file missing AR keys) means the user has chosen to
-  # manage them separately — don't overwrite that decision.
-  if master_key_was_generated && existing.dig(:active_record_encryption, :primary_key).blank?
-    hash["active_record_encryption"] = {
-      "primary_key"         => SecureRandom.alphanumeric(32),
-      "deterministic_key"   => SecureRandom.alphanumeric(32),
-      "key_derivation_salt" => SecureRandom.alphanumeric(32)
-    }
-    seeded << "active_record_encryption"
-  end
-
-  if seeded.any?
-    enc_config.write(hash.to_yaml)
-    File.chmod(0o600, credentials_path)
-
-    rel_key  = master_key_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
-    rel_cred = credentials_path.sub(RoeSitePaths::ROE_ROOT + "/", "")
-    parts    = []
-    parts << "Generated fresh master.key (#{rel_key})" if master_key_was_generated
-    parts << "#{credentials_existed ? 'Updated' : 'Created'} #{rel_cred}: #{seeded.join(', ')}"
-    warn "[RoeSecrets] #{parts.join(' • ')}"
-
-    if master_key_was_generated
-      warn "[RoeSecrets] First-install secrets generated. If this message appears on EVERY boot, your persistent volume isn't mounted at #{RoeSitePaths::SITE_PATH} — fix that before any encrypted data is written, or it'll be unrecoverable across container restarts."
-    end
-  end
 rescue => e
   warn "[RoeSecrets] secret bootstrap warning: #{e.class}: #{e.message}"
 end
@@ -336,7 +277,7 @@ module Roe
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+    config.autoload_lib(ignore: %w[assets tasks roe_secrets])
 
     # Only allow explicit database specification for migrations
     config.active_record.dump_schema_after_migration = true

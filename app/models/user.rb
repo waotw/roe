@@ -22,13 +22,14 @@ class User < ApplicationRecord
     plaintexts
   end
 
-  # Find the unconsumed RecoveryCode whose digest matches the supplied
-  # plaintext (with or without dashes). Returns nil on miss. Caller
-  # consumes on success.
-  def find_unconsumed_recovery_code(plaintext)
+  # Find the RecoveryCode whose bcrypt digest matches the supplied plaintext
+  # (with or without dashes), whether consumed or not. Returns nil on a miss.
+  # The caller checks #consumed? to tell an already-used code apart from an
+  # invalid one, and consumes it on a successful reset.
+  def find_recovery_code(plaintext)
     normalized = RecoveryCode.normalize_plaintext(plaintext)
     return nil if normalized.empty?
-    recovery_codes.unconsumed.find do |rc|
+    recovery_codes.find do |rc|
       begin
         BCrypt::Password.new(rc.code_digest) == normalized
       rescue BCrypt::Errors::InvalidHash
