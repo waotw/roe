@@ -27,8 +27,8 @@
         <%# Fly: keys are Fly secrets, not files — re-push them from local. The
             keys come from the local install's credentials, nothing by hand. %>
         <p class="text-sm text-amber-900 mb-3 max-w-3xl">
-          Your restored database's encrypted settings can't be read with this app's current keys. On Fly the
-          encryption keys live in your <strong>Fly secrets</strong> (not in the backup), so re-push them from your
+          Your restored database's encrypted settings can't be read with this app's current credentials. On Fly the
+          encryption keys live in <strong>Fly secrets</strong> (not in the backup), so re-push them from your
           local machine — the keys come straight from your local install, nothing to copy by hand.
         </p>
         <div class="mb-3"><%= render "restart_instructions", command: fly_sync_secrets_command(@sync_config, ENV["FLY_APP_NAME"]) %></div>
