@@ -123,9 +123,10 @@
 
   <%# Pre-release panel — renders when the install can see prereleases
       (dev clone OR nightly channel) AND VersionChecker found a newer
-      `-suffix` tag. The "Test pre-release update" button posts
-      prerelease=true so the controller's block_on_dev_install allows
-      the update through even on a dev checkout. %>
+      `-suffix` tag. The actionable button is shown ONLY to real user
+      installs on the nightly channel; on a development checkout the
+      in-app updater is disabled (it would clone a release over your
+      working tree), so we show a "use git" note instead. %>
   <% if @update_info && @update_info[:prerelease_available] %>
     <div class="bg-purple-50 border border-purple-300 rounded-xs p-6 mb-6">
       <div class="flex items-start justify-between gap-4">
@@ -143,12 +144,19 @@
           <% end %>
         </div>
         <div class="shrink-0">
-          <%= button_to "Test pre-release update",
-                        admin_start_update_path,
-                        method: :post,
-                        params: { version: @update_info[:prerelease_version], prerelease: "true" },
-                        data: { confirm: "Run the updater against v#{@update_info[:prerelease_version]}? This will overwrite your install with the tagged release contents." },
-                        class: "uppercase inline-flex items-center px-4 py-2 border border-purple-800 bg-purple-200 hover:bg-purple-300 text-purple-900 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
+          <% if @dev_install %>
+            <p class="text-xs text-purple-700 max-w-[16rem]">
+              You're on a development checkout — switch versions with
+              <code class="font-mono bg-purple-100 px-1 rounded">git</code>, not the in-app updater.
+            </p>
+          <% else %>
+            <%= button_to "Test pre-release update",
+                          admin_start_update_path,
+                          method: :post,
+                          params: { version: @update_info[:prerelease_version], prerelease: "true" },
+                          data: { confirm: "Run the updater against v#{@update_info[:prerelease_version]}? This will overwrite your install with the tagged release contents." },
+                          class: "uppercase inline-flex items-center px-4 py-2 border border-purple-800 bg-purple-200 hover:bg-purple-300 text-purple-900 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
+          <% end %>
         </div>
       </div>
     </div>

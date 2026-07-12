@@ -342,17 +342,18 @@ class Admin::UpdatesController < Admin::BaseController
   # Roe itself. A dev install has HEAD on a named branch (e.g. `main`)
   # rather than detached at a release tag. Running the updater here
   # would clone a tagged release over an active development tree.
+  # Hard-block the in-app updater on a developer checkout of Roe — HEAD on a
+  # named git branch rather than a detached release tag. The updater clones
+  # a tagged release over current/, which would destroy an active working
+  # tree (this is exactly how a maintainer once lost uncommitted work: the
+  # old "Test nightly" path passed prerelease=true to slip past this guard —
+  # that escape hatch has been removed). A normal user install is a detached
+  # tag, so it sails through and updates normally. Deploys are NOT blocked
+  # here — those legitimately run from the local/dev install.
   def block_on_dev_install
     return unless RoeUpdater::VersionChecker.dev_install?
-    # Explicit prerelease opt-in lets a maintainer exercise the updater
-    # end-to-end against a -nightly tag without removing the safety
-    # rails for regular update attempts. The "Test nightly update"
-    # button on the page sets prerelease=true; everything else stays
-    # blocked. The button itself carries a JS confirm so it's an
-    # intentional two-click commit.
-    return if params[:prerelease].to_s == "true" && action_name == "start"
     redirect_to admin_updates_path,
-                alert: "Updates are disabled on a development checkout of Roe. Use git directly to pull changes.",
+                alert: "Updates are disabled on a development checkout of Roe. The in-app updater clones a release over current/, which would destroy your working tree — change versions with git instead.",
                 status: :see_other
   end
 
