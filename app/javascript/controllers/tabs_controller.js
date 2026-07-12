@@ -12,14 +12,20 @@ import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
   static targets = ["tab", "panel"];
+  // The URL query key this instance persists into. Defaults to "tab" so
+  // existing usages are unchanged; a nested instance sets its own key
+  // (data-tabs-param-value="…") so it doesn't fight the outer tabs over
+  // the same param. Stimulus scopes targets to the nearest controller, so
+  // nesting the same controller is safe.
+  static values = { param: { type: String, default: "tab" } };
 
   connect() {
-    // Read ?tab=panel-name from the URL. Query params survive Turbo
+    // Read ?<param>=panel-name from the URL. Query params survive Turbo
     // Drive's redirect handling (URL fragments don't — fetch strips
     // them when following the 302). Server redirects after save / test
     // include the tab via `redirect_to ..., tab: "panel-name"`.
     const params = new URLSearchParams(window.location.search);
-    const tabName = params.get("tab");
+    const tabName = params.get(this.paramValue);
     const namedTab = tabName
       ? this.tabTargets.find((t) => t.dataset.tabsPanel === tabName && !t.disabled)
       : null;
@@ -56,7 +62,7 @@ export default class extends Controller {
     // history every time the user clicks between tabs.
     if (updateUrl) {
       const params = new URLSearchParams(window.location.search);
-      params.set("tab", panelName);
+      params.set(this.paramValue, panelName);
       const newUrl = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState(null, "", newUrl);
     }

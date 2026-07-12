@@ -70,9 +70,11 @@
         only when SSG is enabled (controller-gated). %>
     <%
       live_drift_count = if @status[:state] == :local_drift
-                          (@status[:local][:modified].size +
-                           @status[:local][:added].size +
-                           @status[:local][:deleted].size)
+                          # Collapsed counts (documentation/roe etc. count as
+                          # one) so an update's docs don't inflate the tally.
+                          (collapsed_sync_count(@status[:local][:modified]) +
+                           collapsed_sync_count(@status[:local][:added]) +
+                           collapsed_sync_count(@status[:local][:deleted]))
                         else
                           0
                         end
@@ -492,19 +494,23 @@
       <% unless @peer_reachable %>
         <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-6">
           <% counts = @status[:local] %>
+          <%# Collapse Roe-managed groups (documentation/roe) into one row so
+              an update's docs don't read as dozens of changes the user never
+              made. Display only — the sync still transfers every file. %>
+          <% display = { modified: collapse_sync_paths(counts[:modified]), added: collapse_sync_paths(counts[:added]), deleted: collapse_sync_paths(counts[:deleted]) } %>
           <h2 class="text-lg font-semibold text-amber-900 mb-2">Unsynced Changes</h2>
           <p class="text-amber-800 mb-3">
             You've made these changes since your last sync:
           </p>
           <ul class="list-disc ml-6 mb-4 text-sm text-amber-800 space-y-1">
-            <% if counts[:modified].any? %>
-              <li><strong><%= counts[:modified].size %></strong> file<%= 's' if counts[:modified].size != 1 %> modified</li>
+            <% if display[:modified].any? %>
+              <li><strong><%= display[:modified].size %></strong> file<%= 's' if display[:modified].size != 1 %> modified</li>
             <% end %>
-            <% if counts[:added].any? %>
-              <li><strong><%= counts[:added].size %></strong> file<%= 's' if counts[:added].size != 1 %> added</li>
+            <% if display[:added].any? %>
+              <li><strong><%= display[:added].size %></strong> file<%= 's' if display[:added].size != 1 %> added</li>
             <% end %>
-            <% if counts[:deleted].any? %>
-              <li><strong><%= counts[:deleted].size %></strong> file<%= 's' if counts[:deleted].size != 1 %> deleted</li>
+            <% if display[:deleted].any? %>
+              <li><strong><%= display[:deleted].size %></strong> file<%= 's' if display[:deleted].size != 1 %> deleted</li>
             <% end %>
           </ul>
           <% if @status[:recorded_at] %>
@@ -520,7 +526,7 @@
               Show changes
             </summary>
             <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-              <% [ [ "Modified", counts[:modified] ], [ "Added", counts[:added] ], [ "Deleted", counts[:deleted] ] ].each do |label, list| %>
+              <% [ [ "Modified", display[:modified] ], [ "Added", display[:added] ], [ "Deleted", display[:deleted] ] ].each do |label, list| %>
                 <% next if list.empty? %>
                 <div>
                   <h4 class="text-xs font-semibold text-amber-900 mb-1">
@@ -712,18 +718,21 @@
                 ⬇️ <strong><%= SiteSync::Exchange.peer_label %></strong> has changes to pull in.
               </p>
               <% if live_changes %>
-                <% live_counts = live_changes[:counts] || {} %>
+                <%# Collapse Roe-managed groups for display. Counts derive from
+                    the (possibly capped) lists — accurate for a normal diff; a
+                    truncated one keeps its "first N per group" note below. %>
+                <% live_display = { modified: collapse_sync_paths(live_changes[:modified]), added: collapse_sync_paths(live_changes[:added]), deleted: collapse_sync_paths(live_changes[:deleted]) } %>
                 <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
-                  <% if live_counts[:modified].to_i > 0 %><li><strong><%= live_counts[:modified] %></strong> modified</li><% end %>
-                  <% if live_counts[:added].to_i > 0 %><li><strong><%= live_counts[:added] %></strong> added</li><% end %>
-                  <% if live_counts[:deleted].to_i > 0 %><li><strong><%= live_counts[:deleted] %></strong> deleted</li><% end %>
+                  <% if live_display[:modified].any? %><li><strong><%= live_display[:modified].size %></strong> modified</li><% end %>
+                  <% if live_display[:added].any? %><li><strong><%= live_display[:added].size %></strong> added</li><% end %>
+                  <% if live_display[:deleted].any? %><li><strong><%= live_display[:deleted].size %></strong> deleted</li><% end %>
                 </ul>
                 <details class="mt-1">
                   <summary class="text-xs font-semibold text-amber-900 cursor-pointer hover:text-amber-700">
                     Show live changes<% if live_changes[:truncated] %> <span class="font-normal text-amber-700">(first <%= SiteSync::Exchange::DRIFT_LIST_CAP %> per group)</span><% end %>
                   </summary>
                   <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                    <% [ [ "Modified", live_changes[:modified] ], [ "Added", live_changes[:added] ], [ "Deleted", live_changes[:deleted] ] ].each do |label, list| %>
+                    <% [ [ "Modified", live_display[:modified] ], [ "Added", live_display[:added] ], [ "Deleted", live_display[:deleted] ] ].each do |label, list| %>
                       <% next if list.blank? %>
                       <div>
                         <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
@@ -744,15 +753,16 @@
               <p class="text-sm text-amber-800 mb-1">
                 ⬆️ <strong>This <%= Rails.env.production? ? "server" : "machine" %></strong> has local changes<%= Rails.env.production? ? " to pull to dev" : " to push to live" %>.
               </p>
+              <% local_display = { modified: collapse_sync_paths(local_changes[:modified]), added: collapse_sync_paths(local_changes[:added]), deleted: collapse_sync_paths(local_changes[:deleted]) } %>
               <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
-                <% if local_changes[:modified].any? %><li><strong><%= local_changes[:modified].size %></strong> modified</li><% end %>
-                <% if local_changes[:added].any? %><li><strong><%= local_changes[:added].size %></strong> added</li><% end %>
-                <% if local_changes[:deleted].any? %><li><strong><%= local_changes[:deleted].size %></strong> deleted</li><% end %>
+                <% if local_display[:modified].any? %><li><strong><%= local_display[:modified].size %></strong> modified</li><% end %>
+                <% if local_display[:added].any? %><li><strong><%= local_display[:added].size %></strong> added</li><% end %>
+                <% if local_display[:deleted].any? %><li><strong><%= local_display[:deleted].size %></strong> deleted</li><% end %>
               </ul>
               <details class="mt-1">
                 <summary class="text-xs font-semibold text-amber-900 cursor-pointer hover:text-amber-700">Show local changes</summary>
                 <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                  <% [ [ "Modified", local_changes[:modified] ], [ "Added", local_changes[:added] ], [ "Deleted", local_changes[:deleted] ] ].each do |label, list| %>
+                  <% [ [ "Modified", local_display[:modified] ], [ "Added", local_display[:added] ], [ "Deleted", local_display[:deleted] ] ].each do |label, list| %>
                     <% next if list.empty? %>
                     <div>
                       <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
@@ -975,20 +985,32 @@
   <%# ─── Restore database to live (production only, worst-case) ───── %>
   <%= render "restore_database" %>
 
-  <%# ─── Local backups ───────────────────────────────────────────── %>
-  <%# Hidden in production. Local backups live on whichever machine
-      runs the backup; production never auto-backs-itself-up here, so
-      the section would always be empty + the Create button isn't
-      meaningful in the prod context yet. Re-enable when prod-side
-      backup features land (auto-snapshot before push, scheduled
-      backups, etc.). %>
+  <%# ─── Backups: Local / Live Site sub-tabs ─────────────────────── %>
+  <%# Hidden in production — local + live-site backups only exist on the
+      dev machine that runs the sync. Split into sub-tabs so the Live Site
+      list isn't buried under a long Local list. %>
   <% unless Rails.env.production? %>
-    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+    <%# Reuses the shared `tabs` controller (already registered) with its own
+        URL key so it persists like the top tabs and doesn't collide with
+        them. First tab (Local) carries the active classes so it reads right
+        on initial paint; the controller toggles from there. %>
+    <div data-controller="tabs" data-tabs-param-value="backups-tab" class="mb-6">
+      <div class="border-b border-gray-200 mb-6">
+        <nav class="flex gap-4">
+          <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="local"
+                  class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600 cursor-pointer">Local</button>
+          <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="live"
+                  class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 cursor-pointer">Live Site</button>
+        </nav>
+      </div>
+
+      <div data-tabs-target="panel" data-tabs-panel="local">
+        <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
       <div class="flex items-center justify-between mb-4 gap-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900">Local Backups</h2>
           <p class="text-sm text-gray-600 mb-2">
-            Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/local/</code>
+            Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded"><%= roe_folder_path("backups", "local") %>/</code>
             <ul class="list-disc ml-6">
               <li>Each backup is a complete, browsable copy of the <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder</li>
               <li>Files unchanged between backups share disk space</li>
@@ -1015,32 +1037,11 @@
                   <% if backup[:active] %>
                     <span class="ml-2 text-xs font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">matches current /site</span>
                   <% end %>
-                  <% if backup[:encrypted_db] %>
-                    <span class="ml-2 text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded" title="Includes an encrypted copy of the live database">🔒 encrypted DB</span>
-                  <% end %>
                 </div>
                 <div class="text-xs text-gray-500">
                   <%= time_ago_in_words(backup[:created_at]) %> ago
                   <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
                 </div>
-
-                <% if backup[:encrypted_db] %>
-                  <%# Local, non-destructive: decrypt this backup's DB and
-                      download it. Never touches the live/dev database. %>
-                  <details class="mt-2">
-                    <summary class="cursor-pointer text-xs text-gray-600 hover:text-gray-900">🔓 Decrypt database…</summary>
-                    <%= form_with url: admin_decrypt_backup_database_path, method: :post, local: true, class: "mt-2 flex flex-wrap items-center gap-2" do |f| %>
-                      <%= f.hidden_field :name, value: backup[:name] %>
-                      <%= f.password_field :passphrase,
-                            placeholder: "Backup passphrase",
-                            autocomplete: "off",
-                            class: "px-2 py-1 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
-                      <%= f.submit "Decrypt & download",
-                            class: "uppercase text-xs px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs cursor-pointer" %>
-                    <% end %>
-                    <p class="text-xs text-gray-400 mt-1">Downloads a decrypted copy. Nothing plaintext is left on disk here.</p>
-                  </details>
-                <% end %>
               </div>
               <% if backup[:active] %>
                 <span class="inline-flex items-center px-3 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
@@ -1062,51 +1063,64 @@
         </ol>
       <% end %>
     </div>
-  <% end %>
+      </div><%# /data-tabs-panel="local" %>
 
-  <%# ─── Production backups ──────────────────────────────────────── %>
-  <%# Hidden on production itself — the list only shows snapshots of
-      live, which live doesn't need to see in its own admin. Live's
-      Site Sync page is for token/peer config only. %>
-  <% unless Rails.env.production? %>
-    <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
+      <%# ── Live Site backups (encrypted database DR bundles) ── %>
+      <div data-tabs-target="panel" data-tabs-panel="live" class="hidden">
+        <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
       <div>
         <h2 class="text-lg font-semibold text-gray-900">Public/Live Site Backups</h2>
         <p class="text-sm text-gray-600 mb-2">
-          Backups are stored locally in <code class="text-xs bg-gray-100 px-1 rounded">site_backups/production/</code>, these are created when you sync your local site with the hosted site.
+          Encrypted backups of your live database are stored locally in <code class="text-xs bg-gray-100 px-1 rounded-xs"><%= inline_system_svg("folder.svg", class: "text-sky-600 w-3 h-3 inline-block") %><%= roe_folder_path("backups", "live", "database") %></code>. A fresh one is captured every time you sync your local ↔ live sites. Each is a self-contained disaster-recovery bundle — the database plus the encryption keys needed to read it — locked with your backup passphrase.
         </p>
-        <p class="text-xs text-gray-500 mb-4">
-          To restore a production backup, run <code class="text-xs bg-gray-100 px-1 rounded">rake site:rollback[&lt;name&gt;]</code> from your terminal.
-          An admin-UI restore button for production is coming with the cross-env sync work.
+        <p class="text-xs text-gray-500 mb-4 max-w-3xl">
+          To restore one to your live site, <strong>Download .enc</strong>, then visit <a href="<%= @site_url %>/admin/site_sync" class="font-mono text-xs underline">Site Sync</a> on your live site and click <code class="font-mono text-sm bg-red-200 px-1 rounded-xs">RESTORE DATABASE…</code> to upload it. Only do this if absolutely necessary. <strong>Decrypt & download</strong> gives you a plain SQLite copy to inspect locally — it never touches any live database.
         </p>
       </div>
 
-      <% if @production_backups.empty? %>
-        <p class="text-sm text-gray-500 italic">No production backups yet. Run <code class="text-xs bg-gray-100 px-1 rounded">rake site:backup</code> to create one.</p>
+      <% if @live_db_backups.empty? %>
+        <p class="text-sm text-gray-500 italic">No live database backups yet. They're captured automatically each time you sync — set a <strong>backup passphrase</strong> on your live site first, then run a sync.</p>
       <% else %>
         <ul class="divide-y divide-gray-200">
-          <% @production_backups.each do |backup| %>
-            <li class="py-3 flex items-center justify-between">
-              <div>
-                <div class="font-mono text-sm text-gray-900">
-                  <%= backup[:name] %>
-                  <% if backup[:encrypted_db] %>
-                    <span class="ml-2 text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded" title="Includes an encrypted copy of the live database">🔒 encrypted DB</span>
-                  <% end %>
+          <% @live_db_backups.each do |backup| %>
+            <li class="py-3">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <div class="font-mono text-sm text-gray-900 flex gap-1.5 items-center">
+                    <span title="Encrypted disaster-recovery bundle">🔒</span> <%= backup[:name] %>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    <%= time_ago_in_words(backup[:created_at]) %> ago
+                    <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
+                  </div>
                 </div>
-                <div class="text-xs text-gray-500">
-                  <%= time_ago_in_words(backup[:created_at]) %> ago
-                  <% if backup[:size] %> · <%= number_to_human_size(backup[:size]) %><% end %>
-                </div>
+                <%= link_to "Download .enc",
+                          admin_download_backup_database_path(name: backup[:name]),
+                          class: "uppercase inline-flex items-center px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
               </div>
-              <code class="text-xs text-gray-500 font-mono">
-                rake site:rollback[<%= backup[:name] %>]
-              </code>
+
+              <%# Local, non-destructive: unpack this bundle's DB and download
+                  it as plain SQLite. Never touches the live/dev database. %>
+              <details class="mt-2">
+                <summary class="cursor-pointer text-xs text-gray-600 hover:text-gray-900">🔓 Decrypt & download database…</summary>
+                <%= form_with url: admin_decrypt_backup_database_path, method: :post, local: true, class: "mt-2 flex flex-wrap items-center gap-2" do |f| %>
+                  <%= f.hidden_field :name, value: backup[:name] %>
+                  <%= f.password_field :passphrase,
+                        placeholder: "Backup passphrase",
+                        autocomplete: "off",
+                        class: "px-2 py-1 border border-gray-300 rounded-xs font-mono text-xs text-gray-800" %>
+                  <%= f.submit "Decrypt & download",
+                        class: "uppercase text-xs px-3 py-1 border border-gray-600 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs cursor-pointer" %>
+                <% end %>
+                <p class="text-xs text-gray-400 mt-1">Downloads a decrypted SQLite copy. Nothing plaintext is left on disk here.</p>
+              </details>
             </li>
           <% end %>
         </ul>
       <% end %>
     </div>
+      </div><%# /data-tabs-panel="live" %>
+    </div><%# /backups Local/Live sub-tabs %>
   <% end %>
 
   </div><%# /data-tabs-panel="backups" %>

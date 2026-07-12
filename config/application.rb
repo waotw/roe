@@ -132,6 +132,80 @@ rescue => e
   warn "[RoeSecrets] One-time migration warning: #{e.class}: #{e.message}"
 end
 
+# One-time migration: the backups directory was renamed from
+# "site_backups/{local,production}" to "backups/{local,live/content}" (with
+# live/database/ added for encrypted DB DR bundles). Move any existing
+# folders on first boot after the upgrade; idempotent once moved.
+begin
+  __legacy_backups = File.join(RoeSitePaths::ROE_ROOT, "site_backups")
+  __new_backups    = File.join(RoeSitePaths::ROE_ROOT, "backups")
+  if File.directory?(__legacy_backups)
+    FileUtils.mkdir_p(File.join(__new_backups, "live"))
+    {
+      File.join(__legacy_backups, "local")      => File.join(__new_backups, "local"),
+      File.join(__legacy_backups, "production") => File.join(__new_backups, "live", "content")
+    }.each do |src, dst|
+      next unless File.directory?(src)
+      next if File.exist?(dst)
+      FileUtils.mkdir_p(File.dirname(dst))
+      FileUtils.mv(src, dst)
+      warn "[RoeBackups] Migrated #{src} → #{dst}"
+    end
+    # Drop the old wrapper only if we emptied it (any stray files stay put).
+    FileUtils.rmdir(__legacy_backups) if File.directory?(__legacy_backups) && Dir.empty?(__legacy_backups)
+  end
+rescue => e
+  warn "[RoeBackups] backups dir migration warning: #{e.class}: #{e.message}"
+end
+
+# ── Pending DR restore (staged via the admin upload) ───────────────────
+# If an admin staged a database restore (SiteSync::PendingRestore), apply it
+# HERE — at boot, before ActiveRecord opens the DB and before Rails (or the
+# secret bootstrap below) reads the encryption keys — so we never overwrite
+# the live database while it's in use, and a restored DB's keys are in place
+# before anything decrypts with them. The DB and its matching keys are
+# swapped together (a full DR bundle carries both); previous copies are
+# preserved as .pre-restore-<ts> for undo. Runs on every host. Mirrors
+# SiteSync::PendingRestore.apply_if_present! (which the tests cover) — the
+# logic is inlined because autoloading isn't available this early in boot.
+begin
+  require "fileutils"
+  __roe_ts      = Time.now.strftime("%Y%m%d%H%M%S")
+  __roe_secrets = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
+
+  # Keys first (a matched pair with the DB), so the bootstrap + credentials
+  # reads below see the restored set rather than regenerating over it. When a
+  # bundled key already matches this host's (same install) we keep the host's
+  # and drop the staged copy — no swap, no leftover duplicate. Only when they
+  # differ (fresh host / real disaster) do we rename the old key to a
+  # .pre-restore copy and install the bundled one that matches the restored DB.
+  %w[master.key credentials.yml.enc].each do |__fname|
+    __pend = File.join(__roe_secrets, "#{__fname}.restore-pending")
+    next unless File.exist?(__pend)
+    __live = File.join(__roe_secrets, __fname)
+    if File.exist?(__live) && FileUtils.identical?(__pend, __live)
+      FileUtils.rm_f(__pend)
+      next
+    end
+    FileUtils.mv(__live, "#{__live}.pre-restore-#{__roe_ts}") if File.exist?(__live)
+    FileUtils.mv(__pend, __live)
+    File.chmod(0o600, __live)
+    warn "[RoeRestore] Applied staged key restore → #{__live}"
+  end
+
+  __roe_db   = File.join(RoeSitePaths::SITE_DB_PATH, Rails.env, "#{Rails.env}.sqlite3")
+  __roe_pend = "#{__roe_db}.restore-pending"
+  if File.exist?(__roe_pend)
+    FileUtils.mkdir_p(File.dirname(__roe_db))
+    FileUtils.mv(__roe_db, "#{__roe_db}.pre-restore-#{__roe_ts}") if File.exist?(__roe_db)
+    FileUtils.mv(__roe_pend, __roe_db)
+    [ "#{__roe_db}-wal", "#{__roe_db}-shm" ].each { |f| FileUtils.rm_f(f) }
+    warn "[RoeRestore] Applied staged database restore → #{__roe_db}"
+  end
+rescue => e
+  warn "[RoeRestore] pending restore swap warning: #{e.class}: #{e.message}"
+end
+
 # Skip the disk-based bootstrap entirely when running on Fly.
 # Fly Machines get their secrets injected as env vars from `fly
 # secrets set` — same values across every Machine in the app —
@@ -253,29 +327,6 @@ rescue => e
   warn "[RoeSecrets] secret bootstrap warning: #{e.class}: #{e.message}"
 end
 end # unless ENV["FLY_APP_NAME"].present?
-
-# ── Pending database restore (staged via the admin upload) ─────────────
-# If an admin staged a database restore (SiteSync::PendingRestore), swap
-# the decrypted DB into place HERE — at boot, before ActiveRecord opens
-# the file — so we never overwrite the live database while it's in use.
-# The current DB is preserved as a .pre-restore-<ts> copy for undo. Runs
-# on every host (outside the Fly guard). Mirrors
-# SiteSync::PendingRestore.apply_if_present! (which the tests cover) — the
-# logic is inlined because autoloading isn't available this early in boot.
-begin
-  require "fileutils"
-  __roe_db   = File.join(RoeSitePaths::SITE_DB_PATH, Rails.env, "#{Rails.env}.sqlite3")
-  __roe_pend = "#{__roe_db}.restore-pending"
-  if File.exist?(__roe_pend)
-    FileUtils.mkdir_p(File.dirname(__roe_db))
-    FileUtils.mv(__roe_db, "#{__roe_db}.pre-restore-#{Time.now.strftime('%Y%m%d%H%M%S')}") if File.exist?(__roe_db)
-    FileUtils.mv(__roe_pend, __roe_db)
-    [ "#{__roe_db}-wal", "#{__roe_db}-shm" ].each { |f| FileUtils.rm_f(f) }
-    warn "[RoeRestore] Applied staged database restore → #{__roe_db}"
-  end
-rescue => e
-  warn "[RoeRestore] pending restore swap warning: #{e.class}: #{e.message}"
-end
 
 module Roe
   class Application < Rails::Application

@@ -48,7 +48,7 @@
       running the in-app updater would clobber the active branch. %>
   <% if @dev_install %>
     <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
-      <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠ Dev install of Roe — updater disabled</h3>
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠ Dev install of Roe — Update System disabled</h3>
       <p class="text-sm text-amber-800">
         You're on a git branch (not a release tag), so the in-app updater is
         disabled here to avoid clobbering your working tree. Use <code class="font-mono text-xs bg-amber-100 px-0.5">git pull</code>
@@ -87,17 +87,6 @@
   </div>
 
   <h2 class="mt-4 text-2xl font-bold text-gray-900 mb-4">Roe Version & Updates</h2>
-
-  <% if @dev_install %>
-    <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-6">
-      <h3 class="text-sm font-semibold text-amber-900 mb-1">Development Checkout — Updates Disabled</h3>
-      <p class="text-sm text-amber-800">
-        This install is on a live git branch, which means you're working on Roe itself.
-        The in-app updater is disabled to prevent overwriting your working tree with a tagged release.
-        Use <code class="font-mono text-xs bg-amber-100 px-1 rounded">git pull</code> to bring in changes instead.
-      </p>
-    </div>
-  <% end %>
 
   <%# Update channel toggle — visible to everyone. Stable is the
       default; Nightly opts the install in to pre-release tags

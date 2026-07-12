@@ -92,11 +92,11 @@ namespace :site do
   task :backup do
     machine = machine_id
     timestamp = Time.now.strftime("%Y-%m-%d-%H%M%S")
-    # Production-side backups live under site_backups/production/ so the
-    # local-side admin UI can have its own site_backups/local/ subdir
-    # without the two getting tangled. Both follow the same hard-linked
-    # snapshot format.
-    backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
+    # Pre-push safety snapshots of live content live under
+    # backups/live/content/ so the local-side admin UI can have its own
+    # backups/local/ subdir without the two getting tangled. Both follow the
+    # same hard-linked snapshot format.
+    backup_root = SiteSync::BackupPaths.live_content
     FileUtils.mkdir_p(backup_root)
     backup_dir = File.join(backup_root, timestamp)
 
@@ -156,7 +156,7 @@ namespace :site do
     latest_link = File.join(backup_root, "latest")
     FileUtils.rm_f(latest_link) if File.symlink?(latest_link)
     FileUtils.ln_s(timestamp, latest_link)
-    puts "   Updated: site_backups/production/latest → #{timestamp}"
+    puts "   Updated: backups/live/content/latest → #{timestamp}"
 
     # Cleanup: keep only 15 most recent backups
     all_backups = Dir.glob(File.join(backup_root, "20*")).sort
@@ -177,7 +177,7 @@ namespace :site do
     puts "\n✅ Backup complete!"
     puts "📊 Backup size: #{backup_size}"
     puts "📂 Total backups: #{final_count}/15 (#{total_size})"
-    puts "🔗 Latest: site_backups/latest"
+    puts "🔗 Latest: backups/live/content/latest"
   end
 
   desc "Push specific folders to production (e.g., rake site:push_folders[posts,theme])"
@@ -243,8 +243,8 @@ namespace :site do
   desc "Restore production from backup (interactive or direct: rake site:rollback[latest])"
   task :rollback, [ :backup_name ] do |t, args|
     backup_name = args[:backup_name]
-    # Production backups live in site_backups/production/ — see site:backup.
-    backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
+    # Live-content safety snapshots live in backups/live/content/ — see site:backup.
+    backup_root = SiteSync::BackupPaths.live_content
 
     # --- Direct Mode (with argument) ---
     if backup_name
@@ -288,7 +288,7 @@ namespace :site do
     backups = Dir.glob(File.join(backup_root, "20*")).sort.reverse
 
     if backups.empty?
-      puts "❌ No backups found in site_backups/"
+      puts "❌ No backups found in backups/live/content/"
       exit 1
     end
 

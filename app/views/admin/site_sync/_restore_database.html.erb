@@ -29,7 +29,7 @@
           <strong>fresh deploy</strong> or a site you <strong>can't otherwise recover</strong>.
           The current database is kept as a <span class="font-mono text-xs">.pre-restore</span> copy.
           <br>
-          <span class="text-xs">Note: restoring also reverts DB-resident config (the sync token, backup passphrase) to this backup's values — you may need to re-paste the token afterward.</span>
+          <span class="text-xs">Note: restoring onto <strong>this same server</strong> (the usual case) keeps its encryption keys unchanged — no one is signed out. On a <strong>fresh server</strong> whose keys differ, the backup's keys are restored so the database's secrets stay readable, the old keys are renamed to <span class="font-mono">.pre-restore</span> copies, and everyone is signed out. Either way, DB-resident config (the sync token, backup passphrase) reverts to this backup's values, so you may need to re-paste the token afterward.</span>
         </div>
 
         <%= form_with url: admin_restore_database_path, method: :post, local: true, html: { multipart: true }, class: "space-y-3" do |f| %>

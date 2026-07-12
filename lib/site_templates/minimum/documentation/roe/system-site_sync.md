@@ -134,7 +134,7 @@ Once settings are in place, `TEXT CONNECTION` and once green, `PUSH`. This will 
 
 ## Site Backups
 
-Site Sync creates a backup of the local site and the live site every time there is a `PUSH TO LIVE NOW` or a `PULL FROM LIVE`. Backups are stored locally in `site_backups/production/` and `site_backups/local`.
+Site Sync creates a backup of the local site and the live site every time there is a `PUSH TO LIVE NOW` or a `PULL FROM LIVE`. Local content snapshots are stored in `backups/local/`; an encrypted backup of the live database is captured each sync under `backups/live/database/` (see the **Live Site** tab). Pre-push safety snapshots of live content are kept internally under `backups/live/content/`.
 
 The backup system is smart:
 

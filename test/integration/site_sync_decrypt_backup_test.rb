@@ -10,21 +10,22 @@ class SiteSyncDecryptBackupTest < ActionDispatch::IntegrationTest
 
   def setup
     sign_in_as(users(:one))
-    @name = "2099-02-02-000000-decrypt-#{SecureRandom.hex(4)}"
-    @snapshot = File.join(SiteSync::BackupManager::BACKUP_ROOT, @name)
-    FileUtils.mkdir_p(@snapshot)
+    @name = "2099-02-02-000000.enc"
+    @enc  = File.join(SiteSync::BackupPaths.live_database, @name)
+    FileUtils.mkdir_p(File.dirname(@enc))
 
-    @plaintext = SecureRandom.random_bytes(2048)
+    @plaintext = "SQLite format 3\0" + SecureRandom.random_bytes(2048)
     @scratch   = Dir.mktmpdir("decrypt-test")
-    src = File.join(@scratch, "src.sqlite3")
-    File.binwrite(src, @plaintext)
-    SiteSync::BackupCrypto.encrypt_file(
-      src, File.join(@snapshot, "db", "production", "production.sqlite3.enc"), PASS
-    )
+    db  = File.join(@scratch, "src.sqlite3")
+    sec = File.join(@scratch, "secrets")
+    FileUtils.mkdir_p(sec)
+    File.binwrite(db, @plaintext)
+    # A real DR bundle, as DatabaseBackup would store one.
+    SiteSync::BackupBundle.pack(db_path: db, secrets_dir: sec, dest_enc: @enc, passphrase: PASS)
   end
 
   def teardown
-    FileUtils.rm_rf(@snapshot)
+    FileUtils.rm_f(@enc)
     FileUtils.remove_entry(@scratch) if @scratch && Dir.exist?(@scratch)
   end
 

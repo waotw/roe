@@ -122,7 +122,7 @@ module SiteSync
         end
       end
 
-      # Snapshot live → local under site_backups/production/<ts>/.
+      # Snapshot live → local under backups/live/content/<ts>/.
       # If `files` is given, only those are pulled into the snapshot;
       # callers typically pass the diff's modified+deleted (the files
       # about to be overwritten/removed by a push) so the snapshot
@@ -495,7 +495,7 @@ module SiteSync
 
       def new_backup_dir
         timestamp   = Time.now.strftime("%Y-%m-%d-%H%M%S")
-        backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
+        backup_root = SiteSync::BackupPaths.live_content
         FileUtils.mkdir_p(backup_root)
         backup_dir  = File.join(backup_root, timestamp)
         [ backup_dir, backup_root, timestamp ]

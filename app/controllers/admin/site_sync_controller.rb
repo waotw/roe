@@ -10,7 +10,7 @@ class Admin::SiteSyncController < Admin::BaseController
   def index
     @status             = SiteSync::Checker.status
     @local_backups      = SiteSync::BackupManager.list
-    @production_backups = SiteSync::BackupManager.list_production
+    @live_db_backups    = SiteSync::DatabaseBackup.list
     @last_restore       = Rails.cache.read(LAST_RESTORE_CACHE_KEY)
 
     # If the backup the panel references has since been deleted
@@ -134,10 +134,27 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
-  # Decrypt the encrypted database inside a local backup and stream it back
-  # as a download. Non-destructive: it never touches the live/dev DB — it
-  # decrypts to a temp file, sends it, and the temp dir is cleaned up. For
-  # inspecting production data locally or verifying a backup opens.
+  # Stream a stored live-DB backup's raw .enc file — the full, self-contained
+  # DR bundle. Ciphertext; it opens only with the backup passphrase. This is
+  # the file you upload to the live site's RESTORE DATABASE to recover. Never
+  # decrypts here.
+  def download_backup_database
+    path = SiteSync::DatabaseBackup.resolve(params[:name].to_s)
+    if path.nil?
+      flash[:alert] = "That backup no longer exists."
+      return redirect_to admin_site_sync_path
+    end
+
+    send_file path,
+              type:        "application/octet-stream",
+              disposition: "attachment",
+              filename:    File.basename(path)
+  end
+
+  # Decrypt a stored live-DB backup and stream the SQLite database back as a
+  # download. Non-destructive: it never touches the live/dev DB — it unpacks
+  # the DR bundle to a temp file, sends it, and the temp dir is cleaned up.
+  # For inspecting production data locally or verifying a backup opens.
   def decrypt_backup_database
     name       = params[:name].to_s
     passphrase = params[:passphrase].to_s
@@ -240,7 +257,7 @@ class Admin::SiteSyncController < Admin::BaseController
   end
 
   # Pull live's /site over local. Local is snapshotted first
-  # (regular site_backups/local/ entry) so the pull is reversible
+  # (regular backups/local/ entry) so the pull is reversible
   # from the local backup list — no typed confirmation needed
   # since we can always restore.
   def pull_from_live

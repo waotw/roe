@@ -3,6 +3,20 @@ module ApplicationHelper
     SiteConfig.get("title").presence || "(set site title in Settings → site)"
   end
 
+  # The actual on-disk name of the Roe root folder. Usually "roe", but a user
+  # may have it as "roe-v0.2.0" (versioned download) or renamed to their site
+  # name. Use this — and roe_folder_path — anywhere a /roe path is shown so
+  # the UI reflects what's really on their machine.
+  def roe_folder_name
+    File.basename(RoeSitePaths::ROE_ROOT)
+  end
+
+  # Display path rooted at the real Roe folder name, e.g.
+  #   roe_folder_path("backups", "live", "database") => "roe/backups/live/database"
+  def roe_folder_path(*segments)
+    ([ roe_folder_name ] + segments.map(&:to_s)).join("/")
+  end
+
   # Reads an SVG and returns it as inline HTML so CSS (currentColor, width/
   # height via class) can style it directly. Resolution: the site's own copy
   # at site/system/assets/images/ wins; otherwise fall back to the icon Roe

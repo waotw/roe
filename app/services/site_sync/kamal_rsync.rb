@@ -456,7 +456,7 @@ module SiteSync
 
       def new_backup_dir
         timestamp   = Time.now.strftime("%Y-%m-%d-%H%M%S")
-        backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
+        backup_root = SiteSync::BackupPaths.live_content
         FileUtils.mkdir_p(backup_root)
         backup_dir  = File.join(backup_root, timestamp)
         [ backup_dir, backup_root, timestamp ]

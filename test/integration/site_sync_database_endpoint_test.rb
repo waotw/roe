@@ -12,13 +12,6 @@ class SiteSyncDatabaseEndpointTest < ActionDispatch::IntegrationTest
     SyncConfig.delete_all
     @config = SyncConfig.current
     @token  = @config.token
-    # stage_encrypted_db! writes "<primary-db>.enc" next to the test DB.
-    @staged = "#{SiteSync::BackupManager.primary_db_path}.enc"
-    FileUtils.rm_f(@staged)
-  end
-
-  def teardown
-    FileUtils.rm_f(@staged)
   end
 
   def auth(headers = {})
@@ -38,10 +31,9 @@ class SiteSyncDatabaseEndpointTest < ActionDispatch::IntegrationTest
     post "/api/site_sync/database", headers: auth
     assert_response :no_content
     assert_predicate response.body, :empty?
-    refute File.exist?(@staged), "must not stage anything without a passphrase"
   end
 
-  test "serves ciphertext that decrypts back to a valid SQLite database" do
+  test "serves ciphertext that unpacks to a valid SQLite database" do
     @config.update!(backup_passphrase: PASS)
 
     post "/api/site_sync/database", headers: auth
@@ -53,15 +45,15 @@ class SiteSyncDatabaseEndpointTest < ActionDispatch::IntegrationTest
     refute_includes blob.byteslice(0, 16).to_s, "SQLite format 3",
                     "the raw SQLite header must never appear — only ciphertext leaves"
 
-    # Round-trip: write the served blob, decrypt with the passphrase, and
-    # confirm we get a real SQLite file back.
+    # Round-trip: write the served bundle, unpack with the passphrase, and
+    # confirm the DR bundle carries a real SQLite database.
     Dir.mktmpdir("db-endpoint") do |dir|
       enc = File.join(dir, "pulled.enc")
-      out = File.join(dir, "pulled.sqlite3")
       File.binwrite(enc, blob)
-      SiteSync::BackupCrypto.decrypt_file(enc, out, PASS)
-      assert File.binread(out).start_with?("SQLite format 3"),
-             "decrypted blob must be a valid SQLite database"
+      written = SiteSync::BackupBundle.unpack(enc_path: enc, dest_dir: File.join(dir, "out"), passphrase: PASS)
+      assert written[:db], "bundle must contain a database"
+      assert File.binread(written[:db]).start_with?("SQLite format 3"),
+             "unpacked bundle must contain a valid SQLite database"
     end
   end
 

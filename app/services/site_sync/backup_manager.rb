@@ -3,7 +3,7 @@ require "tmpdir"
 
 module SiteSync
   # rsync-mirror snapshot backups of /site, stored at
-  # ROE_ROOT/site_backups/local/<YYYY-MM-DD-HHMMSS>/. Each snapshot
+  # ROE_ROOT/backups/local/<YYYY-MM-DD-HHMMSS>/. Each snapshot
   # is a real, browsable copy of /site; --link-dest hardlinks files
   # that haven't changed since the previous snapshot, so multiple
   # backups of a 2GB site only consume a few MB extra each.
@@ -16,13 +16,13 @@ module SiteSync
   # transfers active status.
   #
   # On-disk layout matches the production-side `rake site:backup`
-  # task (which writes to site_backups/production/) so the two are
+  # task (which writes to backups/live/content/) so the two are
   # consistent and either can be restored from with the same tools.
   class BackupManager
     class BackupError < StandardError; end
 
     BACKUP_RETENTION = 15
-    BACKUP_ROOT      = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "local")
+    BACKUP_ROOT      = SiteSync::BackupPaths.local
 
     # Per-snapshot metadata file (fingerprint, etc.) lives at the
     # root of the snapshot dir. Excluded from rsync in both directions
@@ -47,11 +47,6 @@ module SiteSync
     # `_before_restore` (legacy), and any stray dot-files out of
     # the listing.
     SNAPSHOT_NAME_RE = /\A\d{4}-\d{2}-\d{2}-\d{6}\z/.freeze
-
-    # Auxiliary SQLite files we never carry in a backup — transient and
-    # regenerated at boot. Only the primary DB (member/store data) is
-    # snapshotted and encrypted.
-    TRANSIENT_DB_BASENAMES = %w[cache.sqlite3 queue.sqlite3 cable.sqlite3].freeze
 
     class << self
       # Snapshot /site into BACKUP_ROOT/<timestamp>/ via rsync with
@@ -93,14 +88,11 @@ module SiteSync
           raise BackupError, "Backup dir is empty after rsync — nothing was transferred."
         end
 
-        # rsync excluded /db above. Fold in the encrypted DB blob if one is
-        # already present in /site (staged server-side and synced down, or
-        # staged locally). We never ENCRYPT here: a same-machine snapshot has
-        # the plaintext DB sitting right beside it, so encrypting adds no
-        # protection and would force a passphrase to roll back. Encryption
-        # happens on the host, before the blob is pulled off-box.
-        include_encrypted_db_in(backup_dir)
-
+        # Content snapshots are content-only. The live database is backed up
+        # separately (encrypted DR bundles under backups/live/database/, pulled
+        # every sync — see SiteSync::DatabaseBackup), so we deliberately don't
+        # fold a DB into these; a "Local" restore point and a "Live Site" DB
+        # backup are distinct things in the UI and on disk.
         write_snapshot_meta(backup_dir)
         update_latest_symlink(timestamp)
         prune!
@@ -134,11 +126,12 @@ module SiteSync
            .sort_by { |b| -b[:created_at].to_i }
       end
 
-      # Production-side snapshots (created by `rake site:backup`,
-      # which pulls from fly via fly-rsync). Read-only here — the
-      # rake task owns lifecycle.
+      # Pre-push safety snapshots of live *content* (created by `rake
+      # site:backup` / the rsync transports before a push overwrites live).
+      # Kept as an internal safety net under backups/live/content/ — NOT
+      # surfaced in the UI. Read-only here; the rake task owns lifecycle.
       def list_production
-        prod_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
+        prod_root = SiteSync::BackupPaths.live_content
         return [] unless Dir.exist?(prod_root)
 
         Dir.children(prod_root)
@@ -210,20 +203,21 @@ module SiteSync
 
       # ── Encrypted database restore ──────────────────────────────────────
       #
-      # Decrypt the DB stored inside a snapshot back into place. This is a
-      # SEPARATE, explicit step from `restore` (which handles files and
-      # deliberately leaves /db alone): it needs the passphrase and it
-      # overwrites the live SQLite file. Run it with the app stopped, or
-      # restart afterwards — swapping the DB file under a live connection
-      # is unsafe.
+      # Decrypt a live-database DR bundle (backups/live/database/<ts>.enc,
+      # pulled by SiteSync::DatabaseBackup) into a destination SQLite file.
+      # This is a SEPARATE, explicit step from `restore` (which handles /site
+      # content and leaves the DB alone): it needs the passphrase. Used by the
+      # admin "Decrypt database" download to extract a copy for inspection —
+      # `dest` is a scratch path there, never the live DB under an open
+      # connection.
       #
-      # `dest` defaults to the current environment's primary DB. Returns the
+      # Handles both the current bundle format (db + keys) and legacy
+      # bare-SQLite backups via SiteSync::BackupBundle.unpack. Returns the
       # destination path. Raises BackupError on a wrong passphrase, a corrupt
-      # blob, or a snapshot with no encrypted DB.
-      def restore_db(snapshot_name, passphrase, dest: nil)
-        snapshot_path = resolve_snapshot_path(snapshot_name)
-        enc = encrypted_db_in(snapshot_path)
-        raise BackupError, "This backup has no encrypted database." if enc.nil?
+      # blob, or a missing/empty backup.
+      def restore_db(name, passphrase, dest: nil)
+        enc = SiteSync::DatabaseBackup.resolve(name)
+        raise BackupError, "Backup not found: #{name}" if enc.nil?
 
         # Verify before touching `dest` so a wrong passphrase fails cleanly
         # without disturbing the DB that's already there.
@@ -234,36 +228,49 @@ module SiteSync
         dest ||= primary_db_path
         raise BackupError, "Could not resolve destination database path." if dest.blank?
 
-        SiteSync::BackupCrypto.decrypt_file(enc, dest, passphrase.to_s)
+        Dir.mktmpdir("roe-restore-db") do |tmp|
+          written = SiteSync::BackupBundle.unpack(enc_path: enc, dest_dir: tmp, passphrase: passphrase.to_s)
+          raise BackupError, "This backup contained no database." unless written[:db]
+          FileUtils.mkdir_p(File.dirname(dest))
+          FileUtils.cp(written[:db], dest)
+        end
 
-        # The decrypted copy is a clean, checkpointed DB (see VACUUM INTO on
-        # the encrypt side). Drop any stale WAL/shm sidecars left by the DB
-        # that used to live here, so SQLite can't replay an old log over it.
+        # The bundled copy is a clean, checkpointed DB (see VACUUM INTO on the
+        # encrypt side). Drop any stale WAL/shm sidecars left by the DB that
+        # used to live here, so SQLite can't replay an old log over it.
         [ "#{dest}-wal", "#{dest}-shm" ].each { |f| FileUtils.rm_f(f) }
 
-        Rails.logger.info "[SiteSync::BackupManager] Restored database from #{snapshot_name} → #{dest}"
+        Rails.logger.info "[SiteSync::BackupManager] Restored database from #{name} → #{dest}"
         dest
       end
 
-      # Stage an encrypted copy of the live primary DB *inside /site*, at
-      # <db>.enc, so the normal sync fileset can carry it off-box. Runs on the
-      # host that owns the data (production), right before it serves a pull:
-      # the plaintext DB never crosses the wire — only this ciphertext blob.
-      # A consistent copy is taken via VACUUM INTO first. No-op (returns nil)
-      # when no passphrase is set. Returns the blob path.
-      def stage_encrypted_db!(passphrase = nil)
+      # Build an encrypted live-database DR bundle for THIS host's primary DB
+      # (db + master.key + credentials.yml.enc) and return the ciphertext
+      # bytes. Runs on the host that owns the data (production), when it serves
+      # a pull: the plaintext DB never crosses the wire — only these encrypted
+      # bytes. A consistent copy is taken via VACUUM INTO first. Built in a
+      # tempdir and returned as bytes (no reliance on ROE_ROOT being writable
+      # on the container). Returns nil when no passphrase is set.
+      def build_encrypted_db_bundle(passphrase = nil)
         passphrase ||= backup_passphrase
         return nil if passphrase.blank?
 
         src = primary_db_path
         return nil unless src && File.file?(src)
 
-        dest = "#{src}.enc"
-        with_consistent_db_copy(src) do |copy|
-          SiteSync::BackupCrypto.encrypt_file(copy, dest, passphrase)
+        Dir.mktmpdir("roe-db-bundle") do |tmp|
+          enc = File.join(tmp, "bundle.enc")
+          with_consistent_db_copy(src) do |copy|
+            SiteSync::BackupBundle.pack(
+              db_path:     copy,
+              secrets_dir: RoeSitePaths::SITE_SYSTEM_SECRETS_PATH,
+              dest_enc:    enc,
+              passphrase:  passphrase
+            )
+          end
+          Rails.logger.info "[SiteSync::BackupManager] Built encrypted DB bundle (#{File.size(enc)}b)"
+          File.binread(enc)
         end
-        Rails.logger.info "[SiteSync::BackupManager] Staged encrypted DB: #{File.basename(dest)}"
-        dest
       end
 
       # The primary SQLite DB for the current environment (member/store
@@ -276,42 +283,7 @@ module SiteSync
         nil
       end
 
-      # The encrypted primary-DB blob inside a snapshot dir, or nil. Ignores
-      # any (never-written) transient-DB blobs, and prefers the production
-      # blob when several exist so restore is deterministic (the production
-      # DB is always the disaster-recovery target).
-      def encrypted_db_in(snapshot_path)
-        blobs = Dir.glob(File.join(snapshot_path, "db", "**", "*.sqlite3.enc")).reject do |f|
-          base = File.basename(f)
-          TRANSIENT_DB_BASENAMES.any? { |t| base == "#{t}.enc" }
-        end
-        blobs.find { |f| f.end_with?("db/production/production.sqlite3.enc") } || blobs.first
-      end
-
-      def backup_has_encrypted_db?(snapshot_name)
-        !encrypted_db_in(resolve_snapshot_path(snapshot_name)).nil?
-      rescue BackupError
-        false
-      end
-
       private
-
-      # Copy any already-encrypted DB blob(s) present in /site/db into the
-      # snapshot at the same relative path. This is how the pulled-down
-      # production blob (or a locally staged one) makes it into a portable
-      # snapshot. Pure copy — no encryption, no plaintext DB ever included.
-      # rsync excluded /db, so we replay just the .enc blobs here.
-      def include_encrypted_db_in(backup_dir)
-        Dir.glob(File.join(RoeSitePaths::SITE_PATH, "db", "**", "*.sqlite3.enc")).each do |blob|
-          base = File.basename(blob)
-          next if TRANSIENT_DB_BASENAMES.any? { |t| base == "#{t}.enc" }
-
-          rel  = blob.sub("#{RoeSitePaths::SITE_PATH}/", "")
-          dest = File.join(backup_dir, rel)
-          FileUtils.mkdir_p(File.dirname(dest))
-          FileUtils.cp(blob, dest)
-        end
-      end
 
       def backup_passphrase
         SyncConfig.current.read_backup_passphrase
@@ -419,8 +391,7 @@ module SiteSync
           size:          du_bytes(path),
           created_at:    stat.mtime,
           fingerprint:   fp,
-          active:        !current_fingerprint.nil? && !fp.nil? && fp == current_fingerprint,
-          encrypted_db:  !encrypted_db_in(path).nil?
+          active:        !current_fingerprint.nil? && !fp.nil? && fp == current_fingerprint
         }
       end
 

@@ -89,7 +89,7 @@ module SiteSync
 
       # ─── Backup (live → local, hardlinked) ────────────────────────
       #
-      # Snapshots the live /site into ROE_ROOT/site_backups/production/
+      # Snapshots the live /site into ROE_ROOT/backups/live/content/
       # <timestamp>. Files unchanged since the previous snapshot are
       # hardlinked from it (File.link) instead of re-downloaded — same
       # bandwidth + storage economy as rsync's --link-dest. Only files
@@ -200,7 +200,7 @@ module SiteSync
 
       def new_backup_dir
         timestamp   = Time.now.strftime("%Y-%m-%d-%H%M%S")
-        backup_root = File.join(RoeSitePaths::ROE_ROOT, "site_backups", "production")
+        backup_root = SiteSync::BackupPaths.live_content
         FileUtils.mkdir_p(backup_root)
         backup_dir  = File.join(backup_root, timestamp)
         [ backup_dir, backup_root, timestamp ]

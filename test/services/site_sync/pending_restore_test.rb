@@ -13,6 +13,12 @@ module SiteSync
       @db        = File.join(@dir, "production.sqlite3")
       @pending   = "#{@db}#{PendingRestore::PENDING_SUFFIX}"
       @plaintext = SecureRandom.random_bytes(2048)
+
+      # For the full-DR-bundle tests.
+      @master_key  = SecureRandom.hex(16)
+      @credentials = SecureRandom.random_bytes(256)
+      @secrets     = File.join(@dir, "secrets")
+      FileUtils.mkdir_p(@secrets)
     end
 
     def teardown
@@ -75,6 +81,60 @@ module SiteSync
       PendingRestore.stage_from_upload(uploaded_blob, PASS, dest_db: @db)
       PendingRestore.apply_if_present!(@db)
       assert_equal @plaintext, File.binread(@db)
+    end
+
+    # A full DR bundle upload: DB + master.key + credentials, as production builds.
+    def uploaded_bundle(passphrase = PASS)
+      db  = File.join(@dir, "bundle-db.sqlite3")
+      sec = File.join(@dir, "bundle-secrets")
+      FileUtils.mkdir_p(sec)
+      File.binwrite(db, @plaintext)
+      File.binwrite(File.join(sec, "master.key"), @master_key)
+      File.binwrite(File.join(sec, "credentials.yml.enc"), @credentials)
+      enc = File.join(@dir, "bundle.enc")
+      BackupBundle.pack(db_path: db, secrets_dir: sec, dest_enc: enc, passphrase: passphrase)
+      StringIO.new(File.binread(enc))
+    end
+
+    test "stage_from_upload on a full bundle stages both the DB and the keys" do
+      result = PendingRestore.stage_from_upload(uploaded_bundle, PASS, dest_db: @db, secrets_dir: @secrets)
+      assert_equal :staged, result
+      assert_equal @plaintext,   File.binread(@pending)
+      assert_equal @master_key,  File.binread(File.join(@secrets, "master.key#{PendingRestore::PENDING_SUFFIX}"))
+      assert_equal @credentials, File.binread(File.join(@secrets, "credentials.yml.enc#{PendingRestore::PENDING_SUFFIX}"))
+    end
+
+    test "apply_if_present! swaps in the DB and keys, preserving the old ones" do
+      File.binwrite(@db, "OLD-DB")
+      File.binwrite(File.join(@secrets, "master.key"), "OLD-KEY")
+      File.binwrite(File.join(@secrets, "credentials.yml.enc"), "OLD-CRED")
+      PendingRestore.stage_from_upload(uploaded_bundle, PASS, dest_db: @db, secrets_dir: @secrets)
+
+      assert_equal :applied, PendingRestore.apply_if_present!(@db, secrets_dir: @secrets)
+      assert_equal @plaintext,   File.binread(@db)
+      assert_equal @master_key,  File.binread(File.join(@secrets, "master.key"))
+      assert_equal @credentials, File.binread(File.join(@secrets, "credentials.yml.enc"))
+
+      assert_equal 1, Dir.glob("#{@db}.pre-restore-*").size, "old DB preserved"
+      assert_equal 1, Dir.glob(File.join(@secrets, "master.key.pre-restore-*")).size, "old master.key preserved"
+      assert_equal 1, Dir.glob(File.join(@secrets, "credentials.yml.enc.pre-restore-*")).size, "old credentials preserved"
+    end
+
+    test "apply_if_present! keeps host keys and leaves no duplicate when bundled keys match" do
+      # Host already holds the SAME keys as the bundle (same install).
+      File.binwrite(@db, "OLD-DB")
+      File.binwrite(File.join(@secrets, "master.key"), @master_key)
+      File.binwrite(File.join(@secrets, "credentials.yml.enc"), @credentials)
+      PendingRestore.stage_from_upload(uploaded_bundle, PASS, dest_db: @db, secrets_dir: @secrets)
+
+      PendingRestore.apply_if_present!(@db, secrets_dir: @secrets)
+
+      assert_equal @master_key,  File.binread(File.join(@secrets, "master.key"))
+      assert_equal @credentials, File.binread(File.join(@secrets, "credentials.yml.enc"))
+      # Staged copies consumed; no exact-duplicate keys left lying around.
+      assert_empty Dir.glob(File.join(@secrets, "*#{PendingRestore::PENDING_SUFFIX}")), "staged keys must be consumed"
+      assert_empty Dir.glob(File.join(@secrets, "master.key.pre-restore-*")), "no duplicate master.key left behind"
+      assert_empty Dir.glob(File.join(@secrets, "credentials.yml.enc.pre-restore-*")), "no duplicate credentials left behind"
     end
   end
 end

@@ -193,19 +193,21 @@ module Api
       # afterwards, so we don't do that bookkeeping here.
       # POST /api/site_sync/database
       #
-      # Stage a fresh encrypted copy of THIS host's primary DB and stream
-      # the ciphertext blob. This is the ONE endpoint that emits database
-      # bytes, and it can only ever emit ciphertext — the plaintext DB
-      # never crosses this channel. 200 + blob when a backup passphrase is
-      # set; 204 (no body) when none is, so the caller skips cleanly.
+      # Build a fresh encrypted DR bundle of THIS host's primary DB (database
+      # + master.key + credentials) and stream the ciphertext. This is the ONE
+      # endpoint that emits database bytes, and it can only ever emit
+      # ciphertext — the plaintext DB never crosses this channel. 200 + blob
+      # when a backup passphrase is set; 204 (no body) when none is, so the
+      # caller skips cleanly. Built in a tempdir and returned as bytes, so it
+      # never depends on a writable path outside /site on the container.
       def database
-        blob_path = ::SiteSync::BackupManager.stage_encrypted_db!
-        return head(:no_content) if blob_path.nil?
+        blob = ::SiteSync::BackupManager.build_encrypted_db_bundle
+        return head(:no_content) if blob.nil?
 
-        send_file blob_path,
+        send_data blob,
                   type:        "application/octet-stream",
                   disposition: "attachment",
-                  filename:    File.basename(blob_path)
+                  filename:    "database.enc"
       rescue => e
         Rails.logger.error "[Api::SiteSync::ExchangeController] database FAILED: #{e.class} #{e.message}"
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
