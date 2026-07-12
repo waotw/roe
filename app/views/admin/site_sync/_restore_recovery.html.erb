@@ -21,18 +21,26 @@
     </div>
   <% elsif SiteSync::RestoreCheck.credentials_mismatch? %>
     <div class="bg-amber-50 border border-amber-300 rounded-xs p-4 mb-6">
-      <h2 class="text-lg font-semibold text-amber-900 mb-1">Restored database needs its backup's credentials</h2>
-      <p class="text-sm text-amber-900 mb-3 max-w-3xl">
-        Your restored database's encrypted settings can't be read with this site's current credentials.
-        <% if SiteSync::PendingRestore.backup_credentials_available? %>
+      <h2 class="text-lg font-semibold text-amber-900 mb-1">Restored database needs its encryption keys</h2>
+
+      <% if running_on_fly? %>
+        <%# Fly: keys are Fly secrets, not files — re-push them from local. The
+            keys come from the local install's credentials, nothing by hand. %>
+        <p class="text-sm text-amber-900 mb-3 max-w-3xl">
+          Your restored database's encrypted settings can't be read with this app's current keys. On Fly the
+          encryption keys live in your <strong>Fly secrets</strong> (not in the backup), so re-push them from your
+          local machine — the keys come straight from your local install, nothing to copy by hand.
+        </p>
+        <div class="mb-3"><%= render "restart_instructions", command: fly_sync_secrets_command(@sync_config, ENV["FLY_APP_NAME"]) %></div>
+        <%= button_to "Dismiss", admin_dismiss_restore_recovery_path, method: :post,
+              class: "uppercase text-xs px-3 py-1 border border-amber-600 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs cursor-pointer" %>
+
+      <% elsif SiteSync::PendingRestore.backup_credentials_available? %>
+        <p class="text-sm text-amber-900 mb-3 max-w-3xl">
+          Your restored database's encrypted settings can't be read with this site's current credentials.
           Your backup has the matching pair — apply them? They're installed on the next restart, verified, and
           <strong>automatically reverted</strong> if they don't work, so this is safe.
-        <% else %>
-          The matching credentials aren't available on this server. Recover them from your backup or deploy secrets.
-        <% end %>
-      </p>
-
-      <% if SiteSync::PendingRestore.backup_credentials_available? %>
+        </p>
         <div class="flex flex-wrap items-center gap-3 mb-3">
           <%= button_to "Apply backup credentials", admin_apply_backup_credentials_path, method: :post,
                 data: { turbo_confirm: "Install the backup's encryption credentials on the next restart? They're verified and auto-reverted if they don't fit." },
@@ -44,6 +52,14 @@
           <p class="text-xs mb-2">After clicking apply, restart the live app from your local machine:</p>
           <%= render "restart_instructions" %>
         </div>
+
+      <% else %>
+        <p class="text-sm text-amber-900 mb-3 max-w-3xl">
+          Your restored database's encrypted settings can't be read with this site's current credentials, and the
+          matching credentials aren't available on this server. Recover them from your backup or deploy secrets.
+        </p>
+        <%= button_to "Dismiss", admin_dismiss_restore_recovery_path, method: :post,
+              class: "uppercase text-xs px-3 py-1 border border-amber-600 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs cursor-pointer" %>
       <% end %>
     </div>
   <% end %>

@@ -218,6 +218,10 @@ class Admin::SiteSyncController < Admin::BaseController
       flash[:alert] = "Applying backup credentials runs on the live site only."
       return redirect_to admin_site_sync_path
     end
+    if ENV["FLY_APP_NAME"].present?
+      flash[:alert] = "On Fly, encryption keys live in your Fly secrets, not the backup. From your local machine run: bin/rails roe:fly:sync_secrets APP=#{ENV['FLY_APP_NAME']}"
+      return redirect_to admin_site_sync_path
+    end
     unless SiteSync::PendingRestore.backup_credentials_available?
       flash[:alert] = "No backup credentials are available to apply."
       return redirect_to admin_site_sync_path

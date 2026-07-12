@@ -57,4 +57,21 @@ module SiteSyncHelper
   def restore_roe_folder_label(config)
     config&.peer_folder_name.presence || "your Roe folder"
   end
+
+  # True when this site is running on Fly (keys live in Fly secrets, not files),
+  # so credential recovery uses `roe:fly:sync_secrets` instead of an apply-file
+  # flow.
+  def running_on_fly?
+    ENV["FLY_APP_NAME"].present?
+  end
+
+  # The command that re-pushes this Fly app's encryption keys from the local
+  # install's credentials (no keys are handled by hand). Run from the Rails-app
+  # subdir on the operator's local machine.
+  def fly_sync_secrets_command(config, app_name)
+    app    = app_name.presence || "your-fly-app"
+    subdir = config&.peer_rails_subdir.presence
+    cmd    = "bin/rails roe:fly:sync_secrets APP=#{app}"
+    subdir ? "cd #{subdir} && #{cmd}" : cmd
+  end
 end

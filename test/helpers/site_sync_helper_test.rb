@@ -42,6 +42,31 @@ class SiteSyncHelperTest < ActionView::TestCase
     assert_equal "roe-dev", restore_roe_folder_label(Cfg.new("kamal", "current", "roe-dev"))
   end
 
+  test "fly sync-secrets command includes the app + rails subdir" do
+    assert_equal "cd current && bin/rails roe:fly:sync_secrets APP=my-app",
+                 fly_sync_secrets_command(Cfg.new("fly", "current", "roe"), "my-app")
+  end
+
+  test "fly sync-secrets command without a subdir is bare" do
+    assert_equal "bin/rails roe:fly:sync_secrets APP=my-app",
+                 fly_sync_secrets_command(Cfg.new("fly", nil, "roe"), "my-app")
+  end
+
+  test "fly sync-secrets command falls back when the app name is blank" do
+    assert_equal "cd current && bin/rails roe:fly:sync_secrets APP=your-fly-app",
+                 fly_sync_secrets_command(Cfg.new("fly", "current", "roe"), nil)
+  end
+
+  test "running_on_fly? reflects FLY_APP_NAME" do
+    original = ENV["FLY_APP_NAME"]
+    ENV["FLY_APP_NAME"] = "my-app"
+    assert running_on_fly?
+    ENV.delete("FLY_APP_NAME")
+    refute running_on_fly?
+  ensure
+    original.nil? ? ENV.delete("FLY_APP_NAME") : (ENV["FLY_APP_NAME"] = original)
+  end
+
   test "singular vs plural wording" do
     assert_match(/1 file changed/,  collapse_sync_paths(%w[documentation/roe/a.md]).first)
     assert_match(/2 files changed/, collapse_sync_paths(%w[documentation/roe/a.md documentation/roe/b.md]).first)

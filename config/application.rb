@@ -196,12 +196,16 @@ end
 # valid; otherwise REVERT to the previous pair so the site stays up, and flag
 # the failure. Mirrors SiteSync::PendingRestore.apply_backup_credentials!; keep
 # marker paths in sync with SiteSync::RestoreCheck.
+#
+# SKIPPED on Fly: there the encryption keys are ENV secrets (AR_ENCRYPTION_*),
+# not these files, so swapping the files is inert at best and could churn
+# secret_key_base at worst. Fly recovers keys with `roe:fly:sync_secrets`.
 begin
   require "fileutils"
   require "active_support/encrypted_configuration"
   __sec = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
   __req = File.join(__sec, ".apply-backup-credentials")
-  if File.exist?(__req)
+  if File.exist?(__req) && ENV["FLY_APP_NAME"].blank?
     __ts    = Time.now.strftime("%Y%m%d%H%M%S")
     __saved = {}
     %w[master.key credentials.yml.enc].each do |__f|

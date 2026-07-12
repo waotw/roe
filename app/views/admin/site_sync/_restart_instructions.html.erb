@@ -3,7 +3,8 @@
     credentials. Folder name + deploy target + rails subdir come from the peer
     env synced from local (SyncConfig#peer_*). Shared by the staged-restore
     modal, the persistent staged banner, and the credential-recovery banner. %>
-<% folder = restore_roe_folder_label(@sync_config) %>
+<% folder  = restore_roe_folder_label(@sync_config) %>
+<% command = local_assigns.fetch(:command, restore_restart_command(@sync_config)) %>
 <ol class="list-decimal list-inside text-sm space-y-2">
   <li>
     Navigate to <code class="font-mono text-xs bg-gray-100 px-1 rounded-xs"><%= folder %></code> in your terminal.
@@ -13,6 +14,6 @@
   </li>
   <li>
     Once in <code class="font-mono text-xs bg-gray-100 px-1 rounded-xs"><%= folder %></code>, run this command:
-    <code class="block mt-1 bg-gray-900 text-gray-100 rounded-xs px-3 py-2 font-mono text-sm break-all"><%= restore_restart_command(@sync_config) %></code>
+    <code class="block mt-1 bg-gray-900 text-gray-100 rounded-xs px-3 py-2 font-mono text-sm break-all"><%= command %></code>
   </li>
 </ol>
