@@ -29,21 +29,23 @@ module SiteSync
       assert_equal before, c.reload.peer_env
     end
 
-    test "local_state advertises this side's folder name + deploy target" do
+    test "local_state advertises this side's folder name, deploy target, subdir" do
       state = SiteSync::Exchange.local_state
       assert_equal File.basename(RoeSitePaths::ROE_ROOT), state[:env_info][:folder_name]
       assert state[:env_info].key?(:deploy_target)
+      assert state[:env_info].key?(:rails_subdir)
     end
 
     test "handle_inbound persists the peer's env_info as plaintext" do
       SiteSync::Exchange.handle_inbound(
         "fingerprint" => "abc",
-        "env_info"    => { "folder_name" => "my-roe", "deploy_target" => "kamal" }
+        "env_info"    => { "folder_name" => "my-roe", "deploy_target" => "kamal", "rails_subdir" => "current" }
       )
 
       cfg = SyncConfig.current
-      assert_equal "my-roe", cfg.peer_folder_name
-      assert_equal "kamal",  cfg.peer_deploy_target
+      assert_equal "my-roe",  cfg.peer_folder_name
+      assert_equal "kamal",   cfg.peer_deploy_target
+      assert_equal "current", cfg.peer_rails_subdir
       # Plaintext: the value is readable straight from the column.
       assert_includes cfg.peer_env.to_s, "my-roe"
     end

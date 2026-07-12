@@ -12,8 +12,8 @@
 
     <% if SiteSync::PendingRestore.pending? %>
       <div class="bg-amber-50 border border-amber-300 rounded-xs p-3 mb-3 text-sm text-amber-900">
-        ⏳ A database restore is <strong>staged</strong>. It applies on the next restart — on your local machine, run:
-        <code class="block mt-1 bg-white border border-amber-200 rounded-xs px-3 py-2 font-mono text-xs text-gray-800 break-all"><%= restore_restart_command(@sync_config) %></code>
+        <p class="mb-2">⏳ A database restore is <strong>staged</strong>. It applies on the next restart:</p>
+        <%= render "restart_instructions" %>
       </div>
     <% end %>
 

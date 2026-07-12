@@ -53,7 +53,7 @@ class SyncConfig < ApplicationRecord
   # render even when AR encryption is broken. On production, "peer" = the
   # local machine, so peer_folder_name is the folder to `cd` into locally.
 
-  ALLOWED_PEER_ENV_KEYS = %w[folder_name deploy_target].freeze
+  ALLOWED_PEER_ENV_KEYS = %w[folder_name deploy_target rails_subdir].freeze
 
   def peer_env_hash
     return {} if self[:peer_env].blank?
@@ -70,6 +70,13 @@ class SyncConfig < ApplicationRecord
   # right restart command.
   def peer_deploy_target
     peer_env_hash["deploy_target"].presence
+  end
+
+  # The peer's Rails-app subdir relative to its Roe folder ("current" for the
+  # versioned layout; nil when the app IS the Roe folder) — the dir the
+  # restart command must run from.
+  def peer_rails_subdir
+    peer_env_hash["rails_subdir"].presence
   end
 
   # Merge a peer-supplied env hash (string keys) into the stored plaintext.

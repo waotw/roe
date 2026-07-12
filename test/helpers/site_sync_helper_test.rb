@@ -19,6 +19,29 @@ class SiteSyncHelperTest < ActionView::TestCase
     assert_equal [ "Roe documentation — 1 file changed" ], rows
   end
 
+  Cfg = Struct.new(:peer_deploy_target, :peer_rails_subdir, :peer_folder_name)
+
+  test "restart command: kamal from the rails subdir" do
+    assert_equal "cd current && kamal app boot", restore_restart_command(Cfg.new("kamal", "current", "roe"))
+  end
+
+  test "restart command: fly from the rails subdir" do
+    assert_equal "cd current && fly deploy", restore_restart_command(Cfg.new("fly", "current", "roe"))
+  end
+
+  test "restart command: no subdir (standard layout) is just the boot command" do
+    assert_equal "kamal app boot", restore_restart_command(Cfg.new("kamal", nil, "roe"))
+  end
+
+  test "restart command: unknown deploy target defaults to kamal" do
+    assert_equal "cd current && kamal app boot", restore_restart_command(Cfg.new(nil, "current", "roe"))
+  end
+
+  test "roe folder label falls back when the peer folder is unknown" do
+    assert_equal "your Roe folder", restore_roe_folder_label(Cfg.new("kamal", "current", nil))
+    assert_equal "roe-dev", restore_roe_folder_label(Cfg.new("kamal", "current", "roe-dev"))
+  end
+
   test "singular vs plural wording" do
     assert_match(/1 file changed/,  collapse_sync_paths(%w[documentation/roe/a.md]).first)
     assert_match(/2 files changed/, collapse_sync_paths(%w[documentation/roe/a.md documentation/roe/b.md]).first)

@@ -73,11 +73,15 @@ module SiteSync
           env:                  Rails.env.to_s,
           version:              Time.now.utc.iso8601,
           # Non-secret hints about this side so the peer can render accurate
-          # restart/recovery instructions (e.g. "cd <folder> && kamal app boot"
-          # on the local machine). Stored plaintext on the peer.
+          # restart/recovery instructions (navigate to <folder>, then
+          # "cd <rails_subdir> && kamal app boot" / "… && fly deploy" from where
+          # the deploy config lives). Stored plaintext on the peer.
           env_info: {
             folder_name:   File.basename(RoeSitePaths::ROE_ROOT),
-            deploy_target: SiteSync.deploy_target&.to_s
+            deploy_target: SiteSync.deploy_target&.to_s,
+            # Rails-app dir relative to the Roe folder ("current" for the
+            # versioned layout; nil when the app IS the Roe folder).
+            rails_subdir:  (RoeSitePaths::RAILS_APP_ROOT == RoeSitePaths::ROE_ROOT ? nil : File.basename(RoeSitePaths::RAILS_APP_ROOT))
           }
         }
 

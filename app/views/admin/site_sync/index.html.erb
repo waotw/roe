@@ -1264,9 +1264,7 @@
       <p class="text-gray-700 mb-4">
         Your database restore is saved and loads on the <strong>next restart</strong>. It won't take effect until then.
       </p>
-      <p class="text-sm text-gray-700 mb-1">On your local machine, run:</p>
-      <code class="block bg-gray-900 text-gray-100 rounded-xs px-3 py-2 font-mono text-sm mb-4 break-all"><%= restore_restart_command(@sync_config) %></code>
-      <p class="text-xs text-gray-500">Click outside, press <kbd class="font-mono">Esc</kbd>, or the × to close.</p>
+      <div class="mb-4"><%= render "restart_instructions" %></div>
     </div>
   </div>
 

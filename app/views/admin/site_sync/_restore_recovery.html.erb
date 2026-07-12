@@ -40,10 +40,10 @@
           <%= button_to "Dismiss", admin_dismiss_restore_recovery_path, method: :post,
                 class: "uppercase text-xs px-3 py-1 border border-amber-600 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs cursor-pointer" %>
         </div>
-        <p class="text-xs text-amber-800">
-          After clicking apply, restart the live app from your local machine:
-          <code class="block mt-1 bg-white border border-amber-200 rounded-xs px-3 py-2 font-mono text-xs text-gray-800"><%= restore_restart_command(@sync_config) %></code>
-        </p>
+        <div class="text-amber-900">
+          <p class="text-xs mb-2">After clicking apply, restart the live app from your local machine:</p>
+          <%= render "restart_instructions" %>
+        </div>
       <% end %>
     </div>
   <% end %>
