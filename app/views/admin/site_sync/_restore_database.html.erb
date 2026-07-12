@@ -28,6 +28,8 @@
           changed since this backup was created — new members, orders, and newsletter history. Only use this on a
           <strong>fresh deploy</strong> or a site you <strong>can't otherwise recover</strong>.
           The current database is kept as a <span class="font-mono text-xs">.pre-restore</span> copy.
+          <br>
+          <span class="text-xs">This restores the <strong>database only</strong>; your encryption credentials aren't touched. Everyone is signed out (sessions live in the DB). If the restored data's encrypted settings can't be read here, you'll be offered the backup's matching credentials afterward.</span>
         </div>
 
         <%= form_with url: admin_restore_database_path, method: :post, local: true, html: { multipart: true }, class: "space-y-3" do |f| %>

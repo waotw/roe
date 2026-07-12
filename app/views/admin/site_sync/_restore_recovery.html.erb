@@ -1,0 +1,50 @@
+<%# Post-restore recovery banner (production only). After a DB-only restore,
+    if the restored database's encrypted settings can't be read with this
+    site's current credentials, offer the backup's parked credentials — applied
+    on a restart, validated, and auto-reverted if they don't work. %>
+<% if Rails.env.production? %>
+  <% if SiteSync::RestoreCheck.apply_failed? %>
+    <div class="bg-red-50 border border-red-300 rounded-xs p-4 mb-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-red-900 mb-1">Couldn't recover encryption from the backup</h2>
+          <p class="text-sm text-red-900 max-w-3xl">
+            The backup's credentials were installed but didn't unlock this database's encrypted settings, so they were
+            <strong>automatically reverted</strong> — your site is running on its previous credentials and is otherwise fine.
+            On hosts where the encryption key is managed by your deploy (e.g. <code class="text-xs bg-red-100 px-1 rounded-xs">RAILS_MASTER_KEY</code>
+            as a Kamal secret), the real key lives with your deploy secrets, not in the backup — recover it there.
+          </p>
+        </div>
+        <%= button_to "Dismiss", admin_dismiss_restore_recovery_path, method: :post,
+              class: "shrink-0 uppercase text-xs px-3 py-1 border border-red-600 bg-red-100 hover:bg-red-200 text-red-900 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    </div>
+  <% elsif SiteSync::RestoreCheck.credentials_mismatch? %>
+    <div class="bg-amber-50 border border-amber-300 rounded-xs p-4 mb-6">
+      <h2 class="text-lg font-semibold text-amber-900 mb-1">Restored database needs its backup's credentials</h2>
+      <p class="text-sm text-amber-900 mb-3 max-w-3xl">
+        Your restored database's encrypted settings can't be read with this site's current credentials.
+        <% if SiteSync::PendingRestore.backup_credentials_available? %>
+          Your backup has the matching pair — apply them? They're installed on the next restart, verified, and
+          <strong>automatically reverted</strong> if they don't work, so this is safe.
+        <% else %>
+          The matching credentials aren't available on this server. Recover them from your backup or deploy secrets.
+        <% end %>
+      </p>
+
+      <% if SiteSync::PendingRestore.backup_credentials_available? %>
+        <div class="flex flex-wrap items-center gap-3 mb-3">
+          <%= button_to "Apply backup credentials", admin_apply_backup_credentials_path, method: :post,
+                data: { turbo_confirm: "Install the backup's encryption credentials on the next restart? They're verified and auto-reverted if they don't fit." },
+                class: "uppercase text-sm px-4 py-2 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono rounded-xs cursor-pointer" %>
+          <%= button_to "Dismiss", admin_dismiss_restore_recovery_path, method: :post,
+                class: "uppercase text-xs px-3 py-1 border border-amber-600 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs cursor-pointer" %>
+        </div>
+        <p class="text-xs text-amber-800">
+          After clicking apply, restart the live app from your local machine:
+          <code class="block mt-1 bg-white border border-amber-200 rounded-xs px-3 py-2 font-mono text-xs text-gray-800"><%= restore_restart_command(@sync_config) %></code>
+        </p>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

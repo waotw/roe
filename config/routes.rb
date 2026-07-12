@@ -64,6 +64,8 @@ Rails.application.routes.draw do
     post  "site_sync/backups/decrypt_db",  to: "site_sync#decrypt_backup_database",  as: "decrypt_backup_database"
     get   "site_sync/backups/download_db", to: "site_sync#download_backup_database", as: "download_backup_database"
     post  "site_sync/restore_database",   to: "site_sync#restore_database", as: "restore_database"
+    post  "site_sync/apply_backup_credentials", to: "site_sync#apply_backup_credentials", as: "apply_backup_credentials"
+    post  "site_sync/dismiss_restore_recovery", to: "site_sync#dismiss_restore_recovery", as: "dismiss_restore_recovery"
     post "site_sync/config/regenerate_token", to: "site_sync#regenerate_token", as: "regenerate_site_sync_token"
     post "site_sync/refresh_exchange", to: "site_sync#refresh_exchange", as: "refresh_site_sync_exchange"
     post "site_sync/push_to_live",     to: "site_sync#push_to_live",    as: "push_site_to_live"

@@ -39,4 +39,18 @@ module SiteSyncHelper
   def collapsed_sync_count(paths)
     collapse_sync_paths(paths).size
   end
+
+  # The terminal command to restart the LIVE app from the operator's LOCAL
+  # machine, using the folder name + deploy target the peer advertised over the
+  # sync handshake (SyncConfig#peer_*). Falls back to a clear generic form when
+  # we haven't learned those yet. Runs locally because that's where kamal/fly
+  # live — production can't restart itself.
+  def restore_restart_command(config)
+    folder = config&.peer_folder_name.presence || "your Roe folder"
+    cmd = case config&.peer_deploy_target
+    when "fly" then "fly deploy"
+    else            "kamal app boot" # kamal is the default / unknown case
+    end
+    "cd #{folder} && #{cmd}"
+  end
 end

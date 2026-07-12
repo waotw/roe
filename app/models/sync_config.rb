@@ -45,6 +45,46 @@ class SyncConfig < ApplicationRecord
     update!(token: SecureRandom.hex(32))
   end
 
+  # ── Peer environment (plaintext) ───────────────────────────────────────
+  #
+  # What the OTHER side told us about itself over the sync handshake:
+  # its Roe folder name and deploy target. Stored plaintext JSON (never
+  # encrypted) because it drives restart/recovery instructions — which must
+  # render even when AR encryption is broken. On production, "peer" = the
+  # local machine, so peer_folder_name is the folder to `cd` into locally.
+
+  ALLOWED_PEER_ENV_KEYS = %w[folder_name deploy_target].freeze
+
+  def peer_env_hash
+    return {} if self[:peer_env].blank?
+    JSON.parse(self[:peer_env])
+  rescue JSON::ParserError
+    {}
+  end
+
+  def peer_folder_name
+    peer_env_hash["folder_name"].presence
+  end
+
+  # "kamal" / "fly" / nil — the peer's deploy target, so we can show the
+  # right restart command.
+  def peer_deploy_target
+    peer_env_hash["deploy_target"].presence
+  end
+
+  # Merge a peer-supplied env hash (string keys) into the stored plaintext.
+  # Low-level write (update_column) — no validations/callbacks, no encryption;
+  # skips the write when nothing changed so a routine exchange isn't a write.
+  def merge_peer_env!(hash)
+    return if hash.blank?
+    cleaned = hash.stringify_keys.slice(*ALLOWED_PEER_ENV_KEYS).compact_blank
+    return if cleaned.empty?
+
+    merged = peer_env_hash.merge(cleaned)
+    return if merged == peer_env_hash
+    update_column(:peer_env, merged.to_json)
+  end
+
   # ── Backup passphrase ──────────────────────────────────────────────────
 
   # True when a backup passphrase has been set. Uses the safe read so a

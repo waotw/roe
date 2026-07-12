@@ -1,9 +1,18 @@
 class Admin::BaseController < ApplicationController
   before_action :require_authentication
   before_action :ensure_integration_files
+  before_action :run_restore_check
   layout "admin"
 
   private
+
+  # After a DB restore, verify (once) that the restored encrypted data is
+  # readable with this host's credentials; flag a mismatch otherwise so the
+  # Site Sync page can offer the backup's parked credentials. Gated by a
+  # marker, so it's a cheap File.exist? on every other request.
+  def run_restore_check
+    SiteSync::RestoreCheck.run_if_pending!
+  end
 
   # Drop the media-usage backlink cache after any mutating request. Used by
   # controllers that change what references media (config saves, media

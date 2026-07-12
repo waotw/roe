@@ -71,7 +71,14 @@ module SiteSync
           # to click "Mark Synced." Always-fresh, always-canonical.
           recorded_fingerprint: recorded ? SiteSync::Ledger.fingerprint_of(recorded_files) : nil,
           env:                  Rails.env.to_s,
-          version:              Time.now.utc.iso8601
+          version:              Time.now.utc.iso8601,
+          # Non-secret hints about this side so the peer can render accurate
+          # restart/recovery instructions (e.g. "cd <folder> && kamal app boot"
+          # on the local machine). Stored plaintext on the peer.
+          env_info: {
+            folder_name:   File.basename(RoeSitePaths::ROE_ROOT),
+            deploy_target: SiteSync.deploy_target&.to_s
+          }
         }
 
         if recorded
@@ -650,6 +657,11 @@ module SiteSync
           received_at:          Time.current
         }
         Rails.cache.write(PEER_STATE_CACHE_KEY, normalized, expires_in: PEER_STATE_TTL)
+
+        # Persist the peer's environment hints (plaintext), so recovery
+        # instructions survive restarts and an encryption-broken boot.
+        env_info = payload["env_info"] || payload[:env_info]
+        SyncConfig.current.merge_peer_env!(env_info) if env_info.present?
       end
 
       # Outbound shape: capped path lists per category, plus full

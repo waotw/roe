@@ -160,39 +160,20 @@ end
 
 # ── Pending DR restore (staged via the admin upload) ───────────────────
 # If an admin staged a database restore (SiteSync::PendingRestore), apply it
-# HERE — at boot, before ActiveRecord opens the DB and before Rails (or the
-# secret bootstrap below) reads the encryption keys — so we never overwrite
-# the live database while it's in use, and a restored DB's keys are in place
-# before anything decrypts with them. The DB and its matching keys are
-# swapped together (a full DR bundle carries both); previous copies are
-# preserved as .pre-restore-<ts> for undo. Runs on every host. Mirrors
+# HERE — at boot, before ActiveRecord opens the DB — so we never overwrite the
+# live database while it's in use. The previous DB is preserved as a
+# .pre-restore-<ts> copy for undo. Runs on every host. Mirrors
 # SiteSync::PendingRestore.apply_if_present! (which the tests cover) — the
 # logic is inlined because autoloading isn't available this early in boot.
+#
+# Restore is DB-ONLY: encryption credentials are NOT swapped automatically
+# (doing so once clobbered a live site — see RoeSecrets::Bootstrap). We drop a
+# plaintext ".restore-check-needed" marker so a post-boot self-check can verify
+# the restored DB's encrypted data is readable and, if not, offer the backup's
+# parked credentials. Keep the marker path in sync with SiteSync::RestoreCheck.
 begin
   require "fileutils"
-  __roe_ts      = Time.now.strftime("%Y%m%d%H%M%S")
-  __roe_secrets = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
-
-  # Keys first (a matched pair with the DB), so the bootstrap + credentials
-  # reads below see the restored set rather than regenerating over it. When a
-  # bundled key already matches this host's (same install) we keep the host's
-  # and drop the staged copy — no swap, no leftover duplicate. Only when they
-  # differ (fresh host / real disaster) do we rename the old key to a
-  # .pre-restore copy and install the bundled one that matches the restored DB.
-  %w[master.key credentials.yml.enc].each do |__fname|
-    __pend = File.join(__roe_secrets, "#{__fname}.restore-pending")
-    next unless File.exist?(__pend)
-    __live = File.join(__roe_secrets, __fname)
-    if File.exist?(__live) && FileUtils.identical?(__pend, __live)
-      FileUtils.rm_f(__pend)
-      next
-    end
-    FileUtils.mv(__live, "#{__live}.pre-restore-#{__roe_ts}") if File.exist?(__live)
-    FileUtils.mv(__pend, __live)
-    File.chmod(0o600, __live)
-    warn "[RoeRestore] Applied staged key restore → #{__live}"
-  end
-
+  __roe_ts   = Time.now.strftime("%Y%m%d%H%M%S")
   __roe_db   = File.join(RoeSitePaths::SITE_DB_PATH, Rails.env, "#{Rails.env}.sqlite3")
   __roe_pend = "#{__roe_db}.restore-pending"
   if File.exist?(__roe_pend)
@@ -200,10 +181,64 @@ begin
     FileUtils.mv(__roe_db, "#{__roe_db}.pre-restore-#{__roe_ts}") if File.exist?(__roe_db)
     FileUtils.mv(__roe_pend, __roe_db)
     [ "#{__roe_db}-wal", "#{__roe_db}-shm" ].each { |f| FileUtils.rm_f(f) }
+    File.write(File.join(RoeSitePaths::SITE_DB_PATH, ".restore-check-needed"), __roe_ts)
     warn "[RoeRestore] Applied staged database restore → #{__roe_db}"
   end
 rescue => e
   warn "[RoeRestore] pending restore swap warning: #{e.class}: #{e.message}"
+end
+
+# ── Apply backup credentials (explicit, validated, revertible) ─────────
+# The admin asked to install the DR bundle's parked credentials (the restored
+# DB's encrypted data wasn't readable with this host's current ones). Do it
+# HERE, before the secret bootstrap / Rails reads credentials. Install the
+# parked pair, then VALIDATE (must decrypt to an AR primary_key). Keep it if
+# valid; otherwise REVERT to the previous pair so the site stays up, and flag
+# the failure. Mirrors SiteSync::PendingRestore.apply_backup_credentials!; keep
+# marker paths in sync with SiteSync::RestoreCheck.
+begin
+  require "fileutils"
+  require "active_support/encrypted_configuration"
+  __sec = RoeSitePaths::SITE_SYSTEM_SECRETS_PATH
+  __req = File.join(__sec, ".apply-backup-credentials")
+  if File.exist?(__req)
+    __ts    = Time.now.strftime("%Y%m%d%H%M%S")
+    __saved = {}
+    %w[master.key credentials.yml.enc].each do |__f|
+      __from = File.join(__sec, "#{__f}.from-backup")
+      next unless File.exist?(__from)
+      __live = File.join(__sec, __f)
+      if File.exist?(__live)
+        __pre = "#{__live}.pre-restore-#{__ts}"
+        FileUtils.cp(__live, __pre)
+        __saved[__f] = __pre
+      end
+      FileUtils.cp(__from, __live)
+      File.chmod(0o600, __live)
+    end
+
+    __enc = ActiveSupport::EncryptedConfiguration.new(
+      config_path: File.join(__sec, "credentials.yml.enc"),
+      key_path:    File.join(__sec, "master.key"),
+      env_key:     "RAILS_MASTER_KEY", raise_if_missing_key: false
+    )
+    __ok = (__enc.config.dig(:active_record_encryption, :primary_key).present? rescue false)
+
+    __failed_marker = File.join(RoeSitePaths::SITE_DB_PATH, ".restore-credentials-apply-failed")
+    if __ok
+      %w[master.key credentials.yml.enc].each { |__f| FileUtils.rm_f(File.join(__sec, "#{__f}.from-backup")) }
+      FileUtils.rm_f(__failed_marker)
+      File.write(File.join(RoeSitePaths::SITE_DB_PATH, ".restore-check-needed"), __ts) # re-probe post-boot
+      warn "[RoeRestore] Applied backup credentials (validated)."
+    else
+      __saved.each { |__f, __pre| FileUtils.cp(__pre, File.join(__sec, __f)); FileUtils.rm_f(__pre) }
+      File.write(__failed_marker, __ts)
+      warn "[RoeRestore] Backup credentials did NOT validate — reverted to the previous credentials."
+    end
+    FileUtils.rm_f(__req)
+  end
+rescue => e
+  warn "[RoeRestore] apply-backup-credentials warning: #{e.class}: #{e.message}"
 end
 
 # Skip the disk-based bootstrap entirely when running on Fly.

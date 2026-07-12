@@ -7,6 +7,9 @@
     </p>
   </div>
 
+  <%# ─── Post-restore recovery banner (production only) ───────────── %>
+  <%= render "restore_recovery" %>
+
   <%# ─── About ────────────────────────────────────────────────────── %>
   <%# Hidden on production — the page on live is for configuration only. %>
   <% unless Rails.env.production? %>

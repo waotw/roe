@@ -208,6 +208,32 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # Stage the DR bundle's parked credentials to be installed + validated on the
+  # next boot (offered when a restored DB's encrypted data can't be read here).
+  # Production-only. The boot swap validates and auto-reverts if they don't work.
+  def apply_backup_credentials
+    unless Rails.env.production?
+      flash[:alert] = "Applying backup credentials runs on the live site only."
+      return redirect_to admin_site_sync_path
+    end
+    unless SiteSync::PendingRestore.backup_credentials_available?
+      flash[:alert] = "No backup credentials are available to apply."
+      return redirect_to admin_site_sync_path
+    end
+
+    SiteSync::RestoreCheck.request_credentials_apply!
+    flash[:notice] = "Backup credentials staged. Restart the live app to apply them — they're installed on the next boot, verified, and automatically reverted if they don't work."
+    redirect_to admin_site_sync_path
+  end
+
+  # Dismiss the restore-recovery banner (clears the mismatch / apply-failed
+  # flags). For when the admin has recovered another way or accepts the state.
+  def dismiss_restore_recovery
+    SiteSync::RestoreCheck.clear!
+    flash[:notice] = "Recovery notice dismissed."
+    redirect_to admin_site_sync_path
+  end
+
   def regenerate_token
     # Local is source of truth for the shared token. Production receives it
     # from the deploy bootstrap (or a manual paste via update_config) — it
