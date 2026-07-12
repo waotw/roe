@@ -192,9 +192,10 @@ class Admin::SiteSyncController < Admin::BaseController
       return redirect_to admin_site_sync_path
     end
 
-    case SiteSync::PendingRestore.stage_from_upload(upload, params[:passphrase].to_s)
+    result = SiteSync::PendingRestore.stage_from_upload(upload, params[:passphrase].to_s)
+    case result
     when :staged
-      flash[:notice] = "Database restore staged. Redeploy or restart the live app to apply it — the restored database loads on the next boot. Your current database is kept as a .pre-restore copy."
+      flash[:notice] = "Database restore staged. Restart the live app to apply it — the restored database loads on the next boot. Your current database is kept as a .pre-restore copy."
     when :wrong_passphrase
       flash[:alert] = "That passphrase can't open this backup (or the file is corrupt). Nothing was changed."
     when :not_a_blob
@@ -202,7 +203,8 @@ class Admin::SiteSyncController < Admin::BaseController
     else
       flash[:alert] = "Couldn't stage the restore. Nothing was changed."
     end
-    redirect_to admin_site_sync_path
+    # `restore_staged=1` pops the restart-instructions modal on the reload.
+    redirect_to admin_site_sync_path(result == :staged ? { restore_staged: 1 } : {})
   rescue => e
     flash[:alert] = "Restore failed: #{e.message}"
     redirect_to admin_site_sync_path
