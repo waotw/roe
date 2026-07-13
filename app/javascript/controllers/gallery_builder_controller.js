@@ -93,19 +93,40 @@ export default class extends Controller {
     const start = this.savedStart ?? this.textarea.selectionStart;
     const end = this.savedEnd ?? this.textarea.selectionEnd;
 
+    // Detect the indent of the line containing the cursor/selection start.
+    // If it's 4+ spaces we're likely inside a footnote continuation —
+    // indent every line of the generated gallery block by that amount so
+    // kramdown keeps it inside the footnote instead of ejecting it to body.
+    const lineStart = this.textarea.value.lastIndexOf("\n", start - 1) + 1;
+    const indentMatch = this.textarea.value.substring(lineStart, lineStart + 20).match(/^ */);
+    const indent = indentMatch ? indentMatch[0] : "";
+    const prefix = indent.length >= 4 ? indent : "";
+
     // If the author had text selected (e.g. 2+ image lines highlighted),
     // wrap the selected content in a gallery fence with the chosen
     // directives. Otherwise insert a blank gallery with a placeholder.
     if (start !== null && end !== null && start !== end) {
-      const selected = this.textarea.value.substring(start, end).trim();
-      const directivesLine = directives.length > 0 ? "\n" + directives.join("\n") : "";
-      const block = "```gallery\n" + selected + directivesLine + "\n```";
+      // Normalize selected lines: trim each, then re-indent with prefix
+      // so all lines share consistent indentation inside the fence.
+      const content = this.textarea.value.substring(start, end)
+        .split("\n")
+        .map(line => {
+          const trimmed = line.trim();
+          return trimmed ? prefix + trimmed : "";
+        })
+        .join("\n");
+
+      const directivesText = directives.length > 0
+        ? "\n" + directives.map(d => prefix + d).join("\n")
+        : "";
+
+      const block = prefix + "```gallery\n" + content + directivesText + "\n" + prefix + "```";
 
       this.textarea.setSelectionRange(start, end);
       document.execCommand("insertText", false, block);
     } else {
-      const inner = ["__PLACEHOLDER__", ...directives].join("\n");
-      const block = "```gallery\n" + inner + "\n```";
+      const inner = [prefix + "__PLACEHOLDER__", ...directives.map(d => prefix + d)].join("\n");
+      const block = prefix + "```gallery\n" + inner + "\n" + prefix + "```";
 
       const pos = start ?? 0;
       this.textarea.setSelectionRange(pos, pos);
