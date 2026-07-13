@@ -88,6 +88,14 @@ You can learn about each of these in detail here: [Cards](/documentation/cards)
 
 `COLLECTION` opens as builder as well. Collections have many options and are very powerful and you can learn all about them here: [Collections](/documentation/collections)
 
+`ACTION ▼` opens a menu to insert an interactive element. It appears when the [Store](/documentation/store) or [Members](/documentation/members) feature is on, and each option opens a short form where you pick the type and fill in the fields (all optional — blanks use sensible defaults):
+
+- **Button** — a store product button, a **Share** button, or a **Subscribe** button (links to your sign-up page).
+- **Form** — Sign up, Sign in, Checkout, Donate, or Unsubscribe. Shown when Members is enabled.
+- **Paywall** — a shortcut that opens the form pre-set to the paid-content upgrade block. Shown when payments are enabled.
+
+Only the options your enabled features support are listed (e.g. Product needs the Store; Subscribe and the forms need Members; Paywall needs payments). Full details: [Forms & Buttons](/documentation/forms-and-buttons)
+
 `MEDIA ▼` will open a menu to insert media:
 
 - **Images**

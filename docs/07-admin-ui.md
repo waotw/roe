@@ -30,8 +30,9 @@ The editor (`app/javascript/controllers/editor_controller.js`) provides:
 - Live preview (Turbo frame)
 - Table of contents generation
 - Image/media insertion
-- Card insertion (pullquotes, asides, post links)
+- Card insertion (pullquotes, asides, post/product links)
 - Collection insertion
+- Action insertion — button (product/share/subscribe) and form (signup, paywall, …) blocks
 
 ### Keyboard Shortcuts
 
@@ -51,11 +52,15 @@ Insert cards via the editor toolbar or keyboard shortcut:
 
 | Action | Toolbar Button | Creates |
 |--------|-----------------|---------|
-| Gallery | Gallery icon | ` ```gallery ``` ` |
-| Pullquote | Quote icon | ` ```card type: pullquote ``` ` |
-| Aside | Info icon | ` ```card type: aside ``` ` |
-| Post Link | Link icon | ` ```card type: post-link ``` ` |
-| Collection | List icon | ` ```collection ``` ` |
+| Gallery | `GALLERY` | ` ```gallery ``` ` |
+| Pullquote | `CARD ▼` | ` ```card type: pullquote ``` ` |
+| Aside | `CARD ▼` | ` ```card type: aside ``` ` |
+| Post Link | `CARD ▼` | ` ```card type: post-link ``` ` |
+| Product Link | `CARD ▼` (Store) | ` ```card type: product-link ``` ` |
+| Collection | `COLLECTION` | ` ```collection ``` ` |
+| Button | `ACTION ▼` | ` ```button for: … ``` ` |
+| Form | `ACTION ▼` | ` ```form for: … ``` ` |
+| Paywall | `ACTION ▼` | ` ```form for: paid_content ``` ` |
 
 ### Post Search (for Post Links)
 

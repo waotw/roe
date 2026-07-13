@@ -22,7 +22,7 @@ You can also choose whether or not to show paid content to everyone or just paid
 
 ## Creating Paid Content
 
-Once you enable `Payments`, an `ADD PAYWALL` button shows up in [The Editor](/documentation/the-editor). This allows you to easily add your paywall.
+Once you enable `Payments`, a **Paywall** option appears in the `ACTION ▼` menu of [The Editor](/documentation/the-editor) — a quick way to drop in a paywall form.
 
 To make a post or page premium/paid-only:
 
@@ -59,7 +59,7 @@ Everything below this point is only visible to paid members. This is where your 
 - **Free members & guests** see everything up to the form, then they see the paywall
 - **The form** shows an upgrade button linking to the [Members page](/admin/pages): `/upgrade`
 
-**In the editor:** When editing a post with `audience: paid`, you'll see a green `ADD PAYWALL` button in the toolbar. Click it to insert the paywall form block instantly.
+**In the editor:** When payments are enabled, the `ACTION ▼` menu includes a **Paywall** option. It opens the form builder already set to the paid-content block — keep the default message and button text or edit them, then insert.
 
 ### 3. Without a Paywall Form
 
