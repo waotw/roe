@@ -1,0 +1,50 @@
+<%#
+  Podcast subscribe section. Renders, in order:
+    - the show's app/service links from podcast.yml (blank ones hidden),
+    - the public RSS feed (omitted when the show is paid-only, unless
+      the viewer is an admin),
+    - the private RSS feed for admins and paid + active members.
+
+  `subscribe_display: menu` in podcast.yml collapses everything behind a
+  single "Subscribe" button using a native <details> element — zero JS.
+  The default (`links`) shows everything inline. Renders nothing when
+  there's no link to show.
+%>
+<% key = post.metadata["podcast"] %>
+<% app_links = PodcastConfig.subscribe_links(podcast_config) %>
+<% show_public = key.present? && (authenticated? || podcast_config&.dig("audience") != "paid") %>
+<% private_url =
+     if key.blank?
+       nil
+     elsif authenticated?
+       "/podcast/#{key}/private.xml"
+     elsif current_member&.paid? && current_member&.active?
+       "/podcast/#{key}/private.xml?token=#{current_member.access_token}"
+     end %>
+
+<% if app_links.any? || show_public || private_url.present? %>
+  <% links = capture do %>
+    <div class="subscribe-links">
+      <% app_links.each do |link| %>
+        <a href="<%= link[:url] %>" class="feed-link" target="_blank" rel="noopener"><%= link[:label] %></a>
+      <% end %>
+      <% if show_public %>
+        <a href="/podcast/<%= key %>.xml" class="feed-link" target="_blank" rel="noopener">RSS Feed</a>
+      <% end %>
+      <% if private_url.present? %>
+        <a href="<%= private_url %>" class="feed-link feed-link-private" target="_blank" rel="noopener">Private RSS Feed (Paid)</a>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if PodcastConfig.subscribe_display(podcast_config) == "menu" %>
+    <details class="podcast-subscribe podcast-subscribe--menu">
+      <summary class="btn-primary">Subscribe</summary>
+      <%= links %>
+    </details>
+  <% else %>
+    <div class="podcast-subscribe">
+      <%= links %>
+    </div>
+  <% end %>
+<% end %>

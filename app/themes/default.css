@@ -3016,7 +3016,9 @@ p.podcast-audio-fallback {
 
 /* Subscribe / feed */
 
-.podcast-episode .podcast-subscribe {
+/* Subscribe block spacing — used on episode pages and on podcast-connected
+   pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
+.podcast-subscribe {
   margin-top: var(--space-6);
   font-size: 0.85rem;
 }
@@ -3057,6 +3059,32 @@ p.podcast-audio-fallback {
 
 .feed-link-private {
   opacity: 0.8;
+}
+
+/* Subscribe links row (app/service links + RSS). Used both inline and
+   inside the collapsible menu below. */
+.subscribe-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Menu mode (subscribe_display: menu): a native <details> disclosure —
+   the "Subscribe" button is the <summary> styled as a button, and
+   clicking it reveals the links. No JS. */
+.podcast-subscribe--menu > summary {
+  display: inline-block;
+  list-style: none;
+  cursor: pointer;
+}
+
+.podcast-subscribe--menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.podcast-subscribe--menu[open] > summary {
+  margin-bottom: var(--space-3);
 }
 
 /* ============ DOCUMENTATION =============== */

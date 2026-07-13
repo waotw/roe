@@ -36,6 +36,42 @@ class PodcastConfig
     "explicit" => "false"
   }.freeze
 
+  # Subscribe app/service links, in display order. Each key is a flat
+  # podcast.yml field holding the show's URL on that platform (blank =
+  # hidden); the value is the human label rendered on the button. Kept
+  # separate from CANONICAL_FIELDS (the iTunes-spec set) — these never
+  # go into the feed XML. Surfaced in the admin editor via the same
+  # auto-backfill pattern as `audience`, so existing shows pick them up.
+  SUBSCRIBE_APPS = {
+    "apple_podcasts" => "Apple Podcasts",
+    "spotify"        => "Spotify",
+    "youtube"        => "YouTube",
+    "overcast"       => "Overcast",
+    "pocket_casts"   => "Pocket Casts",
+    "amazon_music"   => "Amazon Music"
+  }.freeze
+
+  # All subscribe-related fields (the app URLs + the display toggle).
+  SUBSCRIBE_FIELDS = (SUBSCRIBE_APPS.keys + %w[subscribe_display]).freeze
+
+  # Ordered [{ label:, url: }] for every app/service field a podcast has
+  # filled in (blank ones dropped). Feed links are added by the template.
+  def self.subscribe_links(config)
+    return [] unless config
+
+    SUBSCRIBE_APPS.filter_map do |field, label|
+      url = config[field].to_s.strip
+      { label: label, url: url } if url.present?
+    end
+  end
+
+  # How the subscribe section renders: "links" (show all inline, the
+  # default) or "menu" (collapse behind a single Subscribe button).
+  def self.subscribe_display(config)
+    value = config&.dig("subscribe_display").to_s.strip
+    %w[links menu].include?(value) ? value : "links"
+  end
+
   def self.default_entry
     CANONICAL_FIELDS.each_with_object({}) { |f, h| h[f] = FIELD_DEFAULTS.fetch(f, "") }
   end

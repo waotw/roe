@@ -39,28 +39,7 @@
     <%= render_post_content(post) %>
   </div>
 
-  <% if podcast_config.present? || post.metadata['podcast'].present? %>
-    <div class="podcast-subscribe">
-      <% if post.metadata['podcast'].present? %>
-        <%# Show public feed unless podcast is paid-only (admins always see it) %>
-        <% if authenticated? || podcast_config&.dig('audience') != 'paid' %>
-          <a href="/podcast/<%= post.metadata['podcast'] %>.xml" class="feed-link" target="_blank">
-            RSS Feed
-          </a>
-        <% end %>
-        <%# Show private feed to paid members and admins %>
-        <% if authenticated? %>
-          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml" class="feed-link feed-link-private" target="_blank">
-            Private RSS Feed (Paid)
-          </a>
-        <% elsif current_member&.paid? && current_member&.active? %>
-          <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml?token=<%= current_member.access_token %>" class="feed-link feed-link-private" target="_blank">
-            Private RSS Feed (Paid)
-          </a>
-        <% end %>
-      <% end %>
-    </div>
-  <% end %>
+  <%= render "posts/types/podcast_subscribe", post: post, podcast_config: podcast_config %>
 
   <% if podcast_episodes.present? && podcast_episodes.length > 1 %>
     <div class="episode-list">

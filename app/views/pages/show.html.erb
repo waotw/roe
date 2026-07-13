@@ -1,4 +1,18 @@
+<%# A page can be connected to a podcast via `podcast: <key>` in its
+    frontmatter. When it is (and the podcast feature is on and the key
+    resolves), the page leads with the show's name and closes with the
+    subscribe section — the same partial the episode pages use. %>
+<% podcast_key    = @page.metadata["podcast"] %>
+<% podcast_config = (podcast_enabled? && podcast_key.present?) ? PodcastConfig.get(podcast_key) : nil %>
 <article class="page page-<%= @page.url_name %><%= ' member-page' if @page.member_page? %>">
+  <% if podcast_config.present? %>
+    <%# Ordinary pages leave the title to the markdown; a podcast page
+        makes an exception and leads with the show name as the H1,
+        followed immediately by the subscribe options. %>
+    <h1 class="podcast-page-title"><%= podcast_config["title"] %></h1>
+    <%= render "posts/types/podcast_subscribe", post: @page, podcast_config: podcast_config %>
+  <% end %>
+
   <div class="content">
     <%# Pass member context if available (for form error display) %>
     <% context = defined?(@member) ? { member: @member } : nil %>

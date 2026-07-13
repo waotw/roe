@@ -593,6 +593,19 @@ class Admin::ConfigsController < Admin::BaseController
       end
     end
 
+    # Auto-surface the subscribe app/service links + display toggle on
+    # every podcast block, so admins can always manage them even for
+    # shows seeded before these fields existed. Same idea as `audience`
+    # above: empty keys become visible "fill me in" inputs; blanks stay
+    # hidden on the public page.
+    @config_hash.each do |key, podcast|
+      next unless podcast.is_a?(Hash)
+      PodcastConfig::SUBSCRIBE_APPS.each_key do |field|
+        podcast[field] = "" unless podcast.key?(field)
+      end
+      podcast["subscribe_display"] = "links" unless podcast.key?("subscribe_display")
+    end
+
     @field_options = build_field_options_for_podcast
     @field_help = build_field_help_for_podcast
     # Source of truth for which podcast fields are required (used by the
@@ -1525,7 +1538,9 @@ class Admin::ConfigsController < Admin::BaseController
       "episode_type" => [ "full", "trailer", "bonus" ],
       # Per-podcast audience gate. Renders as a select when the field is
       # present (auto-surfaced above when payments are enabled).
-      "audience" => [ "everyone", "paid" ]
+      "audience" => [ "everyone", "paid" ],
+      # How the subscribe section renders on the episode page.
+      "subscribe_display" => [ "links", "menu" ]
     }
 
     # Build prefixed versions separately
@@ -1580,6 +1595,15 @@ class Admin::ConfigsController < Admin::BaseController
         title: "Episodic vs. Serial",
         text: ("<strong>Episodic</strong> — episodes stand alone and can be played in any order. Apple Podcasts shows newest first. Good for interviews, news, talk shows.<br><br>" \
                "<strong>Serial</strong> — episodes are meant to be played in order, like chapters. Apple shows oldest first. Good for narrative shows, audio dramas, limited series.").html_safe
+      },
+      "subscribe_display" => {
+        title: "Subscribe display",
+        text: ("<strong>links</strong> — show every subscribe link (Apple, Spotify, RSS…) inline on the episode page.<br><br>" \
+               "<strong>menu</strong> — collapse them behind a single <em>Subscribe</em> button that opens on click.").html_safe
+      },
+      "apple_podcasts" => {
+        title: "Subscribe links",
+        text: ("Paste your show's page URL on each platform. Leave any blank to hide it. The public RSS feed (and the private paid feed, if applicable) are added automatically.").html_safe
       }
     }
   end
