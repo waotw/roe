@@ -2,11 +2,14 @@ import { Controller } from "@hotwired/stimulus";
 
 // Gallery insert popover. Mounted on the editor root alongside `editor`. The
 // Gallery toolbar button opens a small dropdown with a "Display as carousel?"
-// checkbox, an optional aspect-ratio select, and an optional caption; Insert
-// drops a ```gallery block at the cursor — plain (grid) when unchecked, plus
-// `slideshow: true`, `aspect_ratio: ...`, and/or `caption: ...` as chosen —
-// with the image placeholder selected so the author can type/paste paths or
-// use the media picker.
+// checkbox, an optional aspect-ratio select, and an optional caption.
+//
+// Two insertion modes:
+//   - No selection (cursor only): inserts a gallery block with a
+//     __PLACEHOLDER__ image, selected so the author can type/paste paths.
+//   - Text selected (e.g. 2+ image lines highlighted): wraps the selected
+//     content in a gallery fence with the chosen directives — an easy way
+//     to convert a plain run of images into a fancy gallery.
 //
 // Isolated from editor_controller: it reads/writes the shared textarea itself.
 export default class extends Controller {
@@ -16,7 +19,8 @@ export default class extends Controller {
     this.textarea = this.element.querySelector(
       '[data-editor-target="textarea"]',
     );
-    this.savedPos = null;
+    this.savedStart = null;
+    this.savedEnd = null;
     this.onOutside = (e) => {
       if (this.menuTarget.classList.contains("hidden")) return;
       if (this.hasWrapTarget && this.wrapTarget.contains(e.target)) return;
@@ -35,8 +39,10 @@ export default class extends Controller {
   }
 
   show() {
-    // The button click blurred the textarea, but selectionStart is retained.
-    this.savedPos = this.textarea ? this.textarea.selectionStart : null;
+    // The button click blurred the textarea, but selectionStart/End are
+    // retained. Capture both so we can detect a selection vs. cursor-only.
+    this.savedStart = this.textarea ? this.textarea.selectionStart : null;
+    this.savedEnd = this.textarea ? this.textarea.selectionEnd : null;
     this.menuTarget.classList.remove("hidden");
     setTimeout(
       () => document.addEventListener("click", this.onOutside, true),
@@ -64,16 +70,13 @@ export default class extends Controller {
     const aspect = this.hasAspectTarget ? this.aspectTarget.value : "";
     const caption = this.hasCaptionTarget ? this.captionTarget.value.trim() : "";
 
-    // Directives follow the image placeholder, one per line. Each is optional;
+    // Directives follow the content, one per line. Each is optional;
     // an unset control emits nothing. `caption:` is line-based, so collapse any
     // stray whitespace to keep it on one line.
     const directives = [];
     if (carousel) directives.push("slideshow: true");
     if (aspect) directives.push("aspect_ratio: " + aspect);
     if (caption) directives.push("caption: " + caption.replace(/\s+/g, " "));
-
-    const inner = ["__PLACEHOLDER__", ...directives].join("\n");
-    const block = "```gallery\n" + inner + "\n```";
 
     // Clear the controls on insert so the next gallery starts fresh. Closing
     // the menu without inserting leaves them as-is (hide() doesn't reset);
@@ -87,15 +90,32 @@ export default class extends Controller {
     if (!this.textarea) return;
 
     this.textarea.focus({ preventScroll: true });
-    const pos = this.savedPos ?? this.textarea.selectionStart;
-    this.textarea.setSelectionRange(pos, pos);
-    document.execCommand("insertText", false, block);
+    const start = this.savedStart ?? this.textarea.selectionStart;
+    const end = this.savedEnd ?? this.textarea.selectionEnd;
 
-    // Select the placeholder so the author can immediately add images.
-    const idx = block.indexOf("__PLACEHOLDER__");
-    if (idx !== -1) {
-      const start = pos + idx;
-      this.textarea.setSelectionRange(start, start + "__PLACEHOLDER__".length);
+    // If the author had text selected (e.g. 2+ image lines highlighted),
+    // wrap the selected content in a gallery fence with the chosen
+    // directives. Otherwise insert a blank gallery with a placeholder.
+    if (start !== null && end !== null && start !== end) {
+      const selected = this.textarea.value.substring(start, end).trim();
+      const directivesLine = directives.length > 0 ? "\n" + directives.join("\n") : "";
+      const block = "```gallery\n" + selected + directivesLine + "\n```";
+
+      this.textarea.setSelectionRange(start, end);
+      document.execCommand("insertText", false, block);
+    } else {
+      const inner = ["__PLACEHOLDER__", ...directives].join("\n");
+      const block = "```gallery\n" + inner + "\n```";
+
+      const pos = start ?? 0;
+      this.textarea.setSelectionRange(pos, pos);
+      document.execCommand("insertText", false, block);
+
+      // Select the placeholder so the author can immediately add images.
+      const idx = block.indexOf("__PLACEHOLDER__");
+      if (idx !== -1) {
+        this.textarea.setSelectionRange(pos + idx, pos + idx + "__PLACEHOLDER__".length);
+      }
     }
   }
 }
