@@ -335,6 +335,21 @@ module HasMarkdownExtensions
     result = []
     consecutive_images = []
     inside_fenced_block = false
+    inside_footnote = false
+
+    # Flush the pending image buffer as either a gallery block (2+) or a
+    # single passthrough (1), then reset. Used wherever we leave image
+    # collecting — entering/exiting fenced blocks and footnote defs.
+    flush = lambda do
+      if consecutive_images.length >= 2
+        result << "```gallery"
+        result.concat(consecutive_images)
+        result << "```"
+      elsif consecutive_images.length == 1
+        result.concat(consecutive_images)
+      end
+      consecutive_images = []
+    end
 
     lines.each do |line|
       # Track if we're inside a fenced code block
@@ -342,15 +357,7 @@ module HasMarkdownExtensions
         inside_fenced_block = !inside_fenced_block
 
         # Flush any accumulated images before entering a block
-        if inside_fenced_block && consecutive_images.length >= 2
-          result << "```gallery"
-          result.concat(consecutive_images)
-          result << "```"
-          consecutive_images = []
-        elsif consecutive_images.length == 1
-          result.concat(consecutive_images)
-          consecutive_images = []
-        end
+        flush.call if inside_fenced_block
 
         result << line
         next
@@ -362,20 +369,38 @@ module HasMarkdownExtensions
         next
       end
 
+      # Footnote definition tracking. A `[^N]:` line opens a footnote
+      # definition; subsequent continuation lines (4+ space indent or
+      # blank) belong to the footnote. A non-blank, non-indented line
+      # closes it. We must NOT auto-wrap footnote images in a gallery
+      # fence at column 0 — doing so breaks the 4-space continuation
+      # indent that kramdown relies on to keep the lines inside the
+      # footnote, which would silently eject those images (and any
+      # following indented content) into the article body.
+      if line =~ /^\[\^[^\]]+\]:/
+        flush.call
+        inside_footnote = true
+        result << line
+        next
+      end
+
+      if inside_footnote
+        if line.strip.empty? || line =~ /^\s{4,}/
+          # Continuation line — pass through verbatim, don't collect.
+          result << line
+          next
+        end
+        # Non-indented, non-blank line → footnote definition ends.
+        inside_footnote = false
+        # Fall through so the line is processed normally below.
+      end
+
       # Check if this line is an image (with optional caption)
       if line.strip =~ /^!\[([^\]]*)\]\(([^)]+)\)\s*(?:\(\*([^*]+)\*\))?$/
         consecutive_images << line
       else
         # Not an image - process any accumulated images
-        if consecutive_images.length >= 2
-          result << "```gallery"
-          result.concat(consecutive_images)
-          result << "```"
-        elsif consecutive_images.length == 1
-          result.concat(consecutive_images)
-        end
-
-        consecutive_images = []
+        flush.call
         result << line
       end
     end
@@ -2630,18 +2655,51 @@ module HasMarkdownExtensions
   # Email everywhere else — see share_controller.js. URL/title/text are read
   # client-side from the page's canonical link + og:title so they match what
   # unfurls on social; `url:`, `title:`, `text:`, `label:` config override them.
+  # Map a Roe-anji `style:` value (one or more space-separated tokens) to
+  # sanitised modifier classes, e.g. on a share button `style: small center` →
+  # "share-small share-center". Lets the theme restyle action buttons (size,
+  # alignment, …) without a new config key each time — the same `style` pattern
+  # the rest of Roe-anji uses.
+  def action_button_style_classes(config, prefix)
+    config["style"].to_s.split.filter_map do |token|
+      slug = token.downcase.gsub(/[^a-z0-9\-]/, "")
+      "#{prefix}-#{slug}" if slug.present?
+    end
+  end
+
   def render_share_button(config, _context)
     label = ERB::Util.html_escape(config["label"].presence || "Share")
     url   = ERB::Util.html_escape(config["url"].to_s)
     title = ERB::Util.html_escape(config["title"].to_s)
     text  = ERB::Util.html_escape(config["text"].to_s)
+    # Only the opt-in `style:` modifier classes — no default hook classes, so a
+    # future cleanup can't break themes that relied on them. Style the buttons
+    # via btn-primary/btn-outline or a `style:` value.
+    styles     = action_button_style_classes(config, "share")
+    class_attr = styles.any? ? %( class="#{styles.join(' ')}") : ""
 
+    # Only emit the value attrs that were actually set; a blank one is just the
+    # controller's default (read the canonical URL + og:title off the page).
+    data = { "url" => url, "title" => title, "text" => text }
+      .filter_map { |k, v| %(data-share-#{k}-value="#{v}") if v.present? }
+      .join(" ")
+    data = " #{data}" unless data.empty?
+
+    # Progressive enhancement: the trigger is `hidden` and the menu is visible
+    # by default, so with no JS the reader still sees Copy link + Email (Email
+    # works with no JS). On connect the controller flips that — reveals the
+    # trigger, collapses the menu — so with JS it's a single Share button that
+    # opens the menu on desktop / the native sheet on touch. The menu carries
+    # `.button-menu`, the shared hook for any button→menu action (share,
+    # subscribe…) so the theme can size those options once.
     <<~HTML.strip
-      <div class="share-buttons" data-controller="share" data-share-url-value="#{url}" data-share-title-value="#{title}" data-share-text-value="#{text}">
-        <button type="button" class="btn-primary share-native" data-share-target="native" data-action="share#share" hidden>#{label}</button>
-        <button type="button" class="btn-outline share-copy" data-share-target="copy" data-action="share#copy">Copy link</button>
-        <a class="btn-outline share-email" data-share-target="email" href="mailto:">Email</a>
-        <span class="share-feedback" data-share-target="feedback" role="status" aria-live="polite"></span>
+      <div#{class_attr} data-controller="share"#{data}>
+        <button type="button" class="btn-primary" data-share-target="trigger" data-action="share#toggle" aria-haspopup="true" aria-expanded="false" hidden>#{label}</button>
+        <div class="button-menu" data-share-target="menu">
+          <button type="button" class="btn-outline" data-share-target="copy" data-action="share#copy">Copy link</button>
+          <a class="btn-outline" data-share-target="email" href="mailto:">Email</a>
+        </div>
+        <span data-share-target="feedback" role="status" aria-live="polite"></span>
       </div>
     HTML
   end

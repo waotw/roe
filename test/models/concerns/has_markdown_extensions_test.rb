@@ -977,13 +977,15 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
 
   # ---- share button ----------------------------------------------------------
 
-  test "render_share_button emits native + copy + email affordances" do
+  test "render_share_button emits a Share trigger + copy/email menu" do
     html = TestModel.new("").send(:render_share_button, {}, {})
     assert_includes html, 'data-controller="share"'
-    assert_includes html, 'data-action="share#share"'
+    assert_includes html, 'data-share-target="trigger"'
+    assert_includes html, 'data-action="share#toggle"'
+    assert_includes html, 'data-share-target="menu"'
     assert_includes html, 'data-action="share#copy"'
     assert_includes html, 'href="mailto:"'
-    assert_includes html, ">Share</button>"   # default native label
+    assert_includes html, ">Share</button>"   # default trigger label
     assert_includes html, ">Copy link</button>"
   end
 
@@ -1005,5 +1007,27 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "`type: share` is an alias for `for: share`" do
     html = render("```button\ntype: share\n```")
     assert_includes html, 'data-controller="share"'
+  end
+
+  test "share button adds NO container class by default + omits empty values" do
+    html = TestModel.new("").send(:render_share_button, {}, {})
+    # Container closes right after data-controller — no class, no blank values.
+    assert_includes html, '<div data-controller="share">'
+    refute_includes html, 'data-share-url-value'
+  end
+
+  test "share menu uses the reusable .button-menu hook" do
+    html = TestModel.new("").send(:render_share_button, {}, {})
+    assert_includes html, '<div class="button-menu" data-share-target="menu">'
+  end
+
+  test "share button `style:` adds sanitised modifier classes only" do
+    html = TestModel.new("").send(:render_share_button, { "style" => "small center" }, {})
+    assert_includes html, '<div class="share-small share-center" data-controller="share"'
+  end
+
+  test "share button `style:` strips unsafe characters" do
+    html = TestModel.new("").send(:render_share_button, { "style" => "sm<all>" }, {})
+    assert_includes html, 'class="share-small"'
   end
 end
