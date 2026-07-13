@@ -1009,6 +1009,52 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_includes html, 'data-controller="share"'
   end
 
+  # ---- members (subscribe) button --------------------------------------------
+
+  def with_members_enabled(enabled = true)
+    sc = SiteFeature.singleton_class
+    sc.send(:alias_method, :__orig_members_enabled?, :members_enabled?)
+    sc.send(:define_method, :members_enabled?) { enabled }
+    yield
+  ensure
+    sc.send(:alias_method, :members_enabled?, :__orig_members_enabled?)
+    sc.send(:remove_method, :__orig_members_enabled?)
+  end
+
+  test "members button links to /sign-up with a Subscribe label" do
+    with_members_enabled do
+      html = TestModel.new("").send(:render_members_button, {}, {})
+      assert_includes html, '<a class="btn-primary" href="/sign-up">Subscribe</a>'
+    end
+  end
+
+  test "members button honours label / url / style" do
+    with_members_enabled do
+      html = TestModel.new("").send(:render_members_button,
+        { "label" => "Join", "url" => "/upgrade", "style" => "small" }, {})
+      assert_includes html, ">Join</a>"
+      assert_includes html, 'href="/upgrade"'
+      assert_includes html, 'class="btn-primary members-small"'
+    end
+  end
+
+  test "members button dev-warns in dev, silent otherwise, when members are off" do
+    with_members_enabled(false) do
+      assert_equal "", TestModel.new("").send(:render_members_button, {}, {}), "silent outside dev"
+      in_dev_env do
+        html = TestModel.new("").send(:render_members_button, {}, {})
+        assert_includes html, "Subscribe button unavailable"
+      end
+    end
+  end
+
+  test "`for: subscribe` (and `type: subscribe`) route to the members button" do
+    with_members_enabled do
+      assert_includes render("```button\nfor: subscribe\n```"), 'href="/sign-up"'
+      assert_includes render("```button\ntype: subscribe\n```"), 'href="/sign-up"'
+    end
+  end
+
   test "share button adds NO container class by default + omits empty values" do
     html = TestModel.new("").send(:render_share_button, {}, {})
     # Container closes right after data-controller — no class, no blank values.

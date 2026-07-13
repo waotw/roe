@@ -417,11 +417,30 @@ module HasMarkdownExtensions
     result.join("\n")
   end
 
+  # Replace every fenced roe-anji block of the given language with the
+  # output of `renderer.(body, *)`, preserving any leading whitespace on
+  # the fence line. Without this, a ```gallery fence indented 4 spaces
+  # inside a footnote definition gets replaced with column-0 HTML —
+  # which breaks kramdown's 4-space continuation rule and silently
+  # ejects the block (and any following indented content) out of the
+  # footnote into the article body.
+  def replace_fenced_blocks(markdown, lang)
+    pattern = /^( *)```#{lang}\r?\n(.*?)```/m
+    markdown.gsub(pattern) do |match|
+      indent   = Regexp.last_match(1)
+      body     = Regexp.last_match(2)
+      rendered = yield(body)
+      next rendered if indent.empty?
+
+      rendered.lines.map { |line| line.strip.empty? ? line : "#{indent}#{line}" }.join
+    end
+  end
+
   def process_galleries(markdown, preview: false)
     index = -1
-    markdown.gsub(/```gallery\r?\n(.*?)```/m) do
+    replace_fenced_blocks(markdown, "gallery") do |body|
       index += 1
-      render_gallery($1, preview: preview, index: index)
+      render_gallery(body, preview: preview, index: index)
     end
   end
 
@@ -627,8 +646,7 @@ module HasMarkdownExtensions
 
   def process_collections(markdown, preview: false)
     # Match fenced blocks with 'collection' language - handle both \n and \r\n
-    markdown.gsub(/```collection\r?\n(.*?)```/m) do
-      config_text = $1
+    replace_fenced_blocks(markdown, "collection") do |config_text|
       config = parse_collection_config(config_text)
       # A `search: true` collection renders a search icon (inside the
       # collection, beside the heading) — see render_collection/collection_header.
@@ -645,8 +663,8 @@ module HasMarkdownExtensions
   #   scope: documentation/products   (sources and/or post types)
   #   tags: ruby, -news               (include / exclude)
   def process_search(markdown)
-    markdown.gsub(/```search\r?\n(.*?)```/m) do
-      config = parse_collection_config($1)
+    replace_fenced_blocks(markdown, "search") do |config_text|
+      config = parse_collection_config(config_text)
       tokens = (config[:scope] || config[:source]).to_s.split(%r{[\s,/]+}).map(&:strip).reject(&:empty?)
       scope = {}
       sources = tokens & SEARCH_SCOPE_SOURCES
@@ -1700,8 +1718,7 @@ module HasMarkdownExtensions
   ## CARDS
 
   def process_cards(markdown, preview: false)
-    markdown.gsub(/```card\r?\n(.*?)```/m) do
-      config_text = $1
+    replace_fenced_blocks(markdown, "card") do |config_text|
       config = parse_card_config(config_text)
       render_card(config, preview: preview)
     end
@@ -2201,9 +2218,7 @@ module HasMarkdownExtensions
   # FORMS
 
   def process_forms(content, preview: false)
-    content.gsub(/```form\r?\n(.*?)```/m) do
-      yaml_content = $1
-
+    replace_fenced_blocks(content, "form") do |yaml_content|
       begin
         form_config = YAML.safe_load(yaml_content)
         render_form(form_config)
@@ -2644,11 +2659,31 @@ module HasMarkdownExtensions
   # scaffolded for now — specific renderers (e.g. `share`) get added as `when`
   # branches. An unrecognised kind dev-warns rather than rendering nothing.
   def render_action_button(button, context)
-    return render_share_button(button[:config], context) if button[:kind] == "share"
+    return render_share_button(button[:config], context)   if button[:kind] == "share"
+    return render_members_button(button[:config], context) if button[:kind] == "subscribe"
 
     dev_warning("Unknown button type",
       "'#{button[:kind]}' is not a recognised button type.",
-      "Valid: product (the default when no for/type is given), share.")
+      "Valid: product (the default when no for/type is given), share, subscribe.")
+  end
+
+  # A "Subscribe" button that links to the members sign-up page (subscribing to
+  # the newsletter is becoming a member). A plain button-link, not the inline
+  # signup form. Feature-gated: no members feature, no sign-up page → dev-warn.
+  # `label:` (default "Subscribe"), `url:` (default /sign-up), and `style:`
+  # (→ `members-<token>` classes) are all overridable.
+  def render_members_button(config, _context)
+    unless SiteFeature.members_enabled?
+      return dev_warning("Subscribe button unavailable",
+        "Members aren't enabled, so there's no sign-up page to link to.",
+        "Enable members in members.yml.")
+    end
+
+    label = ERB::Util.html_escape(config["label"].presence || "Subscribe")
+    url   = ERB::Util.html_escape(config["url"].presence || "/sign-up")
+    css   = ([ "btn-primary" ] + action_button_style_classes(config, "members")).join(" ")
+
+    %(<a class="#{css}" href="#{url}">#{label}</a>)
   end
 
   # A share button. Native share sheet where supported (mobile), Copy link +

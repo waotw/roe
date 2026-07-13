@@ -177,13 +177,12 @@ i {
   font-style: italic;
 }
 
-a,
-a:visited {
+a {
   color: var(--color-visited);
   text-decoration: underline;
 }
 
-a:hover {
+a:not([class*="btn-"]):hover {
   color: var(--color-hover);
 }
 
@@ -1071,9 +1070,9 @@ h1.post-title {
   margin: var(--space-4) 0;
 }
 
-.post-content a {
+/*.post-content a {
   color: var(--color-link);
-}
+}*/
 
 .post-content h2 a,
 .post-content h3 a {
