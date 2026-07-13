@@ -1,5 +1,5 @@
 ---
-title: "Features → Members"
+title: "Settings → Members"
 status: published
 url_name: settings-members
 tags: settings

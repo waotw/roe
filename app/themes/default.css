@@ -138,6 +138,14 @@
 
 /* ============== BASE STYLES =============== */
 
+/* The `hidden` attribute must win over component display rules (e.g.
+   .btn-primary { display: inline-block }), so JS that toggles [hidden] to
+   show/hide actually hides. Without this, a display rule overrides the UA
+   `[hidden] { display: none }` and the element stays visible. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -184,6 +192,14 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+button {
+  margin: var(--space-2) 0;
+}
+
+button a {
+  text-decoration: none;
 }
 
 picture {
@@ -809,11 +825,6 @@ div.flash mark {
 .content li {
   margin-bottom: var(--space-1);
   line-height: 1.6;
-}
-
-.content a {
-  color: var(--color-link);
-  text-decoration: underline;
 }
 
 .content strong,
@@ -2065,9 +2076,9 @@ figcaption {
   margin-bottom: var(--space-4);
 }
 
-/* Image-less cards collapse the image row so there's no empty space.
-   Modifier class is added in the partial when image is blank. */
 .card.post-link-large.no-image {
+  /* Image-less cards collapse the image row so there's no empty space.
+     Modifier class is added in the partial when image is blank. */
   grid-template-areas:
     "title"
     "subtitle"
@@ -3131,6 +3142,195 @@ hr.clear-floats {
   border-top: none;
 }
 
+/* ================= FORMS ================== */
+
+/* Global form vocabulary. Promoted from member pages (the only place forms
+   appear today); any future form reuses these. Member-specific bits stay in
+   the Members section. */
+
+.form-field {
+  margin-bottom: var(--space-4);
+}
+
+.form-field label {
+  display: block;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+  color: var(--color-muted);
+}
+
+.form-field input[type="email"],
+.form-field input[type="text"],
+.form-field input[type="password"] {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.form-field input:focus {
+  outline: 2px solid var(--color-link);
+  outline-offset: -1px;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.form-actions a {
+  text-decoration: none;
+}
+
+/* ================ BUTTONS ================= */
+
+/* Global button vocabulary: .btn-* classes any feature reuses (share menu,
+   products, member forms). Member pages override the .btn-* palette at higher
+   specificity — those overrides live in the Members section. */
+
+.btn-primary {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-heading);
+  color: var(--color-bg);
+  border: 1px solid var(--color-heading);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background: var(--color-bg);
+  color: var(--color-heading);
+}
+
+.btn-secondary {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  color: var(--color-heading);
+  border: 1px solid var(--color-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: var(--color-heading);
+}
+
+.btn-outline {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  background-color: transparent;
+  border: 1px solid var(--color-link);
+  color: var(--color-link);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-decoration: none;
+  text-wrap: nowrap;
+  box-sizing: border-box;
+  line-height: normal;
+}
+
+.btn-outline:hover {
+  background-color: var(--color-link);
+  color: var(--color-bg);
+}
+
+.btn-destructive {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  background-color: transparent;
+  border: 1px solid var(--color-link);
+  color: var(--color-link);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-decoration: none;
+  text-wrap: nowrap;
+  box-sizing: border-box;
+  line-height: normal;
+}
+
+.btn-destructive:hover {
+  background-color: var(--color-link);
+  color: var(--color-bg);
+}
+
+/* Grid modifier — smaller, tighter (product collection grid) */
+
+.btn-grid {
+  padding: var(--space-1) var(--space-1);
+  font-size: var(--text-sm);
+}
+
+/* ================= SHARE ================== */
+
+/* Share button (Roe-anji `for: share`): a single trigger (.btn-primary) that
+   reveals Copy link + Email (.btn-outline) on desktop, or opens the native
+   share sheet on touch. The container has no class by design — hook it via the
+   controller. Restyle per instance with a `style:` value → `.share-<token>`. */
+
+[data-controller="share"] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+[data-controller="share"] [data-share-target="feedback"] {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+/* Action menu — the options a button→menu action reveals (share, and later
+   subscribe). Reusable hook, so every family member's menu buttons are sized
+   once: a step smaller than the trigger. */
+.button-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.button-menu .btn-primary,
+.button-menu .btn-outline,
+.button-menu button {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+/* Alignment (`style: left|center|right`) — full-width row so it can shift */
+.share-left {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.share-center {
+  display: flex;
+  justify-content: center;
+}
+
+.share-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Compact (`style: small`) */
+.share-small .btn-primary,
+.share-small .btn-outline {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
 /* ================ MEMBERS ================= */
 
 /* Member pages (account/edit) */
@@ -3169,36 +3369,9 @@ hr.clear-floats {
   margin: 0 0;
 }
 
-.member-page .form-field {
-  margin-bottom: var(--space-4);
-}
-
-.member-page .form-field label {
-  display: block;
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-1);
-  color: var(--color-muted);
-}
-
-.member-page .form-field input[type="email"],
-.member-page .form-field input[type="text"],
-.member-page .form-field input[type="password"] {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg);
-  font-family: inherit;
-  font-size: var(--text-base);
-  color: var(--color-text);
-  box-sizing: border-box;
-}
-
-.member-page .form-field input:focus {
-  outline: 2px solid var(--color-link);
-  outline-offset: -1px;
-}
-
-/* Member buttons */
+/* Buttons (member palette) — override the global .btn-* colors on member pages
+   (link-coloured rather than the heading-coloured global default). The base
+   reset also applies to bare <button> here (e.g. donate presets). */
 
 .member-page button,
 .member-page [class*="btn-"] {
@@ -3250,16 +3423,6 @@ hr.clear-floats {
 .member-page .btn-destructive:hover {
   background-color: var(--color-link);
   color: var(--color-bg);
-}
-
-.member-page .form-actions {
-  display: flex;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-}
-
-.member-page .form-actions a {
-  text-decoration: none;
 }
 
 .checkout-form-wrapper {
@@ -3668,48 +3831,6 @@ article.page-store h2 {
   font-size: var(--text-sm);
   font-weight: 400;
   color: var(--color-heading);
-}
-
-/* Buttons (canonical) */
-
-.btn-primary {
-  display: inline-block;
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-heading);
-  color: var(--color-bg);
-  border: 1px solid var(--color-heading);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--text-sm);
-  text-decoration: none;
-}
-
-.btn-primary:hover {
-  background: var(--color-bg);
-  color: var(--color-heading);
-}
-
-.btn-secondary {
-  display: inline-block;
-  padding: var(--space-2) var(--space-4);
-  background: transparent;
-  color: var(--color-heading);
-  border: 1px solid var(--color-text);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--text-sm);
-  text-decoration: none;
-}
-
-.btn-secondary:hover {
-  background: var(--color-heading);
-}
-
-/* Grid button modifier */
-
-.btn-grid {
-  padding: var(--space-1) var(--space-1);
-  font-size: var(--text-sm);
 }
 
 /* ============== BREADCRUMBS =============== */

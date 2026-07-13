@@ -1,5 +1,5 @@
 ---
-title: "Members"
+title: "Admin → Members"
 status: published
 url_name: admin_members
 tags: admin
