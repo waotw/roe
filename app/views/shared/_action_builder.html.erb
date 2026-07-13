@@ -1,0 +1,106 @@
+<%# ACTION builder modal. Mounted via the `action-builder` controller on the
+    editor root (alongside `editor`), so the ACTION dropdown, this modal, and
+    the textarea share its scope. Opened in Button or Form mode from the ACTION ▼
+    menu; the type selector swaps the visible field group. Options come from
+    ActionBuilderSchema, feature-gated the same way the menu is. Only non-empty
+    fields of the active kind get written. %>
+<%# Down-chevron styling used by selects across Roe's forms. %>
+<% select_chevron = "appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" %>
+<% button_kinds = ActionBuilderSchema.button_kinds(store: store_enabled?, members: members_enabled?) %>
+<% form_kinds   = ActionBuilderSchema.form_kinds(members: members_enabled?, payments: payments_enabled?) %>
+<div data-action-builder-target="modal"
+     data-action="keydown->action-builder#onKeydown"
+     class="fixed inset-0 z-50 items-center justify-center"
+     style="display: none;">
+  <div class="absolute inset-0 bg-black/50"
+       data-action="click->action-builder#close"></div>
+
+  <div class="relative bg-white border border-gray-300 shadow-xl flex flex-col"
+       style="width: 90vw; max-width: 560px; max-height: 85vh;">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-300">
+      <div>
+        <h2 data-action-builder-target="title" class="font-mono text-sm font-semibold text-gray-900">Insert button</h2>
+        <p class="text-xs text-gray-500">Pick a type, then fill in the fields. All fields are optional — blanks use sensible defaults.</p>
+      </div>
+      <button type="button" data-action="click->action-builder#close"
+              class="w-7 h-7 flex items-center justify-center border border-gray-400 bg-white hover:bg-gray-100 text-gray-600 text-sm font-mono rounded-xs">×</button>
+    </div>
+
+    <div class="overflow-y-auto p-4 space-y-3">
+      <%# Kind — swaps the visible field group. One select per block; the active
+          block's is shown, the other hidden + disabled (see the controller). %>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+        <% if button_kinds.any? %>
+          <select data-action-builder-target="kindSelect" data-ab-block="button"
+                  data-action="change->action-builder#kindChanged"
+                  class="w-full font-mono text-sm p-2 border border-gray-800 bg-gray-50 <%= select_chevron %>">
+            <% button_kinds.each do |k| %>
+              <option value="<%= k[:value] %>"><%= k[:label] %></option>
+            <% end %>
+          </select>
+        <% end %>
+        <% if form_kinds.any? %>
+          <select data-action-builder-target="kindSelect" data-ab-block="form"
+                  data-action="change->action-builder#kindChanged"
+                  class="w-full font-mono text-sm p-2 border border-gray-800 bg-gray-50 <%= select_chevron %>"
+                  hidden disabled>
+            <% form_kinds.each do |k| %>
+              <option value="<%= k[:value] %>"><%= k[:label] %></option>
+            <% end %>
+          </select>
+        <% end %>
+      </div>
+
+      <% (button_kinds + form_kinds).each do |k| %>
+        <% kind = k[:value] %>
+        <% fields = ActionBuilderSchema.fields_for(kind) %>
+        <div data-action-builder-target="group" data-ab-kind="<%= kind %>"
+             class="space-y-3" hidden>
+          <% fields.each do |field| %>
+            <% key = field[:key] %>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1"><%= field[:label] %></label>
+
+              <% case field[:type] %>
+              <% when :select %>
+                <select data-cb-field="<%= key %>"
+                        data-action="change->action-builder#fieldChanged"
+                        class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> cb-empty">
+                  <option value="">—</option>
+                  <% field[:options].each do |opt| %>
+                    <option value="<%= opt %>"><%= opt %></option>
+                  <% end %>
+                </select>
+
+              <% when :textarea %>
+                <textarea data-cb-field="<%= key %>" rows="3"
+                          data-action="input->action-builder#fieldChanged"
+                          class="cb-input w-full font-mono text-sm p-2 border border-gray-300 cb-empty"></textarea>
+
+              <% else %>
+                <input type="text" data-cb-field="<%= key %>"
+                       data-action="input->action-builder#fieldChanged"
+                       class="cb-input w-full font-mono text-sm p-2 border border-gray-300 cb-empty">
+              <% end %>
+
+              <% if field[:hint] %>
+                <p class="text-xs text-gray-500 mt-1"><%= field[:hint] %></p>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-gray-300">
+      <p data-action-builder-target="error" class="text-xs text-red-600" hidden></p>
+      <div class="flex items-center gap-2 ml-auto">
+        <button type="button" data-action="click->action-builder#close"
+                class="uppercase text-xs px-3 py-1 border border-gray-400 bg-white hover:bg-gray-100 font-mono rounded-xs">Cancel</button>
+        <button type="button" data-action="click->action-builder#insert"
+                class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs">Insert</button>
+      </div>
+    </div>
+  </div>
+</div>

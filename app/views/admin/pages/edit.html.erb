@@ -38,7 +38,7 @@
   <% end %>
 
   <!-- Wrap everything in Stimulus controller -->
-  <div data-controller="editor collection-builder card-builder gallery-builder"
+  <div data-controller="editor collection-builder card-builder gallery-builder action-builder"
        data-editor-resource-type-value="page"
        data-editor-resource-id-value="<%= @page.id %>"
        data-editor-preview-path-value="<%= @preview_path || preview_admin_page_path(@page) %>"
