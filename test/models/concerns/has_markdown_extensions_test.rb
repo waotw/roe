@@ -911,4 +911,99 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_match(/<h1 id="header">Header<\/h1>/, result)
     assert_match(/<strong>bold<\/strong>/, result)
   end
+
+  # =============================================================================
+  # Roe-anji for / type selector (button + form)
+  # =============================================================================
+
+  def kind(config, **opts)
+    TestModel.new("").send(:roeanji_kind, config, **opts)
+  end
+
+  def conflict_warning(config)
+    TestModel.new("").send(:roeanji_kind_conflict_warning, config)
+  end
+
+  def in_dev_env
+    original = Rails.env.to_s
+    Rails.env = "development"
+    yield
+  ensure
+    Rails.env = original
+  end
+
+  test "roeanji_kind reads `for`" do
+    assert_equal "share", kind({ "for" => "share" })
+  end
+
+  test "roeanji_kind reads `type` as an alias" do
+    assert_equal "signup", kind({ "type" => "signup" })
+  end
+
+  test "roeanji_kind: `for` wins when both are present" do
+    assert_equal "share", kind({ "for" => "share", "type" => "product" })
+  end
+
+  test "roeanji_kind falls back to the default only when neither is set" do
+    assert_equal "product", kind({}, default: "product")
+    assert_nil kind({})
+  end
+
+  test "conflict warning is empty unless for and type disagree" do
+    assert_equal "", conflict_warning({ "for" => "share" })
+    assert_equal "", conflict_warning({ "type" => "share" })
+    assert_equal "", conflict_warning({ "for" => "share", "type" => "share" })
+    assert_equal "", conflict_warning({})
+  end
+
+  test "conflict warning fires (in dev) when for and type disagree" do
+    in_dev_env do
+      html = conflict_warning({ "for" => "share", "type" => "product" })
+      assert_includes html, "Conflicting selector"
+      assert_includes html, "for` wins"
+    end
+  end
+
+  test "an unknown non-product button dev-warns in dev, silent otherwise" do
+    button = { kind: "mystery", config: {} }
+    assert_equal "", TestModel.new("").send(:render_action_button, button, {}), "silent outside dev"
+
+    in_dev_env do
+      html = TestModel.new("").send(:render_action_button, button, {})
+      assert_includes html, "Unknown button type"
+      assert_includes html, "mystery"
+    end
+  end
+
+  # ---- share button ----------------------------------------------------------
+
+  test "render_share_button emits native + copy + email affordances" do
+    html = TestModel.new("").send(:render_share_button, {}, {})
+    assert_includes html, 'data-controller="share"'
+    assert_includes html, 'data-action="share#share"'
+    assert_includes html, 'data-action="share#copy"'
+    assert_includes html, 'href="mailto:"'
+    assert_includes html, ">Share</button>"   # default native label
+    assert_includes html, ">Copy link</button>"
+  end
+
+  test "share button honours label + url/title/text config" do
+    html = TestModel.new("").send(:render_share_button,
+      { "label" => "Send it", "url" => "/x", "title" => "T", "text" => "msg" }, {})
+    assert_includes html, ">Send it</button>"
+    assert_includes html, 'data-share-url-value="/x"'
+    assert_includes html, 'data-share-title-value="T"'
+    assert_includes html, 'data-share-text-value="msg"'
+  end
+
+  test "`for: share` routes through the pipeline to the share button" do
+    html = render("```button\nfor: share\n```")
+    assert_includes html, 'data-controller="share"'
+    assert_includes html, "share#copy"
+  end
+
+  test "`type: share` is an alias for `for: share`" do
+    html = render("```button\ntype: share\n```")
+    assert_includes html, 'data-controller="share"'
+  end
 end

@@ -2190,10 +2190,10 @@ module HasMarkdownExtensions
   end
 
   def render_form(config)
-    form_type = config["for"]
+    form_type = roeanji_kind(config)
     button_text = config["button-text"] || config["button_text"] || default_button_text(form_type)
 
-    case form_type
+    result = case form_type
     when "paid_content"
       text = config["text"] || "This is premium content. Upgrade to continue reading."
       button_text = config["button-text"] || config["button_text"] || "Become a paid member"
@@ -2215,9 +2215,35 @@ module HasMarkdownExtensions
       dev_warning("Unknown form type", "'#{form_type}' is not a recognised form type.",
         "Valid types: signup, signin, checkout, donate, unsubscribe, paid_content")
     end
+
+    roeanji_kind_conflict_warning(config) + result.to_s
   rescue => e
     Rails.logger.error "Form rendering error: #{e.message}"
     dev_warning("Form rendering error", e.message)
+  end
+
+  # ── Roe-anji "kind" selector (for / type) ─────────────────────────────
+  #
+  # Blocks that pick a variant select it with `for` (preferred for button/form
+  # — reads as "a form FOR signup", "a button FOR share") or `type` (the
+  # universal selector used elsewhere, e.g. cards). Both are accepted; `for`
+  # wins when both are present. `default` is returned when neither is set
+  # (buttons default to "product" — a bare button is a store button by design).
+
+  def roeanji_kind(config, default: nil)
+    config["for"].presence || config["type"].presence || default
+  end
+
+  # Dev-only warning when a block sets BOTH `for` and `type` to *different*
+  # values (usually a typo). "" otherwise. `for` is the one that takes effect.
+  def roeanji_kind_conflict_warning(config)
+    f = config["for"].presence
+    t = config["type"].presence
+    return "" unless f && t && f != t
+
+    dev_warning("Conflicting selector",
+      "This block sets both `for: #{f}` and `type: #{t}` — `for` wins.",
+      "They mean the same thing here; keep just one.")
   end
 
   def default_button_text(form_type)
@@ -2486,6 +2512,8 @@ module HasMarkdownExtensions
         config = parse_button_config(config_text)
         buttons << {
           config: config,
+          kind: roeanji_kind(config, default: "product"),
+          conflict: roeanji_kind_conflict_warning(config),
           start_pos: start_pos,
           end_pos: end_pos,
           match: $~
@@ -2496,6 +2524,8 @@ module HasMarkdownExtensions
         if Rails.env.development?
           buttons << {
             config: {},
+            kind: "product",
+            conflict: "",
             start_pos: start_pos,
             end_pos: end_pos,
             error: e.message,
@@ -2515,12 +2545,14 @@ module HasMarkdownExtensions
       # Check if there's a blank line between these buttons
       text_between = content[prev[:end_pos]...curr[:start_pos]]
 
-      if text_between =~ /\n\s*\n/
-        # Blank line found - start new group
+      # Only PRODUCT buttons collapse into a SKU variant-list. A blank line
+      # breaks a group as before; so does a non-product button (e.g. a
+      # `for: share`) on either side — those always render on their own.
+      if text_between =~ /\n\s*\n/ || prev[:kind] != "product" || curr[:kind] != "product"
         groups << current_group
         current_group = [ curr ]
       else
-        # No blank line - same group
+        # No blank line, both product - same group
         current_group << curr
       end
     end
@@ -2546,6 +2578,10 @@ module HasMarkdownExtensions
             ProductButtonRenderer.render(btn[:config], context)
           end
         end.join("\n")
+      elsif group.first[:kind] != "product"
+        # Non-product button. Grouping guarantees this is a singleton, so
+        # dispatch it by its for/type kind (product is the default path below).
+        rendered = render_action_button(group.first, context)
       elsif group.length > 1
         # Multiple consecutive buttons - render as variant list
         skus = group.map { |b| b[:config]["sku"] }.compact
@@ -2563,6 +2599,9 @@ module HasMarkdownExtensions
         rendered = ProductButtonRenderer.render(group.first[:config], context)
       end
 
+      # Surface any for/type conflict warnings for the buttons in this group.
+      rendered = group.filter_map { |b| b[:conflict].presence }.join + rendered
+
       # Replace in result
       first_btn = group.first
       last_btn = group.last
@@ -2572,6 +2611,39 @@ module HasMarkdownExtensions
     end
 
     result
+  end
+
+  # Dispatch a NON-product button by its `for`/`type` kind. Product buttons go
+  # through ProductButtonRenderer (the default, handled inline in
+  # process_buttons); this is where the other kinds live. Only the dispatch is
+  # scaffolded for now — specific renderers (e.g. `share`) get added as `when`
+  # branches. An unrecognised kind dev-warns rather than rendering nothing.
+  def render_action_button(button, context)
+    return render_share_button(button[:config], context) if button[:kind] == "share"
+
+    dev_warning("Unknown button type",
+      "'#{button[:kind]}' is not a recognised button type.",
+      "Valid: product (the default when no for/type is given), share.")
+  end
+
+  # A share button. Native share sheet where supported (mobile), Copy link +
+  # Email everywhere else — see share_controller.js. URL/title/text are read
+  # client-side from the page's canonical link + og:title so they match what
+  # unfurls on social; `url:`, `title:`, `text:`, `label:` config override them.
+  def render_share_button(config, _context)
+    label = ERB::Util.html_escape(config["label"].presence || "Share")
+    url   = ERB::Util.html_escape(config["url"].to_s)
+    title = ERB::Util.html_escape(config["title"].to_s)
+    text  = ERB::Util.html_escape(config["text"].to_s)
+
+    <<~HTML.strip
+      <div class="share-buttons" data-controller="share" data-share-url-value="#{url}" data-share-title-value="#{title}" data-share-text-value="#{text}">
+        <button type="button" class="btn-primary share-native" data-share-target="native" data-action="share#share" hidden>#{label}</button>
+        <button type="button" class="btn-outline share-copy" data-share-target="copy" data-action="share#copy">Copy link</button>
+        <a class="btn-outline share-email" data-share-target="email" href="mailto:">Email</a>
+        <span class="share-feedback" data-share-target="feedback" role="status" aria-live="polite"></span>
+      </div>
+    HTML
   end
 
   def parse_button_config(config_text)
