@@ -1,6 +1,6 @@
 # Markdown Extensions
 
-Roe extends standard Markdown with custom syntax for galleries, cards, and pullquotes. All processing happens in `HasMarkdownExtensions#to_html` (`app/models/concerns/has_markdown_extensions.rb`).
+Roe extends standard Markdown with custom syntax for galleries, cards, collections, forms, and buttons. All processing happens in `HasMarkdownExtensions#to_html` (`app/models/concerns/has_markdown_extensions.rb`).
 
 ## Processing Pipeline
 
@@ -185,6 +185,30 @@ pullquote:
 ```
 
 Field values in the card override these defaults.
+
+---
+
+## Forms & Buttons
+
+Two block types add interactive elements, both selected by `for:` (preferred) or `type:` (alias) via `roeanji_kind` — `for` wins on conflict, and a mismatch dev-warns through `roeanji_kind_conflict_warning`.
+
+### Buttons (` ```button `)
+
+A bare `button` block is a **product** button (`ProductButtonRenderer`). `for:`/`type:` switches the kind; non-product kinds dispatch through `render_action_button`:
+
+| `for:` | Renderer | Output |
+|--------|----------|--------|
+| *(none)* / `product` | `ProductButtonRenderer` | Snipcart add-to-cart button |
+| `share` | `render_share_button` | `data-controller="share"` trigger + `.button-menu` (Copy link / Email); native share sheet on touch |
+| `subscribe` | `render_members_button` | `<a class="btn-primary">` → `/sign-up`, gated on `SiteFeature.members_enabled?` |
+
+`style:` tokens become sanitised modifier classes via `action_button_style_classes(config, prefix)` (`share-<token>`, `members-<token>`). Unrecognised kinds dev-warn.
+
+### Forms (` ```form `)
+
+`for:` selects the flow — `signup`, `signin`, `checkout`, `donate`, `unsubscribe`, `paid_content` — each rendering the matching membership/payment partial. Default button labels come from `default_button_text` and are overridable (`button-text:` etc.).
+
+Full option tables live in the user docs (`site/documentation/roe/roeanji_forms-and-buttons.md`).
 
 ---
 

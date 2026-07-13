@@ -81,6 +81,10 @@ Create a page with `url_name: 404` to customize your not-found page.
 
 When you enable [Members](/documentation/members), Roe generates pages for sign up, sign in, upgrade, and more. These live in `/site/pages/members/` and are regular Markdown files you can edit.
 
+### Podcast Pages
+
+Add `podcast: <podcast-key>` to a page's frontmatter to connect it to a podcast show (the key comes from your [podcast config](/documentation/podcasts)). The page then leads with the show's name as its heading and shows the show's [subscribe section](/documentation/podcasts#subscribe-section) beneath it — a ready-made "podcast home" page. Requires the Podcasts feature.
+
 ## Pages vs Posts
 
 | | Pages | Posts |

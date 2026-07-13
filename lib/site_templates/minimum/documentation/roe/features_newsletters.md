@@ -1,6 +1,7 @@
 ---
 title: Newsletters & Email
 status: published
+url_name: newsletters
 tags: feature
 related:
   - postmark

@@ -44,7 +44,7 @@ There is no Store page be default. Since Roe is modular, you can build a Store p
 
 ## Displaying Products with Collections
 
-Products work with the collection system. Use `source: products` to create product grids:
+Products work with the collection system. Use `source: products` to create product grids — see [Collections → Products](/documentation/collections#products) for the full option list.
 
 ### Basic Product Grid
 

@@ -101,6 +101,8 @@ upgrade-button-text: Sign up and become a paid member
 
 The upgrade button only appears if payments are enabled in your config.
 
+**Just a link to sign-up?** For a call-to-action that sends readers to the sign-up page rather than embedding the form, use the Roe-anji [`subscribe` button](/documentation/forms-and-buttons#subscribe-button) — a `button` block with `for: subscribe`.
+
 ### Email Templates
 
 Member emails are customizable Markdown files: [Admin → Emails](/admin/emails)

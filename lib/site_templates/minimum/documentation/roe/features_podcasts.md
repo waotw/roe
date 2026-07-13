@@ -85,6 +85,42 @@ You don't write these yourself; Roe sets and maintains them.
 |---|---|---|
 | `guid` | text | Auto-generated UUID, locked once published — podcast clients depend on stability. When importing from another platform (Substack etc.), the original GUID is preserved verbatim so existing subscribers don't see every episode as new. |
 
+## Subscribe Section
+
+Every podcast episode page shows a **subscribe section** — links to your show on the podcast apps, plus the RSS feed. You can also place it on an ordinary page (see [Podcast Pages](#podcast-pages) below).
+
+### App / service links (podcast.yml)
+
+Each podcast block in `podcast.yml` carries a set of subscribe-link fields. Paste your show's page URL on each platform; leave any blank to hide it. They appear in the podcast settings editor.
+
+| Field | Platform |
+|---|---|
+| `apple_podcasts` | Apple Podcasts |
+| `spotify` | Spotify |
+| `youtube` | YouTube |
+| `overcast` | Overcast |
+| `pocket_casts` | Pocket Casts |
+| `amazon_music` | Amazon Music |
+
+Use the normal `https://` share link for your show on each service (each app's **Share → Copy Link**) — those open the native app when it's installed and fall back to the browser otherwise. Don't use `overcast://`-style deep links; they break on desktop and where the app isn't installed.
+
+The **RSS feed is added automatically** (you don't put a feed URL in these fields), and for paid shows a **private feed link** appears for admins and for paid, active members.
+
+### Display: all links, or a Subscribe button
+
+| Field | Options |
+|---|---|
+| `subscribe_display` | `links` (default) shows every link inline; `menu` collapses them behind a single **Subscribe** button |
+
+## Podcast Pages
+
+Connect an ordinary page to a show by adding `podcast: <podcast-key>` to its frontmatter — the key is the top-level name in `podcast.yml`, the same value episodes use in their `podcast` field. When the podcast feature is on and the key resolves, the page:
+
+- leads with the **show's name as its heading** (ordinary pages leave the title to the markdown — a podcast page is the exception), and
+- shows the **subscribe section** directly beneath it.
+
+This is how you build a "podcast home" landing page; the rest of the page is your normal markdown content.
+
 ## Podcast Settings Breakdown
 
 ```bash

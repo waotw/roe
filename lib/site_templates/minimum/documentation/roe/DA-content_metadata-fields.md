@@ -147,6 +147,7 @@ Pages use the shared fields. The only page-specific behavior is:
 |-------|--------|-------------|
 | `url_name` | `home` `404` or any slug | `home` makes the page your homepage. `404` makes it your not-found page. |
 | `audience` | `everyone` `paid` | When Members is enabled, restricts the page to paid members. |
+| `podcast` | a podcast key | Connects the page to a podcast show: renders the show's name as the page heading and its subscribe section. (Distinct from the *post* `podcast` field above, which assigns an episode to a feed.) |
 
 ---
 

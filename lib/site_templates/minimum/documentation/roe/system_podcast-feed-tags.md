@@ -74,6 +74,8 @@ Admins can access the private feed directly without a token.
 | `itunes:category` | `category_secondary` | Secondary category |
 | subcategories | `subcategory`, `subcategory_secondary` | Up to 2 subcategories per category (where available in iTunes taxonomy) |
 
+<mark>Note:</mark> `podcast.yml` also holds **subscribe-link** fields (`apple_podcasts`, `spotify`, `youtube`, `overcast`, `pocket_casts`, `amazon_music`) and `subscribe_display`. These drive the on-site [subscribe section](/documentation/podcasts#subscribe-section) — they are **not** feed tags and appear nowhere in the RSS/XML.
+
 ---
 
 ## Item-Level (Episode Metadata)

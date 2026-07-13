@@ -36,41 +36,52 @@ File: `app/models/podcast_config.rb`
 
 ### Configuration File
 
+`podcast.yml` is a map of **podcast key → config**. Even a single show is keyed — the key becomes the feed URL slug (`/podcast/<key>.xml`) and the value episodes reference in their `podcast:` field.
+
 ```yaml
 # site/system/features/podcast.yml
-title: "My Podcast"
-description: "A podcast about..."
-author: "Your Name"
-email: "podcast@example.com"
-category: "Technology"
-subcategory: "Software How-To"
-artwork: "system/images/podcast-artwork.jpg"
-explicit: false
-language: "en"
+my-podcast:
+  title: "My Podcast"
+  description: "A podcast about..."
+  author: "Your Name"
+  email: "podcast@example.com"
+  owner_name: "Your Name"
+  category: "Technology"
+  subcategory: "Software How-To"
+  language: "en"
+  copyright: "2026 Your Name"
+  explicit: false
+  type: "episodic"          # episodic | serial
+  artwork: "podcast-artwork.jpg"
+  link: "https://example.com"
 
-# Feed settings
-itunes_url: "https://podcasts.apple.com/..."
-spotify_url: "https://open.spotify.com/..."
-google_url: "https://podcasts.google.com/..."
+  # Paid gating (surfaced when Members is enabled)
+  audience: ""              # "" / everyone, or "paid" for a paid-only show
 
-# Private feed (optional)
-private_feed_enabled: true
-private_feed_suffix: "(private feed for members)"
+  # Subscribe links (blank = hidden; the RSS feed is added automatically)
+  apple_podcasts: ""
+  spotify: ""
+  youtube: ""
+  overcast: ""
+  pocket_casts: ""
+  amazon_music: ""
+  subscribe_display: "links"  # links | menu
 ```
+
+The iTunes-spec metadata set lives in `PodcastConfig::CANONICAL_FIELDS`; `PodcastConfig::SUBSCRIBE_APPS` / `SUBSCRIBE_FIELDS` hold the subscribe-link fields. `audience` and the subscribe fields are auto-surfaced in the admin editor via backfill (they aren't part of the iTunes canonical set and never appear in the feed XML).
 
 ### Multiple Podcasts
 
-Roe supports multiple podcast feeds:
+Add more top-level keys — one per show. `PodcastConfig.get(key)` resolves a block, and a `parent:` key merges a parent's fields for series/spin-offs:
 
 ```yaml
 # site/system/features/podcast.yml
-podcasts:
-  main:
-    title: "Main Podcast"
-    # ... config
-  bonus:
-    title: "Bonus Episodes"
-    # ... config
+main:
+  title: "Main Podcast"
+  # ...
+bonus:
+  parent: main              # inherits main's fields; override as needed
+  title: "Bonus Episodes"
 ```
 
 ## Creating Podcast Posts
@@ -229,7 +240,7 @@ Podcast posts render with:
 - Audio player (HTML5 `<audio>`)
 - Episode artwork (or podcast default)
 - Show notes (Markdown content)
-- Subscribe buttons
+- Subscribe section — app/service links + public RSS + (for admins / paid, active members) the private feed
 
 ```erb
 <%# app/views/posts/types/_podcast.html.erb %>
@@ -247,9 +258,11 @@ Podcast posts render with:
     <%= post.to_html %>
   </div>
   
-  <%= render 'podcast/subscribe_buttons' %>
+  <%= render 'posts/types/podcast_subscribe', post: post, podcast_config: podcast_config %>
 </article>
 ```
+
+The subscribe section is `app/views/posts/types/_podcast_subscribe.html.erb`. `subscribe_display: menu` collapses the links behind a native `<details>` "Subscribe" button (no JS). The same partial renders on any **page** with a `podcast: <key>` frontmatter key — `pages/show.html.erb` leads with the show name as an `<h1>` and renders the subscribe section beneath it (a "podcast home" page).
 
 ### Collections
 

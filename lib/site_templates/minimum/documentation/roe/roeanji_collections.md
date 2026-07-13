@@ -66,6 +66,18 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 | `aspect_ratio` | No | Image aspect ratio: `auto` (default), `portrait`, `square`, or `landscape` |
 | `show_description` | No | Show truncated product description (~100 chars) below the title |
 
+**Grouped products** — when variants share a `group:` (e.g. Paperback/Hardback/Ebook of one book) and you set `groups: enabled`:
+
+- The grid uses the **primary** variant's image and links to its page.
+- Variant names appear in parentheses below the title (e.g. `(Paperback, Hardback)`).
+- Price display is set in your store config (`site/system/features/store.yml`):
+  - `price_display: range` — `$10.00 - $25.00` (default)
+  - `price_display: lowest` — `$10.00`
+  - `price_display: highest` — `$25.00`
+  - `price_separator` — separator for range prices (default `-`)
+- `button_text` (store config) sets the grouped product's "View" button text — leave it blank to render no button.
+- Individual (non-grouped) products show an "Add to Cart" button directly in the grid.
+
 To add a default Collection to your Post/Page, this is all you need:
 
 ````
