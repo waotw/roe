@@ -58,9 +58,19 @@ When you place 2 or more images consecutively (without blank lines between them)
 
 ↑ This creates a 3-column grid like this ↓
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+
+<mark>Note:</mark> This won't work inside of a footnote. If you're inside a footnote, use the Fancy Gallery syntax by wrapping the images in a `gallery` block ↓
+
+````markdown
+```gallery
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+```
+````
 
 ## Fancy Gallery
 
@@ -91,21 +101,21 @@ If you want an image to be full-width, just put it on it's own line like so ↓
 
 ````markdown
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 ```
 ````
 ↑ That will look like this ↓
 
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 ```
 
 - Row 1: 1 image (full width)
@@ -117,10 +127,10 @@ Instead of a grid, add `slideshow: true` at the bottom of the gallery to make it
 
 ````markdown
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 slideshow: true
 ```
 ````
@@ -128,10 +138,10 @@ slideshow: true
 ↑ that will look like this ↓
 
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 slideshow: true
 ```
 
@@ -141,13 +151,13 @@ Add captions to any image using this syntax `(*caption-here*)` immediately after
 
 ````markdown
 ```gallery
-![house on ilkley moore](/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/old_plane.jpg)(*House on Ilkley Moore*)
 ```
 ````
 
 ↑ This will produce an image with a caption ↓
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 ```
 
 ## Gallery Caption
@@ -156,8 +166,8 @@ The `(*...*)` syntax above captions a single image. To add one caption for the *
 
 ````markdown
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 caption: A weekend on the moor
 ```
 ````
@@ -165,8 +175,8 @@ caption: A weekend on the moor
 ↑ That adds a single caption beneath the whole gallery ↓
 
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 caption: A weekend on the moor
 ```
 
@@ -178,8 +188,8 @@ By default, each image takes the shape your theme gives that layout. Add an `asp
 
 ````markdown
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 aspect_ratio: square
 ```
 ````
@@ -187,8 +197,8 @@ aspect_ratio: square
 ↑ That crops each image to a square ↓
 
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
+![house on ilkley moore](/media/images/old_plane.jpg)
 aspect_ratio: square
 ```
 
@@ -218,28 +228,28 @@ Here is to the code to achieve that:
 
 ````markdown
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 ```
 ````
 
 ↑ This code will look like this ↓
 
 ```gallery
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
-![house on ilkley moore](/media/images/house-on-ilkley-moore.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
+![house on ilkley moore](/media/images/old_plane.jpg)(*House on Ilkley Moore*)
 ```
 
 

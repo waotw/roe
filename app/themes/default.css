@@ -936,7 +936,11 @@ a.footnote {
 }
 
 .footnotes p {
-  margin: 0 0 0 0;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.footnotes .gallery {
+  margin-bottom: var(--space-0);
 }
 
 .footnotes blockquote {

@@ -260,7 +260,7 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 ````markdown
 ```card
 type: aside
-image: /media/images/house-on-ilkley-moore.jpg
+image: /media/images/old_plane.jpg
 ```
 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
@@ -272,7 +272,7 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ```card
 type: aside
-image: /media/images/house-on-ilkley-moore.jpg
+image: /media/images/old_plane.jpg
 ```
 
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
@@ -287,7 +287,7 @@ You can use both image and text like so ↓ :
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-image: /media/images/house-on-ilkley-moore.jpg
+image: /media/images/old_plane.jpg
 ```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 ````
@@ -299,7 +299,7 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-image: /media/images/house-on-ilkley-moore.jpg
+image: /media/images/old_plane.jpg
 ```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 
