@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["checkbox", "toolbar", "selectedCount", "form"];
+  static targets = ["checkbox", "toolbar", "selectedCount", "form", "copyUrl"];
 
   connect() {
     this.updateToolbar();
@@ -18,9 +18,38 @@ export default class extends Controller {
     if (count > 0) {
       this.toolbarTarget.style.display = "flex";
       this.selectedCountTarget.textContent = count;
+      // Copy URL only makes sense for a single selection; hide it otherwise.
+      if (this.hasCopyUrlTarget) {
+        this.copyUrlTarget.style.display = count === 1 ? "" : "none";
+      }
     } else {
       this.toolbarTarget.style.display = "none";
     }
+  }
+
+  // Copy the selected item's media path to the clipboard. Shown only when
+  // exactly one item is selected (see updateToolbar); if it's ever called with
+  // several selected, it copies all their paths, one per line.
+  copyUrl(event) {
+    const selected = this.checkboxTargets.filter((cb) => cb.checked);
+    if (selected.length === 0) return;
+
+    const url = selected.map((cb) => cb.dataset.filePath).join("\n");
+    const btn = event.currentTarget;
+
+    navigator.clipboard
+      .writeText(url)
+      .then(() => this.flashCopied(btn, "Copied!"))
+      .catch(() => this.flashCopied(btn, "Press ⌘/Ctrl-C"));
+  }
+
+  flashCopied(btn, message) {
+    if (!btn.dataset.copyLabel) btn.dataset.copyLabel = btn.textContent.trim();
+    btn.textContent = message;
+    clearTimeout(this._copyTimer);
+    this._copyTimer = setTimeout(() => {
+      btn.textContent = btn.dataset.copyLabel;
+    }, 1500);
   }
 
   toggleItem(event) {
