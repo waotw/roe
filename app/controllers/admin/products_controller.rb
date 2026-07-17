@@ -12,7 +12,7 @@ class Admin::ProductsController < Admin::BaseController
   end
 
   def new
-    @template = load_product_template
+    @template = ContentTemplate.template_content("product")
   end
 
   def create
@@ -32,17 +32,11 @@ class Admin::ProductsController < Admin::BaseController
       return
     end
 
-    template_content = load_product_template
     title = filename_to_title(filename)
-
-    parsed = FrontMatterParser::Parser.new(:md).call(template_content)
-    metadata = parsed.front_matter.merge(
-      "title" => title,
-      "url_name" => filename
-    )
+    metadata, body = ContentTemplate.frontmatter_for("product", "title" => title, "url_name" => filename)
 
     yaml_content = metadata.to_yaml.sub(/\A---\n/, "")
-    content = "---\n#{yaml_content}\n---\n#{parsed.content}"
+    content = "---\n#{yaml_content}\n---\n#{body}"
 
     File.write(file_path, content)
     ContentSync.sync_file(file_path)

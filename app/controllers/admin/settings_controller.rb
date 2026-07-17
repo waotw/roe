@@ -1,35 +1,24 @@
 class Admin::SettingsController < Admin::BaseController
-  TEMPLATE_PATH = File.join(RoeSitePaths::SITE_PATH, "templates/post_template.md")
-
-  def edit_post_template
-    @template_content = if File.exist?(TEMPLATE_PATH)
-      File.read(TEMPLATE_PATH)
-    else
-      default_template
-    end
+  # Content-template editors (post / page / product). The editable template
+  # holds the optional default frontmatter + starter body an author can
+  # customise per install. Required fields (ContentTemplate::REQUIRED) are
+  # shown locked and always added to new content, so they can't be lost here.
+  def edit_template
+    @type = template_type
+    @template_content = ContentTemplate.template_content(@type)
+    @required_names = ContentTemplate.required_names(@type)
   end
 
-  def update_post_template
-    # Ensure directory exists
-    FileUtils.mkdir_p(File.dirname(TEMPLATE_PATH))
-
-    File.write(TEMPLATE_PATH, params[:content])
-    flash[:notice] = "Post template updated"
-    redirect_to admin_settings_post_template_path
+  def update_template
+    ContentTemplate.save_template(template_type, params[:content])
+    flash[:notice] = "#{template_type.capitalize} template updated"
+    redirect_to admin_settings_template_path(type: template_type)
   end
 
   private
 
-  def default_template
-    <<~TEMPLATE
-      ---
-      title:
-      date: #{Date.today}
-      status: draft
-      post_type: article
-      ---
-
-      Start writing...
-    TEMPLATE
+  def template_type
+    t = params[:type].to_s
+    ContentTemplate.type?(t) ? t : "post"
   end
 end

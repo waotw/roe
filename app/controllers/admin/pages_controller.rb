@@ -12,7 +12,7 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def new
-    @template = load_page_template
+    @template = ContentTemplate.template_content("page")
   end
 
   def create
@@ -27,15 +27,12 @@ class Admin::PagesController < Admin::BaseController
       return
     end
 
-    template_content = load_page_template
     title = filename_to_title(filename)
-
-    parsed = FrontMatterParser::Parser.new(:md).call(template_content)
-    metadata = parsed.front_matter.merge("title" => title)
+    metadata, body = ContentTemplate.frontmatter_for("page", "title" => title)
 
     # Use formatted YAML
     yaml_content = Page.format_metadata_yaml(metadata)
-    content = "---\n#{yaml_content}\n---\n#{parsed.content}"
+    content = "---\n#{yaml_content}\n---\n#{body}"
 
     normalize_and_write(file_path, content)
     ContentSync.sync_file(file_path)

@@ -69,6 +69,7 @@ export default class extends Controller {
     this.setupStatusListener();
     this.setupPublishModalListeners();
     this.setupImageInHeaderListener();
+    this.setupGroupListener();
 
     this.fieldsContainerTarget.addEventListener("click", (e) => {
       if (e.target.closest('[data-action*="removeMetadataField"]')) {
@@ -313,6 +314,10 @@ export default class extends Controller {
     // Add listeners for audio/video fields
     if (fieldName === "audio" || fieldName === "video") {
       this.setupMediaDurationListeners();
+    }
+
+    if (fieldName === "group") {
+      this.setupGroupListener();
     }
 
     this._notifyMetadataChange();
@@ -1238,6 +1243,52 @@ export default class extends Controller {
         if (!hasValue) row.style.display = "none";
       }
     }
+  }
+
+  // ========== PRODUCT GROUP → VARIANT / PRIMARY ==========
+
+  // variant + primary only matter for grouped products, so they surface only
+  // once `group` has a value (mirrors the image → image_in_header pattern).
+  setupGroupListener() {
+    if (this.resourceTypeValue !== "product") return;
+
+    const groupField = this.element.querySelector(
+      '[data-metadata-field="group"]',
+    );
+    if (!groupField) return;
+
+    setTimeout(() => {
+      this.updateGroupFieldsVisibility(groupField.value);
+    }, 150);
+
+    groupField.addEventListener("input", (e) => {
+      this.updateGroupFieldsVisibility(e.target.value);
+    });
+    groupField.addEventListener("blur", (e) => {
+      this.updateGroupFieldsVisibility(e.target.value);
+    });
+  }
+
+  updateGroupFieldsVisibility(groupValue) {
+    const hasGroup = groupValue && groupValue.trim().length > 0;
+    const defaults = { variant: "", primary: "false" };
+
+    ["variant", "primary"].forEach((name) => {
+      const row = this.fieldsContainerTarget.querySelector(
+        `.metadata-field-row[data-field-name="${name}"]`,
+      );
+      if (hasGroup) {
+        if (row) {
+          row.style.display = "";
+        } else if (this.knownFieldsValue[name]) {
+          this._addKnownFieldByName(name, defaults[name]);
+        }
+      } else if (row) {
+        // Hide only if the field has no saved value.
+        const hasValue = this.originalMetadataValue[name] != null;
+        if (!hasValue) row.style.display = "none";
+      }
+    });
   }
 
   // ========== STATUS / PUBLISH HANDLING ==========

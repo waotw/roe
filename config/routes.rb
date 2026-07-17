@@ -310,9 +310,9 @@ Rails.application.routes.draw do
     post "configs/development/enable", to: "configs#enable_development", as: "enable_development_admin_configs"
     delete "configs/development", to: "configs#delete_development", as: "delete_development_admin_configs"
 
-    # Post template editor
-    get "settings/post_template", to: "settings#edit_post_template"
-    patch "settings/post_template", to: "settings#update_post_template"
+    # Content template editors (post / page / product)
+    get "settings/templates/:type", to: "settings#edit_template", as: "settings_template", constraints: { type: /post|page|product/ }
+    patch "settings/templates/:type", to: "settings#update_template", constraints: { type: /post|page|product/ }
     get "posts/search", to: "posts#search"
     get "posts/card_fields", to: "posts#card_fields"
   end

@@ -133,7 +133,7 @@ class Admin::PostsController < Admin::BaseController
   # end
 
   def new
-    @template = load_post_template
+    @template = ContentTemplate.template_content("post")
   end
 
   def create
@@ -148,14 +148,8 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    template_content = load_post_template
     title = filename_to_title(filename)
-
-    parsed = FrontMatterParser::Parser.new(:md).call(template_content)
-      metadata = parsed.front_matter.merge(
-        "title" => title,
-        "date" => Time.current.strftime("%Y-%m-%dT%H:%M")
-      )
+    metadata, body = ContentTemplate.frontmatter_for("post", "title" => title)
 
     # Ensure podcast GUID (if podcast type + published)
     metadata = ensure_podcast_guid(metadata, Post.new)
@@ -166,7 +160,7 @@ class Admin::PostsController < Admin::BaseController
 
     # Format YAML consistently for new posts
     yaml_content = Post.format_metadata_yaml(metadata)
-    content = "---\n#{yaml_content}\n---\n#{parsed.content}"
+    content = "---\n#{yaml_content}\n---\n#{body}"
 
     normalize_and_write(file_path, content)
     ContentSync.sync_file(file_path)

@@ -32,6 +32,7 @@
       'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'author' => { type: :text, label: 'author', default_from_config: true },
       'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
+      'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. nav, footer)' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png', required: required_for_type.call('image') },
       'excerpt' => { type: :textarea, label: 'excerpt' },
@@ -116,6 +117,7 @@
       'image' => { type: :text, label: 'image', required: true, hint: 'Product image: /media/images/product.jpg' },
       'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
       'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' },
+      'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. featured)' },
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' },
       'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
       'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
@@ -128,6 +130,7 @@
       'subtitle' => { type: :text, label: 'subtitle' },
       'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
       'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
+      'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. nav, footer)' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
       'audience' => {
         type: :select,
@@ -136,7 +139,7 @@
         hint: 'Who should see this page?',
         required: memberships_enabled?
       },
-      'image' => { type: :text, label: 'image' },
+      'image' => { type: :text, label: 'image', hint: 'Page image: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this page?' },
       'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
@@ -163,6 +166,12 @@
   if resource_type == 'post'
     metadata_hash['published_to'] = '' if newsletters_enabled? && !metadata_hash.key?('published_to')
     metadata_hash['image_in_header'] = 'false' if metadata_hash['image'].present? && !metadata_hash.key?('image_in_header')
+  end
+  # variant + primary only matter for grouped products — surface them once a
+  # group is set (the JS keeps this live as the group field changes).
+  if resource_type == 'product' && metadata_hash['group'].present?
+    metadata_hash['variant'] = '' unless metadata_hash.key?('variant')
+    metadata_hash['primary'] = 'false' unless metadata_hash.key?('primary')
   end
 
   # Separate what's in the file vs what's available
@@ -256,8 +265,8 @@
             <% case config[:type] %>
               <% when :text %>
                 <%
-                  # List fields (tags, related) show as comma-separated, not array notation
-                  display_value = if %w[tags related].include?(field_name)
+                  # List fields (tags, related, collection) show as comma-separated, not array notation
+                  display_value = if %w[tags related collection].include?(field_name)
                     if value.is_a?(Array)
                       value.join(', ')
                     else

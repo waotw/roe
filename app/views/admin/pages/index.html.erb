@@ -5,6 +5,7 @@
       <p class="mt-2 text-sm text-gray-700">Standalone pages on your site.</p>
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+      <%= link_to "Edit Template", admin_settings_template_path(type: "page"), class: "inline-flex items-center uppercase text-xs px-1.5 py-1 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
       <%= link_to "New Page", new_admin_page_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     </div>
   </div>
