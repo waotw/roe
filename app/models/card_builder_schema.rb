@@ -55,7 +55,7 @@ module CardBuilderSchema
       { key: "subtitle", type: :text, label: "Subtitle",
         hint: "Override the subtitle." },
       { key: "show_subtitle", type: :boolean, label: "Show subtitle",
-        hint: "Show the subtitle. On by default." },
+        hint: "Show the subtitle. Defaults on for medium/large, off for small." },
       { key: "excerpt", type: :textarea, label: "Excerpt",
         hint: "Override the excerpt pulled from the linked item." },
       { key: "show_excerpt", type: :boolean, label: "Show excerpt",

@@ -212,12 +212,12 @@
     <button type="button"
             data-action="click->metadata-editor#toggleMetadataSection"
       class="text-sm font-semibold text-gray-700 hover:text-gray-900">
-      Metadata <span data-metadata-editor-target="arrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800"><%= metadata_hidden.present? ? '▶' : '▼' %></span>
+      Metadata <span data-metadata-editor-target="arrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer"><%= metadata_hidden.present? ? '▶' : '▼' %></span>
     </button>
     <button type="button"
             data-action="click->metadata-editor#toggleMetadataView"
       data-metadata-editor-target="toggleBtn"
-      class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem]">
+      class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem] cursor-pointer">
       RAW
     </button>
   </div>
@@ -397,7 +397,7 @@
               <% if !config[:required] %>
                 <button type="button"
                       data-action="click->metadata-editor#removeMetadataField"
-                  class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0">
+                  class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0 cursor-pointer">
                   ×
                 </button>
               <% else %>
@@ -421,7 +421,7 @@
                   data-metadata-field="<%= field_name %>">
               <button type="button"
                     data-action="click->metadata-editor#removeMetadataField"
-                class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0">
+                class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0 cursor-pointer">
                 ×
               </button>
             </div>
@@ -431,7 +431,7 @@
         <div class="relative inline-block">
           <button type="button"
                 data-action="click->metadata-editor#toggleAddFieldMenu"
-            class="text-xs px-3 py-1 border border-gray-300 hover:bg-gray-100 ">
+            class="text-xs font-mono uppercase px-3 py-1 border border-gray-400 hover:bg-gray-200 rounded-xs cursor-pointer">
             + Add Field
           </button>
           <div data-metadata-editor-target="addFieldMenu"

@@ -7,7 +7,8 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
   # reads (see HasMarkdownExtensions#render_collection). A typo here silently
   # produces a dead option, so guard the whole set.
   SUPPORTED_KEYS = %w[
-    source heading template limit order offset post_type podcast tags related
+    source heading template style limit order offset post_type podcast tags
+    collection related
     show_author show_excerpt show_date show_subtitle show_more show_more_text
     category groups aspect_ratio show_description
   ].freeze

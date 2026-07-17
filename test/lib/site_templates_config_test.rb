@@ -29,9 +29,18 @@ class SiteTemplatesConfigTest < ActiveSupport::TestCase
     data    = YAML.safe_load(rendered)
     podcast = data.values.first # single entry keyed by the podcast slug
 
-    assert_equal PodcastConfig::CANONICAL_FIELDS, podcast.keys,
-      "podcast.yml template keys drifted from PodcastConfig::CANONICAL_FIELDS — " \
-      "add/remove/reorder fields in the template to match the model."
+    # The template carries CANONICAL_FIELDS (iTunes-spec) followed by the
+    # SUBSCRIBE_APPS keys (platform links, kept separate from the feed
+    # spec) and a subscribe_display toggle. Both lists are authoritative
+    # in the model, so the template must match their union exactly.
+    expected_keys = PodcastConfig::CANONICAL_FIELDS +
+                    PodcastConfig::SUBSCRIBE_APPS.keys +
+                    %w[subscribe_display]
+
+    assert_equal expected_keys, podcast.keys,
+      "podcast.yml template keys drifted from PodcastConfig::CANONICAL_FIELDS + " \
+      "SUBSCRIBE_APPS + subscribe_display — add/remove/reorder fields in the " \
+      "template to match the model."
   end
 
   test "fonts.yml seeds the structure AssetsHelper + the config editor read" do

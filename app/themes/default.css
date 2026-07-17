@@ -1,6 +1,6 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.9.7
+   Version: 0.9.8
    Bundled with: Roe v0.1.0
 
    This theme was installed from Roe. Leave this comment
@@ -27,6 +27,7 @@
   --aside-width: 10rem;
   --aside-text-top-offset: 0.25rem;
   --aside-image-top-offset: 0.4rem;
+  --product-copy-width: 65ch;
 
   /* Typography */
   --font-scale: 1em;
@@ -1371,6 +1372,47 @@ p.collection-more a:hover {
   line-height: 1;
 }
 
+/* Nav — a bare link list for layout areas (navigation, footer, sidebar).
+   `style: horizontal|vertical` toggles the modifier class; default vertical. */
+
+.collection.menu {
+  margin: 0 0 0 0;
+}
+
+.collection.menu ul {
+  margin: 0 0 0 0;
+}
+
+.collection.menu li {
+  margin: 0 0 0 0;
+}
+
+.collection.menu a {
+  text-decoration: underline;
+}
+
+.collection-menu {
+  list-style: none;
+  margin: 0 0 0 0;
+  padding: 0;
+  display: flex;
+  row-gap: var(--space-4);
+}
+
+.collection-menu-vertical {
+  flex-direction: column;
+}
+
+.collection-menu-horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.collection-menu-item {
+  margin: 0;
+}
+
 /* Collection Glossary */
 
 .collection.glossary dl {
@@ -1453,7 +1495,7 @@ p.collection-more a:hover {
 /* ================ GALLERIES =============== */
 
 .gallery {
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-6);
 }
 
 .gallery-row {
@@ -1769,6 +1811,10 @@ figcaption {
   font-style: italic;
 }
 
+.pullquote-merge {
+  margin-bottom: var(--space-4);
+}
+
 .pullquote-merge p {
   display: inline;
 }
@@ -1854,6 +1900,14 @@ figcaption {
   display: block;
 }
 
+.card[class*="post-link-"] .card-subtitle {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 .card[class*="post-link-"] .card-link {
   display: inline-block;
   color: var(--color-link);
@@ -1898,12 +1952,12 @@ figcaption {
 .card.post-link-small {
   gap: var(--space-4);
   padding: var(--space-3);
-  margin: var(--space-0) 0 var(--space-6) 0;
+  margin: var(--space-0) 0 var(--space-4) 0;
 }
 
 .card.post-link-small .card-image {
-  width: 75px;
-  height: 75px;
+  width: 80px;
+  height: 80px;
   display: block;
 }
 
@@ -1911,6 +1965,12 @@ figcaption {
   margin: 0 0 calc(var(--space-1) * 0.5) 0;
   font-size: var(--text-base);
   font-weight: 700;
+}
+
+.card.post-link-small .card-subtitle,
+.card.product-link-small .card-excerpt {
+  font-size: var(--text-sm);
+  line-height: 1.3;
 }
 
 .card.post-link-small .card-metadata {
@@ -1949,7 +2009,7 @@ figcaption {
 /* Post Link - Medium */
 
 .card.post-link-medium {
-  gap: var(--space-8);
+  gap: var(--space-5);
   padding: var(--space-3);
   margin: var(--space-4) 0 var(--space-8) 0;
 }
@@ -1998,7 +2058,8 @@ figcaption {
 }
 
 .product-link-medium .card-excerpt {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
+  line-height: 1.3;
   margin-bottom: var(--space-1);
 }
 
@@ -2052,15 +2113,17 @@ figcaption {
 .card.post-link-large > .large-card-excerpt-link {
   grid-area: excerpt-link;
   display: flex;
-  gap: var(--space-4);
-  align-items: last baseline;
+  flex-direction: column;
+  align-items: flex-end; /* read-more sits on its own line, right-aligned */
+  gap: var(--space-2);
 }
 .card.post-link-large > .large-card-excerpt-link > .card-excerpt {
-  flex: 1;
+  align-self: stretch; /* excerpt fills the width; its text stays left */
   min-width: 0;
+  line-height: 1.3;
+  margin: 0;
 }
 .card.post-link-large > .large-card-excerpt-link > .card-link {
-  flex-shrink: 0;
   white-space: nowrap;
 }
 
@@ -2132,67 +2195,6 @@ figcaption {
   }
 }
 
-/* Desktop layout — two columns, image left, link pinned to bottom
-   of its cell so it lines up with the bottom of the image. */
-@media (min-width: 960px) {
-  .card.post-link-large {
-    grid-template-columns: 45% 1fr;
-    /* Four auto rows for the text, then 1fr for the link row so it
-       absorbs the difference between the image's intrinsic height and
-       the text rows' content height. Without the 1fr, the link's row
-       would be auto-sized to the link itself and there'd be nothing
-       for `align-self: end` to push against. With it, the link row
-       fills the leftover space and `align-self: end` pins the link
-       to the bottom of the image. */
-    grid-template-rows: auto auto auto auto 1fr;
-    grid-template-areas:
-      "image title"
-      "image subtitle"
-      "image metadata"
-      "image excerpt"
-      "image link";
-    /* Row gap was applying between every text element on desktop and
-       compounding with each element's own margin-bottom — way too
-       much air. Drop it to 0 and let the elements' margins control
-       inter-row spacing; keep the column gap so image and text don't
-       touch. */
-    row-gap: 0;
-    column-gap: var(--space-8);
-  }
-
-  .card.post-link-large .card-excerpt {
-    font-size: var(--text-sm);
-  }
-
-  .card.post-link-large.no-image .card-excerpt {
-    font-size: var(--text-base);
-  }
-
-  /* Image cell stretches to the full text-column height. */
-  .card.post-link-large > picture,
-  .card.post-link-large > img.card-image {
-    align-self: stretch;
-  }
-
-  .card.post-link-large .card-image {
-    margin-bottom: 0;
-  }
-
-  /* Same effect as the old flex `margin-top: auto` — pushes the link
-     to the bottom of its (now-expanded) grid cell so it bottom-aligns
-     with the image. */
-  .card.post-link-large > .card-link {
-    font-size: var(--text-xs);
-    align-self: end;
-  }
-
-  /* No-image cards collapse back to a single column on desktop too,
-     otherwise an empty 45% slot would sit next to the text. */
-  .card.post-link-large.no-image {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Product Link - Large */
 
 .product-link-large .card-header {
@@ -2208,16 +2210,12 @@ figcaption {
 
 .post-link-large.product-link-large .card-excerpt {
   font-size: var(--text-lg);
+  line-height: 1.3;
 }
 
 .post-link-large.product-link-large .card-link {
   font-size: var(--text-base);
   margin-top: 0;
-}
-
-.large-card-excerpt-link {
-  display: flex;
-  justify-content: space-between;
 }
 
 /* Asides */
@@ -3131,6 +3129,11 @@ p.podcast-audio-fallback {
   color: var(--color-text);
 }
 
+.content.documentation li pre {
+  padding: var(--space-4);
+  margin: 0;
+}
+
 .content.documentation li code {
   font-size: var(--text-xs);
   padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
@@ -3308,17 +3311,18 @@ hr.clear-floats {
 
 /* Share button (Roe-anji `for: share`): a single trigger (.btn-primary) that
    reveals Copy link + Email (.btn-outline) on desktop, or opens the native
-   share sheet on touch. The container has no class by design — hook it via the
-   controller. Restyle per instance with a `style:` value → `.share-<token>`. */
+   share sheet on touch. `.share` is the wrapper hook — style/align every share
+   button here (e.g. add `justify-content: center`). Per-instance tweaks come
+   from a `style:` value → `.share-<token>`. */
 
-[data-controller="share"] {
+.share {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
 
-[data-controller="share"] [data-share-target="feedback"] {
+.share [data-share-target="feedback"] {
   font-size: var(--text-sm);
   color: var(--color-muted);
 }
@@ -3621,7 +3625,21 @@ hr.clear-floats {
 /* ========== STORE — PRODUCT PAGE ========== */
 
 .product .content {
+  max-width: 65ch;
+  margin-inline: auto;
+}
+
+.product .content {
   max-width: var(--container-width);
+  /* Grid defines the copy column: flexible gutter | copy track | flexible
+     gutter. Every child defaults into the copy track (see placement rules
+     below); media breaks out to the full width. The center track caps at
+     --product-copy-width and collapses the gutters on narrow screens. */
+  display: grid;
+  grid-template-columns: 1fr min(var(--product-copy-width), 100%) 1fr;
+  /* Explicit vertical rhythm. Grid items don't margin-collapse, so this gap
+     is the single knob for spacing between blocks — adjust freely. */
+  row-gap: var(--space-4);
 }
 
 .product h1 {
@@ -3645,8 +3663,15 @@ hr.clear-floats {
   line-height: 1.5;
 }
 
-.product img {
-  max-width: 100%;
+.product .gallery {
+  margin: 0 0 0 0;
+}
+
+/* Product's own body images (the float-left hero photo). Excludes images
+   rendered by roe-anji extensions — galleries and cards bring their own
+   layout, so the float/border/object-fit here would wreck them. */
+.product img:not(.gallery *):not(.card *) {
+  width: 100%;
   height: auto;
   object-fit: contain;
   object-position: center;
@@ -3659,12 +3684,43 @@ hr.clear-floats {
   font-size: var(--text-base);
   list-style: none;
   color: var(--color-link);
-  margin-top: var(--space-6);
+  margin-top: var(--space-2);
   padding-left: 0;
+  /* 3-column table: variant | price | button (pinned right by the 1fr column).
+     `grid` is also a block formatting context, so the list still sits beside the
+     floated image and drops below it as one unit. Tune spacing with `gap`
+     (row  column) — the second value controls the variant↔price gap; the button
+     stays at the far right regardless. */
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
 }
 
 .product ul.product-variant-list li {
   margin-bottom: var(--space-2);
+}
+
+/* Each row's cells (name, price, button) become columns of the list grid via
+   `display: contents`, so they align across every row — a real table. Scoped to
+   the product page; in-content variant lists keep their simple inline flow. */
+.product ul.product-variant-list .product-variant-item {
+  display: contents;
+}
+
+.product ul.product-variant-list .variant-name {
+  justify-self: start;
+}
+
+.product ul.product-variant-list .variant-price {
+  color: var(--color-muted);
+  justify-self: end;
+}
+
+/* The button (last cell) sits at the far right of its 1fr column. */
+.product ul.product-variant-list .product-variant-item > :last-child {
+  justify-self: start;
+  margin: 0 0 0 0;
 }
 
 .product ul button {
@@ -3680,12 +3736,24 @@ hr.clear-floats {
   color: var(--color-bg);
 }
 
-@media (min-width: 590px) {
-  .product img {
-    float: left;
-    max-width: 45%;
-    margin: 0 var(--space-6) var(--space-4) 0;
-  }
+/* Stacked layout: full-width image/gallery on top, text in a centered copy
+   column below. The grid on `.product .content` (above) IS the column — every
+   direct child lands in the center track automatically, so a new element is in
+   the column with no rule of its own. An element's own left/right margins no
+   longer matter (placement is by track, not margin). Block margins are zeroed
+   so the container's row-gap is the sole vertical-rhythm control. */
+.product .content > * {
+  grid-column: 2;
+  margin-block: 0;
+}
+
+/* Images, captioned figures, and galleries span all three tracks — full width. */
+.product .content > p:has(img),
+.product .content > p:has(picture),
+.product .content > figure,
+.product .content > .gallery,
+.product .content > .gallery-figure {
+  grid-column: 1 / -1;
 }
 
 .product h1 {
@@ -3823,6 +3891,37 @@ article.page-store h2 {
   max-height: 100%;
   object-fit: contain;
   object-position: center;
+}
+
+/* Product images are never cropped: EVERY explicit ratio
+   (square / portrait / landscape / tv / wide / cinema / film) fills its ratio
+   cell so `contain` + `center` engage — the whole image shows, a landscape
+   photo centered vertically, a portrait poster horizontally — with a subtle
+   matte behind the letterbox and an outline framing the cell. `img-auto` /
+   `img-original` stay natural (no fixed cell, no letterbox — good for a
+   single-category grid). Photo galleries are separate and use `cover`. */
+.grid-item-image img:not(.img-auto):not(.img-original) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: var(--color-bg-dim);
+}
+
+/* When variants exist the image is wrapped in <picture> (inline by default,
+   collapses to the image's natural size), so the inner <img>'s `height: 100%`
+   has nothing to fill. Make the wrapper fill so the <img> above can. */
+.grid-item-image picture:has(img:not(.img-auto):not(.img-original)) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Frame the cell without changing its size — outline never takes space, so the
+   ratio box stays exact. */
+.grid-item-image:has(img:not(.img-auto):not(.img-original)) {
+  outline: 1px solid var(--color-border);
+  outline-offset: -1px;
 }
 
 .grid-item-title {

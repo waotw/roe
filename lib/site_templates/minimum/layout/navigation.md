@@ -1,6 +1,12 @@
 [Your site](/)
 {: .site-logo}
 
-[Home](/) • [Blog](/blog)
+```collection
+source: pages
+collection: nav
+template: menu
+style: horizontal
+order: home
+```
 
 ---

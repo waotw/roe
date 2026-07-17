@@ -1,6 +1,10 @@
 class ProductsController < SiteController
   def show
-    @product = Product.find_by("metadata->>'url_name' = ?", params[:url_name])
+    # A variant group shares one url_name across its members; the group's
+    # page is the primary variant's (its content, gallery, etc.), so prefer
+    # it. Ungrouped products have a single match, so first == the product.
+    matches = Product.where("metadata->>'url_name' = ?", params[:url_name])
+    @product = matches.detect(&:primary?) || matches.first
 
     # Raise 404 if not found
     raise ActiveRecord::RecordNotFound unless @product

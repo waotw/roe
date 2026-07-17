@@ -152,6 +152,26 @@ module HasMetadata
     end
   end
 
+  # Collections this content opts into by name (e.g. `collection: nav`, or
+  # `collection: footer, resources` for several). `collection:` is to placement
+  # what `tags` is to topics: content declares which collections it belongs to,
+  # and a `menu` collection gathers it by that name. Accepts a comma string or
+  # an array; returns downcased names. Inert on its own — nothing happens until
+  # a collection gathers the name, so it never renders as visible content on the
+  # item itself.
+  def collection_names
+    raw = metadata["collection"]
+    list = case raw
+    when Array then raw
+    when String then raw.split(",")
+    else []
+    end
+
+    list.map { |c| c.to_s.strip.downcase }
+        .reject(&:empty?)
+        .uniq
+  end
+
   # Status methods.
   # Defaults to "draft" when not explicitly set — no-status content is
   # private until the author consciously publishes it. This is the safe

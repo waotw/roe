@@ -70,6 +70,7 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "selenium-webdriver"
+  gem "factory_bot", "~> 6.5"
 end
 
 gem "tailwindcss-rails", "~> 4.4"
@@ -89,8 +90,6 @@ gem "importmap-rails", "~> 2.2"
 gem "stimulus-rails", "~> 1.3"
 
 gem "webrick", "~> 1.9"
-
-gem "factory_bot", "~> 6.5"
 
 gem "nokogiri", "~> 1.19"
 

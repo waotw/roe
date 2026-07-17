@@ -794,10 +794,26 @@ module HasMarkdownExtensions
     collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip)
   end
 
+  # Normalize a collection's `collection:` name filter (comma string or array)
+  # into the same downcased tokens HasMetadata#collection_names returns.
+  def normalize_collection_names(value)
+    list = value.is_a?(Array) ? value : value.to_s.split(",")
+    list.map { |c| c.to_s.strip.downcase }
+        .reject(&:empty?)
+        .uniq
+  end
+
   def render_collection(config)
     heading = config[:heading]
-    source = config[:source] || SiteConfig.default("collections", "default_source") || "posts"
+    menu_template = config[:template].to_s.strip == "menu"
+    # Menus are almost always pages, so a menu with no explicit source
+    # defaults to pages (a plain feed still defaults to posts).
+    source = config[:source] || (menu_template ? "pages" : nil) ||
+             SiteConfig.default("collections", "default_source") || "posts"
     order_by = config[:order] || SiteConfig.default("collections", "default_order") || "date"
+    # A menu is a menu, not a feed: with no explicit `order:` (usually a
+    # url_name list), fall back to alphabetical rather than by date.
+    order_by = "title" if config[:order].blank? && menu_template
     tags = config[:tags]
     category = config[:category]
     podcast_key = config[:podcast]
@@ -888,6 +904,17 @@ module HasMarkdownExtensions
       []
     end
 
+    # Filter by `collection:` membership. Like tags, but a placement concept —
+    # content stays invisible until a collection gathers it by name. Menus do
+    # their own membership below (list unioned with tagged), so this plain
+    # filter only applies to the other templates.
+    if config[:collection].present? && !menu_template
+      wanted = normalize_collection_names(config[:collection])
+      items = items.to_a.select do |item|
+        item.respond_to?(:collection_names) && (item.collection_names & wanted).any?
+      end
+    end
+
     # `related: true` — filter the source collection to items that
     # share a `related:` link with this document, in *either*
     # direction. Lets a doc/post/page render a "see also" block
@@ -944,13 +971,31 @@ module HasMarkdownExtensions
     # block didn't specify its own order, in which case the author's
     # frontmatter ordering is the right answer and we leave it
     # alone.
-    unless related_filter && config[:order].blank?
+    if menu_template
+      # A menu's membership is the `order:` list unioned with anything tagged
+      # `collection: <name>` — a page joins by being listed OR tagged. With
+      # neither, there's nothing to show: bail with a notice (dev-only) rather
+      # than silently dumping every page.
+      has_list  = config[:order].present? && !sort_keyword?(config[:order])
+      has_label = config[:collection].present?
+      unless has_list || has_label
+        return dev_warning(
+          "Empty menu collection",
+          "This collection has template set to menu but has no order: list and no collection: name, so there's nothing to show.",
+          "Add an order: list of url_names, or give it a collection: name and add the same collection: to the pages, posts, or products you want to show up here."
+        )
+      end
+      items = curate_menu(items, config[:order], config[:collection])
+    elsif !related_filter || config[:order].present?
       items = apply_collection_order(items, order_by)
     end
 
     # Apply offset and limit
     offset_value = config[:offset].to_i
     limit_value = config[:limit]
+    # A menu should list every matching item — a capped menu is a bug, not
+    # a feature. Other templates keep the configured default limit.
+    limit_value = "all" if limit_value.blank? && config[:template].to_s.strip == "menu"
     default_limit = SiteConfig.default("collections", "default_limit") || 10
     show_more = config[:show_more] == "true" || config[:show_more] == true
 
@@ -960,6 +1005,24 @@ module HasMarkdownExtensions
 
     # Apply offset (skip first N items)
     items_array = items_array[offset_value..-1] || [] if offset_value > 0
+
+    # Offset skipped past everything: the collection has content, but `offset`
+    # is at least as large as the item count, so nothing is left to show. Flag
+    # it locally (prod still renders the empty collection as before) so the
+    # author can spot a too-large offset instead of staring at a blank block.
+    if Rails.env.development? && offset_value > 0 && total_count > 0 && items_array.empty?
+      max_offset = total_count - 1
+      hint = if max_offset < 1
+        "Remove `offset` — this collection has only #{total_count} #{'item'.pluralize(total_count)}."
+      else
+        "Either remove `offset` altogether, or reduce it to `offset: #{max_offset}` or lower to see content."
+      end
+      return dev_warning(
+        "Collection offset skips all content",
+        "This collection uses `offset: #{offset_value}` but has only #{total_count} #{'item'.pluralize(total_count)}, so there's nothing left to show here.",
+        hint
+      )
+    end
 
     if limit_value.to_s.downcase == "all"
       display_items = items_array
@@ -982,7 +1045,7 @@ module HasMarkdownExtensions
     # All other templates emit Markdown/IAL and need markdown="1".
     output = []
 
-    if template == "compact" || template == "glossary"
+    if template == "compact" || template == "glossary" || template == "menu"
       output << "<div class=\"collection #{template}\">"
       output << collection_header(config, heading, markdown: false)
       output << list_markdown
@@ -1050,9 +1113,74 @@ module HasMarkdownExtensions
       # Oldest first. nil dates sort to the end.
       items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
     else
-      # Default to date descending — same as the explicit "date" case.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
+      # Anything that isn't a known sort keyword is an explicit url_name order
+      # list, e.g. `order: blog, about, store` — the menu spelled out by hand.
+      apply_explicit_order(items, order_by)
     end
+  end
+
+  # Order items by an explicit, comma-separated list of url_names (a
+  # collection's `order:` when it isn't a sort keyword). Listed items come
+  # first, in list order; anything the list doesn't name falls to the end,
+  # alphabetically by title, so nothing is ever silently dropped. A blank list
+  # falls back to date-descending (the normal default).
+  def apply_explicit_order(items, order_list)
+    wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
+
+    if wanted.empty?
+      return items.to_a.sort_by { |i| i.respond_to?(:date) && i.date ? i.date : Date.new(0) }.reverse
+    end
+
+    position = {}
+    wanted.each_with_index { |name, i| position[name] ||= i }
+
+    items.to_a.sort_by do |item|
+      slug = item.respond_to?(:url_name) ? item.url_name.to_s.downcase : ""
+      [ position.fetch(slug, Float::INFINITY), item.title.to_s.downcase ]
+    end
+  end
+
+  # A collection's `order:` is a sort mode when it's one of these keywords;
+  # anything else is read as an explicit url_name list.
+  def sort_keyword?(value)
+    %w[date date-asc title filename].include?(value.to_s.strip.downcase)
+  end
+
+  # A menu's membership: its `order:` url_name list (those items, in that order)
+  # unioned with anything tagged `collection: <name>` — a page joins by being
+  # listed OR by carrying that collection name. Listed items lead, in list
+  # order; tagged-but-unlisted items follow, alphabetically. Unresolved
+  # url_names are skipped (logged in development so a typo is easy to spot).
+  # Reached only when at least one of order/collection is present — an empty
+  # menu is caught earlier with a notice.
+  def curate_menu(items, order_list, label)
+    all      = items.to_a
+    has_list = order_list.present? && !sort_keyword?(order_list)
+
+    listed = []
+    if has_list
+      wanted   = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
+      by_slug  = all.index_by { |item| item.url_name.to_s.downcase }
+      resolved = wanted.map { |slug| by_slug[slug] }
+
+      if Rails.env.development?
+        missing = wanted.zip(resolved).reject { |_, item| item }.map(&:first)
+        Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}") if missing.any?
+      end
+
+      listed = resolved.compact
+    end
+
+    tagged = []
+    if label.present?
+      wanted_names = normalize_collection_names(label)
+      listed_slugs = listed.map { |item| item.url_name.to_s.downcase }
+      tagged = all.select { |item| item.respond_to?(:collection_names) && (item.collection_names & wanted_names).any? }
+                  .reject { |item| listed_slugs.include?(item.url_name.to_s.downcase) }
+                  .sort_by { |item| item.title.to_s.downcase }
+    end
+
+    listed + tagged
   end
 
   def render_template(items, template, config)
@@ -1065,6 +1193,8 @@ module HasMarkdownExtensions
       render_glossary(items)
     when "links"
       render_links(items)
+    when "menu"
+      render_menu(items, config)
     when "full"
       render_full(items, config)
     when "list"
@@ -1075,7 +1205,9 @@ module HasMarkdownExtensions
   end
 
   def render_list(items, config = {})
-    show_author = collection_truthy?(config[:show_author])
+    show_author   = collection_truthy?(config[:show_author])
+    show_subtitle = collection_truthy?(config[:show_subtitle], default: true)
+    show_date     = collection_truthy?(config[:show_date], default: true)
 
     items.map do |item|
       output = []
@@ -1089,14 +1221,14 @@ module HasMarkdownExtensions
       output << ""
 
       # Subtitle
-      if item.respond_to?(:subtitle) && item.subtitle.present?
+      if show_subtitle && item.respond_to?(:subtitle) && item.subtitle.present?
         output << "#{item.subtitle}"
         output << "{: .item-subtitle}"
         output << ""
       end
 
       # Meta row: date, optionally with " • author" appended
-      date_str = item_date(item)
+      date_str = show_date ? item_date(item) : nil
       author_str = show_author ? item_author(item) : nil
       if date_str || author_str
         parts = []
@@ -1114,17 +1246,20 @@ module HasMarkdownExtensions
     end.join("\n")
   end
 
-  # Image-on-the-right template. Includes everything from `list`, plus
-  # excerpt and a featured image. show_author defaults to TRUE for this
-  # template (opposite of list); pass `show_author: false` to suppress.
-  # show_excerpt also defaults to true.
+  # Image-on-the-right template. Includes everything from `list`, plus an
+  # excerpt and a featured image. Like every content template, author is off
+  # by default; pass `show_author: true` to add it. Subtitle, excerpt, and date
+  # default on and can each be turned off. The image shows whenever the item
+  # has one (no toggle).
   #
   # Media indicators (play / headphones for video / audio / podcast posts)
   # are added next to the title by decorate_title — same as every other
   # collection template. No icon overlay on the image.
   def render_full(items, config = {})
-    show_author = collection_truthy?(config[:show_author], default: true)
-    show_excerpt = collection_truthy?(config[:show_excerpt], default: true)
+    show_author   = collection_truthy?(config[:show_author])
+    show_subtitle = collection_truthy?(config[:show_subtitle], default: true)
+    show_excerpt  = collection_truthy?(config[:show_excerpt], default: true)
+    show_date     = collection_truthy?(config[:show_date], default: true)
 
     items.map do |item|
       image_url = item.respond_to?(:image) ? item.image : nil
@@ -1148,7 +1283,7 @@ module HasMarkdownExtensions
       output << "{: .item-title}"
       output << ""
 
-      if item.respond_to?(:subtitle) && item.subtitle.present?
+      if show_subtitle && item.respond_to?(:subtitle) && item.subtitle.present?
         output << "#{item.subtitle}"
         output << "{: .item-subtitle}"
         output << ""
@@ -1160,7 +1295,7 @@ module HasMarkdownExtensions
         output << ""
       end
 
-      date_str = item_date(item)
+      date_str = show_date ? item_date(item) : nil
       author_str = show_author ? item_author(item) : nil
       if date_str || author_str
         parts = []
@@ -1365,6 +1500,23 @@ module HasMarkdownExtensions
     end.join("\n")
   end
 
+  # `menu` template: a bare list of links, nothing else — built for placement
+  # areas like nav, footer, or a sidebar. `style: horizontal|vertical` sets a
+  # modifier class (default vertical). Emits raw HTML (the wrapper carries no
+  # markdown="1"), so Kramdown leaves the list intact; on the navigation file
+  # the active-link pass still tags the current page.
+  def render_menu(items, config)
+    style = config[:style].to_s.strip.downcase
+    style = "vertical" unless %w[horizontal vertical].include?(style)
+
+    lis = items.map do |item|
+      title = ERB::Util.html_escape(item.title.presence || "Untitled")
+      %Q(  <li class="collection-menu-item"><a href="#{item_path(item)}">#{title}</a></li>)
+    end.join("\n")
+
+    %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+  end
+
   def render_product_grid(items, config)
     # Get currency symbol from store config
     currency_symbol = get_currency_symbol
@@ -1500,11 +1652,12 @@ module HasMarkdownExtensions
           output << %Q(      <span class="grid-item-price">#{formatted_price}</span>)
         end
 
-        # View button for grouped products - only render if button text is set
-        if grouped_button_text.present?
-          primary_for_link = find_primary_product(group_products) || display_product
-          output << %Q(      <a href="#{item_path(primary_for_link)}" class="btn-primary btn-grid">#{grouped_button_text}</a>)
-        end
+        # Grouped products can't be added to the cart from the grid — the buyer
+        # picks a variant on the product page — so ALWAYS link there. The
+        # configured button_text overrides the default label.
+        label = grouped_button_text || "View"
+        primary_for_link = find_primary_product(group_products) || display_product
+        output << %Q(      <a href="#{item_path(primary_for_link)}" class="btn-primary btn-grid">#{label}</a>)
       else
         # Single product - show individual price and Add to Cart
         if display_product.respond_to?(:price)
@@ -1913,7 +2066,7 @@ module HasMarkdownExtensions
         # Record not found - render error card in preview, dev warning otherwise
         return render_error_card("Content not found: #{config[:post]}") if preview
         return dev_warning("Content not found",
-          "No post, page, product, or documentation with slug '#{config[:post]}' exists.",
+          "No post, page, product, or documentation with url_name '#{config[:post]}' exists.",
           "Check the url_name in the content's front matter.")
       end
     end
@@ -1942,6 +2095,10 @@ module HasMarkdownExtensions
     # behaviour); small/medium only when explicitly enabled. product-link maps
     # its show_description onto this and defaults it on for all styles.
     show_excerpt = collection_truthy?(config[:show_excerpt], default: style == "large")
+
+    # Whether the subtitle shows. Default per size: off for small (too cramped),
+    # on for medium and large. Overridable with `show_subtitle:` in the card.
+    show_subtitle = collection_truthy?(config[:show_subtitle], default: style != "small")
 
     # Author and date are only meaningful for posts. For pages, products,
     # and docs the keys were intentionally omitted from config above.
@@ -2043,6 +2200,7 @@ module HasMarkdownExtensions
           subtitle:  subtitle,
           excerpt:   card_excerpt,
           show_excerpt: show_excerpt,
+          show_subtitle: show_subtitle,
           link_text: link_text,
           author:    author,
           date:      date
@@ -2063,6 +2221,7 @@ module HasMarkdownExtensions
           price:     price,
           excerpt:   card_excerpt,
           show_excerpt: show_excerpt,
+          show_subtitle: show_subtitle,
           link_text: link_text,
           author:    author,
           date:      date
@@ -2083,6 +2242,7 @@ module HasMarkdownExtensions
           price:     price,
           excerpt:   card_excerpt,
           show_excerpt: show_excerpt,
+          show_subtitle: show_subtitle,
           link_text: link_text,
           author:    author,
           date:      date
@@ -2707,11 +2867,11 @@ module HasMarkdownExtensions
     url   = ERB::Util.html_escape(config["url"].to_s)
     title = ERB::Util.html_escape(config["title"].to_s)
     text  = ERB::Util.html_escape(config["text"].to_s)
-    # Only the opt-in `style:` modifier classes — no default hook classes, so a
-    # future cleanup can't break themes that relied on them. Style the buttons
-    # via btn-primary/btn-outline or a `style:` value.
-    styles     = action_button_style_classes(config, "share")
-    class_attr = styles.any? ? %( class="#{styles.join(' ')}") : ""
+    # `.share` is a stable wrapper hook (a committed class) so themes can target
+    # and align every share button; a `style:` value adds `.share-<token>`
+    # modifiers on top. The buttons inside use btn-primary / btn-outline.
+    styles     = [ "share" ] + action_button_style_classes(config, "share")
+    class_attr = %( class="#{styles.join(' ')}")
 
     # Only emit the value attrs that were actually set; a blank one is just the
     # controller's default (read the canonical URL + og:title off the page).
@@ -2759,12 +2919,20 @@ module HasMarkdownExtensions
   def dev_warning(title, message, hint = nil)
     return "" unless Rails.env.development?
 
-    hint_html = hint ? "<br><span style='color:#78350f'>#{CGI.escapeHTML(hint.to_s)}</span>" : ""
+    hint_html = hint ? "<br><span style='color:#78350f'>#{dev_warning_text(hint)}</span>" : ""
     <<~HTML
       <div style="border:2px dashed #f59e0b;padding:0.75rem 1rem;font-family:monospace;font-size:0.8rem;color:#92400e;background:#fffbeb;margin:0.5rem 0;">
-        <strong>⚠️ #{CGI.escapeHTML(title)}</strong><br>
-        #{CGI.escapeHTML(message.to_s)}#{hint_html}
+        <strong>⚠️ #{dev_warning_text(title)}</strong><br>
+        #{dev_warning_text(message)}#{hint_html}
       </div>
     HTML
+  end
+
+  # Escape a dev-warning string, then render `inline code` spans as <code> so
+  # backticks in the copy show as highlighted code rather than literal ticks.
+  def dev_warning_text(text)
+    CGI.escapeHTML(text.to_s).gsub(/`([^`]+)`/) do
+      "<code style=\"background:#cb863f;padding:0 0.25em;border-radius:2px;\">#{Regexp.last_match(1)}</code>"
+    end
   end
 end

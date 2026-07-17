@@ -3,19 +3,17 @@
     place the image anywhere in the sequence (between text elements
     on mobile, alongside them on desktop). %>
 <div class="card post-link-large<%= ' product-link-large' if kind == 'product-link' %><%= ' no-image' if image.blank? %>">
-  <% if variant.present? %>
+  <% if variant.present? || price.present? %>
     <div class="card-header">
       <h4 class="card-title"><%= title %></h4>
-      <span class="product-variant"><%= variant %></span>
-      <% if price.present? %>
-        <span class="card-price"> - <%= price %></span>
-      <% end %>
+      <% if variant.present? %><span class="product-variant"><%= variant %></span><% end %>
+      <% if price.present? %><span class="card-price"><%= price %></span><% end %>
     </div>
   <% else %>
     <h4 class="card-title"><%= title %></h4>
   <% end %>
 
-  <% if subtitle.present? %>
+  <% if show_subtitle && subtitle.present? %>
     <p class="card-subtitle"><%= subtitle %></p>
   <% end %>
 

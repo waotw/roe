@@ -21,6 +21,7 @@ export default class extends Controller {
     // Grab the caret position now — clicking the toolbar button blurred the
     // textarea, but selectionStart still holds the last position.
     this.savedPos = this.textarea ? this.textarea.selectionStart : null;
+    this.syncTemplateOptions();
     this.applyDependencies();
     this.modalTarget.style.display = "flex";
   }
@@ -42,11 +43,51 @@ export default class extends Controller {
   }
 
   // Reflect emptiness (for dimming) and re-run dependency visibility when a
-  // controlling field (source / show_more) changes.
+  // controlling field (source / show_more) changes. A source change also
+  // offers/removes the products-only `grid` option and pre-selects the
+  // template that source usually wants.
   fieldChanged(event) {
     const el = event.target;
     el.classList.toggle("cb-empty", !el.value);
+    if (el.dataset.cbField === "source") this.applySourceDefaults();
     this.applyDependencies();
+  }
+
+  // `grid` only makes sense for products, so it isn't one of the base template
+  // options — add it when the source is products, remove it otherwise (and drop
+  // a stale `grid` selection when leaving products).
+  syncTemplateOptions() {
+    const source = this.fieldEl("source")?.value || "";
+    const templateEl = this.fieldEl("template");
+    if (!templateEl) return;
+
+    const grid = Array.from(templateEl.options).find((o) => o.value === "grid");
+    if (source === "products" && !grid) {
+      const opt = document.createElement("option");
+      opt.value = "grid";
+      opt.textContent = "grid";
+      // First real option, right after the blank "—".
+      templateEl.insertBefore(opt, templateEl.options[1] || null);
+    } else if (source !== "products" && grid) {
+      if (templateEl.value === "grid") templateEl.value = "";
+      grid.remove();
+    }
+  }
+
+  // On a source change, refresh the grid option and pre-select the template
+  // that source usually wants. Source is normally chosen first, so this makes
+  // the common case one click.
+  applySourceDefaults() {
+    this.syncTemplateOptions();
+    const templateEl = this.fieldEl("template");
+    if (!templateEl) return;
+
+    const DEFAULT_TEMPLATE = { posts: "list", pages: "menu", documentation: "list", products: "grid" };
+    const wanted = DEFAULT_TEMPLATE[this.fieldEl("source")?.value || ""];
+    if (wanted) {
+      templateEl.value = wanted;
+      templateEl.classList.toggle("cb-empty", !templateEl.value);
+    }
   }
 
   // Show a dependent row only when all of its conditions hold; otherwise hide
@@ -101,11 +142,15 @@ export default class extends Controller {
 
   // --- helpers -------------------------------------------------------------
 
+  // Scope to this builder's own modal, not the whole editor root — the card
+  // builder renders its fields with the same [data-cb-field] attribute inside
+  // the same root, and querying the root would scoop up its `style` (small)
+  // field and leak it into the inserted block.
   fieldEls() {
-    return Array.from(this.element.querySelectorAll("[data-cb-field]"));
+    return Array.from(this.modalTarget.querySelectorAll("[data-cb-field]"));
   }
 
   fieldEl(key) {
-    return this.element.querySelector(`[data-cb-field="${key}"]`);
+    return this.modalTarget.querySelector(`[data-cb-field="${key}"]`);
   }
 }

@@ -6,12 +6,13 @@ module LayoutHelper
 
     content = File.read(file_path)
 
-    # Escape inline pipes (same logic as HasMarkdownExtensions)
-    content = escape_inline_pipes_for_layout(content)
+    # Run through the full roe-anji pipeline (Collections, Cards, Galleries,
+    # etc.), not raw Kramdown — that's how a collection in navigation.md or
+    # footer.md renders. to_html handles inline-pipe escaping itself.
+    html = LayoutMarkdown.render(content, static: @static_generation)
 
-    html = Kramdown::Document.new(content).to_html
-
-    # Add active class to navigation links if this is the navigation file
+    # Add active class to navigation links if this is the navigation file.
+    # Runs on the final HTML, so collection-generated nav links get it too.
     if filename == "navigation"
       html = add_active_nav_class(html, current_page)
     end
@@ -87,13 +88,11 @@ module LayoutHelper
     file_path = sidebar_file_path
     content = File.read(file_path)
 
-    # Parse out frontmatter if present
+    # Parse out frontmatter if present (position/scope live there)
     body_content = extract_body_from_content(content)
 
-    # Escape inline pipes
-    body_content = escape_inline_pipes_for_layout(body_content)
-
-    html = Kramdown::Document.new(body_content).to_html
+    # Full roe-anji pipeline so Collections/Cards/Galleries work in the sidebar
+    html = LayoutMarkdown.render(body_content, static: @static_generation)
     html.html_safe
   rescue => e
     Rails.logger.error "Error rendering sidebar: #{e.message}"

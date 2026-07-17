@@ -2,6 +2,7 @@
 title: Home
 url_name: home
 status: published
+collection: nav
 ---
 
 # Welcome

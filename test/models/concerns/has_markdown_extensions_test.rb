@@ -960,7 +960,8 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     in_dev_env do
       html = conflict_warning({ "for" => "share", "type" => "product" })
       assert_includes html, "Conflicting selector"
-      assert_includes html, "for` wins"
+      # `for` is rendered as inline <code> in dev warnings now.
+      assert_includes html, "for</code> wins"
     end
   end
 
@@ -1055,10 +1056,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     end
   end
 
-  test "share button adds NO container class by default + omits empty values" do
+  test "share button carries the stable .share hook + omits empty values" do
     html = TestModel.new("").send(:render_share_button, {}, {})
-    # Container closes right after data-controller — no class, no blank values.
-    assert_includes html, '<div data-controller="share">'
+    assert_includes html, '<div class="share" data-controller="share">'
     refute_includes html, 'data-share-url-value'
   end
 
@@ -1067,13 +1067,13 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_includes html, '<div class="button-menu" data-share-target="menu">'
   end
 
-  test "share button `style:` adds sanitised modifier classes only" do
+  test "share button `style:` adds sanitised modifier classes after the base" do
     html = TestModel.new("").send(:render_share_button, { "style" => "small center" }, {})
-    assert_includes html, '<div class="share-small share-center" data-controller="share"'
+    assert_includes html, '<div class="share share-small share-center" data-controller="share"'
   end
 
   test "share button `style:` strips unsafe characters" do
     html = TestModel.new("").send(:render_share_button, { "style" => "sm<all>" }, {})
-    assert_includes html, 'class="share-small"'
+    assert_includes html, 'class="share share-small"'
   end
 end

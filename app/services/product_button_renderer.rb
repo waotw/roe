@@ -57,8 +57,8 @@ class ProductButtonRenderer
       button = render_button(product, text, style, 1)
 
       "<li class=\"product-variant-item\">" \
-      "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span>, " \
-      "<span class=\"variant-price\">#{price}</span>: " \
+      "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span> " \
+      "<span class=\"variant-price\">#{price}</span> " \
       "#{button}" \
       "</li>"
     end
@@ -145,8 +145,8 @@ class ProductButtonRenderer
       button = render_button(product, text, style, 1)
 
       "<li class=\"product-variant-item\">" \
-      "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span>, " \
-      "<span class=\"variant-price\">#{price}</span>: " \
+      "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span> " \
+      "<span class=\"variant-price\">#{price}</span> " \
       "#{button}" \
       "</li>"
     end
