@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Collections
+title: Collections
 status: published
 url_name: collections
 tags: roe-anji
@@ -17,13 +17,13 @@ template: links
 
 # Collections
 
-Collections are lists of posts, pages, products, or documentation. They can power entire blogs or just add a few "Featured Posts" to your home page.
+A Collection is a list of your content — posts, pages, products, or documentation — that you drop anywhere with a short block. One Collection can power an entire blog; another can add three "Featured Posts" to your home page. They can even build your site's navigation, footer, or sidebar (see [Build a menu, footer, or sidebar](#build-a-menu-footer-or-sidebar)).
 
-When writing anything that uses the Markdown editor, use the `COLLECTION` button to add a Collection without writing the block by hand. It opens a form with all the options below; the relevant fields appear as you go (for example, the product options only show once you set the source to `products`), and only the fields you fill in get written. It then drops the finished `collection` block at your cursor. The Collection defaults are editable in [Admin/Settings](/admin/configs/collections/edit).
+You don't have to write the block by hand. In [The Editor](/documentation/the-editor), click the `COLLECTION` button: it opens a form with every option below, shows each field only when it applies (the product options appear once you set the source to `products`), and writes just the fields you fill in. It then drops the finished `collection` block at your cursor. Set your Collection defaults in [Admin/Settings](/admin/configs/collections/edit).
 
 ## Options
 
-You *do not* have to use all of these. Collections are simple but flexible. These options give you flexibility but you can keep it simple.
+You won't need most of these. Start with a bare block and add options only as you need them — a Collection with no options at all still works.
 
 ### Source & Filtering
 
@@ -31,8 +31,9 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 |--------|----------|-------------|
 | `source` | No | `posts` (default), `pages`, `documentation`, or `products` |
 | `tags` | No | Comma-separated, use `-tag` to exclude |
+| [`areas`](#build-a-menu-footer-or-sidebar) | No | Comma-separated (`nav`, `footer`, `sidebar`) |
 | `category` | No | Filter products by category |
-| `podcast` | No | Filter posts by podcast key |
+| `podcast` | No | Filter posts by podcast key/name |
 | `post_type` | No | Filter posts by type: `article`, `audio`, `video`, `podcast` or `all`|
 | [`related`](#show-related-content) | No | `true` shows items linked via frontmatter `related:`|
 
@@ -40,13 +41,29 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `order` | No | `date` (newest first, default), `date-asc` (oldest first), `title` (alphabetical), or `filename` (numeric prefix aware) |
+| `order` | No | `date` (newest first, default), `date-asc` (oldest first), `title` (alphabetical), `filename` (numeric prefix aware, a file that starts with `0-` will be at the top), or a comma-separated list of `url_name`s for a hand-picked order (see [Pick the order by hand](#pick-the-order-by-hand)) |
+
+#### Pick the order by hand
+
+Instead of a sort mode, give `order:` a comma-separated list of `url_name`s. The items appear in exactly that order:
+
+````
+```collection
+source: pages
+order: blog, about, store
+```
+````
+
+Items you don't name fall to the end, alphabetically — so nothing disappears if you forget one. The whole order lives in the block, so each collection can arrange things its own way, and you never edit the individual pages.
+
+The [`nav`](#build-a-menu-footer-or-sidebar) template is the one exception: there the list *is* the menu, so anything you don't name is left out rather than appended.
 
 ### Display
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, `full` or `glossary` |
+| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, `nav`, `full` or `glossary` |
+| `style` | No | For the `nav` template only: `vertical` (default) or `horizontal` |
 | `limit` | No | Number or `all` — defaults to [collection config](/admin/configs/collections/edit) or 10 |
 | `offset` | No | Skip first `N` items, e.g., `offset: 10` |
 | `heading` | No | Section heading above collection |
@@ -54,8 +71,8 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 | `show_date` | No | `true` = show date |
 | `show_subtitle` | No | `true` = show subtitle |
 | `show_excerpt` | No | `true` = show excerpt |
-| `show_more` | No | Add "View all" link to full [collection pagination](/documentation/collections_pagination) (posts only) |
-| `show_more_text` | No | Custom text for `show_more link` |
+| `show_more` | No | `true` = Add "View all" link to full [collection pagination](/documentation/collections_pagination) (posts only) |
+| `show_more_text` | No | Custom text for `show_more link` (default "View all") |
 
 ### Products
 
@@ -63,19 +80,21 @@ You *do not* have to use all of these. Collections are simple but flexible. Thes
 |--------|----------|-------------|
 | `category` | No | Filter products by category |
 | `groups` | No | `enabled` to group variants together (e.g., Paperback/Hardback/Ebook of same book) |
-| `aspect_ratio` | No | Image aspect ratio: `auto` (default), `portrait`, `square`, or `landscape` |
+| `aspect_ratio` | No | Product image ratio: `original` (default), `square`, `portrait`, `tv`, `wide`, or `cinema` (`auto`, `landscape`, and `film` are accepted aliases) |
 | `show_description` | No | Show truncated product description (~100 chars) below the title |
 
-**Grouped products** — when variants share a `group:` (e.g. Paperback/Hardback/Ebook of one book) and you set `groups: enabled`:
+#### [Grouped products](/documentation/products#product-variants-groups)
+
+When variants share a `group:` (e.g. Paperback/Hardback/Ebook of one book) and you set `groups: enabled`:
 
 - The grid uses the **primary** variant's image and links to its page.
 - Variant names appear in parentheses below the title (e.g. `(Paperback, Hardback)`).
-- Price display is set in your store config (`site/system/features/store.yml`):
+- Price display is set in [Admin → Settings → Store](/admin/configs/store/edit):
   - `price_display: range` — `$10.00 - $25.00` (default)
   - `price_display: lowest` — `$10.00`
   - `price_display: highest` — `$25.00`
   - `price_separator` — separator for range prices (default `-`)
-- `button_text` (store config) sets the grouped product's "View" button text — leave it blank to render no button.
+- `button_text` — an `Add to Cart` button doesn't really make sense for a product with several options to purchase — this button will link to the primary product page for that group; the default is "View".
 - Individual (non-grouped) products show an "Add to Cart" button directly in the grid.
 
 To add a default Collection to your Post/Page, this is all you need:
@@ -85,7 +104,7 @@ To add a default Collection to your Post/Page, this is all you need:
 ```
 ````
 
-When left empty like the above ↑, the defaults will be used ↓ :
+Left empty like that ↑, the block uses your defaults ↓ :
 
 ```markdown
 default_source: posts
@@ -95,24 +114,24 @@ default_limit: 10
 default_template: list
 ```
 
-↑ The Collections defaults can be edited in [Admin/Settings](/admin/configs/collections/edit).
-Any default can be overwritten by adding that parameter to the Collection ↓ 
+↑ Edit these defaults in [Admin → Settings → Collections](/admin/configs/collections/edit). Override any of these defaults by adding that option to the block ↓
 
-## Create a feed (Collection) of All Articles
+## Make a feed of every article
 
 Try the `compact` template:
 
-````
+````markdown
 ```collection
 limit: all
 template: compact
 post_type: article
 ```
 ````
-↑ Try adding this to a Page you're editing and click `PREVIEW`.
+
+↑ Add this to a Page you're editing and click `PREVIEW`.
 
 ## Add a `heading`
-↓ Try adding a `heading` to the Collection:
+↓ Give the Collection a `heading`:
 
 ````markdown
 ```collection
@@ -123,9 +142,54 @@ post_type: article
 ```
 ````
 
+## Build a menu, footer, or sidebar
+
+A Collection isn't only for the body of a page — it works in your **layout files** too: `navigation`, `footer`, and `sidebar` (edit these in [Admin → Layouts](/admin/layouts)). Instead of hand-writing links, you build the menu from your own content.
+
+The simplest way is to list the pages you want, in the order you want them. In your `navigation` layout file:
+
+````
+```collection
+template: menu
+order: blog, about, store
+```
+````
+
+That's the whole menu — those pages, in that exact order. No tagging, no per-page edits: the `order:` list *is* the menu. The layout editor's `SHOW LINKS` panel lists every `url_name` you can drop in.
+
+A few things worth knowing:
+
+- `template: menu` outputs a bare list of links — no headings, no dates, no excerpts.
+- The source defaults to `pages` (the usual case). Set `source: posts` or `products` to build the menu from those instead.
+- `style: horizontal` lays the links out in a row; the default, `vertical`, stacks them.
+- A `url_name` the list can't find is skipped (and logged in development, so a typo is easy to catch).
+- A nav shows every link you give it — it isn't capped at ten like other templates.
+- In the `navigation` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
+
+### Or let the menu fill itself with `areas`
+
+Prefer a menu that updates on its own — every page meant for the footer shows up there, with no list to maintain? Tag the content instead. Add an `areas:` field to any page, post, or product:
+
+```yaml
+collection: nav, footer
+```
+
+`areas` accepts `nav` (or `navigation`), `footer`, and `sidebar`. Then point a `nav` collection at it, leaving `order:` off:
+
+````
+```collection
+template: menu
+collection: footer
+```
+````
+
+Every item tagged `collection: footer` now appears, alphabetically — tag a page and it joins the menu, no layout edit needed. `areas` is to placement what [tags](#source--filtering) are to topics: it groups content by *where it should appear* instead of by subject.
+
+Use whichever fits — or **both**. Give a `nav` collection an `order:` list *and* an `areas` value, and the menu is the two combined: listed pages come first, in your order; anything tagged but not listed follows, alphabetically. Like `related`, it works from either side — name a page in the list here, or tag the page itself — so nothing you meant to include gets dropped.
+
 ## Show `related` content
 
-I'm using a `related` collection at the top of this document in [Related documentation](#related-documentation). Here's how `related` works:
+I'm using a `related` collection at the top of this document in [Related documentation](#related-documentation). Here's an example of how `related` works:
 
 On a product page for a blue t-shirt, you add this ↓
 
@@ -138,17 +202,17 @@ related: true
 ```
 ````
 
-↑ this filters the Collection results to just the `related` results. But how do you make something `related`?
+↑ This narrows the Collection to just the `related` items. But how do you make something `related`?
 
-Add a `related` entry for any Post, Product, Page and those two pieces of content are now "related". I'll add the `url_name` for Blue T-shirt ↓ to my Yellow T-shirt Product metadata and now they are "related". 
+Add a `related` entry to any Post, Product, or Page, and the two pieces of content are now connected. Here I add the `url_name` for **Blue T-shirt** ↓ to my **Yellow T-shirt** product's metadata:
 
 ![Related field in metadata for Yellow T-shirt Product](/media/images/related_product_metadata.png)
 
-This is `bi-directional`, meaning you only have to add `related` to one item and then both are connected. Notice I added `blue-tshirt` to the **Yellow T-shirt**'s metadata, and it shows up in the `related: true` Collection I'm adding to **Blue T-shirt**'s product page — that's what `bi-directional` means. Once they're related by one connection, they're ***related***.
+The link is `bi-directional` — you set it on one side, and both sides see it. I added `blue-tshirt` to **Yellow T-shirt**, and it shows up in the `related: true` Collection on **Blue T-shirt's** page just the same.
 
-## Add Pagination/View All
+## Paginate with a "View all" link
 
-Pagination is very common on a blog. You might want to show 5 posts on your home page and then link to the archive with the rest. Collections makes this easy.
+Often, a home page or blog page will show 5-10 posts, then link to the archive for the rest. A Collection makes this easy.
 
 ````markdown
 ```collection
@@ -158,7 +222,7 @@ show_more: true
 ```
 ````
 
-↑ That will show the most recent post tagged "music" and add a "View all" link to the bottom of the Collection. If you prefer something other than "View all", you can customize that with `show_more_text:` like so ↓ :
+↑ This shows the most recent post tagged "music" and adds a "View all" link below the Collection. To change the label, set `show_more_text:` ↓
 
 ````markdown
 ```collection
@@ -169,7 +233,7 @@ show_more_text: All the music posts →
 ```
 ````
 
-↑ That code will look like this ↓
+↑ That code renders like this ↓
 
 ---
 
@@ -182,9 +246,9 @@ show_more_text: All the music posts →
 
 ---
 
-## Collection Examples:
+## Post Collection examples
 
-### Last 5 Featured Posts
+### Last 5 featured posts
 
 ````markdown
 ```collection
@@ -195,7 +259,7 @@ order: date
 ```
 ````
 
-### Last 5 Music Criticism Posts sorted Alphabetically
+### Last 5 music-criticism posts, alphabetical
 
 ````markdown
 ```collection
@@ -206,9 +270,9 @@ order: title
 ```
 ````
 
-## Product Collection Examples:
+## Product Collection examples
 
-### All Products in a Grid
+### All products in a grid
 
 ````markdown
 ```collection
@@ -217,7 +281,7 @@ template: grid
 ```
 ````
 
-### Books Only, Portrait Format
+### Books only Collection, portrait format
 
 ````markdown
 ```collection
@@ -229,7 +293,7 @@ heading: Books
 ```
 ````
 
-### Featured Products with Descriptions
+### Featured Products with descriptions
 
 ````markdown
 ```collection

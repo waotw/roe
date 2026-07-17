@@ -4,27 +4,54 @@ status: published
 tags: settings
 ---
 
-# Global Site Settings
+# Edit your Global Site Settings
 
-In the [Settings → Global → site.yml](/admin/configs/site/edit) 
+Your Global Site Settings cover the basics of your whole site — its name, branding, search, and more. Edit them in the Admin at [Settings → Global → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
 
-## Site
-- `Site title` - used in feeds, page titles, emails
-- `Site URL` - used in emails and feeds
-- `Site Description` - used in feed metadata
-- `Author` - used in feeds and metadata
+## Site Information
 
-### Branding
-- `Logo` - Image file used in the site's header if you prefer to use an image instead of text
-- `Logo style` - How to display the logo (`beside_text` or `replace_text`)
-    - This can be styled in your theme's CSS
-- `Favicon` - Image file used for favicon
+- `Site Title` (required) — your site's name. Shown in page titles, feeds, and the header.
+- `Site URL` (required) — your site's full web address, like `https://example.com`. Used in emails and feeds.
+- `Site Description` — a short description of your site. Used in meta tags and RSS/Atom feeds.
+- `Author Name` — the default author for your posts and pages.
+- `Author Email` — a contact address for the site author.
 
-### Theme
+## Search
 
-Set your active theme. You can also do this by activating a theme here [Themes](/admin/themes) which will update this setting.
+- `Include all pages in search` — by default, only pages linked in your navigation or footer are searchable. Turn this on to index every published page.
+- `Include bundled Roe documentation in search` — Roe's own documentation is left out of search by default. Turn this on to include it.
+- `Show results before typing` — by default, search waits until you type. Turn this on to show results as soon as the search opens.
 
-### Static Site Settings
+## Content
 
-- Toggle on/off static-site generation
-    - When turned on, all traffic is sent to the static site. (currently, Members, Payments and other features require a database to work and so aren't supported for static-site generation)
+- `Respect single line breaks` — Markdown normally needs two trailing spaces or a blank line to start a new line. Turn this on to treat every single line break as a line break.
+
+## Branding
+
+- `Logo Image Path` — an image to show in your header instead of text. Copy its URL from `GLOBAL IMAGES`.
+- `Logo Style` — how the logo appears: `beside_text` (logo next to your title) or `replace_text` (logo instead of the title). Appears once you set a logo, and can be styled further in your theme's CSS.
+- `Favicon` — the small icon browsers show in the tab. Copy its URL from `GLOBAL IMAGES`.
+- `Social Image` — the image shown when your site is shared on Facebook, X, LinkedIn, iMessage, or Slack. Use 1200×630 for best results.
+- `Always use Social Image` — use the image above on every page and post when your site is shared on social media, even a page or post has it's own image. This does not affect how the images are shown on your site, only when shared on social media. Appears once you set a social image.
+- `Social Image Alt Text` — describes the social image for screen readers and card previews. Skip it when your posts and pages set their own.
+- `Twitter / X handle` — your handle, for the "via @you" credit on shared cards. The leading `@` is optional.
+
+## Theme
+
+- `Active Theme` — the theme your site uses. You can also switch themes on the [Themes](/admin/themes) page, which updates this setting for you.
+
+## Site Sync
+
+- `Transport` — how Site Sync moves files to and from your live site: `http` (recommended; works over HTTPS with a shared token) or `rsync` (needs SSH access to the host).
+
+## Updates
+
+- `Nightly updates` — receive pre-release (nightly) versions instead of stable releases. Off means stable.
+
+## Static Site Generation ([SSG](/documentation/glossary#ssg))
+
+- `Enable Auto-Generation` — keep a static (plain-file) copy of your site up to date and serve it to your visitors.
+
+When this is on, Roe does two things: it rebuilds the static copy of your site whenever your content changes, and it serves that copy to visitors instead of the running app. This applies whether you run Roe locally or deploy it — Roe is still running, but what visitors see is the static version.
+
+Because visitors are served plain files, anything that needs the running app — Members, Payments, and other database-backed features — won't work while this is on.

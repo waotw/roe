@@ -102,7 +102,7 @@ class Admin::ConfigsController < Admin::BaseController
         "social_image_override" => {
           type: :checkbox,
           label: "Always use Social Image",
-          hint: "When checked, the Social Image above is used for all pages and posts — even those with their own image. Useful for consistent brand presence on social platforms.",
+          hint: "When checked, the Social Image above is used for all pages and posts when your site is shared on social media — even those with their own image. This does not affect your site, only how it appears in social media posts. Useful for consistent brand presence on social platforms.",
           depends_on: "social_image"
         },
         "social_image_alt" => {

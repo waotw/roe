@@ -190,16 +190,16 @@ By default, each image takes the shape your theme gives that layout. Add an `asp
 ```gallery
 ![house on ilkley moore](/media/images/old_plane.jpg)
 ![house on ilkley moore](/media/images/old_plane.jpg)
-aspect_ratio: square
+aspect_ratio: film
 ```
 ````
 
-↑ That crops each image to a square ↓
+↑ That crops each image to a `film` ↓
 
 ```gallery
 ![house on ilkley moore](/media/images/old_plane.jpg)
 ![house on ilkley moore](/media/images/old_plane.jpg)
-aspect_ratio: square
+aspect_ratio: film
 ```
 
 The default theme gives you:

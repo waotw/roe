@@ -1,6 +1,6 @@
 ---
 title: Getting Started with Roe
-status: published
+status: draft
 tags: guide, getting-started
 ---
 
@@ -14,65 +14,62 @@ template: links
 
 # Getting started with Roe
 
-#### Before Roe
+#### Before you begin
 
-[Install Roe](/documentation/guide-installation) if you haven't.
+[Install Roe](/documentation/guide-installation) if you haven't already.
 
-## First Steps
+## Learn Roe by editing a Post
 
-- Visit the [Admin](/admin) and click Posts in the navigation
-- Create a new Post
-- Click `Preview` to open up a live preview of the Post in a new tab.
-- Put the Preview tab/window on one side of your screen and the Post on the other
-- As you save the Post, the Preview will auto-refresh so you can see your changes as you make them.
+The fastest way to understand Roe is to watch it work:
 
-This is a great way to learn how things work as you can see the changes live. Try out the buttons in [The Editor](/documentation/the-editor).
+- Open the [Admin](/admin) and click **Posts**.
+- Create a new Post.
+- Click **Preview** to open a live preview in a new tab.
+- Put the preview on one side of your screen and the editor on the other.
+- Save the Post. The preview refreshes, so you see each change as you make it.
 
-## What is Roe
+Editing with the preview open shows you exactly how Roe responds. When you're ready to go further, try the toolbar buttons in [The Editor](/documentation/the-editor).
 
-Roe helps you build a website with nothing but [Markdown](/documentation/glossary#markdown) files, media and [YAML](/documentation/glossary#yaml). You can dive deeper and edit the CSS if you please but this is not required to build a full/working website with Roe. An understanding of [Markdown Syntax](https://www.markdowntools.io/cheat-sheet) will be helpful but you'll be able to figure out what's going on by working on a Post with a Preview open as suggested [above](#first-steps).
+## What Roe is
 
-## Important things to know
+Roe builds a website from three kinds of files: [Markdown](/documentation/glossary#markdown) for your writing, media for images and audio, and [YAML](/documentation/glossary#yaml) for settings. Markdown formats text with ordinary characters like `#` and `*`; YAML stores settings as simple `key: value` lines. You never have to touch CSS to build a working site — though you can edit it whenever you want more control.
 
-### Structure of your site
+If Markdown is new to you, a [cheat sheet](https://www.markdowntools.io/cheat-sheet) helps. Mostly, though, you'll learn it by editing a Post with the preview open, as [above](#learn-roe-by-editing-a-post).
 
-Since Roe is built on Markdown files, the basic structure of your site will be:
+## How your site is organized
 
-- **Header/Navigation**
-  - Edit the Navigation in Admin > [Layouts](/admin/layouts)
-- **Page/Post Content**
-  - Create/edit Posts in Admin > [Posts](/admin/posts)
-  - Create/edit Pages in Admin > [Posts](/admin/pages)
-  - Create/edit Products in Admin > [Posts](/admin/products)
-    - <mark>(you must enable the</mark> [Store](/documentation/store) <mark>first)</mark>
-- **Footer**
-  - Edit the Navigation and Footer in Admin > [Layouts](/admin/layouts)
-  
-## Unique features of Roe
+Every Roe site has three parts, and you edit each one in the Admin:
 
-Roe was built with the idea of taking simple/modular building blocks and combining them to create more complex sites. For this reason Roe does not use a templating language. Instead it uses [Roe-anji](/documentation/roeanji), simple markdown extensions and syntax that allow you to do all kinds of cool things: Collections, Cards, Galleries, and more.
+- **Header and navigation** — [Admin → Layouts](/admin/layouts)
+- **Pages, Posts, and Products** — your content:
+  - Posts — [Admin → Posts](/admin/posts)
+  - Pages — [Admin → Pages](/admin/pages)
+  - Products — [Admin → Products](/admin/products) (enable the [Store](/documentation/store) first)
+- **Footer** — [Admin → Layouts](/admin/layouts)
 
-### Roe-anji - Collections
+## Why Should you Use Roe?
 
-A Collection in Roe is similar to a blog feed in other systems but it's much more flexible. Most often, it's a list of Posts but it could be a list of Pages, Documentation, Products. In Roe, you can add them anywhere using a simple syntax. And you can customize them to create any kind of content Collection you want. [Learn more about Collections →](/documentation/collections)
+Most site builders, like Wordpress, Drupal and Substack, are complex, expensive, bloated or they lock you into rigid and restrictive architectures. Roe doesn’t. Instead, Roe uses an extremely simple text formatting language that allows you to style and organise your content into a light, robust website that you have complete control over.
 
-Collections are generally added to Pages since they're often collections of Posts and Products but you could:
+### Collections: lists of your content
 
-- put a Collection into a Post as well. Perhaps 3 related Posts or 3 featured Posts at the bottom of an article.
-- put a Collection into a Product page, perhaps 3 related Products at the bottom of each one.
+A Collection gathers your content into a list — your latest Posts, featured Products, or related articles — and you can drop one almost anywhere. It works like a blog feed, except you decide what it shows and where it appears. [Learn more about Collections →](/documentation/collections)
 
-### Roe-ajni - Cards
+Collections most often live on Pages (Blog page, Podcast page), but they fit elsewhere too:
 
-Cards allow you to embed styled elements directly in a Markdown file: pullquote, post link, aside. [Learn more about Cards →](cards.md)
+- In a Post — perhaps three related or featured Posts at the end of an article.
+- On a Product page — perhaps three related Products beneath each one.
 
-### Roe-anji - Image Galleries
+### Cards: styled blocks inside your text
 
-Galleries allow you to create complex grids of images with very simple syntax. [Learn more about Galleries →](/documentation/galleries)
+A Card drops a styled element straight into your Markdown — a pullquote, a post link, a product link, or an aside. [Learn more about Cards →](cards.md)
 
-## Onwards… What could you build with Roe?
+### Galleries: image grids from simple syntax
 
-Roe supports a full blog/newsletter system, store and memberships with payments with: Postmark, Snipcart and Stripe. It also has a full podcast system.
+A Gallery arranges images into a grid from a few lines of Markdown. [Learn more about Galleries →](/documentation/galleries)
 
-If you wanted to, you could replace about 5 other paid services with Roe, save a ton of money and have more fun running your site.
+## What you can build
 
-Please reach out with any [issues](mailto:roe@weareontheweb.com?subject=Roe%20bugs), [feedback](mailto:roe@weareontheweb.com?subject=Roe%20feedback), [feature requests](mailto:roe@weareontheweb.com?subject=Roe%20requests) or just to say [hello](mailto:roe@weareontheweb.com?subject=Just%20saying%20hello).
+Roe runs a full blog and newsletter, an online store, and paid memberships — using Postmark for email, Snipcart for e-commerce, and Stripe for payments. It publishes podcasts too. Together, these features can replace about five separate paid services, for less money, all while having more fun running a site you own.
+
+Have a question or an idea? Reach out with [issues](mailto:roe@weareontheweb.com?subject=Roe%20bugs), [feedback](mailto:roe@weareontheweb.com?subject=Roe%20feedback), [feature requests](mailto:roe@weareontheweb.com?subject=Roe%20requests), or just to say [hello](mailto:roe@weareontheweb.com?subject=Just%20saying%20hello).

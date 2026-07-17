@@ -74,6 +74,8 @@ By default it shares the page's canonical URL and its [og:title](/documentation/
 | `text` | No | Extra text passed to the native share sheet |
 | `style` | No | Descriptive word/s that add CSS classes to button (e.g. `style: small-center` → `share-small-center`) |
 
+**Styling:** the wrapper always carries a stable `.share` class (plus a `share-<token>` for each `style:` word), so a theme can align or restyle every share button at once. It's `inline-flex` by default, so to center them all: `.share { display: flex; justify-content: center }`.
+
 ## Subscribe button
 
 A "Subscribe" button that links to the member **sign-up** page. On a Roe site, subscribing means becoming a member (this includes newsletters). This button links to your [member sign-up](/documentation/members#member-pages) page.
