@@ -51,6 +51,7 @@ Your Global Site Settings cover the basics of your whole site — its name, bran
 ## Static Site Generation ([SSG](/documentation/glossary#ssg))
 
 - `Enable Auto-Generation` — keep a static (plain-file) copy of your site up to date and serve it to your visitors.
+- `STATIC SITE ACTIONS` — This button takes you to a page with various actions to help with SSG troubleshooting
 
 When this is on, Roe does two things: it rebuilds the static copy of your site whenever your content changes, and it serves that copy to visitors instead of the running app. This applies whether you run Roe locally or deploy it — Roe is still running, but what visitors see is the static version.
 
