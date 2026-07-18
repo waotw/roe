@@ -14,6 +14,7 @@ export default class extends Controller {
   connect() {
     this.textarea = this.element.querySelector('[data-editor-target="textarea"]');
     this.savedPos = null;
+    this.snapshotDefaults();
   }
 
   open(event) {
@@ -29,6 +30,39 @@ export default class extends Controller {
   close(event) {
     event?.preventDefault();
     this.modalTarget.style.display = "none";
+  }
+
+  // Cancel discards the current entries and closes. A plain close (X, backdrop,
+  // Escape) leaves them as-is so reopening resumes where you left off; a
+  // successful insert also resets, so the next block starts fresh.
+  cancel(event) {
+    event?.preventDefault();
+    this.resetFields();
+    this.close();
+  }
+
+  // Snapshot the modal's pristine field state once, so insert/cancel restore it.
+  snapshotDefaults() {
+    this.defaults = Array.from(
+      this.modalTarget.querySelectorAll("input, select, textarea"),
+    ).map((el) => ({
+      el,
+      value: el.value,
+      checked: el.checked,
+      placeholder: el.getAttribute("placeholder"),
+    }));
+  }
+
+  resetFields() {
+    (this.defaults || []).forEach(({ el, value, checked, placeholder }) => {
+      el.value = value;
+      el.checked = checked;
+      if (placeholder === null) el.removeAttribute("placeholder");
+      else el.setAttribute("placeholder", placeholder);
+      el.classList.toggle("cb-empty", !el.value);
+    });
+    this.syncTemplateOptions();
+    this.applyDependencies();
   }
 
   // The builder's fields live inside the post <form>, so stop Enter from
@@ -138,6 +172,8 @@ export default class extends Controller {
       // other inserts).
       document.execCommand("insertText", false, block);
     }
+
+    this.resetFields();
   }
 
   // --- helpers -------------------------------------------------------------
