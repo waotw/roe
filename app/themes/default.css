@@ -1878,6 +1878,17 @@ figcaption {
   background: var(--color-code-bg);
 }
 
+.card[class*="post-link-"] {
+  cursor: pointer;
+}
+
+.card[class*="post-link-"] .card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 .card[class*="post-link-"] .card-content {
   flex: 1;
   min-width: 0;
