@@ -819,7 +819,6 @@ class Admin::PostsController < Admin::BaseController
       tags:
       ---
 
-      Start writing...
     TEMPLATE
   end
 

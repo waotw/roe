@@ -177,7 +177,8 @@
          sticky bar's range is only ~80px (just the toolbar+TOC), and
          it scrolls out of view as soon as you start editing. -->
     <%= form.text_area :content, value: content,
-            class: "w-full font-mono text-sm p-1 border border-gray-300 box-border bg-white resize-none overflow-hidden pb-96",
+            placeholder: "Start writing…",
+            class: "w-full font-mono text-sm p-1 border border-gray-300 box-border bg-white resize-none overflow-hidden pb-96 focus:placeholder-transparent",
             data: {
               editor_target: "textarea",
               action: "input->editor#hideFlashOnInput input->editor#updateTOC"

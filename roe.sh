@@ -1350,7 +1350,11 @@ cmd_start() {
         esac
 
         log_info "Starting Tailwind CSS watcher..."
-        "$APP_DIR/bin/rails" tailwindcss:watch &
+        # [always] keeps the watcher alive when backgrounded. Plain
+        # tailwindcss:watch binds to a TTY on stdin and exits immediately
+        # when there isn't one — exactly this backgrounded (&) case — so
+        # the CSS would silently never rebuild on save.
+        "$APP_DIR/bin/rails" "tailwindcss:watch[always]" &
         TAILWIND_PID=$!
         echo "$TAILWIND_PID" > "$APP_DIR/tmp/pids/tailwind.pid"
         log_info "Tailwind watcher running (PID: $TAILWIND_PID)"

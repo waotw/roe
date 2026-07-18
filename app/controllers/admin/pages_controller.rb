@@ -374,7 +374,6 @@ class Admin::PagesController < Admin::BaseController
       status: draft
       ---
 
-      Start writing...
     TEMPLATE
   end
 
