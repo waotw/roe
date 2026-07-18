@@ -6,33 +6,50 @@ tags: admin
 
 # Themes
 
-Roe's theme system works with one CSS file. There are variables at the top to make it easy to change typography, spacing, colors, etc. And you can edit the CSS file any way you like or create your own theme.
+A theme controls how your site looks — its colors, fonts, spacing, and layout. Each theme is a single CSS file with a set of variables at the top for the changes you'll make most often. Adjust those variables to restyle your site in seconds, or edit the CSS directly when you want full control.
 
-<mark>Note: custom fonts are handled in the system settings: Settings → Fonts.</mark>
+<mark>Note: custom fonts are handled separately, under Settings → Fonts.</mark>
 
-## How the theme system works
+## How themes work
 
-**Built-in themes** — Roe comes with a curated set of themes. You can preview any theme before activating it. Activating a theme makes it live and copies the file to your site's theme folder. You can always change the theme under: Settings → Site → Theme.
+**Built-in themes.** Roe ships with a curated set of themes. Preview any of them before you commit. When you activate a theme, Roe makes it live and copies its file into your site's theme folder, where you can edit it. Change your active theme anytime under Settings → Site → Theme.
 
-**Reverting** — If you edit a theme's CSS and want to go back, you can revert to the original built-in version at any time. Just click `EDIT CSS` and you'll see a button to revert. 
+**Editing.** Every theme is just a file. Edit it live in Roe (Admin → Themes → `EDIT CSS`), or open the file in any text editor and save. Your edits stick when you switch between themes.
 
-**Version tracking** — When Roe updates, built-in themes may improve. Roe tracks the version of each theme independently from your site. If a newer version of a theme is available, you'll see an update option. Importantly, Roe will never overwrite your active theme automatically — you choose when (or if) to apply the update.
+**Reverting.** Changed a built-in theme and want the original back? Open `EDIT CSS` and click the revert button. Roe restores the bundled version.
 
-**Custom themes** — You're also free to edit the CSS directly. Every theme is just a file. Open it in any text editor, make changes, and save. Or edit the CSS live in the theme section of Roe. Your edits are preserved when switching between themes.
+**Updates.** When Roe updates, its built-in themes may improve. Roe tracks each theme's version separately from your copy, so when a newer version exists, you'll see an update option. Roe never overwrites your active theme on its own — you decide when, or whether, to apply an update.
+
+## Preview your changes as you edit
+
+When you edit a theme's CSS in Roe, you don't have to save to see the result. Roe applies your changes to a live preview as you type.
+
+To set it up:
+
+1. Open Admin → Themes and click `EDIT CSS` on the theme you want to change.
+2. Click `Preview`.
+   Roe opens your site in a new browser tab.
+3. Arrange the editor and the preview side by side.
+4. Edit the CSS.
+   The preview updates as you type — no save needed.
+5. Save when you're happy with it.
+   The preview reloads with your saved file.
+
+For best results, size the two windows so the editor sits on one side and the preview on the other. That way every change lands in front of you, and you can tune a color or a spacing value until it looks right.
 
 ## Customizing a theme
 
-Every theme uses **CSS variables** at the top of the file. This is the easiest and fastest way to customize colors, spacing, fonts, and layout without getting into the nitty gritty but you can do that too.
+The fastest way to restyle your site is through the **CSS variables** at the top of the theme file. They set colors, spacing, fonts, and layout in one place, so you can make sweeping changes without touching the rest of the CSS. The rest of this page lists those variables. You're free to edit the full file too — see [Going further](#going-further).
 
-## CSS Variables
+## CSS variables
 
 ### Layout
 
 `--container-width` = The maximum width of the overall site container.
 
-`--sidebar-width` = Width of the optional site [sidebar](layouts#sidebar) (left or right). <mark>Note: Add a sidebar in Layouts → Sidebar and create the file.</mark>
+`--sidebar-width` = Width of the optional site [sidebar](layouts#sidebar) (left or right). <mark>Note: add a sidebar in Layouts → Sidebar and create the file.</mark>
 
-`--aside-width` = When an [aside](cards#aside) is present, the main content shifts right by this amount and the aside is positioned in this space.
+`--aside-width` = When an [aside](cards#aside) is present, the main content shifts right by this amount and the aside sits in the space that opens up.
 
 #### Fine-tuning asides
 
@@ -40,14 +57,13 @@ Every theme uses **CSS variables** at the top of the file. This is the easiest a
 --aside-text-top-offset: 0.25rem;
 --aside-image-top-offset: 0.4rem;
 ```
-These two variables fine-tune the vertical alignment between the aside and the text to the right of it. Different fonts have different line metrics, so these small offsets ensure the top of the aside and the first line of body text appear visually aligned. Adjust these if you change fonts and notice a slight misalignment with asides.
+These two variables align the top of an aside with the first line of the body text beside it. Different fonts have different line metrics, so a small offset keeps the two visually level. Adjust them if you change fonts and notice an aside sitting slightly high or low.
 
 ### Typography
 
-`--font-scale` = Increase/decrease to affect all font-sizes across the site.
+`--font-scale` = Increase or decrease this to scale every font size on the site at once.
 
-**Font families**  
-By default headings and accent text inherit from the body font. Change `--font-heading` or `--font-accent` to use a different typeface for those elements.
+**Font families.** Headings and accent text use the body font by default. Set `--font-heading` or `--font-accent` to give those elements a different typeface.
 
 ```css
 --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
@@ -73,7 +89,7 @@ By default headings and accent text inherit from the body font. Change `--font-h
 
 ### Spacing
 
-Consistent spacing scale used for margins, padding, and gaps throughout the theme.
+A single scale for the margins, padding, and gaps used throughout the theme.
 
 ```css
 --space-0: 0;
@@ -88,7 +104,7 @@ Consistent spacing scale used for margins, padding, and gaps throughout the them
 --space-16: 4rem;
 ```
 
-`--space-gallery` = the gab between images in a [gallery](galleries). Adjust this if you want tighter or looser spacing between gallery photos.
+`--space-gallery` = The gap between images in a [gallery](galleries). Lower it for tighter photos, raise it for more breathing room.
 
 ### Colors
 
@@ -109,16 +125,16 @@ Consistent spacing scale used for margins, padding, and gaps throughout the them
 --color-highlight-text: #ffff00;
 ```
 
-Most of these are self-explanatory, but a few notes:
+Most of these explain themselves. A few worth calling out:
 
-- `--color-link` controls normal link color; `--color-visited` controls visited links. Set them to the same value if you don't want visited-state differentiation.
-- `--color-link-collection` is used for links inside [collections](collections) (posts, pages, products), letting you style collection links separately from text links.
-- `--color-bg-dim` is used for subtle shaded areas like alternating table rows or form field backgrounds.
-- `--color-highlight-text` sets the background color for highlighted text.
+- `--color-link` sets normal link color and `--color-visited` sets visited links. Give them the same value if you don't want visited links to look different.
+- `--color-link-collection` colors links inside [collections](collections) (posts, pages, products), so you can style them apart from regular text links.
+- `--color-bg-dim` shades subtle areas like alternating table rows and form fields.
+- `--color-highlight-text` sets the background behind highlighted text.
 
 ### Media players
 
-Colors and backgrounds for the audio and video players. These are scoped separately so you can give the players a distinct look from the rest of the page.
+Colors and backgrounds for the audio and video players. They're scoped on their own, so you can give the players a look distinct from the rest of the page.
 
 ```css
 --player-bg: #f5f5f5;
@@ -136,8 +152,10 @@ Colors and backgrounds for the audio and video players. These are scoped separat
 
 ## Going further
 
-You're welcome to edit the entire CSS file as well for a fully custom theme. The class names are all semantic and many are documented in the CSS itself. If you run into trouble, you can always revert back to the original CSS for any theme from `Admin → Themes → Edit CSS`.
+When the variables aren't enough, edit the full CSS file for a completely custom theme. The class names are semantic, and many are documented in the CSS itself. If a change goes sideways, revert to the original at any time from Admin → Themes → `EDIT CSS`.
 
-- Send an [email to support](mailto:roe@weareontheweb.com) and a human will get back to you
-- File an issue here if you've found a bug
-- If you've made improvements to any built-in theme or want to create a theme that others can use, feel free to file a pull request.
+If you get stuck or want to share your work:
+
+- [Email support](mailto:roe@weareontheweb.com) and a human will get back to you.
+- File an issue if you've found a bug.
+- Send a pull request if you've improved a built-in theme or built one others could use.
