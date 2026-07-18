@@ -22,6 +22,13 @@ export default class extends Controller {
     this.channel = new BroadcastChannel(`preview-${this.idValue}`);
     this.channel.onmessage = (event) => this.handleMessage(event);
 
+    // Theme previews apply CSS live: announce we're ready so the editor
+    // pushes the current (unsaved) CSS immediately, without waiting for the
+    // next keystroke. Harmless for content previews (editor ignores it).
+    if (this.idValue.startsWith("theme-")) {
+      this.channel.postMessage({ action: "preview-ready" });
+    }
+
     // Restore scroll position after a refresh-triggered reload.
     const savedScroll = sessionStorage.getItem("previewScrollPosition");
     if (savedScroll !== null) {
@@ -42,10 +49,32 @@ export default class extends Controller {
       return;
     }
 
+    if (data.action === "css" && typeof data.css === "string") {
+      this.applyCss(data.css);
+      return;
+    }
+
     if (data.action === "refresh") {
       sessionStorage.setItem("previewScrollPosition", window.scrollY);
       window.location.reload();
     }
+  }
+
+  // Live theme preview: replace the file-based theme stylesheet with the
+  // editor's unsaved CSS. On the first update we disable the <link> so the
+  // injected <style> alone governs the cascade; later updates just rewrite
+  // its text — no reload, scroll preserved. A save triggers a full "refresh"
+  // reload, which drops this <style> and re-fetches the saved file.
+  applyCss(css) {
+    if (!this.liveThemeStyle) {
+      document
+        .querySelectorAll('link[rel="stylesheet"][href*="/theme/"]')
+        .forEach((link) => { link.disabled = true; });
+      this.liveThemeStyle = document.createElement("style");
+      this.liveThemeStyle.setAttribute("data-live-theme", "");
+      document.head.appendChild(this.liveThemeStyle);
+    }
+    this.liveThemeStyle.textContent = css;
   }
 
   render(html) {

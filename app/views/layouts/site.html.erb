@@ -62,9 +62,15 @@
     <header class="site-nav <%= logo_classes %>">
       <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
     </header>
-    <% preview_live = defined?(@preview_mode) && @preview_mode %>
+    <%# Live preview receiver: content editors set @preview_mode/@preview_id;
+        the theme editor opens the site with ?preview_theme=<name> and drives
+        it over the "preview-theme-<name>" channel. Both attach the same
+        preview-receiver controller. %>
+    <% theme_preview   = params[:preview_theme].presence %>
+    <% preview_live    = (defined?(@preview_mode) && @preview_mode) || theme_preview.present? %>
+    <% preview_recv_id = theme_preview.present? ? "theme-#{theme_preview}" : (defined?(@preview_id) ? @preview_id : nil) %>
     <main data-controller="footnote-tooltip<%= " preview-receiver" if preview_live %>"
-          <% if preview_live %>data-preview-receiver-id-value="<%= @preview_id %>"<% end %>>
+          <% if preview_live %>data-preview-receiver-id-value="<%= preview_recv_id %>"<% end %>>
       <% flash.each do |type, message| %>
         <% flash_classes = "flash flash-#{type}" %>
         <div class="<%= flash_classes %>">

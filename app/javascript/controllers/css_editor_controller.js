@@ -11,6 +11,17 @@ export default class extends Controller {
     console.log("CSS Editor connected");
     this.hasUnsavedChanges = false;
     this.originalContent = this.textareaTarget.value;
+    this.previewUpdateTimer = null;
+
+    // Channel to the live preview tab (same id the preview-receiver uses).
+    // When the preview opens it pings "preview-ready" so we can sync the
+    // current CSS at once, rather than waiting for the next keystroke.
+    if (typeof BroadcastChannel !== "undefined") {
+      this.previewChannel = new BroadcastChannel(`preview-${this.previewIdValue}`);
+      this.previewChannel.onmessage = (event) => {
+        if (event.data && event.data.action === "preview-ready") this.pushPreviewCss();
+      };
+    }
 
     // Wait for CodeMirror to be available, then initialize
     this.waitForCodeMirror().then(() => {
@@ -89,6 +100,9 @@ export default class extends Controller {
       } else {
         this.unsavedIndicatorTarget.classList.add("hidden");
       }
+
+      // Push the edit to the live preview tab (debounced), before save.
+      this.schedulePreviewUpdate();
     });
 
     // Set height
@@ -129,6 +143,20 @@ export default class extends Controller {
     form.requestSubmit();
   }
 
+  // Debounced live push of the current CSS to the open preview tab, so it
+  // updates as you type — the same pre-save auto-refresh posts/pages/products
+  // get. Harmless when no preview tab is listening.
+  schedulePreviewUpdate() {
+    if (!this.previewChannel) return;
+    clearTimeout(this.previewUpdateTimer);
+    this.previewUpdateTimer = setTimeout(() => this.pushPreviewCss(), 150);
+  }
+
+  pushPreviewCss() {
+    if (!this.previewChannel || !this.editor) return;
+    this.previewChannel.postMessage({ action: "css", css: this.editor.getValue() });
+  }
+
   preview() {
     const previewUrl = `/?preview_theme=${this.themeNameValue}`;
     window.open(previewUrl, this.previewIdValue);
@@ -167,6 +195,8 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("keydown", this.handleKeyboard.bind(this));
     window.removeEventListener("beforeunload", this.handleBeforeUnload.bind(this));
+    clearTimeout(this.previewUpdateTimer);
+    if (this.previewChannel) this.previewChannel.close();
     if (this.editor) {
       this.editor.toTextArea();
     }
