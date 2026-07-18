@@ -214,6 +214,10 @@ module HasMarkdownExtensions
   private
 
   def render_code_block(code, language)
+    # Drop the newline before the closing fence — plus any indentation the
+    # fence carries when the block sits inside a list — so it doesn't render
+    # as a trailing blank line inside the <pre>. (Poetry blocks do the same.)
+    code = code.sub(/\n[ \t]*\z/, "")
     escaped_code = CGI.escapeHTML(code)
     lang_class = language.empty? ? "" : " class=\"language-#{CGI.escapeHTML(language)}\""
     "<pre><code#{lang_class}>#{escaped_code}</code></pre>"

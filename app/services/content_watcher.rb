@@ -9,11 +9,11 @@ class ContentWatcher
     # These don't sync into DB models — process_file falls through with
     # no work to do — but they DO need to wake the watcher so the
     # trigger_static_generation call at the end of handle_changes fires.
-    # Without them, edits to navigation.md, theme CSS, or a card
-    # template don't auto-regenerate the static site.
+    # Without them, edits to navigation.md or theme CSS don't
+    # auto-regenerate the static site. (Content/card templates live under
+    # system/templates, already covered by the "system" entry above.)
     File.join(RoeSitePaths::SITE_PATH, "layout"),
-    File.join(RoeSitePaths::SITE_PATH, "theme"),
-    File.join(RoeSitePaths::SITE_PATH, "templates")
+    File.join(RoeSitePaths::SITE_PATH, "theme")
   ].freeze
 
     # Define what file types we process
@@ -27,12 +27,22 @@ class ContentWatcher
     EXTENSION_PATTERN = /\.(#{ALLOWED_EXTENSIONS.join('|')})$/i
 
   def self.start
-    listener = Listen.to(*WATCH_PATHS, ignore: /\/variants\//) do |modified, added, removed|
+    # Listen calls realpath on every watched dir at startup, so a single
+    # missing path (a site that never created site/theme, or a directory
+    # that moved) raises ENOENT and takes the whole watcher — and all
+    # content auto-sync — down with it. Watch only the dirs that exist;
+    # a missing optional dir simply isn't watched.
+    paths = WATCH_PATHS.select { |p| Dir.exist?(p) }
+    if (missing = WATCH_PATHS - paths).any?
+      puts "⚠️  ContentWatcher skipping missing paths: #{missing.join(', ')}"
+    end
+
+    listener = Listen.to(*paths, ignore: /\/variants\//) do |modified, added, removed|
       handle_changes(modified, added, removed)
     end
 
     listener.start
-    puts "👀 Watching #{WATCH_PATHS.join(', ')} for changes (ignoring variants)..."
+    puts "👀 Watching #{paths.join(', ')} for changes (ignoring variants)..."
 
     listener
   end

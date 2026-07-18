@@ -3130,13 +3130,17 @@ p.podcast-audio-fallback {
 }
 
 .content.documentation li pre {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-4);
   margin: 0;
 }
 
 .content.documentation li code {
   font-size: var(--text-xs);
   padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation li pre code {
+  padding: 0;
 }
 
 .page-documentation .collection-grid,

@@ -1319,7 +1319,7 @@ cmd_start() {
 
         echo ""
         echo -e "  ${BOLD}${GREEN}Roe is ready to start${NC}"
-        echo -e "  Server: ${CYAN}${URL}${NC}"
+        echo -e "  Site: ${CYAN}${URL}${NC}"
         echo -e "  Admin:  ${CYAN}${URL}/admin${NC}"
         echo ""
         echo "  Choose:"

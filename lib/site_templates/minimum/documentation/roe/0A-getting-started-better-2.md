@@ -1,6 +1,6 @@
 ---
 title: Getting Started with Roe
-status: draft
+status: published
 tags: guide, getting-started
 url_name: getting-started
 ---
