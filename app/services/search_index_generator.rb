@@ -57,7 +57,7 @@ class SearchIndexGenerator
   end
 
   def search_all_pages?
-    value = SiteConfig.get("search_all_pages")
+    value = SiteConfig.content("search.all_pages")
     value == true || value == "true"
   end
 
@@ -72,7 +72,7 @@ class SearchIndexGenerator
   end
 
   def search_roe_docs?
-    value = SiteConfig.get("search_roe_docs")
+    value = SiteConfig.content("search.roe_docs")
     value == true || value == "true"
   end
 

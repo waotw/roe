@@ -40,38 +40,6 @@ class Admin::ConfigsController < Admin::BaseController
       }
     },
 
-    search: {
-      label: "Search",
-      fields: {
-        "search_all_pages" => {
-          type: :checkbox,
-          label: "Include all pages in search",
-          hint: "By default only pages linked in the navigation or footer are searchable. Turn on to index every published page."
-        },
-        "search_roe_docs" => {
-          type: :checkbox,
-          label: "Include bundled Roe documentation in search",
-          hint: "Roe's own documentation (documentation/roe) is excluded from search by default. Turn on to include it."
-        },
-        "results_when_opened" => {
-          type: :checkbox,
-          label: "Show results before typing",
-          hint: "By default, search doesn't show results until you type but if you want results to show up before typing, enable this option."
-        }
-      }
-    },
-
-    content: {
-      label: "Content",
-      fields: {
-        "soft_line_breaks" => {
-          type: :checkbox,
-          label: "Respect single line breaks",
-          hint: "By default Markdown needs two trailing spaces (or a blank line) to start a new line. Turn on to make every single line break in your content show as a line break."
-        }
-      }
-    },
-
     branding: {
       label: "Branding",
       fields: {
@@ -164,6 +132,49 @@ class Admin::ConfigsController < Admin::BaseController
           type: :checkbox,
           label: "Enable Auto-Generation",
           hint: "Automatically generate static files when content changes"
+        }
+      }
+    }
+  }.freeze
+
+  # Content settings — split into its own content.yml (search nested). Field
+  # keys are dotted so the editor buries them into nested YAML
+  # (search.all_pages → search: { all_pages: ... }), the same way theme.active
+  # does.
+  CONTENT_CONFIG_SCHEMA = {
+    content: {
+      label: "Global",
+      fields: {
+        "soft_line_breaks" => {
+          type: :checkbox,
+          label: "Respect single line breaks",
+          hint: "By default Markdown needs two trailing spaces (or a blank line) to start a new line. Turn on to make every single line break in your content show as a line break."
+        },
+        "heading_links" => {
+          type: :checkbox,
+          label: "Heading links",
+          hint: "Show a copy-link icon when hovering a heading on your public site (desktop only). Click it to copy a link straight to that section."
+        }
+      }
+    },
+
+    search: {
+      label: "Search",
+      fields: {
+        "search.all_pages" => {
+          type: :checkbox,
+          label: "Include all pages in search",
+          hint: "By default only pages linked in the navigation or footer are searchable. Turn on to index every published page."
+        },
+        "search.roe_docs" => {
+          type: :checkbox,
+          label: "Include bundled Roe documentation in search",
+          hint: "Roe's own documentation (documentation/roe) is excluded from search by default. Turn on to include it."
+        },
+        "search.results_when_opened" => {
+          type: :checkbox,
+          label: "Show results before typing",
+          hint: "By default, search doesn't show results until you type but if you want results to show up before typing, enable this option."
         }
       }
     }
@@ -309,6 +320,13 @@ class Admin::ConfigsController < Admin::BaseController
         type: "site",
         description: "Site title, URL, author info, and branding",
         edit_path: admin_edit_site_config_path
+      },
+      {
+        name: "content.yml",
+        path: "global/content.yml",
+        type: "content",
+        description: "Content rendering (line breaks, heading links) and search",
+        edit_path: admin_edit_content_config_path
       },
       {
         name: "custom_code.yml",
@@ -495,6 +513,21 @@ class Admin::ConfigsController < Admin::BaseController
 
   def update_site
     update_config("site", SiteConfig::SITE_FILE)
+  end
+
+  # GET — dedicated edit page for content.yml (rendering + search), split
+  # out of site.yml. Reuses the schema-driven config editor.
+  def edit_content
+    @config_type = "content"
+    @config_content = File.exist?(SiteConfig::CONTENT_FILE) ? File.read(SiteConfig::CONTENT_FILE) : ""
+    @config_hash = (YAML.safe_load(@config_content, permitted_classes: [ Date, Time, Symbol ]) if @config_content.present?) || {}
+    @config_schema = CONTENT_CONFIG_SCHEMA
+    @available_themes = []
+    render :edit
+  end
+
+  def update_content
+    update_config("content", SiteConfig::CONTENT_FILE)
   end
 
   # GET — focused edit page for custom_code.yml. Loads the three
@@ -1678,6 +1711,10 @@ class Admin::ConfigsController < Admin::BaseController
       else
         flash[:notice] = sync_result[:message]
       end
+
+    when "content"
+      Rails.cache.clear
+      flash[:notice] = "Content configuration updated successfully"
 
     else
       flash[:notice] = "#{type.split('/').last.capitalize} configuration updated successfully"

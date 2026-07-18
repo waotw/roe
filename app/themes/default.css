@@ -229,6 +229,17 @@ li > p {
   margin: 0 0 0 0;
 }
 
+.heading-anchor {
+  --heading-anchor-size: clamp(
+    1.4rem,
+    0.85em,
+    1.7rem
+  --heading-anchor-color: currentColor;
+  --heading-anchor-opacity: 0.25;
+  --heading-anchor-offset-x: 0.35em;
+  --heading-anchor-offset-y: 0rem;
+}
+
 /* =========== LAYOUT — SITE NAV ============ */
 
 .site-nav {

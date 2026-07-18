@@ -39,6 +39,11 @@
       value.each do |field, field_value|
         flattened_config["snipcart.#{field}"] = field_value
       end
+    elsif key == 'search' && value.is_a?(Hash)
+      # Search is 1 level: search.all_pages, search.roe_docs, ...
+      value.each do |field, field_value|
+        flattened_config["search.#{field}"] = field_value
+      end
     else
       flattened_config[key] = value
     end
@@ -78,34 +83,6 @@
 
                   <div class="space-y-3 pl-4 border-l-2 border-gray-200">
                     <% config_schema[:site_info][:fields].each do |field_name, field_config| %>
-                      <%= render 'shared/config_field',
-                               field_name: field_name,
-                               field_config: field_config,
-                               value: flattened_config[field_name],
-                               all_values: flattened_config %>
-                    <% end %>
-                  </div>
-                </div>
-
-                <!-- Search Section -->
-                <div class="config-section mb-10">
-                  <h3 class="text-base font-semibold text-gray-900 mb-1">Search</h3>
-                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
-                    <% config_schema[:search][:fields].each do |field_name, field_config| %>
-                      <%= render 'shared/config_field',
-                               field_name: field_name,
-                               field_config: field_config,
-                               value: flattened_config[field_name],
-                               all_values: flattened_config %>
-                    <% end %>
-                  </div>
-                </div>
-
-                <!-- Content Section -->
-                <div class="config-section mb-10">
-                  <h3 class="text-base font-semibold text-gray-900 mb-1">Content</h3>
-                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
-                    <% config_schema[:content][:fields].each do |field_name, field_config| %>
                       <%= render 'shared/config_field',
                                field_name: field_name,
                                field_config: field_config,
@@ -218,6 +195,35 @@
                     <% end %>
                     <%= link_to "Static Site Actions", admin_static_site_path,
                           class: "uppercase text-sm font-normal px-1.5 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
+                  </div>
+                </div>
+
+              <% elsif @config_type == 'content' %>
+                <!-- Content Section -->
+                <div class="config-section mb-10">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1"><%= config_schema[:content][:label] %></h3>
+                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                    <% config_schema[:content][:fields].each do |field_name, field_config| %>
+                      <%= render 'shared/config_field',
+                               field_name: field_name,
+                               field_config: field_config,
+                               value: flattened_config[field_name],
+                               all_values: flattened_config %>
+                    <% end %>
+                  </div>
+                </div>
+
+                <!-- Search Section -->
+                <div class="config-section mb-10">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1"><%= config_schema[:search][:label] %></h3>
+                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                    <% config_schema[:search][:fields].each do |field_name, field_config| %>
+                      <%= render 'shared/config_field',
+                               field_name: field_name,
+                               field_config: field_config,
+                               value: flattened_config[field_name],
+                               all_values: flattened_config %>
+                    <% end %>
                   </div>
                 </div>
 

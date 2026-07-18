@@ -6,7 +6,7 @@ tags: settings
 
 # Edit your Global Site Settings
 
-Your Global Site Settings cover the basics of your whole site — its name, branding, search, and more. Edit them in the Admin at [Settings → Global → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
+Your Global Site Settings cover the basics of your whole site — its name, branding, theme, and more. Edit them in the Admin at [Settings → Global → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
 
 ## Site Information
 
@@ -15,16 +15,6 @@ Your Global Site Settings cover the basics of your whole site — its name, bran
 - `Site Description` — a short description of your site. Used in meta tags and RSS/Atom feeds.
 - `Author Name` — the default author for your posts and pages.
 - `Author Email` — a contact address for the site author.
-
-## Search
-
-- `Include all pages in search` — by default, only pages linked in your navigation or footer are searchable. Turn this on to index every published page.
-- `Include bundled Roe documentation in search` — Roe's own documentation is left out of search by default. Turn this on to include it.
-- `Show results before typing` — by default, search waits until you type. Turn this on to show results as soon as the search opens.
-
-## Content
-
-- `Respect single line breaks` — Markdown normally needs two trailing spaces or a blank line to start a new line. Turn this on to treat every single line break as a line break.
 
 ## Branding
 

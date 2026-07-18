@@ -10,6 +10,16 @@ class SiteConfig < ApplicationRecord
   CUSTOM_CODE_FILE = File.join(SITE_PATH, "custom_code.yml")
   DEVELOPMENT_FILE = File.join(SITE_PATH, "development.yml")
   DEPLOY_FILE = File.join(SITE_PATH, "deploy.yml")
+  CONTENT_FILE = File.join(SITE_PATH, "content.yml")
+
+  # content.yml keys that used to live flat in site.yml. Lets `content`
+  # read a pre-split install (before the boot migration moves them).
+  CONTENT_LEGACY_KEYS = {
+    "search.all_pages"           => "search_all_pages",
+    "search.roe_docs"            => "search_roe_docs",
+    "search.results_when_opened" => "results_when_opened",
+    "soft_line_breaks"           => "soft_line_breaks"
+  }.freeze
 
   CACHE_KEY_PREFIX = "site_config"
 
@@ -68,6 +78,23 @@ class SiteConfig < ApplicationRecord
     config_data&.dig(*keys)
   rescue => e
     Rails.logger.error "SiteConfig.development error: #{e.message}"
+    nil
+  end
+
+  # Get content config (rendering + search), split out of site.yml. Reads
+  # content.yml; if the key isn't there yet, falls back to the pre-split flat
+  # key in site.yml so an un-migrated install keeps working.
+  def self.content(key = nil)
+    config_data = File.exist?(CONTENT_FILE) ? (YAML.load_file(CONTENT_FILE) || {}) : {}
+    return config_data unless key
+
+    value = config_data.dig(*key.to_s.split("."))
+    return value unless value.nil?
+
+    legacy = CONTENT_LEGACY_KEYS[key.to_s]
+    legacy ? get(legacy) : nil
+  rescue => e
+    Rails.logger.error "SiteConfig.content error: #{e.message}"
     nil
   end
 
@@ -175,6 +202,8 @@ class SiteConfig < ApplicationRecord
       SITE_FILE
     when "fonts"
       FONTS_FILE
+    when "content"
+      CONTENT_FILE
     when "deploy"
       DEPLOY_FILE
     when /^features\//

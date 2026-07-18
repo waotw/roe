@@ -37,6 +37,57 @@
     <style>
       <%= font_face_css.html_safe %>
     </style>
+    <%# Heading anchor links. Structure/behavior ships with Roe (theme-
+        independent). SIZE, COLOR, OPACITY and POSITION are exposed as CSS
+        variables so a theme can restyle just those from its own stylesheet,
+        e.g. in default.css:
+          .heading-anchor { --heading-anchor-size: 0.8em; --heading-anchor-color: #888;
+                            --heading-anchor-opacity: 0.5;
+                            --heading-anchor-offset-x: 1.6em; --heading-anchor-offset-y: 0; }
+        Hover-only, left gutter; hidden where there's no hover/gutter (mobile).
+        Toggle: content.yml `heading_links` (on unless explicitly false). %>
+    <% heading_links_on = SiteConfig.content("heading_links") != false %>
+    <% if heading_links_on %>
+    <style>
+      .content :is(h1,h2,h3,h4,h5,h6).has-heading-anchor { position: relative; }
+      a.heading-anchor {
+        position: absolute;
+        right: 100%;              /* sit just left of the heading text... */
+        padding-right: 0.4em;     /* ...and bridge the gap so moving onto the
+                                     icon never leaves the heading's hover area */
+        /* Vertically center on the heading's first line using the icon's
+           ACTUAL size, so alignment holds as the heading (and its size
+           clamp) scale across h1–h6. 0.5lh = middle of the line box. */
+        top: calc(0.5lh - 0.5 * var(--heading-anchor-size, 1em));
+        /* Theme-adjustable nudge (default none). Positive x = right, y = down.
+           Use it to keep the icon clear of a left sidebar, or fine-tune the
+           vertical alignment to taste. */
+        transform: translate(var(--heading-anchor-offset-x, 0), var(--heading-anchor-offset-y, 0));
+        display: inline-flex;
+        align-items: center;
+        opacity: 0;
+        color: inherit;
+        text-decoration: none;
+        transition: opacity 0.12s ease;
+      }
+      a.heading-anchor svg {
+        width: var(--heading-anchor-size, 1em);
+        height: var(--heading-anchor-size, 1em);
+        display: block;
+      }
+      a.heading-anchor svg path { fill: var(--heading-anchor-color, currentColor); }
+      /* Click feedback: instantly swap the link icon for the clipboard icon for
+         ~1s (display toggle, so the switch is instant — no fade). */
+      a.heading-anchor .ha-icon-copied { display: none; }
+      a.heading-anchor.copied .ha-icon-default { display: none; }
+      a.heading-anchor.copied .ha-icon-copied { display: block; }
+      .content :is(h1,h2,h3,h4,h5,h6).has-heading-anchor:hover a.heading-anchor,
+      a.heading-anchor:focus-visible { opacity: var(--heading-anchor-opacity, 1); outline: none; }
+      @media (hover: none), (max-width: 640px) {
+        a.heading-anchor { display: none; }
+      }
+    </style>
+    <% end %>
     <!-- Favicon -->
     <% if SiteConfig.get('favicon').present? %>
       <link rel="icon" type="image/x-icon" href="<%= config_image_path(SiteConfig.get('favicon')) %>">
@@ -69,13 +120,19 @@
     <% theme_preview   = params[:preview_theme].presence %>
     <% preview_live    = (defined?(@preview_mode) && @preview_mode) || theme_preview.present? %>
     <% preview_recv_id = theme_preview.present? ? "theme-#{theme_preview}" : (defined?(@preview_id) ? @preview_id : nil) %>
-    <main data-controller="footnote-tooltip<%= " preview-receiver" if preview_live %>"
+    <main data-controller="footnote-tooltip<%= " heading-anchor" if heading_links_on %><%= " preview-receiver" if preview_live %>"
           <% if preview_live %>data-preview-receiver-id-value="<%= preview_recv_id %>"<% end %>>
       <% flash.each do |type, message| %>
         <% flash_classes = "flash flash-#{type}" %>
         <div class="<%= flash_classes %>">
           <mark>&nbsp; • <%= message %> • &nbsp;</mark>
         </div>
+      <% end %>
+      <% if heading_links_on %>
+        <%# Cloned into each heading by the heading-anchor controller. Both icons
+            are inserted; CSS swaps to the clipboard one briefly after a copy. %>
+        <template data-heading-anchor-target="icon"><%= icon_svg("link") %></template>
+        <template data-heading-anchor-target="copiedIcon"><%= icon_svg("clipboard") %></template>
       <% end %>
       <%= yield %>
     </main>

@@ -3,10 +3,6 @@ url: ""
 description: ""
 author: ""
 author_email: ""
-search_all_pages: false
-results_when_opened: false
-search_roe_docs: false
-soft_line_breaks: false
 logo: ""
 logo_style: ""
 favicon: ""
@@ -17,8 +13,5 @@ twitter_handle: ""
 theme:
   active: "default"
 update_channel: stable
-# Site Sync byte transport: "http" (host-agnostic, over HTTPS — works
-# with any Roe host and makes moving hosts trivial) or "rsync" (over SSH,
-# via the configured deploy target). Defaults to http for new installs.
 sync_transport: http
 static_generation_enabled: false

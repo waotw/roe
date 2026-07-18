@@ -42,6 +42,52 @@ class ConfigGenerator
     )
 
     result[:installed].each { |path| puts "✓ Installed #{path}" }
+
+    migrate_content_config!
+  end
+
+  # One-time, idempotent migration for the site.yml → content.yml split.
+  # Earlier versions kept these flat in site.yml; they now live in
+  # content.yml (search nested). Move any that still linger in site.yml,
+  # preserving the user's values, then strip them from site.yml. A no-op
+  # once site.yml no longer holds them, so it's safe on every boot. Runs
+  # AFTER the kit install above, so it overwrites the freshly-seeded
+  # content.yml defaults with the user's real values.
+  CONTENT_MIGRATION_MAP = {
+    "search_all_pages"    => %w[search all_pages],
+    "search_roe_docs"     => %w[search roe_docs],
+    "results_when_opened" => %w[search results_when_opened],
+    "soft_line_breaks"    => %w[soft_line_breaks]
+  }.freeze
+
+  def migrate_content_config!
+    site_file    = SiteConfig::SITE_FILE
+    content_file = SiteConfig::CONTENT_FILE
+    return unless File.exist?(site_file)
+
+    site = YAML.load_file(site_file) || {}
+    stale = CONTENT_MIGRATION_MAP.keys.select { |k| site.key?(k) }
+    return if stale.empty?
+
+    content = (File.exist?(content_file) ? YAML.load_file(content_file) : {}) || {}
+    stale.each do |old_key|
+      *parents, leaf = CONTENT_MIGRATION_MAP[old_key]
+      target = parents.reduce(content) { |h, k| h[k] ||= {} }
+      target[leaf] = site.delete(old_key)
+    end
+
+    write_config_yaml(content_file, content)
+    write_config_yaml(site_file, site)
+    SiteConfig.sync_from_file("content")
+    SiteConfig.sync_from_file("site")
+    puts "✓ Migrated content settings (#{stale.join(', ')}) → content.yml"
+  rescue => e
+    Rails.logger.warn "[ConfigGenerator] content migration failed: #{e.class} #{e.message}"
+  end
+
+  # Match how Roe's other config writers emit YAML (no leading `---`).
+  def write_config_yaml(path, data)
+    File.write(path, YAML.dump(data).sub(/\A---\s*\n/, ""))
   end
 
   # Members. Three-step install:

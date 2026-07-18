@@ -6,7 +6,7 @@
 <div class="site-search"
      data-controller="site-search"
      data-site-search-index-url-value="<%= search_index_path %>"
-     data-site-search-results-when-opened-value="<%= SiteConfig.get("results_when_opened") ? true : false %>"
+     data-site-search-results-when-opened-value="<%= SiteConfig.content("search.results_when_opened") ? true : false %>"
      data-site-search-scope-value="<%= (local_assigns[:search_scope] || {}).to_json %>">
   <button type="button" class="site-action site-search-toggle"
           data-action="site-search#open" aria-label="Search" title="Search">

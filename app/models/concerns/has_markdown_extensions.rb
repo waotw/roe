@@ -563,7 +563,7 @@ module HasMarkdownExtensions
   # When on (site.yml `soft_line_breaks: true`), a single newline renders as a
   # <br> — no trailing-two-spaces needed. Off by default (standard Markdown).
   def soft_line_breaks?
-    value = SiteConfig.get("soft_line_breaks")
+    value = SiteConfig.content("soft_line_breaks")
     value == true || value == "true"
   end
 

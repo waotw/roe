@@ -1,0 +1,6 @@
+soft_line_breaks: false
+heading_links: true
+search:
+  all_pages: false
+  roe_docs: false
+  results_when_opened: false
