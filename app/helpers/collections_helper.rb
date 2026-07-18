@@ -4,7 +4,7 @@ module CollectionsHelper
     when Post
       "/posts/#{item.url_name}"
     when Documentation
-      "/documentation/#{item.url_name}"
+      item.public_url
     when Page
       "/#{item.url_name}"
     else

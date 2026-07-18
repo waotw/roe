@@ -1744,7 +1744,7 @@ module HasMarkdownExtensions
     if item.is_a?(Post)
       "/posts/#{item.url_name}"
     elsif item.is_a?(Documentation)
-      "/documentation/#{item.url_name}"
+      item.public_url
     elsif item.is_a?(Product)
       "/store/#{item.url_name}"
     else
@@ -2043,7 +2043,7 @@ module HasMarkdownExtensions
         record_url = case referenced_post
         when Page          then referenced_post.public_url
         when Product       then "/store/#{referenced_post.url_name}"
-        when Documentation then "/documentation/#{referenced_post.url_name}"
+        when Documentation then referenced_post.public_url
         else "/posts/#{referenced_post.url_name}"
         end
 

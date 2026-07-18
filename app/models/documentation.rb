@@ -106,4 +106,25 @@ class Documentation < ApplicationRecord
     end
     scope.to_a.flat_map(&:tags).uniq.sort
   end
+
+  # Public URL, mirroring the doc's directory under site/documentation.
+  # A doc inside a subdirectory is namespaced by its top-level folder
+  # (site/documentation/roe/... → /documentation/roe/<url_name>), so Roe's
+  # bundled docs never collide with a user's own docs at
+  # /documentation/<url_name>. Docs in the documentation root stay flat.
+  # Deeper nesting (roe/tutorials/...) collapses to the top-level scope;
+  # url_name is unique within a scope.
+  def public_url
+    scope = url_scope
+    scope.present? ? "/documentation/#{scope}/#{url_name}" : "/documentation/#{url_name}"
+  end
+
+  # Top-level subdirectory under site/documentation this doc lives in
+  # (e.g. "roe"), or nil for docs directly in the documentation root.
+  def url_scope
+    root = self.class.normalized_documentation_path
+    rel  = file_path.to_s.sub(/\A#{Regexp.escape(root)}\/?/, "")
+    segments = rel.split("/")
+    segments.length > 1 ? segments.first.presence : nil
+  end
 end

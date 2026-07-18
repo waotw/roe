@@ -24,7 +24,11 @@ module RoeUpdater
     # at ROE_ROOT/ for users (and for the launcher script). These get
     # copied out after every successful switch so updates pick up new
     # versions of the launcher / docs without manual intervention.
-    ROOT_SYNC_FILES = %w[roe.sh README.md AGENTS.md].freeze
+    # current/ is canonical; these are the files mirrored up to ROE_ROOT/.
+    # Matches bin/sync-from-site's root-file step. AGENTS.md is intentionally
+    # NOT here — it's developer material that rides along in current/ for
+    # anyone cloning the repo, and doesn't need to sit at the package root.
+    ROOT_SYNC_FILES = %w[roe.sh README.md LICENSE].freeze
 
     # Files that live INSIDE current/ but are per-install (gitignored,
     # never in the cloned tag) and so don't survive the SwitchManager

@@ -63,7 +63,7 @@ module CollectionBuilderSchema
 
     { key: "collection", type: :text, label: "Collection name",
       hint: "Name this menu so you can send content here. Add the same `collection: <name>` to any page, post, or product and it will be in this collection — sent content is combined with the order list below.",
-      docs: "/documentation/collections_templates#why-give-the-collection-a-name",
+      docs: "/documentation/roe/collections_templates#why-give-the-collection-a-name",
       depends_on: { field: "template", value: "menu" } },
 
     # For a menu, `order:` is a hand-picked url_name list (membership + order),
@@ -93,12 +93,12 @@ module CollectionBuilderSchema
     # in their own group; every other template gets it here, above `related`.
     { key: "collection", type: :text, label: "Collection name",
       hint: "Show only content tagged with `collection: <name>` in its metadata. (For the menu template, this instead names the menu so you can send content to it.)",
-      docs: "/documentation/collections_templates#why-give-the-collection-a-name",
+      docs: "/documentation/roe/collections_templates#why-give-the-collection-a-name",
       depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
 
     { key: "related", type: :boolean, label: "Related",
       hint: "When set to \"true\", only items connected through metadata will be in results",
-      docs: "/documentation/collections#show-related-content",
+      docs: "/documentation/roe/collections#show-related-content",
       depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
 
     # --- Display toggles: each only appears for the templates it affects.

@@ -68,7 +68,7 @@ class PostLinkPreview
     case record
     when Page          then record.public_url
     when Product       then "/store/#{record.url_name}"
-    when Documentation then "/documentation/#{record.url_name}"
+    when Documentation then record.public_url
     else "/posts/#{record.url_name}"
     end
   end

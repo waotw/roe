@@ -18,8 +18,24 @@ class DocumentationController < ApplicationController
     @docs_html = Page.new(content: index_markdown).to_html
   end
 
+  # Bundled "all docs" landing page at /documentation/roe. Renders a baked
+  # copy of the /site documentation-all page (roe_index.md) through the same
+  # markdown → collection pipeline, so every install has a docs index at the
+  # roe scope root even though the user's own /documentation-all page ships
+  # only on this site. Reuses the index view.
+  def roe_index
+    @docs_html = Page.new(content: roe_index_markdown).to_html
+    render :index
+  end
+
   def show
-    @doc = Documentation.all.find { |d| d.url_name == params[:url_name] }
+    # Scope the lookup to the requested subdirectory so a bundled Roe doc
+    # (/documentation/roe/<name>) and a user's own root doc
+    # (/documentation/<name>) can share a url_name without colliding.
+    # No scope segment resolves to a root doc only.
+    scope = params[:scope]
+    candidates = scope.present? ? Documentation.in_directory(scope) : Documentation.root
+    @doc = candidates.find { |d| d.url_name == params[:url_name] }
 
     raise ActiveRecord::RecordNotFound unless @doc
 
@@ -42,6 +58,12 @@ class DocumentationController < ApplicationController
 
       Roe documentation is not available.
     MD
+  end
+
+  def roe_index_markdown
+    File.read(Rails.root.join("app", "views", "documentation", "roe_index.md"))
+  rescue Errno::ENOENT
+    index_markdown
   end
 
   # Returns `/documentation` if the user has published a page at

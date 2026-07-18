@@ -117,9 +117,11 @@
             <%
               site_title = SiteConfig.get("title").to_s.strip.presence rescue nil
             %>
-            <span class="text-xs px-2 py-0.5 rounded uppercase font-mono border <%= env_classes %>" title="Rails.env: <%= Rails.env %>">
+            <span class="text-xs px-2 py-0.5 rounded-xs uppercase font-mono border <%= env_classes %>" title="Rails.env: <%= Rails.env %>">
               <%= env_label %>: <%= site_title %>
             </span>
+            <%= link_to "View site", root_path, target: "_blank", rel: "noopener",
+                  class: "text-xs px-2 py-0.5 rounded-xs uppercase font-mono border bg-blue-100 text-blue-800 border-blue-300 text-nowrap" %>
           </div>
           <!-- Right: Settings, Updates & Logout -->
           <% if content_for?(:admin_nav) %>
@@ -151,14 +153,29 @@
                 <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="A Roe update is available"></span>
               <% end %>
             </div>
-            <div class="relative inline-flex items-center">
-              <%= link_to "Settings", admin_configs_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%# Settings dropdown — Account + Roe (site configs). Reuses the same
+                dropdown controller/pattern as the Tools menu in the row below. %>
+            <div class="relative inline-flex items-center" data-controller="dropdown">
+              <button type="button" data-action="click->dropdown#toggle" class="text-sm font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1 cursor-pointer" title="Settings">
+                Settings
+                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+              </button>
               <% if any_integration_unconfigured? %>
                 <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
               <% end %>
+              <div data-dropdown-target="menu" class="hidden absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
+                <% if any_integration_unconfigured? %>
+                  <%= link_to admin_configs_path, class: "flex items-center justify-between px-4 py-2 text-sm text-amber-700 hover:bg-gray-100", title: "Some integrations need configuration" do %>
+                    Roe
+                    <span class="w-1.5 h-1.5 bg-amber-500 rounded-full" aria-hidden="true"></span>
+                  <% end %>
+                <% else %>
+                  <%= link_to "Roe", admin_configs_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+                <% end %>
+                <%= link_to "Account", admin_account_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+              </div>
             </div>
             <a href="https://go-roe.com/documentation" class="text-sm font-medium text-gray-500 hover:text-gray-900">Docs</a>
-            <%= link_to "Account", admin_account_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>
         </div>

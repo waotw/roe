@@ -1026,7 +1026,7 @@ class StaticGenerator
     end
 
     Documentation.not_draft.each do |doc|
-      urls << [ "#{host}/documentation/#{doc.url_name}", doc.updated_at ]
+      urls << [ "#{host}#{doc.public_url}", doc.updated_at ]
     end
 
     xml = +%(<?xml version="1.0" encoding="UTF-8"?>\n)

@@ -369,6 +369,13 @@ Rails.application.routes.draw do
   get "posts/:url_name", to: "posts#show", as: :post
   # System-guaranteed docs index.
   get "roe/documentation", to: "documentation#index", as: :roe_documentation
+  # Landing page for the bundled Roe docs at the scope root. Baked into the
+  # app so every install has it, even without a /documentation-all page.
+  # Must precede the dynamic routes below (else :url_name captures "roe").
+  get "documentation/roe", to: "documentation#roe_index", as: :roe_docs_index
+  # Subdirectory-namespaced docs (e.g. /documentation/roe/<name>). Listed
+  # before the flat route so /documentation/<name> only matches root docs.
+  get "documentation/:scope/:url_name", to: "documentation#show", as: :scoped_documentation
   get "documentation/:url_name", to: "documentation#show", as: :documentation
   get "store/:url_name", to: "products#show", as: :product
   # get "store/:url_name/validate", to: "products#validate", as: :product_validate, defaults: { format: :json }

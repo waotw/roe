@@ -97,6 +97,38 @@ if [[ -z "$DRY_RUN" ]]; then
 fi
 echo ""
 
+echo "→ Roe docs index page (single file copy + frontmatter strip):"
+echo "    site/pages/documentation-all.md  →  current/app/views/documentation/roe_index.md"
+rsync -vc $DRY_RUN \
+  site/pages/documentation-all.md \
+  current/app/views/documentation/roe_index.md
+
+# Same frontmatter strip as the /documentation index above: the /site
+# source is a Page (needs `---\n…\n---\n`), the bundled view renders the
+# markdown body only. This is the page served at /documentation/roe.
+if [[ -z "$DRY_RUN" ]]; then
+  dest="current/app/views/documentation/roe_index.md"
+  awk '
+    NR == 1 && /^---$/ { in_fm = 1; next }
+    in_fm && /^---$/   { in_fm = 0; next }
+    !in_fm             { print }
+  ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
+  echo "    (stripped YAML frontmatter from destination)"
+fi
+echo ""
+
+echo "→ Root launcher/docs (current/ is canonical → mirror to package root):"
+# roe.sh, README.md and LICENSE live in BOTH current/ and the package
+# root; current/ is the source of truth (roe.sh is edited there, the docs
+# too). The root copies are what users actually invoke/read, so keep them
+# in step here rather than only on in-app update. rsync -c so identical
+# files are a no-op.
+for f in roe.sh README.md LICENSE; do
+  echo "    current/$f  →  $f"
+  rsync -vc $DRY_RUN "current/$f" "$f"
+done
+echo ""
+
 # ── Config key drift (advisory, read-only) ────────────────────────────────
 # Configs are NOT synced by this script (their values are per-site), but
 # their KEYS still need to stay in step with the seeded templates. This
