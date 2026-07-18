@@ -40,7 +40,7 @@ When you're finished for the day:
 
 If Roe ever behaves oddly, restarting usually sorts it out: quit with `control` + `c`, then run `./roe.sh start` again.
 
-`roe.sh` understands a handful of other commands too. See [Roe App Commands](/documentation/roe-application-commands) for the full list.
+`roe.sh` understands a handful of other commands too. See [Roe App Commands](/documentation/roe/roe-application-commands) for the full list.
 
 ##### Next tutorial
 ```collection

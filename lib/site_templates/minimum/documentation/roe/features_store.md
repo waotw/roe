@@ -26,7 +26,7 @@ There are 3 key pieces that must be in place for Snipcart & Roe to work together
 
 1. Roe needs the API Keys from Snipcart (covered here: [Snipcart](documentation/snipcart))
 2. Your Store settings need to be set up (covered in this article)
-3. You need at least one product (covered here: [Products](/documentation/products))
+3. You need at least one product (covered here: [Products](/documentation/roe/products))
 
 This document has instructions for setting things up on the Roe side. Follow [Snipcart's documentation](https://docs.snipcart.com/v3/dashboard/store-configuration) for setting up things on their side. It's very good.
 
@@ -40,11 +40,11 @@ On the Roe side:
 
 ## Store Page
 
-There is no Store page be default. Since Roe is modular, you can build a Store page easily. Create a page called: `Store`, and add a product [Collection](/documentation/collections#products) to it.
+There is no Store page be default. Since Roe is modular, you can build a Store page easily. Create a page called: `Store`, and add a product [Collection](/documentation/roe/collections#products) to it.
 
 ## Displaying Products with Collections
 
-Products work with the collection system. Use `source: products` to create product grids — see [Collections → Products](/documentation/collections#products) for the full option list.
+Products work with the collection system. Use `source: products` to create product grids — see [Collections → Products](/documentation/roe/collections#products) for the full option list.
 
 ### Basic Product Grid
 
@@ -159,7 +159,7 @@ style: primary
 
 ## Store settings
 
-The Store integrates with Snipcart.  [Setting up Snipcart to work with Roe](/documentation/snipcart)
+The Store integrates with Snipcart.  [Setting up Snipcart to work with Roe](/documentation/roe/snipcart)
 
 Configure your store in [Admin → Settings → store.yml](/admin/configs/store/edit):
 
@@ -215,7 +215,7 @@ The domain of your site has to be registered with Snipcart for this to work.
 
 ## Going Live
 
-In order to add a Live API key to Roe, you'll need to deploy your site to a web host: [Guide → Deploy](/documentation/guide-deploy)
+In order to add a Live API key to Roe, you'll need to deploy your site to a web host: [Guide → Deploy](/documentation/roe/guide-deploy)
 
 1. **Add a credit card to Snipcart** - required to use LIVE mode.
 2. **Get Live API Key** - From your Snipcart dashboard

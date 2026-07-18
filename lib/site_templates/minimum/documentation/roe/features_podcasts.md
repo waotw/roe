@@ -10,7 +10,7 @@ status: published
 
 To create a podcast, go to the Settings page and click the `ADD PODCAST` button. This will generate the settings file (`podcast.yml`) and edit it.
 
-These are the global settings for your podcast and all should be filled in. A breakdown of these settings and what they represent can be found here: [Podcast Feed & Tags](/documentation/podcast-feed-tags).
+These are the global settings for your podcast and all should be filled in. A breakdown of these settings and what they represent can be found here: [Podcast Feed & Tags](/documentation/roe/podcast-feed-tags).
 
 ## Episode
 

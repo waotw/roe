@@ -211,7 +211,7 @@ The default theme gives you:
 - `cinema` — 21:9 super wide (alias: `film`)
 - `original` — keep each image's natural shape (alias: `auto`)
 
-These match the ratios used by [product collections](/documentation/store#displaying-products-with-collections), so the same names work in both places. Which ratios are available comes from your theme's CSS, so a theme can offer its own.
+These match the ratios used by [product collections](/documentation/roe/store#displaying-products-with-collections), so the same names work in both places. Which ratios are available comes from your theme's CSS, so a theme can offer its own.
 
 **Note:** aspect ratio doesn't apply to a carousel (`slideshow: true`) — those images are sized by height instead.
 

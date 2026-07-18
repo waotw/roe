@@ -59,7 +59,7 @@ This is where most of your work happens. Use the Admin to create and edit:
 
 - Posts — [Admin → Posts](/admin/posts)
 - Pages — [Admin → Pages](/admin/pages)
-- Products — [Admin → Products](/admin/products) (after you enable the [Store](/documentation/store))
+- Products — [Admin → Products](/admin/products) (after you enable the [Store](/documentation/roe/store))
 
 ### Footer
 
@@ -67,13 +67,13 @@ The footer holds navigation, copyright, and other site-wide content. To edit it,
 
 ## Building more advanced pages
 
-Once you're comfortable creating posts and pages, Roe can help you build richer layouts — still without writing code. It gives you [Roe-anji](/documentation/roeanji): small additions to Markdown that you combine to make more complex pages.
+Once you're comfortable creating posts and pages, Roe can help you build richer layouts — still without writing code. It gives you [Roe-anji](/documentation/roe/roeanji): small additions to Markdown that you combine to make more complex pages.
 
 ### Collections
 
 A collection shows a list of your content automatically. You could show your latest posts, featured products, related articles, or documentation pages.
 
-You can place a collection almost anywhere — inside a page, a post, or a product page. [Learn more about Collections →](/documentation/collections)
+You can place a collection almost anywhere — inside a page, a post, or a product page. [Learn more about Collections →](/documentation/roe/collections)
 
 ### Cards
 
@@ -81,7 +81,7 @@ A card inserts a ready-made content block into a page, such as a pull quote, a h
 
 ### Image galleries
 
-An image gallery arranges several images into a tidy layout from only a few lines of Markdown. [Learn more about Galleries →](/documentation/galleries)
+An image gallery arranges several images into a tidy layout from only a few lines of Markdown. [Learn more about Galleries →](/documentation/roe/galleries)
 
 ## What else can Roe do?
 

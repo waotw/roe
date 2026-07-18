@@ -18,7 +18,7 @@ template: links
 
 # Installing Roe
 
-Roe is an application built with [Ruby on Rails](/documentation/glossary#ruby-on-rails). In order to use Roe locally, you'll need to install Ruby and a few supporting tools. This is the biggest hurdle to using Roe, well worth it, and once it's done, you can create as many Roe sites as you want without having to reinstall anything.
+Roe is an application built with [Ruby on Rails](/documentation/roe/glossary#ruby-on-rails). In order to use Roe locally, you'll need to install Ruby and a few supporting tools. This is the biggest hurdle to using Roe, well worth it, and once it's done, you can create as many Roe sites as you want without having to reinstall anything.
 
 Currently, I have not tested Roe on Windows. If you're interested in getting it working, I would love the help: [roe@weareontheweb.com](mailto:roe@weareontheweb.com)
 
@@ -41,11 +41,11 @@ Roe contains two folders: `/current` (the app/code) and `/site` (all your site c
 4. In the Terminal type `./roe.sh check` into the terminal and press `return`.
 5. **Installing Ruby:** the script will check what's already installed and then ask to install anything missing.
     - When you see `Install now? [y/q]`, type `y` and press `return`.
-    - The script installs [mise](/documentation/glossary#mise) (a tool for installing programming languages) and the correct Ruby version for Roe.
+    - The script installs [mise](/documentation/roe/glossary#mise) (a tool for installing programming languages) and the correct Ruby version for Roe.
     - <mark>Note:</mark> on a fresh Mac, you may be prompted to install Apple's Command Line Tools. macOS will show a separate installer window; when it finishes, return to the terminal and press `c` to continue.
     - Some steps take a few minutes the first time. Wait until the terminal prompt is back and you see: `[✓] Ready — Ruby and Git are in place.`
 6. **Roe setup:** you'll see `Next step: Run the Roe setup`, type `y` and press `return`.
-    - The setup runs as an interactive progress screen: it installs [gems](/documentation/glossary#gems), creates your `/site` folder, prepares the database, generates default configuration, and syncs content.
+    - The setup runs as an interactive progress screen: it installs [gems](/documentation/roe/glossary#gems), creates your `/site` folder, prepares the database, generates default configuration, and syncs content.
 7. **Admin user:** once setup finishes, you'll see the admin user setup:
     - Enter the email you want to use for Roe
     - Choose whether to use a random or manual password.
@@ -57,7 +57,7 @@ Roe contains two folders: `/current` (the app/code) and `/site` (all your site c
 11. The server starts automatically and opens Roe in your browser.
 12. Sign in with the admin user you just created.
 
-Check [Getting Started with Roe](/documentation/getting-started-with-roe) for some help exploring Roe.
+Check [Getting Started with Roe](/documentation/roe/getting-started-with-roe) for some help exploring Roe.
 
 ## Linux
 
@@ -76,11 +76,11 @@ Check [Getting Started with Roe](/documentation/getting-started-with-roe) for so
 3. Type `./roe.sh check` into the terminal and press `enter`.
 4. **Installing Ruby:** the script will check what's already installed and then ask to install anything missing.
     - When you see `Install now? [y/q]`, type `y` and press `enter`.
-    - The script installs [mise](/documentation/glossary#mise) (a small version manager) and the correct Ruby version for you.
+    - The script installs [mise](/documentation/roe/glossary#mise) (a small version manager) and the correct Ruby version for you.
     - <mark>Note for Linux:</mark> if your system is missing the C compiler and `make` needed to build Ruby's libraries, the script shows the install command for your distribution (Debian/Ubuntu `apt-get`, Fedora/RHEL `dnf`, Arch `pacman`, etc.). Copy it, run it in another terminal, then return here and press `c` to continue.
     - Some steps take a few minutes the first time. Wait until you see: `[✓] Ready — Ruby and Git are in place.`
 5. **Roe setup:** you'll see `Next step: Run the Roe setup`, type `y` and press `enter`.
-    - The setup runs as an interactive progress screen: it installs [gems](/documentation/glossary#gems), creates your `/site` folder, prepares the database, generates default configuration, and syncs content.
+    - The setup runs as an interactive progress screen: it installs [gems](/documentation/roe/glossary#gems), creates your `/site` folder, prepares the database, generates default configuration, and syncs content.
 6. **Admin user:** once setup finishes, you'll see the admin user setup:
     - Enter the email you want to use for Roe
     - Choose whether to use a random or manual password.
@@ -93,4 +93,4 @@ Check [Getting Started with Roe](/documentation/getting-started-with-roe) for so
 
 ## You're done
 
-Check [Getting Started with Roe](/documentation/getting-started-with-roe) for next steps.
+Check [Getting Started with Roe](/documentation/roe/getting-started-with-roe) for next steps.

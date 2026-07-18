@@ -31,4 +31,4 @@ This is the section that allows you to see all members, edit their tier, cancel 
 
 ### Payments
 
-For payment-related configuration (price, mode, donation amounts), see: [Settings → Members](/documentation/settings-members).
+For payment-related configuration (price, mode, donation amounts), see: [Settings → Members](/documentation/roe/settings-members).

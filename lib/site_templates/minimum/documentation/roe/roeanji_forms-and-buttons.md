@@ -51,7 +51,7 @@ quantity: 1
 | `style` | No | `primary` (default), `secondary`, or `outline` |
 | `quantity` | No | Default quantity — default 1 |
 
-For more information about product buttons and how they work, see [Store](/documentation/store) for the full picture.
+For more information about product buttons and how they work, see [Store](/documentation/roe/store) for the full picture.
 
 ## Share button
 
@@ -63,7 +63,7 @@ for: share
 ```
 ````
 
-By default it shares the page's canonical URL and its [og:title](/documentation/glossary#open-graph-og), so links shared on social media have the right link/title. Override any of that:
+By default it shares the page's canonical URL and its [og:title](/documentation/roe/glossary#open-graph-og), so links shared on social media have the right link/title. Override any of that:
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -78,7 +78,7 @@ By default it shares the page's canonical URL and its [og:title](/documentation/
 
 ## Subscribe button
 
-A "Subscribe" button that links to the member **sign-up** page. On a Roe site, subscribing means becoming a member (this includes newsletters). This button links to your [member sign-up](/documentation/members#member-pages) page.
+A "Subscribe" button that links to the member **sign-up** page. On a Roe site, subscribing means becoming a member (this includes newsletters). This button links to your [member sign-up](/documentation/roe/members#member-pages) page.
 
 ````markdown
 ```button
@@ -99,7 +99,7 @@ The subscribe button only works if Members is enabled for your site. With member
 
 # Forms
 
-Forms provide interactive elements for [memberships](/documentation/members), [payments](/documentation/payments), and the [newsletter](/documentation/newsletters). Each is selected with `for:`.
+Forms provide interactive elements for [memberships](/documentation/roe/members), [payments](/documentation/roe/payments), and the [newsletter](/documentation/roe/newsletters). Each is selected with `for:`.
 
 ## Signup
 

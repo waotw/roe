@@ -16,7 +16,7 @@ template: links
 
 #### Before you begin
 
-[Install Roe](/documentation/guide-installation) if you haven't already.
+[Install Roe](/documentation/roe/guide-installation) if you haven't already.
 
 ## Learn Roe by editing a Post
 
@@ -28,11 +28,11 @@ The fastest way to understand Roe is to watch it work:
 - Put the preview on one side of your screen and the editor on the other.
 - Save the Post. The preview refreshes, so you see each change as you make it.
 
-Editing with the preview open shows you exactly how Roe responds. When you're ready to go further, try the toolbar buttons in [The Editor](/documentation/the-editor).
+Editing with the preview open shows you exactly how Roe responds. When you're ready to go further, try the toolbar buttons in [The Editor](/documentation/roe/the-editor).
 
 ## What Roe is
 
-Roe builds a website from three kinds of files: [Markdown](/documentation/glossary#markdown) for your writing, media for images and audio, and [YAML](/documentation/glossary#yaml) for settings. Markdown formats text with ordinary characters like `#` and `*`; YAML stores settings as simple `key: value` lines. You never have to touch CSS to build a working site — though you can edit it whenever you want more control.
+Roe builds a website from three kinds of files: [Markdown](/documentation/roe/glossary#markdown) for your writing, media for images and audio, and [YAML](/documentation/roe/glossary#yaml) for settings. Markdown formats text with ordinary characters like `#` and `*`; YAML stores settings as simple `key: value` lines. You never have to touch CSS to build a working site — though you can edit it whenever you want more control.
 
 If Markdown is new to you, a [cheat sheet](https://www.markdowntools.io/cheat-sheet) helps. Mostly, though, you'll learn it by editing a Post with the preview open, as [above](#learn-roe-by-editing-a-post).
 
@@ -44,7 +44,7 @@ Every Roe site has three parts, and you edit each one in the Admin:
 - **Pages, Posts, and Products** — your content:
   - Posts — [Admin → Posts](/admin/posts)
   - Pages — [Admin → Pages](/admin/pages)
-  - Products — [Admin → Products](/admin/products) (enable the [Store](/documentation/store) first)
+  - Products — [Admin → Products](/admin/products) (enable the [Store](/documentation/roe/store) first)
 - **Footer** — [Admin → Layouts](/admin/layouts)
 
 ## Why Should you Use Roe?
@@ -53,7 +53,7 @@ Most site builders, like Wordpress, Drupal and Substack, are complex, expensive,
 
 ### Collections: lists of your content
 
-A Collection gathers your content into a list — your latest Posts, featured Products, or related articles — and you can drop one almost anywhere. It works like a blog feed, except you decide what it shows and where it appears. [Learn more about Collections →](/documentation/collections)
+A Collection gathers your content into a list — your latest Posts, featured Products, or related articles — and you can drop one almost anywhere. It works like a blog feed, except you decide what it shows and where it appears. [Learn more about Collections →](/documentation/roe/collections)
 
 Collections most often live on Pages (Blog page, Podcast page), but they fit elsewhere too:
 
@@ -66,7 +66,7 @@ A Card drops a styled element straight into your Markdown — a pullquote, a pos
 
 ### Galleries: image grids from simple syntax
 
-A Gallery arranges images into a grid from a few lines of Markdown. [Learn more about Galleries →](/documentation/galleries)
+A Gallery arranges images into a grid from a few lines of Markdown. [Learn more about Galleries →](/documentation/roe/galleries)
 
 ## What you can build
 

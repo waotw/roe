@@ -20,7 +20,7 @@ type: aside
 text: This is an aside which is adding some helpful info about this paragraph.
 ``` 
 
-Cards use a similar syntax to [Collections](/documentation/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside), [product link ↓](#product-link).
+Cards use a similar syntax to [Collections](/documentation/roe/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside), [product link ↓](#product-link).
 
 To make things a bit easier, each card `type` has it's own defaults. The card defaults can be edited in [Admin/Settings](/admin/configs/cards/edit).
 

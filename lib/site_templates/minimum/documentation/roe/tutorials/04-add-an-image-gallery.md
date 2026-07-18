@@ -42,7 +42,7 @@ You created a simple gallery in the last tutorial by adding this:
     ````
 5. Check the preview and you'll see your gallery is now a carousel/slideshow.
 
-You now know how to create galleries. Galleries also allow you to change sizing and layout, as well as add captions. Learn all about Galleries here: [Galleries](/documentation/galleries)
+You now know how to create galleries. Galleries also allow you to change sizing and layout, as well as add captions. Learn all about Galleries here: [Galleries](/documentation/roe/galleries)
 
 ##### Next tutorial
 ```collection

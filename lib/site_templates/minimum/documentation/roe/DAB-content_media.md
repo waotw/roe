@@ -22,7 +22,7 @@ template: links
 Every image, audio, and video file on your site lives in `/site/media`. You can add and manage these files 3 ways:
 
 - the Media Browser
-- `MEDIA ▼` button in [The Editor](/documentation/the-editor)
+- `MEDIA ▼` button in [The Editor](/documentation/roe/the-editor)
 - Adding media straight to your `site/media` folder.
 
 ## Media Browser
@@ -53,7 +53,7 @@ Roe keeps track of where each media file is used. The **Used in** list on each f
 
 ### Uploading
 
-Click **UPLOAD** and pick one or more files at once. Uploads run in the background, so a big drop of images or audio won't lock up the page — you can keep working while they finish. Roe generates the optimized [image variants](/documentation/image-optimization) automatically as files land.
+Click **UPLOAD** and pick one or more files at once. Uploads run in the background, so a big drop of images or audio won't lock up the page — you can keep working while they finish. Roe generates the optimized [image variants](/documentation/roe/image-optimization) automatically as files land.
 
 ### Bulk actions
 
@@ -61,6 +61,6 @@ Tick the checkbox in the upper right corner of any file (there's a **Select All 
 
 ## The `MEDIA ▼` button in The Editor
 
-While writing, use the `MEDIA ▼` button to add media without leaving the editor. It opens a picker for Images, Audio, or Video where you can search, select one or more files, upload new ones, and drop the markdown in at your cursor. Full details: [The Editor](/documentation/the-editor).
+While writing, use the `MEDIA ▼` button to add media without leaving the editor. It opens a picker for Images, Audio, or Video where you can search, select one or more files, upload new ones, and drop the markdown in at your cursor. Full details: [The Editor](/documentation/roe/the-editor).
 
-Selecting several images at once inserts them one per line, which becomes a [simple gallery](/documentation/galleries#simple-gallery).
+Selecting several images at once inserts them one per line, which becomes a [simple gallery](/documentation/roe/galleries#simple-gallery).

@@ -28,8 +28,8 @@ Your Site Settings hold the basics about your site — its name, its address, an
     - **Author Email** — a contact address for your site.
 4. Click `SAVE`.
 
-See [Site Settings](/documentation/global-site) for a description of all the Site Settings and what they do.
+See [Site Settings](/documentation/roe/global-site) for a description of all the Site Settings and what they do.
 
 ##### Next
 
-Now that you have a basic idea of how Roe works, read through [What is Roe?](/documentation/what-is-roe), which will now be clearer. And when you're ready to dive deeper, check out the [full documentation page](/documentation-all).
+Now that you have a basic idea of how Roe works, read through [What is Roe?](/documentation/roe/what-is-roe), which will now be clearer. And when you're ready to dive deeper, check out the [full documentation page](/documentation-all).

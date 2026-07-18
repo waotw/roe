@@ -114,7 +114,7 @@ A `grid` Collection also has its own options:
 
 ### When to use the `glossary` template
 
-The `glossary` template renders a column of short definitions. Roe's own [glossary](https://go-roe.com/documentation/glossary) is built this way. Most sites won't need it. Each entry shows:
+The `glossary` template renders a column of short definitions. Roe's own [glossary](https://go-roe.com/documentation/roe/glossary) is built this way. Most sites won't need it. Each entry shows:
 
 - `title` — the term being defined
 - `subtitle` — a short definition

@@ -21,7 +21,7 @@ template: links
 2. Select Layout
 3. Click `Edit` for Navigation
 4. Replace `Your site` inside `[Your site](/)` with your site name.
-5. Note this Collection with `template: menu`. Learn about this Collection template here: [When to use the `menu` template](/documentation/collections_templates#when-to-use-the-menu-template)
+5. Note this Collection with `template: menu`. Learn about this Collection template here: [When to use the `menu` template](/documentation/roe/collections_templates#when-to-use-the-menu-template)
 6. Click `PREVIEW`
 7. You should see both `home` and the page you just created with `collection: nav` in the metadata.
 

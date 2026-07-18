@@ -48,7 +48,7 @@ Your Global Site Settings cover the basics of your whole site — its name, bran
 
 - `Nightly updates` — receive pre-release (nightly) versions instead of stable releases. Off means stable.
 
-## Static Site Generation ([SSG](/documentation/glossary#ssg))
+## Static Site Generation ([SSG](/documentation/roe/glossary#ssg))
 
 - `Enable Auto-Generation` — keep a static (plain-file) copy of your site up to date and serve it to your visitors.
 - `STATIC SITE ACTIONS` — This button takes you to a page with various actions to help with SSG troubleshooting

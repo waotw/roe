@@ -17,7 +17,7 @@ template: links
 
 Welcome to Roe.
 
-If you've already [installed Roe](/documentation/guide-installation), you're ready to build your first page. If you haven't yet, complete [Install Roe](/documentation/guide-installation) first.
+If you've already [installed Roe](/documentation/roe/guide-installation), you're ready to build your first page. If you haven't yet, complete [Install Roe](/documentation/roe/guide-installation) first.
 
 ## Learn Roe with simple tutorials
 
@@ -25,7 +25,7 @@ The [Docs](/documentation) page has a list of introductory tutorials that flow o
 
 ## Diving deeper
 
-When you've created a few pages, posts and collections, read this article: [What is Roe?](/documentation/what-is-roe) and visit the full [documentation](/documentation-all) to dive deeper. 
+When you've created a few pages, posts and collections, read this article: [What is Roe?](/documentation/roe/what-is-roe) and visit the full [documentation](/documentation-all) to dive deeper. 
 
 ## Let's contribute to a better internet
 

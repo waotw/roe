@@ -21,8 +21,8 @@ template: links
 The Store feature lets you sell products directly from your site using [Snipcart](https://snipcart.com). There are 3 key pieces that must be in place for Snipcart & Roe to work together:
 
 1. Roe needs the API Keys from Snipcart (covered in this article)
-2. Your Store settings need to be set up (covered here: [Store](/documentation/store))
-3. You need at least one product (covered here: [Products](/documentation/products))
+2. Your Store settings need to be set up (covered here: [Store](/documentation/roe/store))
+3. You need at least one product (covered here: [Products](/documentation/roe/products))
 
 #### Before Snipcart
 
@@ -58,8 +58,8 @@ If all seems well, the indicator at the top of the page will be green and say `C
 When it's time to make the store public, it's important that the domain set on Snipcart and the domain for your Store match:
 
 - [Snipcart: Domains & Urls](https://docs.snipcart.com/v3/dashboard/domains-urls)
-- [Roe: Store](/documentation/store)
+- [Roe: Store](/documentation/roe/store)
 
 ---
 
-That's it for the Snipcart settings. Check these aritcles for further setup: [Store](/documentation/store), [Products](/documentation/products)
+That's it for the Snipcart settings. Check these aritcles for further setup: [Store](/documentation/roe/store), [Products](/documentation/roe/products)

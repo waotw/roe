@@ -17,7 +17,7 @@ template: links
 
 #### Before you begin
 
-[Install Roe](/documentation/guide-installation) if you haven't already.
+[Install Roe](/documentation/roe/guide-installation) if you haven't already.
 
 ## Roe builds a website from plain files
 
@@ -41,7 +41,7 @@ The quickest way to understand Roe is to see it respond as you type:
 4. Put the preview on one side of your screen and the editor on the other.
 5. Save the Post. The preview refreshes, so each change appears the moment you make it.
 
-Now edit the Post and save again. Each save shows you exactly how Roe reads your Markdown. When you're ready to go further, try the toolbar buttons in [The Editor](/documentation/the-editor).
+Now edit the Post and save again. Each save shows you exactly how Roe reads your Markdown. When you're ready to go further, try the toolbar buttons in [The Editor](/documentation/roe/the-editor).
 
 ## Where to edit each part of your site
 
@@ -51,16 +51,16 @@ Every Roe site has three parts, and you edit each one in the Admin:
 - **Your content** — Pages, Posts, and Products:
   - Posts — [Admin → Posts](/admin/posts)
   - Pages — [Admin → Pages](/admin/pages)
-  - Products — [Admin → Products](/admin/products) (enable the [Store](/documentation/store) first)
+  - Products — [Admin → Products](/admin/products) (enable the [Store](/documentation/roe/store) first)
 - **Footer** — [Admin → Layouts](/admin/layouts)
 
 ## Build pages from blocks, not a templating language
 
-Most site builders make you learn a templating language. Roe doesn't. Instead it gives you [Roe-anji](/documentation/roeanji): small Markdown extensions that add features like Collections, Cards, and Galleries. You combine these simple blocks to build complex pages.
+Most site builders make you learn a templating language. Roe doesn't. Instead it gives you [Roe-anji](/documentation/roe/roeanji): small Markdown extensions that add features like Collections, Cards, and Galleries. You combine these simple blocks to build complex pages.
 
 ### Collections show a list of your content
 
-A Collection gathers your content into a list — your latest Posts, featured Products, or related articles — and you can drop one almost anywhere. It works like a blog feed, except you choose what it shows and where it appears. [Learn more about Collections →](/documentation/collections)
+A Collection gathers your content into a list — your latest Posts, featured Products, or related articles — and you can drop one almost anywhere. It works like a blog feed, except you choose what it shows and where it appears. [Learn more about Collections →](/documentation/roe/collections)
 
 Collections most often live on Pages, such as a Blog page or a Podcast page, but they fit elsewhere too:
 
@@ -73,7 +73,7 @@ A Card places a styled element straight into your Markdown — a pullquote, a po
 
 ### Galleries turn a few lines into an image grid
 
-A Gallery arranges images into a grid from a few lines of Markdown. [Learn more about Galleries →](/documentation/galleries)
+A Gallery arranges images into a grid from a few lines of Markdown. [Learn more about Galleries →](/documentation/roe/galleries)
 
 ## What you can build with Roe
 

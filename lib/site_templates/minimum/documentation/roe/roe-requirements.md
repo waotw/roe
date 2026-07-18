@@ -17,15 +17,15 @@ template: links
 
 # What Roe installs
 
-You don't need to read this page to install Roe. The [installer](/documentation/guide-installation) sets everything up for you and tells you when each part is ready.
+You don't need to read this page to install Roe. The [installer](/documentation/roe/guide-installation) sets everything up for you and tells you when each part is ready.
 
 This page has two parts. The first is for anyone curious about what landed on their computer. The second is for developers who want the full stack — every tool, gem, and file the installer touches.
 
 ## For users
 
-When you install Roe, it sets up the [Ruby](/documentation/glossary#ruby) programming language and a few supporting tools. Roe is written in Ruby, so this is what lets it run. The installer does all of it for you — there's nothing to install by hand.
+When you install Roe, it sets up the [Ruby](/documentation/roe/glossary#ruby) programming language and a few supporting tools. Roe is written in Ruby, so this is what lets it run. The installer does all of it for you — there's nothing to install by hand.
 
-It also installs a set of Ruby [gems](/documentation/glossary#gems): small add-on libraries Roe depends on, like the web server that serves your pages and the database that holds your content. You don't need to know them by name — the installer handles them, and you can read about each one [below](#for-developers)
+It also installs a set of Ruby [gems](/documentation/roe/glossary#gems): small add-on libraries Roe depends on, like the web server that serves your pages and the database that holds your content. You don't need to know them by name — the installer handles them, and you can read about each one [below](#for-developers)
 
 ### What changes on your computer
 
@@ -34,7 +34,7 @@ A full install:
 - installs a version of Ruby, kept separate from any other Ruby you may already have
 - adds one line to your terminal's startup file, so Roe's Ruby is ready in new windows
 - creates your `/site` folder — your content, settings, and database
-- generates a [master key](/documentation/glossary#master-key) that keeps your secrets safe
+- generates a [master key](/documentation/roe/glossary#master-key) that keeps your secrets safe
 - creates your admin account
 
 Everything runs on your own computer. Roe needs no separate accounts and no outside servers.
@@ -54,14 +54,14 @@ This section covers the full stack — what Roe requires, the gems it installs, 
 
 ### Required to run
 
-Roe is built with [Ruby](/documentation/glossary#ruby), so most of what it installs exists to run Ruby and Roe's code. Four things are required:
+Roe is built with [Ruby](/documentation/roe/glossary#ruby), so most of what it installs exists to run Ruby and Roe's code. Four things are required:
 
 | What | Why Roe needs it | How it arrives |
 |------|------------------|----------------|
-| **Ruby 3.2.2** | The language Roe is written in. Nothing else runs until Ruby is in place. | Installed and pinned by [mise](/documentation/glossary#mise) (below) |
+| **Ruby 3.2.2** | The language Roe is written in. Nothing else runs until Ruby is in place. | Installed and pinned by [mise](/documentation/roe/glossary#mise) (below) |
 | **mise** | A version manager that installs the exact Ruby version Roe needs, without disturbing any other Ruby on your system. | `brew install mise`, or the standalone installer `curl https://mise.run \| sh` |
-| **[Git](/documentation/glossary#git)** | Roe's built-in updater uses Git to fetch new releases. | `xcode-select --install` or `brew install git` (macOS); your package manager (Linux) |
-| **[A C compiler and build tools](/documentation/glossary#build-tools-c-compiler)** | Needed to build Ruby's libraries and any Ruby add-ons written in C. | Xcode Command Line Tools (macOS); `build-essential` or your distribution's equivalent (Linux) |
+| **[Git](/documentation/roe/glossary#git)** | Roe's built-in updater uses Git to fetch new releases. | `xcode-select --install` or `brew install git` (macOS); your package manager (Linux) |
+| **[A C compiler and build tools](/documentation/roe/glossary#build-tools-c-compiler)** | Needed to build Ruby's libraries and any Ruby add-ons written in C. | Xcode Command Line Tools (macOS); `build-essential` or your distribution's equivalent (Linux) |
 
 The install script, `./roe.sh check`, checks for each of these, installs whatever is missing, and configures it.
 
@@ -71,11 +71,11 @@ Roe pins its Ruby version in `current/.ruby-version`. mise reads that file and i
 
 To make the pinned Ruby available in new terminal windows, the installer adds a `mise activate` line to your shell's startup file (`~/.zshrc` on macOS, `~/.bashrc` on many Linux systems).
 
-If you already have [Homebrew](/documentation/glossary#homebrew), the installer uses it to install mise and Git. If you don't, Roe does not require it — mise's standalone installer needs nothing but `curl`. Roe never installs Homebrew for you.
+If you already have [Homebrew](/documentation/roe/glossary#homebrew), the installer uses it to install mise and Git. If you don't, Roe does not require it — mise's standalone installer needs nothing but `curl`. Roe never installs Homebrew for you.
 
-### The Ruby [gems](/documentation/glossary#gems) Roe installs
+### The Ruby [gems](/documentation/roe/glossary#gems) Roe installs
 
-[Bundler](/documentation/glossary#bundler) installs Roe's gems automatically from the `Gemfile` during setup. Roe is a [Rails](/documentation/glossary#ruby-on-rails-rails) app, so it also pulls in the gems any Rails app needs — the web server, the database adapter, and so on. The gems below are the ones that give Roe its own features, beyond what Rails provides.
+[Bundler](/documentation/roe/glossary#bundler) installs Roe's gems automatically from the `Gemfile` during setup. Roe is a [Rails](/documentation/roe/glossary#ruby-on-rails-rails) app, so it also pulls in the gems any Rails app needs — the web server, the database adapter, and so on. The gems below are the ones that give Roe its own features, beyond what Rails provides.
 
 **Content and Markdown**
 
@@ -110,7 +110,7 @@ If you already have [Homebrew](/documentation/glossary#homebrew), the installer 
 
 **Styling**
 
-- **tailwindcss-rails** and **tailwindcss-ruby** — style the admin interface with a standalone Tailwind binary, with no [Node.js](/documentation/glossary#nodejs)
+- **tailwindcss-rails** and **tailwindcss-ruby** — style the admin interface with a standalone Tailwind binary, with no [Node.js](/documentation/roe/glossary#nodejs)
 
 The underlying **libvips** and **ImageMagick** libraries are optional — see below.
 
@@ -120,7 +120,7 @@ Some tools common to other web software are absent by design:
 
 - **No Node.js, npm, or Yarn.** Roe runs its JavaScript with importmaps and styles itself with a standalone Tailwind binary.
 - **No separate database server.** SQLite stores everything in files inside your `/site` folder.
-- **No [Redis](/documentation/glossary#redis) or other background-job service.** The Solid gems use SQLite for that too.
+- **No [Redis](/documentation/roe/glossary#redis) or other background-job service.** The Solid gems use SQLite for that too.
 
 Keeping the stack small is why a Roe site can live entirely in one folder.
 
@@ -128,7 +128,7 @@ Keeping the stack small is why a Roe site can live entirely in one folder.
 
 Not installed by default; Roe runs fine without them. Install them to enable the extra features noted above:
 
-- **[libvips](/documentation/glossary#libvips)** — resizes and compresses images on upload
-- **[ImageMagick](/documentation/glossary#imagemagick)** — reads image dimensions for social and SEO image tags
+- **[libvips](/documentation/roe/glossary#libvips)** — resizes and compresses images on upload
+- **[ImageMagick](/documentation/roe/glossary#imagemagick)** — reads image dimensions for social and SEO image tags
 
 To see what's installed at any time, run `./roe.sh status` from your Roe folder.

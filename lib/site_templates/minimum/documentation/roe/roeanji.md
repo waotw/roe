@@ -39,7 +39,7 @@ text: There's only one way to find out…
 ```
 ````
 
-Full reference → [Cards](/documentation/cards)
+Full reference → [Cards](/documentation/roe/cards)
 
 ## Collections
 
@@ -54,7 +54,7 @@ heading: Latest Posts
 ```
 ````
 
-Full reference → [Collections](/documentation/collections)
+Full reference → [Collections](/documentation/roe/collections)
 
 ## Galleries
 
@@ -67,7 +67,7 @@ Group images into a responsive grid — automatically when images sit next to ea
 ```
 ````
 
-Full reference → [Galleries](/documentation/galleries)
+Full reference → [Galleries](/documentation/roe/galleries)
 
 ## Forms & Buttons
 
@@ -80,7 +80,7 @@ button-text: Sign Up
 ```
 ````
 
-Full reference → [Forms & Buttons](/documentation/forms-and-buttons)
+Full reference → [Forms & Buttons](/documentation/roe/forms-and-buttons)
 
 ## Products
 
@@ -93,10 +93,10 @@ template: grid
 ```
 ````
 
-Full reference → [Collections → Products](/documentation/collections#products) · [Store](/documentation/store)
+Full reference → [Collections → Products](/documentation/roe/collections#products) · [Store](/documentation/roe/store)
 
 ## Search
 
 Built-in site search — a global search in the header plus an optional per-collection search icon. It works out of the box; there's no block to add.
 
-Full reference → [Search](/documentation/roe-search)
+Full reference → [Search](/documentation/roe/roe-search)

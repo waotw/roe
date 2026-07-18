@@ -19,7 +19,7 @@ template: links
 
 A Collection is a list of your content — posts, pages, products, or documentation — that you drop anywhere with a short block. One Collection can power an entire blog; another can add three "Featured Posts" to your home page. They can even build your site's navigation, footer, or sidebar (see [Build a menu, footer, or sidebar](#build-a-menu-footer-or-sidebar)).
 
-You don't have to write the block by hand. In [The Editor](/documentation/the-editor), click the `COLLECTION` button: it opens a form with every option below, shows each field only when it applies (the product options appear once you set the source to `products`), and writes just the fields you fill in. It then drops the finished `collection` block at your cursor. Set your Collection defaults in [Admin/Settings](/admin/configs/collections/edit).
+You don't have to write the block by hand. In [The Editor](/documentation/roe/the-editor), click the `COLLECTION` button: it opens a form with every option below, shows each field only when it applies (the product options appear once you set the source to `products`), and writes just the fields you fill in. It then drops the finished `collection` block at your cursor. Set your Collection defaults in [Admin/Settings](/admin/configs/collections/edit).
 
 ## Options
 
@@ -71,7 +71,7 @@ The [`nav`](#build-a-menu-footer-or-sidebar) template is the one exception: ther
 | `show_date` | No | `true` = show date |
 | `show_subtitle` | No | `true` = show subtitle |
 | `show_excerpt` | No | `true` = show excerpt |
-| `show_more` | No | `true` = Add "View all" link to full [collection pagination](/documentation/collections_pagination) (posts only) |
+| `show_more` | No | `true` = Add "View all" link to full [collection pagination](/documentation/roe/collections_pagination) (posts only) |
 | `show_more_text` | No | Custom text for `show_more link` (default "View all") |
 
 ### Products
@@ -83,7 +83,7 @@ The [`nav`](#build-a-menu-footer-or-sidebar) template is the one exception: ther
 | `aspect_ratio` | No | Product image ratio: `original` (default), `square`, `portrait`, `tv`, `wide`, or `cinema` (`auto`, `landscape`, and `film` are accepted aliases) |
 | `show_description` | No | Show truncated product description (~100 chars) below the title |
 
-#### [Grouped products](/documentation/products#product-variants-groups)
+#### [Grouped products](/documentation/roe/products#product-variants-groups)
 
 When variants share a `group:` (e.g. Paperback/Hardback/Ebook of one book) and you set `groups: enabled`:
 

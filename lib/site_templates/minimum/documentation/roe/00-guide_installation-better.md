@@ -18,7 +18,7 @@ template: links
 
 # Installing Roe
 
-Roe runs on your own computer. Before you can use it, Roe will install the tools it needs to run. You can see a list of all tools here: [Requirements for Roe](/documentation/roe-requirements)
+Roe runs on your own computer. Before you can use it, Roe will install the tools it needs to run. You can see a list of all tools here: [Requirements for Roe](/documentation/roe/roe-requirements)
 
 This is the biggest step in getting started — and you only take it once. After Roe is installed, you can create as many Roe sites as you like without installing anything again.
 
@@ -53,11 +53,11 @@ Now follow the steps for your computer:
 4. Type `./roe.sh check` and press `return`. The script checks what's already installed.
 5. **Install system tools.** The script lists anything missing and offers to install it.
     - When you see `Install now? [y/q]`, type `y` and press `return`.
-    - You can see a list of all tools used by Roe [here](/documentation/roe-requirements) 
+    - You can see a list of all tools used by Roe [here](/documentation/roe/roe-requirements) 
     - <mark>Note:</mark> on a fresh Mac, macOS may ask to install Apple's Command Line Tools in a separate window. Let that installer finish, then return to the Terminal and press `c` to continue.
     - The first run takes a few minutes. Wait until the prompt returns and you see `[✓] Ready — Ruby and Git are in place.`
 6. **Run the Roe setup.** When you see `Next step: Run the Roe setup`, type `y` and press `return`.
-    - A progress screen appears. Setup installs Roe related [tools](/documentation/roe-requirements#the-ruby-gems-roe-installs), creates your `/site` folder, prepares the database, generates default settings, and basic content.
+    - A progress screen appears. Setup installs Roe related [tools](/documentation/roe/roe-requirements#the-ruby-gems-roe-installs), creates your `/site` folder, prepares the database, generates default settings, and basic content.
 7. **Create your admin user.** When setup finishes, Roe asks for your account details.
     - Enter the email you want to sign in with.
     - Choose a random or a manual password.
@@ -68,7 +68,7 @@ Now follow the steps for your computer:
 9. Roe starts the server and opens in your browser.
 10. Sign in with the admin user you just created.
 
-That's it — Roe is running. See [Getting Started with Roe](/documentation/getting-started-with-roe) to start exploring.
+That's it — Roe is running. See [Getting Started with Roe](/documentation/roe/getting-started-with-roe) to start exploring.
 
 ## Install on Linux
 
@@ -89,11 +89,11 @@ That's it — Roe is running. See [Getting Started with Roe](/documentation/gett
 3. Type `./roe.sh check` and press `enter`. The script checks what's already installed.
 4. **Install system tools.** The script lists anything missing and offers to install it.
     - When you see `Install now? [y/q]`, type `y` and press `enter`.
-    - You can see a list of all tools used by Roe [here](/documentation/roe-requirements).
+    - You can see a list of all tools used by Roe [here](/documentation/roe/roe-requirements).
     - <mark>Note for Linux:</mark> if your system is missing the C compiler and `make` that Ruby needs to build its libraries, the script shows the install command for your distribution (Debian/Ubuntu `apt-get`, Fedora/RHEL `dnf`, Arch `pacman`, and so on). Copy it, run it in another terminal, then return here and press `c` to continue.
     - The first run takes a few minutes. Wait until you see `[✓] Ready — Ruby and Git are in place.`
 5. **Run the Roe setup.** When you see `Next step: Run the Roe setup`, type `y` and press `enter`.
-    - A progress screen appears. Setup installs Roe related [tools](/documentation/roe-requirements#the-ruby-gems-roe-installs), creates your `/site` folder, prepares the database, generates default settings, and basic content.
+    - A progress screen appears. Setup installs Roe related [tools](/documentation/roe/roe-requirements#the-ruby-gems-roe-installs), creates your `/site` folder, prepares the database, generates default settings, and basic content.
 6. **Create your admin user.** When setup finishes, Roe asks for your account details.
     - Enter the email you want to sign in with.
     - Choose a random or a manual password.
@@ -106,4 +106,4 @@ That's it — Roe is running. See [Getting Started with Roe](/documentation/gett
 
 ## You're done
 
-Roe is installed and running. See [Getting Started with Roe](/documentation/getting-started-with-roe) for your next steps.
+Roe is installed and running. See [Getting Started with Roe](/documentation/roe/getting-started-with-roe) for your next steps.

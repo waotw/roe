@@ -19,7 +19,7 @@ template: links
 
 ## Metadata Section
 
-The `metadata` for the post/page/product can be edited through a form or you can access the YAML directly through the `RAW` button. Click the `▶︎` to see the metadata, click the `▼` to hide it. If you're very curious, you can see a detailed walkthrough of all fields: [Metadata Fields](/documentation/metadata-fields)
+The `metadata` for the post/page/product can be edited through a form or you can access the YAML directly through the `RAW` button. Click the `▶︎` to see the metadata, click the `▼` to hide it. If you're very curious, you can see a detailed walkthrough of all fields: [Metadata Fields](/documentation/roe/metadata-fields)
 
 As you change things, certain new metadata fields may show up: changing `post_type` from `article` to `podcast` will show fields related to podcasts.
 
@@ -69,32 +69,32 @@ The <code>F<sup>1</sup></code> button creates a footnote:
 2. Click the button and it will bring you to the bottom of the editor to add your footnote text.
 3. Click `✓ DONE WITH FOOTNOTE` and it will bring you write back to where you inserted the footnote.
 
-### [Roe-anji](/documentation/roeanji) Buttons
+### [Roe-anji](/documentation/roe/roeanji) Buttons
 
 You can edit the defaults for all Roe-anji features here: [Settings → Defaults](/admin/configs)
 
-`GALLERY` opens a menu to build a gallery block — optionally toggle a carousel, pick an aspect ratio, and add a caption — then drops it at your cursor with a placeholder for your images. This isn't required for simple galleries, only for more complex layouts. More details here: [Galleries](/documentation/galleries)
+`GALLERY` opens a menu to build a gallery block — optionally toggle a carousel, pick an aspect ratio, and add a caption — then drops it at your cursor with a placeholder for your images. This isn't required for simple galleries, only for more complex layouts. More details here: [Galleries](/documentation/roe/galleries)
 
 `CARD ▼` will open a menu with card options:
 
 - Pull Quote - stylized text pulled out of the flow of the body text
 - Post Link - stylized link to another post in your site.
 - Aside - text/image that runs alongside the text at large sizes and sits within the text at smaller sizes.
-- Product Link - stylized link to a product (only shown when the [Store](/documentation/store) is enabled).
+- Product Link - stylized link to a product (only shown when the [Store](/documentation/roe/store) is enabled).
 
 Clicking an option opens a short form for that card and drops the finished syntax at your cursor. Post Link and Product Link let you search for the item and pull its details in automatically.
 
-You can learn about each of these in detail here: [Cards](/documentation/cards)
+You can learn about each of these in detail here: [Cards](/documentation/roe/cards)
 
-`COLLECTION` opens as builder as well. Collections have many options and are very powerful and you can learn all about them here: [Collections](/documentation/collections)
+`COLLECTION` opens as builder as well. Collections have many options and are very powerful and you can learn all about them here: [Collections](/documentation/roe/collections)
 
-`ACTION ▼` opens a menu to insert an interactive element. It appears when the [Store](/documentation/store) or [Members](/documentation/members) feature is on, and each option opens a short form where you pick the type and fill in the fields (all optional — blanks use sensible defaults):
+`ACTION ▼` opens a menu to insert an interactive element. It appears when the [Store](/documentation/roe/store) or [Members](/documentation/roe/members) feature is on, and each option opens a short form where you pick the type and fill in the fields (all optional — blanks use sensible defaults):
 
 - **Button** — a store product button, a **Share** button, or a **Subscribe** button (links to your sign-up page).
 - **Form** — Sign up, Sign in, Checkout, Donate, or Unsubscribe. Shown when Members is enabled.
 - **Paywall** — a shortcut that opens the form pre-set to the paid-content upgrade block. Shown when payments are enabled.
 
-Only the options your enabled features support are listed (e.g. Product needs the Store; Subscribe and the forms need Members; Paywall needs payments). Full details: [Forms & Buttons](/documentation/forms-and-buttons)
+Only the options your enabled features support are listed (e.g. Product needs the Store; Subscribe and the forms need Members; Paywall needs payments). Full details: [Forms & Buttons](/documentation/roe/forms-and-buttons)
 
 `MEDIA ▼` will open a menu to insert media:
 
@@ -117,4 +117,4 @@ Selecting 3 files to insert will add them one per line, which in the case of ima
 
 Insertions are undoable with `cmd/ctrl–z`.
 
-Manage all your files — rename, find, and clean up — in the [Media Browser](/documentation/media).
+Manage all your files — rename, find, and clean up — in the [Media Browser](/documentation/roe/media).

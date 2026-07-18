@@ -18,7 +18,7 @@ template: links
 - `./roe.sh start` — Start Roe and, if you choose, open it in your browser at `http://localhost:3000`. Roe runs inside this Terminal window, so leave it open while you work. Quit with `control` + `c`.
 - `./roe.sh stop` — Quit/stop Roe — run it from a second Terminal window while Roe is running.
 
-You start and stop the Roe app with a small script called `roe.sh`, which lives in your Roe folder. These commands are run in your Terminal from within the Roe folder: [instructions](/documentation/0-how-to-start-the-roe-app)
+You start and stop the Roe app with a small script called `roe.sh`, which lives in your Roe folder. These commands are run in your Terminal from within the Roe folder: [instructions](/documentation/roe/0-how-to-start-the-roe-app)
 
 ### How Roe and the Terminal work together
 

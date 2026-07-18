@@ -128,11 +128,11 @@ The importer converts Substack's HTML into Roe's Markdown format. Here's how eac
 
 Roe supports many of the special elements used in Substack
 
-- Post Link Embeds → [Post Link Cards](/documentation/cards#post-link)
-- Pullquotes → [Pull quotes](/documentation/cards#pull-quote)
-- Image Galleries → [Galleries](/documentation/galleries)
-- Image with Caption → [Captions](/documentation/galleries#captions)
-- Footnotes → [The Editor](/documentation/the-editor#buttons)
+- Post Link Embeds → [Post Link Cards](/documentation/roe/cards#post-link)
+- Pullquotes → [Pull quotes](/documentation/roe/cards#pull-quote)
+- Image Galleries → [Galleries](/documentation/roe/galleries)
+- Image with Caption → [Captions](/documentation/roe/galleries#captions)
+- Footnotes → [The Editor](/documentation/roe/the-editor#buttons)
 - Poetry 
 
 It will import Audio and Video podcast posts.

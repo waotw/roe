@@ -15,7 +15,7 @@ template: links
 
 # Products
 
-Products in Roe are just [markdown](/documentation/glossary/#markdown) files, similar to Pages/Posts. They can be edited here: [Admin → Products](/admin/products). The files live in your `/site/products` folder and can be edited directly if you prefer. 
+Products in Roe are just [markdown](/documentation/roe/glossary/#markdown) files, similar to Pages/Posts. They can be edited here: [Admin → Products](/admin/products). The files live in your `/site/products` folder and can be edited directly if you prefer. 
 
 ##### Before Products
 
@@ -23,7 +23,7 @@ You'll need to enable the Store feature, go to: [Admin → Settings](/admin/conf
 
 ## Products in Roe
 
-Products are items you sell through your site using the [Store](/documentation/store) feature. Each product is a Markdown file with metadata for price, SKU, images, and more.
+Products are items you sell through your site using the [Store](/documentation/roe/store) feature. Each product is a Markdown file with metadata for price, SKU, images, and more.
 
 Products work with [Snipcart](https://snipcart.com) to handle the shopping cart, checkout, and payment processing.
 
@@ -87,7 +87,7 @@ primary: true
 ---
 ```
 
-In [Collections](/documentation/collections#products) with `groups: enabled`, Roe shows one entry per group and shows one price (lowest, highest or range). You can set this here: [Settings → Features → store.yml](/admin/configs/store/edit).
+In [Collections](/documentation/roe/collections#products) with `groups: enabled`, Roe shows one entry per group and shows one price (lowest, highest or range). You can set this here: [Settings → Features → store.yml](/admin/configs/store/edit).
 
 ## SKUs
 
@@ -114,14 +114,14 @@ The generator:
 
 ## Displaying Products
 
-Details found in the [Store](/documentation/store#displaying-products-with-collections) article.
+Details found in the [Store](/documentation/roe/store#displaying-products-with-collections) article.
 
 ## Product Pages
 
 Each product file is a 'page'. You can add content below the metadata (descriptions, sample chapters, reviews) using regular Markdown.
 
-Use the `PRODUCT` button in [The Editor](/documentation/the-editor) to insert a template product page. This pulls from the metadata to give you a good starting point when building out product pages. (The `PRODUCT` button only appears while editing a product.)
+Use the `PRODUCT` button in [The Editor](/documentation/roe/the-editor) to insert a template product page. This pulls from the metadata to give you a good starting point when building out product pages. (The `PRODUCT` button only appears while editing a product.)
 
-To link to a product from a post or another page, use a [Product Link card](/documentation/cards#product-link) (`CARD ▼ → Product Link`) — it pulls in the product's title, price, and image automatically.
+To link to a product from a post or another page, use a [Product Link card](/documentation/roe/cards#product-link) (`CARD ▼ → Product Link`) — it pulls in the product's title, price, and image automatically.
 
-See [Store](/documentation/store) to learn about the Store feature in Roe.
+See [Store](/documentation/roe/store) to learn about the Store feature in Roe.
