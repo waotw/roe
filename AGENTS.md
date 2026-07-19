@@ -227,7 +227,7 @@ Step pipeline (matches `UpdateOrchestrator::STEPS`):
 5. `migrating` — apply migrations to the real dev DB
 6. `switching` — rename current → current.backup, staging → current
 7. `preserving_secrets` — copy `config/master.key` + `tmp/development_secret.txt` from `current.backup/` (gitignored, absent from the clone — without this the user gets signed out)
-8. `syncing_root_files` — copy `roe.sh`, `README.md`, `AGENTS.md` from `current/` to root
+8. `syncing_root_files` — copy `roe.sh`, `README.md`, `LICENSE` (`UpdateOrchestrator::ROOT_SYNC_FILES`) from `current/` to root. `AGENTS.md` is intentionally not synced — it's dev material that stays in `current/`. `bin/sync-from-site` mirrors the same set for release prep.
 9. `writing_version` — rewrite both root `/VERSION` and `current/VERSION` with the new tag's full YAML
 10. `building_assets` — `assets:precompile` against the new code
 11. `restarting` — schedule a 5-second exit so the supervisor (`roe.sh`) relaunches Puma on the new code
@@ -251,6 +251,16 @@ Deploys the current codebase from local to a live server via Kamal or Fly.io.
 
 ### Content sync
 Markdown files in `site/` are the source of truth. `ContentSync` parses front-matter and body and upserts `Post`, `Page`, `Documentation`, `Medium`, `Product`, and `*Config` rows. `ContentWatcher` (dev) re-syncs on file changes. JSON metadata is stored as a text column and queried via SQLite `json_extract`.
+
+### Site configuration & settings
+Global config files live in `site/system/global/`; each has a dedicated `SiteConfig` accessor that reads its file directly (no cross-file lookup):
+- `SiteConfig.get(k)` → `site.yml` (identity, branding, theme, sync, updates, SSG)
+- `SiteConfig.content(k)` → `content.yml` (content rendering + search; **nested** keys, e.g. `content("search.all_pages")`, `content("heading_links")`)
+- `.fonts` / `.custom_code` / `.development` → their files; `.feature(type, k)` / `.default(type, k)` → `features/*.yml` / `defaults/*.yml`
+
+**Moving keys between config files**: `ConfigGenerator#migrate_content_config!` is the pattern — an idempotent boot migration (runs inside `generate_all`) that relocates keys while preserving user values, paired with a legacy fallback in the accessor so un-migrated installs keep reading the old location. Safe to run on every boot.
+
+**Admin settings are schema-driven**: `Admin::ConfigsController` defines `SITE_CONFIG_SCHEMA` / `CONTENT_CONFIG_SCHEMA` (sections → fields with type/label/hint). The shared `shared/_config_editor` partial has a **hardcoded section block per `config_type`**; on save it serializes `[data-config-field]` inputs into the YAML `content` param, splitting field names on `.` so dotted keys (`search.all_pages`, `theme.active`) nest. Config YAML carries **no comments** — put help text in the schema `hint:`, not the file.
 
 ### Integration Configuration (API Keys)
 Payment and email integrations support dual-storage for test/live environments:
@@ -393,6 +403,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 
 ### CSS
 - Tailwind CSS (via `tailwindcss-rails`) for the application UI
+  - The dev watcher runs `tailwindcss:watch[always]` (in `roe.sh` and `Procfile.dev`). The `[always]` is **required**: plain `tailwindcss:watch` binds to a TTY and exits immediately when backgrounded, silently stopping all CSS rebuilds. If new utility classes aren't taking effect, check the watcher is alive (`pgrep -fl tailwindcss:watch`) before anything else.
 - Public site uses a theme system with dynamic CSS generation served from `/theme/:filename.css`
 - **Naming Convention**: All CSS classes use semantic naming (not BEM):
   - Collections: `.collection-item`, `.item-body`, `.item-image`, `.item-title`

@@ -1,0 +1,41 @@
+# gitleaks config for Roe.
+#
+# Rule of thumb for keeping this SAFE: allowlist the EXACT value of a known
+# fake/test/example secret — never a pattern, a file path, or a commit SHA.
+# An exact literal can only ever suppress that one string, so a real secret
+# (a different string) is always still caught. As you add new test keys or
+# example values, add each exact value below (or mark the line inline with a
+# `# gitleaks:allow` comment for new code — see notes at bottom).
+
+[extend]
+useDefault = true   # keep all built-in rules; only ADD allowlist entries
+
+[allowlist]
+description = "Known-benign example / test / preview values (exact literals only)"
+regexes = [
+  # Email-preview example data (app/controllers/admin/emails_controller.rb, preview_variables)
+  '''smooth-river-dawn-17''',
+
+  # Stripe webhook test fixtures (test/**)
+  '''whsec_live_456''',
+
+  # Snipcart TEST-mode PUBLIC api key example in docs/16-products-store.md.
+  # Snipcart's api_key is public by design (loaded client-side); test mode.
+  # Both forms below are the same key (raw UUID + base64), as documented.
+  '''3317f483-9cb3-4c53-ab56-f30e4dd71c38637922357640993039''',
+  '''MzMxN2Y0ODMtOWNiMy00YzUzLWFiNTYtZjMwZTRkZDcxYzM4NjM3OTIyMzU3NjQwOTkzMDM5''',
+]
+
+# Notes
+# -----
+# 1. Adding future test values: append the exact string here. Because history
+#    scans (`--log-opts=--all`) re-check every past commit, `.gitleaks.toml`
+#    entries are what suppress a value across ALL of history.
+# 2. For brand-new code, you can instead put `# gitleaks:allow` at the end of
+#    the line holding the fake value — self-documenting and precise. Caveat:
+#    inline comments only suppress from the commit they're added onward, so
+#    they don't cover a value that already exists in older commits (use the
+#    regexes above for those).
+# 3. Best prevention of all: make fakes obviously fake. Values containing
+#    markers like EXAMPLE / TEST / FAKE / DUMMY often won't trip gitleaks at
+#    all, so you never need to allowlist them.
