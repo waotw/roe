@@ -353,19 +353,29 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_session_path
   end
 
-  test "site config editor renders search and nightly-updates toggles" do
+  test "site config editor renders the nightly-updates toggle" do
     FileUtils.mkdir_p(File.dirname(SiteConfig::SITE_FILE))
     File.write(SiteConfig::SITE_FILE,
-               { "title" => "T", "update_channel" => "nightly", "search_all_pages" => true }.to_yaml)
+               { "title" => "T", "update_channel" => "nightly" }.to_yaml)
 
     get admin_edit_site_config_path
 
     assert_response :success
-    # Search toggle (plain true/false checkbox)
-    assert_select "input[data-config-field=?][type=checkbox]", "search_all_pages"
     # Nightly toggle maps to stable/nightly instead of true/false
     assert_select "input[data-config-field=?][data-on-value=?][data-off-value=?]",
                   "update_channel", "nightly", "stable"
+  end
+
+  test "content config editor renders the search toggle" do
+    FileUtils.mkdir_p(File.dirname(SiteConfig::CONTENT_FILE))
+    File.write(SiteConfig::CONTENT_FILE,
+               { "search" => { "all_pages" => true } }.to_yaml)
+
+    get admin_edit_content_config_path
+
+    assert_response :success
+    # Search moved out of site.yml into content.yml (nested under `search`).
+    assert_select "input[data-config-field=?][type=checkbox]", "search.all_pages"
   end
 
   private
