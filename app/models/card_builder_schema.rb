@@ -39,7 +39,7 @@ module CardBuilderSchema
       { key: "image", type: :text, label: "Image",
         hint: "Image URL/path to show in the aside." },
       { key: "link", type: :text, label: "Link",
-        hint: "URL the aside links to. Leave blank for a text-only aside." },
+        hint: "URL the aside links to. Leave blank and no link will be added." },
       { key: "link_text", type: :text, label: "Link text",
         hint: "Custom label for the link. Defaults to →." }
     ],

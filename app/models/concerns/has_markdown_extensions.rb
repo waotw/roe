@@ -2093,7 +2093,7 @@ module HasMarkdownExtensions
       ""
     end
     url = config[:url] || "#"
-    link_text = config[:link_text] || SiteConfig.default("cards", "post-link")&.[]("default_link_text") || "Read full story →"
+    link_text = config[:link_text] || SiteConfig.default("cards", "post-link")&.[]("default_link_text") || "Read more →"
 
     # Whether the excerpt/description shows. Large shows it by default (existing
     # behaviour); small/medium only when explicitly enabled. product-link maps
