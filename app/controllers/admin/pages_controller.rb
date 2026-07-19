@@ -357,26 +357,6 @@ class Admin::PagesController < Admin::BaseController
             .gsub(/^-|-$/, "")
   end
 
-  def load_page_template
-    template_path = File.join(RoeSitePaths::SITE_PATH, "templates/page_template.md")
-
-    if File.exist?(template_path)
-      File.read(template_path)
-    else
-      default_template
-    end
-  end
-
-  def default_template
-    <<~TEMPLATE
-      ---
-      title:
-      status: draft
-      ---
-
-    TEMPLATE
-  end
-
   def filename_to_title(filename)
     name = filename.sub(/\.md$/, "")
 

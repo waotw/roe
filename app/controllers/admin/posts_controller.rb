@@ -798,30 +798,6 @@ class Admin::PostsController < Admin::BaseController
             .gsub(/^-|-$/, "")
   end
 
-  def load_post_template
-    template_path = File.join(RoeSitePaths::SITE_PATH, "templates/post_template.md")
-
-    if File.exist?(template_path)
-      File.read(template_path)
-    else
-      # Default template if file doesn't exist
-      default_template
-    end
-  end
-
-  def default_template
-    <<~TEMPLATE
-      ---
-      title:
-      date: #{Date.today}
-      status: draft
-      post_type: article
-      tags:
-      ---
-
-    TEMPLATE
-  end
-
   def filename_to_title(filename)
     # Remove .md extension if present
     name = filename.sub(/\.md$/, "")

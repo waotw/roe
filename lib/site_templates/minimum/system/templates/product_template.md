@@ -4,5 +4,3 @@ description:
 tags: []
 group:
 ---
-
-Product description goes here...

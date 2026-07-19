@@ -412,31 +412,4 @@ class Admin::ProductsController < Admin::BaseController
     filename.gsub("-", " ").titleize
   end
 
-  def load_product_template
-    template_path = File.join(RoeSitePaths::SITE_PATH, "system", "templates", "product_template.md")
-
-    if File.exist?(template_path)
-      File.read(template_path)
-    else
-      # Default template
-      <<~MARKDOWN
-        ---
-        title:
-        url_name:
-        category:
-        status: draft
-        price: 0.00
-        sku:
-        image:
-        description:
-        tags: []
-        group:
-        primary: false
-        variant:
-        ---
-
-        Product description goes here...
-      MARKDOWN
-    end
-  end
 end
