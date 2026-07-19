@@ -1,7 +1,7 @@
 ---
 title: Glossary
 status: published
-tags: getting-started
+tags: getting-started, guide
 ---
 
 # Glossary

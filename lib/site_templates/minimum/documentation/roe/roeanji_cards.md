@@ -145,7 +145,7 @@ Most of these are not required. You can just use: `type:`, `post:`, these are he
 | `author` | No | Override author — falls back to site author |
 | `date` | No | Override date |
 | `url` | No | Custom URL if not using `post` reference |
-| `link_text` | No | Custom call-to-action text — defaults to "Read full story →" |
+| `link_text` | No | Custom call-to-action text — defaults to "Read more →" |
 
 ### Examples
 
