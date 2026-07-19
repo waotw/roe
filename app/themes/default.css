@@ -229,15 +229,14 @@ li > p {
   margin: 0 0 0 0;
 }
 
-.heading-anchor {
-  --heading-anchor-size: clamp(
-    1.4rem,
-    0.85em,
-    1.7rem
+a.heading-anchor,
+.post-content a.heading-anchor {
+  --heading-anchor-size: clamp(1.4rem, 0.85em, 1.4rem);
   --heading-anchor-color: currentColor;
   --heading-anchor-opacity: 0.25;
-  --heading-anchor-offset-x: 0.35em;
+  --heading-anchor-offset-x: -0.02em;
   --heading-anchor-offset-y: 0rem;
+  border-bottom: none;
 }
 
 /* =========== LAYOUT — SITE NAV ============ */
@@ -3651,31 +3650,26 @@ hr.clear-floats {
 /* ========== STORE — PRODUCT PAGE ========== */
 
 .product .content {
-  max-width: 65ch;
-  margin-inline: auto;
-}
-
-.product .content {
   max-width: var(--container-width);
-  /* Grid defines the copy column: flexible gutter | copy track | flexible
-     gutter. Every child defaults into the copy track (see placement rules
-     below); media breaks out to the full width. The center track caps at
-     --product-copy-width and collapses the gutters on narrow screens. */
   display: grid;
   grid-template-columns: 1fr min(var(--product-copy-width), 100%) 1fr;
-  /* Explicit vertical rhythm. Grid items don't margin-collapse, so this gap
-     is the single knob for spacing between blocks — adjust freely. */
-  row-gap: var(--space-4);
+  row-gap: var(--space-0);
 }
 
-.product h1 {
-  font-size: var(--text-4xl);
-  margin-bottom: var(--space-3);
+.product-top {
+  display: contents;
+  /* product_content wraps everything above the first `---` (hero, title, price,
+     button) in .product-top.*/
+}
+
+.product-title {
+  font-size: var(--text-3xl);
+  margin-bottom: var(--space-2);
   color: var(--color-heading);
 }
 
 .product h2 {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   margin: 0 0 var(--space-6) 0;
 }
 
@@ -3693,9 +3687,8 @@ hr.clear-floats {
   margin: 0 0 0 0;
 }
 
-/* Product's own body images (the float-left hero photo). Excludes images
-   rendered by roe-anji extensions — galleries and cards bring their own
-   layout, so the float/border/object-fit here would wreck them. */
+/* Base sizing for the product's own body images — the hero and any inline
+   photos. Galleries and cards bring their own layout, so exclude them. */
 .product img:not(.gallery *):not(.card *) {
   width: 100%;
   height: auto;
@@ -3703,6 +3696,9 @@ hr.clear-floats {
   object-position: center;
   margin: 0 auto var(--space-4);
   display: block;
+}
+
+.product img.product-image {
   border: 1px solid var(--color-border);
 }
 
@@ -3712,11 +3708,6 @@ hr.clear-floats {
   color: var(--color-link);
   margin-top: var(--space-2);
   padding-left: 0;
-  /* 3-column table: variant | price | button (pinned right by the 1fr column).
-     `grid` is also a block formatting context, so the list still sits beside the
-     floated image and drops below it as one unit. Tune spacing with `gap`
-     (row  column) — the second value controls the variant↔price gap; the button
-     stays at the far right regardless. */
   display: grid;
   grid-template-columns: auto auto 1fr;
   align-items: center;
@@ -3727,9 +3718,6 @@ hr.clear-floats {
   margin-bottom: var(--space-2);
 }
 
-/* Each row's cells (name, price, button) become columns of the list grid via
-   `display: contents`, so they align across every row — a real table. Scoped to
-   the product page; in-content variant lists keep their simple inline flow. */
 .product ul.product-variant-list .product-variant-item {
   display: contents;
 }
@@ -3762,36 +3750,29 @@ hr.clear-floats {
   color: var(--color-bg);
 }
 
-/* Stacked layout: full-width image/gallery on top, text in a centered copy
-   column below. The grid on `.product .content` (above) IS the column — every
-   direct child lands in the center track automatically, so a new element is in
-   the column with no rule of its own. An element's own left/right margins no
-   longer matter (placement is by track, not margin). Block margins are zeroed
-   so the container's row-gap is the sole vertical-rhythm control. */
-.product .content > * {
+.product .content > *,
+.product-top > * {
   grid-column: 2;
   margin-block: 0;
 }
 
-/* Images, captioned figures, and galleries span all three tracks — full width. */
+/* Images, captioned figures, and galleries span all three tracks — full width.
+   Listed for both the loose grid children and the .product-top-wrapped hero. */
 .product .content > p:has(img),
 .product .content > p:has(picture),
 .product .content > figure,
 .product .content > .gallery,
-.product .content > .gallery-figure {
+.product .content > .gallery-figure,
+.product-top > p:has(img),
+.product-top > p:has(picture),
+.product-top > figure,
+.product-top > .gallery,
+.product-top > .gallery-figure {
   grid-column: 1 / -1;
 }
 
-.product h1 {
-  font-size: var(--text-3xl);
-}
-
-.product h2 {
-  font-size: var(--text-xl);
-}
-
 @media (min-width: 521px) {
-  .product h1 {
+  .product-title {
     font-size: var(--text-4xl);
   }
 

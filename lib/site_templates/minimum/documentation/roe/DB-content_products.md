@@ -13,43 +13,27 @@ limit: all
 template: links
 ```
 
-# Products
+# Products in Roe
 
-Products in Roe are just [markdown](/documentation/roe/glossary/#markdown) files, similar to Pages/Posts. They can be edited here: [Admin → Products](/admin/products). The files live in your `/site/products` folder and can be edited directly if you prefer. 
+Products are items you sell through your site using the [Store](/documentation/roe/store) feature. Each Products is a [Markdown](/documentation/roe/glossary/#markdown) file (like Pages and Posts) with metadata for price, SKU, and more.
 
 ##### Before Products
 
-You'll need to enable the Store feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE STORE`. You will see see `store.yml` in the `Features` section.
+Products need the Store feature. Enable it in [Admin → Settings](/admin/configs) by clicking `ENABLE STORE` — `store.yml` then appears in the `Features` section.
 
-## Products in Roe
-
-Products are items you sell through your site using the [Store](/documentation/roe/store) feature. Each product is a Markdown file with metadata for price, SKU, images, and more.
-
-Products work with [Snipcart](https://snipcart.com) to handle the shopping cart, checkout, and payment processing.
+The Store and Products work with [Snipcart](https://snipcart.com) to handle the shopping cart, checkout, and payment processing.
 
 ## Creating Products
 
-Create products in [Admin → Products](/admin/products) or add `.md` files to `/site/products`.
+Create and edit products in [Admin → Products](/admin/products).
 
 ### Metadata
 
-The Admin shows product metadata as a simple form; you can also edit it directly in the `.md` file.
+The Admin shows product metadata as a simple form.
 
 ![Product Metadata Form UI](/media/images/product-metadata.png){: .screenshot}
 
-```yaml
----
-title: The First Book
-status: published
-url_name: my-first-book
-sku: BOOK-001-MYFIRSTBOOK
-price: 10.00
-category: book
-tags: fiction, poetry
-image: /media/images/my-first-book.jpg
-description: A lyrical meditation on memory and place
----
-```
+### A table of Product metadata options and descriptions
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -68,36 +52,26 @@ description: A lyrical meditation on memory and place
 
 ## Product Variants (groups)
 
-This allows you to sell different versions of the same thing, e.g. same t-shirt, different colors or same book title but different formats (ebook, paperback). You can edit the settings for product groups here: [Settings → Features → store.yml][/admin/configs/store/edit].
+Groups let you sell different versions of a Product — the same t-shirt in several sizes, or one book in several formats (ebook, paperback). Configure product groups in [Settings → Features → store.yml](/admin/configs/store/edit).
 
-1. Create a product for each variant
-2. Give them all the same `group` value
-3. Set `primary: true` on the variant you want to show first
-4. Label each with `variant`
+1. Create a Product for each variant
+2. Give them all the same `group` name
+3. Set `primary: true` on the version that should be the main Product
+4. Give each a `variant` (e.g., small)
 
-```yaml
----
-title: My Book
-sku: BOOK-001-PAPER
-price: 15.00
-category: book
-group: my-book
-variant: Paperback
-primary: true
----
-```
+![Product Group Metadata Form](/media/images/product-group-metadata.png){: .screenshot}
 
-In [Collections](/documentation/roe/collections#products) with `groups: enabled`, Roe shows one entry per group and shows one price (lowest, highest or range). You can set this here: [Settings → Features → store.yml](/admin/configs/store/edit).
+In [Collections](/documentation/roe/collections#products) with `groups: enabled`, Roe shows one price for the group — the lowest, the highest, or a range. You can change this setting in: [Settings → Features → store.yml](/admin/configs/store/edit).
 
 ## SKUs
 
-SKUs (Stock Keeping Units) are required for every product. They must be unique and should not be changed once your site is live and people have purchased items. <mark>Note:</mark> The SKU is how Snipcart identifies the item that is purchased. Don't change SKUs once a product is live and has been bought.
+Every product needs a SKU (Stock Keeping Unit) — a unique code that Snipcart uses to identify the item at checkout. <mark>Once a product is live and someone has bought it, don't change its SKU:</mark> doing so breaks the link to past orders.
 
-Roe includes a SKU generator that suggests standardized codes.
+Roe includes a SKU generator to help you create standardized SKUs.
 
 ### SKU Generator
 
-When creating a product, the SKU Generator is available in the metadata editor on any product page. This helps to create standardized SKUs:
+While editing any product, you'll find the SKU Generator in the metadata editor. It builds a standardized SKU for you:
 
 ![](/media/images/sku_metadata.png){: .screenshot}
 
@@ -112,16 +86,26 @@ The generator:
 - Auto-increments numbers within each category
 - Makes sure that the SKU is unique
 
-## Displaying Products
+## How to display Products on your site
 
 Details found in the [Store](/documentation/roe/store#displaying-products-with-collections) article.
 
 ## Product Pages
 
-Each product file is a 'page'. You can add content below the metadata (descriptions, sample chapters, reviews) using regular Markdown.
+Each product file is also a page: below the metadata, you can add anything you'd write in regular Markdown — a description, sample chapter, or reviews.
 
-Use the `PRODUCT` button in [The Editor](/documentation/roe/the-editor) to insert a template product page. This pulls from the metadata to give you a good starting point when building out product pages. (The `PRODUCT` button only appears while editing a product.)
+Use the `PRODUCT` button in [The Editor](/documentation/roe/the-editor) to insert a starter product page. It reads your metadata to give you a working layout to build on. (The button appears only while you're editing a product.)
 
-To link to a product from a post or another page, use a [Product Link card](/documentation/roe/cards#product-link) (`CARD ▼ → Product Link`) — it pulls in the product's title, price, and image automatically.
+To link to a product from a post or another page, use a [Product Link card](/documentation/roe/cards#product-link) (`CARD ▼ → Product Link`); it pulls in the product's title, price, and image automatically.
+
+### Automatic CSS classes
+
+Roe adds a few CSS classes to every product page so you can style common elements in your theme:
+
+- `.product-title` — the product's first heading (its title).
+- `.product-image` — the first image or gallery. The class lands on the `<img>` for a single image, or on the wrapper for a gallery.
+- `.product-top` — wraps everything above the first `---` divider, then Roe removes the `---` itself.
+
+The `PRODUCT` button's template ends with `---`; the image, title, price, and buy button sit inside `.product-top`, while anything you write below the first `---` is outside `.product-top`.
 
 See [Store](/documentation/roe/store) to learn about the Store feature in Roe.
