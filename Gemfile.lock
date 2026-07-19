@@ -81,8 +81,6 @@ GEM
     base64 (0.3.0)
     bcrypt (3.1.22)
     bcrypt_pbkdf (1.1.2)
-    bcrypt_pbkdf (1.1.2-arm64-darwin)
-    bcrypt_pbkdf (1.1.2-x86_64-darwin)
     bigdecimal (4.1.2)
     bindex (0.8.1)
     bootsnap (1.24.6)
@@ -109,6 +107,7 @@ GEM
     crass (1.0.6)
     css_parser (1.22.0)
       addressable
+    csv (3.3.5)
     date (3.5.1)
     debug (1.11.1)
       irb (~> 1.10)
@@ -491,6 +490,7 @@ DEPENDENCIES
   brakeman
   bundler-audit
   capybara
+  csv
   debug
   dockerfile-rails (>= 1.7)
   factory_bot (~> 6.5)
@@ -509,6 +509,7 @@ DEPENDENCIES
   net-ftp (>= 0.2)
   net-sftp (~> 4.0)
   nokogiri (~> 1.19)
+  ostruct
   postmark-rails (~> 0.22.1)
   premailer-rails (~> 1.12)
   propshaft
