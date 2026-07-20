@@ -104,7 +104,7 @@ Roe adds a few CSS classes to every product page so you can style common element
 
 - `.product-title` — the product's first heading (its title).
 - `.product-image` — the first image or gallery. The class lands on the `<img>` for a single image, or on the wrapper for a gallery.
-- `.product-top` — wraps everything above the first `---` divider, then Roe removes the `---` itself.
+- `.product-top` — wraps everything above the first `---` divider.
 
 The `PRODUCT` button's template ends with `---`; the image, title, price, and buy button sit inside `.product-top`, while anything you write below the first `---` is outside `.product-top`.
 
