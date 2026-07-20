@@ -14,9 +14,9 @@ class Admin::UpdatesController < Admin::BaseController
   # users can see "an update is available" and know to run the update from
   # their local install. The view surfaces a production-mode notice.
   before_action :block_in_production, only: %i[
-    start rollback start_deploy reset_and_retry_deploy dismiss_deploy
+    start confirm_ruby cancel_ruby rollback start_deploy reset_and_retry_deploy dismiss_deploy
   ]
-  before_action :block_on_dev_install, only: %i[start rollback]
+  before_action :block_on_dev_install, only: %i[start confirm_ruby rollback]
 
   def index
     @current_version    = RoeUpdater::VersionChecker.current_version
@@ -26,6 +26,11 @@ class Admin::UpdatesController < Admin::BaseController
     @update_info        = RoeUpdater::VersionChecker.check_for_updates
     @last_update        = UpdateStatus.order(created_at: :desc).first
     @in_progress        = UpdateStatus.where(status: "in_progress").exists?
+
+    # A paused update waiting for the user to approve an in-browser Ruby
+    # install (see UpdateOrchestrator#ensure_ruby_available). The awaiting
+    # panel in _update_active shows the Install / Cancel choice.
+    @awaiting_required_ruby = awaiting_required_ruby if @last_update&.status == "awaiting_ruby"
 
     # Post-update display state. The version-status block at the top
     # of the page picks one of: amber in-progress / blue restart-needed
@@ -131,12 +136,48 @@ class Admin::UpdatesController < Admin::BaseController
     update_status = UpdateStatus.order(created_at: :desc).first
 
     render json: {
-      status:   update_status&.status,
-      step:     update_status&.current_step,
-      progress: update_status&.progress_percent,
-      error:    update_status&.error_message,
-      log:      update_status&.log
+      status:        update_status&.status,
+      step:          update_status&.current_step,
+      progress:      update_status&.progress_percent,
+      error:         update_status&.error_message,
+      log:           update_status&.log,
+      required_ruby: (awaiting_required_ruby if update_status&.status == "awaiting_ruby")
     }
+  end
+
+  # POST — the user approved the in-browser Ruby install after the update
+  # paused at the checking_ruby step. Flip the paused record back to
+  # in_progress and resume the job with the install approved: it reuses the
+  # existing staging/ clone, installs the Ruby via mise, then continues.
+  def confirm_ruby
+    status = UpdateStatus.where(status: "awaiting_ruby").order(created_at: :desc).first
+    unless status
+      flash[:alert] = "No update is waiting for a Ruby install."
+      redirect_to admin_updates_path and return
+    end
+
+    status.update!(status: "in_progress", current_step: "Preparing to install Ruby…")
+    PerformUpdateJob.perform_later(
+      version: status.to_version, status_id: status.id, ruby_confirmed: true, resume: true
+    )
+
+    flash[:notice] = "Installing Ruby and continuing the update. This may take a minute."
+    redirect_to admin_updates_path
+  end
+
+  # POST — the user declined the Ruby install. Nothing was switched (we
+  # paused before the swap), so just clear the staging clone and drop the
+  # aborted attempt so the page returns to a clean "update available" state
+  # instead of showing a scary failure card.
+  def cancel_ruby
+    status = UpdateStatus.where(status: "awaiting_ruby").order(created_at: :desc).first
+    if status
+      RoeUpdater::Downloader.cleanup_staging
+      status.destroy
+    end
+
+    flash[:notice] = "Update cancelled. Nothing on your site was changed."
+    redirect_to admin_updates_path
   end
 
   def rollback
@@ -359,6 +400,15 @@ class Admin::UpdatesController < Admin::BaseController
 
   def license_valid?
     true
+  end
+
+  # The Ruby version a paused update is waiting to install — read from the
+  # downloaded release in staging/ (the update pauses before the swap, so
+  # staging/.ruby-version is the target). Used by the awaiting-Ruby panel
+  # and the status JSON. Falls back to a generic label if it can't be read.
+  def awaiting_required_ruby
+    path = File.join(RoeUpdater::Downloader::STAGING_PATH, ".ruby-version")
+    (File.read(path).strip.presence if File.exist?(path)) || "a newer version"
   end
 
   # Human-readable server/app descriptor for the card header
