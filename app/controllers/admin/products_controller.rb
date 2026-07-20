@@ -411,5 +411,4 @@ class Admin::ProductsController < Admin::BaseController
   def filename_to_title(filename)
     filename.gsub("-", " ").titleize
   end
-
 end

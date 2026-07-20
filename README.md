@@ -6,7 +6,7 @@ Roe is a file-backed CMS with first-class support for blogs, podcasts, paid memb
 
 ## Installation
 
-Only install Roe with `git` if you plan on developing Roe itself. To build sites with Roe, download it [here](https://go-roe.com) and follow this document: [Installing Roe](https://go-roe.com/documentation/guide-installation)
+Only install Roe with `git` if you plan on developing Roe itself. To build sites with Roe, download it [here](https://go-roe.com) and follow this document: [Installing Roe](https://go-roe.com/documentation/roe/guide-installation)
 
 If you plan to develop Roe: use the following command and it will install all dependencies.
 
@@ -45,6 +45,7 @@ Install these to turn on extra features. Roe runs fine without them.
 /roe/
   current/          # Current Roe version (Rails app)
   site/             # All your site content & config (posts, pages, media, config, databases, etc.)
+  backups/          # Local and live-site backups (created by Site Sync)
   roe.sh            # Server management script
   start.command     # Double-click on macOS to launch Roe
   README.md         # Basic info about Roe and helpful links
@@ -69,7 +70,7 @@ Install these to turn on extra features. Roe runs fine without them.
 - **Admin**: Visit http://localhost:3000/admin
 - **Content**: Edit files in Admin with The Editor or in `site/` directory with text editor of your choice
 - **Updates**: Use Admin → Updates to check for and install updates
-- **Backups**: Automatic backups stored in `site_backups/` when using Site Sync and Deploy from Admin
+- **Backups**: Automatic backups stored in `backups/` when using Site Sync and Deploy from Admin
 
 ## Documentation & Support
 

@@ -48,7 +48,7 @@ module SiteSync
       write(".git/config", "git")
       write(".sync-backups/snap/x.md", "bak")
       write("posts/keep.md", "keep")
-      assert_equal ["posts/keep.md"], ledger.current_manifest.keys
+      assert_equal [ "posts/keep.md" ], ledger.current_manifest.keys
     end
 
     test "excludes system/secrets subtree but keeps other system files" do
@@ -67,13 +67,13 @@ module SiteSync
       write(".sync-state.json", "{}")
       write("system/global/.last_deploy.yml", "x")
       write("posts/real.md", "real")
-      assert_equal ["posts/real.md"], ledger.current_manifest.keys
+      assert_equal [ "posts/real.md" ], ledger.current_manifest.keys
     end
 
     test "directories are never entries; only files" do
       FileUtils.mkdir_p(File.join(@dir, "empty_dir"))
       write("posts/x.md", "x")
-      assert_equal ["posts/x.md"], ledger.current_manifest.keys
+      assert_equal [ "posts/x.md" ], ledger.current_manifest.keys
     end
 
     test "symlinks are skipped (only the real file is tracked)" do
@@ -106,15 +106,15 @@ module SiteSync
         "new.md"   => { "size" => 1, "mtime" => 100 }    # added
       }
       d = Ledger.diff(current, recorded)
-      assert_equal ["new.md"], d[:added]
-      assert_equal ["gone.md"], d[:deleted]
-      assert_equal ["mtime.md", "size.md"], d[:modified]   # sorted
+      assert_equal [ "new.md" ], d[:added]
+      assert_equal [ "gone.md" ], d[:deleted]
+      assert_equal [ "mtime.md", "size.md" ], d[:modified]   # sorted
     end
 
     test "diff treats a nil baseline as everything-added (sorted)" do
       current = { "b.md" => { "size" => 1, "mtime" => 1 }, "a.md" => { "size" => 1, "mtime" => 1 } }
       d = Ledger.diff(current, nil)
-      assert_equal ["a.md", "b.md"], d[:added]
+      assert_equal [ "a.md", "b.md" ], d[:added]
       assert_empty d[:deleted]
       assert_empty d[:modified]
     end

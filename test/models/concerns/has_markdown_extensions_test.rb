@@ -1059,7 +1059,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "share button carries the stable .share hook + omits empty values" do
     html = TestModel.new("").send(:render_share_button, {}, {})
     assert_includes html, '<div class="share" data-controller="share">'
-    refute_includes html, 'data-share-url-value'
+    refute_includes html, "data-share-url-value"
   end
 
   test "share menu uses the reusable .button-menu hook" do

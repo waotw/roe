@@ -2,16 +2,9 @@ class MediaController < ApplicationController
   skip_before_action :require_authentication
 
   def show
-    file_path = File.join(RoeSitePaths::SITE_PATH, "media", params[:path])
-    unless File.exist?(file_path)
-      file_path = File.join(RoeSitePaths::SITE_PATH, "documentation", "media", params[:path])
-    end
-    unless File.exist?(file_path)
-      doc_media_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "documentation", "*", "media", params[:path]))
-      file_path = doc_media_paths.first if doc_media_paths.any?
-    end
+    file_path = resolve_media_path(params[:path].to_s)
 
-    unless File.exist?(file_path)
+    unless file_path
       head :not_found
       return
     end
@@ -55,6 +48,51 @@ class MediaController < ApplicationController
   end
 
   private
+
+  # Resolve a requested media path to a real file, but ONLY within the
+  # allowed media roots. /media/*path is a public wildcard route, so
+  # params[:path] is attacker-controllable and can contain "../" or glob
+  # metacharacters. We expand each candidate and confirm it stays inside its
+  # root before returning it (defeats path traversal), and we build the
+  # per-scope documentation paths with File.join rather than Dir.glob
+  # (defeats glob injection). Returns nil when nothing safe matches.
+  def resolve_media_path(rel)
+    media_roots.each do |root|
+      candidate = File.expand_path(File.join(root, rel))
+      return candidate if within?(root, candidate) && File.file?(candidate)
+    end
+    nil
+  end
+
+  # The directories media may be served from: /site/media,
+  # /site/documentation/media, and each /site/documentation/<scope>/media.
+  # Scope directories are read from disk (no user input), so enumerating
+  # them can't be steered by the request.
+  def media_roots
+    site = RoeSitePaths::SITE_PATH
+    roots = [
+      File.join(site, "media"),
+      File.join(site, "documentation", "media")
+    ]
+
+    docs = File.join(site, "documentation")
+    if Dir.exist?(docs)
+      Dir.children(docs).each do |scope|
+        scope_media = File.join(docs, scope, "media")
+        roots << scope_media if Dir.exist?(scope_media)
+      end
+    end
+
+    roots
+  end
+
+  # True only when `path` is `root` itself or sits below it — so a "../"
+  # that climbs out is rejected. Roots are "/"-suffixed before the prefix
+  # check so a sibling like "/site/media-x" can't pass as "/site/media".
+  def within?(root, path)
+    root = File.expand_path(root)
+    path == root || path.start_with?(root + File::SEPARATOR)
+  end
 
   def parse_range(range_header, file_size)
     # Expects format: "bytes=start-end" or "bytes=start-"
