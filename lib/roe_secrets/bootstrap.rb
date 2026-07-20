@@ -84,11 +84,21 @@ module RoeSecrets
         seeded << "secret_key_base"
       end
 
-      # Seed AR encryption keys ONLY when we generated master.key in the same
-      # run. Anything else (existing master.key, or a credentials file that's
-      # simply missing AR keys) means the operator manages them separately —
-      # don't overwrite that decision.
-      if master_key_was_generated && existing.dig(:active_record_encryption, :primary_key).blank?
+      # Seed AR encryption keys whenever they are ABSENT — covers both a fresh
+      # install and an older one whose credentials predate AR encryption (that
+      # second case otherwise crashes the first `encrypts` save with "Missing
+      # Active Record encryption credential: active_record_encryption.primary_key").
+      #
+      # This can NEVER overwrite existing keys:
+      #   • Undecryptable credentials already returned :unreadable at the guard
+      #     above, so we never reach here with keys we merely failed to READ.
+      #   • We require BOTH the decrypted config (`existing`) AND the exact YAML
+      #     about to be written (`hash`) to show no primary_key before seeding —
+      #     a key present in either representation is left untouched.
+      #   • Absent keys mean nothing was ever encrypted with them (any `encrypts`
+      #     write would have raised), so seeding fresh keys loses nothing.
+      if existing.dig(:active_record_encryption, :primary_key).blank? &&
+         hash.dig("active_record_encryption", "primary_key").blank?
         hash["active_record_encryption"] = {
           "primary_key"         => SecureRandom.alphanumeric(32),
           "deterministic_key"   => SecureRandom.alphanumeric(32),
