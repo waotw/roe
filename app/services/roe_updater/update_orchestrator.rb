@@ -52,9 +52,10 @@ module RoeUpdater
     ].freeze
 
     class << self
-      def start_update(to_version, status_record)
+      def start_update(to_version, status_record, ruby_confirmed: false, resume: false)
         @status = status_record
         @version = to_version
+        @ruby_confirmed = ruby_confirmed
 
         # HARD SAFETY NET — refuse on a developer checkout before ANY
         # destructive step. The controller blocks the web button, but this
@@ -64,22 +65,37 @@ module RoeUpdater
         # refuse_on_dev_checkout!.
         return if refuse_on_dev_checkout!
 
-        execute_step(:validating) { validate_prerequisites }
-        execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
-        execute_step(:downloading) { Downloader.download_version(@version, @status) }
-        execute_step(:checking_ruby) { check_ruby_compatibility }
-        execute_step(:testing) { MigrationTester.test_migrations(@status) }
-        execute_step(:migrating) { run_migrations }
-        execute_step(:switching) { SwitchManager.switch_versions(@status) }
-        execute_step(:preserving_secrets) { preserve_secrets }
-        execute_step(:syncing_root_files) { sync_root_files }
-        execute_step(:syncing_docs) { sync_docs }
-        execute_step(:writing_version) { write_version_files }
-        execute_step(:installing_gems) { install_gems }
-        execute_step(:building_assets) { build_assets }
-        execute_step(:restarting) { restart_server }
+        # A fresh run validates, backs up, and downloads. A RESUME (the user
+        # just approved the in-browser Ruby install after we paused at
+        # checking_ruby) reuses the staging/ clone and DB backup from the
+        # first pass, so it skips straight to the Ruby step and continues.
+        unless resume
+          execute_step(:validating) { validate_prerequisites }
+          execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
+          execute_step(:downloading) { Downloader.download_version(@version, @status) }
+        end
 
-        complete_update
+        # ensure_ruby_available throws :roe_awaiting_ruby when the release
+        # pins a Ruby that isn't installed and the user hasn't yet approved
+        # installing it. catch() turns that throw into a clean stop: the
+        # status is left at "awaiting_ruby", staging/ stays in place, and
+        # NOTHING is switched or migrated. The update resumes here (with
+        # resume: true, ruby_confirmed: true) once they click Install.
+        catch(:roe_awaiting_ruby) do
+          execute_step(:checking_ruby) { ensure_ruby_available }
+          execute_step(:testing) { MigrationTester.test_migrations(@status) }
+          execute_step(:migrating) { run_migrations }
+          execute_step(:switching) { SwitchManager.switch_versions(@status) }
+          execute_step(:preserving_secrets) { preserve_secrets }
+          execute_step(:syncing_root_files) { sync_root_files }
+          execute_step(:syncing_docs) { sync_docs }
+          execute_step(:writing_version) { write_version_files }
+          execute_step(:installing_gems) { install_gems }
+          execute_step(:building_assets) { build_assets }
+          execute_step(:restarting) { restart_server }
+
+          complete_update
+        end
       rescue => e
         handle_failure(e)
       end
@@ -129,50 +145,173 @@ module RoeUpdater
         end
       end
 
-      # Preflight: refuse to proceed when the downloaded release pins a
-      # newer Ruby than the one this install is running. Runs right
-      # after download and BEFORE the version swap / migrations, so a
-      # block here is a cheap no-op rollback (only staging exists; the
-      # live site is untouched).
+      # Gate: make sure the Ruby the downloaded release pins is INSTALLED
+      # before we switch to it. Runs right after download and BEFORE the
+      # swap/migrations, so anything here is a cheap no-op stop — only
+      # staging/ exists; the live site is untouched.
       #
-      # Why this matters: install_gems later does `bundle install` in
-      # current/, where the user's version manager (rbenv or mise)
-      # reads the new .ruby-version. If it pins a Ruby they don't have
-      # (a major bump, most acutely), bundle dies with a cryptic
-      #   `rbenv: version '4.0.5' is not installed`
-      # and the update fails mid-flight. Catching it here turns that
-      # into a clear, actionable message before anything changes.
+      # Availability, not "am I running it": roe.sh boots the app on the
+      # exact version in current/.ruby-version, and that only becomes the
+      # new version AFTER the swap. So the running Ruby can't be the new
+      # one yet — what matters is that the new one is *installed*, so the
+      # post-update restart can boot on it. We check for the exact version
+      # via the user's manager (mise or rbenv).
       #
-      # Conservative: only blocks when the running Ruby is strictly
-      # OLDER than the required one. Equal or newer always proceeds, so
-      # routine releases that don't change Ruby pass untouched. Fails
-      # OPEN on an unparseable version string — never blocks a valid
-      # update over a bad comparison.
-      def check_ruby_compatibility
-        required_file = File.join(Downloader::STAGING_PATH, ".ruby-version")
-        return unless File.exist?(required_file)
+      # Three outcomes:
+      #   • already installed (or no Ruby change) → return, proceed.
+      #   • missing, user hasn't approved an install → pause: set status
+      #     "awaiting_ruby" and throw, leaving staging/ intact. The browser
+      #     shows an Install / Cancel panel; confirming resumes here.
+      #   • missing, user approved (@ruby_confirmed) → install it via mise
+      #     (installing mise first if absent), then verify and proceed.
+      def ensure_ruby_available
+        required = staged_ruby_version
+        return if required.nil?
+        return if ruby_available?(required)
 
-        required = File.read(required_file).strip
-        return if required.empty?
-
-        running = RUBY_VERSION
-        begin
-          return if Gem::Version.new(running) >= Gem::Version.new(required)
-        rescue ArgumentError
-          return # unparseable — let the normal flow surface any issue
+        unless @ruby_confirmed
+          @status.update!(
+            status: "awaiting_ruby",
+            current_step: "Ruby #{required} required to continue"
+          )
+          log("⏸  This release needs Ruby #{required}, which isn't installed. " \
+              "Waiting for your go-ahead to install it.")
+          throw :roe_awaiting_ruby
         end
 
-        raise <<~MSG.strip
-          This update needs Ruby #{required}, but this install is running Ruby #{running}.
+        install_required_ruby(required)
 
-          Install the required Ruby first, then run the update again:
-            1. Open a terminal in your Roe folder
-            2. Run:  ./roe.sh check
-               (installs Ruby #{required} and updates your shell)
-            3. Restart Roe, then retry the update.
+        return if ruby_available?(required)
 
-          Your site was not changed — this update stopped before touching anything.
-        MSG
+        raise "Ruby #{required} still isn't available after the install attempt. " \
+              "Install it manually (e.g. `mise use --global ruby@#{required}`) and retry the update."
+      end
+
+      # The Ruby version the downloaded release pins (staging/.ruby-version),
+      # or nil when the release doesn't pin one.
+      def staged_ruby_version
+        read_ruby_version(File.join(Downloader::STAGING_PATH, ".ruby-version"))
+      end
+
+      # The Ruby version current/ pins AFTER the swap — used to run the
+      # post-swap gem/asset builds under the version the app will boot on.
+      def current_ruby_version
+        read_ruby_version(File.join(RoeSitePaths::ROE_ROOT, "current", ".ruby-version"))
+      end
+
+      def read_ruby_version(path)
+        return nil unless File.exist?(path)
+
+        version = File.read(path).strip
+        version.empty? ? nil : version
+      end
+
+      # Is EXACTLY this Ruby installed and resolvable on this machine? roe.sh
+      # activates the exact pinned version, so an equal-or-newer running Ruby
+      # doesn't help unless the exact version is installed too.
+      def ruby_available?(version)
+        return true if RUBY_VERSION == version
+
+        Bundler.with_original_env do
+          if (mise = mise_bin)
+            return true if system("#{mise} where ruby@#{version} > /dev/null 2>&1")
+          end
+          if command_available?("rbenv")
+            installed = `rbenv versions --bare 2>/dev/null`.split("\n").map(&:strip)
+            return true if installed.include?(version)
+          end
+        end
+        false
+      end
+
+      # Install the pinned Ruby via mise (installing mise itself first if the
+      # machine doesn't have it). Streams output into the update log. mise
+      # only needs the version INSTALLED — roe.sh's `mise env -C current`
+      # resolves it from current/.ruby-version on the next boot, so we don't
+      # touch the user's global.
+      def install_required_ruby(version)
+        ensure_mise!
+        mise = mise_bin
+        raise "mise isn't available to install Ruby #{version}." unless mise
+
+        configure_mise(mise)
+
+        @status.update!(
+          status: "in_progress",
+          current_step: "Installing Ruby #{version} (via mise)…",
+          progress_percent: 40
+        )
+        log("→ Installing Ruby #{version} via mise (usually ~30s)…")
+
+        Bundler.with_original_env do
+          output = `#{mise} install "ruby@#{version}" 2>&1`
+          log(output.to_s.strip) if output.to_s.strip.present?
+          raise "mise failed to install Ruby #{version}: #{output}" unless $?.success?
+        end
+        log("✓ Ruby #{version} installed")
+      end
+
+      # Install mise via its official one-line installer when it's missing.
+      # The standalone installer drops the binary at ~/.local/bin/mise and
+      # needs no sudo. No-op when mise is already present.
+      def ensure_mise!
+        return if mise_bin
+
+        @status.update!(current_step: "Installing mise…", progress_percent: 38)
+        log("→ mise not found — installing it (https://mise.run)…")
+        Bundler.with_original_env do
+          output = `curl -fsSL https://mise.run | sh 2>&1`
+          log(output.to_s.strip) if output.to_s.strip.present?
+          raise "Failed to install mise automatically: #{output}" unless $?.success?
+        end
+        raise "mise install ran but its binary still isn't found." unless mise_bin
+        log("✓ mise installed")
+      end
+
+      # Locate the mise binary: on PATH first, then the standalone
+      # installer's default (~/.local/bin) and the Homebrew locations —
+      # mirrors roe.sh's discovery so a mise installed by roe.sh is found
+      # here too. Returns the command/path string, or nil if not found.
+      def mise_bin
+        return "mise" if command_available?("mise")
+
+        [ File.join(Dir.home, ".local/bin/mise"),
+          "/opt/homebrew/bin/mise",
+          "/usr/local/bin/mise" ].find { |path| File.executable?(path) }
+      end
+
+      def command_available?(cmd)
+        Bundler.with_original_env { system("command -v #{cmd} > /dev/null 2>&1") }
+      end
+
+      # Mirror roe.sh's mise setup so a mise we install (or an existing one)
+      # behaves the way roe.sh's restart expects:
+      #   • idiomatic_version_file_enable_tools=ruby — modern mise ignores
+      #     .ruby-version WITHOUT this, so roe.sh's `mise env -C current`
+      #     wouldn't pin the new Ruby and the app would fall through to the
+      #     system Ruby on restart.
+      #   • ruby.compile=false — install precompiled Ruby (seconds) instead
+      #     of a source build (slow, and where the OpenSSL failures live).
+      # Idempotent; both `set` calls overwrite to the same value.
+      def configure_mise(mise)
+        Bundler.with_original_env do
+          system("#{mise} settings set idiomatic_version_file_enable_tools ruby > /dev/null 2>&1")
+          system("#{mise} settings set ruby.compile false > /dev/null 2>&1")
+        end
+      end
+
+      # Prefix for the post-swap gem/asset build commands. When the release
+      # bumped Ruby, current/.ruby-version now differs from the Ruby THIS
+      # (old) process runs — so run bundle/asset builds under the pinned
+      # Ruby via mise, ensuring native extensions build for the version the
+      # app will actually boot on. Empty (no prefix) when there's no bump or
+      # mise isn't available.
+      def ruby_target_prefix
+        required = current_ruby_version
+        return "" if required.nil? || required == RUBY_VERSION
+
+        mise = mise_bin
+        mise ? "#{mise} exec \"ruby@#{required}\" -- " : ""
       end
 
       def validate_prerequisites
@@ -398,7 +537,7 @@ module RoeUpdater
       # any deps.
       def install_gems
         current_app = File.join(RoeSitePaths::ROE_ROOT, "current")
-        cmd = "cd '#{current_app}' && bundle install 2>&1"
+        cmd = "cd '#{current_app}' && #{ruby_target_prefix}bundle install 2>&1"
         output = nil
 
         Bundler.with_original_env do
@@ -425,7 +564,7 @@ module RoeUpdater
         current_app = File.join(RoeSitePaths::ROE_ROOT, "current")
         rails_env = Rails.env
 
-        cmd = "cd '#{current_app}' && RAILS_ENV=#{rails_env} bundle exec rails assets:precompile 2>&1"
+        cmd = "cd '#{current_app}' && RAILS_ENV=#{rails_env} #{ruby_target_prefix}bundle exec rails assets:precompile 2>&1"
         output = nil
 
         Bundler.with_original_env do

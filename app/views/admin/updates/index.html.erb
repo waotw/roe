@@ -14,7 +14,7 @@
       scrolls to it. The Stimulus `updates` controller finds its polling
       targets here just as well as in the sections. %>
   <% deploy_active = !Rails.env.production? && @deploy_status&.dig(:state).in?([ :running, :failed ]) %>
-  <% update_active = @in_progress || (@last_update && %w[failed rolled_back].include?(@last_update.status)) %>
+  <% update_active = @in_progress || (@last_update && %w[awaiting_ruby failed rolled_back].include?(@last_update.status)) %>
   <% if update_active || deploy_active %>
     <div class="mb-6">
       <% if update_active %>

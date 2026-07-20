@@ -90,6 +90,13 @@ module ActiveSupport
         { "static_generation_enabled" => false }.to_yaml.sub(/\A---\s*\n/, "")
       )
 
+      # content.yml (search + content-rendering settings, split out of
+      # site.yml) is likewise read from disk, so a test that writes a
+      # non-default content.yml (e.g. search.all_pages: true) would pollute
+      # later tests in random order. Remove it so each test starts from the
+      # built-in defaults, exactly as the site.yml rewrite above does.
+      File.delete(SiteConfig::CONTENT_FILE) if File.exist?(SiteConfig::CONTENT_FILE)
+
       # Sync the seeded site.yml into a SiteConfig record. Uses the same
       # path production does (find_by(file_path:) → create_from_file)
       # rather than constructing a record by hand.
