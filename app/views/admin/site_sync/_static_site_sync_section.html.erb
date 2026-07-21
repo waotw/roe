@@ -115,7 +115,7 @@
           <% if @static_site_sync_config.last_verification_error.present? %>
             <p class="text-xs text-red-700 mt-1">Last connection test failed: <%= @static_site_sync_config.last_verification_error %></p>
           <% elsif @static_site_sync_config.last_verified_at %>
-            <p class="text-xs text-gray-500">Connection verified: <%= time_ago_in_words(@static_site_sync_config.last_verified_at) %> ago</p>
+            <p class="text-xs text-green-700">Connection verified: <%= time_ago_in_words(@static_site_sync_config.last_verified_at) %> ago</p>
           <% end %>
         </div>
 
@@ -131,11 +131,11 @@
                 When there's no drift the job no-ops with "Already in
                 sync" — giving the user the button regardless beats
                 hiding it and making them wonder where it went. %>
-            <%= button_to (@static_site_sync_diff && !@static_site_sync_diff.empty? ? "Push now" : "Push (nothing to push)"),
+            <%= button_to (@static_site_sync_diff && !@static_site_sync_diff.empty? ? "PUSH NOW" : "PUSH (nothing to push)"),
                           admin_push_static_site_path,
                           method: :post,
                           class: "inline-flex items-center justify-center px-4 py-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
-            <%= button_to "Test connection",
+            <%= button_to "TEST CONNECTION",
                           admin_test_static_site_sync_connection_path,
                           method: :post,
                           class: "inline-flex items-center justify-center px-3 py-1.5 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>

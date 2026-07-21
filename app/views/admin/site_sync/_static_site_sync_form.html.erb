@@ -5,11 +5,12 @@
     the credentials block when ZIP is selected. (Form ships every field
     regardless — the server ignores host/etc when protocol is ZIP.)
 
-    Password and SSH key fields are intentionally blank on render even
-    when a value is stored — Rails encrypted attributes don't expose
-    plaintext, and pre-filling with "********" placeholders would
-    require special form handling. The controller treats an empty
-    field as "leave existing value alone." %>
+    Stored credentials (password, SSH key, key passphrase) are never
+    rendered back — Rails encrypted attributes don't expose plaintext.
+    When one is already saved we show an "added" badge with an Update
+    button (credential-field controller) instead of an empty box, so it's
+    obvious something is stored. Submitting a blank credential field means
+    "leave the existing value alone." %>
 
 <%# `data-turbo="false"` is mandatory here: when protocol is ZIP the
     submit chains save → redirect-to-download, and Turbo's fetch path
@@ -72,6 +73,7 @@
         <%= f.number_field :port,
                            placeholder: config.default_port.to_s,
                            min: 1, max: 65535,
+                           data: { "static-site-sync-form-target" => "port" },
                            class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
       </div>
     </div>
@@ -87,44 +89,117 @@
       <span class="block text-xs font-semibold text-gray-700 mb-2">Authentication</span>
       <div class="flex gap-6 text-sm">
         <label class="inline-flex items-center gap-2 cursor-pointer">
-          <%= f.radio_button :auth_mode, "password" %>
+          <%= f.radio_button :auth_mode, "password",
+                             data: { action: "change->static-site-sync-form#authModeChanged" } %>
           Password
         </label>
         <label class="inline-flex items-center gap-2 cursor-pointer">
-          <%= f.radio_button :auth_mode, "ssh_key" %>
+          <%= f.radio_button :auth_mode, "ssh_key",
+                             data: { action: "change->static-site-sync-form#authModeChanged" } %>
           SSH private key
         </label>
       </div>
     </div>
 
-    <div>
-      <%= f.label :password, "Password", class: "block text-xs font-semibold text-gray-700 mb-1" %>
-      <%= f.password_field :password,
-                           value: "",
-                           autocomplete: "new-password",
-                           placeholder: config.password.present? ? "•••••••• (leave blank to keep current)" : "",
-                           class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
-      <p class="text-xs text-gray-500 mt-1">Stored encrypted. Used only when Authentication is set to Password.</p>
+    <%# Password auth — shown only when Authentication is "Password". A
+        stored value collapses to an "added" badge; Update reveals the
+        field. Blank submit keeps the current value. %>
+    <div data-static-site-sync-form-target="passwordAuth" class="<%= 'hidden' unless config.auth_mode_password? %>">
+      <span class="block text-xs font-semibold text-gray-700 mb-1">Password</span>
+      <div data-controller="credential-field">
+        <% if config.password.present? %>
+          <div data-credential-field-target="badge" class="flex items-center gap-3">
+            <span class="text-xs font-medium text-green-700">✓ Password added</span>
+            <button type="button" data-action="credential-field#reveal"
+                    class="text-xs px-2 py-1 border border-gray-400 rounded-xs hover:bg-gray-100 cursor-pointer">Update</button>
+          </div>
+          <div data-credential-field-target="field" class="hidden mt-2">
+            <%= f.password_field :password, value: "", autocomplete: "new-password",
+                                 class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+            <p class="text-xs text-gray-500 mt-1">Stored encrypted. Leave blank to keep the current password.</p>
+          </div>
+        <% else %>
+          <div data-credential-field-target="field">
+            <%= f.password_field :password, value: "", autocomplete: "new-password",
+                                 class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+            <p class="text-xs text-gray-500 mt-1">Stored encrypted.</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# SSH-key auth — shown only when Authentication is "SSH private key".
+        Holds the key itself plus an optional passphrase (many hosts, e.g.
+        cPanel, only issue passphrase-protected keys). Same badge pattern. %>
+    <div data-static-site-sync-form-target="keyAuth" class="space-y-4 <%= 'hidden' unless config.auth_mode_ssh_key? %>">
+      <div>
+        <span class="block text-xs font-semibold text-gray-700 mb-1">SSH private key</span>
+        <div data-controller="credential-field">
+          <% if config.ssh_private_key.present? %>
+            <div data-credential-field-target="badge" class="flex items-center gap-3">
+              <span class="text-xs font-medium text-green-700">✓ SSH key added</span>
+              <button type="button" data-action="credential-field#reveal"
+                      class="text-xs px-2 py-1 border border-gray-400 rounded-xs hover:bg-gray-100 cursor-pointer">Update</button>
+            </div>
+            <div data-credential-field-target="field" class="hidden mt-2">
+              <%= f.text_area :ssh_private_key, value: "", autocomplete: "off", rows: 6,
+                              placeholder: "Paste the full private key, including its BEGIN and END lines.",
+                              class: "w-full font-mono text-xs p-2 border border-gray-300 rounded-xs" %>
+              <p class="text-xs text-gray-500 mt-1">Paste the full private key. Stored encrypted. Leave blank to keep the current one.</p>
+            </div>
+          <% else %>
+            <div data-credential-field-target="field">
+              <%= f.text_area :ssh_private_key, value: "", autocomplete: "off", rows: 6,
+                              placeholder: "Paste the full private key, including its BEGIN and END lines.",
+                              class: "w-full font-mono text-xs p-2 border border-gray-300 rounded-xs" %>
+              <p class="text-xs text-gray-500 mt-1">Paste the full private key, including the BEGIN and END lines. Stored encrypted.</p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <div>
+        <span class="block text-xs font-semibold text-gray-700 mb-1">Key passphrase <span class="font-normal text-gray-500">— only if your key is encrypted</span></span>
+        <div data-controller="credential-field">
+          <% if config.ssh_key_passphrase.present? %>
+            <div data-credential-field-target="badge" class="flex items-center gap-3">
+              <span class="text-xs font-medium text-green-700">✓ Passphrase added</span>
+              <button type="button" data-action="credential-field#reveal"
+                      class="text-xs px-2 py-1 border border-gray-400 rounded-xs hover:bg-gray-100 cursor-pointer">Update</button>
+            </div>
+            <div data-credential-field-target="field" class="hidden mt-2">
+              <%= f.password_field :ssh_key_passphrase, value: "", autocomplete: "new-password",
+                                   class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+              <p class="text-xs text-gray-500 mt-1">Stored encrypted. Leave blank to keep the current passphrase.</p>
+            </div>
+          <% else %>
+            <div data-credential-field-target="field">
+              <%= f.password_field :ssh_key_passphrase, value: "", autocomplete: "new-password",
+                                   class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+              <p class="text-xs text-gray-500 mt-1">Many hosts (e.g. cPanel) only generate passphrase-protected keys — enter that passphrase here. Stored encrypted.</p>
+            </div>
+          <% end %>
+        </div>
+      </div>
     </div>
 
     <div>
-      <%= f.label :ssh_private_key, "SSH private key", class: "block text-xs font-semibold text-gray-700 mb-1" %>
-      <%= f.text_area :ssh_private_key,
-                      value: "",
-                      autocomplete: "off",
-                      rows: 6,
-                      placeholder: config.ssh_private_key.present? ? "(leave blank to keep current)" : "-----BEGIN OPENSSH PRIVATE KEY-----\n...",
-                      class: "w-full font-mono text-xs p-2 border border-gray-300 rounded-xs" %>
-      <p class="text-xs text-gray-500 mt-1">Paste the full PEM contents. Stored encrypted. Used only when Authentication is set to SSH private key.</p>
+      <label class="inline-flex items-start gap-2 cursor-pointer">
+        <%= f.check_box :verify_tls, class: "mt-0.5" %>
+        <span>
+          <span class="block text-xs font-semibold text-gray-700">Verify TLS certificate</span>
+          <span class="block text-xs text-gray-500">FTPS only. Uncheck if your host presents a self-signed or mismatched certificate — common on shared / cPanel hosting. The connection stays encrypted; Roe just won't verify the certificate's identity.</span>
+        </span>
+      </label>
     </div>
 
     <div>
       <%= f.label :remote_path, "Remote path", class: "block text-xs font-semibold text-gray-700 mb-1" %>
       <%= f.text_field :remote_path,
-                       placeholder: "/home/yourname/public_html",
+                       placeholder: "public_html",
                        autocomplete: "off",
                        class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
-      <p class="text-xs text-gray-500 mt-1">Absolute path on the host where <code class="text-xs bg-gray-100 px-1 rounded">/static_site</code> contents should land.</p>
+      <p class="text-xs text-gray-500 mt-1">The folder on your host to publish into — commonly <code class="text-xs bg-gray-100 px-1 rounded">public_html</code>, but it varies by host.</p>
     </div>
   </div>
 
@@ -133,17 +208,32 @@
       "Download ZIP" — the controller saves the config and then
       redirects straight to the download endpoint in one motion.
       Stimulus also rewrites this label live when the user toggles
-      protocol radios before saving. %>
+      protocol radios before saving.
+
+      "Test connection" submits the separate, hidden form rendered
+      below via its HTML `form=` attribute — NEVER a <form> nested
+      inside this one. Nested forms are invalid HTML, and with
+      per-form CSRF tokens the browser merges the two tokens and
+      submits the wrong-scoped one, which Rails rejects on save. %>
   <div class="flex gap-2 pt-2">
     <%= f.submit (config.protocol_zip? ? "DOWNLOAD ZIP" : "Save"),
                  data: { "static-site-sync-form-target" => "submitButton" },
                  class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono uppercase text-sm rounded-xs cursor-pointer" %>
     <% if config.configured? && !config.protocol_zip? %>
-      <%= button_to "Test connection",
-                    admin_test_static_site_sync_connection_path,
-                    method: :post,
-                    form: { class: "inline-block" },
-                    class: "inline-flex items-center px-4 py-2 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-sm rounded-xs cursor-pointer" %>
+      <button type="submit" form="static-site-sync-test"
+              class="inline-flex items-center px-4 py-2 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-sm rounded-xs cursor-pointer">
+        Test connection
+      </button>
     <% end %>
   </div>
+<% end %>
+
+<%# Separate form for "Test connection", kept OUTSIDE the settings form
+    so the two never nest. The button above targets it by id. It carries
+    no fields — test_connection reads the saved config from the database. %>
+<% if config.configured? && !config.protocol_zip? %>
+  <%= form_with url: admin_test_static_site_sync_connection_path,
+                method: :post,
+                id: "static-site-sync-test",
+                class: "hidden" do %><% end %>
 <% end %>

@@ -7,7 +7,7 @@ class Admin::StaticSiteSyncController < Admin::BaseController
     config = StaticSiteSyncConfig.current
 
     attrs = params.require(:static_site_sync_config).permit(
-      :protocol, :host, :port, :username, :auth_mode, :password, :ssh_private_key, :remote_path
+      :protocol, :host, :port, :username, :auth_mode, :password, :ssh_private_key, :remote_path, :verify_tls, :ssh_key_passphrase
     )
 
     # Empty password / key in the form means "don't change" — let the
@@ -17,6 +17,7 @@ class Admin::StaticSiteSyncController < Admin::BaseController
     # recoverable by editing again.
     attrs.delete(:password) if attrs[:password].blank?
     attrs.delete(:ssh_private_key) if attrs[:ssh_private_key].blank?
+    attrs.delete(:ssh_key_passphrase) if attrs[:ssh_key_passphrase].blank?
 
     config.assign_attributes(attrs)
     config.last_verification_error = nil
