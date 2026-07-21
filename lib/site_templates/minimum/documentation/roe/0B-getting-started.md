@@ -2,7 +2,7 @@
 title: Getting Started with Roe
 status: published
 tags: guide, getting-started
-url_name: getting-started
+url_name: getting-started-with-roe
 ---
 
 ##### Related documentation
@@ -25,7 +25,7 @@ The [Docs](/documentation) page has a list of introductory tutorials that flow o
 
 ## Diving deeper
 
-When you've created a few pages, posts and collections, read this article: [What is Roe?](/documentation/roe/what-is-roe) and visit the full [documentation](/documentation-all) to dive deeper. 
+When you've created a few pages, posts and collections, visit the full [documentation](/documentation-all) to dive deeper. 
 
 ## Let's contribute to a better internet
 

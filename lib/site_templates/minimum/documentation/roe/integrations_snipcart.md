@@ -16,50 +16,46 @@ limit: all
 template: links
 ```
 
-# Setting up Snipcart to work with Roe
-
-The Store feature lets you sell products directly from your site using [Snipcart](https://snipcart.com). There are 3 key pieces that must be in place for Snipcart & Roe to work together:
-
-1. Roe needs the API Keys from Snipcart (covered in this article)
-2. Your Store settings need to be set up (covered here: [Store](/documentation/roe/store))
-3. You need at least one product (covered here: [Products](/documentation/roe/products))
-
 #### Before Snipcart
 
-You'll need to enable the Store feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE STORE`. You will see see `store.yml` in the `Features` section.
+Snipcart needs the Store feature. Enable it in [Admin → Settings](/admin/configs) by clicking `ENABLE STORE` — `store.yml` then appears in the `Features` section.
 
-## Snipcart settings
+# Setting up Snipcart to work with Roe
 
-When you sign up for Snipcart, it has excellent onboarding that leads you through setup. You can configure things how you like. This article will cover the required settings in Snipcart to get a store working in Roe.
+The Store feature lets you sell products directly from your site using [Snipcart ↗](https://snipcart.com). Three pieces have to be in place for Roe and Snipcart to work together:
 
-Whether in Test or Live Mode, there are 2 things you'll need from Snipcart:
+1. Roe needs Snipcart's `<script>` — covered in this article.
+2. Your Store settings need to be configured — see [Store](/documentation/roe/store).
+3. You need at least one product — see [Products](/documentation/roe/products).
 
-1. Snipcart's `<script>`
-2. Secret API Key (which you create)
-    - a TEST mode secret key starts with `ST_`
-    - a LIVE mode secret key starts with `S_`
+## The Snipcart side
 
-<mark>Note: NEVER paste a Live Mode Secret into the Test Mode on Roe. Test API keys are saved locally in plain text.</mark>
+Snipcart walks you through creating an account when you sign up. This article covers only the piece Roe needs from it.
 
-These are all available on the [API Keys](https://app.snipcart.com/dashboard/account/credentials) page (whichever mode you're in):
+Snipcart has a [Test mode and a Live mode ↗](https://docs.snipcart.com/v3/testing/environment), and Roe has the same two modes:
 
-1. Go to: [https://app.snipcart.com/dashboard/account/credentials](https://app.snipcart.com/dashboard/account/credentials)
-2. Copy the `<script>` snippet in it's entirety.
-3. Create a Secret API Key if you haven't already.
-4. Copy that Key.
-5. Come back to Roe: [Admin → Settings → snipcart.yml](/admin/configs/snipcart/edit)
-6. Paste the Snippet in it's section, paste the Secret Key in it's section.
-7. Click `SAVE (TEST/LIVE KEYS)`.
+- **Test** — fake payments, for setting things up and checking everything works.
+- **Live** — real payments, for when you're ready to sell.
 
-If all seems well, the indicator at the top of the page will be green and say `Connected`.
+In Roe, each mode's snippet lives on its own tab — **Local/Test** and **Live/Static Site** — and the Active Mode toggle picks which one is active. In either mode, Roe needs just one thing from Snipcart: its `<script>` snippet.
 
-### Domains & Going Live
+To add it:
 
-When it's time to make the store public, it's important that the domain set on Snipcart and the domain for your Store match:
+1. Open Snipcart's [API Keys ↗](https://app.snipcart.com/dashboard/account/credentials) page. The label at the top — **Public Test** or **Public Live** — tells you which mode you're using in Snipcart.
+2. Copy the `<script>` snippet in full.
+3. In Roe, open [Settings → Roe → Store (Snipcart)](/admin/configs/snipcart/edit).
+4. Paste it into the matching tab: **Local/Test** or **Live/Static Site**.
+5. Click **Save Test Snippet** (or **Save Live Snippet**).
 
-- [Snipcart: Domains & Urls](https://docs.snipcart.com/v3/dashboard/domains-urls)
+That's it — you're ready to work with the Store and Snipcart.
+
+### Domains and going live
+
+When you make the store public, the domain in your Snipcart dashboard must match your store's domain — otherwise Snipcart rejects orders.
+
+- [Snipcart: Domains & URLs ↗](https://docs.snipcart.com/v3/dashboard/domains-urls)
 - [Roe: Store](/documentation/roe/store)
 
 ---
 
-That's it for the Snipcart settings. Check these aritcles for further setup: [Store](/documentation/roe/store), [Products](/documentation/roe/products)
+That covers the Snipcart settings. To finish setting up your store, see [Store](/documentation/roe/store) and [Products](/documentation/roe/products).

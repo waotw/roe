@@ -1,7 +1,7 @@
 ---
-title: What is Roe?
-status: published
-url_name: what-is-roe
+title: More about Roe
+status: draft
+url_name: more-about-roe
 tags: guide, getting-started
 related:
   - guide-installation
@@ -17,19 +17,19 @@ limit: all
 template: links
 ```
 
-# What is Roe?
+# More about Roe
 
-Roe is an application that gives you the power to:
+With Roe you can:
 
 - create websites in a fun and powerful way
 - get a site going in a few days, not weeks or months
-- make money through memberships, donations and an online store
 - publish writing, podcasts, music and videos
+- make money through memberships, donations and an online store
 - stay independent, so you are not subject to the whims of tech companies, algorithms and increasing costs.
 
 ## Why Should you Use Roe?
 
-It's really fun to use. Most site builders, like Wordpress, Drupal and Substack, are complex, expensive, bloated or they lock you into rigid and restrictive architectures. Roe doesn’t. Instead, Roe uses an extremely simple text formatting language with a few easy-to-learn exentions that allows you to create and organise your content into a light, robust website that you have complete control over.
+It's really fun to use. Most site builders, like Wordpress, Drupal and Substack, are complex, expensive, bloated or they lock you into rigid and restrictive architectures. As you've learned, Roe doesn't do this.
 
 ## How Roe works
 
@@ -49,9 +49,9 @@ If you already know Markdown, you'll feel at home right away. If you don't, you 
 
 Most Roe sites have three main parts.
 
-### Header
+### Navigation
 
-The header holds your site's navigation. To edit it, open [Admin → Layouts](/admin/layouts).
+The navigation holds your site's navigation. To edit it, open [Admin → Layouts](/admin/layouts).
 
 ### Content
 

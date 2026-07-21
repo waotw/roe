@@ -30,6 +30,8 @@ Your Site Settings hold the basics about your site — its name, its address, an
 
 See [Site Settings](/documentation/roe/global-site) for a description of all the Site Settings and what they do.
 
-##### Next
+## Next
 
-Now that you have a basic idea of how Roe works, read through [What is Roe?](/documentation/roe/what-is-roe), which will now be clearer. And when you're ready to dive deeper, check out the [full documentation page](/documentation-all).
+Now that you have a basic idea of how Roe works, continue building your site. And when you're ready to dive deeper, check out the [full documentation page](/documentation-all).
+
+If you need any help, don't hesitate to reach out: [roe@weareontheweb.com](mailto:roe@weareontheweb.com)
