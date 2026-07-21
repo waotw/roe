@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_010000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -245,9 +245,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.integer "port", default: 22
     t.integer "protocol", default: 0, null: false
     t.string "remote_path"
+    t.text "ssh_key_passphrase"
     t.text "ssh_private_key"
     t.datetime "updated_at", null: false
     t.string "username"
+    t.boolean "verify_tls", default: true, null: false
   end
 
   create_table "stripe_configs", force: :cascade do |t|

@@ -487,12 +487,14 @@ PLATFORMS
 
 DEPENDENCIES
   bcrypt (~> 3.1.7)
+  bcrypt_pbkdf
   bootsnap
   brakeman
   bundler-audit
   capybara
   debug
   dockerfile-rails (>= 1.7)
+  ed25519
   factory_bot (~> 6.5)
   fastimage (~> 2.3)
   front_matter_parser (~> 1.0)

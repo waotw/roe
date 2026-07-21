@@ -7,6 +7,7 @@ class StaticSiteSyncConfig < ApplicationRecord
 
   encrypts :password
   encrypts :ssh_private_key
+  encrypts :ssh_key_passphrase
 
   validates :port, numericality: { only_integer: true, greater_than: 0, less_than: 65536 }, allow_nil: true
 
