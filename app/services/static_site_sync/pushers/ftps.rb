@@ -36,9 +36,11 @@ module StaticSiteSync
       private
 
       def with_session
-        ftp = Net::FTP.new
+        # TLS has to be configured at construction — Net::FTP has no ssl=
+        # setter. A nil host defers the actual connect to the call below,
+        # so our own timeout and error handling still wraps it.
+        ftp = Net::FTP.new(nil, ssl: ssl_context_options)
         ftp.passive  = true
-        ftp.ssl      = ssl_context_options
         ftp.open_timeout = 30
         ftp.read_timeout = 60
 
@@ -57,12 +59,14 @@ module StaticSiteSync
         ftp&.close rescue nil
       end
 
-      # Hash form turns on Net::FTP's TLS path. `verify_mode` left at
-      # default (verify peer); the user can lower it later if their
-      # host uses a self-signed cert — not surfacing that knob yet to
-      # avoid encouraging insecure setups by default.
+      # Hash form turns on Net::FTP's TLS path. Verify the peer certificate
+      # by default. FTPS on shared / cPanel hosts often uses a self-signed
+      # or hostname-mismatched cert; when the user turns verification off we
+      # keep the channel encrypted but accept any certificate. VERIFY_NONE
+      # also makes Net::FTP skip its post-connection hostname check.
       def ssl_context_options
-        { verify_mode: OpenSSL::SSL::VERIFY_PEER }
+        mode = @config.verify_tls ? OpenSSL::SSL::VERIFY_PEER : OpenSSL::SSL::VERIFY_NONE
+        { verify_mode: mode }
       end
 
       def upload_file(ftp, rel)
