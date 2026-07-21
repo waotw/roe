@@ -1338,7 +1338,9 @@ class Admin::ConfigsController < Admin::BaseController
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
     existing["test"] ||= {}
-    test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
+    # The snippet is public and shown in full (never masked), so save it
+    # verbatim — a blank submission means "clear it," not "leave unchanged."
+    existing["test"]["snippet"] = test_data["snippet"].to_s
 
     write_yaml(path, existing)
     SiteConfig.sync_from_file("integrations/snipcart")
@@ -1356,9 +1358,9 @@ class Admin::ConfigsController < Admin::BaseController
     # store AND the static-site build (no production server needed). There's
     # no secret key; webhooks (a future production concern) use Snipcart's
     # per-request token, not a stored secret.
-    if params[:live] && params[:live][:snippet].present? && params[:live][:snippet] != "•" * 16
-      SnipcartConfig.save_live_snippet(params[:live][:snippet])
-    end
+    # Save the snippet verbatim — including blank, so clearing the field
+    # removes it (it's public and shown in full, never masked).
+    SnipcartConfig.save_live_snippet(params[:live][:snippet].to_s) if params[:live]
 
     SnipcartConfig.current.verify!
     flash[:notice] = "Snipcart Live & Static Site configuration saved"

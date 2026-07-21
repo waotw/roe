@@ -293,6 +293,26 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "<div>live</div>", SnipcartConfig.current.snippet_live
   end
 
+  # The snippets are public and shown in full, so blanking the field clears it
+  # (they don't behave like masked secret fields, where blank = "unchanged").
+  test "update_snipcart clears the test snippet when submitted blank" do
+    SnipcartConfig.save_test_config("snippet" => "<div>old</div>")
+
+    patch admin_snipcart_integration_config_path, params: { test: { snippet: "" } }
+
+    assert_redirected_to admin_edit_snipcart_integration_config_path(tab: "test")
+    assert SnipcartConfig.current.snippet_test.blank?, "test snippet cleared"
+  end
+
+  test "update_snipcart_live clears the live snippet when submitted blank" do
+    SnipcartConfig.save_live_snippet("<div>old</div>")
+
+    patch admin_live_snipcart_integration_config_path, params: { live: { snippet: "" } }
+
+    assert_redirected_to admin_edit_snipcart_integration_config_path(tab: "live")
+    assert SnipcartConfig.current.snippet_live.blank?, "live snippet cleared"
+  end
+
   test "update_snipcart_mode switches to live once the live snippet is present" do
     SnipcartConfig.save_live_snippet("<div>live</div>")
 
