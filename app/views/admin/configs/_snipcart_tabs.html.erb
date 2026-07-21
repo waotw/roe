@@ -32,7 +32,7 @@
         <textarea name="test[snippet]" rows="7"
                   placeholder="Paste the full Snipcart snippet from your Test mode dashboard."
                   class="w-full font-mono text-sm p-2 border border-gray-300"><%= @config_hash["snippet"].to_s %></textarea>
-        <p class="text-xs text-gray-500 mt-1">Test mode uses fake payments and works locally.</p>
+        <p class="text-xs text-gray-500 mt-1">This snippet comes from <a href="https://docs.snipcart.com/v3/testing/environment" class="text-blue-400 hover:text-blue-600 underline">Snipcart ↗</a> in Test mode. <a href="/documentation/roe/snipcart" class="text-blue-400 hover:text-blue-600 underline">Setting up Snipcart to work with Roe</a></p>
       </div>
       <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
         <input type="submit" value="Save Test Snippet"
@@ -51,7 +51,7 @@
         <textarea name="live[snippet]" rows="7"
                   placeholder="Paste the full Snipcart snippet from your Live mode dashboard."
                   class="w-full font-mono text-sm p-2 border border-gray-300"><%= record&.snippet_live.to_s %></textarea>
-        <p class="text-xs text-gray-500 mt-1">Set this once — the same snippet runs your local store and the static-site build. Switch to Live mode above to use it.</p>
+        <p class="text-xs text-gray-500 mt-1">For Live mode to work, your site needs to be on a web host and your site domain needs to match the domain you've added to <a href="https://docs.snipcart.com/v3/dashboard/domains-urls" class="text-blue-400 hover:text-blue-600 underline">Snipcart: Domains & URLs ↗</a>.</p>
       </div>
       <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
         <input type="submit" value="Save Live Snippet"
