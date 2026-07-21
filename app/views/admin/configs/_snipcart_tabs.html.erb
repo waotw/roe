@@ -1,0 +1,62 @@
+<%# Snipcart-only config tabs. Unlike Stripe/Postmark, Snipcart runs entirely
+    on a PUBLIC snippet (no secret key), and the same live snippet drives both
+    the local store AND the static-site build. So both tabs work in every
+    environment, values are shown in full (never masked), there's no
+    production gate, and no per-section <h3> (the tab already labels it).
+    Locals: update_path, live_update_path, record. %>
+<div data-controller="tabs" data-tabs-default-value="<%= record&.mode %>">
+  <div class="border-b border-gray-200 mb-6">
+    <nav class="flex gap-4">
+      <button type="button"
+              data-tabs-target="tab"
+              data-action="click->tabs#show"
+              data-tabs-panel="test"
+              class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+        Local/Test
+      </button>
+      <button type="button"
+              data-tabs-target="tab"
+              data-action="click->tabs#show"
+              data-tabs-panel="live"
+              class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+        Live/Static Site
+      </button>
+    </nav>
+  </div>
+
+  <%# Local/Test — Snipcart test mode (fake payments, works locally). %>
+  <div data-tabs-target="panel" data-tabs-panel="test">
+    <%= form_with url: update_path, method: :patch, class: "space-y-6" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Snippet (Test)</label>
+        <textarea name="test[snippet]" rows="7"
+                  placeholder="Paste the full Snipcart snippet from your Test mode dashboard."
+                  class="w-full font-mono text-sm p-2 border border-gray-300"><%= @config_hash["snippet"].to_s %></textarea>
+        <p class="text-xs text-gray-500 mt-1">Test mode uses fake payments and works locally.</p>
+      </div>
+      <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+        <input type="submit" value="Save Test Snippet"
+               class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+      </div>
+    <% end %>
+  </div>
+
+  <%# Live/Static Site — the live snippet. Saved locally (public key, nothing
+      to protect); runs the live store locally AND ships in the static build.
+      Switch to Live mode above to activate it. %>
+  <div data-tabs-target="panel" data-tabs-panel="live" class="hidden">
+    <%= form_with url: live_update_path, method: :patch, class: "space-y-6" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Snippet (Live)</label>
+        <textarea name="live[snippet]" rows="7"
+                  placeholder="Paste the full Snipcart snippet from your Live mode dashboard."
+                  class="w-full font-mono text-sm p-2 border border-gray-300"><%= record&.snippet_live.to_s %></textarea>
+        <p class="text-xs text-gray-500 mt-1">Set this once — the same snippet runs your local store and the static-site build. Switch to Live mode above to use it.</p>
+      </div>
+      <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
+        <input type="submit" value="Save Live Snippet"
+               class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+      </div>
+    <% end %>
+  </div>
+</div>

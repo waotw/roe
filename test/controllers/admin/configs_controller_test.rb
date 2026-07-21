@@ -45,7 +45,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    assert_redirected_to admin_edit_payments_config_path
+    assert_redirected_to admin_edit_payments_config_path(tab: "test")
     assert_equal "Stripe configuration saved", flash[:notice]
 
     # Verify YAML file was written
@@ -77,7 +77,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    assert_redirected_to admin_edit_payments_config_path
+    assert_redirected_to admin_edit_payments_config_path(tab: "test")
 
     # Verify stripe.yml preserves old publishable_key and updates secret_key
     stripe_yaml = YAML.load_file(File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml"))
@@ -104,7 +104,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     patch admin_mode_payments_config_path, params: { mode: "live" }
 
-    assert_redirected_to admin_edit_payments_config_path
+    assert_redirected_to admin_edit_payments_config_path(tab: "live")
     assert_equal "Payments mode set to Live", flash[:notice]
     assert stripe.reload.mode_live?
   end
@@ -112,7 +112,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
   test "update_payments_mode rejects live without live keys" do
     patch admin_mode_payments_config_path, params: { mode: "live" }
 
-    assert_redirected_to admin_edit_payments_config_path
+    assert_redirected_to admin_edit_payments_config_path(tab: "test")
     assert_equal "Add live keys before switching to Live mode", flash[:error]
     assert StripeConfig.current.mode_test?
   end
@@ -170,7 +170,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
       test: { server_token: "test-server-token" }
     }
 
-    assert_redirected_to admin_edit_newsletters_config_path
+    assert_redirected_to admin_edit_newsletters_config_path(tab: "test")
     assert_equal "Postmark configuration saved", flash[:notice]
 
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
@@ -197,7 +197,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     patch admin_mode_newsletters_config_path, params: { mode: "live" }
 
-    assert_redirected_to admin_edit_newsletters_config_path
+    assert_redirected_to admin_edit_newsletters_config_path(tab: "live")
     assert_equal "Newsletters mode set to Live", flash[:notice]
     assert postmark.reload.mode_live?
   end
@@ -252,66 +252,73 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?]", admin_snipcart_integration_config_path
   end
 
-  test "update_snipcart writes test config to YAML and syncs" do
+  test "edit_snipcart renders snippet-only tabs that work locally" do
+    get admin_edit_snipcart_integration_config_path
+
+    assert_response :success
+    # Tabs renamed, both usable locally (no production gate, no masked inputs).
+    assert_select "button[data-tabs-panel=?]", "test", text: /Local\/Test/
+    assert_select "button[data-tabs-panel=?]", "live", text: /Live\/Static Site/
+    assert_select "textarea[name=?]", "test[snippet]"
+    assert_select "textarea[name=?]", "live[snippet]"
+    # No leftover secret-key inputs.
+    assert_select "input[name=?]", "test[secret_key]", count: 0
+    assert_select "input[name=?]", "live[secret_key]", count: 0
+  end
+
+  test "update_snipcart writes the test snippet to YAML and syncs" do
     patch admin_snipcart_integration_config_path, params: {
-      test: { snippet: "<div>test</div>", secret_key: "test-secret-key-123" }
+      test: { snippet: "<div>test</div>" }
     }
 
-    assert_redirected_to admin_edit_snipcart_integration_config_path
+    assert_redirected_to admin_edit_snipcart_integration_config_path(tab: "test")
     assert_equal "Store (Snipcart) Test configuration saved", flash[:notice]
 
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     assert File.exist?(path)
-    yaml = YAML.load_file(path)
-    assert_equal "test-secret-key-123", yaml["test"]["secret_key"]
-    assert_equal "<div>test</div>", yaml["test"]["snippet"]
-
-    snipcart = SnipcartConfig.current
-    assert_equal "test-secret-key-123", snipcart.secret_key_test
-    assert_equal "<div>test</div>", snipcart.snippet_test
+    assert_equal "<div>test</div>", YAML.load_file(path)["test"]["snippet"]
+    assert_equal "<div>test</div>", SnipcartConfig.current.snippet_test
   end
 
-  test "update_snipcart_live redirects in non-production" do
+  # Snipcart's live snippet is a public key, so — unlike Stripe/Postmark live
+  # keys — it saves locally with no production gate. It's what the local store
+  # and the static-site build both run on.
+  test "update_snipcart_live saves the live snippet locally, no production gate" do
     patch admin_live_snipcart_integration_config_path, params: {
-      live: { secret_key: "live-secret-key" }
+      live: { snippet: "<div>live</div>" }
     }
 
-    assert_redirected_to admin_edit_snipcart_integration_config_path
-    assert_equal "Live keys are only saved in production.", flash[:notice]
+    assert_redirected_to admin_edit_snipcart_integration_config_path(tab: "live")
+    assert_equal "Snipcart Live & Static Site configuration saved", flash[:notice]
+    assert_equal "<div>live</div>", SnipcartConfig.current.snippet_live
   end
 
-  test "update_snipcart_mode switches mode to live when live key present" do
-    snipcart = SnipcartConfig.current
-    snipcart.update!(secret_key_live: "live-secret-key", verified_at: Time.current)
+  test "update_snipcart_mode switches to live once the live snippet is present" do
+    SnipcartConfig.save_live_snippet("<div>live</div>")
 
     patch admin_mode_snipcart_integration_config_path, params: { mode: "live" }
 
-    assert_redirected_to admin_edit_snipcart_integration_config_path
+    assert_redirected_to admin_edit_snipcart_integration_config_path(tab: "live")
     assert_equal "Store mode set to Live", flash[:notice]
-    assert snipcart.reload.mode_live?
+    assert SnipcartConfig.current.mode_live?
   end
 
-  test "disconnect_snipcart clears all keys" do
-    snipcart = SnipcartConfig.current
-    snipcart.update!(secret_key_test: "test-key", secret_key_live: "live-key", verified_at: Time.current)
-    SnipcartConfig.save_test_config("secret_key" => "test-key")
+  test "disconnect_snipcart clears the snippets and verification" do
+    SnipcartConfig.save_live_snippet("<div>live</div>")
+    SnipcartConfig.save_test_config("snippet" => "<div>test</div>")
+    SnipcartConfig.current.update!(verified_at: Time.current)
 
     delete admin_disconnect_snipcart_integration_config_path
 
     assert_redirected_to admin_edit_snipcart_integration_config_path
     assert_equal "Snipcart disconnected. All keys cleared.", flash[:notice]
 
-    snipcart.reload
-    assert_nil snipcart.secret_key_test
-    assert_nil snipcart.secret_key_live
-    assert_nil snipcart.verified_at
+    assert_nil SnipcartConfig.current.verified_at
     assert_not File.exist?(SnipcartConfig::TEST_CONFIG_PATH)
   end
 
   test "verify_snipcart returns json verification status" do
-    snipcart = SnipcartConfig.current
-    snipcart.update!(secret_key_test: "test-key", verified_at: Time.current)
-
+    SnipcartConfig.current.update!(verified_at: Time.current)
     SnipcartConfig.any_instance.stubs(:verify!).returns(true)
 
     post admin_verify_snipcart_integration_config_path
@@ -328,21 +335,21 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
   test "update_payments_mode rejects invalid mode" do
     patch admin_mode_payments_config_path, params: { mode: "invalid" }
 
-    assert_redirected_to admin_edit_payments_config_path
+    assert_redirected_to admin_edit_payments_config_path(tab: "test")
     assert_equal "Invalid mode: \"invalid\"", flash[:error]
   end
 
   test "update_newsletters_mode rejects invalid mode" do
     patch admin_mode_newsletters_config_path, params: { mode: "staging" }
 
-    assert_redirected_to admin_edit_newsletters_config_path
+    assert_redirected_to admin_edit_newsletters_config_path(tab: "test")
     assert_equal "Invalid mode: \"staging\"", flash[:error]
   end
 
   test "update_snipcart_mode rejects invalid mode" do
     patch admin_mode_snipcart_integration_config_path, params: { mode: "staging" }
 
-    assert_redirected_to admin_edit_snipcart_integration_config_path
+    assert_redirected_to admin_edit_snipcart_integration_config_path(tab: "test")
     assert_equal "Invalid mode: \"staging\"", flash[:error]
   end
 

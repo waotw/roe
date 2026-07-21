@@ -17,15 +17,20 @@ export default class extends Controller {
   // (data-tabs-param-value="…") so it doesn't fight the outer tabs over
   // the same param. Stimulus scopes targets to the nearest controller, so
   // nesting the same controller is safe.
-  static values = { param: { type: String, default: "tab" } };
+  static values = { param: { type: String, default: "tab" }, default: String };
 
   connect() {
     // Read ?<param>=panel-name from the URL. Query params survive Turbo
     // Drive's redirect handling (URL fragments don't — fetch strips
     // them when following the 302). Server redirects after save / test
     // include the tab via `redirect_to ..., tab: "panel-name"`.
+    //
+    // Precedence: an explicit ?tab= (a manual click, or a save/mode-switch
+    // redirect) wins; otherwise fall back to data-tabs-default-value — the
+    // tab that matches the integration's active mode — so a fresh page load
+    // opens on the mode you're in. Empty default → first enabled tab.
     const params = new URLSearchParams(window.location.search);
-    const tabName = params.get(this.paramValue);
+    const tabName = params.get(this.paramValue) || this.defaultValue;
     const namedTab = tabName
       ? this.tabTargets.find((t) => t.dataset.tabsPanel === tabName && !t.disabled)
       : null;

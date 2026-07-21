@@ -24,7 +24,9 @@ module SiteSync
     APPLY_FAILED_MARKER  = File.join(MARKER_DIR, ".restore-credentials-apply-failed").freeze
 
     # Singleton config models that hold AR-encrypted integration secrets.
-    PROBE_MODELS = %w[PostmarkConfig StripeConfig SnipcartConfig StaticSiteSyncConfig].freeze
+    # (Snipcart is intentionally absent — its store runs on a public snippet
+    # with no secret key, so it has nothing encrypted to probe.)
+    PROBE_MODELS = %w[PostmarkConfig StripeConfig StaticSiteSyncConfig].freeze
 
     class << self
       # Called when a DB restore is applied (boot / apply_if_present!) — the
@@ -92,7 +94,10 @@ module SiteSync
           record = klass.respond_to?(:current) ? klass.current : klass.first
           next unless record
 
-          klass.encrypted_attributes.each { |attr| record.public_send(attr) }
+          # encrypted_attributes is nil (not []) on a model with no `encrypts`,
+          # so guard with Array() — a probe model that loses its encrypted
+          # columns must not crash the whole restore check.
+          Array(klass.encrypted_attributes).each { |attr| record.public_send(attr) }
         end
         true
       rescue ActiveRecord::Encryption::Errors::Base => e

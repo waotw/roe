@@ -7,10 +7,6 @@ class SnipcartConfig < ApplicationRecord
 
   before_create :set_connected_at
 
-  # AR Encryption — uses master.key. Only live secret key is encrypted
-  # since test keys live in the gitignored YAML file.
-  encrypts :secret_key_live
-
   # ── Singleton ────────────────────────────────────────────────────────────
 
   def self.current
@@ -32,82 +28,47 @@ class SnipcartConfig < ApplicationRecord
     mode_test? ? snippet_test : snippet_live
   end
 
-  # ── Secret key accessors ─────────────────────────────────────────────────
-
-  def secret_key_test
-    test_config["secret_key"].presence || safe_encrypted_read(:secret_key_test)
-  end
-
-  def secret_key_live
-    safe_encrypted_read(:secret_key_live)
-  end
-
-  # Active secret key based on mode
-  def current_secret_key
-    mode_test? ? secret_key_test : secret_key_live
-  end
-
   # ── Connection status ────────────────────────────────────────────────────
+  #
+  # Snipcart's store runs entirely on the public snippet (which carries the
+  # public API key the client-side widget uses), so "ready/connected" just
+  # means the active-mode snippet is set. There is no secret key: the widget
+  # needs none, and webhook validation — a future, production-only concern —
+  # uses Snipcart's per-request token, not a stored secret.
 
   def keys_present?
-    current_secret_key.present?
+    current_snippet.present?
   end
 
-  # Verified = keys present AND last API check succeeded
   def connected?
     keys_present? && verified_at.present?
   end
 
   def live_mode_ready?
-    secret_key_live.present?
+    snippet_live.present?
   end
 
-  # ── API verification ─────────────────────────────────────────────────────
+  # ── Verification ─────────────────────────────────────────────────────────
+  #
+  # No secret key means there's nothing to check against Snipcart's API —
+  # "verified" simply confirms the active snippet is present. Stamps
+  # verified_at so the admin connection badge reads "connected" once a
+  # snippet is saved.
 
   def verify!
-    return false unless keys_present?
-
-    # Use Snipcart orders endpoint — returns 401 on bad key, 200 on valid
-    uri = URI("https://app.snipcart.com/api/orders?limit=1")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    http.read_timeout = 10
-
-    request = Net::HTTP::Get.new(uri)
-    # Snipcart uses HTTP Basic auth with secret API key as username, empty password
-    request.basic_auth(current_secret_key, "")
-    request["Accept"] = "application/json"
-
-    response = http.request(request)
-
-    if response.code.to_i == 200
-      Rails.logger.info "[SnipcartConfig] verify! succeeded (HTTP 200) in #{mode} mode"
+    if current_snippet.present?
       update_column(:verified_at, Time.current)
       true
     else
-      # Snipcart's 4xx responses include a JSON body with an error
-      # message — log it so future failures don't silently produce
-      # a red badge with no clue why. Truncated to 500 chars to keep
-      # the log readable when Snipcart returns a verbose HTML error.
-      Rails.logger.warn "[SnipcartConfig] verify! failed: HTTP #{response.code} in #{mode} mode — body: #{response.body.to_s.strip[0, 500].inspect}"
       update_column(:verified_at, nil)
       false
     end
-  rescue => e
-    Rails.logger.error "[SnipcartConfig] verify! exception: #{e.class}: #{e.message}"
-    update_column(:verified_at, nil)
-    false
   end
 
   # ── Disconnect ───────────────────────────────────────────────────────────
 
   def disconnect!
-    update!(
-      secret_key_test: nil,
-      secret_key_live: nil,
-      connected_at: nil,
-      verified_at: nil
-    )
+    update!(connected_at: nil, verified_at: nil)
     self.class.clear_test_config
   end
 
@@ -170,21 +131,6 @@ class SnipcartConfig < ApplicationRecord
     File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
   end
 
-  # ── Decryption-failure tracking ──────────────────────────────────────────
-  # Populated by safe_encrypted_read when an encrypted column can't be
-  # decrypted (wrong master key, rotated credentials, corrupted ciphertext).
-  # The admin integration view surfaces this so the operator knows to
-  # re-save their keys instead of believing the integration is silently
-  # disconnected.
-
-  def decryption_errors
-    @decryption_errors ||= Set.new
-  end
-
-  def decryption_failed?
-    decryption_errors.any?
-  end
-
   private
 
   def test_config
@@ -195,15 +141,7 @@ class SnipcartConfig < ApplicationRecord
     self.class.full_config
   end
 
-  def safe_encrypted_read(attr)
-    self[attr]
-  rescue ActiveRecord::Encryption::Errors::Decryption => e
-    Rails.logger.warn "#{self.class.name}##{attr} decryption failed: #{e.message}"
-    decryption_errors << attr
-    nil
-  end
-
   def set_connected_at
-    self.connected_at ||= Time.current if current_secret_key.present?
+    self.connected_at ||= Time.current if current_snippet.present?
   end
 end

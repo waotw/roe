@@ -258,17 +258,15 @@ class Admin::ConfigsController < Admin::BaseController
 
   SNIPCART_CONFIG_SCHEMA = {
     test_keys: {
-      label: "Snipcart Test Mode",
+      label: "Test & Local",
       fields: {
-        "snippet" => { type: :textarea, label: "Snippet (Test)", hint: "Paste the full Snipcart snippet from your Test mode dashboard" },
-        "secret_key" => { type: :password, label: "Secret API Key (Test)", hint: "Create a Secret Key in Test Mode and paste it here" }
+        "snippet" => { type: :textarea, label: "Snippet (Test)", hint: "Paste the full Snipcart snippet from your Test mode dashboard. Test mode uses fake payments and works locally." }
       }
     },
     live_keys: {
-      label: "Snipcart Live Mode",
+      label: "Live & Static Site",
       fields: {
-        "snippet" => { type: :textarea, label: "Snippet (Live)", hint: "Paste the full Snipcart snippet from your Live mode dashboard" },
-        "secret_key" => { type: :password, label: "Secret API Key (Live)", hint: "Create a Secret Key in Live Mode and paste it here" }
+        "snippet" => { type: :textarea, label: "Snippet (Live)", hint: "Paste the full Snipcart snippet from your Live mode dashboard. Set this once — the same snippet runs your local store and the static-site build." }
       }
     }
   }.freeze
@@ -1199,7 +1197,7 @@ class Admin::ConfigsController < Admin::BaseController
     stripe.verify!
 
     flash[:notice] = "Stripe configuration saved"
-    redirect_to admin_edit_payments_config_path
+    redirect_to admin_edit_payments_config_path(tab: "test")
   end
 
   def verify_payments
@@ -1227,12 +1225,14 @@ class Admin::ConfigsController < Admin::BaseController
     else
       flash[:error] = "Failed to save Stripe live keys"
     end
-    redirect_to admin_edit_payments_config_path
+    redirect_to admin_edit_payments_config_path(tab: "live")
   end
 
   def update_payments_mode
     update_integration_mode(StripeConfig.current, "Payments")
-    redirect_to admin_edit_payments_config_path
+    # Reopen the tab matching the now-active mode (the tabs controller reads
+    # ?tab= on load). Falls back to the current mode if the switch was rejected.
+    redirect_to admin_edit_payments_config_path(tab: StripeConfig.current.mode)
   end
 
   def disconnect_payments
@@ -1270,7 +1270,7 @@ class Admin::ConfigsController < Admin::BaseController
     PostmarkConfig.current.verify!
 
     flash[:notice] = "Postmark configuration saved"
-    redirect_to admin_edit_newsletters_config_path
+    redirect_to admin_edit_newsletters_config_path(tab: "test")
   end
 
   def verify_newsletters
@@ -1298,12 +1298,12 @@ class Admin::ConfigsController < Admin::BaseController
     else
       flash[:error] = "Failed to save Postmark live token"
     end
-    redirect_to admin_edit_newsletters_config_path
+    redirect_to admin_edit_newsletters_config_path(tab: "live")
   end
 
   def update_newsletters_mode
     update_integration_mode(PostmarkConfig.current, "Newsletters")
-    redirect_to admin_edit_newsletters_config_path
+    redirect_to admin_edit_newsletters_config_path(tab: PostmarkConfig.current.mode)
   end
 
   def disconnect_newsletters
@@ -1347,36 +1347,29 @@ class Admin::ConfigsController < Admin::BaseController
     SnipcartConfig.current.verify!
 
     flash[:notice] = "Store (Snipcart) Test configuration saved"
-    redirect_to admin_edit_snipcart_integration_config_path
+    redirect_to admin_edit_snipcart_integration_config_path(tab: "test")
   end
 
   def update_snipcart_live
-    unless Rails.env.production?
-      flash[:notice] = "Live keys are only saved in production."
-      redirect_to admin_edit_snipcart_integration_config_path and return
-    end
-
-    # Save live snippet to YAML
+    # The live snippet carries only a PUBLIC key, so — unlike Stripe/Postmark
+    # live keys — it's saved locally too: the same snippet runs the local
+    # store AND the static-site build (no production server needed). There's
+    # no secret key; webhooks (a future production concern) use Snipcart's
+    # per-request token, not a stored secret.
     if params[:live] && params[:live][:snippet].present? && params[:live][:snippet] != "•" * 16
       SnipcartConfig.save_live_snippet(params[:live][:snippet])
     end
 
-    # Save live secret key to database (encrypted)
-    snipcart = SnipcartConfig.current
-    apply_live_keys(snipcart, params[:live] || {}, %w[secret_key])
-
-    if snipcart.save
-      snipcart.verify!
-      flash[:notice] = "Snipcart Live configuration saved"
-    else
-      flash[:error] = "Failed to save Snipcart Live configuration"
-    end
-    redirect_to admin_edit_snipcart_integration_config_path
+    SnipcartConfig.current.verify!
+    flash[:notice] = "Snipcart Live & Static Site configuration saved"
+    # Pin the Live/Static Site tab so the page reopens where the user was
+    # (the tabs Stimulus controller reads ?tab= on load).
+    redirect_to admin_edit_snipcart_integration_config_path(tab: "live")
   end
 
   def update_snipcart_mode
     update_integration_mode(SnipcartConfig.current, "Store")
-    redirect_to admin_edit_snipcart_integration_config_path
+    redirect_to admin_edit_snipcart_integration_config_path(tab: SnipcartConfig.current.mode)
   end
 
   def disconnect_snipcart
@@ -1391,7 +1384,7 @@ class Admin::ConfigsController < Admin::BaseController
     render json: {
       verified:    success,
       verified_at: success ? snipcart.verified_at.iso8601 : nil,
-      error:       success ? nil : "Could not connect to Snipcart. Check your Secret API key."
+      error:       success ? nil : "No Snipcart snippet found. Paste your snippet and save."
     }
   end
 
