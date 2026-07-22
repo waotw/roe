@@ -19,6 +19,12 @@ class Admin::StaticSiteSyncController < Admin::BaseController
     attrs.delete(:ssh_private_key) if attrs[:ssh_private_key].blank?
     attrs.delete(:ssh_key_passphrase) if attrs[:ssh_key_passphrase].blank?
 
+    # An explicit "Remove" (credential-field) clears a stored secret — a blank
+    # field on its own just keeps the current value.
+    attrs[:password]           = nil if params[:clear_password] == "1"
+    attrs[:ssh_private_key]    = nil if params[:clear_ssh_private_key] == "1"
+    attrs[:ssh_key_passphrase] = nil if params[:clear_ssh_key_passphrase] == "1"
+
     # The form no longer offers an auth-method choice — the protocol decides:
     # SFTP always uses the SSH key, FTPS always uses the password. Derive
     # auth_mode so the pusher picks the right path regardless of what was

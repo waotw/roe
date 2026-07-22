@@ -101,7 +101,10 @@
             <span class="text-xs font-medium text-green-700">✓ Password added</span>
             <button type="button" data-action="credential-field#reveal"
                     class="text-xs px-2 py-1 border border-gray-400 rounded-xs hover:bg-gray-100 cursor-pointer">Update</button>
+            <button type="button" data-action="credential-field#remove"
+                    class="text-xs px-2 py-1 border border-red-300 text-red-700 rounded-xs hover:bg-red-50 cursor-pointer">Remove</button>
           </div>
+          <%= hidden_field_tag :clear_password, "0", data: { "credential-field-target" => "clearFlag" } %>
           <div data-credential-field-target="field" class="hidden mt-2">
             <%= f.password_field :password, value: "", autocomplete: "new-password",
                                  class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
@@ -125,11 +128,14 @@
         <span class="block text-xs font-semibold text-gray-700 mb-1">SSH private key</span>
         <div data-controller="credential-field">
           <% if config.ssh_private_key.present? %>
-            <div data-credential-field-target="badge" class="flex items-center gap-3">
+            <div data-credential-field-target="badge" class="flex items-center gap-2">
               <span class="text-xs font-medium text-green-700">✓ SSH key added</span>
               <button type="button" data-action="credential-field#reveal"
-                      class="text-xs px-2 py-1 border border-gray-400 rounded-xs hover:bg-gray-100 cursor-pointer">Update</button>
+                      class="text-xs px-2 py-1 font-mono border border-gray-400 bg-gray-50 rounded-xs hover:bg-gray-100 cursor-pointer">UPDATE</button>
+              <button type="button" data-action="credential-field#remove"
+                      class="text-xs px-1 py-0.5 font-mono border border-red-300 text-red-700 rounded-xs hover:bg-red-50 cursor-pointer">REMOVE</button>
             </div>
+            <%= hidden_field_tag :clear_ssh_private_key, "0", data: { "credential-field-target" => "clearFlag" } %>
             <div data-credential-field-target="field" class="hidden mt-2">
               <%= f.text_area :ssh_private_key, value: "", autocomplete: "off", rows: 6,
                               placeholder: "Paste the full private key, including its BEGIN and END lines.",
@@ -151,11 +157,14 @@
         <span class="block text-xs font-semibold text-gray-700 mb-1">Key passphrase <span class="font-normal text-gray-500"> (or password) — only if you set a password/passphrase when you created the SSH key.</span></span>
         <div data-controller="credential-field">
           <% if config.ssh_key_passphrase.present? %>
-            <div data-credential-field-target="badge" class="flex items-center gap-3">
+            <div data-credential-field-target="badge" class="flex items-center gap-2">
               <span class="text-xs font-medium text-green-700">✓ Passphrase added</span>
               <button type="button" data-action="credential-field#reveal"
-                      class="text-xs px-2 py-1 border border-gray-400 rounded-xs hover:bg-gray-100 cursor-pointer">Update</button>
+                      class="text-xs px-2 py-1 font-mono border border-gray-400 bg-gray-50 rounded-xs hover:bg-gray-100 cursor-pointer">UPDATE</button>
+              <button type="button" data-action="credential-field#remove"
+                      class="text-xs px-1 py-0.5 font-mono border border-red-300 text-red-700 rounded-xs hover:bg-red-50 cursor-pointer">REMOVE</button>
             </div>
+            <%= hidden_field_tag :clear_ssh_key_passphrase, "0", data: { "credential-field-target" => "clearFlag" } %>
             <div data-credential-field-target="field" class="hidden mt-2">
               <%= f.password_field :ssh_key_passphrase, value: "", autocomplete: "new-password",
                                    class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
