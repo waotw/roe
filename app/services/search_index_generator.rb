@@ -61,19 +61,12 @@ class SearchIndexGenerator
     value == true || value == "true"
   end
 
-  # Roe ships its own documentation under documentation/roe. On a user's site
-  # that's noise, so exclude it by default; the Roe project's own site sets
-  # `search_roe_docs: true` to include it (and can then scope a collection to
-  # documentation/roe).
+  # Roe's bundled docs (documentation/roe) are excluded by default; the Roe
+  # project's own site sets `search_roe_docs: true` to include them. This is
+  # the SAME set the static build publishes (Documentation.publishable), so
+  # "excluded from search" and "excluded from the static site" never disagree.
   def searchable_documentation
-    return Documentation.published if search_roe_docs?
-
-    Documentation.published.where("file_path NOT LIKE ?", "%/documentation/roe/%")
-  end
-
-  def search_roe_docs?
-    value = SiteConfig.content("search.roe_docs")
-    value == true || value == "true"
+    Documentation.publishable
   end
 
   # Grouped products (2+ sharing a `group:`) are variants of one item, so index

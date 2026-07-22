@@ -143,6 +143,7 @@ class StaticGenerator
     generate_sitemap
     generate_robots
     generate_search_index
+    copy_site_javascript
 
     save_manifest
     @stats[:end_time] = Time.current
@@ -471,6 +472,9 @@ class StaticGenerator
     puts "📚 Generating #{docs.count} changed documentation pages..."
     docs.each do |doc|
       next if doc.content.blank?
+      # Skip Roe's bundled docs when they're excluded (search.roe_docs off) —
+      # excluded from search means not published to the static site.
+      next unless doc.publishable?
       generate_documentation_page(doc)
       @stats[:documentation] += 1
     rescue => e
@@ -492,7 +496,10 @@ class StaticGenerator
       template: "documentation/show",
       assigns: { doc: doc, back_path: documentation_back_path_for_static }
     )
-    write_file("documentation/#{doc.url_name}.html", html)
+    # Mirror the doc's directory under site/documentation (public_url does the
+    # same) so Roe's docs land under documentation/roe/ and a user's own docs
+    # keep their place — instead of everything being flattened into one folder.
+    write_file("#{doc.public_url.delete_prefix('/')}.html", html)
   end
 
   # Resolves the back-link target for docs in static mode. Mirrors the
@@ -502,8 +509,14 @@ class StaticGenerator
   # every doc in a single build.
   def documentation_back_path_for_static
     @documentation_back_path_for_static ||= begin
-      has_user_page = Page.public_pages.any? { |p| p.url_name == "documentation" }
-      has_user_page ? "/documentation" : "/roe/documentation"
+      if Page.public_pages.any? { |p| p.url_name == "documentation" }
+        "/documentation"
+      elsif Documentation.include_roe_docs?
+        "/roe/documentation"
+      else
+        # No docs landing is published (user authored none, Roe's are excluded).
+        "/"
+      end
     end
   end
 
@@ -516,6 +529,10 @@ class StaticGenerator
   # ```collection``` block inside renders the same theme-styled
   # docs list the dynamic route produces.
   def generate_documentation_index
+    # The /roe/documentation index lists Roe's bundled docs; skip it when they
+    # aren't published (search.roe_docs off) so it can't link to missing pages.
+    return unless defined?(Documentation) && Documentation.include_roe_docs?
+
     puts "📚 Generating /roe/documentation/ index..."
     markdown_path = Rails.root.join("app", "views", "documentation", "index.md")
     markdown = if File.exist?(markdown_path)
@@ -888,6 +905,14 @@ class StaticGenerator
     sync_directory(File.join(RoeSitePaths::SITE_PATH, "theme"), @output_dir.join("theme"))
     copy_bundled_themes
     puts "  ✓ Assets synced"
+  end
+
+  # Roe's own public JavaScript (search, …) — self-contained vanilla files
+  # served from /javascript, distinct from the theme's own scripts. Copied
+  # every build so the output always has them; sync_directory skips unchanged
+  # files and prunes orphans.
+  def copy_site_javascript
+    sync_directory(Rails.root.join("app", "site_js"), @output_dir.join("javascript"))
   end
 
   # If the active theme isn't installed under site/theme/, fall back to

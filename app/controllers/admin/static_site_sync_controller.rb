@@ -84,9 +84,14 @@ class Admin::StaticSiteSyncController < Admin::BaseController
       redirect_to admin_site_sync_path(tab: "static-sync") and return
     end
 
+    full = params[:full].present?
     seed_running_status
-    StaticSiteSyncPushJob.perform_later
-    flash[:notice] = "Push started in the background. Refresh to check progress."
+    StaticSiteSyncPushJob.perform_later(full: full)
+    flash[:notice] = if full
+      "Full re-sync started — re-uploading everything and pruning files removed locally. Refresh to check progress."
+    else
+      "Push started in the background. Refresh to check progress."
+    end
     redirect_to admin_site_sync_path(tab: "static-sync")
   end
 

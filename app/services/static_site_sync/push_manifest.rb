@@ -67,6 +67,20 @@ module StaticSiteSync
       Diff.new(added: added, modified: modified, deleted: deleted)
     end
 
+    # A full re-sync: upload every file on disk (regardless of what the
+    # manifest thinks is already there) and delete anything the manifest
+    # recorded that's since gone. Recovers when the manifest has drifted out
+    # of sync with the host, and prunes orphans left by moved/renamed files.
+    def full_diff
+      current  = current_files
+      recorded = read.fetch("files", {})
+      Diff.new(
+        added: current.keys.sort,
+        modified: [],
+        deleted: (recorded.keys - current.keys).sort
+      )
+    end
+
     # Was anything pushed yet?
     def empty?
       !manifest_path.exist? || read.fetch("files", {}).empty?

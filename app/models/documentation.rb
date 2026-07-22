@@ -127,4 +127,27 @@ class Documentation < ApplicationRecord
     segments = rel.split("/")
     segments.length > 1 ? segments.first.presence : nil
   end
+
+  # Roe ships its own documentation under documentation/roe. On a user's site
+  # that's noise, so it's excluded from BOTH search and the static build by
+  # default; `search_roe_docs: true` opts it back in. One rule, two consumers
+  # (SearchIndexGenerator and StaticGenerator) — so "excluded from search"
+  # always means "not published to the static site."
+  def self.include_roe_docs?
+    value = SiteConfig.content("search.roe_docs")
+    value == true || value == "true"
+  end
+
+  # Published docs that should be exposed — to search and to the static site.
+  def self.publishable
+    return published if include_roe_docs?
+    published.where("file_path NOT LIKE ?", "%/documentation/roe/%")
+  end
+
+  # Should this doc be published (to search / the static site)? Roe's bundled
+  # docs (documentation/roe) are gated behind include_roe_docs?.
+  def publishable?
+    return true unless url_scope == "roe"
+    self.class.include_roe_docs?
+  end
 end

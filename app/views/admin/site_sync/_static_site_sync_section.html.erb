@@ -117,6 +117,14 @@
           <% elsif @static_site_sync_config.last_verified_at %>
             <p class="text-xs text-green-700">Connection verified: <%= time_ago_in_words(@static_site_sync_config.last_verified_at) %> ago</p>
           <% end %>
+          <%# Jump to the full Static Site page (generate / rebuild / clean /
+              browse the output). A link, not a button — it navigates rather
+              than acting on the connection, and applies to every protocol. %>
+
+          <%= link_to "STATIC SITE ACTIONS →",
+                      admin_static_site_path,
+                      class: "inline-flex items-center justify-center mt-4 mb-0 text-blue-500 hover:text-gray-800 underline font-mono text-xs cursor-pointer whitespace-nowrap" %>
+          <p class="text-xs text-gray-500 mt-0">Use Static Site Actions to rebuild your static site.</p>
         </div>
 
         <div class="flex flex-col gap-2 items-stretch shrink-0">
@@ -138,7 +146,16 @@
             <%= button_to "TEST CONNECTION",
                           admin_test_static_site_sync_connection_path,
                           method: :post,
-                          class: "inline-flex items-center justify-center px-3 py-1.5 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+                          class: "inline-flex items-center justify-center px-2 py-1 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+            <%# Full re-sync — re-uploads every file and prunes ones removed
+                locally, to recover when Roe's record and the host drift apart.
+                Deliberately low-key: the escape hatch, not the default. %>
+            <%= button_to "FULL RE-SYNC",
+                          admin_push_static_site_path,
+                          method: :post,
+                          params: { full: 1 },
+                          form: { data: { turbo_confirm: "Re-upload every file and remove any Roe-pushed file that's no longer local?" } },
+                          class: "inline-flex items-center justify-center px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
           <% end %>
         </div>
       </div>
