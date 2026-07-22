@@ -83,28 +83,17 @@
       <%= f.text_field :username,
                        autocomplete: "off",
                        class: "w-full font-mono text-sm p-2 border border-gray-300 rounded-xs" %>
+      <p class="text-xs text-gray-500 mt-1">For SFTP, use your hosting account username (e.g. your cPanel account) — not an FTP account. <br>For FTPS, use the FTP account username (often <code class="text-xs bg-gray-100 px-1 rounded">user@domain</code>).</p>
     </div>
 
-    <div>
-      <span class="block text-xs font-semibold text-gray-700 mb-2">Authentication</span>
-      <div class="flex gap-6 text-sm">
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <%= f.radio_button :auth_mode, "password",
-                             data: { action: "change->static-site-sync-form#authModeChanged" } %>
-          Password
-        </label>
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <%= f.radio_button :auth_mode, "ssh_key",
-                             data: { action: "change->static-site-sync-form#authModeChanged" } %>
-          SSH private key
-        </label>
-      </div>
-    </div>
+    <%# No auth-method chooser: the protocol decides it. SFTP always uses an
+        SSH key (+ optional passphrase); FTPS always uses a password. The
+        controller derives auth_mode from the protocol on save, so the two
+        protocols stay cleanly distinct. %>
 
-    <%# Password auth — shown only when Authentication is "Password". A
-        stored value collapses to an "added" badge; Update reveals the
-        field. Blank submit keeps the current value. %>
-    <div data-static-site-sync-form-target="passwordAuth" class="<%= 'hidden' unless config.auth_mode_password? %>">
+    <%# Password — FTPS only. A stored value collapses to an "added" badge;
+        Update reveals the field. Blank submit keeps the current value. %>
+    <div data-static-site-sync-form-target="passwordAuth" class="<%= 'hidden' unless config.protocol_ftps? %>">
       <span class="block text-xs font-semibold text-gray-700 mb-1">Password</span>
       <div data-controller="credential-field">
         <% if config.password.present? %>
@@ -128,10 +117,10 @@
       </div>
     </div>
 
-    <%# SSH-key auth — shown only when Authentication is "SSH private key".
-        Holds the key itself plus an optional passphrase (many hosts, e.g.
-        cPanel, only issue passphrase-protected keys). Same badge pattern. %>
-    <div data-static-site-sync-form-target="keyAuth" class="space-y-4 <%= 'hidden' unless config.auth_mode_ssh_key? %>">
+    <%# SSH key + passphrase — SFTP only. Many hosts (e.g. cPanel) only
+        issue passphrase-protected keys, hence the passphrase field. Same
+        badge pattern as the password. %>
+    <div data-static-site-sync-form-target="keyAuth" class="space-y-4 <%= 'hidden' unless config.protocol_sftp? %>">
       <div>
         <span class="block text-xs font-semibold text-gray-700 mb-1">SSH private key</span>
         <div data-controller="credential-field">
@@ -159,7 +148,7 @@
       </div>
 
       <div>
-        <span class="block text-xs font-semibold text-gray-700 mb-1">Key passphrase <span class="font-normal text-gray-500">— only if your key is encrypted</span></span>
+        <span class="block text-xs font-semibold text-gray-700 mb-1">Key passphrase <span class="font-normal text-gray-500"> (or password) — only if you set a password/passphrase when you created the SSH key.</span></span>
         <div data-controller="credential-field">
           <% if config.ssh_key_passphrase.present? %>
             <div data-credential-field-target="badge" class="flex items-center gap-3">
@@ -183,12 +172,14 @@
       </div>
     </div>
 
-    <div>
+    <%# TLS certificate verification — FTPS only (SFTP doesn't use TLS
+        certs), so this hides for SFTP and ZIP. %>
+    <div data-static-site-sync-form-target="verifyTls" class="<%= 'hidden' unless config.protocol_ftps? %>">
       <label class="inline-flex items-start gap-2 cursor-pointer">
         <%= f.check_box :verify_tls, class: "mt-0.5" %>
         <span>
           <span class="block text-xs font-semibold text-gray-700">Verify TLS certificate</span>
-          <span class="block text-xs text-gray-500">FTPS only. Uncheck if your host presents a self-signed or mismatched certificate — common on shared / cPanel hosting. The connection stays encrypted; Roe just won't verify the certificate's identity.</span>
+          <span class="block text-xs text-gray-500">Uncheck if your host presents a self-signed or mismatched certificate — common on shared / cPanel hosting. The connection stays encrypted; Roe just won't verify the certificate's identity.</span>
         </span>
       </label>
     </div>
@@ -222,7 +213,7 @@
     <% if config.configured? && !config.protocol_zip? %>
       <button type="submit" form="static-site-sync-test"
               class="inline-flex items-center px-4 py-2 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-sm rounded-xs cursor-pointer">
-        Test connection
+        TEST CONNECTION
       </button>
     <% end %>
   </div>

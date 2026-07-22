@@ -49,4 +49,16 @@ class StaticSiteSync::Pushers::FtpsTest < ActiveSupport::TestCase
     opts = build_pusher(stub_config(verify_tls: false)).send(:ssl_context_options)
     assert_equal OpenSSL::SSL::VERIFY_NONE, opts[:verify_mode]
   end
+
+  test "a name-resolution failure surfaces a DNS-propagation hint" do
+    config = stub("config", host: "ftp.example.com", port: 21, username: "u", password: "p",
+                  verify_tls: true, remote_path: "public_html")
+    ftp = mock("net_ftp")
+    ftp.stubs(:passive=); ftp.stubs(:open_timeout=); ftp.stubs(:read_timeout=); ftp.stubs(:close)
+    ftp.expects(:connect).raises(SocketError, "getaddrinfo: nodename nor servname provided")
+    Net::FTP.expects(:new).returns(ftp)
+    err = assert_raises(StaticSiteSync::Pusher::ConnectionError) { build_pusher(config).test_connection }
+    assert_match(/Couldn't find ftp\.example\.com/, err.message)
+    assert_match(/propagating/, err.message)
+  end
 end

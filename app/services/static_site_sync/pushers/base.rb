@@ -29,6 +29,13 @@ module StaticSiteSync
         @progress_proc&.call(completed: completed, total: total)
       end
 
+      # Message for a DNS / name-resolution failure (a SocketError out of
+      # getaddrinfo). Usually transient right after a nameserver change, so
+      # point the user at propagation rather than their credentials.
+      def unresolved_host_message
+        "Couldn't find #{@config.host}. If you recently changed DNS or nameservers, it may still be propagating. This can take up to a few hours."
+      end
+
       # Walk the diff once, calling the supplied per-item blocks. Keeps
       # the upload/delete loop identical across protocols — subclasses
       # only supply the actual transfer primitive.

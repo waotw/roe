@@ -33,7 +33,9 @@ module StaticSiteSync
         result
       rescue Net::SSH::AuthenticationFailed => e
         raise Pusher::ConnectionError, "Authentication failed: #{e.message}"
-      rescue SocketError, Errno::ECONNREFUSED, Errno::ETIMEDOUT, Net::SSH::ConnectionTimeout => e
+      rescue SocketError
+        raise Pusher::ConnectionError, unresolved_host_message
+      rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT, Net::SSH::ConnectionTimeout => e
         raise Pusher::ConnectionError, "Could not connect to #{@config.host}: #{e.message}"
       rescue Net::SSH::HostKeyMismatch => e
         raise Pusher::ConnectionError, "Host key mismatch — host fingerprint changed. #{e.message}"

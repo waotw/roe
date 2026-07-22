@@ -7,14 +7,19 @@ import { Controller } from "@hotwired/stimulus";
 //     protocol: "Save" for SFTP/FTPS, "Download ZIP" for ZIP
 //   - snap the port to the protocol's default (22 SFTP / 21 FTPS),
 //     without clobbering a custom port the user set on purpose
-//   - show only the auth fields (password vs SSH key + passphrase) for
-//     the authentication mode currently selected
+//   - the protocol decides auth entirely: SFTP shows the SSH key +
+//     passphrase; FTPS shows the password and the TLS-verify option
 export default class extends Controller {
-  static targets = ["credentials", "protocolGroup", "submitButton", "port", "passwordAuth", "keyAuth"];
+  static targets = [
+    "credentials", "protocolGroup", "submitButton", "port",
+    "passwordAuth", "keyAuth", "verifyTls"
+  ];
 
   protocolChanged(event) {
     const value = event.target.value;
     const isZip = value === "zip";
+    const isFtps = value === "ftps";
+    const isSftp = value === "sftp";
 
     if (this.hasCredentialsTarget) {
       this.credentialsTarget.classList.toggle("hidden", isZip);
@@ -33,11 +38,12 @@ export default class extends Controller {
         this.portTarget.value = defaults[value] || current;
       }
     }
-  }
 
-  authModeChanged(event) {
-    const isKey = event.target.value === "ssh_key";
-    if (this.hasPasswordAuthTarget) this.passwordAuthTarget.classList.toggle("hidden", isKey);
-    if (this.hasKeyAuthTarget) this.keyAuthTarget.classList.toggle("hidden", !isKey);
+    if (isZip) return; // credentials block is hidden — nothing else to arrange
+
+    // FTPS = password + TLS-verify; SFTP = SSH key + passphrase.
+    if (this.hasPasswordAuthTarget) this.passwordAuthTarget.classList.toggle("hidden", !isFtps);
+    if (this.hasKeyAuthTarget) this.keyAuthTarget.classList.toggle("hidden", !isSftp);
+    if (this.hasVerifyTlsTarget) this.verifyTlsTarget.classList.toggle("hidden", !isFtps);
   }
 }

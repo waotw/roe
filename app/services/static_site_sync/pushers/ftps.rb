@@ -47,7 +47,9 @@ module StaticSiteSync
         ftp.connect(@config.host, @config.port || 21)
         ftp.login(@config.username, @config.password)
         yield ftp
-      rescue SocketError, Errno::ECONNREFUSED, Errno::ETIMEDOUT => e
+      rescue SocketError
+        raise Pusher::ConnectionError, unresolved_host_message
+      rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT => e
         raise Pusher::ConnectionError, "Could not connect to #{@config.host}: #{e.message}"
       rescue Net::FTPPermError => e
         raise Pusher::ConnectionError, "Authentication failed: #{e.message}"

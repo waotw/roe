@@ -16,6 +16,15 @@ class StaticSiteSync::Pushers::SftpTest < ActiveSupport::TestCase
     assert_equal :block_value, build_pusher(config).send(:with_session) { |_sftp| :block_value }
   end
 
+  test "a name-resolution failure surfaces a DNS-propagation hint" do
+    config = stub("config", host: "sftp.example.com", username: "u", port: 22,
+                  auth_mode_ssh_key?: false, password: "pw")
+    Net::SFTP.expects(:start).raises(SocketError, "getaddrinfo: nodename nor servname provided")
+    err = assert_raises(StaticSiteSync::Pusher::ConnectionError) { build_pusher(config).test_connection }
+    assert_match(/Couldn't find sftp\.example\.com/, err.message)
+    assert_match(/propagating/, err.message)
+  end
+
   test "ssh_options forwards the passphrase and normalizes CRLF line endings in the key" do
     config = stub("config",
       auth_mode_ssh_key?: true,

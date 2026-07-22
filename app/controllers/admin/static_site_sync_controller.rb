@@ -19,6 +19,13 @@ class Admin::StaticSiteSyncController < Admin::BaseController
     attrs.delete(:ssh_private_key) if attrs[:ssh_private_key].blank?
     attrs.delete(:ssh_key_passphrase) if attrs[:ssh_key_passphrase].blank?
 
+    # The form no longer offers an auth-method choice — the protocol decides:
+    # SFTP always uses the SSH key, FTPS always uses the password. Derive
+    # auth_mode so the pusher picks the right path regardless of what was
+    # previously stored.
+    attrs[:auth_mode] = "ssh_key"  if attrs[:protocol] == "sftp"
+    attrs[:auth_mode] = "password" if attrs[:protocol] == "ftps"
+
     config.assign_attributes(attrs)
     config.last_verification_error = nil
 
