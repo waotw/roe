@@ -1701,7 +1701,7 @@ class Admin::ConfigsController < Admin::BaseController
       "subscribe_display" => {
         title: "Subscribe display",
         text: ("<strong>links</strong> — show every subscribe link (Apple, Spotify, RSS…) inline on the episode page.<br><br>" \
-               "<strong>menu</strong> — collapse them behind a single <em>Subscribe</em> button that opens on click.").html_safe
+               "<strong>button + menu</strong> — collapse them behind a single <em>Subscribe</em> button that opens on click.").html_safe
       },
       "apple_podcasts" => {
         title: "Subscribe links",

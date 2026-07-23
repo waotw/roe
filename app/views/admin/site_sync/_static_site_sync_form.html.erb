@@ -56,6 +56,15 @@
         </span>
       </label>
     </div>
+
+    <%# Download sits right next to the protocol picker for ZIP — no
+        network credentials to fill in, so the action belongs here rather
+        than in the floating Save bar (which is for SFTP/FTPS). Submitting
+        saves the config and redirects straight to the download. %>
+    <div data-static-site-sync-form-target="zipAction" class="mt-3 <%= 'hidden' unless config.protocol_zip? %>">
+      <%= f.submit "DOWNLOAD ZIP",
+                   class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono uppercase text-sm rounded-xs cursor-pointer" %>
+    </div>
   </div>
 
   <%# ─── Credentials block — hidden for ZIP ───────────────────── %>
@@ -203,38 +212,14 @@
     </div>
   </div>
 
-  <%# ─── Save / Test actions ──────────────────────────────────── %>
-  <%# When protocol is ZIP the submit button label flips to
-      "Download ZIP" — the controller saves the config and then
-      redirects straight to the download endpoint in one motion.
-      Stimulus also rewrites this label live when the user toggles
-      protocol radios before saving.
-
-      "Test connection" submits the separate, hidden form rendered
-      below via its HTML `form=` attribute — NEVER a <form> nested
-      inside this one. Nested forms are invalid HTML, and with
-      per-form CSRF tokens the browser merges the two tokens and
-      submits the wrong-scoped one, which Rails rejects on save. %>
-
-  <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 left-12 bg-white">
-    <%= f.submit (config.protocol_zip? ? "DOWNLOAD ZIP" : "Save"),
-                 data: { "static-site-sync-form-target" => "submitButton" },
+  <%# ─── Save action ───────────────────────────────────────────── %>
+  <%# Floating Save bar for the network protocols (SFTP/FTPS). Hidden
+      for ZIP, which uses the Download button next to the protocol
+      picker instead. Test connection lives on the Static Site Actions
+      section, not here. %>
+  <div data-static-site-sync-form-target="saveBar"
+       class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 left-12 bg-white <%= 'hidden' if config.protocol_zip? %>">
+    <%= f.submit "Save",
                  class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono uppercase text-sm rounded-xs cursor-pointer" %>
-    <% if config.configured? && !config.protocol_zip? %>
-      <button type="submit" form="static-site-sync-test"
-              class="inline-flex items-center px-4 py-2 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-sm rounded-xs cursor-pointer">
-        TEST CONNECTION
-      </button>
-    <% end %>
   </div>
-<% end %>
-
-<%# Separate form for "Test connection", kept OUTSIDE the settings form
-    so the two never nest. The button above targets it by id. It carries
-    no fields — test_connection reads the saved config from the database. %>
-<% if config.configured? && !config.protocol_zip? %>
-  <%= form_with url: admin_test_static_site_sync_connection_path,
-                method: :post,
-                id: "static-site-sync-test",
-                class: "hidden" do %><% end %>
 <% end %>

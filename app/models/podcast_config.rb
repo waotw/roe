@@ -66,10 +66,13 @@ class PodcastConfig
   end
 
   # How the subscribe section renders: "links" (show all inline, the
-  # default) or "menu" (collapse behind a single Subscribe button).
+  # default) or "button + menu" (collapse behind a single Subscribe
+  # button). Legacy configs may store the older "menu" value — treat it
+  # as the button + menu mode.
   def self.subscribe_display(config)
     value = config&.dig("subscribe_display").to_s.strip
-    %w[links menu].include?(value) ? value : "links"
+    return "button + menu" if value == "button + menu" || value == "menu"
+    "links"
   end
 
   def self.default_entry
