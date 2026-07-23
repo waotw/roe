@@ -247,7 +247,7 @@
       kicking one off. Cache-backed (see SiteSyncTransferJob); cleared
       via the Dismiss button or auto-expires after the cache TTL. %>
   <% if @transfer_status %>
-    <% kind_label = { push: "Push to live", pull: "Pull from live", resolve: "Conflict resolution" }[@transfer_status[:kind]] || "Sync" %>
+    <% kind_label = { push: "Push to live", pull: "Pull from live", clone: "Clone to live", resolve: "Conflict resolution" }[@transfer_status[:kind]] || "Sync" %>
     <% case @transfer_status[:state] %>
       <% when :running %>
         <% progress = @transfer_status[:progress] %>
@@ -787,12 +787,75 @@
           <% end %>
 
           <%# ── One action for everything above ── %>
-          <% if @peer_call_configured %>
+          <% if @site_sync_first_sync %>
+            <%# First sync: no shared history, so a merge would flag every file as
+                a conflict. Clone local → live wholesale instead (live's starter
+                content is removed). Live is backed up first, so it's reversible. %>
+            <div class="mt-2 pt-3 border-t border-amber-200">
+              <p class="text-sm text-amber-800 mb-2">
+                <strong>First sync.</strong> Local and live have never synced, so there's no shared history to merge — make live an exact copy of local (its starter content is removed). Live is backed up first, so it's reversible.
+              </p>
+              <%= form_with url: admin_clone_site_to_live_path, method: :post, data: { turbo: false }, class: "flex flex-wrap items-center gap-2" do %>
+                <%= text_field_tag :confirm, nil,
+                      placeholder: "Type LIVE to confirm",
+                      autocomplete: "off",
+                      class: "font-mono text-sm p-2 border border-amber-400 rounded-xs" %>
+                <%= submit_tag "MAKE LIVE MATCH LOCAL",
+                      data: { turbo_submits_with: "⏳ Starting clone…" },
+                      class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
+              <% end %>
+            </div>
+          <% elsif @peer_call_configured %>
             <%= button_to "SYNC WITH LIVE",
                           admin_sync_site_path,
                           method: :post,
                           data: { turbo_submits_with: "⏳ Starting sync…" },
                           class: "mt-1 inline-flex items-center px-4 py-2 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono text-sm rounded-xs cursor-pointer disabled:opacity-60 disabled:cursor-wait whitespace-nowrap" %>
+
+            <%# Escape hatch when the two have diverged and local should win:
+                mirror local → live wholesale (deletes anything not in local).
+                Destructive on live, so gated behind a confirm dialog; live is
+                snapshotted first. Same clone path as the first-sync card. %>
+            <div class="mt-3" data-controller="force-mirror-modal">
+              <button type="button"
+                      data-action="force-mirror-modal#open"
+                      class="inline-flex items-center px-2.5 py-1 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap">
+                FORCE MIRROR → LIVE
+              </button>
+              <p class="text-xs text-amber-700 mt-1.5">Overwrites live entirely with local. Use when the two have diverged and local should win.</p>
+
+              <%# Custom confirm modal (matches the delete-page/post modal) — the
+                  typed "LIVE" both enables the button and is the confirm param. %>
+              <div data-force-mirror-modal-target="modal"
+                   data-action="click->force-mirror-modal#backdrop"
+                   class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4">
+                  <h3 class="text-lg font-bold text-gray-900 mb-2">Force mirror to live?</h3>
+                  <p class="text-sm text-gray-600 mb-4">
+                    This <strong>replaces the entire live site</strong> with an exact copy of local — everything on live that isn't in local is deleted. Live is backed up first, so it's reversible.
+                  </p>
+                  <%= form_with url: admin_clone_site_to_live_path, method: :post, data: { turbo: false } do %>
+                    <div class="mb-4">
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Type <strong>LIVE</strong> to confirm:</label>
+                      <%= text_field_tag :confirm, nil,
+                            autocomplete: "off",
+                            placeholder: "LIVE",
+                            data: { "force-mirror-modal-target": "input",
+                                    action: "input->force-mirror-modal#validate keydown.enter->force-mirror-modal#submitIfValid keydown.esc->force-mirror-modal#close" },
+                            class: "w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500" %>
+                    </div>
+                    <div class="flex gap-3 justify-end">
+                      <button type="button" data-action="force-mirror-modal#close"
+                              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                      <%= submit_tag "Make Live Match Local",
+                            disabled: true,
+                            data: { "force-mirror-modal-target": "confirm" },
+                            class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed" %>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
           <% else %>
             <p class="text-xs text-amber-700 mt-1">
               Sync is controlled from your <strong>local</strong> development environment — visit your local admin Site Sync page.

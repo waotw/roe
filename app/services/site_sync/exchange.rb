@@ -410,9 +410,13 @@ module SiteSync
 
         uri  = URI.parse(File.join(peer_url, "/api/site_sync/upload"))
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl      = (uri.scheme == "https")
-        http.read_timeout = TRANSFER_TIMEOUT_SECONDS
-        http.open_timeout = HTTP_TIMEOUT_SECONDS
+        http.use_ssl       = (uri.scheme == "https")
+        http.read_timeout  = TRANSFER_TIMEOUT_SECONDS
+        # Without this, write_timeout defaults to 60s — a large multipart body
+        # on a normal uplink exceeds it and the socket dies mid-send, surfacing
+        # as `Net::ReadTimeout with #<TCPSocket:(closed)>`. Match the read side.
+        http.write_timeout = TRANSFER_TIMEOUT_SECONDS
+        http.open_timeout  = HTTP_TIMEOUT_SECONDS
 
         request = Net::HTTP::Post.new(uri.request_uri)
         request["Authorization"] = "Bearer #{token}"

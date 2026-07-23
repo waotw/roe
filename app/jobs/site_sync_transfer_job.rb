@@ -57,7 +57,7 @@ class SiteSyncTransferJob < ApplicationJob
 
   def perform(kind)
     kind = kind.to_sym
-    raise ArgumentError, "kind must be :push, :pull or :sync" unless [ :push, :pull, :sync ].include?(kind)
+    raise ArgumentError, "kind must be :push, :pull, :sync or :clone" unless [ :push, :pull, :sync, :clone ].include?(kind)
 
     @started_at = Time.current
     @kind = kind
@@ -68,6 +68,7 @@ class SiteSyncTransferJob < ApplicationJob
     when :push then perform_push
     when :pull then perform_pull
     when :sync then perform_sync
+    when :clone then perform_clone
     end
 
     # /site is now in a known-good state matching the other side.
@@ -86,7 +87,7 @@ class SiteSyncTransferJob < ApplicationJob
     # until the app restarts.
     update_step(:reconciling_content)
     case @kind
-    when :push then SiteSync::Exchange.reconcile_peer_content!
+    when :push, :clone then SiteSync::Exchange.reconcile_peer_content!
     when :pull then ContentSync.sync_all
     when :sync
       # Reconcile whichever side(s) actually received writes.
@@ -262,6 +263,34 @@ class SiteSyncTransferJob < ApplicationJob
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: pull_diff, on_progress: progress_proc)
     end
+  end
+
+  # First-sync mirror (a "clone"): make the peer an exact copy of this
+  # (initiating) side. No reconcile and no conflicts — on a first sync there's
+  # no shared ancestor, so the initiator is the source of truth by definition.
+  # Pushes every file that differs AND deletes every peer file not present
+  # locally, which is what clears a fresh deploy's starter/seed content. The
+  # peer is snapshotted first (full tree) so even a mis-clicked clone is
+  # recoverable; the generic perform flow afterwards writes the shared baseline
+  # on both sides, so subsequent syncs are clean 3-way merges.
+  def perform_clone
+    update_step(:computing_diff)
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    raise PeerUnreachable if peer.nil?
+
+    # Ledger.diff(local, peer): added = local-only, modified = differ,
+    # deleted = peer-only. That set IS the mirror — apply it and peer == local.
+    diff = SiteSync::Ledger.diff(SiteSync::Ledger.current, peer["files"] || {})
+    @original_diff = diff
+    @pushed = !diff_empty?(diff)
+    return unless @pushed # already identical — nothing to clone
+
+    # Safety net: full snapshot of the peer's /site before we overwrite it.
+    update_step(:backing_up_live_full)
+    SiteSync.transport.backup_live_to_local!(on_progress: progress_proc)
+
+    update_step(:pushing_to_live_full)
+    SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
   end
 
   # Three-way reconcile against the peer, with edit/edit conflicts confirmed

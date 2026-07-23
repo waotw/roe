@@ -42,6 +42,14 @@ class Admin::SiteSyncController < Admin::BaseController
     peer_fp         = @peer_state&.dig(:fingerprint)
     @in_sync_with_peer = local_fp.present? && peer_fp.present? && local_fp == peer_fp
 
+    # First sync: no shared baseline has ever been written (.sync-state.json
+    # absent), the peer is reachable, and the two sides aren't already
+    # identical. Without a common ancestor, a normal reconcile would flag every
+    # shared-path file as a conflict, so the UI offers a one-click mirror clone
+    # instead of that flood.
+    @site_sync_first_sync = @peer_call_configured && @peer_reachable &&
+                            !@in_sync_with_peer && SiteSync::Ledger.recorded.nil?
+
     # When the local ledger was last written = the last successful sync.
     # Persists across cache expiry (unlike the transient transfer status),
     # so the always-on status line can show "last synced …".
@@ -333,6 +341,36 @@ class Admin::SiteSyncController < Admin::BaseController
     redirect_to admin_site_sync_path
   end
 
+  # First-sync clone: mirror this side onto the peer, wholesale. There's no
+  # shared ancestor on a first sync, so instead of a per-file conflict flood we
+  # make the peer an exact copy of local — pushing everything and deleting the
+  # peer's starter/seed content. Destructive on the peer, so it takes the same
+  # typed "LIVE" confirmation as a push; the peer is snapshotted first.
+  def clone_to_live
+    if transfer_in_progress?
+      flash[:alert] = "Another sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "Clone requires a peer URL set on this side (dev only)."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless params[:confirm].to_s.strip == "LIVE"
+      flash[:alert] = "Clone aborted — the confirmation didn't match \"LIVE\"."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    seed_running_status(:clone)
+    SiteSyncTransferJob.perform_later(:clone)
+    flash[:notice] = "Cloning local to live in the background — live will become an exact copy of local. Refresh the page to check progress."
+    redirect_to admin_site_sync_path
+  end
+
   # Apply the admin's choices for a sync that was blocked by conflicts.
   # Each conflict resolves to "local" (keep mine), "live" (keep theirs),
   # or — the default for a blank/`recent` choice — most-recent by mtime.
@@ -409,7 +447,7 @@ class Admin::SiteSyncController < Admin::BaseController
     last = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
     kind = last && last[:kind]
 
-    unless [ :push, :pull, :sync ].include?(kind)
+    unless [ :push, :pull, :sync, :clone ].include?(kind)
       flash[:alert] = "Can't retry — no recent transfer status to retry from."
       redirect_to admin_site_sync_path
       return
