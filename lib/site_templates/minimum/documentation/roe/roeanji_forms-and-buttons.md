@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Forms & Buttons
+title: Forms & Buttons
 status: published
 url_name: forms-and-buttons
 tags: roe-anji

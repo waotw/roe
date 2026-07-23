@@ -20,7 +20,7 @@ template: links
 
 # Metadata Fields
 
-Every content file in Roe — posts, pages, products, documentation — opens with a block of [YAML](/documentation/glossary#yaml) called frontmatter. This is the metadata for that piece of content.
+Every content file in Roe — posts, pages, products, documentation — opens with a block of [YAML](/documentation/roe/glossary#yaml) called frontmatter. This is the metadata for that piece of content.
 
 Frontmatter sits between two `---` lines at the top of the file:
 
@@ -166,7 +166,7 @@ Products require a few additional fields for the store to work:
 | `variant` | No | Label for this variant (e.g., `Paperback`, `Digital`). |
 | `primary` | `true` `false` | When grouping variants, marks which one shows first in collections. |
 
-See [Products](/documentation/products) for a full guide to creating and grouping products.
+See [Products](/documentation/roe/products) for a full guide to creating and grouping products.
 
 ---
 

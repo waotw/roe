@@ -1,5 +1,5 @@
 ---
-title: Defaults → Collections
+title: Settings → Collections
 status: published
 url_name: settings-collections
 tags: settings
@@ -36,4 +36,4 @@ These defaults can always be overridden when using a Collection. Simply add the 
 
 This button drops a `collection` template into your Markdown. This is where that template lives.
 
-See all available [options for Collections](/documentation/collections#options)
+See all available [options for Collections](/documentation/roe/collections#options)

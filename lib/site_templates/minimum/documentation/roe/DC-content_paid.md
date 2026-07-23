@@ -22,7 +22,7 @@ You can also choose whether or not to show paid content to everyone or just paid
 
 ## Creating Paid Content
 
-Once you enable `Payments`, a **Paywall** option appears in the `ACTION ▼` menu of [The Editor](/documentation/the-editor) — a quick way to drop in a paywall form.
+Once you enable `Payments`, a **Paywall** option appears in the `ACTION ▼` menu of [The Editor](/documentation/roe/the-editor) — a quick way to drop in a paywall form.
 
 To make a post or page premium/paid-only:
 

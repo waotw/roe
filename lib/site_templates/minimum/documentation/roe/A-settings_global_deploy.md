@@ -1,5 +1,5 @@
 ---
-title: "Global → Deployment"
+title: "Settings → Deployment"
 status: published
 url_name: settings-deployment
 tags: settings
@@ -19,7 +19,7 @@ template: links
 
 ## Configure Roe for Fly
 
-In your local Roe admin: [Settings → Global → deploy.yml](/admin/configs/deploy/edit)
+In your local Roe admin: [Settings → deploy.yml](/admin/configs/deploy/edit)
 
 1. **Target**: select **Fly.io**.
 2. **App name**: paste the name you just created (e.g. `site-name-roe`).

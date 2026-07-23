@@ -1,5 +1,5 @@
 ---
-title: Defaults → Cards
+title: Settings → Cards
 status: published
 url_name: settings-cards
 tags: settings
@@ -37,6 +37,6 @@ This button drops a `card` template into your Markdown. This is where those temp
 
 See all available options for:
 
-- [Aside options](/documentation/cards#aside)
-- [Pullquote options](/documentation/cards#pull-quote)
-- [Post-link options](/documentation/cards#post-link)
+- [Aside options](/documentation/roe/cards#aside)
+- [Pullquote options](/documentation/roe/cards#pull-quote)
+- [Post-link options](/documentation/roe/cards#post-link)

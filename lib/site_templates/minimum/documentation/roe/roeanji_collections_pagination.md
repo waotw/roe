@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Collections & Pagination
+title: Collections & Pagination
 status: published
 url_name: collections_pagination
 tags: roe-anji

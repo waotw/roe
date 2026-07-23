@@ -1,12 +1,12 @@
 ---
-title: "Global → Content"
+title: "Settings → Content"
 status: published
 tags: settings
 ---
 
 # Edit your Global Content Settings
 
-Your Global Content Settings has options for content and search. Edit them in the Admin at [Settings → Global → Content](/admin/configs/content/edit). Click `SAVE` when you're done.
+Your Global Content Settings has options for content and search. Edit them in the Admin at [Settings → Content](/admin/configs/content/edit). Click `SAVE` when you're done.
 
 ## Global
 

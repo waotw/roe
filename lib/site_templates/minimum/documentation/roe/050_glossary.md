@@ -8,14 +8,14 @@ tags: getting-started, guide
 
 ```collection
 source: documentation/roe
-limit: 11
+limit: 1/2
 tags: definition
 order: title
 template: glossary
 ```
 ```collection
 source: documentation/roe
-offset: 11
+limit: 2/2
 tags: definition
 order: title
 template: glossary

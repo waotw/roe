@@ -15,7 +15,7 @@ template: links
 
 # Pages
 
-A Roe site is mostly [Markdown](/documentation/glossary#markdown) and [YAML](/documentation/glossary#yaml) files. There are 4 sources of content in Roe: Pages, [Posts](/documentation/posts), [Products](/documentation/products) (if you've enabled the Store) and Documentation.
+A Roe site is mostly [Markdown](/documentation/roe/glossary#markdown) and [YAML](/documentation/roe/glossary#yaml) files. There are 4 sources of content in Roe: Pages, [Posts](/documentation/roe/posts), [Products](/documentation/roe/products) (if you've enabled the Store) and Documentation.
 
 Your Page files are in the `/site/pages` folder in your `Roe` folder (where you've installed Roe).
 
@@ -55,7 +55,7 @@ status: published
 | `excerpt` | Short description |
 | `image` | Featured image path |
 
-See [Metadata Fields](/documentation/metadata-fields) for the full list.
+See [Metadata Fields](/documentation/roe/metadata-fields) for the full list.
 
 ## Special Pages
 
@@ -79,11 +79,11 @@ Create a page with `url_name: 404` to customize your not-found page.
 
 ### Member Pages
 
-When you enable [Members](/documentation/members), Roe generates pages for sign up, sign in, upgrade, and more. These live in `/site/pages/members/` and are regular Markdown files you can edit.
+When you enable [Members](/documentation/roe/members), Roe generates pages for sign up, sign in, upgrade, and more. These live in `/site/pages/members/` and are regular Markdown files you can edit.
 
 ### Podcast Pages
 
-Add `podcast: <podcast-key>` to a page's frontmatter to connect it to a podcast show (the key comes from your [podcast config](/documentation/podcasts)). The page then leads with the show's name as its heading and shows the show's [subscribe section](/documentation/podcasts#subscribe-section) beneath it — a ready-made "podcast home" page. Requires the Podcasts feature.
+Add `podcast: <podcast-key>` to a page's frontmatter to connect it to a podcast show (the key comes from your [podcast config](/documentation/roe/podcasts)). The page then leads with the show's name as its heading and shows the show's [subscribe section](/documentation/roe/podcasts#subscribe-section) beneath it — a ready-made "podcast home" page. Requires the Podcasts feature.
 
 ## Pages vs Posts
 
@@ -97,7 +97,7 @@ Add `podcast: <podcast-key>` to a page's frontmatter to connect it to a podcast 
 
 ## Editing Pages
 
-Use [The Editor](/documentation/the-editor) to write and format page content. Pages support all Roe-anji features: [cards](/documentation/cards), [collections](/documentation/collections), [galleries](/documentation/galleries), and more.
+Use [The Editor](/documentation/roe/the-editor) to write and format page content. Pages support all Roe-anji features: [cards](/documentation/roe/cards), [collections](/documentation/roe/collections), [galleries](/documentation/roe/galleries), and more.
 
 ## Navigation
 

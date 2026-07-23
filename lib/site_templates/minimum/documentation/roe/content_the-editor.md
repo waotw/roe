@@ -22,7 +22,7 @@ status: published
 
 The `metadata` for the post/page can be edited through a form or you can access the YAML directly through the `RAW` button. Click the `▶︎` to see the metadata, click the `▼` to hide it.
 
-Find more details about how metadata works here: [Metadata](/documentation/metadata)
+Find more details about how metadata works here: [Metadata](/documentation/roe/metadata)
 
 ## Editor
 
@@ -54,7 +54,7 @@ The <code>F<sup>1</sup></code> button creates a footnote:
 
 You can edit the templates for the `CARD` and `COLLECTION` buttons on the [settings page](/admin/configs)
 
-`GALLERY` will add the image gallery syntax to the editor at the current cursor position. This isn't required for simple galleries, only for more complex layouts. More details here: [Galleries](/documentation/galleries)
+`GALLERY` will add the image gallery syntax to the editor at the current cursor position. This isn't required for simple galleries, only for more complex layouts. More details here: [Galleries](/documentation/roe/galleries)
 
 `CARD ▼` will open a menu with card options:
 
@@ -64,9 +64,9 @@ You can edit the templates for the `CARD` and `COLLECTION` buttons on the [setti
 
 Clicking the option will drop the syntax at your cursor in the editor. Post-link allows you to search for any post in your system and then select it.
 
-You can learn about each of these in detail here: [Cards](/documentation/cards)
+You can learn about each of these in detail here: [Cards](/documentation/roe/cards)
 
-`COLLECTION` will drop in the basic Collections syntax at your cursor in the editor. Collections are very powerful and you can learn all about them here: [Collections](/documentation/collections)
+`COLLECTION` will drop in the basic Collections syntax at your cursor in the editor. Collections are very powerful and you can learn all about them here: [Collections](/documentation/roe/collections)
 
 `MEDIA ▼` will open a menu to insert media:
 

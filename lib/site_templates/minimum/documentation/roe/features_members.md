@@ -26,7 +26,7 @@ Roe includes a complete membership system that allows you to:
 - Gate content behind a paywall with preview snippets
 - Manage members and their access levels from the admin
 - Accept donations from anyone visiting the site
-- See [Payment Models](/documentation/payments#payment-models)
+- See [Payment Models](/documentation/roe/payments#payment-models)
 
 The system is designed to be flexible: you can use it for free newsletters only, paid memberships only, or a combination of both. You can even use payments purely for donations/support without gating any content.
 
@@ -101,7 +101,7 @@ upgrade-button-text: Sign up and become a paid member
 
 The upgrade button only appears if payments are enabled in your config.
 
-**Just a link to sign-up?** For a call-to-action that sends readers to the sign-up page rather than embedding the form, use the Roe-anji [`subscribe` button](/documentation/forms-and-buttons#subscribe-button) — a `button` block with `for: subscribe`.
+**Just a link to sign-up?** For a call-to-action that sends readers to the sign-up page rather than embedding the form, use the Roe-anji [`subscribe` button](/documentation/roe/forms-and-buttons#subscribe-button) — a `button` block with `for: subscribe`.
 
 ### Email Templates
 
@@ -135,6 +135,6 @@ If you're using static site generation, `SSG` + `MEMBERS` is an advanced feature
 
 1. **Customize your member pages** - Edit the copy in signup.md, upgrade.md, etc.
 2. **Enable newsletters** - To test emails ([Settings → Members](/admin/configs/members/edit))
-3. **Enable payments** - When you're ready to monetize, see [Payments](/documentation/payments)
+3. **Enable payments** - When you're ready to monetize, see [Payments](/documentation/roe/payments)
 
 The members system is designed to grow with you - start with free signups, add payments when you're ready, and customize everything to match your membership/publishing model.

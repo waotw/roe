@@ -15,7 +15,7 @@ template: links
 
 # Posts
 
-A Roe site is mostly [Markdown](/documentation/glossary#markdown) and [YAML](/documentation/glossary#yaml) files. There are 4 sources of content in Roe: [Pages](/documentation/pages), Posts, [Products](/documentation/products) (if you've enabled the Store) and Documentation.
+A Roe site is mostly [Markdown](/documentation/roe/glossary#markdown) and [YAML](/documentation/roe/glossary#yaml) files. There are 4 sources of content in Roe: [Pages](/documentation/roe/pages), Posts, [Products](/documentation/roe/products) (if you've enabled the Store) and Documentation.
 
 Your Post files are in the `/site/posts` folder in your `Roe` folder (where you've installed Roe).
 
@@ -71,7 +71,7 @@ status: published
 
 ### Publishing Options
 
-When [Newsletters](/documentation/newsletters) are enabled, posts get a `published_to` field:
+When [Newsletters](/documentation/roe/newsletters) are enabled, posts get a `published_to` field:
 
 | Option | Behavior |
 |--------|----------|
@@ -81,7 +81,7 @@ When [Newsletters](/documentation/newsletters) are enabled, posts get a `publish
 
 ### Audience
 
-When [Members](/documentation/members) are enabled, posts get an `audience` field:
+When [Members](/documentation/roe/members) are enabled, posts get an `audience` field:
 
 | Option | Behavior |
 |--------|----------|
@@ -106,7 +106,7 @@ url_name: custom-post-slug
 
 ## Collections
 
-Posts are the default source for [Collections](/documentation/collections). You can filter collections by:
+Posts are the default source for [Collections](/documentation/roe/collections). You can filter collections by:
 
 - `post_type` — show only podcasts, articles, etc.
 - `tags` — filter by tags
@@ -115,12 +115,12 @@ Posts are the default source for [Collections](/documentation/collections). You 
 
 ## Editing Posts
 
-Use [The Editor](/documentation/the-editor) to write post content. The editor shows different metadata fields depending on your post type.
+Use [The Editor](/documentation/roe/the-editor) to write post content. The editor shows different metadata fields depending on your post type.
 
 ### Common Workflow
 
 1. Create a draft post
-2. Write content using Markdown and [Roe-anji](/documentation/roeanji) features
+2. Write content using Markdown and [Roe-anji](/documentation/roe/roeanji) features
 3. Preview with `cmd/ctrl-p`
     - Open this window/tab side-by-side to see the live preview as you save.
 4. Set `status: published` when ready
@@ -128,7 +128,7 @@ Use [The Editor](/documentation/the-editor) to write post content. The editor sh
 
 ## Podcast Episodes
 
-Podcast episodes are posts with `post_type: podcast`. See [Podcasts](/documentation/podcasts) for full details on creating and managing podcast feeds.
+Podcast episodes are posts with `post_type: podcast`. See [Podcasts](/documentation/roe/podcasts) for full details on creating and managing podcast feeds.
 
 ## Audio & Video Posts
 

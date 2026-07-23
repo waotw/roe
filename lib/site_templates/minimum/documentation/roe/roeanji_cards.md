@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Cards
+title: Cards
 status: published
 url_name: cards
 tags: roe-anji

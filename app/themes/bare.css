@@ -1,28 +1,20 @@
 /* ============== THEME INFO ================
-   Roe Theme: Default
-   Version: 0.9.9
+   Roe Theme: Bare
+   Version: 0.1.0
    Bundled with: Roe v0.2.0
 
-   This theme was installed from Roe. Leave this comment
-   in place and the admin will detect when a new version
-   is available and offer to update it.
-
-   Either of these actions will create a custom theme outside of the updates system:
-
-   - Change the "Roe Theme" name to anything else
-   - install and rename css file in /site/theme/
-
-   You can always download a fresh copy of the newest version of any built in theme.
+   A deliberately minimal theme that stays as close to plain HTML
+   rendering as possible while still supporting Roe's components.
+   Leave this comment in place so the admin can detect updates.
 */
 
 /* ============ THEME VARIABLES ============ */
 
 :root {
-  /* Light/Dark Mode */
   color-scheme: light dark;
 
   /* Layout */
-  --container-width: 56rem;
+  --container-width: 650px;
   --sidebar-width: 11rem;
   --aside-width: 10rem;
   --aside-text-top-offset: 0.25rem;
@@ -31,17 +23,17 @@
 
   /* Typography */
   --font-scale: 1em;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-body: Georgia, "Times New Roman", Times, serif;
   --font-heading: var(--font-body);
   --font-accent: var(--font-body);
   --font-mono:
     ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
 
-  /* Font Sizes */
+  /* Font sizes — anchored to an 18px base */
   --text-xxs: 0.7rem;
   --text-xs: 0.775rem;
   --text-sm: 0.875rem;
-  --text-base: 1rem;
+  --text-base: 18px;
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
@@ -63,34 +55,34 @@
   --space-16: 4rem;
   --space-gallery: 0.75rem;
 
-  /* Colors */
-  --color-bg: #ffffff;
+  /* Colors — plain HTML defaults */
+  --color-bg: #f4f4f4;
   --color-bg-dim: #f5f5f5;
-  --color-text: #000000;
-  --color-heading: #000000;
+  --color-text: #444444;
+  --color-heading: #444444;
   --color-logo: #000000;
   --color-nav-active: #000000;
   --color-muted: #666666;
   --color-really-muted: #e6e6e6;
   --color-link: #0000ee;
-  --color-hover: var(--color-text);
-  --color-visited: #0000ee;
-  --color-link-collection: #000000;
-  --color-border: #e3e3e3;
+  --color-hover: #000000;
+  --color-visited: #551a8b;
+  --color-link-collection: #0000ee;
+  --color-border: #cccccc;
   --color-code-bg: #f5f5f5;
   --color-code-text: #000000;
-  --color-highlight-text: #bfe3ff;
+  --color-highlight-text: #ffff00;
 
-  /* Player tokens (used by audio + video players) */
+  /* Player tokens */
   --player-bg: #f5f5f5;
-  --player-border: #dddddd;
+  --player-border: #cccccc;
   --player-track: #cccccc;
-  --player-accent: #333333;
+  --player-accent: #444444;
   --player-accent-hover: #000000;
-  --player-btn-color: #333333;
+  --player-btn-color: #444444;
   --player-btn-play-color: #ffffff;
   --player-btn-hover-bg: rgba(0, 0, 0, 0.07);
-  --player-meta-color: #888888;
+  --player-meta-color: #666666;
   --player-overlay-bg: rgba(255, 255, 255, 0.75);
   --player-chapter-active-bg: rgba(0, 0, 0, 0.05);
 }
@@ -99,39 +91,33 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Surface colors — near-black bases, not pure black (easier on the eyes) */
-    --color-bg: #121212;
-    --color-bg-dim: #1e1e1e;
+    --color-bg: #1a1a1a;
+    --color-bg-dim: #2a2a2a;
+    --color-text: #d4d4d4;
+    --color-heading: #ffffff;
+    --color-logo: #ffffff;
+    --color-nav-active: #ffffff;
+    --color-muted: #999999;
+    --color-link-collection: #d4d4d4;
 
-    /* Text */
-    --color-text: #e4e4e4;
-    --color-heading: #f5f5f5;
-    --color-logo: #f5f5f5;
-    --color-nav-active: #f5f5f5;
-    --color-muted: #a0a0a0;
-    --color-link-collection: #f5f5f5;
-
-    /* Links */
     --color-link: #6dabf0;
     --color-hover: #c1deff;
     --color-visited: #6dabf0;
 
-    /* Structure */
-    --color-border: #333333;
-    --color-code-bg: #1e1e1e;
-    --color-code-text: #e4e4e4;
+    --color-border: #444444;
+    --color-code-bg: #2a2a2a;
+    --color-code-text: #d4d4d4;
     --color-highlight-text: #bfe3ff;
 
-    /* Player tokens — same surfaces inverted, hover rgba flipped */
-    --player-bg: #1e1e1e;
-    --player-border: #2e2e2e;
-    --player-track: #3a3a3a;
+    --player-bg: #2a2a2a;
+    --player-border: #444444;
+    --player-track: #555555;
     --player-accent: #e8e8e8;
     --player-accent-hover: #ffffff;
     --player-btn-color: #e8e8e8;
-    --player-btn-play-color: #121212;
+    --player-btn-play-color: #1a1a1a;
     --player-btn-hover-bg: rgba(255, 255, 255, 0.08);
-    --player-meta-color: #e8e8e8;
+    --player-meta-color: #999999;
     --player-overlay-bg: rgba(0, 0, 0, 0.75);
     --player-chapter-active-bg: rgba(255, 255, 255, 0.08);
   }
@@ -139,10 +125,6 @@
 
 /* ============== BASE STYLES =============== */
 
-/* The `hidden` attribute must win over component display rules (e.g.
-   .btn-primary { display: inline-block }), so JS that toggles [hidden] to
-   show/hide actually hides. Without this, a display rule overrides the UA
-   `[hidden] { display: none }` and the element stays visible. */
 [hidden] {
   display: none !important;
 }
@@ -153,9 +135,15 @@ body {
   line-height: 1.6;
   color: var(--color-text);
   background-color: var(--color-bg);
-  margin: 0 auto;
-  padding: var(--space-6);
+  margin: 40px auto;
+  padding: 0 20px;
   max-width: var(--container-width);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
 }
 
 h1,
@@ -179,8 +167,12 @@ i {
 }
 
 a {
-  color: var(--color-visited);
+  color: var(--color-link);
   text-decoration: underline;
+}
+
+a:visited {
+  color: var(--color-visited);
 }
 
 a:not([class*="btn-"]):hover {
@@ -192,14 +184,11 @@ input,
 select,
 textarea {
   font-family: inherit;
+  font-size: inherit;
 }
 
 button {
-  margin: var(--space-2) 0;
-}
-
-button a {
-  text-decoration: none;
+  cursor: pointer;
 }
 
 picture {
@@ -215,18 +204,17 @@ sup {
 }
 
 hr {
-  width: 100%;
   border: 0;
   border-top: 1px solid var(--color-border);
-  margin: 0 0 0 0;
+  margin: var(--space-4) 0;
 }
 
 figure {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 li > p {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 a.heading-anchor,
@@ -242,8 +230,8 @@ a.heading-anchor,
 /* =========== LAYOUT — SITE NAV ============ */
 
 .site-nav {
-  padding: var(--space-4) 0;
-  margin-bottom: var(--space-0);
+  padding: var(--space-2) 0;
+  margin-bottom: var(--space-4);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -251,12 +239,11 @@ a.heading-anchor,
 }
 
 .site-nav h1 {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   margin: 0;
 }
 
 .site-nav p {
-  color: var(--color-text);
   margin: 0;
 }
 
@@ -265,21 +252,15 @@ a.heading-anchor,
   margin-right: var(--space-3);
 }
 
-.site-nav p a:first-child {
-  margin-left: 0;
-}
-
 .site-nav a.active {
   color: var(--color-nav-active);
 }
 
-/* Site Logo */
-
 .site-logo {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   line-height: 1em;
   color: var(--color-logo);
-  font-weight: 500;
+  font-weight: 700;
   margin: 0;
 }
 
@@ -302,10 +283,8 @@ p.site-logo a.active:hover {
 }
 
 p:has(.site-logo) {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
 }
-
-/* Logo image variants */
 
 .site-nav.logo .site-logo {
   background-image: var(--logo-url);
@@ -319,7 +298,7 @@ p:has(.site-logo) {
 }
 
 .site-nav.logo.logo-replace_text .site-logo {
-  margin: 0 0 0 0;
+  margin: 0;
   background-image: none;
 }
 
@@ -334,7 +313,7 @@ p:has(.site-logo) {
   background-size: contain;
 }
 
-/* ================ SITE ACTIONS (cart, member icon) ================= */
+/* ================ SITE ACTIONS ================= */
 
 .site-actions {
   position: absolute;
@@ -343,7 +322,6 @@ p:has(.site-logo) {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  z-index: 100;
 }
 
 .site-action {
@@ -360,15 +338,11 @@ p:has(.site-logo) {
 }
 
 .snipcart-items-count {
-  font-size: calc(var(--text-xs) * 0.7);
-  font-weight: 600;
+  font-size: var(--text-xs);
   color: var(--color-link);
-  border-radius: 999px;
-  min-width: 1.25em;
-  text-align: center;
   position: absolute;
-  top: calc(var(--space-1) * -1.1);
-  right: calc(var(--space-1) * -2);
+  top: -0.25rem;
+  right: -0.5rem;
 }
 
 .snipcart-link,
@@ -378,8 +352,6 @@ p:has(.site-logo) {
 
 /* ================ SITE SEARCH ================= */
 
-/* Toggle: sits with the cart/member icons. It carries `.site-action` too,
-   so it inherits their color + svg sizing; this just resets the <button>. */
 .site-actions .site-search svg {
   height: var(--space-4);
   width: var(--space-4);
@@ -393,9 +365,6 @@ p:has(.site-logo) {
   color: var(--color-link);
 }
 
-/* In-content trigger (```search block / collection `search: true`). It sits in
-   a .collection-header row beside the heading (or alone, pushed right). */
-
 .collection-header {
   display: flex;
   align-items: center;
@@ -404,14 +373,14 @@ p:has(.site-logo) {
 }
 
 .collection-grid .collection-header h2 {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .site-search-trigger {
-  margin: 0 0 0 0;
+  margin: 0;
   background: none;
   border: none;
-  padding: var(--space-0);
+  padding: 0;
   cursor: pointer;
   line-height: 0;
   opacity: 0.4;
@@ -423,13 +392,12 @@ p:has(.site-logo) {
 
 .content .site-search-trigger img,
 .site-search-trigger svg {
-  margin: 0 0 0 0;
+  margin: 0;
   color: var(--color-muted);
   height: var(--space-4);
   width: var(--space-4);
 }
 
-/* Top-anchored panel — reads like an extension of the nav. */
 .site-search-overlay {
   position: fixed;
   top: 0;
@@ -438,8 +406,7 @@ p:has(.site-logo) {
   z-index: 200;
   background-color: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-4);
 }
 
 .site-search-box {
@@ -453,8 +420,6 @@ p:has(.site-logo) {
   gap: var(--space-2);
 }
 
-/* Active scope facets — removable pills on their own line above the input,
-   so they never eat into the input width. */
 .site-search-context {
   display: flex;
   flex-wrap: wrap;
@@ -462,21 +427,16 @@ p:has(.site-logo) {
   margin-bottom: var(--space-1);
 }
 
-/* An explicit `display` overrides the `hidden` attribute, so restore it —
-   otherwise the empty container shows on unscoped (site-wide) search. */
 .site-search-context[hidden] {
   display: none;
 }
 
-/* Each active facet: rectangular (rounded-xs), muted, with an × to remove. */
 .site-search-context-label {
-  background-color: var(--color-really-muted);
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: calc(var(--space-1) * 0.2) calc(var(--space-1) * 1.1);
+  padding: 0.05rem 0.25rem;
   border: 1px solid var(--color-border);
-  border-radius: 1px;
   font-size: var(--text-xxs);
   text-transform: uppercase;
   color: var(--color-muted);
@@ -490,17 +450,12 @@ p:has(.site-logo) {
   margin: 0;
   cursor: pointer;
   color: var(--color-muted);
-  font-size: var(--text-base);
-  line-height: 1;
-  position: relative;
-  top: -1px;
 }
 
 .site-search-context-remove:hover {
   color: var(--color-text);
 }
 
-/* Input mirrors the member-form fields. */
 .site-search-input {
   flex: 1;
   padding: var(--space-2) var(--space-3);
@@ -515,20 +470,6 @@ p:has(.site-logo) {
 .site-search-input:focus {
   outline: 2px solid var(--color-link);
   outline-offset: -1px;
-}
-
-.site-search-input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 0.9em;
-  width: 0.9em;
-  cursor: pointer;
-  /* SVG × as a mask so `background-color` sets the color */
-  background-color: currentColor; /* or any color you want */
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6 6 18M6 6l12 12' stroke='black' stroke-width='2' fill='none'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6 6 18M6 6l12 12' stroke='black' stroke-width='2' fill='none'/%3E%3C/svg%3E")
-    center / contain no-repeat;
 }
 
 .site-search-close {
@@ -565,12 +506,6 @@ p:has(.site-logo) {
   border-bottom: 1px solid var(--color-border);
 }
 
-.site-search-result-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
 .site-search-result-link {
   color: var(--color-link);
   text-decoration: none;
@@ -585,37 +520,27 @@ p:has(.site-logo) {
   background-color: var(--color-really-muted);
 }
 
-/* Clickable type / post-type pill (with +) — click adds that facet to scope. */
 .site-search-result-type {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: calc(var(--space-1) * 0.4) calc(var(--space-1) * 0.8);
+  padding: 0.1rem 0.2rem;
   border: 1px solid var(--color-border);
-  border-radius: 2px;
   background: var(--color-bg);
   cursor: pointer;
   font-family: inherit;
   font-size: var(--text-xxs);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--color-muted);
-  line-height: 1;
 }
 
 .site-search-result-type:hover {
   color: var(--color-text);
-  border-color: var(--color-text);
-}
-
-.site-search-result-type-add {
-  font-weight: 600;
 }
 
 .site-search-result-paid {
   font-size: var(--text-xxs);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--color-muted);
 }
 
@@ -628,20 +553,6 @@ p:has(.site-logo) {
 .site-search-empty {
   margin: var(--space-4) 0 0;
   color: var(--color-muted);
-}
-
-/* Site actions - responsive CSS */
-
-@media (min-width: 1100px) {
-  .site-action svg {
-    height: calc(var(--space-5) * 1.2);
-    width: calc(var(--space-5) * 1.2);
-  }
-
-  .site-actions .site-search svg {
-    height: calc(var(--space-4) * 1.2);
-    width: calc(var(--space-4) * 1.2);
-  }
 }
 
 /* ============ LAYOUT — SIDEBAR ============ */
@@ -683,21 +594,23 @@ body.sidebar-right {
   body.has-sidebar .site-nav {
     grid-area: nav;
   }
+
   body.has-sidebar .site-sidebar {
     grid-area: sidebar;
     display: block;
   }
+
   body.has-sidebar main {
     grid-area: main;
     min-width: 0;
   }
+
   body.has-sidebar .site-footer {
     grid-area: footer;
   }
 
   .site-sidebar {
     font-size: var(--text-sm);
-    color: var(--color-text);
     border-right: 1px solid var(--color-border);
     padding-right: var(--space-4);
   }
@@ -714,17 +627,6 @@ body.sidebar-right {
     height: auto;
   }
 
-  .site-sidebar h2 {
-    font-size: var(--text-lg);
-    margin: 0 0 var(--space-2);
-  }
-
-  .site-sidebar p,
-  .site-sidebar ul {
-    margin: 0 0 var(--space-3);
-    line-height: 1.2;
-  }
-
   .site-sidebar ul {
     list-style: none;
     padding: 0;
@@ -733,17 +635,13 @@ body.sidebar-right {
   .site-sidebar li {
     margin-bottom: var(--space-1);
   }
-
-  .site-sidebar a {
-    color: var(--color-link);
-  }
 }
 
 /* ============ LAYOUT - FOOTER ============= */
 
 .site-footer {
-  margin-top: var(--space-16);
-  padding: var(--space-8) 0;
+  margin-top: var(--space-12);
+  padding: var(--space-6) 0;
   font-size: var(--text-sm);
   color: var(--color-muted);
 }
@@ -756,7 +654,7 @@ body.sidebar-right {
 
 div.flash {
   padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   border: 1px solid var(--color-border);
   background-color: var(--color-bg-dim);
   font-size: var(--text-sm);
@@ -768,44 +666,42 @@ div.flash mark {
 
 /* ======== POST/PAGE CONTENT GLOBAL ======== */
 
-/* First element in any content block never has top margin */
 .content > :first-child {
   margin-top: 0 !important;
 }
 
 .content h1 {
-  font-size: var(--text-4xl);
-  line-height: 1;
+  font-size: var(--text-3xl);
+  line-height: 1.2;
   margin: var(--space-0) 0 var(--space-4) 0;
   font-weight: 700;
-  color: var(--color-heading);
 }
 
 .content h2 {
   font-size: var(--text-2xl);
-  line-height: 1.15;
+  line-height: 1.2;
   margin-top: var(--space-6);
   margin-bottom: var(--space-4);
   font-weight: 700;
 }
 
 .content h3 {
-  font-size: var(--text-2xl);
-  line-height: 1.25;
+  font-size: var(--text-xl);
+  line-height: 1.2;
   margin: var(--space-6) 0 var(--space-3) 0;
   font-weight: 700;
 }
 
 .content h4 {
-  font-size: var(--text-xl);
-  line-height: 1.25;
+  font-size: var(--text-lg);
+  line-height: 1.2;
   margin: var(--space-6) 0 var(--space-2) 0;
   font-weight: 700;
 }
 
 .content h5 {
-  font-size: var(--text-lg);
-  line-height: 1.25;
+  font-size: var(--text-base);
+  line-height: 1.2;
   margin: var(--space-6) 0 var(--space-1) 0;
   font-weight: 700;
 }
@@ -850,11 +746,7 @@ div.flash mark {
 }
 
 .content blockquote {
-  margin: 0 0 var(--space-4) var(--space-2);
-  padding-left: var(--space-3);
-  border-left: 3px solid var(--color-border);
-  color: var(--color-text);
-  font-style: italic;
+  margin: 1em 40px;
 }
 
 .content code {
@@ -871,7 +763,6 @@ div.flash mark {
   padding: var(--space-4);
   margin-top: var(--space-2);
   margin-bottom: var(--space-6);
-  overflow-x: auto;
   border: 1px solid var(--color-border);
   white-space: pre-wrap;
 }
@@ -887,12 +778,12 @@ div.flash mark {
   height: auto;
   display: block;
   margin-top: 0;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 .content figure img,
 .content figure picture {
-  /*margin-bottom: var(--space-1);*/
+  margin-bottom: 0;
 }
 
 .content hr {
@@ -929,8 +820,8 @@ a.footnote {
 
 .content .footnotes,
 .footnotes {
-  margin-top: var(--space-12);
-  padding-top: var(--space-6);
+  margin-top: var(--space-8);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
   color: var(--color-muted);
@@ -938,7 +829,7 @@ a.footnote {
 
 .content .footnotes ol,
 .footnotes ol {
-  padding-left: var(--space-0);
+  padding-left: 0;
   list-style: none;
 }
 
@@ -953,11 +844,11 @@ a.footnote {
 }
 
 .footnotes .gallery {
-  margin-bottom: var(--space-0);
+  margin-bottom: 0;
 }
 
 .footnotes blockquote {
-  margin: var(--space-1) 0 var(--space-1) 0;
+  margin: var(--space-1) 0;
 }
 
 a.footnote-backlink-number {
@@ -984,35 +875,25 @@ a.footnote-backlink-number:hover {
   font-size: var(--text-sm);
   line-height: 1.2;
   color: var(--color-text);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .footnote-tooltip p {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .footnote-tooltip code {
   background: var(--color-code-bg);
-  border-radius: 1px;
-  padding: 0rem var(--space-1);
+  padding: 0 var(--space-1);
   border: 1px solid var(--color-border);
 }
 
-/* Poetry block (preserves line breaks, no paragraph margins) */
+/* Poetry block */
 
 .poetry {
   white-space: pre-wrap;
   font-family: var(--font-body);
   line-height: 1.5;
   margin: var(--space-6) 0;
-}
-
-/* Post/page Content Global - Media Queries */
-
-@media (min-width: 601px) {
-  .content h2 {
-    font-size: var(--text-3xl);
-  }
 }
 
 /* ============ POST/PAGE SINGLE ============ */
@@ -1032,28 +913,27 @@ a.footnote-backlink-number:hover {
 .page h1,
 .post-header h1 {
   font-size: var(--text-3xl);
-  line-height: 1.1;
-  margin: 0 0 var(--space-6) 0;
+  line-height: 1.2;
+  margin: 0 0 var(--space-4) 0;
   font-weight: 700;
   color: var(--color-heading);
 }
 
 .post-header-top > div {
-  /* the RSS link's wrapper stays its natural width, never shrinks */
   flex-shrink: 0;
 }
 
 .post-header .post-subtitle {
   font-size: var(--text-lg);
   line-height: 1.4;
-  margin: 0 0 0 0;
+  margin: 0;
   color: var(--color-muted);
   font-weight: 400;
 }
 
 .post-header picture {
   display: block;
-  margin: 0 0 var(--space-6);
+  margin: 0 0 var(--space-4);
 }
 
 .post-header picture img {
@@ -1070,7 +950,7 @@ h1.post-title {
 .post-meta {
   font-size: var(--text-sm);
   color: var(--color-muted);
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .post-meta time {
@@ -1086,10 +966,6 @@ h1.post-title {
   border-top: 1px solid var(--color-border);
   margin: var(--space-4) 0;
 }
-
-/*.post-content a {
-  color: var(--color-link);
-}*/
 
 .post-content h2 a,
 .post-content h3 a {
@@ -1113,17 +989,13 @@ h1.post-title {
   .post-header h1 {
     font-size: var(--text-4xl);
   }
-  .post-header .post-subtitle {
-    font-size: var(--text-xl);
-    margin: 0 0 var(--space-1) 0;
-  }
 }
 
 /* ============== COLLECTIONS =============== */
 
 .collection-page-heading {
   display: flex;
-  gap: var(--space-6);
+  gap: var(--space-4);
   align-items: center;
   margin: var(--space-4) 0;
 }
@@ -1133,7 +1005,6 @@ h1.post-title {
 }
 
 p.collection-description {
-  background-color: var(--color-code-bg);
   border: 1px solid var(--color-border);
   padding: var(--space-2) var(--space-3);
   margin: 0;
@@ -1143,10 +1014,6 @@ p.collection-description {
 p.collection-more a {
   color: var(--color-link);
   font-size: var(--text-sm);
-}
-
-p.collection-more a:hover {
-  color: var(--color-hover);
 }
 
 .pagination {
@@ -1172,8 +1039,7 @@ p.collection-more a:hover {
 }
 
 .collection h2 {
-  font-size: var(--text-3xl);
-  /*margin: var(--space-2) 0 var(--space-4) 0;*/
+  font-size: var(--text-2xl);
 }
 
 .collection h3 {
@@ -1195,18 +1061,16 @@ p.collection-more a:hover {
 }
 
 .collection a:hover {
-  color: var(--color-hover);
+  text-decoration: underline;
 }
 
 .collection .item-title {
-  color: var(--color-link);
+  color: var(--color-heading);
+  font-weight: 700;
 }
 
 .collection .item-subtitle,
-.collection .item-excerpt {
-  color: var(--color-muted);
-}
-
+.collection .item-excerpt,
 .collection .item-meta {
   color: var(--color-muted);
 }
@@ -1218,7 +1082,7 @@ p.collection-more a:hover {
 }
 
 .collection.list .item-title {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 700;
 }
 
@@ -1233,12 +1097,7 @@ p.collection-more a:hover {
   margin: 0;
 }
 
-.collection.list .title-media-icon,
-.collection.list .paid-lock-icon {
-  vertical-align: -1px;
-}
-
-/* Compact - single line, link, date • author */
+/* Compact */
 
 .collection.compact .item-title {
   font-size: var(--text-base);
@@ -1255,12 +1114,7 @@ p.collection-more a:hover {
   font-style: italic;
 }
 
-.collection.compact .title-media-icon,
-.collection.compact .paid-lock-icon {
-  vertical-align: -4px;
-}
-
-/* Full — Image + body when item has media */
+/* Full */
 
 .collection.full .collection-item {
   border-bottom: 1px solid var(--color-border);
@@ -1269,8 +1123,8 @@ p.collection-more a:hover {
 }
 
 .collection.full .item-title {
-  font-size: var(--text-2xl);
-  margin-bottom: var(--space-0);
+  font-size: var(--text-xl);
+  margin-bottom: 0;
   font-weight: 700;
 }
 
@@ -1279,14 +1133,16 @@ p.collection-more a:hover {
 }
 
 .collection.full .item-subtitle {
-  font-size: var(--text-lg);
-  line-height: 1.45;
+  font-size: var(--text-base);
+  line-height: 1.4;
   margin: var(--space-1) 0 0 0;
+  color: var(--color-muted);
+  font-style: italic;
 }
 
 .collection.full .item-excerpt {
   font-size: var(--text-sm);
-  line-height: 1.45;
+  line-height: 1.4;
   margin: var(--space-1) 0 0 0;
 }
 
@@ -1309,7 +1165,7 @@ p.collection-more a:hover {
 .collection-item img {
   max-width: 100%;
   height: auto;
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .collection.full .collection-item:has(.item-image) .item-body {
@@ -1331,37 +1187,13 @@ p.collection-more a:hover {
   object-fit: cover;
 }
 
-.title-media-icon,
-.paid-lock-icon {
-  padding-left: var(--space-1);
-  vertical-align: -1px;
-  opacity: 0.5;
-}
-
 @media (min-width: 601px) {
   .collection.full .collection-item .item-image {
     width: 180px;
   }
-}
 
-.collection.full .collection-item .item-image img {
-  width: 100%;
-  height: auto;
-  display: block;
-  aspect-ratio: 1.5 / 1;
-  object-fit: cover;
-}
-
-.collection.full .title-media-icon {
-  padding-left: var(--space-1);
-  vertical-align: -1px;
-  opacity: 0.5;
-}
-
-@media (min-width: 601px) {
   .collection.full .collection-item:has(.item-image) {
     flex-direction: row;
-    /*flex-direction: row-reverse;*/
   }
 }
 
@@ -1380,23 +1212,22 @@ p.collection-more a:hover {
 .collection.links .item-subtitle {
   font-size: var(--text-xs);
   color: var(--color-muted);
-  margin: 0 0 0 0;
+  margin: 0;
   line-height: 1;
 }
 
-/* Nav — a bare link list for layout areas (navigation, footer, sidebar).
-   `style: horizontal|vertical` toggles the modifier class; default vertical. */
+/* Menu */
 
 .collection.menu {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .collection.menu ul {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .collection.menu li {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .collection.menu a {
@@ -1405,7 +1236,7 @@ p.collection-more a:hover {
 
 .collection-menu {
   list-style: none;
-  margin: 0 0 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   row-gap: var(--space-4);
@@ -1425,10 +1256,10 @@ p.collection-more a:hover {
   margin: 0;
 }
 
-/* Collection Glossary */
+/* Glossary */
 
 .collection.glossary dl {
-  margin: 0 0 0 0;
+  margin: 0;
   max-width: 60%;
 }
 
@@ -1438,7 +1269,7 @@ p.collection-more a:hover {
 
 .collection.glossary dd {
   font-size: var(--text-sm);
-  margin-inline-start: var(--space-0);
+  margin-inline-start: 0;
 }
 
 .collection.glossary .item-title {
@@ -1483,7 +1314,6 @@ p.collection-more a:hover {
   }
 
   .collection.glossary dl {
-    margin: 0 0 0 0;
     max-width: 100%;
   }
 }
@@ -1493,13 +1323,12 @@ p.collection-more a:hover {
 }
 
 .collection-grid h2 {
-  font-size: var(--text-3xl);
+  font-size: var(--text-2xl);
   margin-top: 0;
 }
 
 @media (max-width: 630px) {
   .collection.glossary dl {
-    margin: 0 0 0 0;
     max-width: 100%;
   }
 }
@@ -1524,11 +1353,9 @@ p.collection-more a:hover {
 .gallery-col-1 {
   grid-template-columns: 1fr;
 }
-
 .gallery-col-2 {
   grid-template-columns: repeat(2, 1fr);
 }
-
 .gallery-col-3 {
   grid-template-columns: repeat(3, 1fr);
 }
@@ -1545,11 +1372,9 @@ p.collection-more a:hover {
 .gallery-col-1 img {
   aspect-ratio: auto;
 }
-
 .gallery-col-2 img {
   aspect-ratio: 1;
 }
-
 .gallery-col-3 img {
   aspect-ratio: 1 / 1;
 }
@@ -1576,17 +1401,7 @@ figcaption {
   text-align: center;
 }
 
-@media (min-width: 601px) {
-  .gallery figcaption {
-    font-size: var(--text-sm);
-  }
-}
-
-/* --- Gallery item wrapper + click-to-zoom --------------------------------
-   Each image is wrapped in .gallery-item (the grid/track cell) and a
-   .gallery-zoom-link (the click target). Zoom is pure CSS: the link points
-   at an overlay's #id and .gallery-zoom:target reveals it — no JS needed.
-   gallery.js only adds keyboard/extra niceties. Restyle freely. */
+/* Gallery zoom lightbox */
 
 .gallery-item {
   margin: 0;
@@ -1606,9 +1421,6 @@ figcaption {
   cursor: zoom-in;
 }
 
-/* Native popover lightbox: the browser hides [popover] until open and
-   renders it in the top layer (immune to ancestor transforms/overflow).
-   We only style the open state, the backdrop, and the image. */
 .gallery-zoom {
   max-width: 100vw;
   max-height: 100vh;
@@ -1654,9 +1466,7 @@ figcaption {
   cursor: pointer;
 }
 
-/* Explicit gallery ratios (grids only — carousels size by height).
-   Images crop to fill; `object-fit: cover` comes from `.content .gallery img`.
-   `auto`/`original` keep the image's natural shape instead. */
+/* Gallery ratios */
 
 .gallery-ratio-square .gallery-row img {
   aspect-ratio: 1 / 1;
@@ -1681,9 +1491,7 @@ figcaption {
   object-fit: contain;
 }
 
-/* --- Carousel (slideshow: true) ------------------------------------------
-   CSS scroll-snap does the scrolling/snapping with no JS. gallery.js adds
-   prev/next buttons and dots as progressive enhancement. */
+/* Carousel */
 
 .gallery-carousel {
   position: relative;
@@ -1726,14 +1534,6 @@ figcaption {
   margin-top: var(--space-3);
 }
 
-.gallery-carousel:has(figcaption) .gallery-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  margin-top: var(--space-0);
-}
-
 .gallery-nav-button {
   font-size: 0;
   display: inline-flex;
@@ -1748,9 +1548,6 @@ figcaption {
   color: var(--color-text);
   line-height: 1;
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
 }
 
 .gallery-nav-button::before {
@@ -1764,13 +1561,9 @@ figcaption {
 
 .gallery-prev::before {
   transform: rotate(-135deg);
-} /* points left  */
+}
 .gallery-next::before {
   transform: rotate(45deg);
-} /* points right */
-
-.gallery-nav-button:hover {
-  border-color: var(--color-text);
 }
 
 .gallery-dots {
@@ -1787,7 +1580,6 @@ figcaption {
   border-radius: 50%;
   background: var(--color-border);
   cursor: pointer;
-  transition: background 0.15s ease;
 }
 
 .gallery-dot[aria-current="true"] {
@@ -1865,7 +1657,7 @@ figcaption {
   }
 }
 
-/* Post Link Cards (small / medium / large) */
+/* Post Link Cards */
 
 .card.post-link-small,
 .card.post-link-medium,
@@ -1887,7 +1679,7 @@ figcaption {
 .card.post-link-small:hover,
 .card.post-link-medium:hover,
 .card.post-link-large:hover {
-  background: var(--color-code-bg);
+  background: var(--color-bg-dim);
 }
 
 .card[class*="post-link-"] {
@@ -1939,10 +1731,6 @@ figcaption {
   margin: auto 0 0 0;
 }
 
-.card.post-link-large .card-link {
-  margin: 0 0 0 0;
-}
-
 .card[class*="post-link-"] .card-link:hover {
   color: var(--color-text);
 }
@@ -1961,21 +1749,12 @@ figcaption {
   color: var(--color-muted);
 }
 
-/* Excerpt typography — applies to all post-link sizes (small / medium /
-   large) since they all use .card-excerpt now. */
-/*.card[class*="post-link-"] .card-excerpt {
-  margin: var(--space-2) 0 0 0;
-  font-size: var(--text-base);
-  line-height: 1.4;
-  color: var(--color-text);
-}*/
-
 /* Post Link - Small */
 
 .card.post-link-small {
   gap: var(--space-4);
   padding: var(--space-3);
-  margin: var(--space-0) 0 var(--space-4) 0;
+  margin: 0 0 var(--space-4) 0;
 }
 
 .card.post-link-small .card-image {
@@ -2014,12 +1793,12 @@ figcaption {
   background-color: var(--color-muted);
   color: var(--color-bg);
   line-height: 1;
-  padding: var(--space-1) var(--space-1);
+  padding: var(--space-1);
 }
 
 .product-link-small .card-excerpt {
   font-size: var(--text-sm);
-  margin-bottom: var(--space-0);
+  margin-bottom: 0;
 }
 
 .product-link-small .card-price {
@@ -2065,7 +1844,6 @@ figcaption {
 .card.post-link-medium .card-body {
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--color-text);
 }
 
 /* Product Link - Medium */
@@ -2090,16 +1868,9 @@ figcaption {
   font-size: var(--text-base);
 }
 
-/* Post Link - Large
-   Grid layout with template areas. Mobile-first single column where
-   the image sits between metadata and excerpt. Desktop (≥960px) uses
-   a two-column grid with the image on the left spanning all text
-   rows. Adding/removing a breakpoint = editing one template-areas
-   string; HTML order doesn't matter. */
+/* Post Link - Large */
 
 .card.post-link-large {
-  /* Override the shared .card flex layout — grid is what enables the
-     responsive reflow without changing HTML order. */
   display: grid;
   grid-template-columns: 1fr;
   grid-template-areas:
@@ -2112,47 +1883,43 @@ figcaption {
   margin: var(--space-4) 0 var(--space-6) 0;
 }
 
-/* Map each direct child to its named area. Direct-child (>)
-   selectors so anything nested inside (e.g. <a> in .card-title)
-   isn't accidentally caught. */
-/* title cell: the bare <h4> on posts/variant-less cards, or the .card-header
-   wrapper (title + variant) on product cards that have a variant. */
 .card.post-link-large > .card-title,
 .card.post-link-large > .card-header {
   grid-area: title;
 }
+
 .card.post-link-large > .card-subtitle {
   grid-area: subtitle;
 }
+
 .card.post-link-large > .card-metadata {
   grid-area: metadata;
 }
+
 .card.post-link-large > picture,
 .card.post-link-large > img.card-image {
   grid-area: image;
 }
-/* Excerpt + link share one grid cell and lay out as a flex row. The nested
-   .card-excerpt / .card-link are flex children here, not grid items. */
+
 .card.post-link-large > .large-card-excerpt-link {
   grid-area: excerpt-link;
   display: flex;
   flex-direction: column;
-  align-items: flex-end; /* read-more sits on its own line, right-aligned */
+  align-items: flex-end;
   gap: var(--space-2);
 }
+
 .card.post-link-large > .large-card-excerpt-link > .card-excerpt {
-  align-self: stretch; /* excerpt fills the width; its text stays left */
+  align-self: stretch;
   min-width: 0;
   line-height: 1.3;
   margin: 0;
 }
+
 .card.post-link-large > .large-card-excerpt-link > .card-link {
   white-space: nowrap;
 }
 
-/* Image sizing — fills its grid cell width and keeps proportions.
-   Picture wrapper has to be block-level for sizing to apply when
-   ResponsiveImageRenderer added variants. */
 .card.post-link-large > picture {
   display: block;
 }
@@ -2166,8 +1933,6 @@ figcaption {
 }
 
 .card.post-link-large.no-image {
-  /* Image-less cards collapse the image row so there's no empty space.
-     Modifier class is added in the partial when image is blank. */
   grid-template-areas:
     "title"
     "subtitle"
@@ -2176,11 +1941,9 @@ figcaption {
     "link";
 }
 
-/* Typography — unchanged by the layout switch, since these target
-   the same descendant elements regardless of the parent's display. */
 .card.post-link-large .card-title {
   margin: 0 0 var(--space-1) 0;
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 700;
 }
 
@@ -2204,18 +1967,6 @@ figcaption {
 
 .card.post-link-large .card-link {
   font-size: var(--text-sm);
-}
-
-/* Mid breakpoint (≥601px) — bump the excerpt up to text-base for the
-   awkward sizes where the card is still single-column but the viewport
-   has room for a slightly larger reading size. The desktop rule below
-   overrides this back to text-sm at ≥960. Order matters: this block
-   MUST appear before the 960px block so the later block wins at the
-   overlap. */
-@media (min-width: 601px) {
-  .card.post-link-large .card-excerpt {
-    font-size: var(--text-base);
-  }
 }
 
 /* Product Link - Large */
@@ -2255,12 +2006,13 @@ figcaption {
   font-size: var(--text-xs);
   line-height: 1.4;
   border: 1px solid var(--color-border);
-  padding: var(--space-2) var(--space-2);
+  padding: var(--space-2);
 }
 
 .card-aside:not(:has(.aside-image)) {
   grid-template-columns: 1fr;
 }
+
 .card-aside:not(:has(.aside-image)) .aside-text,
 .card-aside:not(:has(.aside-image)) .aside-link {
   grid-column: 1;
@@ -2275,17 +2027,13 @@ figcaption {
   grid-row: 1;
   width: 100%;
   height: auto;
-  margin: 0 0 0 0;
+  margin: 0;
   display: block;
 }
 
 a.aside-link-inline {
   text-decoration: underline;
   color: var(--color-muted);
-}
-
-.card-aside .aside-link-inline:hover {
-  color: var(--color-text);
 }
 
 .card-aside .aside-link {
@@ -2314,6 +2062,7 @@ a.aside-link-inline {
 .aside-text > :first-child {
   margin-top: 0;
 }
+
 .aside-text > :last-child {
   margin-bottom: 0;
 }
@@ -2328,10 +2077,12 @@ article .content,
   .card-aside {
     grid-template-columns: 1fr;
   }
+
   .card-aside .aside-image {
     grid-column: 1;
     grid-row: 1;
   }
+
   .card-aside .aside-body {
     grid-column: 1;
     grid-row: 2;
@@ -2340,12 +2091,9 @@ article .content,
 
 @media (min-width: 601px) {
   .card-aside {
-    border: 1px solid var(--color-border);
     position: static;
     float: right;
-    /*margin: var(--space-3) 0 var(--space-2) 1rem;*/
     margin: 0 0 var(--space-2) var(--space-2);
-    /*padding: 0.8rem;*/
     left: auto;
     transform: none;
     clear: right;
@@ -2361,21 +2109,12 @@ article .content,
   .card-aside.image-only .aside-image {
     margin: 0 0 var(--space-3) auto;
   }
-
-  .card-aside .aside-image {
-    margin: 0 0 var(--space-2) 0;
-  }
-
-  .card-aside .aside-link {
-    margin: var(--space-2) 0 0 0;
-  }
 }
 
 @media (min-width: 960px) {
   article .content:has(.card-aside),
   .home.content:has(.card-aside) {
     margin-left: var(--aside-width);
-    /*max-width: var(--aside-content-width);*/
   }
 
   .card-aside + :is(p, h2, h3, h4, ul, ol, blockquote) {
@@ -2388,8 +2127,8 @@ article .content,
     width: calc(var(--aside-width) - 14px);
     overflow-wrap: break-word;
     float: none;
-    margin: 0 0 0 0;
-    padding: 0 0 0 0;
+    margin: 0;
+    padding: 0;
     border: none;
     text-align: right;
   }
@@ -2409,7 +2148,7 @@ article .content,
 /* Audio Player */
 
 .audio-player {
-  padding: var(--space-5);
+  padding: var(--space-4);
   background: var(--player-bg);
   border: 1px solid var(--player-border);
   margin: var(--space-6) 0;
@@ -2486,7 +2225,6 @@ article .content,
   width: 0%;
   background: var(--player-accent);
   pointer-events: none;
-  transition: width 0.1s linear;
 }
 
 .progress-handle {
@@ -2501,7 +2239,6 @@ article .content,
   transform: translate(-50%, -50%);
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.15s;
 }
 
 .player-progress:hover .progress-handle {
@@ -2546,10 +2283,6 @@ article .content,
   display: flex;
   align-items: center;
   justify-content: center;
-  /*border-radius: 50%;*/
-  transition:
-    background 0.15s,
-    color 0.15s;
 }
 
 .player-btn:hover {
@@ -2597,7 +2330,6 @@ article .content,
   padding: var(--space-1) var(--space-2);
   min-width: var(--space-12);
   border: 1px solid var(--player-border);
-  border-radius: 0.1rem;
   background: var(--color-bg);
   color: var(--player-btn-color);
   font-variant-numeric: tabular-nums;
@@ -2607,7 +2339,7 @@ article .content,
   right: var(--space-4);
 }
 
-/* Prev/Next episode in player */
+/* Prev/Next episode */
 
 .btn-wrapper {
   flex: 1;
@@ -2618,6 +2350,7 @@ article .content,
 .btn-wrapper:first-child {
   justify-content: flex-start;
 }
+
 .btn-wrapper:last-child {
   justify-content: flex-end;
 }
@@ -2633,7 +2366,6 @@ article .content,
   border: none;
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  transition: background 0.15s;
   flex: 0 0 auto;
   max-width: 80%;
 }
@@ -2645,6 +2377,7 @@ a.btn-episode {
 .btn-prev {
   justify-content: flex-start;
 }
+
 .btn-next {
   justify-content: flex-end;
 }
@@ -2676,6 +2409,7 @@ a.btn-episode {
 .btn-prev .episode-nav-title {
   text-align: left;
 }
+
 .btn-next .episode-nav-title {
   text-align: right;
 }
@@ -2712,7 +2446,6 @@ a.btn-episode {
   padding: 0.35rem var(--space-2);
   cursor: pointer;
   font-size: 0.85rem;
-  transition: background 0.1s;
 }
 
 .chapter:hover,
@@ -2737,7 +2470,6 @@ a.btn-episode {
   position: relative;
   background: #000;
   overflow: hidden;
-  /*margin: var(--space-6) 0;*/
 }
 
 .video-player-video {
@@ -2757,7 +2489,6 @@ a.btn-episode {
   height: 4px;
   background: rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  transition: height 0.2s;
   margin-bottom: var(--space-2);
 }
 
@@ -2784,7 +2515,6 @@ a.btn-episode {
   background: #ffffff;
   border-radius: 50%;
   transform: translate(-50%, -50%) scale(0);
-  transition: transform 0.2s;
   pointer-events: none;
 }
 
@@ -2816,8 +2546,6 @@ a.btn-episode {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: background 0.15s;
 }
 
 a.video-btn {
@@ -2863,10 +2591,6 @@ a.video-btn {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-}
-
-.video-time-separator {
-  opacity: 0.6;
 }
 
 .video-btn.btn-fullscreen {
@@ -2931,8 +2655,6 @@ article.post-podcast {
 .hero-player .audio-player {
   background: var(--player-overlay-bg);
   border: 1px solid var(--color-border);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(8px);
   margin: 0;
 }
 
@@ -2948,14 +2670,12 @@ article.post-podcast {
 
 .podcast-hero.is-no-cover .hero-player .audio-player {
   background: var(--player-bg);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   border: 1px solid var(--player-border);
 }
 
 p.podcast-audio-fallback {
   font-size: var(--text-xs);
-  margin: 0 0 0 0;
+  margin: 0;
   line-height: 1;
   position: absolute;
   right: 0;
@@ -2966,7 +2686,7 @@ p.podcast-audio-fallback {
 .episode-list {
   margin-top: var(--space-8);
   border-top: 1px solid var(--color-border);
-  padding-top: var(--space-0);
+  padding-top: 0;
 }
 
 .episode-list ol {
@@ -3013,7 +2733,6 @@ p.podcast-audio-fallback {
   padding: var(--space-3) var(--space-4);
   text-decoration: none;
   color: inherit;
-  transition: background 0.1s;
 }
 
 .episode-item a:hover {
@@ -3041,14 +2760,10 @@ p.podcast-audio-fallback {
 
 /* Subscribe / feed */
 
-/* Subscribe block spacing — used on episode pages and on podcast-connected
-   pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
 .podcast-subscribe {
   margin-top: var(--space-6);
   font-size: 0.85rem;
 }
-
-/* Larger feed-link variant */
 
 .podcast-subscribe .feed-link {
   display: inline-flex;
@@ -3058,9 +2773,7 @@ p.podcast-audio-fallback {
   border: 1px solid var(--player-border);
   color: var(--player-btn-color);
   font-size: 0.8rem;
-  text-transform: none;
-  letter-spacing: normal;
-  opacity: 1;
+  text-decoration: none;
 }
 
 .podcast-subscribe .feed-link:hover {
@@ -3075,7 +2788,6 @@ p.podcast-audio-fallback {
   border: 1px solid currentColor;
   text-decoration: none;
   opacity: 0.6;
-  transition: opacity 0.15s;
 }
 
 .feed-link:hover {
@@ -3086,8 +2798,6 @@ p.podcast-audio-fallback {
   opacity: 0.8;
 }
 
-/* Subscribe links row (app/service links + RSS). Used both inline and
-   inside the collapsible menu below. */
 .subscribe-links {
   display: flex;
   flex-wrap: wrap;
@@ -3095,9 +2805,6 @@ p.podcast-audio-fallback {
   align-items: center;
 }
 
-/* Menu mode (subscribe_display: menu): a native <details> disclosure —
-   the "Subscribe" button is the <summary> styled as a button, and
-   clicking it reveals the links. No JS. */
 .podcast-subscribe--menu > summary {
   display: inline-block;
   list-style: none;
@@ -3115,7 +2822,7 @@ p.podcast-audio-fallback {
 /* ============ DOCUMENTATION =============== */
 
 .docs-back-link {
-  margin-bottom: var(--space-0);
+  margin-bottom: 0;
   font-size: var(--text-sm);
   display: inline-block;
 }
@@ -3125,7 +2832,6 @@ p.podcast-audio-fallback {
   background-color: var(--color-highlight-text);
   color: var(--color-text);
   padding: 0 calc(var(--space-1) * 0.8);
-  border-radius: 1px;
   line-height: 1;
 }
 
@@ -3148,12 +2854,8 @@ p.podcast-audio-fallback {
   color: var(--color-link);
 }
 
-.content.documentation a:hover code {
-  color: var(--color-text);
-}
-
 .content.documentation li pre {
-  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-4);
+  padding: var(--space-4);
   margin: 0;
 }
 
@@ -3189,7 +2891,7 @@ p.podcast-audio-fallback {
 .back-link {
   display: inline-block;
   margin-top: var(--space-12);
-  padding-top: var(--space-8);
+  padding-top: var(--space-6);
   color: var(--color-link);
   text-decoration: underline;
 }
@@ -3204,10 +2906,6 @@ hr.clear-floats {
 }
 
 /* ================= FORMS ================== */
-
-/* Global form vocabulary. Promoted from member pages (the only place forms
-   appear today); any future form reuses these. Member-specific bits stay in
-   the Members section. */
 
 .form-field {
   margin-bottom: var(--space-4);
@@ -3250,10 +2948,6 @@ hr.clear-floats {
 
 /* ================ BUTTONS ================= */
 
-/* Global button vocabulary: .btn-* classes any feature reuses (share menu,
-   products, member forms). Member pages override the .btn-* palette at higher
-   specificity — those overrides live in the Members section. */
-
 .btn-primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
@@ -3285,6 +2979,7 @@ hr.clear-floats {
 
 .btn-secondary:hover {
   background: var(--color-heading);
+  color: var(--color-bg);
 }
 
 .btn-outline {
@@ -3327,20 +3022,12 @@ hr.clear-floats {
   color: var(--color-bg);
 }
 
-/* Grid modifier — smaller, tighter (product collection grid) */
-
 .btn-grid {
   padding: var(--space-1) var(--space-1);
   font-size: var(--text-sm);
 }
 
-/* ================= SHARE ================== */
-
-/* Share button (Roe-anji `for: share`): a single trigger (.btn-primary) that
-   reveals Copy link + Email (.btn-outline) on desktop, or opens the native
-   share sheet on touch. `.share` is the wrapper hook — style/align every share
-   button here (e.g. add `justify-content: center`). Per-instance tweaks come
-   from a `style:` value → `.share-<token>`. */
+/* ================ SHARE ================== */
 
 .share {
   display: inline-flex;
@@ -3354,9 +3041,6 @@ hr.clear-floats {
   color: var(--color-muted);
 }
 
-/* Action menu — the options a button→menu action reveals (share, and later
-   subscribe). Reusable hook, so every family member's menu buttons are sized
-   once: a step smaller than the trigger. */
 .button-menu {
   display: inline-flex;
   align-items: center;
@@ -3370,7 +3054,6 @@ hr.clear-floats {
   font-size: var(--text-xs);
 }
 
-/* Alignment (`style: left|center|right`) — full-width row so it can shift */
 .share-left {
   display: flex;
   justify-content: flex-start;
@@ -3386,7 +3069,6 @@ hr.clear-floats {
   justify-content: flex-end;
 }
 
-/* Compact (`style: small`) */
 .share-small .btn-primary,
 .share-small .btn-outline {
   padding: var(--space-1) var(--space-2);
@@ -3394,8 +3076,6 @@ hr.clear-floats {
 }
 
 /* ================ MEMBERS ================= */
-
-/* Member pages (account/edit) */
 
 .member-page .account-details {
   margin: 0 0 var(--space-6) 0;
@@ -3412,8 +3092,6 @@ hr.clear-floats {
   display: contents;
 }
 
-/* Member pages (signup/signin/upgrade/donate/unsubscribe wrapper) */
-
 .member-page {
   max-width: 26rem;
   margin: var(--space-12) auto;
@@ -3428,12 +3106,8 @@ hr.clear-floats {
 }
 
 .member-page form {
-  margin: 0 0;
+  margin: 0;
 }
-
-/* Buttons (member palette) — override the global .btn-* colors on member pages
-   (link-coloured rather than the heading-coloured global default). The base
-   reset also applies to bare <button> here (e.g. donate presets). */
 
 .member-page button,
 .member-page [class*="btn-"] {
@@ -3499,8 +3173,8 @@ hr.clear-floats {
 /* Alerts */
 
 .member-page .alert {
-  padding: var(--space-6);
-  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
   border: 1px solid var(--color-border);
   background-color: var(--color-bg-dim);
 }
@@ -3660,12 +3334,10 @@ hr.clear-floats {
 
 .product-top {
   display: contents;
-  /* product_content wraps everything above the first `---` (hero, title, price,
-     button) in .product-top.*/
 }
 
 .product-title {
-  font-size: var(--text-3xl);
+  font-size: var(--text-2xl);
   margin-bottom: var(--space-2);
   color: var(--color-heading);
 }
@@ -3686,11 +3358,9 @@ hr.clear-floats {
 }
 
 .product .gallery {
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
-/* Base sizing for the product's own body images — the hero and any inline
-   photos. Galleries and cards bring their own layout, so exclude them. */
 .product img:not(.gallery *):not(.card *) {
   width: 100%;
   height: auto;
@@ -3733,10 +3403,9 @@ hr.clear-floats {
   justify-self: end;
 }
 
-/* The button (last cell) sits at the far right of its 1fr column. */
 .product ul.product-variant-list .product-variant-item > :last-child {
   justify-self: start;
-  margin: 0 0 0 0;
+  margin: 0;
 }
 
 .product ul button {
@@ -3758,8 +3427,6 @@ hr.clear-floats {
   margin-block: 0;
 }
 
-/* Images, captioned figures, and galleries span all three tracks — full width.
-   Listed for both the loose grid children and the .product-top-wrapped hero. */
 .product .content > p:has(img),
 .product .content > p:has(picture),
 .product .content > figure,
@@ -3775,7 +3442,7 @@ hr.clear-floats {
 
 @media (min-width: 521px) {
   .product-title {
-    font-size: var(--text-4xl);
+    font-size: var(--text-3xl);
   }
 
   .product h2 {
@@ -3793,7 +3460,7 @@ article.page-store .content {
 
 article.page-store h1 {
   color: var(--color-heading);
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   margin-bottom: var(--space-4);
 }
 
@@ -3864,10 +3531,6 @@ article.page-store h2 {
   background: var(--color-bg);
 }
 
-/* Aspect-ratio containers driven by class on the image */
-
-/* Aspect-ratio containers driven by the class on the image. Product images
-   are never cropped (object-fit: contain) — they sit inside the ratio box. */
 .grid-item-image:has(.img-square) {
   aspect-ratio: 1 / 1;
 }
@@ -3885,7 +3548,6 @@ article.page-store h2 {
 .grid-item-image:has(.img-film) {
   aspect-ratio: 21 / 9;
 }
-/* img-auto / img-original: no container ratio → natural sizing */
 
 .img-auto,
 .img-original,
@@ -3902,13 +3564,6 @@ article.page-store h2 {
   object-position: center;
 }
 
-/* Product images are never cropped: EVERY explicit ratio
-   (square / portrait / landscape / tv / wide / cinema / film) fills its ratio
-   cell so `contain` + `center` engage — the whole image shows, a landscape
-   photo centered vertically, a portrait poster horizontally — with a subtle
-   matte behind the letterbox and an outline framing the cell. `img-auto` /
-   `img-original` stay natural (no fixed cell, no letterbox — good for a
-   single-category grid). Photo galleries are separate and use `cover`. */
 .grid-item-image img:not(.img-auto):not(.img-original) {
   width: 100%;
   height: 100%;
@@ -3917,17 +3572,12 @@ article.page-store h2 {
   background: var(--color-bg-dim);
 }
 
-/* When variants exist the image is wrapped in <picture> (inline by default,
-   collapses to the image's natural size), so the inner <img>'s `height: 100%`
-   has nothing to fill. Make the wrapper fill so the <img> above can. */
 .grid-item-image picture:has(img:not(.img-auto):not(.img-original)) {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-/* Frame the cell without changing its size — outline never takes space, so the
-   ratio box stays exact. */
 .grid-item-image:has(img:not(.img-auto):not(.img-original)) {
   outline: 1px solid var(--color-border);
   outline-offset: -1px;
@@ -4000,6 +3650,7 @@ article.page-store h2 {
 }
 
 /* ============== CUSTOM CODE =============== */
+
 [data-typewriter]::after {
   color: var(--color-link);
   font-weight: bold;

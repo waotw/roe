@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Images & Image Galleries
+title: Images & Image Galleries
 status: published
 url_name: galleries
 tags: roe-anji

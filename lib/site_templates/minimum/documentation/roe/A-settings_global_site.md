@@ -1,12 +1,12 @@
 ---
-title: "Global → Site"
+title: "Settings → Site"
 status: published
 tags: settings
 ---
 
 # Edit your Global Site Settings
 
-Your Global Site Settings cover the basics of your whole site — its name, branding, theme, and more. Edit them in the Admin at [Settings → Global → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
+Your Global Site Settings cover the basics of your whole site — its name, branding, theme, and more. Edit them in the Admin at [Settings → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
 
 ## Site Information
 
