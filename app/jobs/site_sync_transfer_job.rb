@@ -33,6 +33,7 @@ class SiteSyncTransferJob < ApplicationJob
     pulling_from_live:   "Pulling changed files from live…",
     pulling_from_live_full: "Pulling from live (full tree)…",
     refreshing_baseline: "Refreshing sync baseline…",
+    realigning_mtimes:   "Aligning file timestamps…",
     reconciling_content: "Updating the database to match new files…",
     notifying_peer:      "Notifying peer to refresh its ledger…",
     backing_up_database: "Backing up live database (encrypted)…"
@@ -107,6 +108,18 @@ class SiteSyncTransferJob < ApplicationJob
     #     sides agree they're in sync now.
     update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
+
+    # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
+    # config file re-serialized by ContentSync) can leave a file byte-identical
+    # but with a fresher mtime — which the size+mtime drift check reads as a
+    # phantom "ledgers diverged" even though the content matches. Stamp the
+    # local mtime to the peer's for any such byte-identical file so the two
+    # fingerprints end genuinely equal and the sync finishes green. Only the
+    # side that can reach the peer runs this (production never initiates).
+    if SiteSync::Exchange.can_call_peer?
+      update_step(:realigning_mtimes)
+      realign_phantom_mtimes!
+    end
 
     # Phase ②: pull a fresh encrypted copy of the live database so the
     # local /site always carries a current, restorable DB blob. Distinct
@@ -291,6 +304,47 @@ class SiteSyncTransferJob < ApplicationJob
 
     update_step(:pushing_to_live_full)
     SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
+  end
+
+  # A peer-side rewrite during reconcile can leave a file byte-identical but
+  # with a fresher mtime — a phantom "diverged" under the size+mtime check. For
+  # any file whose size matches the peer but mtime differs AND whose content
+  # hash matches, stamp the local mtime to the peer's (cheap, no re-transfer) so
+  # the fingerprints end equal and the sync finishes green. Refreshes the
+  # baseline when anything was realigned. Best-effort: a missing peer manifest
+  # or hash just skips the realignment (the file resyncs normally next time).
+  def realign_phantom_mtimes!
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    return unless peer
+    peer_files = peer["files"] || {}
+    local = SiteSync::Ledger.current
+
+    candidates = local.keys.select do |rel|
+      l = local[rel]
+      p = peer_files[rel]
+      p && l["size"] == p["size"] && l["mtime"] != p["mtime"]
+    end
+    return if candidates.empty?
+
+    peer_hashes = SiteSync::Exchange.fetch_peer_file_hashes(candidates)
+    realigned = 0
+    candidates.each do |rel|
+      full = File.join(RoeSitePaths::SITE_PATH, rel)
+      next unless File.file?(full)
+      next unless Digest::SHA256.hexdigest(File.read(full)) == peer_hashes[rel]
+
+      t = Time.at(peer_files[rel]["mtime"].to_i)
+      File.utime(t, t, full)
+      realigned += 1
+    end
+
+    if realigned.positive?
+      Rails.logger.info "[SiteSyncTransferJob] realigned #{realigned} phantom-mtime file(s)"
+      SiteSync::Ledger.write_current!
+    end
+  rescue => e
+    # Never let a realignment hiccup fail a sync that already succeeded.
+    Rails.logger.warn "[SiteSyncTransferJob] phantom-mtime realign skipped: #{e.class} #{e.message}"
   end
 
   # Three-way reconcile against the peer, with edit/edit conflicts confirmed
