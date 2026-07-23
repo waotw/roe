@@ -846,6 +846,52 @@ module HasMarkdownExtensions
       SiteConfig.default("collections", "default_source") || "posts"
   end
 
+  # Resolve a limit/offset directive to an item count. Accepts a strict integer
+  # ("11") or a percentage of the matched set ("50%", rounded to the nearest
+  # item). Percentages let paired collections split a list into equal parts —
+  # `limit: 50%` on one, `offset: 50%` on the next — without hardcoding counts
+  # as the set grows. Both sides round identically, so the halves meet with no
+  # gap or overlap. Blank/garbage → 0.
+  def collection_count(value, total)
+    str = value.to_s.strip
+    if str.end_with?("%")
+      (str.chomp("%").to_f / 100.0 * total).round
+    else
+      str.to_i
+    end
+  end
+
+  # Parse a `limit: a-g` alphabetical range (or a single `limit: c`) into
+  # [first, last] downcased letters, or nil when the value isn't a letter range.
+  # Reversed ranges ("g-a") are tolerated.
+  def parse_letter_range(value)
+    m = value.to_s.strip.downcase.match(/\A([a-z])(?:\s*-\s*([a-z]))?\z/)
+    return nil unless m
+    a = m[1]
+    b = m[2] || a
+    a <= b ? [ a, b ] : [ b, a ]
+  end
+
+  # True when the item's title starts with a letter within [first, last].
+  # Non-letter initials (numbers, symbols) fall outside every letter range.
+  def title_initial_in_range?(item, range)
+    initial = item.title.to_s.strip.downcase[0]
+    return false unless initial
+    initial.between?(range[0], range[1])
+  end
+
+  # Parse a `part: k/m` column directive into the Range of the ordered set that
+  # column k of m occupies, or nil when it isn't a valid k/m (1 <= k <= m).
+  # Boundaries are floored from the shared total, so the m slices partition the
+  # set with no gaps or overlaps and sizes differing by at most one item.
+  def parse_part(value, total)
+    m = value.to_s.strip.match(%r{\A(\d+)\s*/\s*(\d+)\z})
+    return nil unless m
+    k, n = m[1].to_i, m[2].to_i
+    return nil if n < 1 || k < 1 || k > n
+    ((k - 1) * total / n)...(k * total / n)
+  end
+
   # Resolve a parsed collection config to its final displayed members.
   # Returns [display_items, total_count, warning] — warning is dev-only HTML
   # that replaces the collection when the config is invalid (nil on the happy
@@ -1035,7 +1081,6 @@ module HasMarkdownExtensions
     end
 
     # Apply offset and limit
-    offset_value = config[:offset].to_i
     limit_value = config[:limit]
     # A menu should list every matching item — a capped menu is a bug, not
     # a feature. Other templates keep the configured default limit.
@@ -1044,9 +1089,50 @@ module HasMarkdownExtensions
 
     # Convert to array if needed
     items_array = items.is_a?(Array) ? items : items.to_a
+
+    # limit: a-g — an alphabetical range on the title's first letter (also a
+    # single letter, "limit: c"). It filters rather than counts, so it narrows
+    # the set and shows all of it — splits a glossary into A–G / H–P sections.
+    # Titles that don't start with a letter fall outside every letter range.
+    if (letter_range = parse_letter_range(config[:limit]))
+      items_array = items_array.select { |item| title_initial_in_range?(item, letter_range) }
+      limit_value = "all"
+    end
+
     total_count = items_array.count
 
-    # Apply offset (skip first N items)
+    # k/m — an equal column slice of the matched set (column k of m), from
+    # shared floored boundaries so the m columns never gap or overlap and differ
+    # by at most one item. Written as `limit: 1/2` (it's just another way to say
+    # what shows up) or the explicit `part: 1/2`; `part:` wins if both are set.
+    # A slice fully determines what's shown, so offset and a numeric limit don't
+    # apply. The "invalid" nudge fires only for an explicit `part:` — a non-k/m
+    # `limit:` is a normal count/percentage/letter range, handled below.
+    part_value = config[:part].presence || config[:limit]
+    if (part_range = parse_part(part_value, total_count))
+      return [ items_array[part_range] || [], total_count, nil ]
+    elsif config[:part].present? && Rails.env.development?
+      return [ [], 0, dev_warning(
+        "Invalid part",
+        "`part: #{config[:part]}` isn't a valid column slice. Use `k/m` with k from 1 to m (e.g. `part: 2/3`).",
+        "For equal columns, give each block the same m: `1/3`, `2/3`, `3/3` — on `part:` or `limit:`."
+      ) ]
+    end
+
+    # Apply offset (skip first N items). offset and limit each accept a strict
+    # integer or a percentage of the matched set ("50%") — see collection_count.
+    offset_value = collection_count(config[:offset], total_count)
+
+    # A letter range belongs on `limit:` (it filters); on `offset:` it silently
+    # parses to 0, so steer the author before they get a confusing result.
+    if Rails.env.development? && config[:offset].present? && parse_letter_range(config[:offset])
+      return [ [], 0, dev_warning(
+        "Letter range on offset",
+        "`offset: #{config[:offset]}` looks like a letter range, but ranges filter and belong on `limit:`.",
+        "Use `limit: #{config[:offset]}` — each column filters its own range (e.g. `limit: a-m` then `limit: n-z`)."
+      ) ]
+    end
+
     items_array = items_array[offset_value..-1] || [] if offset_value > 0
 
     # Offset skipped past everything: the collection has content, but `offset`
@@ -1070,8 +1156,13 @@ module HasMarkdownExtensions
     if limit_value.to_s.downcase == "all"
       display_items = items_array
     elsif limit_value
-      limit_int = limit_value.to_i
-      display_items = items_array.take(limit_int)
+      display_items = items_array.take(collection_count(limit_value, total_count))
+    elsif offset_value > 0
+      # A bare offset with no limit slices off a remainder — show all of it,
+      # not the default page cap (which is meant for uncapped feeds). This is
+      # what lets `limit: 50%` / `offset: 50%` two-column splits balance and
+      # cover every item.
+      display_items = items_array
     else
       display_items = items_array.take(default_limit)
     end
