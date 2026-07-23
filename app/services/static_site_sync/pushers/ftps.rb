@@ -54,7 +54,9 @@ module StaticSiteSync
       rescue Net::FTPPermError => e
         raise Pusher::ConnectionError, "Authentication failed: #{e.message}"
       rescue OpenSSL::SSL::SSLError => e
-        raise Pusher::ConnectionError, "TLS handshake failed: #{e.message}"
+        raise tls_certificate_failure?(e) ?
+          Pusher::CertificateError.new(tls_certificate_message) :
+          Pusher::ConnectionError.new("TLS handshake failed: #{e.message}")
       rescue Net::FTPError => e
         raise Pusher::ConnectionError, "FTP error: #{e.message}"
       ensure
@@ -69,6 +71,21 @@ module StaticSiteSync
       def ssl_context_options
         mode = @config.verify_tls ? OpenSSL::SSL::VERIFY_PEER : OpenSSL::SSL::VERIFY_NONE
         { verify_mode: mode }
+      end
+
+      # A verification failure — untrusted / self-signed / expired cert, or a
+      # hostname that doesn't match — is distinct from a genuine handshake
+      # problem: the channel would still encrypt, we just can't confirm the
+      # host's identity. Only possible while we're actually verifying, so a
+      # host we've already chosen to trust (verify_tls off) never lands here.
+      def tls_certificate_failure?(error)
+        @config.verify_tls &&
+          error.message.match?(/certificate verify failed|does not match|hostname/i)
+      end
+
+      def tls_certificate_message
+        "#{@config.host} presented a TLS certificate Roe couldn't verify. " \
+          "Shared and cPanel hosts often use self-signed or mismatched certificates."
       end
 
       def upload_file(ftp, rel)

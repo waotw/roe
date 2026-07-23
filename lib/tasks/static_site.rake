@@ -156,7 +156,13 @@ namespace :site do
 
   desc "Clean and regenerate the entire static site"
   task rebuild: :environment do
-    Rake::Task["site:clean"].invoke
-    Rake::Task["site:generate"].invoke
+    # Use execute, not invoke. invoke runs a task at most once per process,
+    # and the admin "Rebuild" button runs inside the long-lived Puma
+    # process — so after the first rebuild, invoke treats clean/generate as
+    # already-run and silently no-ops on every later click. execute always
+    # runs the task body. (:environment is already loaded here, so skipping
+    # the prerequisite is harmless.)
+    Rake::Task["site:clean"].execute
+    Rake::Task["site:generate"].execute
   end
 end

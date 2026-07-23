@@ -105,6 +105,9 @@ class StaticSiteSyncPushJob < ApplicationJob
       kind:     :push,
       step:     @last_step,
       error:    "#{error.class}: #{error.message}",
+      # Lets the failed panel offer "connect without verification" instead
+      # of a dead-end error when the host's cert couldn't be verified.
+      cert_unverified: error.is_a?(StaticSiteSync::Pusher::CertificateError),
       failed_at: Time.current
     )
   end

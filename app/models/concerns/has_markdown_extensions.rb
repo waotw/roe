@@ -211,6 +211,29 @@ module HasMarkdownExtensions
     end
   end
 
+  # Fingerprint of the members every ```collection block in this record's body
+  # currently resolves to. The static generator stores this in its manifest so
+  # it can regenerate an aggregation page (e.g. the glossary) when a
+  # collection's membership — or a shown member's content — changes, even
+  # though this record's own updated_at didn't. Returns nil when the body
+  # embeds no collections.
+  #
+  # Each block contributes its ordered, displayed members as
+  # "Class:id:updated_at" tuples, so add/remove, reorder, and edits to a shown
+  # member all move the digest. The block's own config (query, limit, order)
+  # lives in this body, so a config change already bumps this record's
+  # updated_at and needs no separate tracking here.
+  def embedded_collection_fingerprint
+    blocks = content.to_s.scan(/^ *```collection\r?\n(.*?)```/m).map(&:first)
+    return nil if blocks.empty?
+
+    parts = blocks.map do |config_text|
+      items, = resolve_collection_items(parse_collection_config(config_text))
+      Array(items).map { |i| "#{i.class.name}:#{i.id}:#{i.updated_at.to_i}" }.join(",")
+    end
+    Digest::SHA1.hexdigest(parts.join("|"))
+  end
+
   private
 
   def render_code_block(code, language)
@@ -808,12 +831,30 @@ module HasMarkdownExtensions
   end
 
   def render_collection(config)
-    heading = config[:heading]
+    display_items, total_count, warning = resolve_collection_items(config)
+    return warning if warning
+
+    render_resolved_collection(config, display_items, total_count)
+  end
+
+  # Default source for a collection, shared by resolve_collection_items and
+  # render_resolved_collection: a menu with no explicit source defaults to
+  # pages; a plain feed defaults to posts.
+  def collection_source(config)
     menu_template = config[:template].to_s.strip == "menu"
-    # Menus are almost always pages, so a menu with no explicit source
-    # defaults to pages (a plain feed still defaults to posts).
-    source = config[:source] || (menu_template ? "pages" : nil) ||
-             SiteConfig.default("collections", "default_source") || "posts"
+    config[:source] || (menu_template ? "pages" : nil) ||
+      SiteConfig.default("collections", "default_source") || "posts"
+  end
+
+  # Resolve a parsed collection config to its final displayed members.
+  # Returns [display_items, total_count, warning] — warning is dev-only HTML
+  # that replaces the collection when the config is invalid (nil on the happy
+  # path); total_count is the pre-offset/limit size (drives the "View all"
+  # link). Shared by render_collection and embedded_collection_fingerprint so
+  # change detection and rendering never disagree on membership.
+  def resolve_collection_items(config)
+    menu_template = config[:template].to_s.strip == "menu"
+    source = collection_source(config)
     order_by = config[:order] || SiteConfig.default("collections", "default_order") || "date"
     # A menu is a menu, not a feed: with no explicit `order:` (usually a
     # url_name list), fall back to alphabetical rather than by date.
@@ -827,7 +868,6 @@ module HasMarkdownExtensions
     post_type = nil if post_type == "all"
 
     # Validate tags in dev — warn about tags that don't exist on the source
-    tag_warning = ""
     if Rails.env.development? && tags.present?
       requested = tags.split(",").map(&:strip)
                       .reject { |t| t.start_with?("-") }  # ignore exclusions
@@ -851,12 +891,12 @@ module HasMarkdownExtensions
       unknown = requested.reject { |t| existing.include?(t) }
       if unknown.any?
         source_name = source == "products" ? "product" : "post"
-        return dev_warning(
+        return [ [], 0, dev_warning(
           "Unknown tag#{'s' if unknown.size > 1}",
           "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any #{source_name}.",
           "Existing tags: #{existing.any? ? existing.join(', ') : '(none yet)'}. " \
           "Add the tag to at least one #{source_name}'s metadata and it will show up in this collection."
-        )
+        ) ]
       end
     end
 
@@ -864,11 +904,11 @@ module HasMarkdownExtensions
     if Rails.env.development? && post_type.present? && source == "posts"
       valid_types = Post.post_type_options
       unless valid_types.include?(post_type)
-        return dev_warning(
+        return [ [], 0, dev_warning(
           "Unknown post_type",
           "'#{post_type}' is not a recognised post type.",
           "Valid types: #{valid_types.join(', ')}"
-        )
+        ) ]
       end
     end
 
@@ -901,9 +941,9 @@ module HasMarkdownExtensions
     else
       if Rails.env.development?
         valid = %w[posts pages documentation documentation/roe products]
-        return dev_warning("Unknown collection source",
+        return [ [], 0, dev_warning("Unknown collection source",
           "'#{source}' is not a valid source.",
-          "Valid sources: #{valid.join(', ')}")
+          "Valid sources: #{valid.join(', ')}") ]
       end
       []
     end
@@ -983,11 +1023,11 @@ module HasMarkdownExtensions
       has_list  = config[:order].present? && !sort_keyword?(config[:order])
       has_label = config[:collection].present?
       unless has_list || has_label
-        return dev_warning(
+        return [ [], 0, dev_warning(
           "Empty menu collection",
           "This collection has template set to menu but has no order: list and no collection: name, so there's nothing to show.",
           "Add an order: list of url_names, or give it a collection: name and add the same collection: to the pages, posts, or products you want to show up here."
-        )
+        ) ]
       end
       items = curate_menu(items, config[:order], config[:collection])
     elsif !related_filter || config[:order].present?
@@ -1001,7 +1041,6 @@ module HasMarkdownExtensions
     # a feature. Other templates keep the configured default limit.
     limit_value = "all" if limit_value.blank? && config[:template].to_s.strip == "menu"
     default_limit = SiteConfig.default("collections", "default_limit") || 10
-    show_more = config[:show_more] == "true" || config[:show_more] == true
 
     # Convert to array if needed
     items_array = items.is_a?(Array) ? items : items.to_a
@@ -1021,11 +1060,11 @@ module HasMarkdownExtensions
       else
         "Either remove `offset` altogether, or reduce it to `offset: #{max_offset}` or lower to see content."
       end
-      return dev_warning(
+      return [ [], 0, dev_warning(
         "Collection offset skips all content",
         "This collection uses `offset: #{offset_value}` but has only #{total_count} #{'item'.pluralize(total_count)}, so there's nothing left to show here.",
         hint
-      )
+      ) ]
     end
 
     if limit_value.to_s.downcase == "all"
@@ -1036,6 +1075,14 @@ module HasMarkdownExtensions
     else
       display_items = items_array.take(default_limit)
     end
+
+    [ display_items, total_count, nil ]
+  end
+
+  def render_resolved_collection(config, display_items, total_count)
+    heading = config[:heading]
+    source  = collection_source(config)
+    show_more = config[:show_more] == "true" || config[:show_more] == true
 
     # Render based on template, default to 'grid' for products, otherwise use configured default
     default_template = source == "products" ? "grid" : (SiteConfig.default("collections", "default_template") || "list")
@@ -1086,7 +1133,7 @@ module HasMarkdownExtensions
       output << "</div>"
     end
 
-    tag_warning + output.join("\n")
+    output.join("\n")
   end
 
   def apply_collection_order(items, order_by)

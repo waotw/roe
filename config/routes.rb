@@ -84,6 +84,7 @@ Rails.application.routes.draw do
     patch "site_sync/static/config",           to: "static_site_sync#update_config",        as: "update_static_site_sync_config"
     post  "site_sync/static/test_connection",  to: "static_site_sync#test_connection",      as: "test_static_site_sync_connection"
     post  "site_sync/static/push",             to: "static_site_sync#push",                 as: "push_static_site"
+    post  "site_sync/static/skip_tls_verification", to: "static_site_sync#skip_tls_verification", as: "skip_tls_verification_static_site"
     get   "site_sync/static/download_zip",     to: "static_site_sync#download_zip",         as: "download_static_site_zip"
     get   "site_sync/static/transfer_status",  to: "static_site_sync#transfer_status",      as: "static_site_transfer_status"
     post  "site_sync/static/transfer_status/dismiss", to: "static_site_sync#dismiss_transfer_status", as: "dismiss_static_site_transfer_status"

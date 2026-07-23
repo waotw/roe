@@ -88,7 +88,15 @@
               Failed during <code class="text-xs bg-white px-1 rounded font-mono"><%= StaticSiteSyncPushJob::STEPS[sss[:step]] || sss[:step] %></code>
               <% if sss[:failed_at] %><%= time_ago_in_words(sss[:failed_at]) %> ago<% end %>.
             </p>
-            <p class="text-xs text-red-700 font-mono break-all"><%= sss[:error] %></p>
+            <% if sss[:cert_unverified] %>
+              <p class="text-sm text-red-800 mb-3">The host's TLS certificate couldn't be verified. The connection would still be encrypted — if you trust this host, connect without verification and push again.</p>
+              <%= button_to "CONNECT WITHOUT VERIFICATION",
+                            admin_skip_tls_verification_static_site_path,
+                            method: :post,
+                            class: "inline-flex items-center px-3 py-2 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono text-xs rounded-xs cursor-pointer" %>
+            <% else %>
+              <p class="text-xs text-red-700 font-mono break-all"><%= sss[:error] %></p>
+            <% end %>
           </div>
           <%= button_to "Dismiss",
                         admin_dismiss_static_site_transfer_status_path,
@@ -96,6 +104,25 @@
                         class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
         </div>
     <% end %>
+  <% end %>
+
+  <%# ─── TLS certificate prompt ──────────────────────────────────── %>
+  <%# Shown after Test Connection fails specifically on certificate
+      verification. Verification is automatic; this is the one-click
+      "I trust this host" escape hatch (drops verification, keeps the
+      channel encrypted). %>
+  <% if flash[:tls_cert_prompt] %>
+    <div class="bg-amber-50 border border-amber-300 rounded-xs p-6 mb-6">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">Certificate couldn't be verified</h3>
+      <p class="text-sm text-amber-800 mb-3">
+        <%= flash[:tls_cert_error] %>
+        The connection would still be encrypted — Roe just can't confirm the host's identity. If you trust this host, connect without verification.
+      </p>
+      <%= button_to "CONNECT WITHOUT VERIFICATION",
+                    admin_skip_tls_verification_static_site_path,
+                    method: :post,
+                    class: "inline-flex items-center px-3 py-2 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono text-xs rounded-xs cursor-pointer" %>
+    </div>
   <% end %>
 
   <%# ─── Configured: summary + push ─────────────────────────────── %>

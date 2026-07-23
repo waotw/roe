@@ -200,9 +200,10 @@ class StaticGenerator
         "defaults/collections" => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
         "defaults/cards" => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
         "features/podcast" => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
-        "defaults/members" => SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.updated_at&.iso8601(6)
+        "features/members" => SiteConfig.find_by("file_path LIKE ?", "%features/members.yml")&.updated_at&.iso8601(6)
       },
       layouts: layout_checksums,
+      layout_collections: layout_collection_fingerprint,
       assets: asset_checksums
     }
 
@@ -220,19 +221,34 @@ class StaticGenerator
     docs = changed_items(Documentation.not_draft, "documentation")
     products = changed_items(Product.published, "products")
 
-    podcast_posts = posts.select { |p| p.metadata["post_type"] == "podcast" }
-
     # Track which specific configs changed
     site_config_changed = config_file_changed?("site")
     collections_config_changed = config_file_changed?("defaults/collections")
     cards_config_changed = config_file_changed?("defaults/cards")
     podcast_config_changed = config_file_changed?("features/podcast")
-    members_config_changed = config_file_changed?("defaults/members")
+    members_config_changed = config_file_changed?("features/members")
 
-    global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed?
+    # A layout file edit (nav/footer/sidebar mtime) OR a change to what its
+    # embedded collections list — e.g. a page joining `collection: nav` — alters
+    # every page's chrome, so it forces a full rebuild.
+    layout_collections_changed = layout_collections_changed?
+    global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed? || layout_collections_changed
+
+    # Pull in host pages whose EMBEDDED collections changed membership/content —
+    # a new glossary definition, a retagged post, a deleted member — even though
+    # the host file's own updated_at is untouched. Skipped under global_changed,
+    # which already regenerates every page of each type.
+    unless global_changed
+      posts    |= collection_dependents(Post.not_draft, "posts", posts)
+      pages    |= collection_dependents(static_pages_scope, "pages", pages)
+      docs     |= collection_dependents(Documentation.not_draft, "documentation", docs)
+      products |= collection_dependents(Product.published, "products", products)
+    end
+
+    podcast_posts = posts.select { |p| p.metadata["post_type"] == "podcast" }
 
     {
-      home: home_changed? || site_config_changed || collections_config_changed || members_config_changed || layouts_changed?,
+      home: home_changed? || site_config_changed || collections_config_changed || members_config_changed || layouts_changed? || layout_collections_changed,
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? static_pages_scope.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
@@ -265,6 +281,60 @@ class StaticGenerator
         !last_generated || item.updated_at > Time.parse(last_generated)
       end
     end
+  end
+
+  # Records in `scope` that embed a collection whose current membership
+  # fingerprint differs from the manifest — an aggregation page (glossary,
+  # index, "see also") that must regenerate because a member changed even
+  # though its own file didn't. `already` are records already flagged changed;
+  # those are skipped (they'll regenerate anyway). Legacy manifests have no
+  # stored fingerprint, so a page with a collection regenerates once.
+  def collection_dependents(scope, type, already)
+    already_ids = already.map(&:id).to_set
+    with_static_context do
+      scope.where("content LIKE ?", "%```collection%").select do |rec|
+        next false if already_ids.include?(rec.id)
+        rec.embedded_collection_fingerprint != @manifest.dig(type, rec.id.to_s, "collections_fp")
+      end
+    end
+  end
+
+  # Fingerprint of every collection embedded in the layout files (nav / footer /
+  # sidebar). These render into every page's chrome, so a membership change here
+  # (e.g. a page joining `collection: nav`) means a full rebuild. Keyed by
+  # filename; only files that actually embed a collection are included.
+  def layout_collection_fingerprint
+    layout_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "layout"))
+    return {} unless layout_dir.exist?
+
+    with_static_context do
+      Dir.glob(layout_dir.join("*.md")).sort.each_with_object({}) do |f, acc|
+        fp = LayoutMarkdown.new(File.read(f)).embedded_collection_fingerprint
+        acc[File.basename(f)] = fp if fp
+      end
+    end
+  end
+
+  def layout_collections_changed?
+    (@manifest["layout_collections"] || {}) != layout_collection_fingerprint
+  end
+
+  # Resolve collections the way the static build renders them — anonymous
+  # viewer, static_generation on — so fingerprints match the generated HTML
+  # regardless of who triggered the build (e.g. a logged-in admin on Rebuild).
+  # Safe to nest: it saves and restores whatever was set.
+  def with_static_context
+    prior_static = Current.static_generation
+    prior_member = Current.member
+    prior_user   = Current.user
+    Current.static_generation = true
+    Current.member = nil
+    Current.user   = nil
+    yield
+  ensure
+    Current.static_generation = prior_static
+    Current.member            = prior_member
+    Current.user              = prior_user
   end
 
   def home_changed?
@@ -341,12 +411,26 @@ class StaticGenerator
 
   def build_content_manifest(scope)
     klass_name = scope.respond_to?(:klass) ? scope.klass.name : scope.name
+
+    # Membership fingerprint for items that embed a collection, so change
+    # detection can regenerate an aggregation page when a member changed even
+    # though the page's own file didn't. Only items with a collection block are
+    # resolved; computed as the anonymous static viewer to match the output.
+    fingerprints = with_static_context do
+      scope.where("content LIKE ?", "%```collection%").each_with_object({}) do |rec, acc|
+        fp = rec.embedded_collection_fingerprint
+        acc[rec.id] = fp if fp
+      end
+    end
+
     items = scope.pluck(:id, :updated_at, Arel.sql("json_extract(metadata, '$.url_name')"))
     items.map do |id, updated_at, url_name|
-      [ id.to_s, {
+      entry = {
         updated_at: updated_at.iso8601(6),
         html_file: html_filename_for_type(klass_name, url_name)
-      } ]
+      }
+      entry[:collections_fp] = fingerprints[id] if fingerprints.key?(id)
+      [ id.to_s, entry ]
     end.to_h
   end
 
@@ -1197,15 +1281,19 @@ class StaticGenerator
       href = link["href"]
       next if href.start_with?("/media/", "/system/", "/assets/")
 
-      clean_href = href[1..-1]
+      # Split off any ?query / #fragment first so the .html suffix lands on
+      # the path, not after the anchor: /docs/glossary#sec must become
+      # /docs/glossary.html#sec, never /docs/glossary#sec.html.
+      path, sep, tail = href.partition(/[?#]/)
+      suffix = "#{sep}#{tail}"
+
+      clean_href = path[1..-1]
 
       # Keep root path as-is (don't convert / to /index.html)
-      if clean_href.empty?
-        link["href"] = prefix.chomp("./") + "/"
-      elsif clean_href == "index"
-        link["href"] = prefix.chomp("./") + "/"
+      if clean_href.empty? || clean_href == "index"
+        link["href"] = prefix.chomp("./") + "/" + suffix
       elsif !clean_href.match?(/\.\w+$/)
-        link["href"] = "#{prefix}#{clean_href}.html"
+        link["href"] = "#{prefix}#{clean_href}.html#{suffix}"
       end
     end
   end

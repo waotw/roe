@@ -11,6 +11,11 @@ module StaticSiteSync
   module Pusher
     class ConnectionError < StandardError; end
     class TransferError   < StandardError; end
+    # A TLS certificate that couldn't be verified — untrusted / self-signed /
+    # expired, or a hostname mismatch. Subclasses ConnectionError so existing
+    # rescues still catch it, while callers that care can offer the
+    # "connect without verification" path when they see it specifically.
+    class CertificateError < ConnectionError; end
 
     def self.for(config:, root: RoeSitePaths::STATIC_SITE_PATH, progress_proc: nil)
       case config.protocol

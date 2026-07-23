@@ -12,7 +12,7 @@ import { Controller } from "@hotwired/stimulus";
 export default class extends Controller {
   static targets = [
     "credentials", "protocolGroup", "zipAction", "saveBar", "port",
-    "passwordAuth", "keyAuth", "verifyTls"
+    "passwordAuth", "keyAuth"
   ];
 
   protocolChanged(event) {
@@ -41,9 +41,9 @@ export default class extends Controller {
 
     if (isZip) return; // credentials block is hidden — nothing else to arrange
 
-    // FTPS = password + TLS-verify; SFTP = SSH key + passphrase.
+    // FTPS = password; SFTP = SSH key + passphrase. (TLS verification is
+    // automatic, so there's no verify-cert field to toggle here.)
     if (this.hasPasswordAuthTarget) this.passwordAuthTarget.classList.toggle("hidden", !isFtps);
     if (this.hasKeyAuthTarget) this.keyAuthTarget.classList.toggle("hidden", !isSftp);
-    if (this.hasVerifyTlsTarget) this.verifyTlsTarget.classList.toggle("hidden", !isFtps);
   }
 }
