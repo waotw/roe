@@ -169,6 +169,17 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-900 mb-1">Artwork filename</label>
+            <%# Fill-from-feed captures the artwork URL (hidden image_url field)
+                but defers the download to Enable, so the filename field below
+                stays blank in preview. Show the source art as a thumbnail so
+                it's clear the artwork was found and will be imported. %>
+            <% if @image_url.present? %>
+              <div class="flex items-center gap-3 mb-2">
+                <img src="<%= @image_url %>" alt="Podcast artwork" loading="lazy"
+                     class="w-16 h-16 rounded object-cover border border-gray-200">
+                <p class="text-xs text-green-700">Artwork found — it'll be imported when you enable.</p>
+              </div>
+            <% end %>
             <%# Shared image-upload widget: text field + Upload button +
                 inline existence check. The partial wires its own <input>
                 with the explicit `name:` we pass, so it bypasses the

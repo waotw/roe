@@ -215,7 +215,8 @@
       inside this one. Nested forms are invalid HTML, and with
       per-form CSRF tokens the browser merges the two tokens and
       submits the wrong-scoped one, which Rails rejects on save. %>
-  <div class="flex gap-2 pt-2">
+
+  <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 left-12 bg-white">
     <%= f.submit (config.protocol_zip? ? "DOWNLOAD ZIP" : "Save"),
                  data: { "static-site-sync-form-target" => "submitButton" },
                  class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono uppercase text-sm rounded-xs cursor-pointer" %>

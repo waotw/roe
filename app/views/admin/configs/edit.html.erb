@@ -76,14 +76,14 @@
     </div>
   <% elsif @config_type == 'podcast' %>
     <div class="px-8 py-4 bg-blue-50 border-b border-blue-200">
-      <h4 class="text-sm font-semibold text-blue-900 mb-2">Seed from existing RSS feed</h4>
+      <h4 class="text-sm font-semibold text-blue-900 mb-2">Seed from an RSS feed or Apple Podcasts link</h4>
       <p class="text-xs text-blue-800 mb-3">
-        Paste a podcast RSS feed URL (public or private/paid) to auto-fill a podcast.yml entry from the feed's iTunes metadata. The artwork is downloaded too. The URL is not stored or logged — only the parsed metadata is used. <mark class="bg-white px-0.5 py-0.5 text-amber-700">Running this twice on the same feed will overwrite the existing data</mark>.
+        Paste a podcast RSS feed URL (public or private/paid), or an Apple Podcasts link — Roe resolves it to the feed and also fills in the Apple Podcasts and Overcast subscribe links. Either way it auto-fills a podcast.yml entry from the feed's iTunes metadata, and the artwork is downloaded too. The URL is not stored or logged — only the parsed metadata is used. <mark class="bg-white px-0.5 py-0.5 text-amber-700">Running this twice overwrites the existing iTunes metadata</mark> (your subscribe links are kept).
       </p>
       <%= form_with url: admin_seed_podcast_config_from_rss_path, method: :post, local: true, class: "flex gap-2" do %>
         <%= text_field_tag :rss_url, nil,
                            class: "flex-1 font-mono text-xs p-2 border border-blue-300",
-                           placeholder: "https://api.substack.com/feed/podcast/.../rss",
+                           placeholder: "RSS feed URL, or https://podcasts.apple.com/…/id123456789",
                            autocomplete: "off" %>
         <%= submit_tag "Seed",
                        class: "uppercase text-xs px-3 py-2 border border-blue-700 bg-blue-200 hover:bg-blue-300 text-blue-900 font-mono rounded-xs" %>
@@ -97,7 +97,20 @@
                field_options: @field_options %>
                <div class="px-8 py-4 bg-red-50 border-t border-red-200">
                  <h4 class="text-sm font-semibold text-red-900 mb-2">Danger Zone</h4>
-                 <p class="text-xs text-red-700 mb-3">Deleting this will remove all configuration and feeds for all podcasts.<br>Any podcast posts are untouched.</p>
+                 <%# Per-podcast removal — deletes just that entry from
+                     podcast.yml; the show's posts are untouched. %>
+                 <% @config_hash.each do |pkey, pval| %>
+                   <% next unless pval.is_a?(Hash) %>
+                   <% ptitle = pval['title'].to_s.strip.presence || pkey %>
+                   <div class="mb-2">
+                     <%= button_to "Delete “#{ptitle}”",
+                                   delete_podcast_entry_admin_configs_path(key: pkey),
+                                   method: :delete,
+                                   data: { turbo_confirm: "Remove the “#{ptitle}” podcast from podcast.yml? Its posts are untouched." },
+                                   class: "uppercase text-xs px-2 py-1.5 border border-red-500 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
+                   </div>
+                 <% end %>
+                 <p class="text-xs text-red-700 mt-3 mb-3">Or remove everything — deletes all configuration and feeds for all podcasts.<br>Any podcast posts are untouched.</p>
                  <%= button_to "Disable Podcasts | Delete Config",
                             delete_podcast_admin_configs_path,
                              method: :delete,

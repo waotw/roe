@@ -23,10 +23,29 @@ class PodcastFeedFetcher
   def fetch
     return failure("URL is blank") if @url.empty?
 
-    xml = http_get(@url)
+    # Apple Podcasts links aren't feeds — resolve the iTunes ID to the show's
+    # real RSS URL, and keep the ID so callers can derive subscribe links.
+    apple_id = PodcastAppleLink.podcast_id(@url)
+    feed_url = @url
+    apple    = {}
+    if apple_id
+      apple    = PodcastAppleLink.lookup(apple_id)
+      feed_url = apple[:feed_url]
+      return failure("Couldn't find an RSS feed for that Apple Podcasts link") if feed_url.to_s.empty?
+    end
+
+    xml = http_get(feed_url)
     return failure("Empty response body") if xml.to_s.strip.empty?
 
     parsed = PodcastFeedParser.parse(xml)
+    if apple_id
+      parsed[:apple_id] = apple_id
+      # Some feeds omit <itunes:image> — backfill artwork from Apple's copy.
+      channel = parsed[:channel]
+      if channel && channel[:image_url].to_s.strip.empty? && apple[:artwork_url].present?
+        channel[:image_url] = apple[:artwork_url]
+      end
+    end
     Result.new(success?: true, data: parsed, error: nil)
   rescue => e
     # Don't log @url — it may contain a paywall token. Just the class/message.

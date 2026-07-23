@@ -637,6 +637,18 @@ class Admin::ConfigsController < Admin::BaseController
       podcast["subscribe_display"] = "links" unless podcast.key?("subscribe_display")
     end
 
+    # Order each podcast's fields so the subscribe group renders last, with the
+    # display toggle first — the editor draws a single "Subscribe Links"
+    # heading over them (see _config_editor).
+    subscribe_order = [ "subscribe_display" ] + PodcastConfig::SUBSCRIBE_APPS.keys
+    @config_hash.each_key do |key|
+      podcast = @config_hash[key]
+      next unless podcast.is_a?(Hash)
+      reordered = podcast.reject { |k, _| PodcastConfig::SUBSCRIBE_FIELDS.include?(k) }
+      subscribe_order.each { |k| reordered[k] = podcast[k] if podcast.key?(k) }
+      @config_hash[key] = reordered
+    end
+
     @field_options = build_field_options_for_podcast
     @field_help = build_field_help_for_podcast
     # Source of truth for which podcast fields are required (used by the
@@ -669,11 +681,15 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     key = PodcastConfigSeeder.derive_key(title)
-    seeder = PodcastConfigSeeder.new(key, channel.transform_keys(&:to_s), mode: :overwrite)
+    # If the source was an Apple Podcasts link, fill the Apple + Overcast
+    # subscribe fields from its iTunes ID too.
+    subscribe = fetch.data[:apple_id] ? PodcastAppleLink.subscribe_links(fetch.data[:apple_id]) : {}
+    seeder = PodcastConfigSeeder.new(key, channel.transform_keys(&:to_s), mode: :overwrite, subscribe_links: subscribe)
     result = seeder.seed!
 
+    extra = subscribe.any? ? " Apple & Overcast links added." : ""
     redirect_to admin_edit_podcast_config_path,
-                notice: "Podcast '#{title}' seeded as '#{key}' (#{result})."
+                notice: "Podcast '#{title}' seeded as '#{key}' (#{result}).#{extra}"
   end
 
   def update_podcast
@@ -837,6 +853,64 @@ class Admin::ConfigsController < Admin::BaseController
 
     flash[:notice] = "Podcast configuration deleted successfully"
     redirect_to admin_configs_path
+  end
+
+  # Delete a single podcast's entry from podcast.yml, leaving the others (and
+  # the feature) in place. The show's posts are untouched. If it was the last
+  # podcast, remove the whole config and disable the feature.
+  def delete_podcast_entry
+    key = params[:key].to_s
+    file_path = SiteConfig::FEATURES_PATH.join("podcast.yml")
+
+    unless File.exist?(file_path)
+      redirect_to admin_configs_path, alert: "Podcast configuration doesn't exist." and return
+    end
+
+    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    unless config.is_a?(Hash) && config.key?(key)
+      redirect_to admin_edit_podcast_config_path, alert: "Podcast '#{key}' not found." and return
+    end
+
+    title = config[key].is_a?(Hash) ? config[key]["title"].to_s.strip.presence : nil
+    config.delete(key)
+
+    if config.empty?
+      File.delete(file_path)
+      SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
+      SiteConfig.reload!("features/podcast")
+      redirect_to admin_configs_path,
+                  notice: "Removed “#{title || key}”. That was the last podcast, so podcasts are now disabled."
+    else
+      File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
+      SiteConfig.reload!("features/podcast")
+      redirect_to admin_edit_podcast_config_path, notice: "Removed podcast “#{title || key}”."
+    end
+  end
+
+  # Append a fresh blank podcast entry to podcast.yml (canonical defaults) so
+  # the admin can fill it in — the manual counterpart to "Seed from feed".
+  def add_podcast
+    file_path = SiteConfig::FEATURES_PATH.join("podcast.yml")
+    unless File.exist?(file_path)
+      redirect_to admin_configs_path, alert: "Enable podcasts before adding a show." and return
+    end
+
+    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    config = {} unless config.is_a?(Hash)
+
+    base = "new-podcast"
+    key = base
+    n = 1
+    while config.key?(key)
+      n += 1
+      key = "#{base}-#{n}"
+    end
+    config[key] = PodcastConfig.default_entry
+
+    File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteConfig.reload!("features/podcast")
+    redirect_to admin_edit_podcast_config_path(tab: key),
+                notice: "Added a new podcast (“#{key}”). Rename its key and fill in the details below."
   end
 
   def edit_members
@@ -1568,7 +1642,7 @@ class Admin::ConfigsController < Admin::BaseController
       # present (auto-surfaced above when payments are enabled).
       "audience" => [ "everyone", "paid" ],
       # How the subscribe section renders on the episode page.
-      "subscribe_display" => [ "links", "menu" ]
+      "subscribe_display" => [ "links", "button + menu" ]
     }
 
     # Build prefixed versions separately

@@ -179,7 +179,9 @@ Rails.application.routes.draw do
         get  :new_podcast_setup
         post :preview_podcast_from_rss
         post :create_podcast
+        post :add_podcast
         delete :delete_podcast
+        delete :delete_podcast_entry
         get :new_members_setup
         post :create_members
         delete :delete_members

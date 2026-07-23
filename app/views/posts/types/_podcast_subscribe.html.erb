@@ -37,7 +37,7 @@
     </div>
   <% end %>
 
-  <% if PodcastConfig.subscribe_display(podcast_config) == "menu" %>
+  <% if PodcastConfig.subscribe_display(podcast_config) == "button + menu" %>
     <details class="podcast-subscribe podcast-subscribe--menu">
       <summary class="btn-primary">Subscribe</summary>
       <%= links %>

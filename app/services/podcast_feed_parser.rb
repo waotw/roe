@@ -144,34 +144,34 @@ class PodcastFeedParser
     author_email = feed.at_xpath("author/email")&.text&.strip
 
     {
-      # Atom's <subtitle> is the closest semantic match to RSS's
-      # channel <description>. We populate both keys with it so
-      # downstream consumers that look for either work the same way
-      # the RSS path does.
+      # Atom's <subtitle> is the closest semantic match to RSS's channel
+      # <description>; populate both so downstream consumers work either way.
       title:       text(feed, "title"),
       description: text(feed, "subtitle"),
       link:        atom_link_href(feed, "alternate"),
-      # `xml:lang` is special — even after remove_namespaces! it can
-      # be stored as the unprefixed "lang" attribute on the root.
-      # Check both to cover Nokogiri versions that differ in handling.
+      # `xml:lang` is special — even after remove_namespaces! it can be stored
+      # as the unprefixed "lang" attribute on the root. Check both.
       language:    feed["xml:lang"] || feed["lang"],
-      copyright:   text(feed, "rights"),
       author:      author_name,
       subtitle:    text(feed, "subtitle"),
-
-      # iTunes-namespace fields aren't part of Atom 1.0. Left nil so
-      # the user fills them in on the podcast edit page (the form
-      # already supports manual entry for everything below).
-      type:        nil,
-      explicit:    nil,
       owner_name:  author_name,
       owner_email: author_email,
-      category:    nil,
-      subcategory: nil,
 
-      # Atom has both <icon> (small, favicon-ish) and <logo> (larger).
-      # Podcast art is large, so prefer logo when present.
-      image_url:   text(feed, "logo") || text(feed, "icon")
+      # Some feeds are Atom on the outside but carry RSS/iTunes metadata inside
+      # (FeedPress, for one). After remove_namespaces! those elements are just
+      # unprefixed, so pull them here — each falls back to the pure-Atom
+      # equivalent (or nil), so genuine Atom feeds behave exactly as before.
+      # (Atom's own <category> uses a `term` attribute, not `text`, so reading
+      # the `text` attribute safely ignores it and only catches iTunes ones.)
+      copyright:   text(feed, "copyright").to_s.presence || text(feed, "rights"),
+      type:        text(feed, "type").to_s.presence,
+      explicit:    text(feed, "explicit").to_s.presence,
+      category:    feed.at_xpath("category")&.attribute("text")&.value,
+      subcategory: feed.at_xpath("category/category")&.attribute("text")&.value,
+      # <itunes:image href> first; then Atom's <logo> (large) / <icon> (small).
+      image_url:   (feed.at_xpath("image")&.attribute("href")&.value.presence ||
+                    text(feed, "logo").to_s.presence ||
+                    text(feed, "icon").to_s.presence)
     }
   end
 
