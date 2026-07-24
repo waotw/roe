@@ -1,0 +1,17 @@
+target: kamal
+app_name: ""
+ssl: true
+kamal:
+  servers:
+    - ""
+  registry_username: ""
+  image_name: ""
+  host: ""
+  ssh:
+    keys:
+      - ""
+    keys_only: true
+fly:
+  region: ""
+  vm_memory: ""
+  volume_size_gb: 1
