@@ -60,7 +60,10 @@ class Admin::FileImportsController < Admin::BaseController
       source_type: "files", phase: 1, status: :importing_posts,
       started_at: Time.current, configuration: { "source" => params[:source_name].presence || "ZIP upload" }
     )
-    result = FilesImporter::Runner.new(root: dir, overrides: overrides, import_ref: import.id).import
+    media_mode = (params[:media_mode] == "all" ? :all : :referenced)
+    result = FilesImporter::Runner.new(
+      root: dir, overrides: overrides, import_ref: import.id, media_mode: media_mode
+    ).import
     FileUtils.rm_rf(dir)
 
     import.update!(

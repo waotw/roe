@@ -7,9 +7,12 @@ class FilesImporterRunnerTest < ActiveSupport::TestCase
     FileUtils.mkdir_p(File.join(root, "pages"))
     FileUtils.mkdir_p(File.join(root, "images"))
     File.write(File.join(root, "images/pic.png"), "PNGDATA")
+    File.write(File.join(root, "images/cover.jpg"), "JPGDATA")
+    File.write(File.join(root, "images/orphan.gif"), "GIFDATA") # referenced by nothing
     File.write(File.join(root, "_posts/2024-01-05-hello.md"), <<~MD)
       ---
       title: Hello
+      image: /images/cover.jpg
       tags: [ruby]
       summary: A summary
       weird: keep me
@@ -38,20 +41,63 @@ class FilesImporterRunnerTest < ActiveSupport::TestCase
             assert_equal 2, r.pages, "pages/about.md + top-level index.html"
 
             assert File.exist?(File.join(posts, "2024-01-05-hello.md")), "filename preserved exactly"
-            assert File.exist?(File.join(media, "images", "pic.png")), "bundled media copied"
+            assert File.exist?(File.join(media, "images", "pic.png")), "bundled body media copied"
+            assert File.exist?(File.join(media, "images", "cover.jpg")), "bundled frontmatter media copied"
+            assert_not File.exist?(File.join(media, "images", "orphan.gif")), "unreferenced media left out by default"
 
             body = File.read(File.join(posts, "2024-01-05-hello.md"))
-            assert_includes body, "](/media/images/pic.png)", "media link rewritten"
+            assert_includes body, "](/media/images/pic.png)", "body media link rewritten"
+            assert_includes body, %(image: "/media/images/cover.jpg"), "frontmatter media link rewritten"
             assert_includes body, "tags:", "tags mapped"
             assert_includes body, "excerpt:", "summary → excerpt"
             assert_includes body, "weird:", "unmapped frontmatter passed through"
             assert_includes body, "source_file:", "dedup key stored"
-            assert_equal [ "/media/images/pic.png" ], r.assets
+            assert_equal %w[/media/images/cover.jpg /media/images/pic.png], r.assets.sort
 
             r2 = runner.import
             assert_equal 0, r2.posts
             assert_equal 0, r2.pages
             assert_equal 3, r2.skipped, "everything already imported"
+          end
+        end
+      end
+    end
+  end
+
+  test "media_mode :all also copies unreferenced bundled media" do
+    Dir.mktmpdir do |root|
+      build_tree(root)
+      Dir.mktmpdir do |posts|
+        Dir.mktmpdir do |pages|
+          Dir.mktmpdir do |media|
+            FilesImporter::Runner.new(
+              root: root, posts_dir: posts, pages_dir: pages, media_root: media, media_mode: :all
+            ).import
+            assert File.exist?(File.join(media, "images", "orphan.gif")), "unreferenced file swept in"
+            assert File.exist?(File.join(media, "images", "cover.jpg")), "referenced file still copied"
+          end
+        end
+      end
+    end
+  end
+
+  test "descends into a single wrapper folder so root-absolute media resolves" do
+    Dir.mktmpdir do |root|
+      # A ZIP made from a folder: everything nested under a wrapper dir, plus a
+      # __MACOSX sibling like real Mac zips.
+      wrapper = File.join(root, "The Briefcase")
+      FileUtils.mkdir_p(File.join(wrapper, "images"))
+      FileUtils.mkdir_p(File.join(root, "__MACOSX"))
+      File.write(File.join(wrapper, "images/ben_patterns.jpg"), "JPG")
+      File.write(File.join(wrapper, "about.html"),
+                 %(<html><body><main><p><img src="/images/ben_patterns.jpg" alt="Ben" /></p></main></body></html>))
+
+      Dir.mktmpdir do |posts|
+        Dir.mktmpdir do |pages|
+          Dir.mktmpdir do |media|
+            r = FilesImporter::Runner.new(root: root, posts_dir: posts, pages_dir: pages, media_root: media).import
+            assert_equal [ "/media/images/ben_patterns.jpg" ], r.assets, "wrapper media resolved + copied"
+            assert File.exist?(File.join(pages, "about.md")), "top-level file classifies as a page"
           end
         end
       end

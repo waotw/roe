@@ -43,6 +43,16 @@
       <% end %>
     </div>
 
+    <div class="bg-white shadow p-6 mb-6">
+      <label class="flex items-center gap-2 text-sm">
+        <%= check_box_tag :media_mode, "all" %>
+        Import <strong>all</strong> bundled media, not just referenced files
+      </label>
+      <p class="text-xs text-gray-500 mt-1 ml-6">
+        By default only images/audio/video your content actually references are copied into your library. Check this to also pull in every other media file in the ZIP.
+      </p>
+    </div>
+
     <div class="flex items-center gap-3">
       <%= submit_tag "IMPORT AS DRAFTS", class: "px-4 py-2 border border-gray-300 text-sm font-mono text-white bg-black hover:bg-white hover:text-black rounded-xs" %>
       <%= link_to "CANCEL", admin_file_imports_path, class: "text-sm text-gray-500 hover:text-gray-700 font-mono" %>

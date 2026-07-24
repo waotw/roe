@@ -20,8 +20,9 @@ class FilesImporter::MediaCopier
   SKIP_SCHEMES = %r{\A(?:https?:|//|data:|mailto:|tel:|#|/media/)}i
 
   def initialize(root:, media_root: File.join(RoeSitePaths::SITE_PATH, "media"))
-    @root       = File.expand_path(root)
-    @media_root = media_root
+    @root           = File.expand_path(root)
+    @media_root     = media_root
+    @copied_sources = Set.new # absolute source paths already copied
   end
 
   # Returns [rewritten_body, [copied "/media/..." paths]]. source_path is the
@@ -45,7 +46,47 @@ class FilesImporter::MediaCopier
     [ new_body, copied ]
   end
 
+  # Rewrites local media references inside a frontmatter hash — a cover `image`,
+  # an `audio`/`artwork` field, or any custom field whose value points at a
+  # bundled file. Non-media values (titles, slugs, the source .md) resolve to
+  # nothing and pass through untouched. Returns [rewritten_hash, [copied paths]].
+  def rewrite_metadata(metadata, source_path)
+    copied = []
+    rewritten = metadata.transform_values { |value| rewrite_value(value, source_path, copied) }
+    [ rewritten, copied ]
+  end
+
+  # For "import all media": copy every bundled media file not already pulled in
+  # by a reference. Returns the copied "/media/..." paths.
+  def copy_unreferenced
+    copied = []
+    Dir.glob(File.join(@root, "**", "*"), File::FNM_DOTMATCH).each do |abs|
+      next unless File.file?(abs) && bucket_for(abs) && !@copied_sources.include?(File.expand_path(abs))
+      path = copy_asset(File.expand_path(abs))
+      copied << path if path
+    end
+    copied
+  end
+
   private
+
+  def rewrite_value(value, source_path, copied)
+    case value
+    when String
+      resolved = resolve(value, source_path)
+      media_path = resolved && copy_asset(resolved)
+      if media_path
+        copied << media_path
+        media_path
+      else
+        value
+      end
+    when Array
+      value.map { |v| rewrite_value(v, source_path, copied) }
+    else
+      value
+    end
+  end
 
   # Absolute path to a bundled asset the URL points at, or nil when it's
   # external, missing, or escapes the import root.
@@ -79,6 +120,7 @@ class FilesImporter::MediaCopier
     filename = destination_name(dir, abs)
     dest = File.join(dir, filename)
     FileUtils.cp(abs, dest) unless File.exist?(dest)
+    @copied_sources << File.expand_path(abs)
     "/media/#{bucket}/#{filename}"
   end
 

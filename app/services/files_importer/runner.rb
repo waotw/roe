@@ -11,13 +11,16 @@ class FilesImporter::Runner
 
   # overrides: { "source/path.md" => "post" | "page" | "skip" } from the review
   # step, taking precedence over the classifier.
-  def initialize(root:, overrides: {}, import_ref: nil,
+  # media_mode: :referenced (default) copies only media a doc references;
+  # :all also copies every other media file bundled in the ZIP/folder.
+  def initialize(root:, overrides: {}, import_ref: nil, media_mode: :referenced,
                  posts_dir: RoeSitePaths::SITE_POSTS_PATH,
                  pages_dir: RoeSitePaths::SITE_PAGES_PATH,
                  media_root: File.join(RoeSitePaths::SITE_PATH, "media"))
-    @root       = File.expand_path(root)
+    @root       = effective_root(File.expand_path(root))
     @overrides  = (overrides || {}).transform_values(&:to_s)
     @import_ref = import_ref
+    @media_mode = media_mode.to_sym
     @parser     = FilesImporter::Parser.new
     @writer     = ContentWriter.new(posts_dir: posts_dir, pages_dir: pages_dir)
     @copier     = FilesImporter::MediaCopier.new(root: @root, media_root: media_root)
@@ -45,11 +48,12 @@ class FilesImporter::Runner
         next
       end
 
-      body, assets = @copier.rewrite(doc.body, rel)
-      result.assets.concat(assets)
+      metadata, meta_assets = @copier.rewrite_metadata(metadata_for(doc, kind), rel)
+      body, body_assets = @copier.rewrite(doc.body, rel)
+      result.assets.concat(meta_assets).concat(body_assets)
 
       target = (kind == :page ? :page : :post)
-      @writer.write(kind: target, filename: doc.basename, metadata: metadata_for(doc, kind), body: body)
+      @writer.write(kind: target, filename: doc.basename, metadata: metadata, body: body)
 
       target == :page ? result.pages += 1 : result.posts += 1
       result.ambiguous << rel if kind == :ambiguous
@@ -57,10 +61,30 @@ class FilesImporter::Runner
       result.warnings << "#{rel}: #{e.class} #{e.message}"
       Rails.logger.error "[FilesImporter] #{rel}: #{e.class} #{e.message}"
     end
+
+    # "Import all media" — sweep in any bundled files nothing referenced.
+    result.assets.concat(@copier.copy_unreferenced) if @media_mode == :all
     result
   end
 
   private
+
+  # A ZIP made from a folder unwraps to a single top-level directory (often
+  # alongside __MACOSX / dotfiles). Descend into that wrapper so root-absolute
+  # asset paths (/images/x) resolve and top-level files classify as pages.
+  # Don't descend into a real content folder (posts/, _posts/, pages/) — that
+  # would change how its files classify.
+  def effective_root(dir)
+    entries = Dir.children(dir).reject { |e| e.start_with?(".") || IGNORE_DIRS.include?(e) }
+    return dir unless entries.size == 1
+
+    only = entries.first
+    full = File.join(dir, only)
+    return dir unless File.directory?(full)
+
+    content_folder = (FilesImporter::Classifier::POST_DIRS + FilesImporter::Classifier::PAGE_DIRS).include?(only.downcase)
+    content_folder ? dir : effective_root(full)
+  end
 
   def resolved_kind(doc, rel)
     case @overrides[rel]
