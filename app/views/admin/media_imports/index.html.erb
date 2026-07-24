@@ -1,0 +1,72 @@
+<% s = @status.respond_to?(:with_indifferent_access) ? @status.with_indifferent_access : {} %>
+<% status_state = s[:state] %>
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold mb-2">Media Imports</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Finds external images, audio, and video linked across your posts, pages, and
+    products, downloads them into your local media library, and rewrites the
+    links. Downloads run in the background — big audio and video are fine.
+  </p>
+
+  <%# Live panel only while running — polling. Terminal states render a static
+      panel (no controller) so the "done" reload can't loop. %>
+  <% if status_state == "running" %>
+    <div class="bg-white shadow p-6 mb-6"
+         data-controller="media-import-status"
+         data-media-import-status-url-value="<%= status_admin_media_imports_path %>">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium text-gray-800" data-media-import-status-target="state">Working…</p>
+          <p class="text-xs text-gray-500 mt-1" data-media-import-status-target="detail"></p>
+        </div>
+        <%= button_to "Dismiss", dismiss_status_admin_media_imports_path, method: :delete,
+              class: "text-xs text-gray-500 hover:text-gray-700 font-mono" %>
+      </div>
+    </div>
+  <% elsif %w[done failed].include?(status_state) %>
+    <div class="bg-white shadow p-6 mb-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <% if status_state == "done" %>
+            <p class="text-sm font-medium text-green-800">Media import complete</p>
+            <p class="text-xs text-gray-500 mt-1">
+              <%= pluralize(s[:downloaded].to_i, "file") %> downloaded · <%= pluralize(s[:rewritten].to_i, "item") %> updated<%= " · #{s[:failed]} failed" if s[:failed].to_i.positive? %>
+            </p>
+          <% else %>
+            <p class="text-sm font-medium text-red-800">Media import failed</p>
+            <p class="text-xs text-gray-500 mt-1"><%= s[:error] %></p>
+          <% end %>
+        </div>
+        <%= button_to "Dismiss", dismiss_status_admin_media_imports_path, method: :delete,
+              class: "text-xs text-gray-500 hover:text-gray-700 font-mono" %>
+      </div>
+    </div>
+  <% end %>
+
+  <% total = @summary.values.sum { |v| v[:urls] } %>
+  <% if total.zero? %>
+    <div class="bg-white shadow p-6 text-sm text-gray-600">
+      No external media found — everything referenced is already local.
+    </div>
+  <% else %>
+    <div class="bg-white shadow p-6">
+      <%= form_with url: admin_media_imports_path, method: :post, data: { turbo: false } do %>
+        <p class="text-sm font-medium text-gray-700 mb-3">Choose what to import</p>
+        <% Admin::MediaImportsController::TYPES.each do |type| %>
+          <% info = @summary[type.to_sym] %>
+          <% next unless info && info[:urls].positive? %>
+          <label class="flex items-center gap-2 mb-2 text-sm">
+            <%= check_box_tag "types[]", type, true, id: "type_#{type}" %>
+            <span class="capitalize font-medium"><%= type %></span>
+            <span class="text-gray-400"><%= pluralize(info[:urls], "file") %> across <%= pluralize(info[:records], "item") %></span>
+          </label>
+        <% end %>
+        <p class="text-xs text-gray-500 mt-3 mb-4">
+          Unreachable links are skipped and left as-is — you can re-run any time.
+        </p>
+        <%= submit_tag "Import selected",
+              class: "uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs cursor-pointer" %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

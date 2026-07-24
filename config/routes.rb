@@ -287,6 +287,13 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :media_imports, only: [ :index, :create ] do
+      collection do
+        get :status
+        delete :dismiss_status
+      end
+    end
+
     resources :emails, only: [ :index, :edit, :update ] do
       member do
         post :preview
