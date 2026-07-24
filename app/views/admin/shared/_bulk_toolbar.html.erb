@@ -11,11 +11,11 @@
   <div class="flex-1"></div>
   <button type="button" data-action="bulk-select#openPublish" data-bulk-select-target="publishButton"
           class="hidden uppercase text-xs px-3 py-1 border border-green-400 bg-green-100 text-green-800 hover:bg-green-200 font-mono rounded-xs cursor-pointer">
-    Publish selected
+    PUBLISH SELECTED
   </button>
   <button type="button" data-action="bulk-select#openDelete"
           class="uppercase text-xs px-3 py-1 border border-red-400 bg-red-100 text-red-700 hover:bg-red-200 font-mono rounded-xs cursor-pointer">
-    Delete selected
+    DELETE SELECTED
   </button>
 </div>
 
@@ -37,10 +37,10 @@
       <div data-bulk-select-target="deleteIds"></div>
       <div class="flex gap-3 justify-end">
         <button type="button" data-action="bulk-select#closeModals"
-                class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                class="px-4 py-2 border font-mono border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 rounded-xs">CANCEL</button>
         <button type="submit" data-bulk-select-target="deleteSubmit" disabled
-                class="px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
-          Delete Permanently
+                class="px-4 py-2 font-mono border border-transparent text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xs">
+          DELETE PERMANENTLY
         </button>
       </div>
     <% end %>
@@ -62,9 +62,9 @@
       <div data-bulk-select-target="publishIds"></div>
       <div class="flex gap-3 justify-end">
         <button type="button" data-action="bulk-select#closeModals"
-                class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">CANCEL</button>
         <button type="submit"
-                class="px-4 py-2 border border-transparent text-sm font-medium text-white bg-green-600 hover:bg-green-700">Publish</button>
+                class="px-4 py-2 border border-transparent text-sm font-medium text-white bg-green-600 hover:bg-green-700">PUBLISH</button>
       </div>
     <% end %>
   </div>

@@ -33,15 +33,15 @@
     <div class="flex gap-3 justify-end">
       <button type="button"
               onclick="hideDeleteConfirmation('<%= resource_type %>')"
-              class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-        Cancel
+              class="px-4 py-2 border font-mono border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 rounded-xs">
+        CANCEL
       </button>
-      <%= button_to "Delete Permanently",
+      <%= button_to "DELETE PERMANENTLY",
           delete_path,
           method: :delete,
           id: "delete-confirm-btn-#{resource_type}",
           disabled: true,
-          class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed",
+          class: "px-4 py-2 border font-mono border-transparent text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xs",
           form: {
             onsubmit: "return document.getElementById('delete-confirmation-input-#{resource_type}').value === 'DELETE'",
             style: "display: inline; margin: 0;"
