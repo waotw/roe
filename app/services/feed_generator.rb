@@ -171,13 +171,10 @@ class FeedGenerator
 
               # Audio enclosure — omit for paid episodes in public feed
               if post.metadata["audio"].present? && (!is_paid || include_paid)
-                audio_url = audio_full_url(post.metadata["audio"])
-                audio_path = audio_file_path(post.metadata["audio"])
-
                 xml.enclosure(
-                  url: audio_url,
-                  length: audio_file_size(audio_path),
-                  type: audio_mime_type(audio_path)
+                  url:    audio_full_url(post.metadata["audio"]),
+                  length: audio_byte_length(post),
+                  type:   audio_content_type(post)
                 )
               end
 
@@ -300,9 +297,31 @@ class FeedGenerator
   end
 
   def audio_full_url(audio_path)
-    # Remove leading slash if present
+    # An already-absolute URL (a referenced remote file, e.g. an episode
+    # imported with remote audio) is the enclosure URL as-is. Prepending the
+    # site URL would produce a broken https://mysite/https://host/… link — so
+    # only local /media paths get the site URL prepended.
+    return audio_path if audio_path.to_s.match?(%r{\Ahttps?://})
+
     clean_path = audio_path.start_with?("/") ? audio_path[1..-1] : audio_path
     "#{site_config[:url]}/#{clean_path}"
+  end
+
+  # Enclosure byte length. Prefer a stored `audio_bytes` (importers set this
+  # from the source feed for remote audio Roe can't stat locally); otherwise
+  # stat the local /media file; 0 when neither is available.
+  def audio_byte_length(post)
+    stored = post.metadata["audio_bytes"]
+    return stored.to_i if stored.present?
+
+    path = audio_file_path(post.metadata["audio"])
+    File.exist?(path) ? File.size(path) : 0
+  end
+
+  # Enclosure MIME type. Prefer a stored `audio_type`; otherwise derive it from
+  # the file extension.
+  def audio_content_type(post)
+    post.metadata["audio_type"].presence || audio_mime_type(post.metadata["audio"].to_s)
   end
 
   # Build an absolute URL for an image. Pass `variant:` to point at a

@@ -26,6 +26,9 @@
 # it's nil — consumers should match by slug / link instead.
 class PodcastFeedParser
   ITUNES_NS = { "itunes" => "http://www.itunes.com/dtds/podcast-1.0.dtd" }.freeze
+  # RSS content module — carries <content:encoded>, the full HTML body
+  # (article content / show notes) that's richer than <description>.
+  CONTENT_NS = { "content" => "http://purl.org/rss/1.0/modules/content/" }.freeze
 
   def self.parse(xml_string)
     new(xml_string).parse
@@ -110,21 +113,26 @@ class PodcastFeedParser
     doc.xpath("//item").map do |item|
       guid = text(item, "guid")
       enclosure = item.at_xpath("enclosure")
+      enc_url = enclosure&.attribute("url")&.value
 
       {
         guid:             guid,
         substack_post_id: extract_substack_post_id(guid),
         title:            text(item, "title"),
         description:      text(item, "description"),
+        content_html:     content_encoded(item),
         link:             text(item, "link"),
         pub_date:         text(item, "pubDate"),
         author:           itunes_text(item, "author"),
         explicit:         itunes_text(item, "explicit"),
         duration:         itunes_text(item, "duration"),
+        episode:          itunes_text(item, "episode"),
+        season:           itunes_text(item, "season"),
+        episode_type:     itunes_text(item, "episodeType"),
         image_url:        item.at_xpath("itunes:image", ITUNES_NS)&.attribute("href")&.value,
-        enclosure_url:    enclosure&.attribute("url")&.value,
-        enclosure_type:   enclosure&.attribute("type")&.value,
-        enclosure_length: enclosure&.attribute("length")&.value
+        enclosure_url:    enc_url,
+        enclosure_type:   enclosure_mime(enc_url, enclosure&.attribute("type")&.value),
+        enclosure_length: to_bytes(enclosure&.attribute("length")&.value)
       }
     end
   end
@@ -140,7 +148,7 @@ class PodcastFeedParser
     feed = doc.root
     return {} unless feed && feed.name == "feed"
 
-    author_name  = feed.at_xpath("author/name")&.text&.strip
+    author_name  = atom_author(feed)
     author_email = feed.at_xpath("author/email")&.text&.strip
 
     {
@@ -180,6 +188,7 @@ class PodcastFeedParser
 
     doc.root.xpath("entry").map do |entry|
       enclosure = atom_link_node(entry, "enclosure")
+      enc_url = enclosure&.attribute("href")&.value
 
       {
         # Atom's <id> is the equivalent of RSS's <guid>. Carries
@@ -194,6 +203,11 @@ class PodcastFeedParser
         # <summary> for feeds that only carry the shorter form.
         description:      text(entry, "content") || text(entry, "summary"),
 
+        # Hybrid Atom feeds (FeedPress) carry <content:encoded> for the full
+        # body; after remove_namespaces! it's just <encoded>. nil on pure Atom
+        # (its body already comes through `description` above).
+        content_html:     text(entry, "encoded"),
+
         link:             atom_link_href(entry, "alternate"),
 
         # Atom prefers <published> for original publish date and
@@ -201,14 +215,21 @@ class PodcastFeedParser
         # pub_date string, so fall through if published is absent.
         pub_date:         text(entry, "published") || text(entry, "updated"),
 
-        author:           entry.at_xpath("author/name")&.text&.strip,
-        explicit:         nil,
-        duration:         nil,
-        image_url:        nil,
+        author:           atom_author(entry),
 
-        enclosure_url:    enclosure&.attribute("href")&.value,
-        enclosure_type:   enclosure&.attribute("type")&.value,
-        enclosure_length: enclosure&.attribute("length")&.value
+        # Pure Atom carries none of these, so they're nil there. Hybrid Atom
+        # feeds embed iTunes tags (unprefixed after remove_namespaces!), so
+        # read them the same way the channel extractor already does.
+        explicit:         text(entry, "explicit"),
+        duration:         text(entry, "duration"),
+        episode:          text(entry, "episode"),
+        season:           text(entry, "season"),
+        episode_type:     text(entry, "episodeType"),
+        image_url:        entry.at_xpath("image")&.attribute("href")&.value,
+
+        enclosure_url:    enc_url,
+        enclosure_type:   enclosure_mime(enc_url, enclosure&.attribute("type")&.value),
+        enclosure_length: to_bytes(enclosure&.attribute("length")&.value)
       }
     end
   end
@@ -229,6 +250,45 @@ class PodcastFeedParser
 
   def itunes_text(node, name)
     node.at_xpath("itunes:#{name}", ITUNES_NS)&.text&.strip
+  end
+
+  # <content:encoded> — the full HTML body (article content / show notes),
+  # distinct from the shorter <description>. nil when absent or empty.
+  def content_encoded(item)
+    item.at_xpath("content:encoded", CONTENT_NS)&.text&.strip.presence
+  end
+
+  # Enclosure byte length as an Integer (feeds carry it as a string), or nil
+  # when absent/blank — feeds this into the episode's `audio_bytes` so a
+  # re-published feed's <enclosure length> is correct even for remote audio.
+  def to_bytes(value)
+    value.to_s.strip.presence&.to_i
+  end
+
+  # Enclosure MIME type: the declared `type` if present, else inferred from the
+  # URL's file extension. Some feeds (FeedPress's Atom) ship a bare
+  # <link rel="enclosure" href="…mp3"> with no type — inferring keeps the item
+  # classifiable as an episode and gives a re-published feed a valid type.
+  def enclosure_mime(url, declared)
+    return declared.strip if declared.present?
+
+    ext = File.extname(url.to_s.split(/[?#]/).first.to_s).downcase
+    AUDIO_MIME[ext]
+  end
+
+  AUDIO_MIME = {
+    ".mp3" => "audio/mpeg", ".m4a" => "audio/x-m4a", ".mp4" => "audio/mp4",
+    ".m4b" => "audio/mp4",  ".aac" => "audio/aac",   ".wav" => "audio/wav",
+    ".ogg" => "audio/ogg",  ".oga" => "audio/ogg",   ".opus" => "audio/opus",
+    ".flac" => "audio/flac"
+  }.freeze
+
+  # Standard Atom nests the name (<author><name>X</name></author>); iTunes
+  # feeds carry a bare <itunes:author>X</itunes:author> — just <author>X</author>
+  # after remove_namespaces!. `author[not(name)]` catches that bare form.
+  def atom_author(node)
+    node.at_xpath("author/name")&.text&.strip.presence ||
+      node.at_xpath("author[not(name)]")&.text&.strip.presence
   end
 
   # Find an <link rel="X"> child node. Atom allows multiple <link>

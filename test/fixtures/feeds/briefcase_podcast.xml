@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" media="screen" href="/~files/atom-premium.xsl"?>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:feedpress="https://feed.press/xmlns" xmlns:media="http://search.yahoo.com/mrss/" xmlns:podcast="https://podcastindex.org/namespace/1.0" xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:dc="http://purl.org/dc/elements/1.1/" lang="en">
+  <feedpress:locale>en</feedpress:locale>
+  <link rel="hub" href="https://feedpress.superfeedr.com/"/>
+  <itunes:category text="Society &amp; Culture">
+    <itunes:category text="Philosophy"/>
+  </itunes:category>
+  <media:category scheme="http://www.itunes.com/dtds/podcast-1.0.dtd">Society &amp; Culture/Philosophy</media:category>
+  <media:rating>nonadult</media:rating>
+  <media:description type="plain">The Briefcase: Podcast</media:description>
+  <media:credit role="author">Benjamin Welch</media:credit>
+  <media:keywords>philosophy, commentary, memoir, culture, essay</media:keywords>
+  <media:copyright>Copyright © 2009-2023 Benjamin Welch</media:copyright>
+  <copyright>Copyright © 2009-2023 Benjamin Welch</copyright>
+  <dc:creator>Benjamin Welch</dc:creator>
+  <feedpress:podcastId>553753672</feedpress:podcastId>
+  <itunes:new-feed-url>https://feedpress.me/thebriefcasepodcast</itunes:new-feed-url>
+  <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+  <itunes:explicit>false</itunes:explicit>
+  <itunes:author>Benjamin Welch</itunes:author>
+  <itunes:owner>
+    <itunes:email>ben@thebriefcase.org</itunes:email>
+    <itunes:name>Benjamin Welch</itunes:name>
+  </itunes:owner>
+  <itunes:summary>The Briefcase is an autobiographical, narrative podcast. Part music project, part memoir, part recommendations. The world is a confusing place. I’ll do my best to sort it out for you and me. One episode at a time.</itunes:summary>
+  <itunes:subtitle>The Briefcase: Podcast</itunes:subtitle>
+  <language>en</language>
+  <googleplay:email>ben@thebriefcase.org</googleplay:email>
+  <googleplay:description>The Briefcase is an autobiographical, narrative podcast. Part music project, part memoir, part recommendations. The world is a confusing place. I’ll do my best to sort it out for you and me. One episode at a time.</googleplay:description>
+  <googleplay:explicit>no</googleplay:explicit>
+  <googleplay:author>Benjamin Welch</googleplay:author>
+  <id>http://thebriefcase.org/</id>
+  <title>The Briefcase: Podcast</title>
+  <link rel="alternate" href="http://thebriefcase.org/"/>
+  <link rel="self" href="https://feedpress.me/thebriefcasepodcast"/>
+  <author>
+    <name>Benjamin Welch</name>
+    <uri>http://thebriefcase.org</uri>
+  </author>
+  <entry>
+    <id>tag:thebriefcase.org,2013-05-31:/articles/the-journal.html</id>
+    <title type="html">09 - The Journal</title>
+    <published>2013-05-31T05:00:00Z</published>
+    <updated>2013-05-31T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/the-journal.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2013/05/thebriefcase-009.mp3"/>
+    <content type="html"><![CDATA[
+<h2 id="show-notes--music">Show Notes &amp; Music</h2>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2013/05/diary.mp3" title="Download Beginnings">Diary</a></li>
+</ol>
+
+<p>This track is licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>If you enjoy the show, please tell your friends and rate it in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>. Thanks so much for listening.</p>
+
+]]></content>
+    <summary type="html">I kept an audio journal for a little under 3 months. This was 5 years ago. I'm not sure why I started but while I was recording, the darnedest thing happened.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>
+Show Notes &amp;amp; Music
+
+Diary
+
+This track is licensed under a Creative Commons License. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your c…</itunes:subtitle>
+    <itunes:summary>
+&lt;h2 id="show-notes--music"&gt;Show Notes &amp;amp; Music&lt;/h2&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2013/05/diary.mp3" title="Download Beginnings"&gt;Diary&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This track is licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;If you enjoy the show, please tell your friends and rate it in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;. Thanks so much for listening.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-11-27:/articles/my-love-for-you-might-still-be-strong.html</id>
+    <title type="html">08 - My Love for You</title>
+    <published>2012-11-27T06:00:00Z</published>
+    <updated>2012-11-27T06:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/my-love-for-you-might-still-be-strong.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/11/thebriefcase-008.mp3"/>
+    <content type="html"><![CDATA[
+<h2 id="show-notes--music">Show Notes &amp; Music</h2>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/11/beginnings.mp3" title="Download Beginnings">Beginnings</a></li>
+</ol>
+
+<p>This track is licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>If you enjoy the show, please tell your friends and rate it in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>. Thanks so much for listening.</p>
+
+]]></content>
+    <summary type="html">A story about the first time I became really aware of music and what it could do to me.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>
+Show Notes &amp;amp; Music
+
+Beginnings
+
+This track is licensed under a Creative Commons License. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your c…</itunes:subtitle>
+    <itunes:summary>
+&lt;h2 id="show-notes--music"&gt;Show Notes &amp;amp; Music&lt;/h2&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/11/beginnings.mp3" title="Download Beginnings"&gt;Beginnings&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This track is licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;If you enjoy the show, please tell your friends and rate it in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;. Thanks so much for listening.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-10-12:/articles/the-breakup.html</id>
+    <title type="html">07 - The Breakup</title>
+    <published>2012-10-12T05:00:00Z</published>
+    <updated>2012-10-12T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/the-breakup.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/10/thebriefcase-007.mp3"/>
+    <content type="html"><![CDATA[
+<h2 id="show-notes">Show Notes</h2>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/10/surprises.mp3" title="Download Surprises">Surprises</a></li>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/10/waiting.mp3" title="Download Waiting">Waiting</a></li>
+</ol>
+
+<p>This track is licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>This podcast is a really important thing in my life. Thanks so much for listening.</p>
+
+]]></content>
+    <summary type="html">Oh the times, they are changing.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>
+Show Notes
+
+Surprises
+Waiting
+
+This track is licensed under a Creative Commons License. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial p…</itunes:subtitle>
+    <itunes:summary>
+&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/10/surprises.mp3" title="Download Surprises"&gt;Surprises&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/10/waiting.mp3" title="Download Waiting"&gt;Waiting&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This track is licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;This podcast is a really important thing in my life. Thanks so much for listening.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-10-05:/articles/the-bystanders.html</id>
+    <title type="html">06 - The Bystanders</title>
+    <published>2012-10-05T05:00:00Z</published>
+    <updated>2012-10-05T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/the-bystanders.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/10/thebriefcase-006.mp3"/>
+    <content type="html"><![CDATA[<h2 id="show-notes">Show Notes</h2>
+
+<p>This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:</p>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/10/surprises.mp3" title="Download Surprises">Surprises</a></li>
+</ol>
+
+<p>This track is licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>.</p>
+
+]]></content>
+    <summary type="html">I've been living in Los Angeles my whole life. It's about time I had a movie idea.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>Show Notes
+This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:
+
+Surprises
+
+This track is licensed under a Creative Commons License. Feel free to…</itunes:subtitle>
+    <itunes:summary>&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;p&gt;This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/10/surprises.mp3" title="Download Surprises"&gt;Surprises&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This track is licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-09-27:/articles/field-of-dreams.html</id>
+    <title type="html">05 - Field of Dreams</title>
+    <published>2012-09-27T05:00:00Z</published>
+    <updated>2012-09-27T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/field-of-dreams.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/09/thebriefcase-005.mp3"/>
+    <content type="html"><![CDATA[<h2 id="show-notes">Show Notes</h2>
+
+<p>This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:</p>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/09/star.mp3" title="Download Star">Star</a></li>
+</ol>
+
+<p>This track is licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>Audio clips:</p>
+
+<ol>
+  <li><a href="http://www.youtube.com/watch?v=lkUYS3WbILM">Take Me Out to the Ballgame</a></li>
+  <li><a href="http://www.imdb.com/title/tt0104694/">A League of Their Own</a> on <a href="http://movies.netflix.com/WiMovie/A_League_of_Their_Own/691124?locale=en-US">Netflix</a></li>
+</ol>
+
+<p>Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>.</p>
+
+]]></content>
+    <summary type="html">Some people take to sports like a dolphin to the sea. I'm not one of those people.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>Show Notes
+This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:
+
+Star
+
+This track is licensed under a Creative Commons License. Feel free to copy…</itunes:subtitle>
+    <itunes:summary>&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;p&gt;This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/09/star.mp3" title="Download Star"&gt;Star&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This track is licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share it. Just include my name if you publish it. And don’t use it in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Audio clips:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://www.youtube.com/watch?v=lkUYS3WbILM"&gt;Take Me Out to the Ballgame&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://www.imdb.com/title/tt0104694/"&gt;A League of Their Own&lt;/a&gt; on &lt;a href="http://movies.netflix.com/WiMovie/A_League_of_Their_Own/691124?locale=en-US"&gt;Netflix&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-09-19:/articles/superman-isnt-brave.html</id>
+    <title type="html">04 - Superman Isn't Brave</title>
+    <published>2012-09-19T05:00:00Z</published>
+    <updated>2012-09-19T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/superman-isnt-brave.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/09/thebriefcase-004.mp3"/>
+    <content type="html"><![CDATA[<h2 id="show-notes">Show Notes</h2>
+
+<p>This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:</p>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/09/drive.mp3" title="Download Drive">Drive</a></li>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/09/woods.mp3" title="Download Woods">Woods</a></li>
+</ol>
+
+<p>These tracks are licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share them. Just include my name if you publish them. And don’t use them in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>Check out Angus on <a href="http://itunes.apple.com/us/movie/angus-1995/id383490021" title="Angus on iTunes">iTunes</a> or <a href="http://www.amazon.com/Angus/dp/B0047E7ESG/ref=pd_sim_sbs_mov_2" title="Angus on Amazon">Amazon</a>.</p>
+
+<p>Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>.</p>
+
+]]></content>
+    <summary type="html">Sure, I'll review a movie. As long as it's kind of obscure and 17 years old.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>Show Notes
+This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:
+
+Drive
+Woods
+
+These tracks are licensed under a Creative Commons License. Feel…</itunes:subtitle>
+    <itunes:summary>&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;p&gt;This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/09/drive.mp3" title="Download Drive"&gt;Drive&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/09/woods.mp3" title="Download Woods"&gt;Woods&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;These tracks are licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share them. Just include my name if you publish them. And don’t use them in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Check out Angus on &lt;a href="http://itunes.apple.com/us/movie/angus-1995/id383490021" title="Angus on iTunes"&gt;iTunes&lt;/a&gt; or &lt;a href="http://www.amazon.com/Angus/dp/B0047E7ESG/ref=pd_sim_sbs_mov_2" title="Angus on Amazon"&gt;Amazon&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-09-11:/articles/wheres-my-party.html</id>
+    <title type="html">03 - Where's My Party?</title>
+    <published>2012-09-11T05:00:00Z</published>
+    <updated>2012-09-11T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/wheres-my-party.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/09/thebriefcase-003.mp3"/>
+    <content type="html"><![CDATA[<h2 id="show-notes">Show Notes</h2>
+
+<p>This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:</p>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/09/people.mp3" title="Download People">People</a></li>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/09/party.mp3" title="Download Party">Party</a></li>
+</ol>
+
+<p>These tracks are licensed under a <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)">Creative Commons License</a>. Feel free to copy and share them. Just include my name if you publish them. And don’t use them in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>.</p>
+
+]]></content>
+    <summary type="html">There's nothing like mingling at a political party.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>Show Notes
+This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:
+
+People
+Party
+
+These tracks are licensed under a Creative Commons License. Feel…</itunes:subtitle>
+    <itunes:summary>&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;p&gt;This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/09/people.mp3" title="Download People"&gt;People&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/09/party.mp3" title="Download Party"&gt;Party&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;These tracks are licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc-nd/3.0/deed.en_US" title="Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy and share them. Just include my name if you publish them. And don’t use them in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-08-31:/articles/zombies-bad-chubby-good.html</id>
+    <title type="html">02 - Zombies Bad, Chubby Good</title>
+    <published>2012-08-31T05:00:00Z</published>
+    <updated>2012-08-31T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/zombies-bad-chubby-good.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/08/thebriefcase-002.mp3"/>
+    <content type="html"><![CDATA[<h2 id="show-notes">Show Notes</h2>
+
+<p>This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:</p>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/08/moves.mp3" title="Download Moves">Moves</a></li>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/08/bedtime.mp3" title="Download Bedtime">Bedtime</a></li>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/08/baby.mp3" title="Download Baby">Baby</a></li>
+</ol>
+
+<p>These tracks are licensed under a <a href="http://creativecommons.org/licenses/by-nc/3.0/deed.en_US" title="Creative Commons: Attribution-NonCommercial 3.0 Unported (CC BY-NC 3.0)">Creative Commons License</a>. Feel free to copy, share and remix these tracks. Just include my name if you publish them. And don’t use them in your commercial projects without permission. You can get in touch <a href="http://thebriefcase.org/contact.html">here</a>.</p>
+
+<p>Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes">iTunes</a>.</p>
+
+]]></content>
+    <summary type="html">There's a storm coming and I hope you're ready for it.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>Show Notes
+This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:
+
+Moves
+Bedtime
+Baby
+
+These tracks are licensed under a Creative Commons License.…</itunes:subtitle>
+    <itunes:summary>&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;p&gt;This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/08/moves.mp3" title="Download Moves"&gt;Moves&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/08/bedtime.mp3" title="Download Bedtime"&gt;Bedtime&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/08/baby.mp3" title="Download Baby"&gt;Baby&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;These tracks are licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc/3.0/deed.en_US" title="Creative Commons: Attribution-NonCommercial 3.0 Unported (CC BY-NC 3.0)"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy, share and remix these tracks. Just include my name if you publish them. And don’t use them in your commercial projects without permission. You can get in touch &lt;a href="/contact.html"&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Thanks so much for listening. If you enjoy The Briefcase, please tell your friends or rate the show in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672" title="URL to The Briefcase in iTunes"&gt;iTunes&lt;/a&gt;.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+  <entry>
+    <id>tag:thebriefcase.org,2012-08-15:/articles/my-comics-arent-for-kids.html</id>
+    <title type="html">01 - My Comics Aren't for Kids</title>
+    <published>2012-08-15T05:00:00Z</published>
+    <updated>2012-08-15T05:00:00Z</updated>
+    <link rel="alternate" href="http://thebriefcase.org/articles/my-comics-arent-for-kids.html"/>
+    <link rel="enclosure" href="http://s3.amazonaws.com/thebriefcase/2012/08/thebriefcase-001.mp3"/>
+    <content type="html"><![CDATA[<h2 id="show-notes">Show Notes</h2>
+
+<p>This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:</p>
+
+<ol>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/08/arcade.mp3" title="Download">Arcade</a></li>
+  <li><a href="http://s3.amazonaws.com/thebriefcase/2012/08/baskerville.mp3" title="Download">Baskerville</a></li>
+</ol>
+
+<p>These tracks are licensed under a <a href="http://creativecommons.org/licenses/by-nc/3.0/deed.en_US" title="Creative Commons Attribution-NonCommercial 3.0 Unported">Creative Commons License</a>. Feel free to copy, share and remix these tracks. Just include my name if you publish them and don’t use them in your commercial projects without permission.</p>
+
+<p>For those of you looking for a great comic shop:</p>
+
+<ul>
+  <li><a href="http://thesecretheadquarters.com" title="Secret Headquarters">Secret Headquarters</a> in Silver Lake</li>
+  <li><a href="http://bergenstreetcomics.com" title="Bergen Street Comics">Bergen Street Comics</a> in Brooklyn</li>
+</ul>
+
+<p>If you enjoy The Briefcase, please tell your friends or rate the show in <a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672">iTunes</a>.</p>
+
+]]></content>
+    <summary type="html">This is the first episode of The Briefcase. I talk about comic books. And why you should read them.</summary>
+    <itunes:author>Benjamin Welch</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>philosophy, commentary, memoir, culture, essay</itunes:keywords>
+    <dc:creator>Benjamin Welch</dc:creator>
+    <itunes:subtitle>Show Notes
+This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:
+
+Arcade
+Baskerville
+
+These tracks are licensed under a Creative Commons License.…</itunes:subtitle>
+    <itunes:summary>&lt;h2 id="show-notes"&gt;Show Notes&lt;/h2&gt;
+
+&lt;p&gt;This episode was produced by me, Benjamin Welch. The music heard in this episode can be downloaded here:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/08/arcade.mp3" title="Download"&gt;Arcade&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://s3.amazonaws.com/thebriefcase/2012/08/baskerville.mp3" title="Download"&gt;Baskerville&lt;/a&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;These tracks are licensed under a &lt;a href="http://creativecommons.org/licenses/by-nc/3.0/deed.en_US" title="Creative Commons Attribution-NonCommercial 3.0 Unported"&gt;Creative Commons License&lt;/a&gt;. Feel free to copy, share and remix these tracks. Just include my name if you publish them and don’t use them in your commercial projects without permission.&lt;/p&gt;
+
+&lt;p&gt;For those of you looking for a great comic shop:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href="http://thesecretheadquarters.com" title="Secret Headquarters"&gt;Secret Headquarters&lt;/a&gt; in Silver Lake&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://bergenstreetcomics.com" title="Bergen Street Comics"&gt;Bergen Street Comics&lt;/a&gt; in Brooklyn&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;If you enjoy The Briefcase, please tell your friends or rate the show in &lt;a href="http://itunes.apple.com/us/podcast/the-briefcase-podcast-feed/id553753672"&gt;iTunes&lt;/a&gt;.&lt;/p&gt;
+
+</itunes:summary>
+  </entry>
+</feed>
