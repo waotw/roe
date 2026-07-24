@@ -273,6 +273,12 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :file_imports, only: [ :index, :create, :show, :destroy ] do
+      collection do
+        post :run
+      end
+    end
+
     resources :emails, only: [ :index, :edit, :update ] do
       member do
         post :preview

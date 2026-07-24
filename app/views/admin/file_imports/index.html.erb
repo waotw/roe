@@ -1,0 +1,69 @@
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold mb-2">File Imports</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Upload a ZIP of markdown and/or HTML — a blog export, a static site, a folder
+    of notes. Files come in as drafts: posts and pages sorted out by folder and
+    frontmatter, with a review step for anything unclear. Bundled images and
+    media are copied into your library and their links rewritten. Nothing is
+    published until you review it.
+  </p>
+
+  <div class="bg-white shadow p-6">
+    <%= form_with url: admin_file_imports_path, method: :post, multipart: true, data: { turbo: false } do %>
+      <label for="archive" class="uppercase text-xs px-3 py-1 border border-blue-700 bg-blue-200 text-blue-600 hover:bg-blue-700 hover:text-white font-mono rounded-xs cursor-pointer">ZIP FILE</label>
+      <div class="flex flex-wrap items-center gap-3">
+        <%= file_field_tag "file_import[archive]", accept: ".zip", id: "archive", class: "text-sm" %>
+        <%= submit_tag "Upload & review", class: "uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if @imports.any? %>
+    <h2 class="text-lg font-medium mt-8 mb-3">Previous imports</h2>
+    <div class="bg-white shadow overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs uppercase text-gray-400 border-b border-gray-200">
+            <th class="px-4 py-2 font-medium">Import</th>
+            <th class="px-4 py-2 font-medium">When</th>
+            <th class="px-4 py-2 font-medium">Content</th>
+            <th class="px-4 py-2 font-medium text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @imports.each do |import| %>
+            <% drafts = import.ref_draft_count; published = import.ref_published_count %>
+            <tr class="border-b border-gray-100">
+              <td class="px-4 py-2">
+                <%= link_to "Import ##{import.id}", admin_file_import_path(import), class: "text-blue-700 hover:underline font-medium" %>
+              </td>
+              <td class="px-4 py-2 text-gray-500"><%= import.created_at.strftime("%b %-d, %Y · %-l:%M %p") %></td>
+              <td class="px-4 py-2 text-gray-600">
+                <%= pluralize(drafts, "draft") %><% if published.positive? %> · <span class="text-gray-500"><%= published %> published</span><% end %>
+              </td>
+              <td class="px-4 py-2 text-right">
+                <button type="button"
+                        data-action="delete"
+                        data-resource-id="<%= import.id %>"
+                        data-resource-title="Import #<%= import.id %>"
+                        data-resource-type="import"
+                        data-delete-url="<%= admin_file_import_path(import) %>"
+                        class="uppercase text-xs px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs cursor-pointer">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <%# One delete modal for the whole table; delete_modal.js retargets its form
+        to the clicked row via data-delete-url. Only DRAFT content is removed. %>
+    <%= render "shared/delete_file_modal",
+               resource_type: "import",
+               resource: @imports.first,
+               delete_path: admin_file_import_path(@imports.first),
+               delete_message: "This deletes the DRAFT posts and pages from this import (file and record). Published posts and pages are kept — remove those manually from Posts/Pages. You can always re-import.".html_safe %>
+  <% end %>
+</div>

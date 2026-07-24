@@ -44,7 +44,7 @@ class FeedImporter
 
   def import
     result = Result.new(imported: 0, skipped: 0, slugs: [])
-    FileUtils.mkdir_p(@posts_dir)
+    writer = ContentWriter.new(posts_dir: @posts_dir)
 
     selected.each do |item|
       if already_imported?(item)
@@ -52,11 +52,7 @@ class FeedImporter
         next
       end
 
-      slug, content = content_for(item, disambiguate: true)
-      path = File.join(@posts_dir, "#{slug}.md")
-      File.write(path, content)
-      ::Post.create_or_update_from_file(path)
-
+      slug = writer.write(kind: :post, metadata: metadata_for(item), body: body_for(item))
       result.slugs << slug
       result.imported += 1
     rescue => e
@@ -66,14 +62,12 @@ class FeedImporter
     result
   end
 
-  # Build one post's [slug, file_content] — the mapping + serialization, no I/O
-  # beyond the optional filename-collision check. Public so previews/tests can
-  # inspect exactly what would be written.
-  def content_for(item, disambiguate: false)
+  # Build one post's [slug, file_content] — the mapping + serialization, no I/O.
+  # Public so previews/tests can inspect exactly what would be written (the
+  # actual write, with -N disambiguation, goes through ContentWriter).
+  def content_for(item)
     metadata = metadata_for(item)
-    metadata["url_name"] = unique_slug(metadata["url_name"]) if disambiguate
-    body = @converter.convert(item[:content_html].presence || item[:description].to_s)
-    [ metadata["url_name"], "---\n#{::Post.format_metadata_yaml(metadata)}\n---\n#{body}\n" ]
+    [ metadata["url_name"], "---\n#{::Post.format_metadata_yaml(metadata)}\n---\n#{body_for(item)}\n" ]
   end
 
   private
@@ -113,11 +107,15 @@ class FeedImporter
     @kind == :episodes ? episode_metadata(item) : article_metadata(item)
   end
 
+  def body_for(item)
+    @converter.convert(item[:content_html].presence || item[:description].to_s)
+  end
+
   def base_metadata(item)
     {
       "title"        => item[:title].to_s.strip.presence,
       "url_name"     => slugify(item),
-      "date"         => to_iso(item[:pub_date]),
+      "date"         => published_at(item[:pub_date]),
       "status"       => "draft",
       "audience"     => "everyone",
       "published_to" => "site",
@@ -155,16 +153,6 @@ class FeedImporter
     source.parameterize.presence || "item"
   end
 
-  # Never overwrite an existing post file. If <slug>.md is taken by a different
-  # item, append -2, -3, … ; the url_name-collision warning surfaces it so the
-  # author can rename or delete.
-  def unique_slug(slug)
-    return slug unless File.exist?(File.join(@posts_dir, "#{slug}.md"))
-    n = 2
-    n += 1 while File.exist?(File.join(@posts_dir, "#{slug}-#{n}.md"))
-    "#{slug}-#{n}"
-  end
-
   # Roe's podcast schema stores explicit as "true"/"false"; feeds say
   # yes/no/clean/explicit. nil (absent) falls back to the show setting.
   def normalize_explicit(value)
@@ -172,10 +160,13 @@ class FeedImporter
     %w[yes true explicit].include?(value.to_s.strip.downcase) ? "true" : "false"
   end
 
-  def to_iso(pub_date)
-    return nil if pub_date.blank?
-    Time.parse(pub_date).utc.iso8601
-  rescue StandardError
-    nil
+  # The item's publish time from the feed (<pubDate> / <published>), parsed
+  # with its own timezone and normalized to UTC — accurate, not guessed. Feeds
+  # almost always carry a real time; when one doesn't (or it's unparseable) we
+  # fall back to the import time so the draft still sorts sensibly.
+  def published_at(raw)
+    raw.to_s.strip.present? ? Time.parse(raw).utc.iso8601 : Time.current.utc.iso8601
+  rescue ArgumentError
+    Time.current.utc.iso8601
   end
 end

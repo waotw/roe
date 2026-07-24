@@ -59,6 +59,42 @@ class Import < ApplicationRecord
     save!
   end
 
+  # ── File / Feed importers: content tagged by import_ref in its metadata ─────
+  # These importers write file-backed posts/pages and tag each with
+  # `import_ref: <this import's id>` in frontmatter (rather than the Substack FK
+  # `posts` association above), so the same mechanism covers pages too. These
+  # helpers let an import list and roll back exactly what it created.
+  def ref_content(model)
+    model.where("json_extract(metadata, '$.import_ref') = ?", id)
+  end
+
+  def ref_draft_count
+    [ Post, Page ].sum { |m| ref_content(m).where("json_extract(metadata, '$.status') = ?", "draft").count }
+  end
+
+  # Non-draft (published/unlisted) content this import created — kept on delete.
+  def ref_published_count
+    [ Post, Page ].sum { |m| ref_content(m).where("json_extract(metadata, '$.status') <> ?", "draft").count }
+  end
+
+  # Delete this import's DRAFT posts/pages — file and record — leaving published
+  # ones for manual removal. Returns the count deleted.
+  def delete_draft_content!
+    site_root = File.expand_path(RoeSitePaths::SITE_PATH)
+    deleted = 0
+    [ Post, Page ].each do |model|
+      ref_content(model).where("json_extract(metadata, '$.status') = ?", "draft").find_each do |rec|
+        path = rec.file_path
+        if path.present? && File.expand_path(path).start_with?(site_root + File::SEPARATOR) && File.exist?(path)
+          FileUtils.rm_f(path)
+        end
+        rec.destroy
+        deleted += 1
+      end
+    end
+    deleted
+  end
+
   # Phase management
   def complete_phase!(phase_number)
     return if completed_phases.include?(phase_number)
