@@ -119,6 +119,11 @@ class Page < ApplicationRecord
   # that doesn't exist on disk.
   def needs_attention?
     return false unless published?
+    publish_warnings?
+  end
+
+  # Guardless version of needs_attention? — used to gate bulk publish on drafts.
+  def publish_warnings?
     missing_site_gated_fields.any? || missing_media_refs.any?
   end
 

@@ -262,6 +262,11 @@ class Product < ApplicationRecord
   # the admin UI to surface mistakes without blocking save.
   def needs_attention?
     return false unless status == "published"
+    publish_warnings?
+  end
+
+  # Guardless version of needs_attention? — used to gate bulk publish on drafts.
+  def publish_warnings?
     missing_required_fields.any? || missing_media_refs.any?
   end
 

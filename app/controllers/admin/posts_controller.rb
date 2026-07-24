@@ -1,4 +1,17 @@
 class Admin::PostsController < Admin::BaseController
+  include BulkContentActions
+
+  # Bulk-action wiring (see BulkContentActions).
+  def bulk_model = Post
+  def bulk_index_path = admin_posts_path
+  def bulk_label = "post"
+  def prepare_publish_metadata(record, metadata) = ensure_podcast_guid(metadata, record)
+
+  def bulk_publish_side_effect(record)
+    return false unless should_send_newsletter?(record)
+    QueueNewsletterBatchesJob.perform_later(record.id)
+    true
+  end
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index

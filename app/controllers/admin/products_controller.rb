@@ -1,4 +1,9 @@
 class Admin::ProductsController < Admin::BaseController
+  include BulkContentActions
+
+  def bulk_model = Product
+  def bulk_index_path = admin_products_path
+  def bulk_label = "product"
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   before_action :set_product, only: [ :edit, :update, :show, :destroy ]

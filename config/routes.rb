@@ -110,6 +110,8 @@ Rails.application.routes.draw do
       collection do
         get :drafts
         get :unlisted
+        post :bulk_destroy
+        post :bulk_publish
       end
       member do
         post :publish_modal
@@ -128,6 +130,10 @@ Rails.application.routes.draw do
 
 
     resources :pages, only: [ :index, :edit, :update, :new, :create, :destroy ] do
+      collection do
+        post :bulk_destroy
+        post :bulk_publish
+      end
       member do
         post :publish_modal
         patch :unpublish
@@ -164,6 +170,8 @@ Rails.application.routes.draw do
         get :search
         get :next_sku_number
         get :duplicate_skus
+        post :bulk_destroy
+        post :bulk_publish
       end
       member do
         post :publish_modal
@@ -266,7 +274,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :feed_imports, only: [ :index, :create ] do
+    resources :feed_imports, only: [ :index, :create, :show, :destroy ] do
       collection do
         post :preview
         post :add_show

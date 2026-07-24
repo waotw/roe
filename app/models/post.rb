@@ -513,6 +513,13 @@ class Post < ApplicationRecord
   # Used to surface warnings in the admin UI without blocking save.
   def needs_attention?
     return false unless published?
+    publish_warnings?
+  end
+
+  # The same checks as needs_attention?, but without the published? guard — so
+  # the admin can tell whether a DRAFT would publish clean (the bulk-publish
+  # gate hides "Publish selected" when any chosen draft returns true here).
+  def publish_warnings?
     missing_type_required_fields.any? ||
       missing_media_refs.any? ||
       missing_site_gated_fields.any? ||

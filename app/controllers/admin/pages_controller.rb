@@ -1,4 +1,9 @@
 class Admin::PagesController < Admin::BaseController
+  include BulkContentActions
+
+  def bulk_model = Page
+  def bulk_index_path = admin_pages_path
+  def bulk_label = "page"
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index

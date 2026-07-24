@@ -30,11 +30,12 @@ class FeedImporter
   # podcast_key: the podcast.yml show key (required for :episodes)
   # limit:       nil = all, Integer = latest N (feeds are newest-first)
   # posts_dir:   overridable so tests can write to a temp dir
-  def initialize(feed:, kind:, podcast_key: nil, limit: nil, posts_dir: RoeSitePaths::SITE_POSTS_PATH)
+  def initialize(feed:, kind:, podcast_key: nil, limit: nil, import_ref: nil, posts_dir: RoeSitePaths::SITE_POSTS_PATH)
     @items       = Array(feed[:items])
     @kind        = kind.to_sym
     @podcast_key = podcast_key
     @limit       = limit
+    @import_ref  = import_ref
     @posts_dir   = posts_dir
     @converter   = SubstackImporter::Converter.new(insert_paywalls: false)
 
@@ -120,7 +121,8 @@ class FeedImporter
       "audience"     => "everyone",
       "published_to" => "site",
       "author"       => item[:author].presence,
-      "image"        => item[:image_url].presence
+      "image"        => item[:image_url].presence,
+      "import_ref"   => @import_ref
     }.compact
   end
 

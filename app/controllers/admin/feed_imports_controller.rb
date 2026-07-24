@@ -3,8 +3,32 @@
 # via FeedImporter. Fetching is stateless: the feed is re-fetched on the import
 # submit rather than stashed, so a token-bearing feed URL never gets persisted.
 class Admin::FeedImportsController < Admin::BaseController
+  before_action :load_imports, only: [ :index, :preview, :add_show ]
+
   def index
     @feed_url = ""
+  end
+
+  # Summary of a single feed import + its current content breakdown.
+  def show
+    @import = Import.where(source_type: "feed").find(params[:id])
+  end
+
+  # Delete a feed import and its DRAFT episodes/articles; published are kept.
+  def destroy
+    import = Import.where(source_type: "feed").find(params[:id])
+    deleted = import.delete_draft_content!
+    kept = import.ref_published_count
+
+    if kept.zero?
+      import.destroy
+      notice = "Deleted import ##{import.id} and its #{helpers.pluralize(deleted, 'draft')}."
+    else
+      import.update!(status: :rolled_back)
+      notice = "Deleted #{helpers.pluralize(deleted, 'draft')}. " \
+               "Kept #{helpers.pluralize(kept, 'published item')} — delete those manually from Posts."
+    end
+    redirect_to admin_feed_imports_path, notice: notice
   end
 
   # Fetch + classify, then re-render index with the preview panel.
@@ -90,9 +114,17 @@ class Admin::FeedImportsController < Admin::BaseController
       return redirect_to admin_feed_imports_path, alert: "Couldn't load that feed: #{result.error}"
     end
 
+    import = Import.create!(
+      source_type: "feed", phase: 1, status: :importing_posts,
+      started_at: Time.current, configuration: { "source" => feed_url_label(feed_url), "kind" => kind }
+    )
     outcome = FeedImporter.new(
-      feed: result.data, kind: kind.to_sym, podcast_key: podcast_key, limit: limit
+      feed: result.data, kind: kind.to_sym, podcast_key: podcast_key, limit: limit, import_ref: import.id
     ).import
+    import.update!(
+      status: :completed, completed_at: Time.current,
+      stats: { "imported" => outcome.imported, "skipped" => outcome.skipped, "kind" => kind }
+    )
 
     redirect_to admin_posts_path(status: "draft", sort: "updated-desc"), notice: import_notice(kind, outcome)
   rescue ArgumentError => e
@@ -100,6 +132,17 @@ class Admin::FeedImportsController < Admin::BaseController
   end
 
   private
+
+  def load_imports
+    @imports = Import.where(source_type: "feed").order(created_at: :desc)
+  end
+
+  # A feed URL may carry a paywall token — keep only the host for display.
+  def feed_url_label(url)
+    URI.parse(url).host || "feed"
+  rescue URI::InvalidURIError
+    "feed"
+  end
 
   # nil = all; a positive Integer = latest N.
   def import_limit

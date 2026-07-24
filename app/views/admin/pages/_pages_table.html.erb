@@ -1,10 +1,23 @@
+<div data-controller="bulk-select">
+  <%= render "admin/shared/bulk_toolbar",
+             destroy_path: bulk_destroy_admin_pages_path,
+             publish_path: bulk_publish_admin_pages_path, label: "page" %>
 <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
   <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
     <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
   <table class="min-w-full divide-y divide-gray-300">
     <thead class="bg-gray-50">
       <tr>
-        <th scope="col" class="py-2 pl-6 md:pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Title</th>
+        <th scope="col" data-bulk-select-target="selectColumn" class="hidden py-2 pl-6 md:pl-4 pr-2 w-8">
+          <input type="checkbox" data-action="change->bulk-select#selectAll" aria-label="Select all">
+        </th>
+        <th scope="col" class="py-2 pl-6 md:pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">
+          <span class="inline-flex items-center gap-2">
+            Title
+            <button type="button" data-action="bulk-select#toggleMode" data-bulk-select-target="toggle"
+                    class="uppercase text-[10px] px-2 py-0.5 border border-gray-800 bg-white hover:bg-gray-200 font-mono rounded-xs cursor-pointer">Select</button>
+          </span>
+        </th>
         <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Filename <span class="text-xs normal-case text-gray-500 font-normal">(double click to rename)</span></th>
         <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
         <th scope="col" class="relative py-1.5 pl-3 md:pr-4 pr-6">
@@ -15,13 +28,23 @@
     <tbody class="divide-y divide-gray-200 bg-white">
       <% if pages.empty? %>
         <tr>
-          <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500">
+          <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
             No pages yet
           </td>
         </tr>
       <% else %>
         <% pages.each do |page| %>
           <tr>
+            <td data-bulk-select-target="selectColumn" class="hidden pl-6 md:pl-4 pr-2 w-8 align-middle">
+              <input type="checkbox"
+                     data-bulk-select-target="checkbox"
+                     data-action="change->bulk-select#update"
+                     data-id="<%= page.id %>"
+                     data-status="<%= page.status %>"
+                     data-warnings="<%= page.publish_warnings? %>"
+                     data-newsletter="false"
+                     data-paid="<%= page.metadata['audience'].to_s == 'paid' %>">
+            </td>
             <td class="max-w-[12rem] py-1.5 pl-6 md:pl-4 pr-3 text-sm font-medium text-gray-900">
               <div class="flex items-center gap-1.5">
                 <%= link_to page.title || "Untitled", edit_admin_page_path(page), class: "min-w-0 truncate text-blue-600 hover:text-blue-900" %>
@@ -84,4 +107,5 @@
   </table>
     </div>
   </div>
+</div>
 </div>

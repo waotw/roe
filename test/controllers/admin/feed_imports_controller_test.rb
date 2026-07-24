@@ -108,4 +108,29 @@ class Admin::FeedImportsControllerTest < ActionDispatch::IntegrationTest
   ensure
     (Dir[File.join(RoeSitePaths::SITE_POSTS_PATH, "*.md")] - before).each { |f| File.delete(f) }
   end
+
+  test "importing records a feed import that is listed and can be deleted" do
+    before = Dir[File.join(RoeSitePaths::SITE_POSTS_PATH, "*.md")]
+    PodcastFeedFetcher.stubs(:fetch).returns(feed_result("verge.xml"))
+
+    assert_difference -> { Import.where(source_type: "feed").count }, 1 do
+      post admin_feed_imports_path,
+           params: { feed_url: "https://theverge.com/rss.xml", kind: "articles", count_mode: "all" }
+    end
+
+    import = Import.where(source_type: "feed").order(:id).last
+    assert_equal 3, import.stats["imported"].to_i
+    assert_operator import.ref_draft_count, :>=, 1, "episodes/articles tagged with import_ref"
+
+    get admin_feed_imports_path
+    assert_response :success
+    assert_select "a", text: "Import ##{import.id}"
+
+    assert_difference -> { Import.count }, -1 do
+      delete admin_feed_import_path(import)
+    end
+    assert_equal 0, Post.where("json_extract(metadata, '$.import_ref') = ?", import.id).count
+  ensure
+    (Dir[File.join(RoeSitePaths::SITE_POSTS_PATH, "*.md")] - before).each { |f| File.delete(f) }
+  end
 end
