@@ -269,6 +269,7 @@ Rails.application.routes.draw do
     resources :feed_imports, only: [ :index, :create ] do
       collection do
         post :preview
+        post :add_show
       end
     end
 

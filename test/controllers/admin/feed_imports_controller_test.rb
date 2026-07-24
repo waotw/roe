@@ -1,14 +1,36 @@
 require "test_helper"
 
 class Admin::FeedImportsControllerTest < ActionDispatch::IntegrationTest
+  PODCAST_YML = PodcastConfigSeeder::PODCAST_YML
+
   setup do
     @user = User.take
     sign_in_as(@user)
+    @podcast_yml_backup = File.exist?(PODCAST_YML) ? File.read(PODCAST_YML) : :absent
+  end
+
+  teardown do
+    if @podcast_yml_backup == :absent
+      File.delete(PODCAST_YML) if File.exist?(PODCAST_YML)
+    else
+      File.write(PODCAST_YML, @podcast_yml_backup)
+    end
+    SiteConfig.reload!("features/podcast") rescue nil
   end
 
   def feed_result(fixture)
     data = PodcastFeedParser.parse(File.read(Rails.root.join("test", "fixtures", "feeds", fixture)))
     PodcastFeedFetcher::Result.new(success?: true, data: data, error: nil)
+  end
+
+  def write_podcast_config(shows)
+    FileUtils.mkdir_p(File.dirname(PODCAST_YML))
+    File.write(PODCAST_YML, shows.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteConfig.reload!("features/podcast")
+  end
+
+  def show_entry(title)
+    { "title" => title, "link" => "", "apple_podcasts" => "" }
   end
 
   test "index renders the paste form" do
@@ -29,6 +51,38 @@ class Admin::FeedImportsControllerTest < ActionDispatch::IntegrationTest
     post preview_admin_feed_imports_path, params: { feed_url: "   " }
     assert_response :unprocessable_entity
     assert_equal "Paste a feed URL or an Apple Podcasts link.", flash[:alert]
+  end
+
+  test "preview pre-selects the show that matches the feed, not the first one" do
+    feed  = feed_result("npr_all_songs.xml")
+    title = feed.data[:channel][:title]
+    key   = PodcastConfigSeeder.derive_key(title)
+    write_podcast_config(
+      "the-briefcast-podcast" => show_entry("The Briefcast: Podcast"),
+      key                     => show_entry(title)
+    )
+
+    PodcastFeedFetcher.stubs(:fetch).returns(feed)
+    post preview_admin_feed_imports_path, params: { feed_url: "https://example.com/atc" }
+
+    assert_response :success
+    assert_select "select[name=podcast_key] option[selected][value=?]", key
+    assert_select "select[name=podcast_key] option[selected]", count: 1
+  end
+
+  test "add_show seeds a show from the feed and re-renders with it selected" do
+    # No image_url in the channel, so no artwork download (no network).
+    data = {
+      channel: { title: "Fresh Cast", link: "https://freshcast.fm", author: "Ana", description: "hi" },
+      items: [ { title: "Ep 1", guid: "g1", enclosure_url: "https://freshcast.fm/1.mp3", enclosure_type: "audio/mpeg", duration: "600" } ]
+    }
+    PodcastFeedFetcher.stubs(:fetch).returns(PodcastFeedFetcher::Result.new(success?: true, data: data, error: nil))
+
+    post add_show_admin_feed_imports_path, params: { feed_url: "https://freshcast.fm/feed.xml", podcast_title: "Fresh Cast" }
+
+    assert_response :success
+    assert_select "select[name=podcast_key] option[selected][value=?]", "fresh-cast"
+    assert_includes File.read(PODCAST_YML), "fresh-cast:"
   end
 
   test "importing episodes without a podcast show is rejected" do

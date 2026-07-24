@@ -25,12 +25,44 @@ class Admin::FeedImportsController < Admin::BaseController
     @channel     = @feed[:channel] || {}
     @composition = FeedImporter.classify(@feed[:items])
     @podcast_options = podcast_options
+    @default_podcast_key = matching_podcast_key(@feed)
 
     if @composition[:total].zero?
       flash.now[:alert] = "That feed has no items to import."
       return render :index, status: :unprocessable_entity
     end
 
+    render :index
+  end
+
+  # Seed a new podcast show from this feed's channel (no leaving the page),
+  # then re-render the preview with the new show selected so the import can
+  # continue. Reuses the same seeder as the Podcasts admin's "Seed from RSS".
+  def add_show
+    feed_url = params[:feed_url].to_s.strip
+    result   = PodcastFeedFetcher.fetch(feed_url)
+    unless result.success?
+      return redirect_to admin_feed_imports_path, alert: "Couldn't load that feed: #{result.error}"
+    end
+
+    channel = (result.data[:channel] || {}).transform_keys(&:to_s)
+    title   = params[:podcast_title].presence || channel["title"]
+    if title.blank?
+      return redirect_to admin_feed_imports_path, alert: "Give the new show a title."
+    end
+    channel["title"] = title
+
+    key       = PodcastConfigSeeder.derive_key(title)
+    subscribe = result.data[:apple_id] ? PodcastAppleLink.subscribe_links(result.data[:apple_id]) : {}
+    PodcastConfigSeeder.new(key, channel, mode: :create, subscribe_links: subscribe).seed!
+
+    @feed_url        = feed_url
+    @feed            = result.data
+    @channel         = result.data[:channel] || {}
+    @composition     = FeedImporter.classify(@feed[:items])
+    @podcast_options = podcast_options
+    @default_podcast_key = key
+    flash.now[:notice] = "Added “#{title}.” Review the options and import below."
     render :index
   end
 
@@ -84,5 +116,32 @@ class Admin::FeedImportsController < Admin::BaseController
   def podcast_options
     return [] unless SiteFeature.podcast_enabled?
     PodcastConfig.podcast_keys.map { |key| [ PodcastConfig.get(key)["title"].presence || key, key ] }
+  end
+
+  # The existing show that this feed belongs to, so it's pre-selected instead
+  # of defaulting to whichever show happens to be first. Matched (in priority)
+  # by Apple ID, the key its title would derive to, website link, then title.
+  def matching_podcast_key(feed)
+    return nil unless SiteFeature.podcast_enabled?
+
+    channel  = feed[:channel] || {}
+    apple_id = feed[:apple_id].to_s
+    link     = normalize_link(channel[:link])
+    title    = channel[:title].to_s.strip.downcase
+    derived  = PodcastConfigSeeder.derive_key(channel[:title])
+
+    by_apple = by_derived = by_link = by_title = nil
+    PodcastConfig.podcast_keys.each do |key|
+      cfg = PodcastConfig.get(key) || {}
+      by_apple   ||= key if apple_id.present? && PodcastAppleLink.podcast_id(cfg["apple_podcasts"]) == apple_id
+      by_derived ||= key if derived.present? && key == derived
+      by_link    ||= key if link.present? && normalize_link(cfg["link"]) == link
+      by_title   ||= key if title.present? && cfg["title"].to_s.strip.downcase == title
+    end
+    by_apple || by_derived || by_link || by_title
+  end
+
+  def normalize_link(url)
+    url.to_s.strip.downcase.sub(%r{\Ahttps?://}, "").sub(/\Awww\./, "").sub(%r{/\z}, "")
   end
 end

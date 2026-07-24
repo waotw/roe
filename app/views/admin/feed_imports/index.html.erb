@@ -27,7 +27,7 @@
                      elsif episodes >= articles then "episodes"
                      else "articles" end
     %>
-    <div class="bg-white shadow p-6">
+    <div class="bg-white shadow p-6" data-controller="feed-import-new-show">
       <div class="flex items-baseline justify-between mb-4">
         <h2 class="text-lg font-medium"><%= @channel[:title].presence || "Feed" %></h2>
         <span class="text-sm text-gray-500"><%= pluralize(@composition[:total], "item") %></span>
@@ -56,18 +56,15 @@
             <label for="podcast_key" class="block text-sm font-medium text-gray-700 mb-1">Podcast show <span class="text-gray-400 font-normal">(for episodes)</span></label>
             <% if @podcast_options.present? %>
               <%= select_tag :podcast_key,
-                    options_for_select(@podcast_options),
+                    options_for_select(@podcast_options, @default_podcast_key),
                     class: "pl-2 pr-8 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" %>
               <p class="mt-1 text-xs text-gray-500">
-                Need another show?
+                <button type="button" data-action="feed-import-new-show#open" data-feed-import-new-show-target="trigger" class="text-gray-700 underline cursor-pointer">＋ New show from this feed</button>
+                ·
                 <%= link_to "Manage podcasts →", admin_edit_podcast_config_path, class: "text-gray-700 underline" %>
               </p>
             <% else %>
-              <p class="text-sm text-gray-600">
-                No podcast show yet.
-                <%= link_to "Set one up first →", new_podcast_setup_admin_configs_path, class: "text-gray-700 underline" %>
-                then come back and paste the feed again.
-              </p>
+              <p class="text-sm text-gray-600">No podcast show yet — create one from this feed below.</p>
             <% end %>
           </div>
         <% end %>
@@ -86,6 +83,32 @@
         </fieldset>
 
         <%= submit_tag "Import as drafts", class: "bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer" %>
+      <% end %>
+
+      <%# Add-show panel — a sibling form (HTML forbids nesting it in the import
+          form). Hidden until the trigger fires, or shown by default when there
+          are no shows to select yet. %>
+      <% if episodes.positive? %>
+        <div data-feed-import-new-show-target="panel" class="<%= "hidden" if @podcast_options.present? %> mt-4 border border-gray-200 bg-gray-50 p-4">
+          <p class="text-sm font-medium text-gray-700 mb-1">New show from this feed</p>
+          <p class="text-xs text-gray-500 mb-3">
+            Creates a podcast show from this feed's title, artwork, and details.
+            You can edit everything afterward under Manage podcasts.
+          </p>
+          <%= form_with url: add_show_admin_feed_imports_path, method: :post, data: { turbo: false } do %>
+            <%= hidden_field_tag :feed_url, @feed_url %>
+            <label for="podcast_title" class="block text-xs font-medium text-gray-600 mb-1">Show title</label>
+            <div class="flex gap-2">
+              <%= text_field_tag :podcast_title, @channel[:title],
+                    id: "podcast_title", data: { "feed-import-new-show-target": "title" },
+                    class: "flex-1 border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400" %>
+              <%= submit_tag "Create show", class: "bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer whitespace-nowrap" %>
+              <% if @podcast_options.present? %>
+                <button type="button" data-action="feed-import-new-show#close" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer">Cancel</button>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
       <% end %>
     </div>
   <% end %>
