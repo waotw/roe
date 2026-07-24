@@ -411,6 +411,10 @@ Rails.application.routes.draw do
   # Theme assets (CSS and JS)
   # get 'theme/:filename', to: 'system/themes#show'
 
+  # Roe bundled site JavaScript (search.js, etc.) — served from /javascript
+  # so the same layout path works in dynamic and static builds.
+  get "javascript/:filename.js", to: "system/javascripts#show", defaults: { format: "js" }, constraints: { filename: /[^\/]+/ }
+
   # System assets
   get "system/fonts/:filename", to: "system/fonts#show", as: :system_font, constraints: { filename: /[^\/]+/ }
   get "system/images/:filename", to: "system/images#show", as: :system_image, constraints: { filename: /[^\/]+/ }

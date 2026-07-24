@@ -27,9 +27,20 @@ export default class extends Controller {
     this.confirmTarget.disabled = this.inputTarget.value.trim() !== "LIVE";
   }
 
+  // Close the modal before submitting so the sync starts on the Site Sync
+  // page behind the overlay, not in a new window/tab.
+  submit(event) {
+    if (this.inputTarget.value.trim() !== "LIVE") {
+      event.preventDefault();
+      return;
+    }
+    this.close();
+  }
+
   submitIfValid(event) {
     if (this.inputTarget.value.trim() === "LIVE") {
       event.preventDefault();
+      this.close();
       this.confirmTarget.form.requestSubmit();
     }
   }

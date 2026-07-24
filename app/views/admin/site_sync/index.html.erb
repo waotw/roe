@@ -834,7 +834,7 @@
                   <p class="text-sm text-gray-600 mb-4">
                     This <strong>replaces the entire live site</strong> with an exact copy of local — everything on live that isn't in local is deleted. Live is backed up first, so it's reversible.
                   </p>
-                  <%= form_with url: admin_clone_site_to_live_path, method: :post, data: { turbo: false } do %>
+                  <%= form_with url: admin_clone_site_to_live_path, method: :post do %>
                     <div class="mb-4">
                       <label class="block text-sm font-medium text-gray-700 mb-1">Type <strong>LIVE</strong> to confirm:</label>
                       <%= text_field_tag :confirm, nil,
@@ -849,7 +849,9 @@
                               class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
                       <%= submit_tag "Make Live Match Local",
                             disabled: true,
-                            data: { "force-mirror-modal-target": "confirm" },
+                            data: { "force-mirror-modal-target": "confirm",
+                                    turbo_submits_with: "⏳ Starting mirror…",
+                                    action: "force-mirror-modal#submit" },
                             class: "px-4 py-2 border border-transparent text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed" %>
                     </div>
                   <% end %>

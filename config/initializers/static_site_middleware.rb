@@ -6,7 +6,7 @@ class StaticSiteMiddleware
 
   # Asset prefixes that should be served from static_site/ verbatim
   # (no .html appending, return as-is with a guessed Content-Type).
-  ASSET_PREFIXES = %w[/theme/ /media/ /system/ /assets/].freeze
+  ASSET_PREFIXES = %w[/theme/ /media/ /system/ /assets/ /javascript/].freeze
 
   MIME_TYPES = {
     ".html" => "text/html; charset=utf-8",
