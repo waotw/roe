@@ -89,4 +89,5 @@ class MediaImporterTest < ActiveSupport::TestCase
     (Dir[File.join(RoeSitePaths::SITE_PATH, "media", "**", "*")] - media_before)
       .select { |f| File.file?(f) }.each { |f| File.delete(f) }
   end
+
 end

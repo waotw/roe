@@ -13,7 +13,7 @@
         <%= text_field_tag :feed_url, @feed_url,
               id: "feed_url", placeholder: "https://example.com/feed.xml",
               class: "flex-1 border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400" %>
-        <%= submit_tag "Preview feed", class: "bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer" %>
+        <%= submit_tag "PREVIEW FEED", class: "bg-gray-900 font-mono rounded-xs text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer" %>
       </div>
     <% end %>
   </div>
@@ -82,7 +82,7 @@
           </label>
         </fieldset>
 
-        <%= submit_tag "Import as drafts", class: "bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer" %>
+        <%= submit_tag "IMPORT AS DRAFTS", class: "bg-gray-900 text-white px-4 py-2 text-sm font-mono rounded-xs hover:bg-gray-700 cursor-pointer" %>
       <% end %>
 
       <%# Add-show panel — a sibling form (HTML forbids nesting it in the import
