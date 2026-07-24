@@ -98,16 +98,36 @@
                <div class="px-8 py-4 bg-red-50 border-t border-red-200">
                  <h4 class="text-sm font-semibold text-red-900 mb-2">Danger Zone</h4>
                  <%# Per-podcast removal — deletes just that entry from
-                     podcast.yml; the show's posts are untouched. %>
+                     podcast.yml. Published episodes are always kept; when the
+                     show has draft episodes, offer to delete those too. %>
                  <% @config_hash.each do |pkey, pval| %>
                    <% next unless pval.is_a?(Hash) %>
                    <% ptitle = pval['title'].to_s.strip.presence || pkey %>
-                   <div class="mb-2">
-                     <%= button_to "Delete “#{ptitle}”",
-                                   delete_podcast_entry_admin_configs_path(key: pkey),
-                                   method: :delete,
-                                   data: { turbo_confirm: "Remove the “#{ptitle}” podcast from podcast.yml? Its posts are untouched." },
-                                   class: "uppercase text-xs px-2 py-1.5 border border-red-500 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
+                   <% drafts = @draft_episode_counts[pkey].to_i %>
+                   <div class="mb-3">
+                     <% if drafts.positive? %>
+                       <p class="text-xs text-red-800 mb-1">
+                         <%= pluralize(drafts, "draft episode") %> belong to “<%= ptitle %>.” Published episodes are always kept — remove those from Posts by hand.
+                       </p>
+                       <div class="flex flex-wrap gap-2">
+                         <%= button_to "Delete “#{ptitle}” + #{pluralize(drafts, 'draft')}",
+                                       delete_podcast_entry_admin_configs_path(key: pkey, delete_drafts: 1),
+                                       method: :delete,
+                                       data: { turbo_confirm: "Permanently delete “#{ptitle}” and its #{pluralize(drafts, 'draft episode')}? This can't be undone — but you can re-import them. Published episodes are kept." },
+                                       class: "uppercase text-xs px-2 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
+                         <%= button_to "Delete “#{ptitle}” only",
+                                       delete_podcast_entry_admin_configs_path(key: pkey),
+                                       method: :delete,
+                                       data: { turbo_confirm: "Remove “#{ptitle}” from podcast.yml? Its #{pluralize(drafts, 'draft episode')} and any published episodes are kept." },
+                                       class: "uppercase text-xs px-2 py-1.5 border border-red-400 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded-xs" %>
+                       </div>
+                     <% else %>
+                       <%= button_to "Delete “#{ptitle}”",
+                                     delete_podcast_entry_admin_configs_path(key: pkey),
+                                     method: :delete,
+                                     data: { turbo_confirm: "Remove the “#{ptitle}” podcast from podcast.yml? Published episodes are kept — remove those from Posts by hand if needed." },
+                                     class: "uppercase text-xs px-2 py-1.5 border border-red-500 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
+                     <% end %>
                    </div>
                  <% end %>
                  <p class="text-xs text-red-700 mt-3 mb-3">Or remove everything — deletes all configuration and feeds for all podcasts.<br>Any podcast posts are untouched.</p>

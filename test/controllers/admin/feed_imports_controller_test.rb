@@ -71,6 +71,12 @@ class Admin::FeedImportsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "add_show seeds a show from the feed and re-renders with it selected" do
+    # A show already exists — and materialize its config DB row so a bare
+    # cache-clear would leave that row stale (the real-app bug: the new show
+    # would then be missing from the select).
+    write_podcast_config("the-briefcast-podcast" => show_entry("The Briefcast: Podcast"))
+    PodcastConfig.podcast_keys
+
     # No image_url in the channel, so no artwork download (no network).
     data = {
       channel: { title: "Fresh Cast", link: "https://freshcast.fm", author: "Ana", description: "hi" },
@@ -81,7 +87,8 @@ class Admin::FeedImportsControllerTest < ActionDispatch::IntegrationTest
     post add_show_admin_feed_imports_path, params: { feed_url: "https://freshcast.fm/feed.xml", podcast_title: "Fresh Cast" }
 
     assert_response :success
-    assert_select "select[name=podcast_key] option[selected][value=?]", "fresh-cast"
+    assert_select "select[name=podcast_key] option[value=?]", "the-briefcast-podcast" # existing show still listed
+    assert_select "select[name=podcast_key] option[selected][value=?]", "fresh-cast"  # new show listed + pre-selected
     assert_includes File.read(PODCAST_YML), "fresh-cast:"
   end
 

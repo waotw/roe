@@ -55,6 +55,10 @@ class Admin::FeedImportsController < Admin::BaseController
     key       = PodcastConfigSeeder.derive_key(title)
     subscribe = result.data[:apple_id] ? PodcastAppleLink.subscribe_links(result.data[:apple_id]) : {}
     PodcastConfigSeeder.new(key, channel, mode: :create, subscribe_links: subscribe).seed!
+    # seed! only clears the config cache; when a podcast config row already
+    # exists (shows already set up) that stale row would hide the new show.
+    # Re-read the file into the DB row so the select picks it up this request.
+    SiteConfig.sync_from_file("features/podcast")
 
     @feed_url        = feed_url
     @feed            = result.data

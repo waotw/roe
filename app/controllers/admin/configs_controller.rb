@@ -654,6 +654,9 @@ class Admin::ConfigsController < Admin::BaseController
     # Source of truth for which podcast fields are required (used by the
     # admin form to render the red asterisk next to the label).
     @field_required = PodcastConfig::REQUIRED_FIELDS
+    # Per-show draft episode counts, so the Danger Zone can offer to delete a
+    # show's drafts on removal. Published episodes are never touched here.
+    @draft_episode_counts = draft_episode_counts_by_podcast
     render :edit
   end
 
@@ -872,6 +875,13 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     title = config[key].is_a?(Hash) ? config[key]["title"].to_s.strip.presence : nil
+
+    # Opt-in: also delete this show's DRAFT episodes (published ones are never
+    # touched here — those are removed by hand). Done before the config write
+    # so a failure leaves the show in place.
+    deleted_drafts = params[:delete_drafts].present? ? delete_draft_episodes(key) : 0
+    drafts_note = deleted_drafts.positive? ? " and #{helpers.pluralize(deleted_drafts, 'draft episode')}" : ""
+
     config.delete(key)
 
     if config.empty?
@@ -879,11 +889,11 @@ class Admin::ConfigsController < Admin::BaseController
       SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
       SiteConfig.reload!("features/podcast")
       redirect_to admin_configs_path,
-                  notice: "Removed “#{title || key}”. That was the last podcast, so podcasts are now disabled."
+                  notice: "Removed “#{title || key}”#{drafts_note}. That was the last podcast, so podcasts are now disabled."
     else
       File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
       SiteConfig.reload!("features/podcast")
-      redirect_to admin_edit_podcast_config_path, notice: "Removed podcast “#{title || key}”."
+      redirect_to admin_edit_podcast_config_path, notice: "Removed podcast “#{title || key}”#{drafts_note}."
     end
   end
 
@@ -1504,6 +1514,33 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     File.write(path, lines.join("\n") + "\n")
+  end
+
+  # Draft podcast episodes belonging to a given show (never published ones).
+  def draft_episodes_for(key)
+    Post.where("json_extract(metadata, '$.post_type') = ?", "podcast")
+        .where("json_extract(metadata, '$.podcast') = ?", key.to_s)
+        .where("json_extract(metadata, '$.status') = ?", "draft")
+  end
+
+  # Delete a show's draft episodes — both the markdown file and the DB record,
+  # mirroring the posts controller's destroy. Returns how many were removed.
+  def delete_draft_episodes(key)
+    count = 0
+    draft_episodes_for(key).find_each do |post|
+      File.delete(post.file_path) if post.file_path.present? && File.exist?(post.file_path)
+      post.destroy
+      count += 1
+    end
+    count
+  end
+
+  # { podcast_key => draft_episode_count } across all shows, in one query.
+  def draft_episode_counts_by_podcast
+    Post.where("json_extract(metadata, '$.post_type') = ?", "podcast")
+        .where("json_extract(metadata, '$.status') = ?", "draft")
+        .group("json_extract(metadata, '$.podcast')")
+        .count
   end
 
   # Format a single YAML field at the given indentation level.
