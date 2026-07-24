@@ -562,6 +562,20 @@ class Admin::PostsController < Admin::BaseController
     redirect_to edit_admin_post_path(@post)
   end
 
+  # Client-side duration backfill (episode_durations controller reads the
+  # audio/video metadata in the browser and posts it here). Only fills a blank
+  # value — never clobbers a real one.
+  def set_duration
+    post = Post.find(params[:id])
+    duration = params[:duration].to_s.strip
+
+    return head :unprocessable_entity unless duration.match?(/\A\d{1,3}:\d{2}(:\d{2})?\z/)
+    return head :no_content if post.metadata["duration"].to_s.strip.present?
+
+    write_metadata_field(post, "duration", duration)
+    head :ok
+  end
+
   def search
     query = params[:q].to_s.downcase
     title_match = "%#{query}%"
@@ -862,6 +876,17 @@ class Admin::PostsController < Admin::BaseController
       normalize_and_write(post.file_path, new_content)
       ContentSync.sync_file(post.file_path)
     end
+  end
+
+  # Set a single frontmatter field on a post's file and re-sync.
+  def write_metadata_field(post, key, value)
+    content = File.read(post.file_path)
+    return unless content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)/m
+
+    metadata = YAML.safe_load($1, permitted_classes: [ Date, Time, Symbol ]) || {}
+    metadata[key] = value
+    normalize_and_write(post.file_path, "---\n#{Post.format_metadata_yaml(metadata)}\n---\n#{$2}")
+    ContentSync.sync_file(post.file_path)
   end
 
   def normalize_and_write(file_path, content)

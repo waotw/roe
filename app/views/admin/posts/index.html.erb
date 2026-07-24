@@ -1,5 +1,5 @@
 <div class="px-4 sm:px-0 font-mono"
-     data-controller="posts-filter bulk-select"
+     data-controller="posts-filter bulk-select episode-durations"
      data-posts-filter-total-value="<%= @posts.count %>">
 
   <div class="sm:flex sm:items-center">
@@ -137,6 +137,13 @@
                   </td>
                   <td class="max-w-[16rem] py-1.5 pl-6 md:pl-4 pr-3 text-sm font-medium text-gray-900">
                     <div class="flex items-center gap-1.5">
+                      <% media_url = post.metadata['audio'].presence || post.metadata['video'].presence %>
+                      <% if %w[podcast audio video].include?(post.metadata['post_type'].to_s) && post.metadata['duration'].to_s.strip.blank? && media_url.present? %>
+                        <span class="hidden" data-episode-durations-target="item"
+                              data-media-url="<%= media_url %>"
+                              data-kind="<%= post.metadata['video'].present? ? 'video' : 'audio' %>"
+                              data-save-url="<%= set_duration_admin_post_path(post) %>"></span>
+                      <% end %>
                       <%= link_to post.title || "Untitled", edit_admin_post_path(post), class: "min-w-0 truncate text-blue-600 hover:text-blue-900" %>
                       <% if post.needs_attention? %>
                         <%

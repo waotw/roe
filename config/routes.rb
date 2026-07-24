@@ -119,6 +119,7 @@ Rails.application.routes.draw do
         post :preview
         get :preview
         patch :rename
+        patch :set_duration
         post :duplicate
         post :send_test_email
         get :resend_modal

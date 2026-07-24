@@ -27,34 +27,34 @@
           data-action="click->media-filter#filterByType"
           data-type="all"
           data-media-filter-target="tab"
-          class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
           All
         </button>
 
         <!-- Show tabs for types that exist -->
         <% if @existing_types.include?('images') %>
-          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Images
           </button>
         <% end %>
 
         <% if @existing_types.include?('audio') %>
-          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Audio
           </button>
         <% end %>
 
         <% if @existing_types.include?('video') %>
-          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Video
           </button>
         <% end %>
         <% if @has_global_media && MediaUsageIndex.global_tab_enabled? %>
-          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Global
           </button>
         <% end %>
-          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Unused
           </button>
       </nav>
@@ -140,7 +140,7 @@
   </p>
 
   <!-- Media Grid -->
-  <div class="grid grid-cols-4 gap-4" data-media-filter-target="grid" data-media-upload-target="grid">
+  <div class="grid grid-cols-4 gap-2" data-media-filter-target="grid" data-media-upload-target="grid">
     <% @media.each do |media| %>
       <%= render "media_card", media: media, usages: @media_usages[media.file_path] %>
     <% end %>
