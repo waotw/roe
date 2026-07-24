@@ -98,6 +98,19 @@ class FeedImporterTest < ActiveSupport::TestCase
     end
   end
 
+  # --- dedup on guid when links aren't unique (monome) ---------------------
+  test "articles with a shared link dedupe on guid, not source_url" do
+    Dir.mktmpdir do |dir|
+      run1 = FeedImporter.new(feed: feed("monome.xml"), kind: :articles, posts_dir: dir).import
+      assert_equal 3, run1.imported, "distinct guids all import despite one shared link"
+      assert_equal 3, run1.slugs.uniq.size, "collisions disambiguate to distinct slugs (monome, monome-2, …)"
+
+      run2 = FeedImporter.new(feed: feed("monome.xml"), kind: :articles, posts_dir: dir).import
+      assert_equal 0, run2.imported
+      assert_equal 3, run2.skipped, "re-import skips by guid, not the shared link"
+    end
+  end
+
   # --- guardrails -----------------------------------------------------------
   test "episodes require a podcast_key" do
     assert_raises(ArgumentError) { FeedImporter.new(feed: { items: [] }, kind: :episodes) }

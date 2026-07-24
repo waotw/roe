@@ -266,6 +266,12 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :feed_imports, only: [ :index, :create ] do
+      collection do
+        post :preview
+      end
+    end
+
     resources :emails, only: [ :index, :edit, :update ] do
       member do
         post :preview

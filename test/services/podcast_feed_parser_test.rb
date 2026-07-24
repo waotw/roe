@@ -68,6 +68,21 @@ class PodcastFeedParserTest < ActiveSupport::TestCase
     assert_equal "Benjamin Welch", parsed[:channel][:author]
   end
 
+  # --- monome: RSS blog that reuses one title + link for every item --------
+  test "RSS blog reusing one title/link per item: guids stay unique, bodies present" do
+    items = parse("monome.xml")[:items]
+    assert_operator items.size, :>=, 2
+
+    assert_equal [ "monome" ], items.map { |i| i[:title] }.uniq, "feed reuses one title"
+    assert_equal 1, items.map { |i| i[:link] }.uniq.size, "feed reuses one link"
+    assert_equal items.size, items.map { |i| i[:guid] }.uniq.size, "guids are the only unique id"
+
+    items.each do |i|
+      assert i[:enclosure_url].blank?, "articles, not episodes"
+      assert i[:description].present?, "body comes from description"
+    end
+  end
+
   # --- Exact field mapping (synthetic, precise) ----------------------------
   test "reads content:encoded, itunes episode/season/type, and casts length to Integer" do
     xml = <<~XML

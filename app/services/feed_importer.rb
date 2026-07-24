@@ -85,16 +85,27 @@ class FeedImporter
     @limit ? items.first(@limit) : items
   end
 
-  # Episodes dedupe on the immutable guid; articles on source_url (the item
-  # link), falling back to title when a feed omits links.
+  # Dedupe on the single most-authoritative identifier available. Checking one
+  # key (not several OR'd together) matters: feeds like monome reuse the same
+  # <link> for every item, so a source_url check would wrongly skip everything
+  # after the first — the per-item guid is what's actually unique there.
   def already_imported?(item)
+    field, value = dedup_key(item)
+    value.present? && ::Post.exists?([ "json_extract(metadata, '$.#{field}') = ?", value ])
+  end
+
+  # Priority: guid (RSS's per-item id) → source_url (the item link) → title.
+  # Episodes almost always carry a guid; fall back to the audio URL if not.
+  # (field is always a controlled literal, never feed input.)
+  def dedup_key(item)
     if @kind == :episodes
-      guid = item[:guid].presence
-      guid.present? && ::Post.exists?([ "json_extract(metadata, '$.guid') = ?", guid ])
+      item[:guid].present? ? [ "guid", item[:guid] ] : [ "audio", item[:enclosure_url] ]
+    elsif item[:guid].present?
+      [ "guid", item[:guid] ]
     elsif item[:link].present?
-      ::Post.exists?([ "json_extract(metadata, '$.source_url') = ?", item[:link] ])
+      [ "source_url", item[:link] ]
     else
-      ::Post.exists?([ "json_extract(metadata, '$.title') = ?", item[:title].to_s ])
+      [ "title", item[:title].to_s ]
     end
   end
 

@@ -1,0 +1,92 @@
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold mb-2">Feed Imports</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Paste an RSS or Atom feed URL, or an Apple Podcasts link. Items come in as
+    drafts — episodes (with audio) as podcast posts, everything else as articles.
+    Media stays remote for now; nothing is published until you review it.
+  </p>
+
+  <div class="bg-white shadow p-6 mb-6">
+    <%= form_with url: preview_admin_feed_imports_path, method: :post, data: { turbo: false } do %>
+      <label for="feed_url" class="block text-sm font-medium text-gray-700 mb-1">Feed URL or Apple Podcasts link</label>
+      <div class="flex gap-2">
+        <%= text_field_tag :feed_url, @feed_url,
+              id: "feed_url", placeholder: "https://example.com/feed.xml",
+              class: "flex-1 border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400" %>
+        <%= submit_tag "Preview feed", class: "bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if @feed.present? %>
+    <%
+      episodes = @composition[:episodes]
+      articles = @composition[:articles]
+      default_kind = if episodes.zero? then "articles"
+                     elsif articles.zero? then "episodes"
+                     elsif episodes >= articles then "episodes"
+                     else "articles" end
+    %>
+    <div class="bg-white shadow p-6">
+      <div class="flex items-baseline justify-between mb-4">
+        <h2 class="text-lg font-medium"><%= @channel[:title].presence || "Feed" %></h2>
+        <span class="text-sm text-gray-500"><%= pluralize(@composition[:total], "item") %></span>
+      </div>
+      <p class="text-sm text-gray-600 mb-6">
+        <%= pluralize(episodes, "episode") %> (with audio) · <%= pluralize(articles, "article") %> (text)
+      </p>
+
+      <%= form_with url: admin_feed_imports_path, method: :post, data: { turbo: false } do %>
+        <%= hidden_field_tag :feed_url, @feed_url %>
+
+        <fieldset class="mb-6">
+          <legend class="text-sm font-medium text-gray-700 mb-2">Import as</legend>
+          <label class="flex items-center gap-2 mb-1 <%= "opacity-40" if episodes.zero? %>">
+            <%= radio_button_tag :kind, "episodes", default_kind == "episodes", disabled: episodes.zero? %>
+            <span class="text-sm">Podcast episodes <span class="text-gray-400">(<%= episodes %>)</span></span>
+          </label>
+          <label class="flex items-center gap-2 <%= "opacity-40" if articles.zero? %>">
+            <%= radio_button_tag :kind, "articles", default_kind == "articles", disabled: articles.zero? %>
+            <span class="text-sm">Articles <span class="text-gray-400">(<%= articles %>)</span></span>
+          </label>
+        </fieldset>
+
+        <% if episodes.positive? %>
+          <div class="mb-6">
+            <label for="podcast_key" class="block text-sm font-medium text-gray-700 mb-1">Podcast show <span class="text-gray-400 font-normal">(for episodes)</span></label>
+            <% if @podcast_options.present? %>
+              <%= select_tag :podcast_key,
+                    options_for_select(@podcast_options),
+                    class: "pl-2 pr-8 py-2 border border-gray-300 text-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" %>
+              <p class="mt-1 text-xs text-gray-500">
+                Need another show?
+                <%= link_to "Manage podcasts →", admin_edit_podcast_config_path, class: "text-gray-700 underline" %>
+              </p>
+            <% else %>
+              <p class="text-sm text-gray-600">
+                No podcast show yet.
+                <%= link_to "Set one up first →", new_podcast_setup_admin_configs_path, class: "text-gray-700 underline" %>
+                then come back and paste the feed again.
+              </p>
+            <% end %>
+          </div>
+        <% end %>
+
+        <fieldset class="mb-6">
+          <legend class="text-sm font-medium text-gray-700 mb-2">How many</legend>
+          <label class="flex items-center gap-2 mb-1">
+            <%= radio_button_tag :count_mode, "all", true %>
+            <span class="text-sm">All <span class="text-gray-400">(<%= @composition[:total] %>)</span></span>
+          </label>
+          <label class="flex items-center gap-2">
+            <%= radio_button_tag :count_mode, "latest", false %>
+            <span class="text-sm">Latest</span>
+            <%= number_field_tag :count, 10, min: 1, class: "w-20 border border-gray-300 px-2 py-1 text-sm" %>
+          </label>
+        </fieldset>
+
+        <%= submit_tag "Import as drafts", class: "bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 cursor-pointer" %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
