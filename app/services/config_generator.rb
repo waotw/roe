@@ -189,7 +189,11 @@ class ConfigGenerator
   # Without this, deleting welcome.md would have it reappear on every
   # boot.
   def skip_paths_for_minimum
-    paths = []
+    # The sidebar is opt-in: its template lives with the other layout files
+    # (so it's the canonical default), but unlike header/footer it is never
+    # auto-installed. The admin creates it on request via LayoutsController,
+    # which renders this same template — see #generate_missing there.
+    paths = [ "layout/sidebar.md" ]
     posts_dir = File.join(RoeSitePaths::SITE_PATH, "posts")
     if Dir.exist?(posts_dir) && Dir.glob(File.join(posts_dir, "*.md")).any?
       paths << "posts/welcome.md"
