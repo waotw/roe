@@ -73,13 +73,16 @@
                     <span class="text-xs text-gray-400">— <%= file[:description] %></span>
                   </div>
                 </td>
-                <td class="py-4 pl-3 pr-4 text-right text-sm">
-                  <% if file[:unconfigured] %>
-                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500 mr-2">
-                      unconfigured
-                    </span>
-                  <% end %>
-                  <%= link_to "Edit", file[:edit_path], class: "text-blue-600 hover:text-blue-900" %>
+                <td class="py-2 pl-3 pr-4 text-sm">
+                  <div class="flex items-center justify-end gap-2">
+                    <% if file[:unconfigured] %>
+                      <span class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        unconfigured
+                      </span>
+                    <% end %>
+                    <%= link_to icon_svg("edit", class: "w-[1.3rem] h-[1.3rem]"), file[:edit_path],
+                          class: "inline-flex text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
+                  </div>
                 </td>
               </tr>
             <% end %>
