@@ -787,47 +787,11 @@ module HasMarkdownExtensions
     config
   end
 
-  def apply_tag_filters(collection, tag_string)
-    return collection if tag_string.blank?
-
-    # Split by comma and clean up whitespace
-    tags = tag_string.split(",").map(&:strip)
-
-    # Separate positive and negative tags
-    positive_tags = tags.reject { |t| t.start_with?("-") }
-    negative_tags = tags.select { |t| t.start_with?("-") }.map { |t| t[1..-1] } # Remove the '-'
-
-    # Apply positive tags (OR logic - any of these tags)
-    if positive_tags.any?
-      collection = collection.tagged_with(positive_tags)
-    end
-
-    # Apply negative tags (exclude all of these, but keep untagged posts)
-    negative_tags.each do |neg_tag|
-      collection = collection.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{neg_tag}%"
-      )
-    end
-
-    collection
-  end
-
-  def apply_category_filter(collection, category)
-    collection.where("json_extract(metadata, '$.category') = ?", category.strip)
-  end
-
-  def apply_podcast_filter(collection, podcast_key)
-    collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip)
-  end
-
-  # Normalize a collection's `collection:` name filter (comma string or array)
-  # into the same downcased tokens HasMetadata#collection_names returns.
+  # Selection helpers (tag/podcast/category filters) now live in CollectionQuery,
+  # shared with named feeds. This name-normalizer is still called elsewhere in
+  # the renderer (menu curation), so it delegates rather than duplicating.
   def normalize_collection_names(value)
-    list = value.is_a?(Array) ? value : value.to_s.split(",")
-    list.map { |c| c.to_s.strip.downcase }
-        .reject(&:empty?)
-        .uniq
+    CollectionQuery.normalize_names(value)
   end
 
   def render_collection(config)
@@ -838,12 +802,10 @@ module HasMarkdownExtensions
   end
 
   # Default source for a collection, shared by resolve_collection_items and
-  # render_resolved_collection: a menu with no explicit source defaults to
-  # pages; a plain feed defaults to posts.
+  # render_resolved_collection. Delegates to CollectionQuery so collections and
+  # feeds resolve the source identically.
   def collection_source(config)
-    menu_template = config[:template].to_s.strip == "menu"
-    config[:source] || (menu_template ? "pages" : nil) ||
-      SiteConfig.default("collections", "default_source") || "posts"
+    CollectionQuery.source_for(config)
   end
 
   # Resolve a limit/offset directive to an item count. Accepts a strict integer
@@ -906,8 +868,6 @@ module HasMarkdownExtensions
     # url_name list), fall back to alphabetical rather than by date.
     order_by = "title" if config[:order].blank? && menu_template
     tags = config[:tags]
-    category = config[:category]
-    podcast_key = config[:podcast]
 
     # Get post_type from config or default, treating 'all' as nil (no filter)
     post_type = config[:post_type]
@@ -958,51 +918,20 @@ module HasMarkdownExtensions
       end
     end
 
-    # Get base collection
-    items = case source
-    when "posts"
-      collection = Post.published.regular_posts
-      collection = collection.by_type(post_type) if post_type
-      collection = apply_podcast_filter(collection, podcast_key) if podcast_key.present?
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when "pages"
-      collection = Page.public_pages
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when "documentation"
-      collection = Documentation.public_documentation.root
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when /^documentation\//
-      dir = source.sub("documentation/", "")
-      collection = Documentation.public_documentation.in_directory(dir)
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when "products"
-      collection = Product.published
-      collection = apply_category_filter(collection, category) if category
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    else
+    # Base selection (source + post_type/podcast/tags/category + `collection:`
+    # membership) lives in CollectionQuery, shared with named feeds so the two
+    # can never disagree about membership. The rendering-only steps below
+    # (related, menus, ordering, limit/offset) stay here. A nil result means an
+    # unknown source — warn in dev, render empty in prod, as before.
+    items = CollectionQuery.new(config).records
+    if items.nil?
       if Rails.env.development?
         valid = %w[posts pages documentation documentation/roe products]
         return [ [], 0, dev_warning("Unknown collection source",
           "'#{source}' is not a valid source.",
           "Valid sources: #{valid.join(', ')}") ]
       end
-      []
-    end
-
-    # Filter by `collection:` membership. Like tags, but a placement concept —
-    # content stays invisible until a collection gathers it by name. Menus do
-    # their own membership below (list unioned with tagged), so this plain
-    # filter only applies to the other templates.
-    if config[:collection].present? && !menu_template
-      wanted = normalize_collection_names(config[:collection])
-      items = items.to_a.select do |item|
-        item.respond_to?(:collection_names) && (item.collection_names & wanted).any?
-      end
+      items = []
     end
 
     # `related: true` — filter the source collection to items that
