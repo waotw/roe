@@ -3,15 +3,15 @@ class System::JavascriptsController < ApplicationController
   skip_before_action :verify_authenticity_token
 
   def show
-    # Serve the self-contained vanilla JS files from app/site_js (search.js,
-    # etc.). Constrain the filename to a basename so the route can't escape
-    # the directory.
+    # Serve the site-facing vanilla JS (search.js, gallery.js, checkout.js).
+    # SiteJavascript prefers the per-site copy in site/javascript/ and falls
+    # back to the shipped app/site_js/; the basename guard blocks traversal.
     filename = File.basename(params[:filename].to_s)
     format = params[:format] == "css" ? "css" : "js"
     full_filename = "#{filename}.#{format}"
     content_type = format == "js" ? "application/javascript" : "text/css"
 
-    file_path = Rails.root.join("app", "site_js", full_filename)
+    file_path = SiteJavascript.path(full_filename)
 
     unless File.exist?(file_path)
       head :not_found

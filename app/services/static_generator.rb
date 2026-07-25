@@ -995,8 +995,20 @@ class StaticGenerator
   # served from /javascript, distinct from the theme's own scripts. Copied
   # every build so the output always has them; sync_directory skips unchanged
   # files and prunes orphans.
+  # Publish site JS to /javascript/. The shipped source is the base; the
+  # per-site copies in site/javascript/ overlay it so overrides win — the same
+  # site-first-then-source resolution the dynamic controller uses.
   def copy_site_javascript
-    sync_directory(Rails.root.join("app", "site_js"), @output_dir.join("javascript"))
+    out = @output_dir.join("javascript")
+    sync_directory(SiteJavascript.source_dir, out) # shipped base
+
+    # Overlay the per-site copies (and any site-only additions) on top without
+    # removing the base — a site override wins, matching the dynamic resolver.
+    return unless File.directory?(SiteJavascript.site_dir)
+
+    Dir.glob(File.join(SiteJavascript.site_dir, "*")).each do |f|
+      FileUtils.cp(f, out.join(File.basename(f))) if File.file?(f)
+    end
   end
 
   # If the active theme isn't installed under site/theme/, fall back to
@@ -1004,7 +1016,7 @@ class StaticGenerator
   # out-of-box default theme would publish with no stylesheet.
   def copy_bundled_themes
     theme_name = SiteConfig.get("theme.active") || "default"
-    %W[#{theme_name}.css checkout.js gallery.js].each do |filename|
+    %W[#{theme_name}.css].each do |filename|
       dest = @output_dir.join("theme", filename)
       next if dest.exist? # site/theme/<file> already won the copy
 
