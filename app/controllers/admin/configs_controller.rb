@@ -3,6 +3,26 @@ class Admin::ConfigsController < Admin::BaseController
   # so any non-GET config action busts the media-usage backlink cache.
   after_action :invalidate_media_usage_index
 
+  # Structured editors that fall back to the raw YAML editor when their file
+  # can't be parsed. Maps the edit action → the SiteConfig type (also the
+  # file_path_for key). The matching path helper is always
+  # admin_<action>_config_path, so we derive it rather than list it twice.
+  RAW_EDITABLE_CONFIGS = {
+    "edit_site"        => "site",
+    "edit_content"     => "content",
+    "edit_fonts"       => "fonts",
+    "edit_podcast"     => "features/podcast",
+    "edit_cards"       => "defaults/cards",
+    "edit_collections" => "defaults/collections",
+    "edit_members"     => "features/members",
+    "edit_store"       => "features/store"
+  }.freeze
+
+  # When a structured editor above hits malformed YAML, don't 500 — send the
+  # admin to the raw editor for that file so they can fix it by hand. Any other
+  # source of a syntax error re-raises as before.
+  rescue_from Psych::SyntaxError, with: :handle_unparseable_config
+
   # Site Config Schema Definition
   SITE_CONFIG_SCHEMA = {
     site_info: {
@@ -413,12 +433,14 @@ class Admin::ConfigsController < Admin::BaseController
         name: "cards.yml",
         path: "defaults/cards.yml",
         type: "defaults/cards",
+        description: "post-link, aside, pullquote, templates",
         edit_path: admin_edit_cards_config_path
       },
       {
         name: "collections.yml",
         path: "defaults/collections.yml",
         type: "defaults/collections",
+        description: "source, post-type, order, limit, template",
         edit_path: admin_edit_collections_config_path
       }
     ]
@@ -629,6 +651,37 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = content
     flash.now[:alert] = "YAML error: #{e.message}"
     render(:edit_feeds, status: :unprocessable_entity)
+  end
+
+  # Raw YAML editor — the escape hatch a structured editor redirects to when its
+  # file won't parse. Shows the file as-is so the admin can fix it by hand.
+  def edit_raw
+    @raw_type = params[:type].to_s
+    return redirect_to(admin_configs_path, alert: "Unknown config file.") unless RAW_EDITABLE_CONFIGS.value?(@raw_type)
+
+    path = SiteConfig.file_path_for(@raw_type)
+    @config_content = File.exist?(path) ? File.read(path) : ""
+    @structured_path = structured_edit_path(@raw_type)
+    render :edit_raw
+  end
+
+  def update_raw
+    @raw_type = params[:type].to_s
+    return redirect_to(admin_configs_path, alert: "Unknown config file.") unless RAW_EDITABLE_CONFIGS.value?(@raw_type)
+
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+    YAML.load(content) # raises Psych::SyntaxError if it still won't parse
+
+    path = SiteConfig.file_path_for(@raw_type)
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, content)
+    SiteConfig.sync_from_file(@raw_type)
+    redirect_to structured_edit_path(@raw_type), notice: "Saved. The settings form should open now."
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    @structured_path = structured_edit_path(@raw_type)
+    flash.now[:alert] = "Still invalid YAML: #{e.message}"
+    render(:edit_raw, status: :unprocessable_entity)
   end
 
   def edit_fonts
@@ -1540,6 +1593,23 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   private
+
+  # rescue_from handler: a structured editor couldn't parse its file. Route the
+  # admin to the raw editor for that config; re-raise for anything unmapped.
+  def handle_unparseable_config(error)
+    type = RAW_EDITABLE_CONFIGS[action_name]
+    raise error unless type
+
+    redirect_to admin_edit_raw_config_path(type: type),
+      alert: "This config file has a YAML error, so its settings form can't open. Fix the raw YAML below and save. (#{error.message})"
+  end
+
+  # The structured edit path for a raw-editable config type. Every one follows
+  # admin_<action>_config_path, so derive it from the action in the map.
+  def structured_edit_path(type)
+    action = RAW_EDITABLE_CONFIGS.key(type)
+    send("admin_#{action}_config_path")
+  end
 
   # Write a Ruby hash to YAML at `path` without the leading `---`
   # document separator. Hand-authored Roe config files don't use it,

@@ -90,9 +90,12 @@ class ProductCategory
       end
 
       if in_categories_block
-        if line.match?(/\A[ \t]+-\s/) || line.match?(/\A[ \t]*\Z/)
-          # Indented `- item` or blank line: still inside the block,
-          # skip (we've already emitted the replacement)
+        if line.match?(/\A[ \t]*-\s/) || line.match?(/\A[ \t]*\Z/)
+          # A `- item` (indented OR at column 0 — a block sequence may sit at
+          # the parent key's indent, which is valid YAML) or a blank line: still
+          # inside the block, skip (we've already emitted the replacement). The
+          # earlier `[ \t]+` here missed column-0 items and left them behind,
+          # producing a second, stale list and an unparseable file.
           next
         else
           # Non-indented line: we're out of the categories block

@@ -68,8 +68,10 @@
             <% section[:files].each do |file| %>
               <tr>
                 <td class="py-2 pl-3 pr-1.5 text-sm font-medium text-gray-900 font-mono">
-                  <%= link_to file[:name], file[:edit_path], class: "text-blue-600 hover:text-blue-900 block mb-0.5" %>
-                  <span class="text-xs text-gray-400"><%= file[:description] %></span>
+                  <div class="flex gap-2 items-center">
+                    <%= link_to file[:name], file[:edit_path], class: "text-blue-600 hover:text-blue-900 block" %>
+                    <span class="text-xs text-gray-400">— <%= file[:description] %></span>
+                  </div>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right text-sm">
                   <% if file[:unconfigured] %>

@@ -462,6 +462,48 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_equal before, File.read(SiteConfig::FEATURES_PATH.join("feeds.yml")), "bad input is not written"
   end
 
+  # ── Raw YAML fallback ──────────────────────────────────────────────────────
+
+  test "a structured editor with malformed YAML redirects to the raw editor" do
+    File.write(SiteConfig::FEATURES_PATH.join("store.yml"), "enabled: true\n- broken\n")
+
+    get admin_edit_store_config_path
+
+    assert_redirected_to admin_edit_raw_config_path(type: "features/store")
+  end
+
+  test "edit_raw shows the offending file's content" do
+    File.write(SiteConfig::FEATURES_PATH.join("store.yml"), "enabled: true\n- broken\n")
+
+    get admin_edit_raw_config_path(type: "features/store")
+
+    assert_response :success
+    assert_select "textarea", /broken/
+  end
+
+  test "update_raw writes valid YAML and returns to the settings form" do
+    ensure_feature_file("store.yml")
+
+    patch admin_raw_config_path, params: { type: "features/store", content: "enabled: true\ncurrency: usd\n" }
+
+    assert_redirected_to admin_edit_store_config_path
+    assert_includes File.read(SiteConfig::FEATURES_PATH.join("store.yml")), "usd"
+  end
+
+  test "update_raw re-renders when the YAML still won't parse" do
+    ensure_feature_file("store.yml")
+
+    patch admin_raw_config_path, params: { type: "features/store", content: "ok: true\n- nope\n" }
+
+    assert_response :unprocessable_entity
+  end
+
+  test "the raw editor rejects a config type not on the whitelist" do
+    get admin_edit_raw_config_path(type: "etc/passwd")
+
+    assert_redirected_to admin_configs_path
+  end
+
   private
 
   def ensure_feature_file(filename)

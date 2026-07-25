@@ -340,6 +340,10 @@ Rails.application.routes.draw do
     get "configs/feeds/edit", to: "configs#edit_feeds", as: "edit_feeds_config"
     patch "configs/feeds", to: "configs#update_feeds", as: "feeds_config"
 
+    # Raw YAML fallback editor for a config whose structured form won't parse.
+    get "configs/raw/edit", to: "configs#edit_raw", as: "edit_raw_config"
+    patch "configs/raw", to: "configs#update_raw", as: "raw_config"
+
     get "configs/members/edit", to: "configs#edit_members", as: "edit_members_config"
     patch "configs/members", to: "configs#update_members", as: "members_config"
 
