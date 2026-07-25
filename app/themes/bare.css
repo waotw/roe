@@ -15,7 +15,7 @@
 
   /* Layout */
   --container-width: 650px;
-  --sidebar-width: 11rem;
+  --sidebar-width: 6rem;
   --aside-width: 10rem;
   --aside-text-top-offset: 0.25rem;
   --aside-image-top-offset: 0.4rem;
@@ -573,7 +573,7 @@ body.sidebar-right {
 @media (min-width: 769px) {
   body.has-sidebar {
     display: grid;
-    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-columns: fit-content(var(--sidebar-width)) 1fr;
     grid-template-areas:
       "nav nav"
       "sidebar main"
@@ -584,7 +584,7 @@ body.sidebar-right {
   }
 
   body.sidebar-right {
-    grid-template-columns: 1fr var(--sidebar-width);
+    grid-template-columns: 1fr fit-content(var(--sidebar-width));
     grid-template-areas:
       "nav nav"
       "main sidebar"
@@ -645,10 +645,19 @@ body.sidebar-right {
     display: flex;
     flex-direction: column;
   }
-  body.sidebar-mobile-top .site-nav     { order: 1; }
-  body.sidebar-mobile-top .site-sidebar { order: 2; display: block; }
-  body.sidebar-mobile-top main          { order: 3; }
-  body.sidebar-mobile-top .site-footer  { order: 4; }
+  body.sidebar-mobile-top .site-nav {
+    order: 1;
+  }
+  body.sidebar-mobile-top .site-sidebar {
+    order: 2;
+    display: block;
+  }
+  body.sidebar-mobile-top main {
+    order: 3;
+  }
+  body.sidebar-mobile-top .site-footer {
+    order: 4;
+  }
 
   body.sidebar-mobile-top .site-sidebar {
     border-bottom: 1px solid var(--color-border);
@@ -657,6 +666,7 @@ body.sidebar-right {
   }
   body.sidebar-mobile-top .site-sidebar .collection-menu {
     display: flex;
+    flex-direction: row;
     flex-wrap: nowrap;
     gap: var(--space-4);
     overflow-x: auto;
@@ -681,6 +691,7 @@ body.sidebar-right {
      horizontal, `bottom` to vertical, and this forces either regardless. */
   body.sidebar-mobile-style-horizontal .site-sidebar .collection-menu {
     display: flex;
+    flex-direction: row;
     flex-wrap: nowrap;
     gap: var(--space-4);
     overflow-x: auto;

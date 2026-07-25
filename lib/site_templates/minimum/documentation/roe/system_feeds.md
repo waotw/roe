@@ -56,6 +56,56 @@ The feed’s channel-level title, description, link, and author come from your s
 | Channel link | `url` in site.yml |
 | Managing editor | `author` in site.yml |
 
+## Custom Feeds
+
+The `/feed` above covers every post. To publish a narrower feed — one post type, one tag, a curated set — turn on custom feeds and define them.
+
+Enable the feature from [Admin → Settings](/admin/configs) with **Enable Custom Feeds**. That creates `site/system/features/feeds.yml` (seeded with one example) and adds a `feeds.yml` editor under Features. Each entry is a collection query — the same fields you write in a `collection` block — plus a title:
+
+```yaml
+articles:
+  title: "Articles"
+  description: "Long-form pieces"
+  source: posts
+  post_type: article
+  order: date
+  limit: 20
+  audience: free
+
+music:
+  title: "Music"
+  source: posts
+  tags: music
+```
+
+Each feed is served at two URLs, using its key from the file:
+
+| Format | URL |
+|--------|-----|
+| RSS 2.0 | `/feed/<name>.xml` |
+| Atom | `/feed/<name>.atom` |
+
+So the `articles` feed above is at `/feed/articles.xml`.
+
+### Fields
+
+| Field | Purpose |
+|-------|---------|
+| `title` | The feed’s channel title (defaults to the site title) |
+| `description` | The feed’s channel description |
+| `source` | Where items come from: `posts` (default), `pages`, `documentation`, `products` |
+| `post_type` | Limit posts to one type, e.g. `article` |
+| `tags` | Include by tag; prefix with `-` to exclude, e.g. `music, -draft` |
+| `order` | `date` (default), `date-asc`, `title`, or an explicit list of `url_name`s |
+| `limit` | How many items to include (default 20) |
+| `audience` | `free` (default) or `paid` |
+
+### Free and paid feeds
+
+A **free** feed is public and never includes paid content, even if your site shows paid teasers on the page. A **paid** feed is private: it includes everything, but a reader must supply a paid member’s access token (the same token that unlocks a private podcast feed), so it’s only served to paying members. If you build a static site, free feeds are written out as files; paid feeds are not, since a static file couldn’t enforce the token.
+
+Named feeds are for standard content. A podcast needs its own feed with enclosures and iTunes tags — see below.
+
 ## Podcast Feeds
 
 Podcast episodes have their own dedicated RSS feeds with full iTunes/Apple Podcasts support. These are separate from the main blog feed.

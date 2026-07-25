@@ -662,7 +662,7 @@ body.sidebar-right {
 @media (min-width: 769px) {
   body.has-sidebar {
     display: grid;
-    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-columns: fit-content(var(--sidebar-width)) 1fr;
     grid-template-areas:
       "nav nav"
       "sidebar main"
@@ -673,7 +673,7 @@ body.sidebar-right {
   }
 
   body.sidebar-right {
-    grid-template-columns: 1fr var(--sidebar-width);
+    grid-template-columns: 1fr fit-content(var(--sidebar-width));
     grid-template-areas:
       "nav nav"
       "main sidebar"
@@ -759,6 +759,7 @@ body.sidebar-right {
   }
   body.sidebar-mobile-top .site-sidebar .collection-menu {
     display: flex;
+    flex-direction: row;
     flex-wrap: nowrap;
     gap: var(--space-4);
     overflow-x: auto;
@@ -783,6 +784,7 @@ body.sidebar-right {
      horizontal, `bottom` to vertical, and this forces either regardless. */
   body.sidebar-mobile-style-horizontal .site-sidebar .collection-menu {
     display: flex;
+    flex-direction: row;
     flex-wrap: nowrap;
     gap: var(--space-4);
     overflow-x: auto;
