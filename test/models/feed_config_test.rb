@@ -2,7 +2,7 @@ require "test_helper"
 
 class FeedConfigTest < ActiveSupport::TestCase
   def stub_feeds(hash)
-    SiteConfig.stubs(:current).with("feeds").returns(stub(config: hash))
+    SiteConfig.stubs(:current).with("features/feeds").returns(stub(config: hash))
   end
 
   test "feed_names lists configured feeds and drops reserved names" do
@@ -25,7 +25,7 @@ class FeedConfigTest < ActiveSupport::TestCase
   end
 
   test "an absent feeds.yml means no feeds, not an error" do
-    SiteConfig.stubs(:current).with("feeds").returns(nil)
+    SiteConfig.stubs(:current).with("features/feeds").returns(nil)
     assert_equal({}, FeedConfig.all_feeds)
     assert_empty FeedConfig.feed_names
   end

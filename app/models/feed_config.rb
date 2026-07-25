@@ -1,4 +1,5 @@
-# Named feeds, read from site/system/global/feeds.yml. Each entry is a
+# Named feeds, read from site/system/features/feeds.yml. The file's presence is
+# what enables the feature (like the other features/*.yml). Each entry is a
 # collection query (source/post_type/tags/category/order/limit) plus feed
 # metadata (title/description) and an audience:
 #
@@ -19,8 +20,15 @@ class FeedConfig
   # slug. A feed may not use one.
   RESERVED_NAMES = %w[feed xml atom rss].freeze
 
+  FILE = SiteConfig::FEATURES_PATH.join("feeds.yml")
+
+  # The feature is on when the file exists (matches SiteConfig.feature_enabled?).
+  def self.enabled?
+    File.exist?(FILE)
+  end
+
   def self.all_feeds
-    config = SiteConfig.current("feeds")&.config
+    config = SiteConfig.current("features/feeds")&.config
     config.is_a?(Hash) ? config : {}
   end
 
@@ -46,6 +54,6 @@ class FeedConfig
   end
 
   def self.reload!
-    SiteConfig.reload!("feeds")
+    SiteConfig.reload!("features/feeds")
   end
 end

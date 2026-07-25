@@ -202,6 +202,7 @@ Rails.application.routes.draw do
         get :new_store_setup
         post :create_store
         delete :delete_store
+        get :new_feeds_setup
       end
     end
 
@@ -335,6 +336,9 @@ Rails.application.routes.draw do
 
     get "configs/collections/edit", to: "configs#edit_collections", as: "edit_collections_config"
     patch "configs/collections", to: "configs#update_collections", as: "collections_config"
+
+    get "configs/feeds/edit", to: "configs#edit_feeds", as: "edit_feeds_config"
+    patch "configs/feeds", to: "configs#update_feeds", as: "feeds_config"
 
     get "configs/members/edit", to: "configs#edit_members", as: "edit_members_config"
     patch "configs/members", to: "configs#update_members", as: "members_config"

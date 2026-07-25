@@ -138,6 +138,7 @@ module ApplicationHelper
   def stripe_configured?          = SiteFeature.stripe_configured?
   def snipcart_configured?        = SiteFeature.snipcart_configured?
   def podcast_enabled?            = SiteFeature.podcast_enabled?
+  def custom_feeds_enabled?       = SiteFeature.custom_feeds_enabled?
   def payments_feature_enabled?    = SiteFeature.payments_feature_enabled?
   def newsletters_feature_enabled? = SiteFeature.newsletters_feature_enabled?
   def any_integration_unconfigured? = SiteFeature.any_integration_unconfigured?

@@ -330,7 +330,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "custom_code.yml",
         path: "global/custom_code.yml",
         type: "custom_code",
-        description: "Add analytics, fonts, widgets, or any HTML/JS/CSS into your site's <head> or footer",
+        description: "Add any HTML/JS/CSS into your site's <head> or footer",
         edit_path: admin_edit_custom_code_config_path
       },
       {
@@ -372,6 +372,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "members.yml",
         path: "features/members.yml",
         type: "features/members",
+        description: "Member payments and newsletter settings",
         edit_path: admin_edit_members_config_path
       }
     end
@@ -381,6 +382,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "podcast.yml",
         path: "features/podcast.yml",
         type: "features/podcast",
+        description: "Add, edit, remove podcasts",
         edit_path: admin_edit_podcast_config_path
       }
     end
@@ -390,7 +392,18 @@ class Admin::ConfigsController < Admin::BaseController
         name: "store.yml",
         path: "features/store.yml",
         type: "features/store",
+        description: "Currency, domain, categories, product groups",
         edit_path: admin_edit_store_config_path
+      }
+    end
+
+    if File.exist?(SiteConfig::FEATURES_PATH.join("feeds.yml"))
+      features_files << {
+        name: "feeds.yml",
+        path: "features/feeds.yml",
+        type: "features/feeds",
+        description: "Custom RSS/Atom feeds.",
+        edit_path: admin_edit_feeds_config_path
       }
     end
 
@@ -564,6 +577,58 @@ class Admin::ConfigsController < Admin::BaseController
 
     flash[:notice] = "Custom code saved."
     redirect_to admin_edit_custom_code_config_path
+  end
+
+  # Enable custom feeds by creating features/feeds.yml, seeded with one example
+  # feed so the format is clear. Idempotent — if the file already exists, just
+  # open the editor.
+  def new_feeds_setup
+    unless File.exist?(FeedConfig::FILE)
+      FileUtils.mkdir_p(File.dirname(FeedConfig::FILE))
+      File.write(FeedConfig::FILE, <<~YAML)
+        articles:
+          title: Articles
+          source: posts
+          post_type: article
+          order: date
+          limit: 20
+          audience: free
+      YAML
+      SiteConfig.sync_from_file("features/feeds")
+      flash[:notice] = "Custom feeds enabled. Edit feeds.yml below to define your feeds."
+    end
+    redirect_to admin_edit_feeds_config_path
+  end
+
+  def edit_feeds
+    unless File.exist?(FeedConfig::FILE)
+      redirect_to admin_configs_path, alert: "Custom feeds aren't enabled yet." and return
+    end
+    @config_content = File.read(FeedConfig::FILE)
+    render :edit_feeds
+  end
+
+  # Raw-YAML save. Validate the document is a mapping (feed name → settings)
+  # before writing — a broken file would take down every named feed — and
+  # re-render with the user's input intact on any parse error.
+  def update_feeds
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+
+    parsed = YAML.safe_load(content)
+    unless parsed.nil? || parsed.is_a?(Hash)
+      @config_content = content
+      flash.now[:alert] = "feeds.yml must be a mapping of feed name to settings."
+      return render(:edit_feeds, status: :unprocessable_entity)
+    end
+
+    File.write(FeedConfig::FILE, content)
+    SiteConfig.sync_from_file("features/feeds")
+    flash[:notice] = "Feeds saved."
+    redirect_to admin_edit_feeds_config_path
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    flash.now[:alert] = "YAML error: #{e.message}"
+    render(:edit_feeds, status: :unprocessable_entity)
   end
 
   def edit_fonts

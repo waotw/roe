@@ -11,7 +11,6 @@ class SiteConfig < ApplicationRecord
   DEVELOPMENT_FILE = File.join(SITE_PATH, "development.yml")
   DEPLOY_FILE = File.join(SITE_PATH, "deploy.yml")
   CONTENT_FILE = File.join(SITE_PATH, "content.yml")
-  FEEDS_FILE = File.join(SITE_PATH, "feeds.yml")
 
   # content.yml keys that used to live flat in site.yml. Lets `content`
   # read a pre-split install (before the boot migration moves them).
@@ -145,12 +144,12 @@ class SiteConfig < ApplicationRecord
       [
         "site",
         "fonts",
-        "feeds",
         "defaults/collections",
         "defaults/cards",
         "features/members",
         "features/podcast",
-        "features/store"
+        "features/store",
+        "features/feeds"
       ].each do |config_type|
         Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{config_type}")
       end
@@ -178,7 +177,6 @@ class SiteConfig < ApplicationRecord
     sync_from_file("site") if File.exist?(SITE_FILE)
     sync_from_file("fonts") if File.exist?(FONTS_FILE)
     sync_from_file("deploy") if File.exist?(DEPLOY_FILE)
-    sync_from_file("feeds") if File.exist?(FEEDS_FILE)
 
     # Sync all defaults
     Dir.glob(DEFAULTS_PATH.join("*.yml")).each do |file|
@@ -207,8 +205,6 @@ class SiteConfig < ApplicationRecord
       FONTS_FILE
     when "content"
       CONTENT_FILE
-    when "feeds"
-      FEEDS_FILE
     when "deploy"
       DEPLOY_FILE
     when /^features\//

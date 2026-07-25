@@ -18,6 +18,12 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     ensure_feature_file("store.yml")
   end
 
+  teardown do
+    feeds = SiteConfig::FEATURES_PATH.join("feeds.yml")
+    File.delete(feeds) if File.exist?(feeds)
+    SiteConfig.reload!("features/feeds")
+  end
+
   # ── Index ──────────────────────────────────────────────────────────────────
 
   test "index lists integrations when features are enabled" do
@@ -403,6 +409,57 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     # Search moved out of site.yml into content.yml (nested under `search`).
     assert_select "input[data-config-field=?][type=checkbox]", "search.all_pages"
+  end
+
+  # ── Custom feeds ─────────────────────────────────────────────────────────
+
+  test "new_feeds_setup creates feeds.yml with an example and opens the editor" do
+    feeds = SiteConfig::FEATURES_PATH.join("feeds.yml")
+    File.delete(feeds) if File.exist?(feeds)
+
+    get new_feeds_setup_admin_configs_path
+
+    assert File.exist?(feeds), "feeds.yml is created"
+    assert_includes File.read(feeds), "articles", "seeded with an example feed"
+    assert_redirected_to admin_edit_feeds_config_path
+  end
+
+  test "the Enable Custom Feeds button shows while the feature is off" do
+    feeds = SiteConfig::FEATURES_PATH.join("feeds.yml")
+    File.delete(feeds) if File.exist?(feeds)
+
+    get admin_configs_path
+
+    assert_response :success
+    assert_select "a[href=?]", new_feeds_setup_admin_configs_path
+  end
+
+  test "index lists feeds.yml under Features once enabled" do
+    ensure_feature_file("feeds.yml")
+
+    get admin_configs_path
+
+    assert_response :success
+    assert_select "a[href=?]", admin_edit_feeds_config_path
+  end
+
+  test "update_feeds saves a valid YAML mapping" do
+    ensure_feature_file("feeds.yml")
+
+    patch admin_feeds_config_path, params: { content: "music:\n  source: posts\n  tags: music\n" }
+
+    assert_redirected_to admin_edit_feeds_config_path
+    assert_includes File.read(SiteConfig::FEATURES_PATH.join("feeds.yml")), "music"
+  end
+
+  test "update_feeds rejects a non-mapping document without writing it" do
+    ensure_feature_file("feeds.yml")
+    before = File.read(SiteConfig::FEATURES_PATH.join("feeds.yml"))
+
+    patch admin_feeds_config_path, params: { content: "- just\n- a\n- list\n" }
+
+    assert_response :unprocessable_entity
+    assert_equal before, File.read(SiteConfig::FEATURES_PATH.join("feeds.yml")), "bad input is not written"
   end
 
   private

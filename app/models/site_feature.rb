@@ -29,6 +29,10 @@ module SiteFeature
     File.exist?(File.join(FEATURES_PATH, "podcast.yml"))
   end
 
+  def custom_feeds_enabled?
+    File.exist?(File.join(FEATURES_PATH, "feeds.yml"))
+  end
+
   # Payments enabled = members enabled AND payments.enabled in members.yml
   def payments_feature_enabled?
     return false unless members_enabled?

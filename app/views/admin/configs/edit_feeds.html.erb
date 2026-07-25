@@ -1,0 +1,39 @@
+<div class="px-4 sm:px-0">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Custom Feeds</h1>
+      <p class="mt-1 text-sm text-gray-700">
+        <span class="font-mono">features/feeds.yml</span> — define named RSS/Atom feeds. Each is served at
+        <span class="font-mono">/feed/&lt;name&gt;.xml</span> and <span class="font-mono">/feed/&lt;name&gt;.atom</span>.
+      </p>
+    </div>
+    <%= link_to "← Settings", admin_configs_path, class: "text-sm text-blue-600 hover:text-blue-900" %>
+  </div>
+
+  <details class="mb-4 p-3 border border-gray-300 bg-gray-50 rounded text-sm">
+    <summary class="cursor-pointer font-semibold">Field reference</summary>
+    <div class="mt-2 space-y-1 text-gray-700">
+      <p>Each top-level key is a feed name — its URL slug. Under it:</p>
+      <ul class="list-disc pl-5 space-y-0.5">
+        <li><span class="font-mono">title</span> — the feed's title (defaults to the site title)</li>
+        <li><span class="font-mono">description</span> — the feed's description</li>
+        <li><span class="font-mono">source</span> — <span class="font-mono">posts</span> (default), <span class="font-mono">pages</span>, <span class="font-mono">documentation</span>, or <span class="font-mono">products</span></li>
+        <li><span class="font-mono">post_type</span> — limit to one type, e.g. <span class="font-mono">article</span></li>
+        <li><span class="font-mono">tags</span> — include by tag; prefix a tag with <span class="font-mono">-</span> to exclude</li>
+        <li><span class="font-mono">order</span> — <span class="font-mono">date</span> (default), <span class="font-mono">date-asc</span>, <span class="font-mono">title</span>, or a list of url_names</li>
+        <li><span class="font-mono">limit</span> — how many items to include (default 20)</li>
+        <li><span class="font-mono">audience</span> — <span class="font-mono">free</span> (default, public) or <span class="font-mono">paid</span> (members only, token-gated)</li>
+      </ul>
+      <p class="pt-1">A podcast needs its own feed — enable Podcasts instead.</p>
+    </div>
+  </details>
+
+  <%= form_with url: admin_feeds_config_path, method: :patch do |f| %>
+    <%= f.text_area :content, value: @config_content,
+        class: "w-full bg-white font-mono text-sm p-2 border border-gray-300 box-border h-[420px]" %>
+    <div class="mt-3">
+      <%= f.submit "Save Feeds",
+          class: "inline-flex items-center uppercase text-sm px-2 py-1 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+    </div>
+  <% end %>
+</div>

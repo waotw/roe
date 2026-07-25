@@ -29,12 +29,22 @@
     <% end %>
   </div>
 
-  <% unless podcast_enabled? %>
+  <% if !podcast_enabled? || !custom_feeds_enabled? %>
     <div class="mt-4">
       <h3 class="mb-2 text-xl font-bold text-gray-900">Features</h3>
-      <%= link_to "Enable Podcasts",
-                  new_podcast_setup_admin_configs_path,
-                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      <% feature_btn = "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 font-mono rounded-xs" %>
+      <div class="flex gap-2">
+        <% unless podcast_enabled? %>
+          <%= link_to "Enable Podcasts",
+                      new_podcast_setup_admin_configs_path,
+                      class: "#{feature_btn} bg-blue-200 hover:bg-blue-300" %>
+        <% end %>
+        <% unless custom_feeds_enabled? %>
+          <%= link_to "Enable Custom Feeds",
+                      new_feeds_setup_admin_configs_path,
+                      class: "#{feature_btn} bg-teal-200 hover:bg-teal-300" %>
+        <% end %>
+      </div>
     </div>
   <% end %>
 
@@ -57,7 +67,7 @@
           <tbody class="divide-y border border-gray-200 divide-gray-200 bg-white">
             <% section[:files].each do |file| %>
               <tr>
-                <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 font-mono">
+                <td class="py-2 pl-3 pr-1.5 text-sm font-medium text-gray-900 font-mono">
                   <%= link_to file[:name], file[:edit_path], class: "text-blue-600 hover:text-blue-900 block mb-0.5" %>
                   <span class="text-xs text-gray-400"><%= file[:description] %></span>
                 </td>
