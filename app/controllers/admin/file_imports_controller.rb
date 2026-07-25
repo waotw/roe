@@ -41,9 +41,14 @@ class Admin::FileImportsController < Admin::BaseController
       return redirect_to admin_file_imports_path, alert: "No markdown or HTML files found in that ZIP."
     end
 
-    @posts     = docs.select { |d| d.kind == :post }
-    @pages     = docs.select { |d| d.kind == :page }
-    @ambiguous = docs.select { |d| d.kind == :ambiguous }
+    # Files that look like podcast episodes are surfaced separately with Skip
+    # pre-selected — they belong in Feed Imports, not as articles/pages.
+    @episodes  = docs.select(&:episode_like)
+    others     = docs.reject(&:episode_like)
+    @posts     = others.select { |d| d.kind == :post }
+    @pages     = others.select { |d| d.kind == :page }
+    @ambiguous = others.select { |d| d.kind == :ambiguous }
+    @nav       = FilesImporter::NavExtractor.extract(dir)
     render :preview
   end
 
@@ -64,6 +69,15 @@ class Admin::FileImportsController < Admin::BaseController
     result = FilesImporter::Runner.new(
       root: dir, overrides: overrides, import_ref: import.id, media_mode: media_mode
     ).import
+
+    # Optionally place the detected nav in the header or sidebar (before the
+    # temp dir is cleaned up).
+    nav_note = ""
+    if %w[header sidebar].include?(params[:nav_target]) && (nav = FilesImporter::NavExtractor.extract(dir))
+      FilesImporter::NavWriter.write(nav.links, target: params[:nav_target])
+      nav_note = " Added #{helpers.pluralize(nav.links.size, 'nav link')} to the #{params[:nav_target]}."
+    end
+
     FileUtils.rm_rf(dir)
 
     import.update!(
@@ -75,7 +89,7 @@ class Admin::FileImportsController < Admin::BaseController
       }
     )
 
-    redirect_to admin_posts_path(status: "draft", sort: "updated-desc"), notice: summary(result)
+    redirect_to admin_posts_path(status: "draft", sort: "updated-desc"), notice: summary(result) + nav_note
   end
 
   # Delete an import and its DRAFT content; published content is kept for manual

@@ -22,6 +22,7 @@ module FilesImporter
     :custom,       # leftover frontmatter (Hash), passed through as custom fields
     :type_hint,    # "post" | "page" | nil (from frontmatter layout/type)
     :dated,        # true when a real publish date is known
+    :episode_like, # looks like a podcast episode (has audio) → suggest Feed Imports
     :kind,         # :post | :page | :ambiguous (filled by Classifier)
     keyword_init: true
   )

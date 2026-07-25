@@ -14,6 +14,8 @@ class FilesImporter::Parser
   ].freeze
 
   JEKYLL_DATE = /\A(\d{4}-\d{2}-\d{2})-/
+  AUDIO_LINK  = /\.(?:mp3|m4a|m4b|aac|wav|ogg|oga|opus|flac)(?![a-z0-9])/i
+  EPISODE_DIRS = %w[audio podcast podcasts episode episodes].freeze
 
   def initialize(converter: SubstackImporter::Converter.new(insert_paywalls: false))
     @converter = converter
@@ -57,7 +59,8 @@ class FilesImporter::Parser
       body:        body,
       custom:      fm.except(*MAPPED_KEYS),
       type_hint:   type_hint(fm),
-      dated:       date.present?
+      dated:       date.present?,
+      episode_like: episode_like?(source_path, body, fm["audio"], fm["enclosure"])
     )
   end
 
@@ -90,11 +93,21 @@ class FilesImporter::Parser
       body:        @converter.convert(main.inner_html).to_s.strip,
       custom:      {},
       type_hint:   nil,
-      dated:       date.present?
+      dated:       date.present?,
+      episode_like: episode_like?(source_path, content)
     )
   end
 
   private
+
+  # Flags files that look like podcast episodes (an <audio> element or a link
+  # to an audio file, or an audio/podcast folder) so the review can suggest
+  # importing them via Feed Imports instead of as articles/pages.
+  def episode_like?(source_path, *texts)
+    dirs = File.dirname(source_path).split("/").map(&:downcase)
+    return true if (dirs & EPISODE_DIRS).any?
+    texts.any? { |t| t.to_s.match?(/<audio\b/i) || t.to_s.match?(AUDIO_LINK) }
+  end
 
   def split_frontmatter(content)
     if content =~ /\A\s*---\s*\n(.*?)\n---\s*\n?(.*)\z/m

@@ -7,6 +7,49 @@
   <%= form_with url: run_admin_file_imports_path, method: :post, data: { turbo: false } do %>
     <%= hidden_field_tag :token, @token %>
 
+    <% if @episodes.present? %>
+      <div class="bg-white shadow p-6 mb-6 border-l-4 border-amber-300">
+        <h2 class="text-lg font-medium mb-1">These look like podcast episodes</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          They have audio — import them with real episode data (duration, GUID, artwork) via
+          <%= link_to "Feed Imports", admin_feed_imports_path, class: "text-blue-700 underline" %>.
+          Skipped by default; override only if you want them as plain posts/pages.
+        </p>
+        <% @episodes.each do |d| %>
+          <div class="flex items-center justify-between gap-4 border-t border-gray-100 py-2">
+            <div class="min-w-0">
+              <div class="text-sm text-gray-800 truncate"><%= d.title %></div>
+              <code class="text-xs text-gray-400"><%= d.source_path %></code>
+            </div>
+            <div class="flex gap-3 shrink-0 text-sm">
+              <label class="flex items-center gap-1"><%= radio_button_tag "kinds[#{d.source_path}]", "skip", true %> Skip</label>
+              <label class="flex items-center gap-1"><%= radio_button_tag "kinds[#{d.source_path}]", "post" %> Post</label>
+              <label class="flex items-center gap-1"><%= radio_button_tag "kinds[#{d.source_path}]", "page" %> Page</label>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if @nav.present? %>
+      <div class="bg-white shadow p-6 mb-6">
+        <h2 class="text-lg font-medium mb-1">Navigation detected</h2>
+        <p class="text-sm text-gray-500 mb-3">
+          <%= pluralize(@nav.links.size, "link") %> from your site's <code>&lt;nav&gt;</code>. Put them in your header or sidebar?
+        </p>
+        <ul class="text-xs text-gray-500 mb-4 flex flex-wrap gap-x-3 gap-y-1">
+          <% @nav.links.first(12).each do |l| %><li><%= l[:text] %></li><% end %>
+          <% if @nav.links.size > 12 %><li>…</li><% end %>
+        </ul>
+        <div class="flex gap-4 text-sm">
+          <label class="flex items-center gap-1"><%= radio_button_tag :nav_target, "skip", true %> Skip</label>
+          <label class="flex items-center gap-1"><%= radio_button_tag :nav_target, "header" %> Header</label>
+          <label class="flex items-center gap-1"><%= radio_button_tag :nav_target, "sidebar" %> Sidebar</label>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Any existing header/sidebar content is backed up to <code>*.replaced.md</code> first.</p>
+      </div>
+    <% end %>
+
     <% if @ambiguous.any? %>
       <div class="bg-white shadow p-6 mb-6">
         <h2 class="text-lg font-medium mb-1">Not sure about these</h2>

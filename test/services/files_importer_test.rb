@@ -80,6 +80,15 @@ class FilesImporterTest < ActiveSupport::TestCase
     assert_not_includes doc.body, "junk", "footer stripped"
   end
 
+  # --- Episode-like detection ----------------------------------------------
+  test "flags episode-like files (audio in frontmatter/body/HTML or a podcast folder)" do
+    assert parser.parse_markdown("---\ntitle: X\naudio: https://x/ep.mp3\n---\nbody", "blog/x.md").episode_like, "audio frontmatter"
+    assert parser.parse_markdown("body [listen](https://x/ep.mp3)", "notes/y.md").episode_like, "audio link in body"
+    assert parser.parse_html("<html><body><main><audio src='/a.mp3'></audio></main></body></html>", "p.html").episode_like, "<audio> tag"
+    assert parser.parse_markdown("just text", "podcast/ep1.md").episode_like, "podcast/ folder"
+    assert_not parser.parse_markdown("---\ntitle: A\n---\nplain text", "blog/article.md").episode_like, "plain article"
+  end
+
   # ── Classification ───────────────────────────────────────────────────────
   def doc(source_path, type_hint: nil, dated: false)
     FilesImporter::Document.new(

@@ -3,7 +3,14 @@ require "tmpdir"
 
 class MediaImporterTest < ActiveSupport::TestCase
   setup { @created = [] }
-  teardown { @created.each { |f| File.delete(f) if File.exist?(f) } }
+  teardown do
+    @created.each { |f| File.delete(f) if File.exist?(f) }
+    if @podcast_backup
+      path = PodcastConfigSeeder::PODCAST_YML
+      @podcast_backup == :absent ? (File.delete(path) if File.exist?(path)) : File.write(path, @podcast_backup)
+      SiteConfig.reload!("features/podcast")
+    end
+  end
 
   def make_post(name, meta, body)
     slug = ContentWriter.new.write(kind: :post, filename: name, metadata: meta.merge("title" => name), body: body)
@@ -58,6 +65,22 @@ class MediaImporterTest < ActiveSupport::TestCase
                    fetcher.fetch("https://cdn.example.com/other/pic.jpg", :images),
                    "same basename, different bytes disambiguates"
     end
+  end
+
+  test "scanner finds external podcast.yml artwork, and rewrite localizes it in the config" do
+    path = PodcastConfigSeeder::PODCAST_YML
+    @podcast_backup = File.exist?(path) ? File.read(path) : :absent
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, { "myshow" => { "title" => "My Show", "artwork" => "https://cdn.example.com/art.jpg" } }.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteConfig.reload!("features/podcast")
+
+    art = MediaImporter::Scanner.scan.find { |r| r.url == "https://cdn.example.com/art.jpg" }
+    assert art, "external podcast artwork scanned"
+    assert_equal :images, art.type
+
+    assert MediaImporter.rewrite_file(art.record, { "https://cdn.example.com/art.jpg" => "/media/images/art.jpg" })
+    assert_includes File.read(path), "/media/images/art.jpg"
+    assert_not_includes File.read(path), "https://cdn.example.com/art.jpg"
   end
 
   test "fetcher infers an extension from content-type when the URL has none" do

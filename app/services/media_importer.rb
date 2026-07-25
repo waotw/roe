@@ -92,7 +92,9 @@ module MediaImporter
     return false if updated == original
 
     File.write(path, updated)
-    ContentSync.sync_file(path)
+    # Config targets (podcast.yml) re-sync themselves; content files go through
+    # ContentSync.
+    record.respond_to?(:resync) ? record.resync : ContentSync.sync_file(path)
     true
   end
 end

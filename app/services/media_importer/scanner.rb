@@ -26,10 +26,27 @@ class MediaImporter::Scanner
     @models.each do |model|
       model.find_each { |record| refs.concat(refs_for(record)) }
     end
+    refs.concat(podcast_artwork_refs)
     refs
   end
 
   private
+
+  # Show-level artwork in podcast.yml that's still an external URL. One shared
+  # target (the file) so the rewrite touches podcast.yml once.
+  def podcast_artwork_refs
+    return [] unless File.exist?(PodcastConfigSeeder::PODCAST_YML)
+
+    target = MediaImporter::ConfigTarget.new(
+      PodcastConfigSeeder::PODCAST_YML,
+      resync: -> { SiteConfig.sync_from_file("features/podcast") }
+    )
+    PodcastConfig.all_podcasts.filter_map do |key, cfg|
+      artwork = cfg.is_a?(Hash) ? cfg["artwork"].to_s : ""
+      next unless MediaImporter.external?(artwork)
+      MediaImporter::Ref.new(url: artwork, type: :images, record: target, location: "artwork (#{key})")
+    end
+  end
 
   def refs_for(record)
     path = MediaImporter.content_path(record)
