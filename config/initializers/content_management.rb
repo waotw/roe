@@ -44,9 +44,13 @@ if should_run
           end
         end
 
+        # MUST precede ConfigGenerator: header.md now ships in the minimum kit,
+        # so an existing user's navigation.md has to be renamed to header.md
+        # first. Then generate_all's skip-if-exists preserves it instead of
+        # writing the stock header over their content. (one-time, idempotent)
+        LayoutFiles.migrate_navigation_to_header!
         ConfigGenerator.generate_all
         PageGenerator.generate_defaults
-        LayoutFiles.migrate_navigation_to_header! # navigation.md → header.md (one-time)
         SiteJavascript.seed! # copy shipped JS into site/javascript so the site is self-contained
         ContentSync.sync_all
 
