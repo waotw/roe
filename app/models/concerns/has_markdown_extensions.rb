@@ -1656,7 +1656,17 @@ module HasMarkdownExtensions
       %Q(  <li class="collection-menu-item"><a href="#{item_path(item)}">#{title}</a></li>)
     end.join("\n")
 
-    %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+    list = %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+
+    # In a layout file (header/footer/sidebar) a menu IS site navigation — wrap
+    # it in a <nav> landmark. In a page body it's a content list, so leave the
+    # bare <ul>. Label the landmark with the collection's (invisible) name when
+    # set, so multiple navs stay distinguishable for assistive tech.
+    return list unless is_a?(LayoutMarkdown)
+
+    name = config[:collection].to_s.split(",").first.to_s.strip
+    aria = name.present? ? %Q( aria-label="#{ERB::Util.html_escape(name)}") : ""
+    %Q(<nav class="collection-nav"#{aria}>\n#{list}\n</nav>)
   end
 
   def render_product_grid(items, config)

@@ -89,7 +89,7 @@
         in Admin → Settings → Custom Code. %>
     <%= CustomCodeRenderer.render_field("head_html", nonce: safe_csp_nonce) %>
   </head>
-  <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}" ].compact.join(" ") %>
+  <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}", ("sidebar-mobile-#{sidebar_mobile}" if show_sidebar?) ].compact.join(" ") %>
   <body class="<%= body_classes %>">
     <header class="site-nav <%= logo_classes %>">
       <%= render_layout_file('header', current_page: @post || @page || @doc) %>

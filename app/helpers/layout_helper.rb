@@ -62,6 +62,17 @@ module LayoutHelper
     @sidebar_position = parse_sidebar_frontmatter["position"] || "left"
   end
 
+  # How the sidebar behaves on narrow screens (frontmatter `mobile:`):
+  #   hidden (default) — hidden below the breakpoint
+  #   top             — horizontal strip under the header, always visible
+  #   bottom          — full-width below the content, always visible
+  def sidebar_mobile
+    return @sidebar_mobile if defined?(@sidebar_mobile)
+
+    value = parse_sidebar_frontmatter["mobile"].to_s.strip.downcase
+    @sidebar_mobile = %w[top bottom hidden].include?(value) ? value : "hidden"
+  end
+
   # Get sidebar scope from frontmatter (default: ['all'])
   # Supports: 'all', 'pages', 'posts', 'products', 'documentation'
   # Can be a single value or array: 'pages, posts' or ['pages', 'posts']
@@ -94,6 +105,11 @@ module LayoutHelper
 
     # Full roe-anji pipeline so Collections/Cards/Galleries work in the sidebar
     html = LayoutMarkdown.render(body_content, static: @static_generation)
+
+    # Highlight the current page — a `menu` collection in the sidebar is
+    # navigation just like the header, so it gets the same active-link pass.
+    html = add_active_nav_class(html, @post || @page || @doc)
+
     html.html_safe
   rescue => e
     Rails.logger.error "Error rendering sidebar: #{e.message}"

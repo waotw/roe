@@ -1,45 +1,14 @@
 class Admin::LayoutsController < Admin::BaseController
+  # Every layout file is generated from its canonical template in
+  # lib/site_templates/minimum/layout/ — the same files a fresh install seeds
+  # (header/footer) or that the admin opts into (sidebar). One source of truth,
+  # so a regenerated file can't drift from what ships. The rescue covers any
+  # key without a template (there is none today; keys come from
+  # LayoutFiles::KEYS) with a harmless placeholder.
   def default_layout_content(file_key)
-    author_name = SiteConfig.get("author_name").presence || SiteConfig.get("author").presence || "Author Name"
-    site_title = SiteConfig.get("title").presence || "Site Title"
-    site_url = SiteConfig.get("url").presence || "/"
-    year = Date.current.year
-
-    case file_key
-    when "header"
-      <<~MD
-        #{author_name}
-        {: .site-author}
-
-        [#{site_title}](#{site_url}){: .site-logo}
-
-        [Home](#{site_url}) **|**
-
-      MD
-    when "footer"
-      <<~MD
-        Built with [Roe](https://getroe.com) • © #{author_name} #{year}
-
-      MD
-    when "sidebar"
-      <<~MD
-        ---
-        position: left
-        scope: pages
-        ---
-
-        ## Sidebar
-
-        This content appears in the sidebar.
-
-        - [Link 1](#)
-        - [Link 2](#)
-        - [Link 3](#)
-
-      MD
-    else
-      "<!-- #{file_key.capitalize} content - edit as needed -->\n\n"
-    end
+    SiteTemplates::Loader.render(folder: "minimum", template: "layout/#{file_key}.md")
+  rescue ArgumentError
+    "<!-- #{file_key.capitalize} content - edit as needed -->\n\n"
   end
 
   before_action :ensure_layout_directory_exists
