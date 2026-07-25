@@ -2,11 +2,16 @@ module AdminHelper
   def useful_links
     links = {}
 
-    # Feed URLs
+    # Feed URLs — the built-in all-posts feed plus any named feeds from feeds.yml.
     links[:feeds] = {
       "RSS Feed" => feed_path,
       "Atom Feed" => feed_atom_path
     }
+    FeedConfig.feed_names.each do |name|
+      config = FeedConfig.get(name)
+      label = config["title"].presence || name.to_s.titleize
+      links[:feeds][label] = named_feed_path(name)
+    end
 
     # Podcast feeds — one per show in podcast.yml. The live public feed is
     # /podcast/<key>.xml; a paid-only show has no public feed, so we point at

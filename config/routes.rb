@@ -434,6 +434,9 @@ Rails.application.routes.draw do
   get "feed", to: "feeds#rss", defaults: { format: "xml" }, as: :feed
   get "feed.xml", to: "feeds#rss", defaults: { format: "xml" }
   get "feed.atom", to: "feeds#atom", defaults: { format: "xml" }, as: :feed_atom
+  # Named feeds from feeds.yml — a collection query served as RSS/Atom.
+  get "feed/:name.xml", to: "feeds#named", defaults: { format: "xml" }, as: :named_feed
+  get "feed/:name.atom", to: "feeds#named", defaults: { format: "xml", atom: true }, as: :named_feed_atom
   get "/podcast/:podcast_key.xml", to: "feeds#podcast", as: :podcast_feed
   get "/podcast/:podcast_key/private.xml", to: "feeds#private_podcast", as: :private_podcast_feed
 

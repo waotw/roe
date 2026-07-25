@@ -920,9 +920,34 @@ class StaticGenerator
     atom_xml = render_feed(format: :atom)
     write_file("feed.atom", atom_xml) if atom_xml.present?
 
+    generate_named_feeds
+
     puts "  ✓ Generated feeds"
   rescue => e
     log_error("feeds", nil, e)
+  end
+
+  # Named feeds from feeds.yml. Only free feeds are emitted statically — a paid
+  # feed is token-gated, so a static file would just leak its content.
+  def generate_named_feeds
+    FeedConfig.feed_names.each do |name|
+      next if FeedConfig.paid?(name)
+
+      posts = FeedContent.for(FeedConfig.get(name), include_paid: false)
+      write_file("feed/#{name}.xml", FeedGenerator.new(posts: posts, format: :rss, site_config: feed_site_config).generate)
+      write_file("feed/#{name}.atom", FeedGenerator.new(posts: posts, format: :atom, site_config: feed_site_config).generate)
+    rescue => e
+      log_error("named_feed", name, e)
+    end
+  end
+
+  def feed_site_config
+    {
+      title: SiteConfig.get("title") || "My Blog",
+      description: SiteConfig.get("description") || "Blog posts and updates",
+      url: "https://#{site_host}",
+      author: SiteConfig.get("author") || "Site Author"
+    }
   end
 
   def generate_podcast_feeds

@@ -1156,65 +1156,14 @@ module HasMarkdownExtensions
     output.join("\n")
   end
 
+  # Ordering lives in CollectionQuery, shared with feeds. These thin wrappers
+  # keep the call sites in resolve_collection_items and curate_menu unchanged.
   def apply_collection_order(items, order_by)
-    case order_by
-    when "filename"
-      items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, ".md")
-        # Extract leading number if present
-        if filename =~ /^(\d+)/
-          [ $1.to_i, filename ]
-        else
-          [ Float::INFINITY, filename ]
-        end
-      end
-    when "title"
-      # Alphabetical by title. In-memory sort so this works whether
-      # `items` is an ActiveRecord relation (regular collections) or
-      # a plain Array (which `related: true` produces after its
-      # bidirectional dedup pass). Collection blocks operate on small
-      # N already, so the cost over SQL ORDER BY is negligible.
-      items.to_a.sort_by { |item| item.title.to_s.downcase }
-    when "date"
-      # Newest first (default). nil dates sort to the end via a
-      # nil-safe sentinel — matches the NULLS LAST behaviour of the
-      # previous SQL form.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
-    when "date-asc"
-      # Oldest first. nil dates sort to the end.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
-    else
-      # Anything that isn't a known sort keyword is an explicit url_name order
-      # list, e.g. `order: blog, about, store` — the menu spelled out by hand.
-      apply_explicit_order(items, order_by)
-    end
+    CollectionQuery.order_items(items, order_by)
   end
 
-  # Order items by an explicit, comma-separated list of url_names (a
-  # collection's `order:` when it isn't a sort keyword). Listed items come
-  # first, in list order; anything the list doesn't name falls to the end,
-  # alphabetically by title, so nothing is ever silently dropped. A blank list
-  # falls back to date-descending (the normal default).
-  def apply_explicit_order(items, order_list)
-    wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
-
-    if wanted.empty?
-      return items.to_a.sort_by { |i| i.respond_to?(:date) && i.date ? i.date : Date.new(0) }.reverse
-    end
-
-    position = {}
-    wanted.each_with_index { |name, i| position[name] ||= i }
-
-    items.to_a.sort_by do |item|
-      slug = item.respond_to?(:url_name) ? item.url_name.to_s.downcase : ""
-      [ position.fetch(slug, Float::INFINITY), item.title.to_s.downcase ]
-    end
-  end
-
-  # A collection's `order:` is a sort mode when it's one of these keywords;
-  # anything else is read as an explicit url_name list.
   def sort_keyword?(value)
-    %w[date date-asc title filename].include?(value.to_s.strip.downcase)
+    CollectionQuery.sort_keyword?(value)
   end
 
   # A menu's membership: its `order:` url_name list (those items, in that order)

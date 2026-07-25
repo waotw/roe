@@ -36,6 +36,60 @@ class CollectionQuery
         .uniq
   end
 
+  # Order items by a sort keyword (date, date-asc, title, filename) or, for
+  # anything else, an explicit comma-separated url_name list. In-memory so it
+  # works on a relation or an Array (related:/membership produce Arrays).
+  # Shared by the collection renderer and feeds.
+  def self.order_items(items, order_by)
+    case order_by
+    when "filename"
+      items.to_a.sort_by do |item|
+        filename = File.basename(item.file_path, ".md")
+        # Extract leading number if present
+        if filename =~ /^(\d+)/
+          [ $1.to_i, filename ]
+        else
+          [ Float::INFINITY, filename ]
+        end
+      end
+    when "title"
+      items.to_a.sort_by { |item| item.title.to_s.downcase }
+    when "date"
+      # Newest first (default). nil dates sort to the end via a nil-safe sentinel.
+      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
+    when "date-asc"
+      # Oldest first. nil dates sort to the end.
+      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
+    else
+      explicit_order(items, order_by)
+    end
+  end
+
+  # Order by an explicit, comma-separated list of url_names. Listed items come
+  # first, in list order; the rest fall to the end alphabetically by title, so
+  # nothing is dropped. A blank list falls back to date-descending.
+  def self.explicit_order(items, order_list)
+    wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
+
+    if wanted.empty?
+      return items.to_a.sort_by { |i| i.respond_to?(:date) && i.date ? i.date : Date.new(0) }.reverse
+    end
+
+    position = {}
+    wanted.each_with_index { |name, i| position[name] ||= i }
+
+    items.to_a.sort_by do |item|
+      slug = item.respond_to?(:url_name) ? item.url_name.to_s.downcase : ""
+      [ position.fetch(slug, Float::INFINITY), item.title.to_s.downcase ]
+    end
+  end
+
+  # An `order:` value is a sort mode when it's one of these keywords; anything
+  # else is read as an explicit url_name list.
+  def self.sort_keyword?(value)
+    %w[date date-asc title filename].include?(value.to_s.strip.downcase)
+  end
+
   def source
     @source ||= self.class.source_for(@config)
   end

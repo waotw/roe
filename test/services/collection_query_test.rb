@@ -70,6 +70,26 @@ class CollectionQueryTest < ActiveSupport::TestCase
     assert_includes negative, "cq-untagged", "but keeps the untagged one"
   end
 
+  # --- ordering ----------------------------------------------------------
+
+  test "order_items sorts by a keyword and by an explicit url_name list" do
+    a = write_post("cq-ord-a", "date" => "2026-01-01")
+    b = write_post("cq-ord-b", "date" => "2026-03-01")
+    items = Post.where("json_extract(metadata, '$.url_name') IN (?, ?)", a, b).to_a
+
+    newest_first = CollectionQuery.order_items(items, "date").map(&:url_name)
+    assert_equal [ "cq-ord-b", "cq-ord-a" ], newest_first
+
+    explicit = CollectionQuery.order_items(items, "cq-ord-a, cq-ord-b").map(&:url_name)
+    assert_equal [ "cq-ord-a", "cq-ord-b" ], explicit
+  end
+
+  test "sort_keyword? recognizes only the known sort modes" do
+    assert CollectionQuery.sort_keyword?("date")
+    assert CollectionQuery.sort_keyword?("title")
+    assert_not CollectionQuery.sort_keyword?("home, blog, store")
+  end
+
   # --- records: collection membership -----------------------------------
 
   test "a collection: name filter selects only members (and returns an Array)" do

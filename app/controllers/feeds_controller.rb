@@ -27,6 +27,32 @@ class FeedsController < ApplicationController
     render xml: feed_xml
   end
 
+  # A named feed defined in feeds.yml — a collection query served as RSS/Atom.
+  # Free feeds are public and exclude paid content; paid feeds are token-gated
+  # (like the private podcast feed) and include everything.
+  def named
+    feed = FeedConfig.get(params[:name])
+    return head :not_found unless feed
+
+    if FeedConfig.paid?(params[:name])
+      return unless authorize_paid_feed! # renders 401 and returns false if denied
+      include_paid = true
+    else
+      include_paid = false
+    end
+
+    fmt = params[:atom] ? :atom : :rss
+    feed_xml = FeedGenerator.new(
+      posts: FeedContent.for(feed, include_paid: include_paid),
+      format: fmt,
+      site_config: site_config
+    ).generate
+
+    response.headers["Content-Type"] =
+      fmt == :atom ? "application/atom+xml; charset=utf-8" : "application/rss+xml; charset=utf-8"
+    render xml: feed_xml
+  end
+
   def podcast
     @podcast_key = params[:podcast_key]
 
@@ -105,6 +131,27 @@ class FeedsController < ApplicationController
   end
 
   private
+
+  # Token gate for a paid feed, mirroring #private_podcast: admins pass through;
+  # everyone else needs a paid, active member's access token. Renders 401 and
+  # returns false when denied.
+  def authorize_paid_feed!
+    return true if authenticated?
+
+    token = params[:token]
+    if token.blank?
+      head :unauthorized
+      return false
+    end
+
+    member = Member.find_by(access_token: token)
+    unless member&.paid? && member&.active?
+      head :unauthorized
+      return false
+    end
+
+    true
+  end
 
   def podcast_episodes(podcast_key)
     Post
