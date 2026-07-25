@@ -94,16 +94,25 @@ module SiteSync
         if changed.any?
           on_progress&.call(completed: 0, total: changed.size)
 
-          # Fetch peer mtimes up front so we can stamp them after unpack.
+          # Fetch peer mtimes up front so we can stamp them after unpack, and
+          # size the download batches (the local copy may not exist yet).
           states = Exchange.fetch_peer_file_states(changed)
 
-          bytes = Exchange.download_files(changed)
-          raise HttpTransportError, "download from peer failed" if bytes.nil?
+          done = 0
+          batches = batch_by_size(changed) { |rel| states.dig(rel, "size") }
+          batches.each_with_index do |batch, i|
+            bytes = nil
+            Exchange.with_retries(label: "download batch #{i + 1}/#{batches.size}") do
+              bytes = Exchange.download_files(batch)
+              raise HttpTransportError, "download from peer failed" if bytes.nil?
+            end
 
-          written = TarArchive.unpack(bytes, dest: RoeSitePaths::SITE_PATH)
-          SiteWriter.restore_mtimes(root: RoeSitePaths::SITE_PATH, manifest: states)
+            written = TarArchive.unpack(bytes, dest: RoeSitePaths::SITE_PATH)
+            SiteWriter.restore_mtimes(root: RoeSitePaths::SITE_PATH, manifest: states.slice(*written))
 
-          on_progress&.call(completed: written.size, total: changed.size)
+            done += written.size
+            on_progress&.call(completed: done, total: changed.size)
+          end
         end
 
         SiteWriter.delete_paths(root: RoeSitePaths::SITE_PATH, paths: deleted) if deleted.any?
@@ -153,12 +162,21 @@ module SiteSync
         end
 
         if to_download.any?
-          bytes = Exchange.download_files(to_download)
-          raise HttpTransportError, "backup download from peer failed" if bytes.nil?
+          downloaded = 0
+          batches = batch_by_size(to_download) { |rel| peer_files.dig(rel, "size") }
+          batches.each_with_index do |batch, i|
+            bytes = nil
+            Exchange.with_retries(label: "backup download batch #{i + 1}/#{batches.size}") do
+              bytes = Exchange.download_files(batch)
+              raise HttpTransportError, "backup download from peer failed" if bytes.nil?
+            end
 
-          written = TarArchive.unpack(bytes, dest: backup_dir)
-          SiteWriter.restore_mtimes(root: backup_dir, manifest: peer_files.slice(*written))
-          on_progress&.call(completed: linked + written.size, total: wanted.size)
+            written = TarArchive.unpack(bytes, dest: backup_dir)
+            SiteWriter.restore_mtimes(root: backup_dir, manifest: peer_files.slice(*written))
+
+            downloaded += written.size
+            on_progress&.call(completed: linked + downloaded, total: wanted.size)
+          end
         else
           on_progress&.call(completed: linked, total: wanted.size)
         end
@@ -178,13 +196,16 @@ module SiteSync
       # Split paths into batches bounded by cumulative bytes and file count.
       # Preserves order; a single oversized file lands in its own batch rather
       # than being dropped or split.
-      def batch_paths(paths)
+      # Chunk paths into bounded batches by file count and total bytes. The
+      # block yields each path's size — local file size for a push, the peer's
+      # reported size for a download (the local copy may not exist yet).
+      def batch_by_size(paths)
         batches = []
         current = []
         bytes   = 0
 
         paths.each do |rel|
-          size = File.size?(File.join(RoeSitePaths::SITE_PATH, rel)).to_i
+          size = yield(rel).to_i
           if current.any? && (current.size >= PUSH_BATCH_MAX_FILES || bytes + size > PUSH_BATCH_MAX_BYTES)
             batches << current
             current = []
@@ -196,6 +217,10 @@ module SiteSync
 
         batches << current if current.any?
         batches
+      end
+
+      def batch_paths(paths)
+        batch_by_size(paths) { |rel| File.size?(File.join(RoeSitePaths::SITE_PATH, rel)) }
       end
 
       # Full push with no precomputed diff: diff local against the peer's

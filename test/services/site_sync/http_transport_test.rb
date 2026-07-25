@@ -141,5 +141,33 @@ module SiteSync
       Exchange.stubs(:fetch_peer_manifest).returns(nil)
       assert_raises(HttpTransport::HttpTransportError) { HttpTransport.backup_live_to_local! }
     end
+
+    # The bug: a large site's backup pulled every file in one request, which
+    # timed out ("backup download from peer failed"). Downloads must chunk by
+    # the peer's reported sizes, like the push side does.
+    test "backup chunks the download into batches by peer-reported size" do
+      %w[ba bb bc].each { |f| site_write("posts/#{f}.md", f.upcase) }
+      big = 20 * 1024 * 1024 # each "file" reports 20MB → 25MB cap forces 3 batches
+      peer_files = {
+        "posts/ba.md" => { "size" => big, "mtime" => 1 },
+        "posts/bb.md" => { "size" => big, "mtime" => 1 },
+        "posts/bc.md" => { "size" => big, "mtime" => 1 }
+      }
+      Exchange.stubs(:fetch_peer_manifest).returns({ "files" => peer_files })
+
+      calls = []
+      Exchange.stubs(:download_files).with { |paths| calls << paths; true }.returns(
+        TarArchive.pack(root: SITE, paths: [ "posts/ba.md" ]),
+        TarArchive.pack(root: SITE, paths: [ "posts/bb.md" ]),
+        TarArchive.pack(root: SITE, paths: [ "posts/bc.md" ])
+      )
+
+      out = HttpTransport.backup_live_to_local!
+      @created << out if out
+
+      assert_equal 3, calls.size, "one bounded request per batch, not one big download"
+      assert_equal [ [ "posts/ba.md" ], [ "posts/bb.md" ], [ "posts/bc.md" ] ], calls
+      %w[ba bb bc].each { |f| assert File.exist?(File.join(out, "posts/#{f}.md")), "#{f} in backup" }
+    end
   end
 end
