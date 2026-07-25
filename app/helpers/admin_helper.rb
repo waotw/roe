@@ -8,6 +8,23 @@ module AdminHelper
       "Atom Feed" => feed_atom_path
     }
 
+    # Podcast feeds — one per show in podcast.yml. The live public feed is
+    # /podcast/<key>.xml; a paid-only show has no public feed, so we point at
+    # its private URL instead. (PodcastConfig.feed_url is stale — it names a
+    # route that doesn't exist — so build the paths from the routes directly.)
+    podcast_feeds = PodcastConfig.podcast_keys.each_with_object({}) do |key, hash|
+      config = PodcastConfig.get(key)
+      next unless config
+
+      title = config["title"].presence || key.to_s.titleize
+      if config["audience"] == "paid"
+        hash["#{title} (private)"] = private_podcast_feed_path(key)
+      else
+        hash[title] = podcast_feed_path(key)
+      end
+    end
+    links[:podcasts] = podcast_feeds if podcast_feeds.any?
+
     # Published Pages - order by title in metadata JSON
     published_pages = Page.published.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
     links[:pages] = published_pages.each_with_object({}) do |page, hash|
