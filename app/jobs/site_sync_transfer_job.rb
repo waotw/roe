@@ -26,7 +26,6 @@ class SiteSyncTransferJob < ApplicationJob
     starting:            "Starting…",
     computing_diff:      "Computing what changed…",
     backing_up_live:     "Backing up live (only the files about to change)…",
-    backing_up_live_full: "Backing up live (full tree — no diff available)…",
     pushing_to_live:     "Pushing changed files to live…",
     pushing_to_live_full: "Pushing to live (full tree)…",
     backing_up_local:    "Backing up local…",
@@ -283,9 +282,10 @@ class SiteSyncTransferJob < ApplicationJob
   # no shared ancestor, so the initiator is the source of truth by definition.
   # Pushes every file that differs AND deletes every peer file not present
   # locally, which is what clears a fresh deploy's starter/seed content. The
-  # peer is snapshotted first (full tree) so even a mis-clicked clone is
-  # recoverable; the generic perform flow afterwards writes the shared baseline
-  # on both sides, so subsequent syncs are clean 3-way merges.
+  # peer content it's about to overwrite/delete is snapshotted first (just that
+  # set, not the whole tree) so even a mis-clicked clone is recoverable; the
+  # generic perform flow afterwards writes the shared baseline on both sides, so
+  # subsequent syncs are clean 3-way merges.
   def perform_clone
     update_step(:computing_diff)
     peer = SiteSync::Exchange.fetch_peer_manifest
@@ -298,9 +298,14 @@ class SiteSyncTransferJob < ApplicationJob
     @pushed = !diff_empty?(diff)
     return unless @pushed # already identical — nothing to clone
 
-    # Safety net: full snapshot of the peer's /site before we overwrite it.
-    update_step(:backing_up_live_full)
-    SiteSync.transport.backup_live_to_local!(on_progress: progress_proc)
+    # Safety net: snapshot only the peer files this mirror will OVERWRITE or
+    # DELETE — its own content that isn't coming from local. Added files are new
+    # to the peer (nothing to lose) and unchanged files are recoverable from
+    # local, so `modified + deleted` is the complete recovery set — no need to
+    # pull the whole tree. On a fresh peer that's near-empty; on a retry it
+    # shrinks as files converge (already-mirrored files leave the diff).
+    update_step(:backing_up_live)
+    SiteSync.transport.backup_live_to_local!(files: diff[:modified] + diff[:deleted], on_progress: progress_proc)
 
     update_step(:pushing_to_live_full)
     SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
