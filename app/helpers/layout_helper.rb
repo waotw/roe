@@ -73,6 +73,17 @@ module LayoutHelper
     @sidebar_mobile = %w[top bottom hidden].include?(value) ? value : "hidden"
   end
 
+  # Optional override for a relocated sidebar menu's orientation on narrow
+  # screens (frontmatter `mobile_style:`). Unset (nil) keeps the sensible
+  # default: `mobile: top` flips the menu horizontal, `bottom` stays vertical.
+  # Set `horizontal` or `vertical` to force it either way.
+  def sidebar_mobile_style
+    return @sidebar_mobile_style if defined?(@sidebar_mobile_style)
+
+    value = parse_sidebar_frontmatter["mobile_style"].to_s.strip.downcase
+    @sidebar_mobile_style = %w[horizontal vertical].include?(value) ? value : nil
+  end
+
   # Get sidebar scope from frontmatter (default: ['all'])
   # Supports: 'all', 'pages', 'posts', 'products', 'documentation'
   # Can be a single value or array: 'pages, posts' or ['pages', 'posts']
