@@ -80,11 +80,10 @@ class SearchIndexGenerator
     end
   end
 
-  # Set of root-relative paths linked from navigation.md / footer.md.
+  # Set of root-relative paths linked from header.md / footer.md.
   def nav_footer_paths
     paths = Set.new
-    %w[navigation.md footer.md].each do |name|
-      file = File.join(RoeSitePaths::SITE_LAYOUT_PATH, name)
+    [ LayoutFiles.path("header"), File.join(RoeSitePaths::SITE_LAYOUT_PATH, "footer.md") ].each do |file|
       next unless File.file?(file)
 
       text = File.read(file)

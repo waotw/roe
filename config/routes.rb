@@ -96,8 +96,11 @@ Rails.application.routes.draw do
     patch "account/password",       to: "account#update_password",            as: "update_account_password"
     post  "account/recovery_codes", to: "account#regenerate_recovery_codes",  as: "regenerate_account_recovery_codes"
 
-    get "layout/navigation/edit", to: "layouts#edit_navigation"
-    patch "layout/navigation", to: "layouts#update_navigation"
+    get "layout/header/edit", to: "layouts#edit_header"
+    patch "layout/header", to: "layouts#update_header"
+    # Legacy aliases so old links/bookmarks keep working.
+    get "layout/navigation/edit", to: "layouts#edit_header"
+    patch "layout/navigation", to: "layouts#update_header"
     get "layout/footer/edit", to: "layouts#edit_footer"
     patch "layout/footer", to: "layouts#update_footer"
     get "layout/sidebar/edit", to: "layouts#edit_sidebar"

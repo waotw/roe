@@ -46,6 +46,7 @@ if should_run
 
         ConfigGenerator.generate_all
         PageGenerator.generate_defaults
+        LayoutFiles.migrate_navigation_to_header! # navigation.md → header.md (one-time)
         ContentSync.sync_all
 
         # Sync Stripe product/price if payments are enabled in members.yml

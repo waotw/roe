@@ -92,7 +92,7 @@
   <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}" ].compact.join(" ") %>
   <body class="<%= body_classes %>">
     <header class="site-nav <%= logo_classes %>">
-      <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
+      <%= render_layout_file('header', current_page: @post || @page || @doc) %>
     </header>
     <%# Live preview receiver: content editors set @preview_mode/@preview_id;
         the theme editor opens the site with ?preview_theme=<name> and drives

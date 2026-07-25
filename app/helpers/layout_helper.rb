@@ -1,19 +1,20 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-    file_path = File.join(RoeSitePaths::SITE_PATH, "layout", "#{filename}.md")
+    file_path = LayoutFiles.path(filename)
 
     return "" unless File.exist?(file_path)
 
     content = File.read(file_path)
 
     # Run through the full roe-anji pipeline (Collections, Cards, Galleries,
-    # etc.), not raw Kramdown — that's how a collection in navigation.md or
+    # etc.), not raw Kramdown — that's how a collection in header.md or
     # footer.md renders. to_html handles inline-pipe escaping itself.
     html = LayoutMarkdown.render(content, static: @static_generation)
 
-    # Add active class to navigation links if this is the navigation file.
-    # Runs on the final HTML, so collection-generated nav links get it too.
-    if filename == "navigation"
+    # Add the active class to header/nav links (header supersedes the legacy
+    # navigation file). Runs on the final HTML, so collection-generated nav
+    # links get it too.
+    if %w[header navigation].include?(filename.to_s)
       html = add_active_nav_class(html, current_page)
     end
 
