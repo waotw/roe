@@ -51,7 +51,7 @@ Most Roe sites have three main parts.
 
 ### Navigation
 
-The navigation holds your site's navigation. To edit it, open [Admin → Layouts](/admin/layouts).
+The header holds your site's logo/title and often the navigation. To edit it, open [Admin → Layouts](/admin/layouts).
 
 ### Content
 
@@ -63,7 +63,7 @@ This is where most of your work happens. Use the Admin to create and edit:
 
 ### Footer
 
-The footer holds navigation, copyright, and other site-wide content. To edit it, open [Admin → Layouts](/admin/layouts).
+The footer holds links, copyright, and other site-wide content. To edit it, open [Admin → Layouts](/admin/layouts).
 
 ## Building more advanced pages
 

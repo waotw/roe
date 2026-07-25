@@ -101,7 +101,7 @@ Use [The Editor](/documentation/roe/the-editor) to write and format page content
 
 ## Navigation
 
-Add pages to your site's navigation in [Admin → Layouts](/admin/layouts):
+Add pages to your site's header in [Admin → Layouts](/admin/layouts):
 
 1. Go to **Layouts**
 2. Under **Navigation**, add links to your pages

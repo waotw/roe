@@ -15,6 +15,6 @@ Your Global Content Settings has options for content and search. Edit them in th
 
 ## Search
 
-- `Include all pages in search` — by default, only pages linked in your navigation or footer are searchable. Turn this on to index every published page.
+- `Include all pages in search` — by default, only pages linked in your header or footer are searchable. Turn this on to index every published page.
 - `Include bundled Roe documentation in search` — Roe's own documentation is left out of search by default. Turn this on to include it.
 - `Show results before typing` — by default, search waits until you type. Turn this on to show results as soon as the search opens.

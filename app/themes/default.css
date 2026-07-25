@@ -739,6 +739,70 @@ body.sidebar-right {
   }
 }
 
+/* Sidebar on narrow screens — frontmatter `mobile:` on the sidebar file.
+   Default (hidden) keeps the base `.site-sidebar { display: none }`. */
+@media (max-width: 768px) {
+  /* top: horizontal, scrollable strip under the header (for a nav sidebar). */
+  body.sidebar-mobile-top {
+    display: flex;
+    flex-direction: column;
+  }
+  body.sidebar-mobile-top .site-nav     { order: 1; }
+  body.sidebar-mobile-top .site-sidebar { order: 2; display: block; }
+  body.sidebar-mobile-top main          { order: 3; }
+  body.sidebar-mobile-top .site-footer  { order: 4; }
+
+  body.sidebar-mobile-top .site-sidebar {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  body.sidebar-mobile-top .site-sidebar .collection-menu {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--space-4);
+    overflow-x: auto;
+    margin: 0;
+  }
+  body.sidebar-mobile-top .site-sidebar .collection-menu-item {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  /* bottom: full-width below the content. The DOM already orders the sidebar
+     after main, so we only need to reveal it. */
+  body.sidebar-mobile-bottom .site-sidebar {
+    display: block;
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-4);
+    margin-top: var(--space-8);
+  }
+
+  /* mobile_style: explicit override of a relocated menu's orientation. Placed
+     after the top rule so it wins at equal specificity — `top` defaults to
+     horizontal, `bottom` to vertical, and this forces either regardless. */
+  body.sidebar-mobile-style-horizontal .site-sidebar .collection-menu {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--space-4);
+    overflow-x: auto;
+    margin: 0;
+  }
+  body.sidebar-mobile-style-horizontal .site-sidebar .collection-menu-item {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  body.sidebar-mobile-style-vertical .site-sidebar .collection-menu {
+    display: block;
+    overflow-x: visible;
+  }
+  body.sidebar-mobile-style-vertical .site-sidebar .collection-menu-item {
+    flex: none;
+    margin: 0 0 var(--space-1);
+  }
+}
+
 /* ============ LAYOUT - FOOTER ============= */
 
 .site-footer {

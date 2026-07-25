@@ -33,7 +33,7 @@ If you know Markdown, you’ll feel at home right away. If you don’t, you can 
 
 Roe sites have three main parts:
 
-- **Navigation.** Site title and links at the top of the site
+- **Header.** Site title and links at the top of the site
 -  **Footer.** Copyright notice and links at the bottom of the site.
 	-  both you can edit in Roe’s [layouts](/admin/layouts) section
 - **Content.** Which you edit in Roe’s pages and posts sections.
@@ -49,5 +49,3 @@ With Roe-anji you can add:
 - **Image galleries.** These are groups of images. [Learn more about Galleries →](/documentation/roe/galleries)
 
 Roe-anji, like markdown, is very easy to learn, and just like markdown, you can learn as you go, which we’ll do now…
-
-

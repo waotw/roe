@@ -82,14 +82,16 @@ The `menu` template is a clean list of links — no subtitle, date, or author, j
 order: home, blog, shop, about, contact
 ```
 
+When a `menu` lives in a sidebar, `style` sets its orientation on a full-size screen. On a narrow screen the sidebar can move under the header or below your content, and the links change orientation to fit. See [the sidebar options](/documentation/roe/admin_layouts#the-sidebar-on-narrow-screens) for `mobile` and `mobile_style`.
+
 #### Why give the `collection` a name?
 
 Once a `menu` has a name, you can send content to it. Say you're editing a new Page and want it in your site's navigation:
 
-- add `collection: nav` to the `menu` Collection in your [navigation](/admin/layouts) layout
+- add `collection: nav` to the `menu` Collection in your [header](/admin/layouts) layout
 - add `collection: nav` to the new Page's metadata
 
-The Page now shows up in the navigation on its own. To place it at a specific spot, add its `url_name` to the menu's `order`, as shown above.
+The Page now shows up in the header on its own. To place it at a specific spot, add its `url_name` to the menu's `order`, as shown above.
 
 ### When to use the `grid` template
 

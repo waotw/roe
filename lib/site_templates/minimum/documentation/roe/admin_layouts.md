@@ -10,7 +10,7 @@ tags: admin
 
 Layouts are all the parts of your site that are not the main content section:
 
-- `navigation` = logo, site links, anything you want at the top of every page
+- `header` = logo, site links, anything you want at the top of every page
 - `footer` = copyright, extra links, anything you want at the bottom of every page
 - `sidebar` = enable the sidebar by creating this file, disable this on specific Pages or Post with `show_sidebar: false`
 
@@ -50,7 +50,7 @@ You can give any Collection a name and then send Pages, Posts, Products to that 
 1. Giving the Collection a name: `collection: nav`
 2. Adding this to the metadata for my new Page with: `collection: nav`
 
-Now, the new page I just created is "sent" to the navigation. You will control the order with `order` in the Collection itself. The new page will be added to the end unless you give it a specific place.
+Now, the new page I just created is "sent" to the `nav`igation. You will control the order with `order` in the Collection itself. The new page will be added to the end unless you give it a specific place.
 
 ### How to style your Logo / Site Title
 
@@ -62,11 +62,28 @@ Nothing special here. Just add the links and copyright notice if needed. A [`men
 
 ## Sidebar
 
-To enable the sidebar, click `Create`. This layout has options you'll see them in the front matter[^1] at the top of the file.
+To enable the sidebar, click `Create`. Its options live in the front matter[^1] at the top of the file:
 
 - `position` = use `left` or `right` to move the sidebar to either side of the site.
 - `scope` = which sources (`pages`, `posts`, `documentation`) show the sidebar. It's set to `pages` by default. This means it will only show up on pages, not posts.
+- `mobile` = how the sidebar behaves once the screen is too narrow to show it beside your content. Set to `hidden` by default.
+- `mobile_style` = the orientation of a `menu` Collection after the sidebar has moved on a narrow screen. Optional.
 
 Again, a [`menu` Collection](#add-dynamic-navigation) would be useful here if you want to add a specific list of links.
+
+### The sidebar on narrow screens
+
+By default the sidebar disappears once the screen is too narrow to show it beside your content. Set `mobile` to keep it in view instead:
+
+- `hidden` (default) = the sidebar is hidden on narrow screens.
+- `top` = the sidebar moves under the header as a horizontal strip that stays visible.
+- `bottom` = the sidebar moves below your content, full width, and stays visible.
+
+When the sidebar holds a `menu` Collection, its links take the orientation that fits the new spot: `top` lays them out in a row, `bottom` keeps them in a column. Set `mobile_style` to override that:
+
+- `horizontal` = lay the links out in a row.
+- `vertical` = stack the links in a column.
+
+If your sidebar is the site navigation and should stay on screen, `mobile: top` is the usual choice.
 
 [^1]: Frontmatter is a block of metadata at the start of a Markdown file, enclosed by `---` at the top/bottom. It provides information about the document that is used by the system but isn't visible when viewing the page/post.
