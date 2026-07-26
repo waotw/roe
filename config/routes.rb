@@ -203,6 +203,7 @@ Rails.application.routes.draw do
         post :create_store
         delete :delete_store
         get :new_feeds_setup
+        get :new_music_setup
       end
     end
 
@@ -339,6 +340,9 @@ Rails.application.routes.draw do
 
     get "configs/feeds/edit", to: "configs#edit_feeds", as: "edit_feeds_config"
     patch "configs/feeds", to: "configs#update_feeds", as: "feeds_config"
+
+    get "configs/music/edit", to: "configs#edit_music", as: "edit_music_config"
+    patch "configs/music", to: "configs#update_music", as: "music_config"
 
     # Raw YAML fallback editor for a config whose structured form won't parse.
     get "configs/raw/edit", to: "configs#edit_raw", as: "edit_raw_config"

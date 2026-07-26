@@ -19,9 +19,11 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
-    feeds = SiteConfig::FEATURES_PATH.join("feeds.yml")
-    File.delete(feeds) if File.exist?(feeds)
-    SiteConfig.reload!("features/feeds")
+    %w[feeds music].each do |feature|
+      path = SiteConfig::FEATURES_PATH.join("#{feature}.yml")
+      File.delete(path) if File.exist?(path)
+      SiteConfig.reload!("features/#{feature}")
+    end
   end
 
   # ── Index ──────────────────────────────────────────────────────────────────
@@ -448,7 +450,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     patch admin_feeds_config_path, params: { content: "music:\n  source: posts\n  tags: music\n" }
 
-    assert_redirected_to admin_edit_feeds_config_path
+    assert_redirected_to admin_configs_path
     assert_includes File.read(SiteConfig::FEATURES_PATH.join("feeds.yml")), "music"
   end
 
@@ -460,6 +462,47 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal before, File.read(SiteConfig::FEATURES_PATH.join("feeds.yml")), "bad input is not written"
+  end
+
+  # ── Music ──────────────────────────────────────────────────────────────────
+
+  test "new_music_setup creates music.yml with an example and opens the editor" do
+    music = SiteConfig::FEATURES_PATH.join("music.yml")
+    File.delete(music) if File.exist?(music)
+
+    get new_music_setup_admin_configs_path
+
+    assert File.exist?(music), "music.yml is created"
+    assert_includes File.read(music), "summer-release", "seeded with an example release"
+    assert_redirected_to admin_edit_music_config_path
+  end
+
+  test "the Enable Music button shows while the feature is off" do
+    music = SiteConfig::FEATURES_PATH.join("music.yml")
+    File.delete(music) if File.exist?(music)
+
+    get admin_configs_path
+
+    assert_response :success
+    assert_select "a[href=?]", new_music_setup_admin_configs_path
+  end
+
+  test "index lists music.yml under Features once enabled" do
+    ensure_feature_file("music.yml")
+
+    get admin_configs_path
+
+    assert_response :success
+    assert_select "a[href=?]", admin_edit_music_config_path
+  end
+
+  test "update_music saves a valid YAML mapping" do
+    ensure_feature_file("music.yml")
+
+    patch admin_music_config_path, params: { content: "winter:\n  title: Winter\n  release_date: 2026-12-01\n" }
+
+    assert_redirected_to admin_configs_path
+    assert_includes File.read(SiteConfig::FEATURES_PATH.join("music.yml")), "Winter"
   end
 
   # ── Raw YAML fallback ──────────────────────────────────────────────────────

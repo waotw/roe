@@ -10,11 +10,12 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
     "pullquote"    => %w[text attribution position],
     "aside"        => %w[text image link link_text],
     "post-link"    => %w[post style title subtitle show_subtitle excerpt show_excerpt url link_text author date image],
-    "product-link" => %w[product style title description show_description url link_text image]
+    "product-link" => %w[product style title description show_description url link_text image],
+    "player"       => %w[audio title image show_artwork]
   }.freeze
 
   test "types match the renderer's dispatch values" do
-    assert_equal %w[pullquote post-link aside product-link], CardBuilderSchema.types.map { |t| t[:value] }
+    assert_equal %w[pullquote post-link aside product-link player], CardBuilderSchema.types.map { |t| t[:value] }
   end
 
   test "every field is well-formed and a real option for its type" do

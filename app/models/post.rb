@@ -92,7 +92,28 @@ class Post < ApplicationRecord
         { name: "captions", type: :text, label: "Captions/Transcript",
           hint: "Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)" }
       ]
+    },
+    music: {
+      label: "Music",
+      description: "A music track — group into releases, distribute later",
+      icon: "🎵",
+      metadata_fields: [
+        { name: "audio", type: :text, required: true, label: "Audio File",
+          hint: "Path to the audio file (e.g., /media/audio/summer/01-opening.flac)" },
+        { name: "release", type: :text, label: "Release",
+          hint: "The release this track belongs to — its key in music.yml (optional)" },
+        { name: "track_number", type: :text, label: "Track Number", hint: "Optional" },
+        { name: "duration", type: :text, label: "Duration", hint: 'Optional, e.g. "3:45"' }
+      ]
     }
+  }.freeze
+
+  # Post types that only appear in the editor's type picker when their feature
+  # is enabled — most sites don't use every type. Maps the type to the
+  # SiteFeature predicate that gates it.
+  FEATURE_GATED_TYPES = {
+    "podcast" => :podcast_enabled?,
+    "music"   => :music_enabled?
   }.freeze
 
   def audio
@@ -165,15 +186,18 @@ class Post < ApplicationRecord
   end
 
   def self.post_type_options
-    Rails.cache.fetch("post_type_options", expires_in: 1.hour) do
-      # Official types from POST_TYPES constant
-      official_types = POST_TYPES.keys.map(&:to_s)
+    base = Rails.cache.fetch("post_type_options", expires_in: 1.hour) do
+      # Official types from POST_TYPES + types actually used (legacy/custom).
+      (POST_TYPES.keys.map(&:to_s) + all_post_types).uniq.sort
+    end
 
-      # Types actually used in posts (for legacy/custom types)
-      discovered_types = all_post_types
-
-      # Merge, dedupe, and sort
-      (official_types + discovered_types).uniq.sort
+    # Hide a feature-gated type when its feature is off — but keep it if a post
+    # already uses it, so an existing type never vanishes from the picker.
+    # Filtered outside the cache so toggling a feature takes effect immediately.
+    in_use = all_post_types
+    base.reject do |type|
+      gate = FEATURE_GATED_TYPES[type]
+      gate && !SiteFeature.public_send(gate) && !in_use.include?(type)
     end
   end
 

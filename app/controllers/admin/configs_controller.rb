@@ -427,6 +427,16 @@ class Admin::ConfigsController < Admin::BaseController
       }
     end
 
+    if File.exist?(SiteConfig::FEATURES_PATH.join("music.yml"))
+      features_files << {
+        name: "music.yml",
+        path: "features/music.yml",
+        type: "features/music",
+        description: "Music releases.",
+        edit_path: admin_edit_music_config_path
+      }
+    end
+
     # Default configs
     defaults_files = [
       {
@@ -646,11 +656,61 @@ class Admin::ConfigsController < Admin::BaseController
     File.write(FeedConfig::FILE, content)
     SiteConfig.sync_from_file("features/feeds")
     flash[:notice] = "Feeds saved."
-    redirect_to admin_edit_feeds_config_path
+    redirect_to admin_configs_path
   rescue Psych::SyntaxError => e
     @config_content = content
     flash.now[:alert] = "YAML error: #{e.message}"
     render(:edit_feeds, status: :unprocessable_entity)
+  end
+
+  # Enable music by creating features/music.yml, seeded with one example
+  # release. Idempotent — if it already exists, just open the editor.
+  def new_music_setup
+    unless File.exist?(ReleaseConfig::FILE)
+      FileUtils.mkdir_p(File.dirname(ReleaseConfig::FILE))
+      File.write(ReleaseConfig::FILE, <<~YAML)
+        artist: Your Name
+        audience: free
+
+        releases:
+          summer-release:
+            title: Summer Release
+            release_date: 2026-06-01
+            cover: /media/images/summer-release-cover.jpg
+            synopsis: A short description of this release.
+      YAML
+      SiteConfig.sync_from_file("features/music")
+      flash[:notice] = "Music enabled. Edit music.yml below to define your releases."
+    end
+    redirect_to admin_edit_music_config_path
+  end
+
+  def edit_music
+    unless File.exist?(ReleaseConfig::FILE)
+      redirect_to admin_configs_path, alert: "Music isn't enabled yet." and return
+    end
+    @config_content = File.read(ReleaseConfig::FILE)
+    render :edit_music
+  end
+
+  def update_music
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+
+    parsed = YAML.safe_load(content, permitted_classes: [ Date, Time ])
+    unless parsed.nil? || parsed.is_a?(Hash)
+      @config_content = content
+      flash.now[:alert] = "music.yml must be a mapping of release name to settings."
+      return render(:edit_music, status: :unprocessable_entity)
+    end
+
+    File.write(ReleaseConfig::FILE, content)
+    SiteConfig.sync_from_file("features/music")
+    flash[:notice] = "Music saved."
+    redirect_to admin_configs_path
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    flash.now[:alert] = "YAML error: #{e.message}"
+    render(:edit_music, status: :unprocessable_entity)
   end
 
   # Raw YAML editor — the escape hatch a structured editor redirects to when its

@@ -64,13 +64,13 @@
                 <% end %>
               </div>
             </td>
-            <td class="max-w-0 px-1.5 py-4 text-sm text-gray-500">
+            <td class="max-w-0 px-1.5 py-2 text-sm text-gray-500">
               <%= render 'shared/inline_rename',
                   resource: page,
                   resource_type: 'page',
                   display_class: "inline-block max-w-full truncate align-bottom" %>
             </td>
-            <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+            <td class="whitespace-nowrap px-1.5 py-2 text-sm text-gray-500">
               <% case page.status %>
               <% when 'published' %>
                 <span class="inline-flex bg-green-100 px-2 text-xs font-mono leading-5 text-green-800">Published</span>
@@ -80,7 +80,7 @@
                 <span class="inline-flex bg-gray-100 px-2 text-xs font-mono leading-5 text-gray-800">Draft</span>
               <% end %>
             </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 md:pr-4 pr-6 text-right text-xs font-medium">
+            <td class="relative whitespace-nowrap py-2 pl-3 md:pr-4 pr-6 text-right text-xs font-medium">
               <div class="flex items-center justify-end gap-2">
                 <%= link_to icon_svg("edit", class: "w-[1.1rem] h-[1.1rem]"), edit_admin_page_path(page),
                       class: "text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>

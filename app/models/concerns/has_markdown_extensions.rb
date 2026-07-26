@@ -1116,7 +1116,7 @@ module HasMarkdownExtensions
     # All other templates emit Markdown/IAL and need markdown="1".
     output = []
 
-    if template == "compact" || template == "glossary" || template == "menu"
+    if template == "compact" || template == "glossary" || template == "menu" || template == "player" || template == "playlist"
       output << "<div class=\"collection #{template}\">"
       output << collection_header(config, heading, markdown: false)
       output << list_markdown
@@ -1215,6 +1215,10 @@ module HasMarkdownExtensions
       render_links(items)
     when "menu"
       render_menu(items, config)
+    when "player", "playlist"
+      # `player` is now a card (the transport); as a collection template it's an
+      # alias for `playlist` (the list). The transport comes from a `player` card.
+      render_playlist(items, config)
     when "full"
       render_full(items, config)
     when "list"
@@ -1545,6 +1549,171 @@ module HasMarkdownExtensions
     name = config[:collection].to_s.split(",").first.to_s.strip
     aria = name.present? ? %Q( aria-label="#{ERB::Util.html_escape(name)}") : ""
     %Q(<nav class="collection-nav"#{aria}>\n#{list}\n</nav>)
+  end
+
+  # A single-player playlist over a collection of audio posts — music tracks or
+  # podcast episodes. The template emits every element and its DOM order; the
+  # theme's CSS controls the entire look (symbols, layout, type). Structure:
+  # header (cover/title/artist) ▸ now-playing ▸ transport (toggle/times/playhead)
+  # ▸ the track list. Each row also carries a native <audio controls> as the
+  # no-JS fallback; player.js hides those (adds .is-enhanced) and drives one
+  # active track through the transport, auto-advancing on end.
+  # The track/episode list on its own — `template: playlist`. Each row is a
+  # native <audio controls> (no-JS fallback) plus data attributes (title, image,
+  # url; audio via the <audio> src) so a `player` can adopt it as its queue.
+  # This is the list half of the old combined player; the transport is the
+  # `player` card.
+  def render_playlist(items, config)
+    tracks = items.select do |item|
+      item.respond_to?(:audio) && item.audio.to_s.strip.present?
+    end
+
+    rows = tracks.each_with_index.map do |item, i|
+      title  = ERB::Util.html_escape(item.title.presence || "Untitled")
+      number = ERB::Util.html_escape(player_track_number(item).presence || (i + 1).to_s)
+      audio  = ERB::Util.html_escape(item.audio.to_s.strip)
+      image  = ERB::Util.html_escape(player_item_image(item))
+      url    = ERB::Util.html_escape(item_path(item))
+      dur    = item.respond_to?(:duration) ? item.duration.to_s.strip : ""
+      dur_html = dur.present? ? %Q(<span class="player-track-duration">#{ERB::Util.html_escape(dur)}</span>) : ""
+
+      <<~HTML
+        <li class="player-track" data-player-track data-title="#{title}" data-image="#{image}" data-url="#{url}">
+          <div class="player-track-meta" data-player-select>
+            <span class="player-track-number">#{number}</span>
+            <span class="player-track-title">#{title}</span>
+            <a class="player-track-link" href="#{url}" target="_blank" rel="noopener" aria-label="Open #{title}"></a>
+            #{dur_html}
+          </div>
+          <audio class="player-track-audio" controls preload="none" src="#{audio}"></audio>
+        </li>
+      HTML
+    end.join
+
+    %Q(<ol class="player-tracks" data-playlist>\n#{rows}</ol>)
+  end
+
+  # The release/podcast cover for the player — the artwork fallback when a track
+  # has no image of its own. The association key comes from the block first, then
+  # the current post/page (which usually carries it), so the artwork "just works"
+  # on a podcast/release page. Empty when unscoped.
+  def player_cover(config)
+    release_key = config[:release].presence || player_context_key("release")
+    podcast_key = config[:podcast].presence || player_context_key("podcast")
+    raw =
+      if release_key.present?
+        ReleaseConfig.get(release_key).to_h["cover"]
+      elsif podcast_key.present?
+        PodcastConfig.get(podcast_key).to_h["artwork"]
+      end
+    resolve_player_image(raw)
+  end
+
+  # A post's own artwork (podcast episode / track image), if set.
+  def player_item_image(item)
+    return "" unless item.respond_to?(:metadata)
+    resolve_player_image(item.metadata["image"])
+  end
+
+  # Config/metadata image references may be a bare filename (served from
+  # /system/images/<name>), an absolute path, or a full URL. Normalize all three
+  # — mirrors ApplicationHelper#config_image_path (kept in sync), but callable
+  # from the model without a view context / route helpers.
+  def resolve_player_image(value)
+    v = value.to_s.strip
+    return "" if v.empty? || v == "none"
+    return v if v.start_with?("http://", "https://", "/")
+    "/system/images/#{v}"
+  end
+
+  # A key from the current post/page metadata (self) when this markdown renders
+  # in a content context; nil in a layout or when the key is absent.
+  def player_context_key(key)
+    return nil unless respond_to?(:metadata) && metadata.is_a?(Hash)
+    metadata[key].to_s.strip.presence
+  end
+
+  # Artwork for the player card: explicit `image:` → the current post's own
+  # image → the release/podcast cover (association-resolved). Empty for none.
+  def player_card_artwork(config)
+    explicit = resolve_player_image(config[:image])
+    return explicit if explicit.present?
+    own = respond_to?(:metadata) ? resolve_player_image(metadata["image"]) : ""
+    return own if own.present?
+    player_cover(config)
+  end
+
+  # `card` with `type: player` — the transport. Plays an explicit `audio:` (or a
+  # bare `video:`), else the current post's audio/video. Reuses the audio-player
+  # Stimulus controller and the .collection-player TUI base. The list is a
+  # separate `playlist` collection; a later step lets this adopt one.
+  def render_player_card(config, preview: false)
+    audio_src = config[:audio].presence || (respond_to?(:audio) ? audio.to_s.strip.presence : nil)
+    video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
+
+    if audio_src.blank? && video_src.present?
+      # Minimal native video for now; the full video transport is a follow-up.
+      return %Q(<div class="card-player card-player-video"><video class="player-video" controls preload="metadata" src="#{ERB::Util.html_escape(video_src)}"></video></div>)
+    end
+
+    card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
+    title_html  = ERB::Util.html_escape(card_title)
+    info_url    = ERB::Util.html_escape(respond_to?(:url_name) ? item_path(self) : "#")
+
+    # Own audio → <source> tags. With none, the transport still renders empty so
+    # it can adopt a `playlist` on the page (the JS loads the first track).
+    sources_html =
+      if audio_src.present?
+        s = ERB::Util.html_escape(audio_src)
+        %Q(<source src="#{s}" type="audio/mpeg"><source src="#{s}" type="audio/mp4"><source src="#{s}" type="audio/ogg">)
+      else
+        ""
+      end
+
+    show_artwork = config[:show_artwork].to_s.strip.downcase != "false"
+    cover        = player_cover(config)
+    art          = show_artwork ? player_card_artwork(config) : ""
+    figure_html  =
+      if show_artwork
+        img = art.present? ?
+          %Q(<img class="player-cover" data-audio-player-target="artwork" src="#{ERB::Util.html_escape(art)}" alt="">) :
+          %Q(<img class="player-cover" data-audio-player-target="artwork" alt="" hidden>)
+        %Q(<figure class="player-figure">#{img}</figure>)
+      else
+        ""
+      end
+
+    <<~HTML
+      <div class="card-player" data-controller="audio-player" data-audio-player-type-value="audio" data-cover="#{ERB::Util.html_escape(cover)}">
+        <audio data-audio-player-target="audio" preload="metadata" hidden>#{sources_html}</audio>
+        <div class="player-body">
+          #{figure_html}
+          <div class="player-main">
+            <div class="player-now">
+              <span class="player-now-title" data-audio-player-target="title">#{title_html}</span>
+              <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener">[info]</a>
+            </div>
+            <div class="player-transport">
+              <button type="button" class="player-toggle" data-audio-player-target="playButton" data-action="click->audio-player#togglePlay" data-playing="false" aria-label="Play"></button>
+              <span class="player-time player-time-current" data-audio-player-target="currentTime">0:00</span>
+              <div class="player-progress" data-audio-player-target="progressBar" data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub" role="slider" aria-label="Seek" tabindex="0">
+                <div class="player-progress-fill" data-audio-player-target="progressFill"></div>
+                <div class="player-progress-handle" data-audio-player-target="progressHandle"></div>
+              </div>
+              <span class="player-time player-time-duration" data-audio-player-target="duration">0:00</span>
+              <button type="button" class="player-speed" data-audio-player-target="speedButton" data-action="click->audio-player#cycleSpeed" aria-label="Playback speed">1×</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    HTML
+  end
+
+  # A track/episode's number for the player row: track_number, then
+  # episode_number, else blank.
+  def player_track_number(item)
+    return "" unless item.respond_to?(:metadata)
+    (item.metadata["track_number"].presence || item.metadata["episode_number"].presence).to_s
   end
 
   def render_product_grid(items, config)
@@ -1929,6 +2098,8 @@ module HasMarkdownExtensions
       render_post_link(config, preview: preview)
     when "product-link"
       render_product_link(config, preview: preview)
+    when "player"
+      render_player_card(config, preview: preview)
     else
       preview ? "<!-- Unknown card type -->" : ""
     end

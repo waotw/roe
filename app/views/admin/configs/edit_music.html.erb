@@ -1,0 +1,45 @@
+<div class="px-4 sm:px-0">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Music</h1>
+      <p class="mt-1 text-sm text-gray-700">
+        <span class="font-mono">features/music.yml</span> — define music releases. Each release has a page at
+        <span class="font-mono">/music/&lt;name&gt;</span>.
+      </p>
+    </div>
+    <%= link_to "← Settings", admin_configs_path, class: "text-sm text-blue-600 hover:text-blue-900" %>
+  </div>
+
+  <details class="mb-4 p-3 border border-gray-300 bg-gray-50 rounded text-sm">
+    <summary class="cursor-pointer font-semibold">Field reference</summary>
+    <div class="mt-2 space-y-1 text-gray-700">
+      <p>Top-level defaults apply everywhere unless a release overrides them:</p>
+      <ul class="list-disc pl-5 space-y-0.5">
+        <li><span class="font-mono">artist</span> — the default artist (usually just you)</li>
+        <li><span class="font-mono">audience</span> — <span class="font-mono">free</span> (default) or <span class="font-mono">paid</span>, only relevant when Members is on</li>
+      </ul>
+      <p class="pt-1">Under <span class="font-mono">releases:</span>, each key is a release. Fields:</p>
+      <ul class="list-disc pl-5 space-y-0.5">
+        <li><span class="font-mono">title</span>, <span class="font-mono">release_date</span>, <span class="font-mono">synopsis</span></li>
+        <li><span class="font-mono">cover</span> — a <span class="font-mono">/media/images/…</span> path (and optional <span class="font-mono">cover_alt</span>)</li>
+        <li><span class="font-mono">artist</span> / <span class="font-mono">audience</span> — override the top-level default for this release</li>
+      </ul>
+      <p class="pt-1">
+        Tracks are posts with <span class="font-mono">post_type: music</span> and <span class="font-mono">release: &lt;name&gt;</span>,
+        each pointing at an <span class="font-mono">audio:</span> file, ordered by <span class="font-mono">track_number</span>. A track
+        inherits its release's artist, cover, and audience — set them on the track only to override.
+      </p>
+    </div>
+  </details>
+
+  <%= form_with url: admin_music_config_path, method: :patch do |f| %>
+    <%= f.text_area :content, value: @config_content,
+        class: "w-full bg-white font-mono text-sm p-2 border border-gray-300 box-border h-[420px]" %>
+    <div class="mt-3 flex gap-2">
+      <%= f.submit "Save Music",
+          class: "inline-flex items-center uppercase text-sm px-2 py-1 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+      <%= link_to "Cancel", admin_configs_path,
+          class: "inline-flex items-center uppercase text-sm px-2 py-1 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+    </div>
+  <% end %>
+</div>

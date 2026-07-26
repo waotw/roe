@@ -29,7 +29,7 @@
     <% end %>
   </div>
 
-  <% if !podcast_enabled? || !custom_feeds_enabled? %>
+  <% if !podcast_enabled? || !custom_feeds_enabled? || !music_enabled? %>
     <div class="mt-4">
       <h3 class="mb-2 text-xl font-bold text-gray-900">Features</h3>
       <% feature_btn = "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 font-mono rounded-xs" %>
@@ -43,6 +43,11 @@
           <%= link_to "Enable Custom Feeds",
                       new_feeds_setup_admin_configs_path,
                       class: "#{feature_btn} bg-teal-200 hover:bg-teal-300" %>
+        <% end %>
+        <% unless music_enabled? %>
+          <%= link_to "Enable Music",
+                      new_music_setup_admin_configs_path,
+                      class: "#{feature_btn} bg-rose-200 hover:bg-rose-300" %>
         <% end %>
       </div>
     </div>

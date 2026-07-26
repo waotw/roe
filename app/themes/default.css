@@ -747,10 +747,19 @@ body.sidebar-right {
     display: flex;
     flex-direction: column;
   }
-  body.sidebar-mobile-top .site-nav     { order: 1; }
-  body.sidebar-mobile-top .site-sidebar { order: 2; display: block; }
-  body.sidebar-mobile-top main          { order: 3; }
-  body.sidebar-mobile-top .site-footer  { order: 4; }
+  body.sidebar-mobile-top .site-nav {
+    order: 1;
+  }
+  body.sidebar-mobile-top .site-sidebar {
+    order: 2;
+    display: block;
+  }
+  body.sidebar-mobile-top main {
+    order: 3;
+  }
+  body.sidebar-mobile-top .site-footer {
+    order: 4;
+  }
 
   body.sidebar-mobile-top .site-sidebar {
     border-bottom: 1px solid var(--color-border);
@@ -1489,6 +1498,58 @@ p.collection-more a:hover {
 
 .collection-menu-item {
   margin: 0;
+}
+
+/* ============ COLLECTION PLAYLIST (music / podcast) ============
+   The `playlist` collection renders the track/episode list. Rows carry the data
+   a `player` card reads to build its queue. TUI-flavored: mono, compact, symbol
+   markers. Override or replace freely. (`player` is an alias for `playlist`.) */
+.collection.playlist,
+.collection.player {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.player-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.player-track-meta {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0.15rem 0;
+  cursor: pointer;
+}
+.player-track-number {
+  min-width: 2ch;
+  text-align: right;
+  opacity: 0.5;
+}
+.player-track-title {
+  flex: 1;
+}
+.player-track-duration {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.player-track.is-playing .player-track-title {
+  font-weight: 700;
+}
+.player-track.is-playing .player-track-title::before {
+  margin-right: 0.4rem;
+  content: "\25B8 ";
+}
+.player-track-link {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.5;
+}
+.player-track-link::before {
+  content: "\2197";
+}
+.player-track-link:hover {
+  opacity: 1;
 }
 
 /* Collection Glossary */
@@ -2468,6 +2529,140 @@ article .content,
   .card-aside .aside-text {
     margin: var(--aside-text-top-offset) 0 0 0;
   }
+}
+
+/* Player card (card type: player) — the transport, driven by the audio-player
+   controller. It reads a `playlist` collection on the same page (if any) to
+   build its queue. TUI-flavored: mono, compact, symbol-based transport. Play
+   state is [data-playing] on the button; progress width and handle position are
+   set inline by the controller, so here we only style appearance. */
+.card-player {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+  border: 1px solid var(--color-border);
+  margin-top: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  --player-progress: 0;
+}
+
+/* Artwork (show_artwork) sits left of the now/transport column; drop it and the
+   column reflows full-width. Its left edge lines up with the column's. */
+.player-body {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.player-main {
+  flex: 1;
+  min-width: 0;
+}
+.player-figure {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.player-cover {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+}
+
+.player-now {
+  margin-bottom: var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-now::before {
+  content: "\266A";
+  opacity: 0.6;
+  margin-right: 0.5ch;
+}
+.player-now-link {
+  margin-left: 0.5ch;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.6;
+}
+.player-now-link:hover {
+  opacity: 1;
+}
+
+.player-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.player-toggle {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.player-toggle::before {
+  content: "\25B6";
+}
+.player-toggle[data-playing="true"]::before {
+  content: "\23F8";
+}
+.player-speed {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.player-speed:hover {
+  opacity: 1;
+}
+.player-time {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-progress {
+  position: relative;
+  flex: 1;
+  height: 1em;
+  cursor: pointer;
+}
+.player-progress::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.3;
+  transform: translateY(-50%);
+}
+.player-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+  width: calc(var(--player-progress, 0) * 100%);
+  transform: translateY(-50%);
+}
+.player-progress-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.player-progress-handle::before {
+  content: "\25CF";
+  font-size: 0.8em;
+}
+.card-player .player-video {
+  width: 100%;
 }
 
 /* ============ MEDIA PLAYERS =============== */

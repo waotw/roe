@@ -90,6 +90,34 @@ class CollectionQueryTest < ActiveSupport::TestCase
     assert_not CollectionQuery.sort_keyword?("home, blog, store")
   end
 
+  # --- release membership -------------------------------------------------
+
+  test "a release: filter selects only that release's tracks" do
+    write_post("cq-track-a", "post_type" => "music", "release" => "summer")
+    write_post("cq-track-b", "post_type" => "music", "release" => "winter")
+
+    summer = CollectionQuery.new(source: "posts", post_type: "music", release: "summer")
+      .records.to_a.map(&:url_name)
+
+    assert_includes summer, "cq-track-a"
+    assert_not_includes summer, "cq-track-b"
+  end
+
+  # --- show_unlisted ------------------------------------------------------
+
+  test "show_unlisted widens a posts collection to include unlisted items" do
+    write_post("cq-pub", "status" => "published")
+    write_post("cq-unl", "status" => "unlisted")
+
+    without = CollectionQuery.new(source: "posts").records.to_a.map(&:url_name)
+    assert_includes without, "cq-pub"
+    assert_not_includes without, "cq-unl", "unlisted hidden by default"
+
+    with = CollectionQuery.new(source: "posts", show_unlisted: "true").records.to_a.map(&:url_name)
+    assert_includes with, "cq-pub"
+    assert_includes with, "cq-unl", "shown with show_unlisted: true"
+  end
+
   # --- records: collection membership -----------------------------------
 
   test "a collection: name filter selects only members (and returns an Array)" do

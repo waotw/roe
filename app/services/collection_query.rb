@@ -112,11 +112,19 @@ class CollectionQuery
     post_type   = @config[:post_type]
     post_type   = nil if post_type == "all"
 
+    release_key = @config[:release]
+
+    # By default a collection shows only published items. `show_unlisted: true`
+    # widens it to published + unlisted — a player that gathers unlisted tracks,
+    # a members-only list of unlisted pages, etc.
+    show_unlisted = @config[:show_unlisted].to_s.strip.downcase == "true"
+
     case source
     when "posts"
-      collection = Post.published.regular_posts
+      collection = show_unlisted ? Post.public_posts : Post.published.regular_posts
       collection = collection.by_type(post_type) if post_type
       collection = apply_podcast_filter(collection, podcast_key) if podcast_key.present?
+      collection = apply_release_filter(collection, release_key) if release_key.present?
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "pages"
@@ -191,5 +199,12 @@ class CollectionQuery
 
   def apply_podcast_filter(collection, podcast_key)
     collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip)
+  end
+
+  # Membership in a music release — a track post carries `release: <key>`. Like
+  # the podcast filter, but a separate axis, so a track can be in a release, a
+  # podcast, or both.
+  def apply_release_filter(collection, release_key)
+    collection.where("json_extract(metadata, '$.release') = ?", release_key.strip)
   end
 end

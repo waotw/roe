@@ -19,7 +19,8 @@ module CardBuilderSchema
     { value: "pullquote",    label: "Pull quote" },
     { value: "post-link",    label: "Post link" },
     { value: "aside",        label: "Aside" },
-    { value: "product-link", label: "Product link" }
+    { value: "product-link", label: "Product link" },
+    { value: "player",       label: "Player" }
   ].freeze
 
   FIELDS_BY_TYPE = {
@@ -92,6 +93,17 @@ module CardBuilderSchema
         hint: "Label for the link. Defaults to “View product →”." },
       { key: "image", type: :text, label: "Image",
         hint: "Override the product image. Use “none” to suppress it." }
+    ],
+
+    "player" => [
+      { key: "audio", type: :text, label: "Audio",
+        hint: "Audio file to play. Defaults to the post's own audio." },
+      { key: "title", type: :text, label: "Title",
+        hint: "Defaults to the post's title." },
+      { key: "image", type: :text, label: "Artwork",
+        hint: "Defaults to the post's image, then the release/podcast cover." },
+      { key: "show_artwork", type: :boolean, label: "Show artwork",
+        hint: "Show the artwork. On by default." }
     ]
   }.freeze
 

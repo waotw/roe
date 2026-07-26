@@ -61,6 +61,100 @@ export default class extends Controller {
     if (this.chapters.length > 0 && this.hasChapterListTarget) {
       this.renderChapters();
     }
+
+    // Adopt a `playlist` on the page as this transport's queue.
+    this.setupPlaylist();
+  }
+
+  // Wire this player to a `playlist` collection elsewhere on the page: selecting
+  // a row loads it here, playback auto-advances through the list, and the
+  // now-playing title/artwork/[info] follow the active track. One player + one
+  // playlist per page for now.
+  setupPlaylist() {
+    this.tracks = [];
+    this.currentIndex = -1;
+    this.fallbackCover = this.element.getAttribute("data-cover") || "";
+    this.infoLink = this.element.querySelector("[data-player-info]");
+
+    const playlist = document.querySelector("[data-playlist]");
+    if (!playlist) {
+      // Single-source player: the [info] link would just point at the current
+      // page, so hide it.
+      if (this.infoLink) this.infoLink.hidden = true;
+      return;
+    }
+
+    this.tracks = Array.prototype.slice.call(
+      playlist.querySelectorAll(".player-track"),
+    );
+    playlist.classList.add("is-enhanced");
+
+    this.tracks.forEach((row, i) => {
+      const rowAudio = row.querySelector(".player-track-audio");
+      if (rowAudio) rowAudio.hidden = true; // the transport drives playback now
+
+      const select = row.querySelector("[data-player-select]");
+      if (select) {
+        select.addEventListener("click", (e) => {
+          if (e.target.closest && e.target.closest("a")) return; // let [info] navigate
+          this.selectTrack(i, true);
+        });
+      }
+    });
+
+    // No source of its own → adopt the first track (paused).
+    const hasOwnSource = !!(
+      this.mediaEl.currentSrc || this.mediaEl.querySelector("source[src]")
+    );
+    if (!hasOwnSource && this.tracks.length) this.selectTrack(0, false);
+  }
+
+  trackSrc(row) {
+    const a = row.querySelector(".player-track-audio");
+    const source = a && a.querySelector("source[src]");
+    return (
+      (a && a.getAttribute("src")) ||
+      (source && source.getAttribute("src")) ||
+      row.getAttribute("data-audio") ||
+      ""
+    );
+  }
+
+  selectTrack(index, autoplay) {
+    if (index < 0 || index >= this.tracks.length) return;
+    const row = this.tracks[index];
+    const src = this.trackSrc(row);
+    if (!src) return;
+
+    this.currentIndex = index;
+    this.element.classList.remove("is-ended");
+    this.mediaEl.src = src;
+    this.mediaEl.load();
+
+    if (this.hasTitleTarget) {
+      this.titleTarget.textContent = row.getAttribute("data-title") || "";
+    }
+    if (this.hasArtworkTarget) {
+      const image = row.getAttribute("data-image") || this.fallbackCover;
+      if (image) {
+        this.artworkTarget.src = image;
+        this.artworkTarget.hidden = false;
+      } else {
+        this.artworkTarget.removeAttribute("src");
+        this.artworkTarget.hidden = true;
+      }
+    }
+    if (this.infoLink) {
+      const url = row.getAttribute("data-url");
+      if (url) {
+        this.infoLink.setAttribute("href", url);
+        this.infoLink.hidden = false;
+      }
+    }
+
+    this.tracks.forEach((t, j) => t.classList.toggle("is-playing", j === index));
+
+    if (autoplay) this.mediaEl.play();
   }
 
   disconnect() {
@@ -172,33 +266,6 @@ export default class extends Controller {
     window.removeEventListener("touchend", this._boundScrubEnd);
   }
 
-  // ========== EXTERNAL CONTROL (playlist) ==========
-
-  // Called by playlist to load a new track without full page reload
-  loadTrack({ src, title, artwork, duration }) {
-    if (!this.mediaEl) return;
-
-    const wasPlaying = !this.mediaEl.paused;
-    this.mediaEl.src = src;
-    this.mediaEl.load();
-
-    if (this.hasTitleTarget && title) {
-      this.titleTarget.textContent = title;
-    }
-
-    if (this.hasArtworkTarget && artwork) {
-      this.artworkTarget.src = artwork;
-      this.artworkTarget.classList.remove("hidden");
-    }
-
-    if (wasPlaying) {
-      this.mediaEl.play();
-    }
-
-    // Update progress immediately
-    this.updateProgress(0, 0);
-  }
-
   // ========== MEDIA EVENTS ==========
 
   onPlay() {
@@ -226,6 +293,16 @@ export default class extends Controller {
     this.element.dispatchEvent(
       new CustomEvent("audio-player:ended", { bubbles: true }),
     );
+
+    // Auto-advance through an adopted playlist.
+    if (
+      this.tracks &&
+      this.tracks.length &&
+      this.currentIndex >= 0 &&
+      this.currentIndex + 1 < this.tracks.length
+    ) {
+      this.selectTrack(this.currentIndex + 1, true);
+    }
   }
 
   onTimeUpdate() {
