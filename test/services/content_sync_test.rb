@@ -267,6 +267,31 @@ class ContentSyncTest < ActiveSupport::TestCase
     assert_equal "Test Doc", result.title
   end
 
+  test "sync_documentation excludes documentation/roe unless opted in, and purges stale roe docs" do
+    roe_raw  = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "roe", "zz-roe-sync-test.md")
+    root_raw = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "zz-root-sync-test.md")
+    [ roe_raw, root_raw ].each do |p|
+      FileUtils.mkdir_p(File.dirname(p))
+      File.write(p, "---\ntitle: #{File.basename(p, '.md')}\nstatus: published\n---\n\nbody")
+    end
+    roe  = RoeSitePaths.normalize(roe_raw)
+    root = RoeSitePaths.normalize(root_raw)
+
+    # Pre-seed the roe doc as if a previous opt-in had synced it.
+    Documentation.create_or_update_from_file(roe_raw)
+    assert Documentation.exists?(file_path: roe)
+
+    Documentation.stubs(:include_roe_docs?).returns(false)
+    Dir.stubs(:glob).returns([ root_raw, roe_raw ])
+
+    ContentSync.new.send(:sync_documentation)
+
+    assert Documentation.exists?(file_path: root), "a root doc still syncs"
+    assert_not Documentation.exists?(file_path: roe), "documentation/roe is excluded and purged when opted out"
+  ensure
+    [ roe_raw, root_raw ].each { |p| File.delete(p) if p && File.exist?(p) }
+  end
+
   test "sync_file routes to correct model for posts" do
     content = <<~YAML
       ---
