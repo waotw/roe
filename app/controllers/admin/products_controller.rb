@@ -358,7 +358,7 @@ class Admin::ProductsController < Admin::BaseController
         cats = ProductCategory.all rescue []
         cats.any? ? "e.g., #{cats.first(3).join(', ')}" : "e.g., book, ebook, poster"
       end,
-      "price"    => "Price in dollars (e.g., 29.99)",
+      "price"    => "Price in #{helpers.store_currency_symbol} (e.g., 29.99)",
       "sku"      => "Stock Keeping Unit (e.g., BOOK-001-TITLE)",
       "image"    => "Path to product image: /media/images/file.jpg"
     }
