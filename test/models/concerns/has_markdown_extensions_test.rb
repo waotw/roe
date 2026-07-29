@@ -124,6 +124,41 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   end
 
   # =============================================================================
+  # Footnote Tests
+  # =============================================================================
+
+  test "footnote backlink numbers skip nested list items" do
+    html = <<~HTML
+      <div class="footnotes" role="doc-endnotes">
+        <ol>
+          <li id="fn:1">
+            <p>first footnote</p>
+          </li>
+          <li id="fn:2">
+            <p>second footnote with a list</p>
+            <ul>
+              <li>list item one</li>
+              <li>list item two</li>
+            </ul>
+          </li>
+          <li id="fn:3">
+            <p>third footnote</p>
+          </li>
+        </ol>
+      </div>
+    HTML
+
+    result = TestModel.new("").send(:add_footnote_backlinks, html)
+    doc = Nokogiri::HTML::DocumentFragment.parse(result)
+    numbers = doc.css(".footnote-backlink-number").map(&:text)
+
+    # The bug: nested <ul>/<ol> <li>s were counted, making the third
+    # footnote render as "5." instead of "3."
+    assert_equal [ "1.", "2.", "3." ], numbers
+    assert_operator doc.css(".footnotes ul li").count, :>, 0
+  end
+
+  # =============================================================================
   # Gallery Tests
   # =============================================================================
 

@@ -328,8 +328,9 @@ module HasMarkdownExtensions
   def add_footnote_backlinks(html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    # Find all footnote list items
-    footnotes = doc.css(".footnotes ol li")
+    # Find only top-level footnote list items (direct children of the ol),
+    # so nested <ul>/<ol> lists inside a footnote don't shift the numbering.
+    footnotes = doc.css(".footnotes ol > li")
 
     footnotes.each_with_index do |li, index|
       footnote_id = li["id"] # e.g., "fn:1"
