@@ -7,8 +7,8 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
   # reads (see HasMarkdownExtensions#render_collection). A typo here silently
   # produces a dead option, so guard the whole set.
   SUPPORTED_KEYS = %w[
-    source heading template style limit order offset post_type podcast tags
-    collection related
+    source heading template style limit order offset post_type podcast release
+    show_unlisted tags collection related
     show_author show_excerpt show_date show_subtitle show_more show_more_text
     category groups aspect_ratio show_description
   ].freeze
@@ -28,6 +28,27 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
   test "all keys are real collection options" do
     CollectionBuilderSchema.fields.each do |field|
       assert_includes SUPPORTED_KEYS, field[:key], "#{field[:key]} is not a supported collection option"
+    end
+  end
+
+  # The builder has drifted from the renderer before: `music` and the
+  # `playlist` template both shipped without being offered here, so a user
+  # could build the block by hand but not from the UI.
+  test "music post_type and playlist template are offered" do
+    post_type = CollectionBuilderSchema.fields.find { |f| f[:key] == "post_type" }
+    assert_includes post_type[:options], "music"
+
+    template = CollectionBuilderSchema.fields.find { |f| f[:key] == "template" }
+    assert_includes template[:options], "playlist"
+  end
+
+  test "playlist gets the feed controls (order, limit, offset)" do
+    %w[order limit offset].each do |key|
+      field = CollectionBuilderSchema.fields.find do |f|
+        f[:key] == key && Array.wrap(f[:depends_on]).any? { |c| c[:in] }
+      end
+      condition = Array.wrap(field[:depends_on]).find { |c| c[:in] }
+      assert_includes condition[:in], "playlist", "#{key} should apply to playlist"
     end
   end
 

@@ -34,7 +34,7 @@ module CollectionBuilderSchema
       hint: "Which content to pull from. Defaults to posts." },
 
     { key: "post_type", type: :select, label: "Post type",
-      options: %w[all article audio video podcast],
+      options: %w[all article audio video podcast music],
       hint: "Filter posts by type. Only applies when the source is posts.",
       depends_on: { field: "source", value: "posts" } },
 
@@ -45,6 +45,21 @@ module CollectionBuilderSchema
         { field: "post_type", value: "podcast" }
       ] },
 
+    # Release is to music what podcast is to episodes — a separate axis, so a
+    # track can belong to a release, a podcast, or both.
+    { key: "release", type: :text, label: "Release",
+      hint: "Show only tracks from this release key (its key in music.yml).",
+      depends_on: [
+        { field: "source", value: "posts" },
+        { field: "post_type", value: "music" }
+      ] },
+
+    # Collections show published items only unless this is on. Mainly for
+    # playlists that gather tracks not listed on their own.
+    { key: "show_unlisted", type: :boolean, label: "Include unlisted",
+      hint: "Also include unlisted posts. Off by default.",
+      depends_on: { field: "source", value: "posts" } },
+
     { key: "tags", type: :text, label: "Tags",
       hint: "Comma-separated tags to include. Prefix a tag with - to exclude it." },
 
@@ -52,8 +67,8 @@ module CollectionBuilderSchema
     # products, so the controller adds it as an option (and pre-selects it)
     # when the source is products, and removes it otherwise.
     { key: "template", type: :select, label: "Template",
-      options: %w[list compact links menu full glossary],
-      hint: "How each item is displayed. Products default to grid; everything else to list. menu is a bare link list you can hand-order and send content to." },
+      options: %w[list compact links menu full glossary playlist],
+      hint: "How each item is displayed. Products default to grid; everything else to list. menu is a bare link list you can hand-order and send content to. playlist is a track/episode list a player card can drive." },
 
     # --- Menu group: shown only when the template is `menu` ------------------
     { key: "style", type: :select, label: "Menu style",
@@ -78,15 +93,15 @@ module CollectionBuilderSchema
     { key: "order", type: :select, label: "Order",
       options: %w[date date-asc title filename],
       hint: "Sort order. date is newest-first (default); date-asc is oldest-first. For a hand-picked order, type a comma-separated list of url_names into the block instead (e.g. order: blog, about, store).",
-      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
+      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary", "playlist" ] } },
 
     { key: "limit", type: :text, label: "Limit",
       hint: "Max items to show — a number, or \"all\". Defaults to the site setting (10).",
-      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
+      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary", "playlist" ] } },
 
     { key: "offset", type: :text, label: "Offset",
       hint: "Skip the first N items (e.g. to show a second page).",
-      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
+      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary", "playlist" ] } },
 
     # Non-menu counterpart of the `collection` field above: for a feed it's a
     # membership filter (show only content tagged with this name). Menus put it
@@ -94,12 +109,12 @@ module CollectionBuilderSchema
     { key: "collection", type: :text, label: "Collection name",
       hint: "Show only content tagged with `collection: <name>` in its metadata. (For the menu template, this instead names the menu so you can send content to it.)",
       docs: "/documentation/roe/collections_templates#why-give-the-collection-a-name",
-      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
+      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary", "playlist" ] } },
 
     { key: "related", type: :boolean, label: "Related",
       hint: "When set to \"true\", only items connected through metadata will be in results",
       docs: "/documentation/roe/collections#show-related-content",
-      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary" ] } },
+      depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary", "playlist" ] } },
 
     # --- Display toggles: each only appears for the templates it affects.
     # list/compact/full carry meta; excerpt is full-only. ---------------------
