@@ -259,11 +259,14 @@ export default class extends Controller {
       history.scrollRestoration = "manual";
     }
 
-    // Combined Enter key handler for footnotes and lists
+    // Combined Enter key handler for lists, blockquotes, and footnotes
     this.enterHandler = (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         // Try list handling first (more common)
         if (this.handleListEnter(e)) return;
+        // Then blockquotes (must run before footnote continuation so
+        // indented `> ` lines inside footnotes continue as blockquotes)
+        if (this.handleBlockquoteEnter(e)) return;
         // Then try footnote handling
         if (this.handleFootnoteEnter(e)) return;
       }
@@ -977,7 +980,20 @@ export default class extends Controller {
       // Kramdown expects 4 spaces for continuation, not visual alignment
       const indent = "    "; // Always 4 spaces for Kramdown compatibility
 
-      document.execCommand("insertText", false, "\n" + indent);
+      const currentLine = lines[currentLineNumber];
+      // Continue a blockquote inside the footnote. The blockquote handler
+      // catches regular `    > ` continuation lines; this covers the
+      // footnote definition line (`[^N]: > ...`) and acts as a fallback.
+      const isBlockquoteLine =
+        currentLine.match(/^(\s*)>(?:\s|$)/) ||
+        (currentLine === footnoteDefLine &&
+          footnoteDefLine.match(/^\[\^\d+\]:\s*(>)(?:\s|$)/));
+
+      if (isBlockquoteLine) {
+        document.execCommand("insertText", false, "\n" + indent + "> ");
+      } else {
+        document.execCommand("insertText", false, "\n" + indent);
+      }
       return true;
     }
 
@@ -1205,6 +1221,63 @@ export default class extends Controller {
     }
 
     return false; // Not a list
+  }
+
+  handleBlockquoteEnter(event) {
+    const cursorPos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+    const beforeCursor = content.substring(0, cursorPos);
+    const afterCursor = content.substring(cursorPos);
+
+    // Get current line
+    const lines = beforeCursor.split("\n");
+    const currentLine = lines[lines.length - 1];
+
+    // Match a blockquote line: optional leading whitespace, >, optional space
+    const blockquoteMatch = currentLine.match(/^(\s*)>\s?(.*)$/);
+    if (!blockquoteMatch) return false;
+
+    // Only handle Enter at end of line
+    const nextChar = afterCursor[0];
+    const atEndOfLine = !nextChar || nextChar === "\n";
+    if (!atEndOfLine) return false;
+
+    const leadingSpace = blockquoteMatch[1];
+    const lineContent = blockquoteMatch[2];
+    const isEmpty = lineContent.trim() === "";
+
+    if (isEmpty) {
+      const previousLine = lines.length > 1 ? lines[lines.length - 2] : null;
+      const previousIsEmptyBlockquote =
+        previousLine && previousLine.match(/^(\s*)>\s*$/);
+
+      if (previousIsEmptyBlockquote) {
+        event.preventDefault();
+        // Exit the blockquote: remove the current empty `>` line AND the
+        // previous empty `>` separator line, then land on a new empty line
+        // preserving any leading indentation (so footnotes keep their indent).
+        const currentLineStart = beforeCursor.length - currentLine.length;
+        const previousLineStart =
+          currentLineStart - previousLine.length - 1;
+        this.textareaTarget.value =
+          content.substring(0, previousLineStart) +
+          "\n" +
+          leadingSpace +
+          afterCursor;
+        this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
+          previousLineStart + 1 + leadingSpace.length;
+        return true;
+      }
+    }
+
+    // Continue the blockquote on a new line
+    event.preventDefault();
+    document.execCommand(
+      "insertText",
+      false,
+      "\n" + leadingSpace + "> ",
+    );
+    return true;
   }
 
   outdentLine() {
