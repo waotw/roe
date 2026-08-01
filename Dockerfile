@@ -129,6 +129,12 @@ USER root
 # Deployment options
 ENV DATABASE_URL="sqlite3:///data/site/db/production/production.sqlite3"
 
+# Refuse libvips' unfuzzed loaders, which a crafted image can use to read
+# arbitrary files (CVE-2026-66066). config/initializers/vips_block_untrusted.rb
+# sets this too; setting it here as well covers anything that reaches libvips
+# without booting Rails first — rake tasks, the entrypoint, a console.
+ENV VIPS_BLOCK_UNTRUSTED="1"
+
 # Entrypoint prepares the database.
 ENTRYPOINT ["/rails/current/bin/docker-entrypoint"]
 
