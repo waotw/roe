@@ -34,7 +34,7 @@ module ContentMetadataSchema
   # can't be sold without a price and a SKU, and won't appear in a product
   # collection without an image. Everything else waits for the editor.
   CREATE_FIELDS = {
-    "page"    => [].freeze,
+    "page"    => %w[subtitle].freeze,
     "product" => %w[category price sku image].freeze
   }.freeze
 
