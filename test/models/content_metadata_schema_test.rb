@@ -49,6 +49,32 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
     end
   end
 
+  # create_fields names a field; where it's defined shouldn't matter. Core
+  # fields (image, excerpt, tags…) belong to every post type, so requiring them
+  # to be copied into each type's metadata_fields would be exactly the
+  # duplication this module exists to remove.
+  test "create_fields resolves core post fields, not just type-specific ones" do
+    # article declares no metadata_fields of its own, so anything it names in
+    # create_fields can only come from the core post fields.
+    assert_empty Post::POST_TYPES[:article][:metadata_fields]
+
+    core = ContentMetadataSchema.as_create_field("image", fields("post")["image"])
+    assert_equal "image", core[:name]
+    assert_equal :text, core[:type]
+    assert core[:hint].present?, "the schema's hint comes along"
+  end
+
+  test "a type's own field wins over the core one of the same name" do
+    music_audio = Post.create_fields_for_type("music").find { |f| f[:name] == "audio" }
+
+    assert music_audio[:required], "music declares audio required; the core field isn't"
+    assert_equal "Audio File", music_audio[:label], "the type's label, not the core one"
+  end
+
+  test "an unknown create_field name is dropped rather than rendered blank" do
+    assert_nil ContentMetadataSchema.as_create_field("nonsense", fields("post")["nonsense"])
+  end
+
   test "per-type required flags come through from Post::POST_TYPES" do
     music = fields("post", metadata: { "post_type" => "music" })
     assert music["audio"][:required], "audio is required for music"

@@ -22,6 +22,12 @@
 class ReleaseConfig
   FILE = SiteConfig::FEATURES_PATH.join("music.yml")
 
+  # Every track belongs to a release, so a track without one belongs to this.
+  # Seeded into music.yml when the feature is enabled and used as the default
+  # on new music posts: a single still gets a working player and track list,
+  # and `release: singles` gathers them all as a collection.
+  DEFAULT_RELEASE = "singles"
+
   def self.enabled?
     File.exist?(FILE)
   end

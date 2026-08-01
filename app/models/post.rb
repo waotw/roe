@@ -29,40 +29,52 @@ class Post < ApplicationRecord
     "/posts/#{url_name}"
   end
 
-  # Post type definitions
+  # Every post type, and everything that makes one. This hash is the only place
+  # a type is defined — to add one, add an entry here:
+  #
+  #   my_type: {
+  #     label:       "My Type",        # shown in the picker
+  #     description: "…",              # shown in the picker
+  #     icon:        "📀",
+  #     feature:     :my_feature_enabled?,  # optional — omit for always-on types
+  #     metadata_fields: [                  # everything the editor offers
+  #       { name: "thing", type: :text, required: true, label: "Thing",
+  #         hint: "What goes here" },       # required: true → marked * and
+  #     ],                                  # checked before publishing
+  #     create_fields: %w[thing],           # the short list the NEW POST form asks
+  #     scaffold: [ :player, :content ]     # markdown written into the new file
+  #   }
+  #
+  # The three lists do different jobs:
+  #   metadata_fields — SUGGESTED: offered in the editor. `required: true` marks
+  #                     it with a * and gates publishing (missing_type_required_fields).
+  #   create_fields   — the subset the NEW POST form asks for up front. Keep it
+  #                     to what Roe needs to write a working post of this type.
+  #                     Names resolve against this type's metadata_fields first,
+  #                     then the core post fields in ContentMetadataSchema — so
+  #                     `create_fields: %w[image]` works without redeclaring it.
+  #   scaffold        — which blocks go in the body, `:content` marking where the
+  #                     template body lands. See ContentScaffold.
+  #
+  # DECLARATION ORDER IS THE PICKER ORDER (see .post_type_options).
+  #
+  # One catch: a name used in metadata_fields must also exist in
+  # ContentMetadataSchema, or the editor won't render a row for it. A guard test
+  # (content_metadata_schema_test) fails with the field name if you forget.
   POST_TYPES = {
     article: {
       label: "Article",
       description: "Standard blog post",
       icon: "📝",
-      metadata_fields: []
-    },
-    audio: {
-      label: "Audio",
-      description: "Article with featured audio player",
-      icon: "🔊",
-      metadata_fields: [
-        { name: "audio", type: :text, required: true, label: "Audio File",
-          hint: "Path to audio file (e.g., /media/audio/my-song.mp3)" },
-        { name: "duration", type: :text, label: "Duration",
-          hint: 'Optional, e.g., "12:34"' }
-      ]
-    },
-    video: {
-      label: "Video",
-      description: "Article with featured video player",
-      icon: "🎬",
-      metadata_fields: [
-        { name: "video", type: :text, required: true, label: "Video File",
-          hint: "Path to video file (e.g., /media/video/my-video.mp4)" },
-        { name: "duration", type: :text, label: "Duration",
-          hint: 'Optional, e.g., "12:34"' }
-      ]
+      metadata_fields: [],
+      scaffold: [ :content ],
+      create_fields: %w[subtitle image]
     },
     podcast: {
       label: "Podcast",
       description: "Podcast episode with RSS feed integration",
       icon: "🎙️",
+      feature: :podcast_enabled?,
       metadata_fields: [
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to audio file (e.g., /media/audio/episode-1.mp3)" },
@@ -91,12 +103,20 @@ class Post < ApplicationRecord
           hint: "Short episode description" },
         { name: "captions", type: :text, label: "Captions/Transcript",
           hint: "Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)" }
-      ]
+      ],
+      # Player above the writing, episode list below — the order the ERB
+      # episode page used. The list needs `podcast:` to know what to gather, so
+      # it's only written once that's set.
+      scaffold: [ :player, :content, :playlist ],
+      # season comes before episode_number because it scopes it: episode 1 of
+      # season 2 is a different episode 1.
+      create_fields: %w[audio podcast season episode_number]
     },
     music: {
       label: "Music",
       description: "A music track — group into releases, distribute later",
       icon: "🎵",
+      feature: :music_enabled?,
       metadata_fields: [
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to the audio file (e.g., /media/audio/summer/01-opening.flac)" },
@@ -104,16 +124,92 @@ class Post < ApplicationRecord
           hint: "The release this track belongs to — its key in music.yml (optional)" },
         { name: "track_number", type: :text, label: "Track Number", hint: "Optional" },
         { name: "duration", type: :text, label: "Duration", hint: 'Optional, e.g. "3:45"' }
-      ]
+      ],
+      # Same shape as a podcast episode: the track's player, then the rest of
+      # the release. Needs `release:` before the list can be written.
+      scaffold: [ :player, :content, :playlist ],
+      create_fields: %w[audio release track_number]
+    },
+    audio: {
+      label: "Audio",
+      description: "Article with featured audio player",
+      icon: "🔊",
+      metadata_fields: [
+        { name: "audio", type: :text, required: true, label: "Audio File",
+          hint: "Path to audio file (e.g., /media/audio/my-song.mp3)" },
+        { name: "duration", type: :text, label: "Duration",
+          hint: 'Optional, e.g., "12:34"' }
+      ],
+      scaffold: [ :player, :content ],
+      create_fields: %w[audio]
+    },
+    video: {
+      label: "Video",
+      description: "Article with featured video player",
+      icon: "🎬",
+      metadata_fields: [
+        { name: "video", type: :text, required: true, label: "Video File",
+          hint: "Path to video file (e.g., /media/video/my-video.mp4)" },
+        { name: "duration", type: :text, label: "Duration",
+          hint: 'Optional, e.g., "12:34"' }
+      ],
+      scaffold: [ :player, :content ],
+      create_fields: %w[video]
     }
   }.freeze
 
-  # Post types that only appear in the editor's type picker when their feature
-  # is enabled — most sites don't use every type. Maps the type to the
-  # SiteFeature predicate that gates it.
-  FEATURE_GATED_TYPES = {
-    "podcast" => :podcast_enabled?,
-    "music"   => :music_enabled?
+  # Fields a writer expects to be unique, mapped to the fields that scope them.
+  # A number only clashes inside its own context: episode 1 of season 2 doesn't
+  # collide with episode 1 of season 1, or with episode 1 of another show — so
+  # every scope field takes part in the comparison. `url_name` has no scope
+  # because it IS the post's URL.
+  #
+  # Nothing here blocks a save: a conflict is surfaced as a warning and the
+  # writer decides. See .conflicting_post.
+  UNIQUE_FIELDS = {
+    "url_name"       => [].freeze,
+    "episode_number" => %w[podcast season].freeze,
+    "track_number"   => %w[release].freeze,
+    "chapter_number" => %w[audiobook].freeze
+  }.freeze
+
+  # The first other post already using this value, or nil. `scopes` is a hash of
+  # scope field => value; `exclude_url_name` keeps a post from flagging itself.
+  #
+  # Everything is compared AS TEXT because YAML decides the type for us:
+  # `episode_number: 1` stores an Integer and `episode_number: "1"` a String,
+  # and in SQLite those don't compare equal — which silently hid every conflict
+  # between a hand-written episode and one Roe created.
+  def self.conflicting_post(field:, value:, scopes: {}, exclude_url_name: nil)
+    field = field.to_s
+    scope_fields = UNIQUE_FIELDS[field] # whitelist: names are interpolated below
+    return nil unless scope_fields
+    value = value.to_s.strip
+    return nil if value.blank?
+
+    rel = regular_posts.where("CAST(json_extract(metadata, '$.#{field}') AS TEXT) = ?", value)
+
+    scopes = (scopes || {}).transform_keys(&:to_s)
+    scope_fields.each do |scope_field|
+      # Unset compares equal to unset, so two loose tracks with no release —
+      # or two episodes with no season — still see each other's numbers.
+      rel = rel.where(
+        "IFNULL(CAST(json_extract(metadata, '$.#{scope_field}') AS TEXT), '') = ?",
+        scopes[scope_field].to_s.strip
+      )
+    end
+
+    if exclude_url_name.present?
+      rel = rel.where("IFNULL(json_extract(metadata, '$.url_name'), '') != ?", exclude_url_name.to_s.strip)
+    end
+
+    rel.first
+  end
+
+  # Derived from the `feature:` key above, so a type is defined in exactly one
+  # place. Types listed here only appear in the picker when their feature is on.
+  FEATURE_GATED_TYPES = POST_TYPES.each_with_object({}) { |(type, config), out|
+    out[type.to_s] = config[:feature] if config[:feature]
   }.freeze
 
   def audio
@@ -185,10 +281,13 @@ class Post < ApplicationRecord
       .sort
   end
 
+  # The picker's options, in POST_TYPES declaration order — that hash is where
+  # the order is set. Legacy/custom types found in existing content follow,
+  # alphabetically, so nothing a site already uses disappears from the picker.
   def self.post_type_options
-    base = Rails.cache.fetch("post_type_options", expires_in: 1.hour) do
-      # Official types from POST_TYPES + types actually used (legacy/custom).
-      (POST_TYPES.keys.map(&:to_s) + all_post_types).uniq.sort
+    base = Rails.cache.fetch("post_type_options/v2", expires_in: 1.hour) do
+      known = POST_TYPES.keys.map(&:to_s)
+      known + (all_post_types - known).sort
     end
 
     # Hide a feature-gated type when its feature is off — but keep it if a post
@@ -352,7 +451,7 @@ class Post < ApplicationRecord
       post.save!
 
       # Invalidate post_type cache if metadata changed
-      Rails.cache.delete("post_type_options") if post.saved_changes.key?("metadata")
+      Rails.cache.delete("post_type_options/v2") if post.saved_changes.key?("metadata")
     rescue => e
       Rails.logger.error "Failed to save #{file_path}: #{e.message}"
       puts "\n  ✗ Error saving: #{File.basename(file_path)} - #{e.message}\n"
@@ -426,6 +525,33 @@ class Post < ApplicationRecord
     type_config = POST_TYPES[post_type.to_s.to_sym]
     return [] unless type_config
     (type_config[:metadata_fields] || []).select { |f| f[:required] }
+  end
+
+  # The short list of fields the NEW POST form asks for, in `create_fields`
+  # order. Deliberately narrower than metadata_fields: only what Roe needs to
+  # scaffold a working post of this type — the audio a player will play, the
+  # podcast/release a track list will gather. Everything else is left to the
+  # metadata editor afterwards.
+  #
+  # A name is resolved against this type's metadata_fields first, then against
+  # the CORE post fields every type shares (ContentMetadataSchema) — so
+  # `create_fields: %w[image]` works without copying `image` into the type,
+  # which is the kind of duplication that lets the two drift apart.
+  def self.create_fields_for_type(post_type)
+    post_type = post_type.to_s
+    type_config = POST_TYPES[post_type.to_sym]
+    return [] unless type_config
+
+    type_fields = type_config[:metadata_fields] || []
+    # Pass the type through so a core field's `required` flag is resolved for
+    # the type being built, not for the default.
+    core = ContentMetadataSchema.fields_for("post", metadata: { "post_type" => post_type })
+
+    Array(type_config[:create_fields]).filter_map do |name|
+      name = name.to_s
+      type_fields.find { |f| f[:name].to_s == name } ||
+        ContentMetadataSchema.as_create_field(name, core[name])
+    end
   end
 
   # Returns the subset of POST_TYPES required fields that are blank on this post.

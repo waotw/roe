@@ -20,7 +20,8 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
       assert field[:label].present?, "#{field[:key]} missing label"
       assert field[:hint].present?, "#{field[:key]} missing hint"
       if field[:type] == :select
-        assert field[:options].present?, "#{field[:key]} select needs options"
+        opts = CollectionBuilderSchema.options_for(field)
+        assert opts.is_a?(Array) && opts.any?, "#{field[:key]} select needs options"
       end
     end
   end
@@ -49,6 +50,35 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
       end
       condition = Array.wrap(field[:depends_on]).find { |c| c[:in] }
       assert_includes condition[:in], "playlist", "#{key} should apply to playlist"
+    end
+  end
+
+  # Ordered-media sorts are noise on a site that doesn't publish that medium.
+  test "numbered sorts are offered only when their feature is enabled" do
+    order = CollectionBuilderSchema.fields.find { |f| f[:key] == "order" && f[:type] == :select }
+
+    SiteFeature.stubs(:music_enabled?).returns(false)
+    SiteFeature.stubs(:podcast_enabled?).returns(false)
+    offered = CollectionBuilderSchema.options_for(order)
+    assert_not_includes offered, "track_number"
+    assert_not_includes offered, "episode_number"
+    assert_includes offered, "date", "the base sorts are always offered"
+
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    offered = CollectionBuilderSchema.options_for(order)
+    assert_includes offered, "track_number"
+    assert_includes offered, "episode_number"
+  end
+
+  # Every offered sort must be one the query actually understands.
+  test "offered order options are all real sort keywords" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    order = CollectionBuilderSchema.fields.find { |f| f[:key] == "order" && f[:type] == :select }
+
+    CollectionBuilderSchema.options_for(order).each do |opt|
+      assert CollectionQuery.sort_keyword?(opt), "`#{opt}` is offered but isn't a sort keyword"
     end
   end
 

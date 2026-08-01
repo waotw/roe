@@ -130,7 +130,22 @@ class ProductButtonRenderer
     quantity = config["quantity"]&.to_i || 1
 
     # Generate Snipcart button
-    render_button(product, text, style, quantity)
+    button = render_button(product, text, style, quantity)
+
+    # A single product's price is otherwise invisible — it rides along as
+    # data-item-price for Snipcart, but nothing renders it. Shown by default
+    # (a shopper expects a price next to a buy button); `show_price: false`
+    # turns it off. Variant lists print their own, so this is the single case.
+    return button if falsy?(config["show_price"])
+
+    price = "#{get_currency_symbol}#{sprintf('%.2f', product.price)}"
+    "<span class=\"product-price\">#{ERB::Util.html_escape(price)}</span> #{button}"
+  end
+
+  # Block values arrive as real booleans from YAML or as strings from the
+  # builder, so accept both. Anything unset means "default", i.e. show.
+  def falsy?(value)
+    %w[false no 0].include?(value.to_s.strip.downcase)
   end
 
   def render_product_list(products)

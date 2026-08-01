@@ -1,5 +1,6 @@
 class Admin::PagesController < Admin::BaseController
   include BulkContentActions
+  include CreatesContent
 
   def bulk_model = Page
   def bulk_index_path = admin_pages_path
@@ -21,7 +22,21 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def create
+    title_param = params[:title].to_s.strip
     filename = sanitize_filename(params[:filename])
+
+    # The two derive from each other: a filename gives a title, a title gives a
+    # filename. Without this a title-only submission wrote "pages/.md", which
+    # File.extname reads as having no extension — the front matter parser then
+    # can't pick a syntax and dies on nil.to_sym.
+    filename = sanitize_filename(title_param.parameterize) if filename.blank?
+
+    if filename.blank?
+      flash.now[:error] = "Give the page a filename or a title"
+      render :new, status: :unprocessable_entity
+      return
+    end
+
     file_path = File.join(RoeSitePaths::SITE_PATH, "pages/#{filename}.md")
 
     if File.exist?(file_path)
@@ -32,8 +47,9 @@ class Admin::PagesController < Admin::BaseController
       return
     end
 
-    title = filename_to_title(filename)
-    metadata, body = ContentTemplate.frontmatter_for("page", "title" => title)
+    title = title_param.presence || filename_to_title(filename)
+    overrides = { "title" => title }.merge(create_field_overrides("page"))
+    metadata, body = ContentTemplate.frontmatter_for("page", overrides)
 
     # Use formatted YAML
     yaml_content = Page.format_metadata_yaml(metadata)
@@ -372,8 +388,12 @@ class Admin::PagesController < Admin::BaseController
     end
   end
 
+  # nil-safe: the form's filename is optional now (it follows the title), so a
+  # submission can arrive without one at all.
   def sanitize_filename(filename)
-    filename = filename.sub(/\.md$/, "")
+    filename = filename.to_s.sub(/\.md$/, "")
+    return "" if filename.blank?
+
     File.basename(filename)
   end
 

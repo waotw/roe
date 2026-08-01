@@ -8,8 +8,48 @@ class Admin::PostsEditRenderTest < ActionDispatch::IntegrationTest
   setup { sign_in_as(User.take) }
 
   def teardown
-    File.delete(File.join(RoeSitePaths::SITE_PATH, "posts", "edit-render.md")) rescue nil
-    File.delete(File.join(RoeSitePaths::SITE_PATH, "posts", "edit-music.md")) rescue nil
+    %w[edit-render.md edit-music.md uniq-a.md uniq-b.md].each do |f|
+      File.delete(File.join(RoeSitePaths::SITE_PATH, "posts", f)) rescue nil
+    end
+  end
+
+  # Pre-save (as you type) is handled by the unique-field controller; this is
+  # the after-save half — an existing clash is visible the moment the editor
+  # opens, without touching anything.
+  test "an existing episode-number clash is shown on load, and never blocks" do
+    dir = File.join(RoeSitePaths::SITE_PATH, "posts")
+    [ %w[uniq-a First], %w[uniq-b Second] ].each do |slug, title|
+      path = File.join(dir, "#{slug}.md")
+      File.write(path, "---\ntitle: \"#{title}\"\nurl_name: #{slug}\nstatus: published\n" \
+                       "post_type: podcast\npodcast: showa\nepisode_number: '4'\n---\nx\n")
+      ContentSync.sync_file(path)
+    end
+    record = Post.find_by("json_extract(metadata, '$.url_name') = ?", "uniq-b")
+
+    get edit_admin_post_path(record)
+
+    assert_response :success
+    assert_includes response.body, 'data-controller="unique-field"'
+    assert_includes response.body, "Already used by"
+    assert_includes response.body, "First", "the clashing post is named"
+    # Both scope fields and the post's own url_name ride along, so the live
+    # check stays scoped to show + season and the post can't flag itself.
+    assert_match(/data-unique-field-scope-fields-value="[^"]*podcast[^"]*season/, response.body)
+    assert_includes response.body, 'data-unique-field-exclude-value="uniq-b"'
+  end
+
+  test "a unique episode number shows no warning" do
+    dir = File.join(RoeSitePaths::SITE_PATH, "posts")
+    path = File.join(dir, "uniq-a.md")
+    File.write(path, "---\ntitle: \"Only\"\nurl_name: uniq-a\nstatus: published\n" \
+                     "post_type: podcast\npodcast: showa\nepisode_number: '99'\n---\nx\n")
+    ContentSync.sync_file(path)
+    record = Post.find_by("json_extract(metadata, '$.url_name') = ?", "uniq-a")
+
+    get edit_admin_post_path(record)
+
+    assert_response :success
+    assert_not_includes response.body, "Already used by"
   end
 
   # `release` and `track_number` were defined in Post::POST_TYPES but missing

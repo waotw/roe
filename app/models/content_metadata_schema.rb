@@ -26,6 +26,34 @@ module ContentMetadataSchema
     TYPES.include?(type.to_s)
   end
 
+  # The short list the NEW <thing> form asks for, beyond title/filename.
+  # Posts vary by post_type and live in Post::POST_TYPES[:create_fields];
+  # pages and products have no sub-types, so theirs are here.
+  #
+  # Keep these to what Roe needs to produce something that works: a product
+  # can't be sold without a price and a SKU, and won't appear in a product
+  # collection without an image. Everything else waits for the editor.
+  CREATE_FIELDS = {
+    "page"    => [].freeze,
+    "product" => %w[category price sku image].freeze
+  }.freeze
+
+  # A schema entry (keyed by name) reshaped as a create-form field, matching the
+  # shape of Post::POST_TYPES metadata_fields so one form partial renders either.
+  def self.as_create_field(name, config)
+    return nil unless config
+
+    { name: name.to_s, type: config[:type], label: config[:label],
+      hint: config[:hint], required: config[:required], options: config[:options] }
+  end
+
+  def self.create_fields_for(resource_type)
+    schema = fields_for(resource_type)
+    Array(CREATE_FIELDS[resource_type.to_s]).filter_map do |name|
+      as_create_field(name, schema[name.to_s])
+    end
+  end
+
   # The known fields for a resource type, in display order.
   #
   # metadata: the item's parsed frontmatter. Needed because a few fields

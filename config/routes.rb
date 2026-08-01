@@ -113,6 +113,7 @@ Rails.application.routes.draw do
       collection do
         get :drafts
         get :unlisted
+        get :check_unique
         post :bulk_destroy
         post :bulk_publish
       end
@@ -171,6 +172,7 @@ Rails.application.routes.draw do
     resources :products do
       collection do
         get :check_sku
+        get :suggest_sku
         get :search
         get :next_sku_number
         get :duplicate_skus

@@ -673,6 +673,9 @@ class Admin::ConfigsController < Admin::BaseController
         audience: free
 
         releases:
+          singles:
+            title: Singles
+            synopsis: Tracks that aren't part of a release.
           summer-release:
             title: Summer Release
             release_date: 2026-06-01

@@ -8,7 +8,7 @@ class ActionBuilderSchemaTest < ActiveSupport::TestCase
   # render_form's per-`for` branches, ProductButtonRenderer). A typo produces a
   # dead option, so guard each kind's set.
   SUPPORTED_KEYS = {
-    "product"      => %w[sku text style quantity],
+    "product"      => %w[sku text style quantity show_price],
     "share"        => %w[label url title text style],
     "subscribe"    => %w[label url style],
     "signup"       => %w[button-text upgrade-button-text],

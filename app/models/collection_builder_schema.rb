@@ -90,8 +90,11 @@ module CollectionBuilderSchema
 
     # --- Feed group: every non-menu template. "Not menu" is spelled out as the
     # other templates plus blank (the default). --------------------------------
+    # The ordered-media sorts (track_number / episode_number / chapter_number)
+    # are offered only when their feature is on — for everyone else they're
+    # noise. Callable so the gate is read per request, not frozen at boot.
     { key: "order", type: :select, label: "Order",
-      options: %w[date date-asc title filename],
+      options: -> { %w[date date-asc title filename] + CollectionQuery.enabled_numbered_sorts },
       hint: "Sort order. date is newest-first (default); date-asc is oldest-first. For a hand-picked order, type a comma-separated list of url_names into the block instead (e.g. order: blog, about, store).",
       depends_on: { field: "template", in: [ "", "list", "grid", "compact", "links", "full", "glossary", "playlist" ] } },
 
@@ -168,6 +171,13 @@ module CollectionBuilderSchema
 
   def self.fields
     FIELDS
+  end
+
+  # A select's options, resolving a callable (a feature-gated list) to an Array.
+  # Callers should use this rather than reading field[:options] directly.
+  def self.options_for(field)
+    opts = field[:options]
+    opts.respond_to?(:call) ? Array(opts.call) : Array(opts)
   end
 
   # The install's button_template (raw YAML-ish text from collections.yml),

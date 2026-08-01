@@ -75,6 +75,28 @@
   if resource_type == 'post' && defined?(item) && item.respond_to?(:missing_media_refs)
     item.missing_media_refs.each { |ref| initial_missing_media[ref[:field]] = true }
   end
+
+  # Same idea for values expected to be unique (url_name, episode/track/chapter
+  # numbers): resolve conflicts server-side so an existing clash is visible the
+  # moment the editor opens, not only after the field is touched. The
+  # unique-field controller keeps it current while typing. Advisory only —
+  # nothing here prevents a save.
+  unique_conflicts = {}
+  unique_exclude = nil
+  if resource_type == 'post'
+    unique_exclude = item.url_name if defined?(item) && item.respond_to?(:url_name)
+    Post::UNIQUE_FIELDS.each do |unique_name, scope_fields|
+      next if metadata_hash[unique_name].to_s.strip.blank?
+
+      found = Post.conflicting_post(
+        field: unique_name,
+        value: metadata_hash[unique_name],
+        scopes: scope_fields.index_with { |sf| metadata_hash[sf] },
+        exclude_url_name: unique_exclude
+      )
+      unique_conflicts[unique_name] = found.title if found
+    end
+  end
 %>
 <div id="metadata-container"
      data-controller="metadata-editor"
@@ -230,6 +252,28 @@
                          data-media-field-target="warning">
                         ⚠ File not found under <code>site/media/</code>.
                       </p>
+                    </div>
+                  <% elsif resource_type == 'post' && Post::UNIQUE_FIELDS.key?(field_name) %>
+                    <!-- Text input with an advisory "already in use" warning -->
+                    <div class="flex-1 flex flex-col gap-1"
+                         data-controller="unique-field"
+                         data-unique-field-field-value="<%= field_name %>"
+                         data-unique-field-scope-fields-value="<%= ERB::Util.html_escape(Post::UNIQUE_FIELDS[field_name].to_json) %>"
+                         data-unique-field-exclude-value="<%= ERB::Util.html_escape(unique_exclude) %>">
+                      <input type="text"
+                              id="metadata-field-<%= field_name %>"
+                              name="metadata_fields[<%= field_name %>]"
+                              value="<%= ERB::Util.html_escape(display_value) %>"
+                              class="w-full font-mono text-xs px-2 py-1 border border-gray-300 <%= 'border-amber-400' if unique_conflicts[field_name] %>"
+                              data-metadata-field="<%= field_name %>"
+                              data-unique-field-target="input"
+                              data-action="input->unique-field#checkDebounced blur->unique-field#check change->unique-field#check"
+                              <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <%# Left empty when there's no conflict — the controller
+                          fills it in. Otherwise the message sits in the DOM
+                          claiming a clash that isn't there. %>
+                      <p class="text-xs text-amber-700 <%= 'hidden' unless unique_conflicts[field_name] %>"
+                         data-unique-field-target="warning"><% if unique_conflicts[field_name] %>⚠ Already used by “<%= unique_conflicts[field_name] %>”.<% end %></p>
                     </div>
                   <% else %>
                   <!-- Regular text input -->

@@ -42,7 +42,9 @@ module ActionBuilderSchema
       { key: "style", type: :select, label: "Style", options: %w[primary secondary outline],
         hint: "Defaults to primary." },
       { key: "quantity", type: :text, label: "Quantity",
-        hint: "Defaults to 1." }
+        hint: "Defaults to 1." },
+      { key: "show_price", type: :select, label: "Show price", options: %w[true false],
+        hint: "Show the price next to the button. On by default — set false to hide it. A variant list always shows its prices." }
     ],
     "share" => [
       { key: "label", type: :text, label: "Label",

@@ -36,12 +36,16 @@ class CollectionQuery
         .uniq
   end
 
-  # Order items by a sort keyword (date, date-asc, title, filename) or, for
-  # anything else, an explicit comma-separated url_name list. In-memory so it
-  # works on a relation or an Array (related:/membership produce Arrays).
-  # Shared by the collection renderer and feeds.
+  # Order items by a sort keyword (date, date-asc, title, filename, or one of
+  # NUMBERED_SORTS) or, for anything else, an explicit comma-separated url_name
+  # list. In-memory so it works on a relation or an Array (related:/membership
+  # produce Arrays). Shared by the collection renderer and feeds.
+  #
+  # Matched case-insensitively, like sort_keyword? — otherwise `order: Date`
+  # reads as a keyword there but falls through to the url_name list here, and
+  # sorts by nothing.
   def self.order_items(items, order_by)
-    case order_by
+    case (keyword = order_by.to_s.strip.downcase)
     when "filename"
       items.to_a.sort_by do |item|
         filename = File.basename(item.file_path, ".md")
@@ -60,6 +64,14 @@ class CollectionQuery
     when "date-asc"
       # Oldest first. nil dates sort to the end.
       items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
+    when *NUMBERED_SORTS.keys
+      # Ordered-media sorts: same behaviour, one per medium (see NUMBERED_SORTS).
+      # Numeric so 10 follows 9; unnumbered items sort to the end alphabetically
+      # so nothing is dropped.
+      items.to_a.sort_by do |item|
+        number = item.metadata[keyword].presence
+        [ number ? number.to_s.to_f : Float::INFINITY, item.title.to_s.downcase ]
+      end
     else
       explicit_order(items, order_by)
     end
@@ -86,8 +98,29 @@ class CollectionQuery
 
   # An `order:` value is a sort mode when it's one of these keywords; anything
   # else is read as an explicit url_name list.
+  # Ordered-media sorts: order a collection by a number carried in metadata.
+  # One per medium, identical in behaviour — a release has tracks, a podcast has
+  # episodes, an audiobook has chapters. Each maps to the SiteFeature predicate
+  # that gates it, so the collection builder only offers the ones a site uses.
+  # A predicate that doesn't exist yet (audiobook) simply never offers its sort,
+  # while the keyword still works if written by hand; adding the feature turns
+  # it on with no change here.
+  NUMBERED_SORTS = {
+    "track_number"   => :music_enabled?,
+    "episode_number" => :podcast_enabled?,
+    "chapter_number" => :audiobook_enabled?
+  }.freeze
+
+  # The subset of NUMBERED_SORTS whose feature is live on this site.
+  def self.enabled_numbered_sorts
+    NUMBERED_SORTS.select do |_keyword, predicate|
+      SiteFeature.respond_to?(predicate) && SiteFeature.public_send(predicate)
+    end.keys
+  end
+
   def self.sort_keyword?(value)
-    %w[date date-asc title filename].include?(value.to_s.strip.downcase)
+    keyword = value.to_s.strip.downcase
+    %w[date date-asc title filename].include?(keyword) || NUMBERED_SORTS.key?(keyword)
   end
 
   def source

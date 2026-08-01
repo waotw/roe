@@ -107,6 +107,19 @@ class PlayerTemplateTest < ActiveSupport::TestCase
     assert_includes html, "Custom"
   end
 
+  test "a playlist can be ordered by track_number from the block" do
+    write_post("to-3", "post_type" => "music", "release" => "to", "audio" => "/media/to/c.mp3", "track_number" => "10")
+    write_post("to-1", "post_type" => "music", "release" => "to", "audio" => "/media/to/a.mp3", "track_number" => "2")
+    write_post("to-2", "post_type" => "music", "release" => "to", "audio" => "/media/to/b.mp3", "track_number" => "9")
+
+    html = render_body("```collection\ntemplate: playlist\nsource: posts\npost_type: music\n" \
+                       "release: to\norder: track_number\n```")
+
+    positions = %w[/media/to/a.mp3 /media/to/b.mp3 /media/to/c.mp3].map { |src| html.index(src) }
+    assert positions.none?(&:nil?), "all three tracks should render"
+    assert_equal positions.sort, positions, "rows should be in track order (2, 9, 10)"
+  end
+
   test "a music post without audio is skipped from the playlist" do
     write_post("pt-has-audio", "post_type" => "music", "release" => "s2", "audio" => "/media/a.mp3")
     write_post("pt-no-audio", "post_type" => "music", "release" => "s2")

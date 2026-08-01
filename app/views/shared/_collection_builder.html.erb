@@ -45,7 +45,7 @@
                     data-action="change->collection-builder#fieldChanged"
                     class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
               <option value="">—</option>
-              <% field[:options].each do |opt| %>
+              <% CollectionBuilderSchema.options_for(field).each do |opt| %>
                 <option value="<%= opt %>"<%= ' selected' if value == opt %>><%= opt %></option>
               <% end %>
             </select>

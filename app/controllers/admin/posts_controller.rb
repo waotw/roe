@@ -1,5 +1,6 @@
 class Admin::PostsController < Admin::BaseController
   include BulkContentActions
+  include CreatesContent
 
   # Bulk-action wiring (see BulkContentActions).
   def bulk_model = Post
@@ -161,8 +162,37 @@ class Admin::PostsController < Admin::BaseController
     @template = ContentTemplate.template_content("post")
   end
 
+  # Is this episode/track/chapter number (or url_name) already in use? Advisory
+  # only — nothing here blocks a save; the writer is told and decides.
+  def check_unique
+    scopes = params[:scopes].respond_to?(:to_unsafe_h) ? params[:scopes].to_unsafe_h : {}
+    conflict = Post.conflicting_post(
+      field: params[:field],
+      value: params[:value],
+      scopes: scopes,
+      exclude_url_name: params[:exclude]
+    )
+
+    render json: { taken: conflict.present?, conflict: conflict&.title }
+  end
+
   def create
+    title_param = params[:title].to_s.strip
     filename = sanitize_filename(params[:filename])
+
+    # The two fields derive from each other: type a filename and the title
+    # follows, or type only a title and the filename follows from it. Without
+    # this a title-only submission wrote "posts/.md" — a dotfile, which
+    # File.extname reads as having no extension, so the front matter parser
+    # couldn't pick a syntax and died on nil.to_sym.
+    filename = sanitize_filename(title_param.parameterize) if filename.blank?
+
+    if filename.blank?
+      flash.now[:error] = "Give the post a filename or a title"
+      render :new, status: :unprocessable_entity
+      return
+    end
+
     file_path = File.join(RoeSitePaths::SITE_PATH, "posts/#{filename}.md")
 
     if File.exist?(file_path)
@@ -173,8 +203,26 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    title = filename_to_title(filename)
-    metadata, body = ContentTemplate.frontmatter_for("post", "title" => title)
+    # The form's title field is optional — blank means "use the one derived
+    # from the filename", which is what its placeholder was showing.
+    title = title_param.presence || filename_to_title(filename)
+
+    # post_type and the type's create fields come from the new-post form and go
+    # straight into the frontmatter, so ContentScaffold can write a body that
+    # actually works: a player that has audio to play, a track list that knows
+    # which release to gather.
+    overrides = { "title" => title }
+    overrides["post_type"] = params[:post_type] if Post.post_type_options.include?(params[:post_type].to_s)
+    overrides.merge!(create_field_overrides("post", post_type: overrides["post_type"]))
+
+    # A track with no release still belongs somewhere: `singles`. Without it the
+    # scaffold can't write a track list (an unfiltered one would gather every
+    # track on the site), and singles would have no collection to appear in.
+    if overrides["post_type"] == "music" && overrides["release"].blank?
+      overrides["release"] = ReleaseConfig::DEFAULT_RELEASE
+    end
+
+    metadata, body = ContentTemplate.frontmatter_for("post", overrides)
 
     # Ensure podcast GUID (if podcast type + published)
     metadata = ensure_podcast_guid(metadata, Post.new)
