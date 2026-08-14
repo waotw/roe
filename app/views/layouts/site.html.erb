@@ -137,6 +137,10 @@
     <script src="/javascript/gallery.js" nonce="<%= safe_csp_nonce %>" defer></script>
     <%# Public site search. %>
     <script src="/javascript/search.js" nonce="<%= safe_csp_nonce %>" defer></script>
+    <%# Footnote backlinks return you to the mention you followed. Footnotes
+        work without it — a multiply-referenced note renders a return link per
+        mention, and single-reference notes need nothing. %>
+    <script src="/javascript/footnotes.js" nonce="<%= safe_csp_nonce %>" defer></script>
     <%# Cart icon shows in both dynamic and static — Snipcart is entirely
         client-side so it works on static product pages. Member icon only
         appears in dynamic mode (current_member is forced to nil during

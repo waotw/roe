@@ -91,9 +91,23 @@ module HasMarkdownExtensions
       hard_wrap: soft_breaks
     ).to_html
 
-    # Restore code blocks (now as HTML)
+    # Restore code blocks (now as HTML). See
+    # docs/04-markdown-extensions.md#code-block-protection for why the
+    # wrapping paragraph goes too, and why gsub takes a block.
+    #
+    # Take the wrapping paragraph with the token where there is one. Kramdown
+    # wraps a bare placeholder in <p>, and <pre> can't live inside <p> — so
+    # replacing only the token produces `<p><pre>…</pre></p>`, which the next
+    # Nokogiri pass rewrites to `<p></p><pre>…</pre>`, leaving a stray empty
+    # paragraph before every code block on the site. The bare-token pass after
+    # it handles placements Kramdown doesn't wrap, e.g. inside a list item.
+    #
+    # Both use the BLOCK form of gsub on purpose: with a string replacement
+    # Ruby reads \0, \1 and \\ in the replacement as backreferences, which
+    # silently mangles any code block containing them.
     code_blocks.each do |token, html_code|
-      html.gsub!(token, html_code)
+      html.gsub!(%r{<p>\s*#{Regexp.escape(token)}\s*</p>}) { html_code }
+      html.gsub!(token) { html_code }
     end
 
     # Restore pullquote splits
@@ -325,12 +339,19 @@ module HasMarkdownExtensions
     end.join("\n")
   end
 
+  # Footnote quirks (empty trailing <p>, ids on <sup>, repeat references):
+  # see docs/04-markdown-extensions.md#known-quirks
   def add_footnote_backlinks(html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    # Find only top-level footnote list items (direct children of the ol),
-    # so nested <ul>/<ol> lists inside a footnote don't shift the numbering.
-    footnotes = doc.css(".footnotes ol > li")
+    # Only the footnote list's OWN items, so a list inside a footnote doesn't
+    # shift the numbering. The child combinator has to reach all the way up:
+    # `.footnotes ol > li` still matches the items of a nested <ol>, because
+    # that <ol> is itself a descendant of .footnotes — which numbered a
+    # footnote containing an ordered list as several footnotes, and pushed
+    # every note after it out of step. `<ul>` never triggered it, which is why
+    # it looked fixed.
+    footnotes = doc.css(".footnotes > ol > li")
 
     footnotes.each_with_index do |li, index|
       footnote_id = li["id"] # e.g., "fn:1"
@@ -351,9 +372,65 @@ module HasMarkdownExtensions
       # Insert at the very beginning of the <li>
       li.prepend_child(backlink)
       li.prepend_child(Nokogiri::XML::Text.new(" ", doc)) # Add space after number
+
+      append_extra_returns(doc, li, footnote_id, number)
     end
 
     doc.to_html
+  end
+
+  # A footnote referenced more than once has only one place the leading number
+  # can point, so on its own it always returns you to the first mention — even
+  # if you arrived from the third.
+  #
+  # Kramdown ids repeat references `fnref:name`, `fnref:name:1`, `fnref:name:2`,
+  # so every mention is addressable. When there's more than one, add a return
+  # link per mention at the end of the note. That works with no JavaScript, and
+  # doubles as a way to visit the other mentions.
+  #
+  # site_js/footnotes.js then enhances it: clicking a reference repoints this
+  # note's leading number at that specific mention, so the number returns you
+  # where you actually came from. Markup is untouched for single-reference
+  # footnotes, which is nearly all of them.
+  def append_extra_returns(doc, li, footnote_id, number)
+    references = doc.css(%(a[href="##{footnote_id}"]))
+    return if references.size < 2
+
+    returns = Nokogiri::XML::Node.new("span", doc)
+    returns["class"] = "footnote-returns"
+
+    references.each_with_index do |ref, i|
+      # Kramdown hangs the id on the wrapping <sup>, not the <a>:
+      #   <sup id="fnref:reuse"><a href="#fn:reuse" class="footnote">1</a></sup>
+      ref_id = ref["id"].presence || ref.parent&.[]("id")
+      next if ref_id.blank?
+
+      link = Nokogiri::XML::Node.new("a", doc)
+      link["href"] = "##{ref_id}"
+      link["class"] = "footnote-return"
+      link["role"] = "doc-backlink"
+      link["aria-label"] = "Return to mention #{i + 1} of reference #{number}"
+      link.inner_html = %(<span aria-hidden="true">↩</span><sup>#{i + 1}</sup>)
+
+      returns.add_child(link)
+    end
+
+    return if returns.element_children.empty?
+
+    # Kramdown already makes a home for a backlink. With
+    # footnote_backlinks_inline it appends to the note's last paragraph, and
+    # when the note ends in a block (quote, list, code, table, image) it adds a
+    # paragraph to hold it — which, since footnote_backlink is "", arrives
+    # empty. Put the links in that paragraph either way: after the text where
+    # there is text, and filling the empty slot otherwise. Appending to the <li>
+    # instead would leave the phantom paragraph sitting between the block and
+    # the links.
+    last = li.element_children.last
+    if last && last.name == "p"
+      last.add_child(returns)
+    else
+      li.add_child(returns)
+    end
   end
 
   # GALLERIES

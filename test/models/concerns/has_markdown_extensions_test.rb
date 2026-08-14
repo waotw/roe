@@ -24,6 +24,77 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   # Code Block Protection Tests
   # =============================================================================
 
+  # Kramdown wraps the placeholder in a paragraph. <pre> can't live inside <p>,
+  # so restoring only the token left `<p><pre>…</pre></p>`, which every later
+  # Nokogiri pass rewrote to `<p></p><pre>…</pre>` — a stray empty paragraph
+  # before every code block. Hidden by `.content p:empty` in the themes, but
+  # present in static builds and newsletter renders where that CSS isn't.
+  test "a code block leaves no empty paragraph behind" do
+    html = render("Before.\n\n```ruby\nputs \"hi\"\n```\n\nAfter.\n")
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    assert_empty doc.css("p").select { |p| p.children.empty? },
+      "the paragraph that wrapped the placeholder should have gone with it"
+
+    # …and the block itself must be untouched by the change.
+    assert_equal 1, doc.css("pre code").size
+    assert_includes doc.at_css("pre code")["class"].to_s, "ruby"
+    assert_includes doc.at_css("pre code").text, 'puts "hi"'
+    assert_includes html, "Before."
+    assert_includes html, "After."
+  end
+
+  test "a code block inside a footnote leaves no empty paragraph" do
+    html = render("Text[^fn]\n\n[^fn]: A note:\n\n    ```ruby\n    puts 1\n    ```\n\n    Closing line.\n")
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    assert_empty doc.css(".footnotes p").select { |p| p.children.empty? }
+    assert_equal 1, doc.css(".footnotes pre code").size
+  end
+
+  # Kramdown doesn't wrap every placement in a paragraph, so the bare-token
+  # pass still has to run or the block would never be restored.
+  test "a code block inside a list item is still restored" do
+    html = render("- An item:\n\n    ```ruby\n    puts 2\n    ```\n")
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    assert_equal 1, doc.css("pre code").size, "the block should render"
+    assert_not_includes html, "CODE_BLOCK_PLACEHOLDER",
+      "no placeholder token should survive into the output"
+  end
+
+  test "several code blocks all restore, with no leftovers" do
+    html = render("```ruby\na = 1\n```\n\nMiddle.\n\n```js\nlet b = 2;\n```\n")
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    assert_equal 2, doc.css("pre code").size
+    assert_empty doc.css("p").select { |p| p.children.empty? }
+    assert_not_includes html, "CODE_BLOCK_PLACEHOLDER"
+  end
+
+  # gsub with a STRING replacement reads \0, \1 and \\ as backreferences, so
+  # code containing them was silently rewritten. The block form doesn't.
+  test "backslash sequences in a code block survive verbatim" do
+    # Single-quoted heredoc: what's written here is exactly what's in the file.
+    markdown = <<~'MD'
+      ```ruby
+      text.gsub(/(a)(b)/, "\1-\2")
+      ```
+    MD
+
+    code = Nokogiri::HTML::DocumentFragment.parse(render(markdown)).at_css("pre code").text
+
+    assert_includes code, '\1-\2',
+      "a string replacement would read \\1 as a backreference and drop it"
+  end
+
+  test "Roe's own fenced blocks are untouched by code-block restoration" do
+    html = render("```card\ntype: player\n```\n")
+
+    assert_includes html, "card-player", "a card block should still render as a card"
+    assert_not_includes html, "CODE_BLOCK_PLACEHOLDER"
+  end
+
   test "preserves triple backtick code blocks" do
     content = MarkdownFixture::CODE_BLOCK_RUBY
     result = render(content)
@@ -156,6 +227,101 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     # footnote render as "5." instead of "3."
     assert_equal [ "1.", "2.", "3." ], numbers
     assert_operator doc.css(".footnotes ul li").count, :>, 0
+  end
+
+  test "footnote backlink numbers ignore a nested ORDERED list" do
+    html = <<~HTML
+      <div class="footnotes" role="doc-endnotes">
+        <ol>
+          <li id="fn:1">
+            <p>first footnote</p>
+          </li>
+          <li id="fn:2">
+            <p>second footnote with an ordered list</p>
+            <ol>
+              <li>step one</li>
+              <li>step two</li>
+            </ol>
+          </li>
+          <li id="fn:3">
+            <p>third footnote</p>
+          </li>
+        </ol>
+      </div>
+    HTML
+
+    result = TestModel.new("").send(:add_footnote_backlinks, html)
+    doc = Nokogiri::HTML::DocumentFragment.parse(result)
+    numbers = doc.css(".footnote-backlink-number").map(&:text)
+
+    # The <ul> case above was fixed by selecting `.footnotes ol > li`, but that
+    # still matches the items of a nested <ol> — the nested list is itself a
+    # descendant of .footnotes, so its <li>s are direct children of *an* ol.
+    # Only <ol> triggered it, which is why the earlier fix looked complete.
+    assert_equal [ "1.", "2.", "3." ], numbers
+    assert_operator doc.css(".footnotes ol ol li").count, :>, 0,
+      "the nested list itself should still render"
+  end
+
+  test "a footnote referenced twice gets a return link per mention" do
+    markdown = <<~MD
+      First mention[^reuse] and second mention.[^reuse]
+
+      [^reuse]: Referenced twice.
+    MD
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(render(markdown))
+    note = doc.at_css(".footnotes > ol > li")
+
+    # Kramdown ids repeat references fnref:name, fnref:name:1, …
+    returns = note.css(".footnote-returns .footnote-return")
+    assert_equal 2, returns.size, "one return link per mention"
+    assert_equal [ "#fnref:reuse", "#fnref:reuse:1" ], returns.map { |a| a["href"] }
+
+    # These have to work with no JavaScript, so they must be real anchors
+    # pointing at ids that exist in the document.
+    returns.each do |link|
+      target = link["href"].sub("#", "")
+      assert doc.at_css(%(##{target.gsub(":", "\\\\:")})) || doc.at_css("[id='#{target}']"),
+        "return link points at #{target}, which isn't in the document"
+    end
+  end
+
+  test "a footnote referenced once gets no return links" do
+    markdown = <<~MD
+      Only mentioned here.[^once]
+
+      [^once]: Referenced once.
+    MD
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(render(markdown))
+
+    assert_empty doc.css(".footnote-returns"),
+      "single-reference footnotes should keep their markup unchanged"
+    assert_equal 1, doc.css(".footnote-backlink-number").size
+  end
+
+  test "a footnote containing an ordered list keeps the numbering in step" do
+    markdown = <<~MD
+      One[^one] two[^two] three[^three]
+
+      [^one]: First note.
+
+      [^two]: Second note, with steps:
+
+          1. Step one
+          2. Step two
+          3. Step three
+
+      [^three]: Third note.
+    MD
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(render(markdown))
+
+    assert_equal 3, doc.css(".footnotes > ol > li").count, "three footnotes, not six"
+    assert_equal [ "1.", "2.", "3." ], doc.css(".footnote-backlink-number").map(&:text)
+    assert_operator doc.css(".footnotes ol ol li").count, :>, 0,
+      "the ordered list inside the footnote should still render"
   end
 
   # =============================================================================

@@ -1013,18 +1013,60 @@ a.footnote {
 
 .content .footnotes ol,
 .footnotes ol {
-  padding-left: var(--space-0);
+  padding-left: 0;
   list-style: none;
 }
 
 .footnotes ol li {
   position: relative;
-  padding-left: 2em;
+  padding-left: 0rem;
   margin-bottom: var(--space-2);
+}
+
+.footnotes ol li > ul {
+  padding-left: var(--space-3);
+}
+
+.footnotes ol > li {
+  position: relative;
+  padding-left: var(--space-8);
+  line-height: var(--space-6);
 }
 
 .footnotes p {
   margin: 0 0 var(--space-1) 0;
+}
+
+.footnotes table {
+  margin-bottom: var(--space-2);
+}
+
+.footnotes pre {
+  margin-bottom: var(--space-3);
+}
+
+/* Return links for a footnote referenced more than once. The leading number
+   can only point at one mention, so each mention gets its own link here —
+   these work with no JavaScript. Single-reference footnotes render none. */
+.footnotes .footnote-returns {
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-left: var(--space-1);
+}
+
+.footnotes .footnote-return {
+  text-decoration: none;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.footnotes .footnote-return:hover,
+.footnotes .footnote-return:focus {
+  opacity: 1;
+}
+
+.footnotes .footnote-return sup {
+  margin-left: 0.1em;
 }
 
 .footnotes .gallery {
@@ -3992,6 +4034,13 @@ hr.clear-floats {
 .product ul.product-variant-list .variant-price {
   color: var(--color-muted);
   justify-self: end;
+}
+
+/* Single product button with `show_price: true`. A variant list prints its own
+   prices; this is the one-product case, where the price sits beside the button. */
+.product-price {
+  color: var(--color-muted);
+  margin-right: var(--space-2);
 }
 
 /* The button (last cell) sits at the far right of its 1fr column. */

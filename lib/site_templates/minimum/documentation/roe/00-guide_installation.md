@@ -24,7 +24,7 @@ This is the biggest step in getting started — and you only take it once. After
 
 You won't do the work by hand. Roe has a friendly installer script that checks what your computer already has, installs only what's missing, and tells what each section is doing and when it is done.
 
-These instructions cover macOS and Linux. I haven't tested Roe on Windows yet. If you'd like to help get it working, I'd love to hear from you: [roe@weareontheweb.com](mailto:roe@weareontheweb.com).
+These instructions cover macOS, Linux, and Windows. Windows support is new and I'm still gathering feedback on it — if you hit something these steps don't cover, I'd love to hear from you: [roe@weareontheweb.com](mailto:roe@weareontheweb.com).
 
 ## Download Roe
 
@@ -39,6 +39,9 @@ Now follow the steps for your computer:
 
 - [Install on a Mac](#install-on-a-mac)
 - [Install on Linux](#install-on-linux)
+- [Install on Windows](#install-on-windows)
+
+<mark>Note for Windows:</mark> you don't need the download above. Roe installs itself in one command — skip to [Install on Windows](#install-on-windows).
 
 ## Install on a Mac
 
@@ -103,6 +106,61 @@ That's it — Roe is running. See [Getting Started with Roe](/documentation/roe/
 7. Press `y` and `enter` to start Roe.
 8. Roe starts the server and opens in your browser.
 9. Sign in with the admin user you just created.
+
+## Install on Windows
+
+Roe runs on Windows inside **WSL** — a full Linux system that Microsoft builds into Windows 10 and 11. You don't need to know anything about Linux to use it. Windows installs it for you, and from then on Roe behaves exactly as it does on a Mac.
+
+One command sets up everything, including Roe itself.
+
+1. Open **PowerShell as Administrator**.
+    - Press the `Windows` key and type `powershell`.
+    - Right-click **Windows PowerShell** and choose `Run as administrator`.
+    - Click `Yes` when Windows asks for permission.
+2. Copy this line, paste it into PowerShell, and press `enter`:
+
+    `irm https://go-roe.com/install.ps1 | iex`
+
+3. **If Windows needs to install Linux first**, the script sets it up and asks you to restart.
+    - Restart your computer.
+    - Open PowerShell as Administrator again and run the same command a second time.
+    - <mark>Note:</mark> this restart is required by Windows, not by Roe. Once it's done, you never need it again.
+4. **Create your Linux username** if you're asked for one. This happens the first time Linux starts.
+    - Pick any username and password you like. They're only used inside Linux.
+    - <mark>Write the password down.</mark> Linux asks for it when installing tools.
+5. The script installs Roe into your Linux home folder and hands over to the Roe installer. From here, everything matches the Mac and Linux steps above:
+    - **Install system tools.** When you see `Install now? [y/q]`, type `y` and press `enter`. The first run takes a few minutes. Wait for `[✓] Ready — Ruby and Git are in place.`
+    - **Run the Roe setup.** When you see `Next step: Run the Roe setup`, type `y` and press `enter`.
+    - **Create your admin user.** Enter your email, choose a password, and <mark>write down your password and your recovery codes</mark> — you won't see the codes again.
+    - Press `y` and `enter` to start Roe.
+6. Roe opens in your normal Windows browser at `http://localhost:3000`.
+7. Sign in with the admin user you just created.
+
+### Where your files live
+
+Roe installs into your Linux home folder, and it needs to stay there. Windows drives (your `C:` drive) can't store the file permissions Roe needs, and they hide file changes from Roe — so your edits would quietly stop appearing on your site. Roe checks for this and stops with instructions rather than letting you find out later.
+
+Your files are still yours, and Windows can see them. Open File Explorer and paste this into the address bar:
+
+`\\wsl$\Ubuntu\home\your-username\`
+
+You'll find your Roe folder there, with `/site` inside it — the same folder Mac and Linux users have.
+
+### Editing your files from Windows
+
+The friendliest way is [Visual Studio Code](https://code.visualstudio.com):
+
+1. Install VS Code on Windows.
+2. Install its **WSL** extension (search for `WSL` in the Extensions panel).
+3. Open the Ubuntu app from your Start menu and type: `code ~/roe-folder-name`
+
+VS Code opens on Windows while your files stay on the Linux side, which keeps everything working as it should.
+
+### Starting Roe again later
+
+Open the **Ubuntu** app from your Start menu, then:
+
+`cd ~/roe-folder-name && ./roe.sh start`
 
 ## You're done
 

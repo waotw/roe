@@ -201,6 +201,8 @@ article {
 
 sup {
   line-height: 1;
+  font-size: var(--text-xxs);
+  margin-left: calc(var(--space-1) * 0.5);
 }
 
 hr {
@@ -910,12 +912,47 @@ a.footnote {
 
 .footnotes ol li {
   position: relative;
-  padding-left: 2em;
+  padding-left: 0rem;
   margin-bottom: var(--space-2);
+}
+
+.footnotes ol li > ul {
+  padding-left: var(--space-3);
+}
+
+.footnotes ol > li {
+  position: relative;
+  padding-left: var(--space-8);
+  line-height: var(--space-6);
 }
 
 .footnotes p {
   margin: 0 0 var(--space-1) 0;
+  line-height: 1.5;
+}
+
+/* Return links for a footnote referenced more than once. The leading number
+   can only point at one mention, so each mention gets its own link here —
+   these work with no JavaScript. Single-reference footnotes render none. */
+.footnotes .footnote-returns {
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-left: var(--space-1);
+}
+
+.footnotes .footnote-return {
+  text-decoration: none;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.footnotes .footnote-return:hover,
+.footnotes .footnote-return:focus {
+  opacity: 1;
+}
+
+.footnotes .footnote-return sup {
+  margin-left: 0.1em;
 }
 
 .footnotes .gallery {
@@ -924,16 +961,27 @@ a.footnote {
 
 .footnotes blockquote {
   margin: var(--space-1) 0;
+  border-left: 1px solid var(--color-border);
+  padding-left: var(--space-2);
+}
+
+.footnotes table {
+  margin-bottom: var(--space-2);
+}
+
+.footnotes pre {
+  margin-bottom: var(--space-3);
 }
 
 a.footnote-backlink-number {
   position: absolute;
   left: 0;
-  top: 0;
+  top: -2px;
   min-width: 1.5em;
   text-align: right;
   text-decoration: none;
   color: var(--color-link);
+  font-variant-numeric: lining-nums;
 }
 
 a.footnote-backlink-number:hover {
@@ -2286,7 +2334,7 @@ article .content,
   font-size: var(--text-sm, 0.875rem);
   border: 1px solid var(--color-border);
   margin-top: var(--space-6);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-4) var(--space-4);
   --player-progress: 0;
 }
 
@@ -2337,7 +2385,7 @@ article .content,
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-0);
 }
 .player-toggle {
   border: 0;
@@ -2355,12 +2403,12 @@ article .content,
 .player-toggle[data-playing="true"]::before {
   content: "\23F8";
 }
-.player-speed {
-  border: 0;
-  padding: 0;
+.card-player button.player-speed {
+  border: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  padding: 0 var(--space-2);
   background: none;
   color: inherit;
-  font: inherit;
   cursor: pointer;
   opacity: 0.7;
 }
@@ -3670,6 +3718,13 @@ hr.clear-floats {
 .product ul.product-variant-list .variant-price {
   color: var(--color-muted);
   justify-self: end;
+}
+
+/* Single product button with `show_price: true`. A variant list prints its own
+   prices; this is the one-product case, where the price sits beside the button. */
+.product-price {
+  color: var(--color-muted);
+  margin-right: var(--space-2);
 }
 
 .product ul.product-variant-list .product-variant-item > :last-child {
