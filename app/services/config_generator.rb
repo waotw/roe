@@ -32,6 +32,16 @@ class ConfigGenerator
   # customizations stick. Also safe to re-run later with a different
   # kit (e.g. blog_kit) without overwriting anything.
   def generate_all
+    # MUST run before the kit is installed, and it lives here rather than at the
+    # call site so every caller is covered. The loader skips a file only when
+    # that exact path exists — it doesn't know header.md and navigation.md are
+    # the same slot — so on a site still using navigation.md it installs the
+    # stock header.md, which then wins in LayoutFiles.path and silently hides
+    # the user's navigation. The boot initializer ordered these correctly, but
+    # bin/setup calls generate_all with the initializer disabled (no
+    # Rails::Server), so re-running setup shadowed the nav.
+    LayoutFiles.migrate_navigation_to_header!
+
     ensure_directories
 
     result = SiteTemplates::Loader.install(
