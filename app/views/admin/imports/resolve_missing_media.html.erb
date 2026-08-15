@@ -2,7 +2,7 @@
 <div class="max-w-4xl mx-auto">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">Resolve Missing Media</h1>
-    <%= link_to "← Back to Import", admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+    <%= link_to "← Back to Import Overview", admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
   </div>
   <% if @missing_items.empty? %>
     <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
@@ -13,7 +13,7 @@
       <div class="bg-blue-50 border border-blue-200 p-4 mb-4">
         <h3 class="font-medium text-blue-900 mb-2">How This Works</h3>
         <ul class="text-sm text-blue-800 list-disc list-inside space-y-1">
-          <li>Posts already have the expected media URLs in their frontmatter (e.g., <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">audio: /media/audio/post-slug.mp3</code>)</li>
+          <li>Posts already have the expected media URLs in their frontmatter (e.g., <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">audio: /media/audio/post-slug.mp3</code>)</li>
           <li>You just need to download the files and place them at those locations</li>
           <li>The system will automatically detect when files exist and connect them to posts</li>
           <li>Files should be named: [post-slug]-cover.ext (images), [post-slug].mp3 (audio), or [post-slug].mp4 (video)</li>
@@ -22,26 +22,26 @@
         <ol class="text-sm text-blue-800 list-decimal list-inside space-y-1">
           <li>Visit the post on Substack</li>
           <li>Right-click on the background of the site/post and click "View Page Source".</li>
-          <li>Use <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">cmd/ctrl-f</code> to open Find so you can search</li>
+          <li>Use <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">cmd/ctrl-f</code> to open Find so you can search</li>
             <ul class="text-sm text-blue-800 list-disc ml-6">
-              <li class="my-1">For an audio file, search: <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">audio src</code> and copy the url for: <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">src=</code></li>
-              <li class="my-1 leading-6">For a video file, it's a bit trickier. You'll need to use the Dev Tools Inspector to find the <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">&lt;source src=</code> for the <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">type="video/mp4"</code> It might be easier to just upload the video file to Roe directly and name it to match what is in the post <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">audio:</code> metadata.</li>
-              <li class="my-1">For post image, search: <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">og:image</code> and copy the url for: <code class="bg-blue-900 text-white rounded-xs px-1 py-0.5">content=</code></li>
+              <li class="my-1">For an audio file, search: <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">audio src</code> and copy the url for: <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">src=</code></li>
+              <li class="my-1 leading-6">For a video file, it's a bit trickier. You'll need to use the Dev Tools Inspector to find the <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">&lt;source src=</code> for the <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">type="video/mp4"</code> It might be easier to just upload the video file to Roe directly and name it to match what is in the post <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">audio:</code> metadata.</li>
+              <li class="my-1">For post image, search: <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">og:image</code> and copy the url for: <code class="bg-white text-blue-900 rounded-xs px-1 py-0.5 text-xs font-semibold">content=</code></li>
             </ul>
           <li>Once you have the url, paste it below for that post/media.</li>
 
         </ol>
       </div>
-      <div class="flex gap-2 mb-6">
-              <%= link_to "← Back to Import", admin_import_path(@import), class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+      <div class="flex gap-2 mb-6 items-center">
+              <%= link_to "← Back to Import Overview", admin_import_path(@import), class: "inline-flex uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
               <%= button_to "Retry Live Fetch", retry_live_fetch_admin_import_path(@import),
                   method: :post,
-                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-400 hover:bg-blue-300 font-mono rounded-xs",
+                  class: "inline-flex uppercase text-xs px-1.5 py-0.5 border border-blue-800 bg-blue-400 hover:bg-blue-300 font-mono rounded-xs cursor-pointer",
                   data: { confirm: "This will fetch fresh URLs from Substack's live site and attempt to download missing media. Continue?" } %>
 
               <%= button_to "Verify All Media Connections", reconnect_media_admin_import_path(@import),
                   method: :post,
-                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-400 hover:bg-amber-300 font-mono rounded-xs",
+                  class: "inline-flex uppercase text-xs px-1.5 py-0.5 border border-amber-800 bg-amber-400 hover:bg-amber-300 font-mono rounded-xs cursor-pointer",
                   data: { confirm: "This will scan all media files and verify they're properly connected to posts. Continue?" } %>
             </div>
     </div>

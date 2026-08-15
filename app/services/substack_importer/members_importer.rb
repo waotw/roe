@@ -270,10 +270,19 @@ module SubstackImporter
 
       options = @import.options || {}
 
+      # The three grants widen rather than compete: lifetime only, annual as
+      # well, or every paid plan. Any that applies is enough, so ticking the
+      # broad one covers the narrow ones and the order they're ticked in
+      # doesn't matter. Leave all three unticked and nobody is granted paid.
+      #
+      # "annual" is Substack's `yearly` alone — `semiannually` bills twice a
+      # year, so it belongs with the other recurring plans.
       base_tier = case plan
       when "lifetime"
                     options["auto_gift_lifetime"] ? :paid : :free
-      when "monthly", "quarterly", "semiannually", "yearly", "ios_app"
+      when "yearly"
+                    (options["auto_gift_annual"] || options["auto_gift_paid"]) ? :paid : :free
+      when "monthly", "quarterly", "semiannually", "ios_app"
                     options["auto_gift_paid"] ? :paid : :free
       else  # comp, other, unknown
                     :free

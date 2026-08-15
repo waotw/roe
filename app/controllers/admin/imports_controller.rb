@@ -812,7 +812,7 @@ class Admin::ImportsController < Admin::BaseController
 
   def phase_3_params
     params.require(:import).permit(
-      options: [ :auto_gift_lifetime, :auto_gift_paid ]
+      options: [ :auto_gift_lifetime, :auto_gift_annual, :auto_gift_paid ]
     ).tap do |whitelisted|
       whitelisted[:options] ||= {}
     end
