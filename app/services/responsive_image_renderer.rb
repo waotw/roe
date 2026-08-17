@@ -115,6 +115,17 @@ class ResponsiveImageRenderer
     html
   end
 
+  # The single-source fallback, used when there are no variants to offer yet.
+  #
+  # Still wrapped in <picture>, even with nothing to choose between. Themes size
+  # images with rules keyed on the wrapper — `.post-header picture img`,
+  # `.grid-item-image picture:has(…)`, `.gallery-item picture` — so a bare <img>
+  # matches none of them and paints at its intrinsic size. Keeping the two paths
+  # structurally identical means CSS can't care which one rendered, and an image
+  # can't visibly resize when its variants finish.
+  #
+  # decoding="async" matches build_picture_tag for the same reason: this path
+  # serves the original, which is the heaviest thing to decode.
   def simple_img_tag
     alt_text = ERB::Util.html_escape(options[:alt] || "")
     css_class = ERB::Util.html_escape(options[:class] || "")
@@ -122,12 +133,14 @@ class ResponsiveImageRenderer
     extra_attrs = build_extra_attributes
 
     # Use + to make string mutable
-    html = +"<img src=\"#{ERB::Util.html_escape(source_path)}\" "
+    html = +"<picture>"
+    html << "<img src=\"#{ERB::Util.html_escape(source_path)}\" "
     html << "alt=\"#{alt_text}\" "
     html << "class=\"#{css_class}\" " if css_class.present?
-    html << "loading=\"#{loading}\" "
+    html << "loading=\"#{loading}\" decoding=\"async\" "
     html << extra_attrs if extra_attrs.present?
     html << ">"
+    html << "</picture>"
     html
   end
 

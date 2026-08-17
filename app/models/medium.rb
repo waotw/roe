@@ -5,7 +5,11 @@ class Medium < ApplicationRecord
 
   before_save :normalize_media_type
   before_destroy :delete_variants, if: :image?
-  after_create :queue_variant_generation, if: -> { image? && !Rails.env.production? }
+  # Production included: both deploy targets run Solid Queue inside Puma
+  # (SOLID_QUEUE_IN_PUMA in the generated fly.toml and config/deploy.yml), so
+  # the job actually runs there. Skipping it meant the first visitor to every
+  # image was served the full-size original while the on-demand path caught up.
+  after_create :queue_variant_generation, if: :image?
 
   # Scope helpers for filtering
   scope :images, -> { where(media_type: "images") }
