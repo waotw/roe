@@ -75,7 +75,9 @@
   <% end %>
 
   <!-- Wrap everything in Stimulus controller -->
-  <div data-controller="editor collection-builder card-builder gallery-builder action-builder"
+  <div data-controller="editor collection-builder card-builder gallery-builder action-builder markdown-doctor"
+       data-markdown-doctor-check-url-value="<%= admin_check_markdown_path %>"
+       data-markdown-doctor-fix-url-value="<%= admin_fix_markdown_path %>"
        data-editor-resource-type-value="post"
        data-editor-resource-id-value="<%= @post.id %>"
        data-editor-preview-path-value="<%= @preview_path || preview_admin_post_path(@post) %>"

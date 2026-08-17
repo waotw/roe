@@ -162,6 +162,10 @@ module HasMarkdownExtensions
   AUDIO_EMBED_EXTENSIONS = %w[.mp3 .m4a .aac .ogg .oga .wav .flac].freeze
   VIDEO_EMBED_EXTENSIONS = %w[.mp4 .m4v .webm .ogv .mov].freeze
 
+  # Written in the paragraph that follows a floated pullquote to choose where the
+  # text wraps around it, instead of letting Roe pick a sentence near the middle.
+  PULLQUOTE_SPLIT_MARKER = "||"
+
   def render_audio_embed(src, alt)
     label = alt.to_s.strip
     aria = label.empty? ? "" : %( aria-label="#{escape_html(label)}")
@@ -2228,82 +2232,117 @@ module HasMarkdownExtensions
     output.join("\n")
   end
 
+  # Wrap a floated pullquote inside the paragraph that follows it, so text runs
+  # down both sides of the quote instead of only beside its second half.
   def merge_floated_pullquotes(html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    # Find all floated pullquotes (left or right position)
-    floated_pullquotes = doc.css(".pullquote-left, .pullquote-right")
+    doc.css(".pullquote-left, .pullquote-right").each do |pullquote|
+      paragraph = pullquote.next_element
+      next unless paragraph&.name == "p"
 
-    floated_pullquotes.each do |pullquote|
-      # Get the next sibling element
-      next_element = pullquote.next_element
+      first_half, second_half = split_paragraph_for_quote(paragraph)
+      # A break with nothing on one side of it isn't a wrap, it's an empty
+      # paragraph beside a quote. Leave the pullquote as its own block.
+      next if first_half.empty? || second_half.empty?
 
-      # Check if it's a paragraph
-      if next_element && next_element.name == "p"
-        # Get the paragraph HTML
-        para_html = next_element.inner_html
+      wrapper = Nokogiri::XML::Node.new("div", doc)
+      wrapper["class"] = "pullquote-merge"
+      wrapper.add_child(paragraph_from(doc, first_half))
+      wrapper.add_child(pullquote.dup)
+      wrapper.add_child(paragraph_from(doc, second_half))
 
-        # Check for manual split marker
-        if para_html.include?("||")
-          # Manual split - use the || marker
-          parts = para_html.split("||", 2)
-          first_half = parts[0].strip
-          second_half = parts[1].strip
-        else
-          # Automatic split - use smart detection
-          split_point = find_split_point(para_html)
-          first_half = para_html[0...split_point].strip
-          second_half = para_html[split_point..-1].strip
-        end
-
-        # Create a wrapper div to hold all three parts
-        wrapper = Nokogiri::XML::Node.new("div", doc)
-        wrapper["class"] = "pullquote-merge"
-
-        # Create first paragraph
-        first_p = Nokogiri::XML::Node.new("p", doc)
-        first_p.inner_html = first_half
-
-        # Create second paragraph
-        second_p = Nokogiri::XML::Node.new("p", doc)
-        second_p.inner_html = second_half
-
-        # Build the structure
-        wrapper.add_child(first_p)
-        wrapper.add_child(pullquote.dup) # Duplicate the pullquote
-        wrapper.add_child(second_p)
-
-        # Replace the original paragraph with the wrapper
-        next_element.replace(wrapper)
-
-        # Remove the original pullquote
-        pullquote.remove
-      end
+      paragraph.replace(wrapper)
+      pullquote.remove
     end
 
     doc.to_html
   end
 
-  def find_split_point(text)
-    # Remove HTML tags for better sentence detection
-    plain_text = Nokogiri::HTML(text).text
+  def paragraph_from(doc, nodes)
+    paragraph = Nokogiri::XML::Node.new("p", doc)
+    nodes.each { |node| paragraph.add_child(node) }
+    paragraph
+  end
 
-    middle = plain_text.length / 2
+  # Decide where the paragraph breaks, honouring a manual `||` marker if there
+  # is one and otherwise picking a sentence boundary near the middle.
+  #
+  # The offset is measured in the paragraph's TEXT, so it can only be applied to
+  # the paragraph's NODES. This used to slice the HTML string with it, which cut
+  # wherever the tags had pushed that offset along: mid-word, mid-element, or
+  # straight through a footnote reference's attribute list — which is how
+  # `class="footnote" rel="footnote" role="doc-noteref">` came to be rendered as
+  # body text in a reader's post. Text offsets and markup offsets are different
+  # coordinate systems; the tags aren't in the text.
+  def split_paragraph_for_quote(paragraph)
+    text = paragraph.text
+
+    marker = text.index(PULLQUOTE_SPLIT_MARKER)
+    return split_children(paragraph, marker, marker + PULLQUOTE_SPLIT_MARKER.length) if marker
+
+    point = find_split_point(text)
+    return [ [], [] ] unless point
+
+    split_children(paragraph, point, point)
+  end
+
+  # Divide a paragraph's children in two at a plain-text offset. `cut_at` ends
+  # the first half and `resume_at` begins the second, so the `||` marker can be
+  # dropped in the gap between them.
+  def split_children(paragraph, cut_at, resume_at)
+    before = []
+    after = []
+    consumed = 0
+
+    paragraph.children.to_a.each do |node|
+      length = node.text.length
+
+      if consumed >= cut_at
+        after << node
+      elsif consumed + length <= cut_at
+        before << node
+      elsif node.text?
+        head = node.text[0...(cut_at - consumed)].rstrip
+        tail = (node.text[(resume_at - consumed)..] || "").lstrip
+        before << Nokogiri::XML::Text.new(head, node.document) unless head.empty?
+        after << Nokogiri::XML::Text.new(tail, node.document) unless tail.empty?
+      else
+        # An element straddles the break — a link, emphasis, a footnote marker.
+        # There's no valid place to cut inside one, so it crosses over whole and
+        # the break lands just before it.
+        after << node
+      end
+
+      consumed += length
+    end
+
+    [ before, after ]
+  end
+
+  # An offset into `text`, the paragraph's plain text — never an index into
+  # markup. Prefers the end of a sentence near the middle, then the nearest word
+  # boundary either side of it.
+  #
+  # nil when there's no boundary to break on at all. The old fallback was the
+  # midpoint itself, which cut whatever word happened to be there in half — a
+  # one-word paragraph beside a pullquote came out as "Sho" / "rt.". A quote
+  # that stays where it is reads better than a broken word.
+  def find_split_point(text)
+    middle = text.length / 2
 
     # Look for ". " near the middle (within 30% either way for more flexibility)
     search_start = [ (middle * 0.7).to_i, 0 ].max
-    search_end = [ (middle * 1.3).to_i, plain_text.length ].min
+    search_end = [ (middle * 1.3).to_i, text.length ].min
 
-    sentence_end = plain_text[search_start..search_end]&.index(". ")
+    sentence_end = text[search_start..search_end]&.index(". ")
+    return search_start + sentence_end + 2 if sentence_end
 
-    if sentence_end
-      # Find this position in the original HTML text
-      search_start + sentence_end + 2
-    else
-      # Fallback: try to split at a space near middle
-      space_pos = plain_text[middle..-1]&.index(" ")
-      space_pos ? middle + space_pos : middle
-    end
+    after = text.index(" ", middle)
+    return after + 1 if after
+
+    before = text.rindex(" ", middle)
+    before ? before + 1 : nil
   end
 
   ### POST LINKS

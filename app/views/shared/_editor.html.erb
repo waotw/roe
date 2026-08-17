@@ -14,9 +14,15 @@
 
   <div>
     <!-- Sticky container for buttons + TOC -->
-    <div data-controller="sticky-toolbar" class="sticky top-0 z-10 bg-white border-b border-gray-300">
+    <%# reveal: a markdown check can be started from the sticky drawer at the
+        bottom of the window, with this toolbar scrolled away or its lower half
+        auto-hidden. Opening the results panel expands the region and brings the
+        toolbar back into view, so the results land somewhere visible. %>
+    <div data-controller="sticky-toolbar"
+         data-action="markdown-doctor:opened->sticky-toolbar#reveal"
+         class="sticky top-0 z-10 bg-white border-b border-gray-300">
           <!-- Button bar -->
-          <div class="flex justify-start gap-6 items-center py-2 px-2">
+          <div class="flex justify-start gap-6 items-center py-2 px-2 border-x border-5 border-gray-300">
             <div class="flex gap-4">
             <div class="flex gap-1">
           <button type="button" data-action="click->editor#insertBold" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><strong>B</strong></button>
@@ -151,19 +157,103 @@
            feedback oscillation that height changes can cause. -->
       <div data-sticky-toolbar-target="collapsible"
            class="overflow-hidden transition-[max-height] duration-200 ease-out">
-        <!-- TOC toggle row -->
-        <div class="flex items-center px-2 py-1 border-t border-gray-200">
+        <%# Tab strip. Table of contents on the left, markdown check on the
+            right, sharing one row and the panel space beneath it. Only one is
+            open at a time — stacked, two panels would push the writing area
+            off the screen — so each toggle closes the other.
+
+            No bottom padding on the row: the tabs have their own, so they reach
+            the panel's top edge and can join it. The whole active-tab look
+            (background, border) lives in application.css — see .editor-tab. %>
+        <div class="editor-tabs flex items-center gap-1 px-1.5 py-1 border-t border-x border-gray-300">
           <button type="button"
-                  data-action="click->editor#toggleTOC"
-                  class="text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+                  data-action="click->editor#toggleTOC click->markdown-doctor#closePanel"
+                  class="editor-tab editor-tab-toc text-xs text-gray-600 hover:text-gray-900 text-nowrap">
             Table of Contents
             <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
           </button>
+
+          <%# Present only while there's something to read. Arriving and leaving
+              costs no vertical space — the table-of-contents tab sets the row's
+              height — so it can follow the writing without shoving the page
+              around. Nothing here opens on its own; that's always a click. %>
+          <button type="button"
+                  data-markdown-doctor-target="toggleRow"
+                  data-action="click->markdown-doctor#togglePanel click->editor#closeTOC"
+                  class="editor-tab editor-tab-markdown hidden text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+            Markdown Check
+            <%# Collapsed to start: the tab now arrives on its own when a check
+                finds something, with the panel still closed. %>
+            <span data-markdown-doctor-target="arrow"
+                  class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
+          </button>
+
+          <%# Status. Green says the markdown is fine, amber that something's
+              worth a look — the same two colours the save dot uses, since it's
+              the same question asked about a different thing. Grey until the
+              first check answers, so a document with problems never flashes
+              green on the way in. The dot is decorative; the text beside it
+              carries the meaning, which is what a screen reader will read.
+
+              Both sit outside the panel so they stay legible with it closed —
+              which, for a clean document, is the only state there is.
+
+              Undo is here rather than in the Fixable section because a
+              successful Fix All empties that section, which is exactly when undo
+              is wanted. The fix only touches the textarea, so Ctrl+Z and "don't
+              save" already undo it; this just makes one click reversible in one. %>
+          <span data-markdown-doctor-target="dot" aria-hidden="true"
+                class="inline-block w-2 h-2 rounded-full bg-gray-300 ml-1 shrink-0"></span>
+          <span data-markdown-doctor-target="summary" class="text-xs text-gray-500 ml-1.5"></span>
+          <button type="button"
+                  data-markdown-doctor-target="revertButton"
+                  data-action="click->markdown-doctor#revert"
+                  class="hidden uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
+            Undo Fix
+          </button>
         </div>
 
-        <!-- TOC Panel -->
+        <%# Two sections, because the distinction is what the writer acts on:
+            things Roe can safely rewrite (with the Fix All button beside that
+            heading) and things only they can decide about.
+
+            keep-open pins the auto-hide region open while this panel is showing
+            — see sticky_toolbar_controller. Scrolling shouldn't swallow results
+            the writer just asked for. The TOC is deliberately not pinned. %>
+        <div data-markdown-doctor-target="panel"
+             data-sticky-toolbar-keep-open
+             class="editor-panel-markdown hidden border-t border-gray-300 bg-gray-50 p-3 max-h-60 overflow-y-auto">
+
+          <div data-markdown-doctor-target="fixableSection" class="hidden mb-3">
+            <div class="flex items-center gap-2 mb-1">
+              <h4 class="text-xs font-semibold text-gray-700">
+                Fixable <span data-markdown-doctor-target="fixableCount" class="text-gray-500"></span>
+              </h4>
+              <button type="button"
+                      data-markdown-doctor-target="fixButton"
+                      data-action="click->markdown-doctor#fixAll"
+                      class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
+                Fix All
+              </button>
+            </div>
+            <div data-markdown-doctor-target="fixableList" class="text-xs font-mono space-y-1"></div>
+          </div>
+
+          <div data-markdown-doctor-target="manualSection" class="hidden">
+            <h4 class="text-xs font-semibold text-gray-700 mb-1">
+              Needs your attention <span data-markdown-doctor-target="manualCount" class="text-gray-500"></span>
+            </h4>
+            <div data-markdown-doctor-target="manualList" class="text-xs font-mono space-y-1"></div>
+          </div>
+
+          <p data-markdown-doctor-target="clean" class="hidden text-xs text-gray-600">
+            No formatting issues found.
+          </p>
+        </div>
+
+        <!-- TOC Panel — shares the tab strip above with the markdown check -->
         <div data-editor-target="tocPanel"
-          class="hidden border-t border-gray-300 bg-gray-50 p-3 max-h-60 overflow-y-auto transition-all"
+          class="editor-panel-toc hidden border-t border-gray-300 bg-gray-50 p-3 max-h-60 overflow-y-auto transition-all"
           data-action="mouseenter->editor#restoreTocOpacity">
           <div data-editor-target="tocContent" class="text-sm font-mono">
             <!-- TOC will be rendered here -->
@@ -176,12 +266,18 @@
          block extends down through the textarea. Without this, the
          sticky bar's range is only ~80px (just the toolbar+TOC), and
          it scrolls out of view as soon as you start editing. -->
+    <%# No top border: the sticky toolbar above already ends in one
+        (border-b border-gray-300), and two adjacent 1px lines read as a
+        thick grey bar. border-x/border-b are WIDTH utilities — border-l-gray-300
+        and friends only set a colour, and Tailwind's preflight zeroes every
+        border width, so naming colours alone leaves no border at all. %>
     <%= form.text_area :content, value: content,
             placeholder: "Start writing…",
-            class: "w-full font-mono text-sm p-1 border border-gray-300 box-border bg-white resize-none overflow-hidden pb-96 focus:placeholder-transparent",
+            class: "w-full font-mono text-sm p-1 border-x border-b border-gray-300 bg-white resize-none overflow-hidden pb-96 focus:placeholder-transparent",
             data: {
               editor_target: "textarea",
-              action: "input->editor#hideFlashOnInput input->editor#updateTOC"
+              action: "input->editor#hideFlashOnInput input->editor#updateTOC " \
+                      "markdown-doctor:contentChanged->editor#refreshPreview"
             },
             id: "content-textarea" %>
   </div>

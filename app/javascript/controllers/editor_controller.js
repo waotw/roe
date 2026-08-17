@@ -1740,6 +1740,17 @@ export default class extends Controller {
     }
   }
 
+  // Closes the TOC without toggling it. The markdown check shares the tab strip
+  // and the panel space below it, so opening that one closes this one. Separate
+  // from toggleTOC because a toggle would re-open the TOC on a second click of
+  // the markdown tab, leaving both panels open — the thing the tabs prevent.
+  closeTOC() {
+    if (!this.hasTocPanelTarget) return;
+
+    this.tocPanelTarget.classList.add("hidden");
+    if (this.hasTocArrowTarget) this.tocArrowTarget.textContent = "▶";
+  }
+
   updateTOC() {
     if (!this.hasTocContentTarget) return;
 
@@ -1918,6 +1929,18 @@ export default class extends Controller {
     if (!this.previewOpened) return;
     clearTimeout(this.previewUpdateTimer);
     this.previewUpdateTimer = setTimeout(() => this.pushPreviewUpdate(), 800);
+  }
+
+  // Push to the preview tab NOW, skipping the typing debounce. For a change the
+  // writer made in one click — Fix All, Undo Fix — there is no typing pause to
+  // wait at the end of, and 800ms of an unchanged preview reads as the click
+  // having done nothing. Clearing the timer first means the `input` event that
+  // accompanied the change doesn't fire a second, redundant render.
+  refreshPreview() {
+    if (!this.previewOpened) return;
+
+    clearTimeout(this.previewUpdateTimer);
+    this.pushPreviewUpdate();
   }
 
   // Render the current (unsaved) content server-side and hand the resulting

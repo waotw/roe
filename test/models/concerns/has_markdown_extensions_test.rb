@@ -461,6 +461,79 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_match(/Float this to the right/, result)
   end
 
+  # A floated pullquote is wrapped inside the paragraph that follows it so text
+  # runs down both sides, which means breaking that paragraph in two. The break
+  # point is chosen from the paragraph's TEXT and used to be applied to its HTML
+  # — two different coordinate systems, because the tags aren't in the text. The
+  # more markup before the break, the further the offset drifted, until it landed
+  # inside a tag and cut it open. A reader hit this with a footnote and saw
+  # `class="footnote" rel="footnote" role="doc-noteref">` printed in their post.
+  def merged_pullquote(body, footnote: true)
+    quote = "```card\ntype: pullquote\nposition: right\ntext: A quote.\n```\n\n"
+    note = footnote ? "\n\n[^1]: A note.\n" : "\n"
+    doc = Nokogiri::HTML::DocumentFragment.parse(render("#{quote}#{body}#{note}"))
+    doc.at_css(".pullquote-merge").tap do |merge|
+      assert merge, "expected the pullquote to merge into the paragraph"
+    end
+  end
+
+  test "the pullquote break never cuts a tag open" do
+    # Each emphasis adds tag characters ahead of the break without adding any
+    # text, which is exactly what used to drag the offset into a tag.
+    [ 0, 1, 3, 6, 10 ].each do |count|
+      filler = ([ "*stressed*" ] * count).join(" ")
+      merge = merged_pullquote(
+        "An opening clause #{filler} runs on for a while before a footnote[^1] " \
+        "arrives, and the sentence keeps going long enough afterwards that the " \
+        "middle of the paragraph sits somewhere near that reference.",
+      )
+
+      assert_no_match(/(?:class|rel|role|href)=/, merge.text,
+        "tag attributes leaked into the body text (emphasis=#{count})")
+      assert_equal 1, merge.css("a[href^='#fn']").size,
+        "the footnote reference should cross the break whole (emphasis=#{count})"
+      assert_equal count, merge.css("em").size,
+        "emphasis should survive the break (emphasis=#{count})"
+    end
+  end
+
+  test "the pullquote break loses no words" do
+    body = "Sentence one sits before the break. Sentence two has *emphasis* in " \
+           "it and a footnote[^1] as well. Sentence three closes it out."
+    merge = merged_pullquote(body)
+
+    halves = merge.css("> p")
+    assert_equal 2, halves.size, "the paragraph should end up in two halves"
+
+    # The invariant is against the same paragraph with no quote beside it:
+    # wrapping one changes where the text breaks, never what the text says.
+    alone = Nokogiri::HTML::DocumentFragment.parse(render("#{body}\n\n[^1]: A note.\n"))
+    assert_equal alone.at_css("p").text.split(/\s+/),
+      halves.map(&:text).join(" ").split(/\s+/),
+      "text changed across the break"
+  end
+
+  test "a manual || marker breaks where it is written, and does not render" do
+    merge = merged_pullquote(
+      "The first half is written here. || The second half follows it.",
+      footnote: false,
+    )
+
+    halves = merge.css("> p")
+    assert_equal "The first half is written here.", halves[0].text.strip
+    assert_equal "The second half follows it.", halves[1].text.strip
+    assert_not_includes merge.text, "||", "the marker is an instruction, not content"
+  end
+
+  test "a pullquote before a paragraph too short to break is left alone" do
+    quote = "```card\ntype: pullquote\nposition: right\ntext: A quote.\n```\n\n"
+    doc = Nokogiri::HTML::DocumentFragment.parse(render("#{quote}Short.\n"))
+
+    # Better an unmerged quote than a wrapper holding an empty paragraph.
+    assert_nil doc.at_css(".pullquote-merge")
+    assert doc.at_css(".pullquote-right"), "the quote itself still renders"
+  end
+
   test "pullquote with attribution renders cite" do
     content = MarkdownFixture::PULLQUOTE_CENTER
     result = render(content)

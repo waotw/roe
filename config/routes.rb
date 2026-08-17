@@ -57,6 +57,12 @@ Rails.application.routes.draw do
     # OS-correct install command. Read-only; installs happen in a terminal.
     get "dependencies", to: "dependencies#index", as: "dependencies"
 
+    # Markdown diagnostics for the editor. Shared by posts/pages/products/emails
+    # — they all render shared/_editor. POST because the content being checked
+    # is in the body (it hasn't been saved yet).
+    post "markdown/check", to: "markdown#check", as: "check_markdown"
+    post "markdown/fix",   to: "markdown#fix",   as: "fix_markdown"
+
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
