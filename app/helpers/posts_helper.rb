@@ -19,7 +19,7 @@ module PostsHelper
   end
 
   def render_post_content(post)
-    html = post.to_html(static: @static_generation)
+    html = post.to_html(preview: editor_preview?, static: @static_generation)
 
     # Replace token placeholders
     html = html.gsub("AUTHENTICITY_TOKEN_PLACEHOLDER", form_authenticity_token)

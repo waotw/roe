@@ -1,6 +1,6 @@
 module PagesHelper
   def render_page_content(page, context: nil)
-    html = page.to_html(context: context, static: @static_generation)
+    html = page.to_html(context: context, preview: editor_preview?, static: @static_generation)
 
     # Replace token placeholders with actual tokens
     html = html.gsub("AUTHENTICITY_TOKEN_PLACEHOLDER", form_authenticity_token)

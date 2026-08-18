@@ -45,13 +45,14 @@
                 Display as carousel?
               </label>
               <select data-gallery-builder-target="aspect" data-action="change->gallery-builder#updateRatioNote" class="w-full mb-2 border border-gray-300 rounded-xs px-2 py-1 text-xs">
+                <%# From GalleryBuilderSchema, so the menu and the renderer's
+                    directive checking can't drift apart. One entry per shape:
+                    `landscape`, `film` and `auto` are synonyms of TV, Cinema
+                    and Original, and stay valid to type by hand. %>
                 <option value="">Aspect ratio (default)</option>
-                <option value="square">Square</option>
-                <option value="portrait">Portrait</option>
-                <option value="tv">TV</option>
-                <option value="wide">Wide</option>
-                <option value="cinema">Cinema</option>
-                <option value="original">Original</option>
+                <% GalleryBuilderSchema::MENU_RATIOS.each do |ratio| %>
+                  <option value="<%= ratio[:value] %>"><%= ratio[:label] %></option>
+                <% end %>
               </select>
               <p data-gallery-builder-target="ratioNote" class="hidden text-xs text-red-600 mb-2">Slideshow will ignore aspect ratio</p>
               <input type="text" data-gallery-builder-target="caption" data-action="keydown.enter->gallery-builder#insert" placeholder="Caption this gallery (empty = no caption)" class="w-full mb-2 border border-gray-300 rounded-xs px-2 py-1 text-xs">

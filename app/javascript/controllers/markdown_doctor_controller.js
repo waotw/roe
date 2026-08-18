@@ -57,21 +57,26 @@ export default class extends Controller {
     // Responses can land out of order; only the newest one may paint.
     this.sequence = 0;
 
+    // Saving reloads the editor. A panel that closed itself every time would be
+    // no use for working through a list, so remember it per document — in
+    // sessionStorage, which doesn't outlive the tab.
+    this.panelStateKey = `roe-markdown-panel-${window.location.pathname}`;
+    this.restoredPanel = false;
+
     this.onInput = this.handleInput.bind(this);
-    // On the form rather than the textarea so it keeps working if the field is
-    // ever swapped out.
-    this.form?.addEventListener("input", this.onInput);
+    // On the controller element, not a form. `input` bubbles, and this element
+    // is an ancestor of the textarea, so it can't miss. Looking the form up by
+    // querySelector found the *duplicate* form instead — it comes first in the
+    // document and the textarea isn't inside it — so nothing ever fired and the
+    // only check that ran was the one below, on load.
+    this.element.addEventListener("input", this.onInput);
 
     this.check();
   }
 
   disconnect() {
     clearTimeout(this.autoTimer);
-    this.form?.removeEventListener("input", this.onInput);
-  }
-
-  get form() {
-    return this.element.querySelector("form");
+    this.element.removeEventListener("input", this.onInput);
   }
 
   get textarea() {
@@ -104,6 +109,8 @@ export default class extends Controller {
       .then((data) => {
         if (!data || seq !== this.sequence) return;
         this.lastChecked = content;
+        // Before render, so it sees the panel as open and keeps the tab.
+        this.restorePanel();
         this.render(data.issues);
       })
       .catch(() => {}); // a failed check leaves the last known state alone
@@ -248,9 +255,23 @@ export default class extends Controller {
     else this.openPanel();
   }
 
+  // Reopen where the last page load left off. Deliberately not openPanel: that
+  // asks the toolbar to scroll itself into view, which on a fresh load would
+  // yank the page down before anyone had looked at it. It also doesn't write
+  // the key back — restoring isn't a decision, it's the same decision.
+  restorePanel() {
+    if (this.restoredPanel) return;
+    this.restoredPanel = true;
+    if (sessionStorage.getItem(this.panelStateKey) !== "1") return;
+
+    this.panelTarget.classList.remove("hidden");
+    this.arrowTarget.textContent = "▼";
+  }
+
   openPanel() {
     this.panelTarget.classList.remove("hidden");
     this.arrowTarget.textContent = "▼";
+    sessionStorage.setItem(this.panelStateKey, "1");
 
     // Dispatched from the PANEL, not this.element. The sticky toolbar is a
     // descendant of the element this controller is mounted on — it has to be,
@@ -267,6 +288,7 @@ export default class extends Controller {
   closePanel() {
     this.panelTarget.classList.add("hidden");
     this.arrowTarget.textContent = "▶";
+    sessionStorage.removeItem(this.panelStateKey);
     if (!this.cleanTarget.classList.contains("hidden")) {
       this.toggleRowTarget.classList.add("hidden");
     }

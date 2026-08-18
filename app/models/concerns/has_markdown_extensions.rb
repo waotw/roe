@@ -17,6 +17,12 @@ module HasMarkdownExtensions
     # through every render_* method signature.
     @rendering_static = static
 
+    # Whether this render is an editor preview. Same reasoning as the flag
+    # above: dev_warning is reached from a dozen renderers and threading a
+    # keyword through all of them to answer one question isn't worth it.
+    # Defaults to false, so any caller that doesn't ask for warnings gets none.
+    @rendering_preview = preview
+
     # In static-site mode, strip dynamic blocks that require a Rails
     # backend (forms, paywalls, product buttons). Done before any other
     # processing so downstream renderers never see them.
@@ -582,12 +588,13 @@ module HasMarkdownExtensions
   # Fenced-gallery directives understood at the top/bottom of a ```gallery```
   # block (a `key: value` line that isn't a markdown image). Whitelisted so
   # stray "Word: text" lines stay content, not config.
-  GALLERY_DIRECTIVES = %w[slideshow caption aspect_ratio].freeze
+  GALLERY_DIRECTIVES = GalleryBuilderSchema::DIRECTIVES
 
   def render_gallery(content, preview: false, index: 0)
-    config, image_rows = parse_gallery(content)
+    config, image_rows, strays = parse_gallery(content)
     return (preview ? "<!-- Empty gallery -->" : "") if image_rows.flatten.empty?
 
+    notice = gallery_directive_warning(strays) + gallery_ratio_warning(config["aspect_ratio"])
     ratio_class = gallery_ratio_class(config["aspect_ratio"])
 
     body =
@@ -602,8 +609,45 @@ module HasMarkdownExtensions
     # {::nomarkdown} passes the raw HTML through kramdown untouched; the
     # later process_responsive_images sweep turns each <img data-sizes> into
     # a responsive <picture> (grid thumbs get small/medium variants, the
-    # zoom overlay's data-sizes="100vw" pulls the largest).
-    [ "", "{::nomarkdown}", body, "{:/nomarkdown}", "" ].join("\n")
+    # zoom overlay's data-sizes="100vw" pulls the largest). The notice goes
+    # outside that wrapper — it's already HTML, and "" when warnings are off.
+    [ notice, "", "{::nomarkdown}", body, "{:/nomarkdown}", "" ].join("\n")
+  end
+
+  # A directive line the gallery threw away. `carousel:` is the one people
+  # actually write, so it's named outright rather than left to spelling.
+  def gallery_directive_warning(strays)
+    return "" if strays.blank? || !show_block_warnings?
+
+    named = strays.filter_map do |key|
+      if (real = GalleryBuilderSchema::ALIASES[key])
+        "`#{key}:` isn't a gallery directive — use `#{real}:`."
+      elsif (near = nearest_term(key, GALLERY_DIRECTIVES))
+        "`#{key}:` isn't a gallery directive — did you mean `#{near}:`?"
+      end
+    end
+    return "" if named.empty?
+
+    dev_warning("Gallery #{'directive'.pluralize(named.size)} not understood", named.join(" "),
+      "A line a gallery doesn't recognise isn't kept as text either — it's dropped with the images.")
+  end
+
+  # Spell-checked, never restricted: a theme is free to define a
+  # `gallery-ratio-<anything>` class, so only a near-miss of a known shape is
+  # worth mentioning. An unknown value renders a class no stylesheet defines,
+  # which does nothing at all and looks exactly like the default.
+  def gallery_ratio_warning(value)
+    return "" if value.blank? || !show_block_warnings?
+
+    ratio = value.to_s.strip.downcase
+    return "" if GalleryBuilderSchema::RATIOS.include?(ratio)
+
+    near = nearest_term(ratio, GalleryBuilderSchema::RATIOS)
+    return "" unless near
+
+    dev_warning("Unknown aspect ratio",
+      "`aspect_ratio: #{ratio}` doesn't match a shape Roe knows. Did you mean `#{near}`?",
+      "Shapes: #{GalleryBuilderSchema::MENU_RATIOS.map { |r| r[:value] }.join(', ')} — or any ratio class your theme defines.")
   end
 
   # A gallery-level `caption:` directive wraps the whole gallery in a
@@ -625,22 +669,31 @@ module HasMarkdownExtensions
   # Split a gallery body into [config, image_rows]. Directive lines are
   # pulled out first; the rest is grouped into rows by blank lines (blank
   # line = new grid row), each row scanned for `![alt](src) (*caption*)`.
+  # Returns [config, image_rows, strays] — strays being `key: value` lines that
+  # look like a directive but aren't one. The whitelist above means those aren't
+  # merely ignored: they fall through to the image scanner, match nothing, and
+  # are dropped with the row. Collected here so render_gallery can say so.
   def parse_gallery(content)
     config = {}
     image_lines = []
+    strays = []
 
     content.to_s.each_line do |line|
       m = line.match(/\A\s*([a-z_]+)\s*:\s*(.+?)\s*\z/i)
-      if m && line !~ /!\[/ && GALLERY_DIRECTIVES.include?(m[1].downcase)
-        config[m[1].downcase] = m[2]
-      else
-        image_lines << line
+      if m && line !~ /!\[/
+        key = m[1].downcase
+        if GALLERY_DIRECTIVES.include?(key)
+          config[key] = m[2]
+          next
+        end
+        strays << key
       end
+      image_lines << line
     end
 
     rows = image_lines.join.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
     image_rows = rows.map { |row| scan_gallery_images(row) }.reject(&:empty?)
-    [ config, image_rows ]
+    [ config, image_rows, strays ]
   end
 
   def scan_gallery_images(row)
@@ -759,7 +812,10 @@ module HasMarkdownExtensions
       config = parse_collection_config(config_text)
       # A `search: true` collection renders a search icon (inside the
       # collection, beside the heading) — see render_collection/collection_header.
-      render_collection(config)
+      # A misspelled key is silently dropped, so `limitt: 3` renders the whole
+      # list with no hint that a limit was asked for. Prefixed, never
+      # substituted: the collection itself is fine.
+      unrecognised_option_warnings(config, "collection blocks") + render_collection(config)
     end
   end
 
@@ -956,7 +1012,7 @@ module HasMarkdownExtensions
     post_type = nil if post_type == "all"
 
     # Validate tags in dev — warn about tags that don't exist on the source
-    if Rails.env.development? && tags.present?
+    if show_block_warnings? && tags.present?
       requested = tags.split(",").map(&:strip)
                       .reject { |t| t.start_with?("-") }  # ignore exclusions
 
@@ -989,7 +1045,7 @@ module HasMarkdownExtensions
     end
 
     # Validate post_type in dev — catches typos like 'articles' instead of 'article'
-    if Rails.env.development? && post_type.present? && source == "posts"
+    if show_block_warnings? && post_type.present? && source == "posts"
       valid_types = Post.post_type_options
       unless valid_types.include?(post_type)
         return [ [], 0, dev_warning(
@@ -1007,7 +1063,7 @@ module HasMarkdownExtensions
     # unknown source — warn in dev, render empty in prod, as before.
     items = CollectionQuery.new(config).records
     if items.nil?
-      if Rails.env.development?
+      if show_block_warnings?
         valid = %w[posts pages documentation documentation/roe products]
         return [ [], 0, dev_warning("Unknown collection source",
           "'#{source}' is not a valid source.",
@@ -1122,7 +1178,7 @@ module HasMarkdownExtensions
     part_value = config[:part].presence || config[:limit]
     if (part_range = parse_part(part_value, total_count))
       return [ items_array[part_range] || [], total_count, nil ]
-    elsif config[:part].present? && Rails.env.development?
+    elsif config[:part].present? && show_block_warnings?
       return [ [], 0, dev_warning(
         "Invalid part",
         "`part: #{config[:part]}` isn't a valid column slice. Use `k/m` with k from 1 to m (e.g. `part: 2/3`).",
@@ -1136,7 +1192,7 @@ module HasMarkdownExtensions
 
     # A letter range belongs on `limit:` (it filters); on `offset:` it silently
     # parses to 0, so steer the author before they get a confusing result.
-    if Rails.env.development? && config[:offset].present? && parse_letter_range(config[:offset])
+    if show_block_warnings? && config[:offset].present? && parse_letter_range(config[:offset])
       return [ [], 0, dev_warning(
         "Letter range on offset",
         "`offset: #{config[:offset]}` looks like a letter range, but ranges filter and belong on `limit:`.",
@@ -1150,7 +1206,7 @@ module HasMarkdownExtensions
     # is at least as large as the item count, so nothing is left to show. Flag
     # it locally (prod still renders the empty collection as before) so the
     # author can spot a too-large offset instead of staring at a blank block.
-    if Rails.env.development? && offset_value > 0 && total_count > 0 && items_array.empty?
+    if show_block_warnings? && offset_value > 0 && total_count > 0 && items_array.empty?
       max_offset = total_count - 1
       hint = if max_offset < 1
         "Remove `offset` — this collection has only #{total_count} #{'item'.pluralize(total_count)}."
@@ -1851,7 +1907,7 @@ module HasMarkdownExtensions
                      display_product.missing_media_refs.any? { |r| r[:field] == "image" }
       broken_image = image_url.blank? || missing_file
 
-      if broken_image && Rails.env.development?
+      if broken_image && show_block_warnings?
         variant_label = display_product.respond_to?(:variant) ? display_product.variant.presence : nil
         primary_flag  = display_product.respond_to?(:primary?) && display_product.primary?
         name_parts    = [ display_product.title.presence || "Untitled" ]
@@ -2171,7 +2227,13 @@ module HasMarkdownExtensions
   def render_card(config, preview: false)
     type = config[:type] || "pullquote"
 
-    case type
+    # Prefixed rather than substituted, and "" whenever warnings are off, so a
+    # published page renders exactly what it rendered before. A card with a
+    # misspelled option still draws — it just draws without that option, which
+    # is the whole reason the mistake is so easy to miss.
+    notice = card_warnings(type, config)
+
+    body = case type
     when "pullquote"
       render_pullquote(config)
     when "aside"
@@ -2185,6 +2247,154 @@ module HasMarkdownExtensions
     else
       preview ? "<!-- Unknown card type -->" : ""
     end
+
+    notice + body
+  end
+
+  # Why a card didn't come out the way it was written. An unknown type renders
+  # nothing at all and a dropped option renders the default, both without a word
+  # of explanation — the failures worth catching are the quiet ones.
+  def card_warnings(type, config)
+    return "" unless show_block_warnings?
+
+    valid_types = CardBuilderSchema::TYPES.map { |t| t[:value] }
+    unless valid_types.include?(type)
+      return dev_warning(
+        "Unknown card type",
+        "'#{type}' is not a card type.#{did_you_mean(type, valid_types)}",
+        "Valid types: #{valid_types.join(', ')}"
+      )
+    end
+
+    [ missing_card_fields_warning(type, config),
+      unrecognised_option_warnings(config, "#{type} cards") ].join
+  end
+
+  def missing_card_fields_warning(type, config)
+    rules = CardBuilderSchema::REQUIRED[type] or return ""
+    present = ->(key) { config[key.to_sym].present? }
+
+    if (missing = Array(rules[:all]).reject(&present)).any?
+      return dev_warning(
+        missing.one? ? "Card is missing a required value" : "Card is missing required values",
+        "`#{type}` cards need #{missing.map { |k| "`#{k}:`" }.to_sentence}.")
+    end
+
+    if rules[:any] && Array(rules[:any]).none?(&present)
+      return dev_warning("Card has nothing to show",
+        "`#{type}` cards need at least one of #{Array(rules[:any]).map { |k| "`#{k}:`" }.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')}.")
+    end
+
+    ""
+  end
+
+  # Keys the renderers read that the builder modals don't offer. Both halves of
+  # the option warning depend on this being right: without them a working block
+  # is told its option isn't real, and — now that a stray key can be reported as
+  # belonging somewhere else — a misfiled one would name the wrong home.
+  #
+  # `video` is read by render_player_card, `subtitle_from_record` by
+  # render_post_link (which product-link delegates to), `skus`/`variants` by
+  # ProductButtonRenderer, and the collection three by the collection renderer.
+  CARD_EXTRA_KEYS = {
+    "player"       => %w[video],
+    "post-link"    => %w[subtitle_from_record],
+    "product-link" => %w[subtitle_from_record]
+  }.freeze
+  ACTION_EXTRA_KEYS = { "product" => %w[skus variants] }.freeze
+  COLLECTION_EXTRA_KEYS = %w[part scope search].freeze
+
+  # Every option Roe understands, grouped by the block it belongs to. Built from
+  # the same schemas that drive the builder modals, so there's no second
+  # vocabulary to drift out of step with the first.
+  def option_contexts
+    @option_contexts ||= begin
+      contexts = {}
+
+      CardBuilderSchema::FIELDS_BY_TYPE.each_key do |type|
+        contexts["#{type} cards"] = card_keys_for(type)
+      end
+
+      ActionBuilderSchema::FIELDS_BY_KIND.each do |kind, fields|
+        keys = fields.map { |f| f[:key] } + ACTION_EXTRA_KEYS.fetch(kind, []) + %w[for type]
+        # The action renderers read `button-text` and `button_text` alike, so
+        # both spellings are legitimate however the schema happens to write it.
+        contexts[action_context_name(kind)] =
+          keys.flat_map { |key| [ key, key.tr("-", "_"), key.tr("_", "-") ] }.uniq
+      end
+
+      contexts["collection blocks"] =
+        CollectionBuilderSchema::FIELDS.map { |f| f[:key] }.uniq + COLLECTION_EXTRA_KEYS
+
+      contexts
+    end
+  end
+
+  def action_context_name(kind)
+    button = ActionBuilderSchema::BUTTON_KINDS.any? { |k| k[:value] == kind }
+    "#{kind} #{button ? 'buttons' : 'forms'}"
+  end
+
+  def card_keys_for(type)
+    fields = CardBuilderSchema::FIELDS_BY_TYPE[type].to_a.map { |f| f[:key] }
+    (fields + Array(CardBuilderSchema::CORE[type]) +
+      CARD_EXTRA_KEYS.fetch(type, []) + [ "type" ]).uniq
+  end
+
+  # Options a block doesn't understand. Two different mistakes, told apart
+  # because they need different answers:
+  #
+  #   `attribution:` on an aside  — a real option, written on the wrong block
+  #   `postion:` on a pullquote   — not an option anywhere, but nearly one
+  #
+  # Anything else is left alone. The schemas describe what the modals offer and
+  # the renderers read a few keys besides, so "unlisted" doesn't mean "wrong" —
+  # and a warning that cries wolf gets ignored along with the ones that matter.
+  def unrecognised_option_warnings(config, context)
+    return "" unless show_block_warnings?
+
+    known = option_contexts[context] or return ""
+    strays = config.keys.map(&:to_s).reject { |key| known.include?(key) }
+    return "" if strays.empty?
+
+    misplaced, unheard_of = strays.partition { |key| other_homes(key, context).any? }
+    misplaced_option_warning(misplaced, context) +
+      misspelled_option_warning(unheard_of, context, known)
+  end
+
+  def other_homes(key, context)
+    option_contexts.select { |name, keys| name != context && keys.include?(key) }.keys
+  end
+
+  # A key that is a real option somewhere else. No guessing involved — Roe knows
+  # exactly where it belongs, so it says so rather than offering a correction.
+  def misplaced_option_warning(keys, context)
+    return "" if keys.empty?
+
+    dev_warning(
+      "#{'Option'.pluralize(keys.size)} from another block",
+      keys.map { |key| "`#{key}:` belongs to #{homes_phrase(other_homes(key, context))}, not #{context}." }.join(" "),
+      "An option a block doesn't recognise is ignored."
+    )
+  end
+
+  # A common key like `text:` is valid on half a dozen blocks, and naming them
+  # all buries the only part that matters: not this one.
+  def homes_phrase(homes)
+    return homes.to_sentence(two_words_connector: " and ", last_word_connector: ", and ") if homes.size <= 3
+
+    "#{homes.first(2).to_sentence} and #{homes.size - 2} other blocks"
+  end
+
+  def misspelled_option_warning(keys, context, known)
+    suspect = keys.filter_map { |key| (near = nearest_term(key, known)) && [ key, near ] }
+    return "" if suspect.empty?
+
+    dev_warning(
+      "Unrecognised #{'option'.pluralize(suspect.size)}",
+      suspect.map { |key, near| "`#{key}:` isn't an option for #{context} — did you mean `#{near}:`?" }.join(" "),
+      "Unrecognised options are ignored, so the block renders without them."
+    )
   end
 
   # A product-link is a live post-link card pointed at a product. post-link
@@ -2730,11 +2940,14 @@ module HasMarkdownExtensions
     when "donate"
       render_donate_form(button_text)
     else
-      dev_warning("Unknown form type", "'#{form_type}' is not a recognised form type.",
-        "Valid types: signup, signin, checkout, donate, unsubscribe, paid_content")
+      kinds = ActionBuilderSchema::FORM_KINDS.map { |k| k[:value] }
+      dev_warning("Unknown form type",
+        "'#{form_type}' is not a recognised form type.#{did_you_mean(form_type, kinds)}",
+        "Valid types: #{kinds.join(', ')}")
     end
 
-    roeanji_kind_conflict_warning(config) + result.to_s
+    roeanji_kind_conflict_warning(config) +
+      unrecognised_option_warnings(config, action_context_name(form_type)) + result.to_s
   rescue => e
     Rails.logger.error "Form rendering error: #{e.message}"
     dev_warning("Form rendering error", e.message)
@@ -2775,7 +2988,7 @@ module HasMarkdownExtensions
 
   def render_donate_form(button_text)
     unless SiteFeature.donations_enabled?
-      if Rails.env.development?
+      if show_block_warnings?
         reason = if !SiteFeature.payments_feature_enabled?
           "payments not enabled in members.yml"
         elsif !SiteFeature.payments_mode&.in?(%w[donations both])
@@ -3031,7 +3244,8 @@ module HasMarkdownExtensions
         buttons << {
           config: config,
           kind: roeanji_kind(config, default: "product"),
-          conflict: roeanji_kind_conflict_warning(config),
+          conflict: roeanji_kind_conflict_warning(config) +
+            unrecognised_option_warnings(config, action_context_name(roeanji_kind(config, default: "product"))),
           start_pos: start_pos,
           end_pos: end_pos,
           match: $~
@@ -3039,7 +3253,7 @@ module HasMarkdownExtensions
       rescue => e
         Rails.logger.error "Button parsing error: #{e.message}"
         # Replace the failed button block with a dev warning
-        if Rails.env.development?
+        if show_block_warnings?
           buttons << {
             config: {},
             kind: "product",
@@ -3140,9 +3354,10 @@ module HasMarkdownExtensions
     return render_share_button(button[:config], context)   if button[:kind] == "share"
     return render_members_button(button[:config], context) if button[:kind] == "subscribe"
 
+    kinds = ActionBuilderSchema::BUTTON_KINDS.map { |k| k[:value] }
     dev_warning("Unknown button type",
-      "'#{button[:kind]}' is not a recognised button type.",
-      "Valid: product (the default when no for/type is given), share, subscribe.")
+      "'#{button[:kind]}' is not a recognised button type.#{did_you_mean(button[:kind], kinds)}",
+      "Valid: #{kinds.join(', ')} — product is the default when no for/type is given.")
   end
 
   # A "Subscribe" button that links to the members sign-up page (subscribing to
@@ -3229,13 +3444,48 @@ module HasMarkdownExtensions
     config
   end
 
-  # Renders an amber dev-only warning box.
-  # Silent (returns "") in production so no debug info leaks.
+  # Renders an amber warning box explaining why a Roe block didn't render.
   #
   #   dev_warning("Title", "What went wrong", "optional hint or context")
   #
+  # Shown while writing — in development, and in an editor preview whatever the
+  # environment. Silent everywhere else, which is the important half: a
+  # published URL never shows these, so a reader can't be handed a diagnostic
+  # and a self-hosted site can't leak one. Static builds are excluded outright
+  # rather than relying on the preview flag being false, because a generated
+  # file outlives the request that made it.
+  #
+  # Without the preview case these were invisible to anyone not running Roe
+  # locally — the writer whose block silently rendered nothing got no
+  # explanation at all.
+  # Whether this render should explain itself. One definition, because the
+  # answer is needed both here and at the call sites — several of which build an
+  # expensive message, or take a different branch entirely, and shouldn't do
+  # that work only for dev_warning to discard it.
+  #
+  # Static output is excluded outright rather than by trusting the preview flag
+  # to be false: a generated file outlives the request that made it.
+  def show_block_warnings?
+    return false if @rendering_static
+
+    Rails.env.development? || @rendering_preview.present?
+  end
+
+  # The closest term in `vocabulary`, or nil if nothing is close. Ruby's own
+  # spell checker — the one behind NoMethodError's "did you mean?" — so the
+  # threshold for "close" is the same one people already read every day, and
+  # there's no similarity metric of our own to tune.
+  def nearest_term(word, vocabulary)
+    DidYouMean::SpellChecker.new(dictionary: vocabulary).correct(word).first
+  end
+
+  # " Did you mean 'x'?", or "" — written to sit on the end of a sentence.
+  def did_you_mean(word, vocabulary)
+    (near = nearest_term(word, vocabulary)) ? " Did you mean '#{near}'?" : ""
+  end
+
   def dev_warning(title, message, hint = nil)
-    return "" unless Rails.env.development?
+    return "" unless show_block_warnings?
 
     hint_html = hint ? "<br><span style='color:#78350f'>#{dev_warning_text(hint)}</span>" : ""
     <<~HTML

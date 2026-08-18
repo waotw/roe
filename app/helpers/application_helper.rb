@@ -3,6 +3,22 @@ module ApplicationHelper
     SiteConfig.get("title").presence || "(set site title in Settings → site)"
   end
 
+  # True only while an admin preview action is re-rendering content from the
+  # editor. This is what lets Roe's amber block warnings appear in a preview in
+  # any environment while never appearing on a published URL.
+  #
+  # The test is which controller is rendering, because the preview actions
+  # render the very same views and helpers as the public site — @preview_mode
+  # alone can't tell them apart. It's also set by setup_theme_preview, which
+  # runs on the real published URL from a public controller, and a published URL
+  # showing diagnostics is the one thing this must never do.
+  #
+  # Both halves matter: @preview_mode is never true for an unauthenticated
+  # visitor, and an admin controller never serves a public page.
+  def editor_preview?
+    @preview_mode.present? && controller_path.start_with?("admin/")
+  end
+
   # The actual on-disk name of the Roe root folder. Usually "roe", but a user
   # may have it as "roe-v0.2.0" (versioned download) or renamed to their site
   # name. Use this — and roe_folder_path — anywhere a /roe path is shown so

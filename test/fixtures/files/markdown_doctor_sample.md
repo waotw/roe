@@ -24,8 +24,8 @@ list check below it. Rearranging the sections will change what gets reported.
 
 ## 1. List item with no blank line above it — FIXABLE
 
-This paragraph runs straight into a list with no blank line between them, which
-Kramdown reads as one paragraph rather than a list.
+This paragraph runs straight into a list with no blank line between them.
+Kramdown copes, so this one is about tidiness rather than broken output.
 - first item
 - second item
 
@@ -38,13 +38,36 @@ four spaces keeps it inside the item.
 > this quote is meant to belong to item one
 - shopping list item two
 
-## 3. Single backtick alone on a line
+## 3. Heading swallowed by the list above — FIXABLE
+
+A heading written straight after a list item, with no blank line between them,
+ends up *inside* that item instead of ending the list.
+
+- first item
+- second item
+## This heading is trapped in the bullet above
+
+## 4. Footnote problems — NEEDS ATTENTION
+
+Footnotes fail quietly. A reference with no definition prints as raw text[^99],
+and a definition nobody references renders nothing at all, so a note that was
+written simply isn't there.
+
+[^unused]: This note is never referenced, so it won't appear in the post.
+
+[^dupe]: First definition of this one.
+
+Referencing the duplicate[^dupe] here so only its second definition is at fault.
+
+[^dupe]: Second definition — kramdown keeps this one and drops the first.
+
+## 5. Single backtick alone on a line
 
 A lone backtick isn't a fence — three or more are needed.
 
 `
 
-## 4. Two-backtick fence
+## 6. Two-backtick fence
 
 Two backticks look like a fence but aren't one.
 
@@ -52,7 +75,7 @@ Two backticks look like a fence but aren't one.
 this was meant to be a code block
 ``
 
-## 5. Fence with five backticks
+## 7. Fence with five backticks
 
 Roe supports three or four, not five.
 
@@ -60,7 +83,7 @@ Roe supports three or four, not five.
 too many backticks to be a valid fence
 `````
 
-## 6. Four-backtick fence with nothing nested inside
+## 8. Four-backtick fence with nothing nested inside
 
 Four backticks exist so a fence can contain another fence. With nothing nested,
 three would have been right.
@@ -69,7 +92,7 @@ three would have been right.
 just some plain text, no inner fence in sight
 ````
 
-## 7. Nested fence using the same length as its wrapper
+## 9. Nested fence using the same length as its wrapper
 
 An outer fence has to be longer than the one it contains, or the first inner
 closer ends the outer block early.
@@ -78,7 +101,7 @@ closer ends the outer block early.
 ```inner
 ```
 
-## 8. Mismatched closing fence
+## 10. Mismatched closing fence
 
 Opened with three backticks, closed with four.
 
@@ -86,7 +109,7 @@ Opened with three backticks, closed with four.
 puts "the closer below doesn't match"
 ````
 
-## 9. Unclosed fence
+## 11. Unclosed fence
 
 Last on purpose: everything after an unclosed fence is swallowed into it, so any
 further sections would go unchecked.

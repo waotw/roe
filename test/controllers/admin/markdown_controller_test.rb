@@ -87,6 +87,16 @@ class Admin::MarkdownControllerTest < ActionDispatch::IntegrationTest
     assert_match(/data-controller="editor[^"]*markdown-doctor"/, response.body)
     assert_includes response.body, admin_check_markdown_path
 
+    # Typing is detected by listening for bubbled `input` on the controller
+    # element, so it has to be an ancestor of the textarea. It also must not be
+    # the editor form: the first form inside it is the duplicate button's, which
+    # the textarea isn't in — binding there meant no check ever ran while typing
+    # and issues only refreshed on save.
+    controller_el = Nokogiri::HTML(response.body).at_css('[data-controller~="markdown-doctor"]')
+    assert controller_el.at_css("#content-textarea"),
+      "the textarea must sit inside the controller element for input to bubble to it"
+    assert_not_equal "form", controller_el.name
+
     # Two sections: what Roe can rewrite, and what only the writer can decide.
     assert_includes response.body, 'data-markdown-doctor-target="fixableSection"'
     assert_includes response.body, 'data-markdown-doctor-target="manualSection"'

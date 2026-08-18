@@ -18,7 +18,7 @@ module ProductsHelper
   # Position-based, so it only fires on a product's predictable shape (documented
   # as a convention). Runs for dynamic AND static, since both render products/show.
   def product_content(product)
-    frag = Nokogiri::HTML::DocumentFragment.parse(product.to_html.to_s)
+    frag = Nokogiri::HTML::DocumentFragment.parse(product.to_html(preview: editor_preview?).to_s)
 
     if (title = frag.at_css("h1"))
       add_html_class(title, "product-title")
