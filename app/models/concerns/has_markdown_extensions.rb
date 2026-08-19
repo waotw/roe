@@ -2221,14 +2221,38 @@ module HasMarkdownExtensions
     end
   end
 
+  # An option line: a lowercase identifier, a colon, and the rest of the line.
+  # Lowercase on purpose — prose that opens with "Note: …" is a sentence, not an
+  # option, and capitalising is how people write it.
+  CARD_OPTION_RE = /\A[ \t]*([a-z_][a-z0-9_]*)[ \t]*:[ \t]?(.*)\z/
+
+  # Keys whose value runs on until the next option or the end of the block.
+  # Prose, in other words. Everything else is a single value on its own line,
+  # where a stray line underneath is far more likely to be a mistake than a
+  # continuation — a second line under `image:` would just break the path.
+  CARD_PROSE_KEYS = %w[text].freeze
+
+  # Cards are `key: value` lines, except that a prose value carries on over
+  # blank lines and all until the next option. That's what lets an aside hold
+  # more than one paragraph.
+  #
+  # Unrecognised keys are still parsed as keys rather than swallowed into the
+  # text above them, or a misspelled `postion:` would silently become part of
+  # the card's prose instead of being reported.
   def parse_card_config(text)
     config = {}
-    text.split("\n").each do |line|
-      next if line.strip.empty?
-      key, value = line.split(":", 2).map(&:strip)
-      config[key.to_sym] = value if key && value
+    current = nil
+
+    text.to_s.split("\n").each do |line|
+      if (option = line.match(CARD_OPTION_RE))
+        current = option[1]
+        config[current.to_sym] = option[2].to_s
+      elsif current && CARD_PROSE_KEYS.include?(current)
+        config[current.to_sym] = "#{config[current.to_sym]}\n#{line}"
+      end
     end
-    config
+
+    config.transform_values(&:strip)
   end
 
   def render_card(config, preview: false)
@@ -2867,8 +2891,37 @@ module HasMarkdownExtensions
 
   ### ASIDES
 
+  # Render a fragment the way the document itself is rendered, so a line break,
+  # a bare URL or an em dash behaves the same inside a card as outside one.
+  # Footnote options are deliberately left off: a footnote defined inside a card
+  # would build its own list there rather than joining the page's.
+  def render_markdown_fragment(text)
+    return "" if text.to_s.strip.empty?
+
+    soft_breaks = soft_line_breaks?
+    Kramdown::Document.new(
+      text.to_s.strip,
+      input: soft_breaks ? "GFM" : "kramdown",
+      hard_wrap: soft_breaks
+    ).to_html.strip
+  end
+
+  # The same, with the wrapping <p> removed, for somewhere a paragraph can't go
+  # — inside a link, say. Returns nil when the text is more than one paragraph
+  # and there's nothing to unwrap.
+  def inline_markdown_fragment(text)
+    html = render_markdown_fragment(text)
+    match = html.match(%r{\A<p>(.*)</p>\z}m)
+    return nil unless match
+    return nil if match[1].include?("<p>")
+
+    match[1]
+  end
+
   def render_aside(config, preview: false)
-    text = config[:text] || ""
+    # Asides took their text straight into the HTML, so `*emphasis*` came out
+    # with the asterisks showing and a second paragraph never arrived at all.
+    text = render_markdown_fragment(config[:text])
     image = config[:image] || ""
     link = config[:link] || ""
     link_text = config[:link_text] || ""
@@ -2883,15 +2936,21 @@ module HasMarkdownExtensions
     body_parts = []
 
     if text.present?
-      if link.present?
-        if link_text.present?
-          # Case 3: Link with custom link text - text separate from link
-          body_parts << "<div class=\"aside-text\">#{text}</div>"
-          body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
-        else
-          # Case 2: Link without link text - arrow inline with text
-          body_parts << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} #{default_link_text}</a></div>"
-        end
+      inline = link.present? && link_text.blank? ? inline_markdown_fragment(config[:text]) : nil
+
+      if link.present? && link_text.present?
+        # Case 3: Link with custom link text - text separate from link
+        body_parts << "<div class=\"aside-text\">#{text}</div>"
+        body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
+      elsif inline
+        # Case 2: Link without link text - arrow inline with the text
+        body_parts << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{inline} #{default_link_text}</a></div>"
+      elsif link.present?
+        # Case 2, but the text is more than one paragraph — an arrow can't sit
+        # at the end of a sentence that has several. It becomes its own link,
+        # the way it does when link_text is given.
+        body_parts << "<div class=\"aside-text\">#{text}</div>"
+        body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{default_link_text}</a>"
       else
         # Case 1: No link - just text
         body_parts << "<div class=\"aside-text\">#{text}</div>"

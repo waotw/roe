@@ -636,6 +636,76 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   # Aside Card Tests
   # =============================================================================
 
+  # An aside's text went straight into the HTML, so `*emphasis*` came out with
+  # the asterisks showing and a second paragraph never arrived at all — the
+  # parser stopped at the first line and dropped the rest.
+  def aside(body) = Nokogiri::HTML::DocumentFragment.parse(render("```card\ntype: aside\n#{body}\n```\n"))
+
+  test "an aside holds more than one paragraph" do
+    doc = aside("text: text is cool\n\nAnd so is this")
+
+    assert_equal [ "text is cool", "And so is this" ], doc.css(".aside-text p").map(&:text)
+  end
+
+  test "an aside renders markdown, not the characters for it" do
+    assert_equal "italic", aside("text: This is *italic*").at_css(".aside-text em")&.text
+    assert_equal "Bold", aside("text: **Bold** here").at_css(".aside-text strong")&.text
+    assert_equal "/docs", aside("text: See [the docs](/docs)").at_css(".aside-text a")&.[]("href")
+    assert_equal 2, aside("text: Intro:\n\n- one\n- two").css(".aside-text li").size
+  end
+
+  test "an option after the prose is still an option" do
+    doc = aside("text: one\n\ntwo\nimage: /media/images/a.jpg")
+
+    assert_equal 2, doc.css(".aside-text p").size
+    assert doc.at_css(".aside-image"), "the image is an option, not a third paragraph"
+  end
+
+  # Prose opening with "Note:" is a sentence. Option keys are lowercase, which
+  # is what tells them apart.
+  test "a capitalised word before a colon stays in the text" do
+    doc = aside("text: Note: this stays\n\nSecond para")
+
+    assert_equal [ "Note: this stays", "Second para" ], doc.css(".aside-text p").map(&:text)
+  end
+
+  # An unrecognised key has to stay a key, or a misspelled option would be
+  # silently swallowed into the prose above it instead of being reported.
+  test "an unrecognised option does not become part of the text" do
+    doc = aside("text: one\n\ntwo\npostion: right")
+
+    assert_equal 2, doc.css(".aside-text p").size
+    assert_not_includes doc.text, "postion"
+  end
+
+  # A single paragraph still runs into the arrow inline. More than one can't —
+  # so the arrow becomes its own link, as it does when link_text is given.
+  test "a link keeps its inline arrow for one paragraph" do
+    doc = aside("text: read on\nlink: /docs")
+
+    assert_equal "read on →", doc.at_css("a.aside-link-inline")&.text&.strip
+    assert_empty doc.css(".aside-text p")
+  end
+
+  test "a link beside several paragraphs stands on its own" do
+    doc = aside("text: one\n\ntwo\nlink: /docs")
+
+    assert_equal 2, doc.css(".aside-text p").size
+    assert_equal "→", doc.at_css("a.aside-link")&.text&.strip
+    assert_empty doc.css("a.aside-link-inline")
+  end
+
+  # Pullquotes read the same `text:`, so they get the paragraphs too — their
+  # rendering already ran the text through markdown.
+  test "a pullquote holds more than one paragraph" do
+    doc = Nokogiri::HTML::DocumentFragment.parse(
+      render("```card\ntype: pullquote\ntext: first para\n\nsecond para\nattribution: Me\n```\n"),
+    )
+
+    assert_equal [ "first para", "second para" ], doc.css(".card-pullquote p").map(&:text)
+    assert_equal "— Me", doc.at_css("cite")&.text
+  end
+
   test "aside renders card with aside classes" do
     content = MarkdownFixture::ASIDE_SIMPLE
     result = render(content)
