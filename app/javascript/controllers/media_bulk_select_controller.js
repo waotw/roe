@@ -1,7 +1,14 @@
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["checkbox", "toolbar", "selectedCount", "form", "copyUrl"];
+  static targets = [
+    "checkbox",
+    "toolbar",
+    "selectedCount",
+    "form",
+    "copyUrl",
+    "galleryButton",
+  ];
 
   connect() {
     this.updateToolbar();
@@ -21,6 +28,11 @@ export default class extends Controller {
       // Copy URL only makes sense for a single selection; hide it otherwise.
       if (this.hasCopyUrlTarget) {
         this.copyUrlTarget.style.display = count === 1 ? "" : "none";
+      }
+      // Gallery needs more than one, so it takes the same slot — the two can
+      // never both apply.
+      if (this.hasGalleryButtonTarget) {
+        this.galleryButtonTarget.style.display = count > 1 ? "" : "none";
       }
     } else {
       this.toolbarTarget.style.display = "none";
@@ -134,6 +146,30 @@ export default class extends Controller {
         bubbles: true,
         detail: { mediaItems },
       }),
+    );
+  }
+
+  // Hand the selection to the gallery builder rather than writing markdown.
+  // The picker deliberately knows nothing about gallery syntax — one place
+  // builds a gallery block, and this isn't it.
+  submitGallery() {
+    const selected = this.checkboxTargets.filter((cb) => cb.checked);
+    if (selected.length === 0) return;
+
+    const mediaItems = selected.map((cb) => ({
+      path: cb.dataset.filePath,
+      filename: cb.dataset.filename,
+    }));
+
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:insert-gallery", {
+        bubbles: true,
+        detail: { mediaItems },
+      }),
+    );
+    // Closing is the editor's job; it owns the modal.
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:close", { bubbles: true }),
     );
   }
 

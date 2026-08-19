@@ -30,7 +30,11 @@ class MarkdownDoctor
     absorbed_by_list: "Heading or code block pulled into the list above",
     orphaned_footnote: "Footnote reference with no definition",
     unused_footnote: "Footnote defined but never referenced",
-    duplicate_footnote: "Footnote defined more than once"
+    duplicate_footnote: "Footnote defined more than once",
+    over_indented_fence: "Fence indented far enough to become a code block",
+    unindented_fence_in_list: "Unindented code fence breaking a list",
+    under_indented_footnote: "Footnote continuation not indented enough",
+    list_indent_too_shallow: "List item indented but not enough to nest"
   }.freeze
 
   # Which issues Fix All is allowed to touch.
@@ -45,6 +49,7 @@ class MarkdownDoctor
     list_spacing
     unindented_blockquote_in_list
     absorbed_by_list
+    under_indented_footnote
   ].freeze
 
   def self.fixable?(type)
@@ -58,8 +63,24 @@ class MarkdownDoctor
   FOOTNOTE_DEF_RE = /^\s*\[\^([^\]\s]+)\]:/
   INLINE_CODE_RE = /`[^`]*`/
 
-  FENCE_RE = /^(\`+)([^\`]*?)\s*$/
+  # Up to three spaces of indentation, because that's what kramdown accepts —
+  # a fence indented that far still opens a code block. Anchoring at column
+  # zero meant an indented fence wasn't seen at all, so its partner looked like
+  # a lone opener and every one of them was reported as an unclosed fence.
+  #
+  # Four or more is deliberately not a fence: at top level that's an indented
+  # code block, and inside a list item or footnote it's a continuation, where
+  # the fence belongs to a context this doesn't track.
+  #
+  # The indent is not captured, so the group numbers every check reads stay put.
+  FENCE_RE = /^ {0,3}(\`+)([^\`]*?)\s*$/
   LIST_RE  = /^(\s*)(?:[-*+]|\d+\.)\s+/
+  # Indent, marker and the space after it. The column the item's own content
+  # starts at is what a child has to reach to nest under it.
+  LIST_PARTS_RE = /^( *)([-*+]|\d+\.)( +)/
+  # Four or more spaces: too far to be a fence, so kramdown reads it as an
+  # indented code block instead of opening one.
+  OVER_INDENTED_FENCE_RE = /^( {4,})(`{3,})/
   BLOCKQUOTE_RE = /^>/
   HEADING_RE = /^\s*\#{1,6}(\s|$)/
   SETEXT_UNDERLINE_RE = /^\s*(=+|-+)\s*$/
@@ -83,8 +104,9 @@ class MarkdownDoctor
     check_fences
     check_list_spacing
     check_absorbed_blocks
-    check_list_blockquotes
+    check_list_interruptions
     check_footnotes
+    check_indentation
     @issues.each { |i| i[:fixable] = self.class.fixable?(i[:type]) }
     @issues
   end
@@ -113,6 +135,10 @@ class MarkdownDoctor
       when :unindented_blockquote_in_list
         # A `>` at column 0 escapes the list; four spaces keeps it in the item.
         out[idx] = "    " + out[idx]
+      when :under_indented_footnote
+        # Already indented, just not to four. Top it up rather than prepending,
+        # so the line ends up at four rather than four-plus-what-was-there.
+        out[idx] = "    " + out[idx].sub(/\A[ \t]+/, "")
       end
     end
 
@@ -349,7 +375,7 @@ class MarkdownDoctor
   # Detect blockquotes at column 0 that appear between two top-level list
   # items. In kramdown a `>` at column 0 breaks out of the list; to keep it
   # inside a list item it must be indented by 4 spaces.
-  def check_list_blockquotes
+  def check_list_interruptions
     inside_code_block = false
     code_block_fence_len = nil
     pending_blockquotes = []
@@ -365,6 +391,12 @@ class MarkdownDoctor
           inside_code_block = false
           code_block_fence_len = nil
         elsif !inside_code_block
+          # A fence at column 0 leaves the list the same way a blockquote does,
+          # and for the same reason — it isn't indented into the item. Only the
+          # opener is recorded; the closer is part of the same block.
+          if last_list_item_line && line_indent(line).zero?
+            pending_blockquotes << { line: line_num, type: :unindented_fence_in_list, what: "Code fence" }
+          end
           inside_code_block = true
           code_block_fence_len = length
         end
@@ -375,7 +407,7 @@ class MarkdownDoctor
       # Blockquote at column 0 between list items likely breaks the list
       if line.match?(BLOCKQUOTE_RE) && line_indent(line) == 0
         if last_list_item_line
-          pending_blockquotes << { line: line_num, after_list: last_list_item_line }
+          pending_blockquotes << { line: line_num, type: :unindented_blockquote_in_list, what: "Blockquote" }
         end
         next
       end
@@ -384,9 +416,9 @@ class MarkdownDoctor
       if line.match?(LIST_RE) && line_indent(line) == 0
         pending_blockquotes.each do |bq|
           @issues << {
-            type: :unindented_blockquote_in_list,
+            type: bq[:type],
             line: bq[:line],
-            message: "Blockquote at line #{bq[:line]} breaks out of list that continues at line #{line_num}; indent it by 4 spaces to keep it inside the list item"
+            message: "#{bq[:what]} at line #{bq[:line]} breaks out of list that continues at line #{line_num}; indent it by 4 spaces to keep it inside the list item"
           }
         end
         pending_blockquotes = []
@@ -491,6 +523,133 @@ class MarkdownDoctor
         code_block_fence_len = length
       end
     end
+  end
+
+  # Indentation that was clearly meant and didn't take.
+  #
+  # These share a shape: the author indented something on purpose, kramdown
+  # needed a different amount, and the result still renders — just not where it
+  # was put. Nothing looks broken, which is what makes them worth reporting.
+  def check_indentation
+    inside_code_block = false
+    code_block_fence_len = nil
+    previous_item = nil
+    over_indented = nil
+
+    effective_lines.each_with_index do |line, idx|
+      fence = line.match(FENCE_RE)
+      line_num = effective_line_number(idx)
+
+      unless inside_code_block
+        over_indented = check_over_indented_fence(line, idx, line_num, over_indented)
+        check_footnote_continuation(line, idx, line_num)
+        previous_item = check_list_nesting(line, line_num, previous_item)
+      end
+
+      next unless fence
+
+      length = fence[1].length
+      if inside_code_block && length >= code_block_fence_len
+        inside_code_block = false
+        code_block_fence_len = nil
+      elsif !inside_code_block
+        inside_code_block = true
+        code_block_fence_len = length
+      end
+    end
+  end
+
+  # Four spaces or more and kramdown reads the line as an indented code block,
+  # so the fence is printed rather than obeyed — you get backticks inside your
+  # code block. Only at top level: the same four spaces under a list item or a
+  # footnote is a continuation, and correct.
+  # `open` is the backtick count of an over-indented fence still waiting for its
+  # closer, so the pair is reported once rather than at both ends — the closer
+  # is the same mistake, not a second one. Returned for the next line.
+  def check_over_indented_fence(line, idx, line_num, open)
+    match = line.match(OVER_INDENTED_FENCE_RE)
+    return open unless match
+
+    length = match[2].length
+    return nil if open && length >= open
+    return open if open
+    return nil if continuation_context(idx)
+
+    @issues << {
+      type: :over_indented_fence,
+      line: line_num,
+      message: "Fence indented #{match[1].length} spaces — four or more makes a code block instead of opening one"
+    }
+    length
+  end
+
+  # A footnote's continuation has to reach four spaces. One to three is someone
+  # aiming for it and missing, and the paragraph silently leaves the note.
+  # An unindented line isn't reported: that's also how a footnote ends.
+  def check_footnote_continuation(line, idx, line_num)
+    return if line.strip.empty?
+
+    indent = line_indent(line)
+    return unless indent.between?(1, 3)
+    return unless continuation_context(idx) == :footnote
+
+    @issues << {
+      type: :under_indented_footnote,
+      line: line_num,
+      message: "Indented #{indent} #{indent == 1 ? 'space' : 'spaces'}, so this leaves the footnote — a continuation needs four"
+    }
+  end
+
+  # A child item has to reach the column its parent's own text starts at, which
+  # is two for `- ` and three for `1. `. Indented less than that and it stays a
+  # sibling — `1. a` over `  1. b` looks nested and isn't.
+  #
+  # Returns the item to compare the next one against.
+  def check_list_nesting(line, line_num, previous_item)
+    parts = line.match(LIST_PARTS_RE)
+    return previous_item unless parts
+
+    indent = parts[1].length
+    item = { indent: indent, content_column: parts[0].length }
+
+    if previous_item && indent > previous_item[:indent] && indent < previous_item[:content_column]
+      @issues << {
+        type: :list_indent_too_shallow,
+        line: line_num,
+        message: "Indented #{indent} past the item above but its text starts at #{previous_item[:content_column]}, so this stays a sibling rather than nesting"
+      }
+      # Compare the next item against the parent, not against this one — its
+      # indent didn't establish a level.
+      return previous_item
+    end
+
+    # A shallower item closes the deeper ones; the nearest enclosing item is
+    # what the next one has to clear.
+    return item if previous_item.nil? || indent >= previous_item[:indent]
+
+    item
+  end
+
+  # Whether an indented line is a continuation of something, which is what
+  # decides whether its indentation is deliberate or a mistake. Four spaces
+  # under a list item or a footnote is a continuation; the same four spaces at
+  # top level is a code block.
+  def continuation_context(idx)
+    i = idx - 1
+    while i >= 0
+      line = effective_lines[i]
+
+      if line.strip.empty?
+        i -= 1
+        next
+      end
+      return :footnote if line.match?(FOOTNOTE_DEF_RE)
+      return :list if line.match?(LIST_RE) && line_indent(line).zero?
+      return nil if line_indent(line).zero?
+
+      i -= 1
+    end
+    nil
   end
 
   def line_indent(line)

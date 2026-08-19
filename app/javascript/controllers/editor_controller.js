@@ -223,6 +223,15 @@ export default class extends Controller {
       this.mediaPickerInsertHandler,
     );
 
+    // The gallery builder asks for images; the editor owns the modal, so it
+    // does the opening. The selection comes back as media-picker:insert-gallery,
+    // which the gallery builder listens for itself.
+    this.galleryPickHandler = () => this.openMediaPickerFor("images", "gallery");
+    this.element.addEventListener(
+      "gallery-builder:pick-images",
+      this.galleryPickHandler,
+    );
+
     // Listen for media picker close events (e.g. Cancel button)
     this.mediaPickerCloseHandler = this.closeMediaPicker.bind(this);
     this.element.addEventListener(
@@ -510,6 +519,13 @@ export default class extends Controller {
       this.element.removeEventListener(
         "media-picker:insert",
         this.mediaPickerInsertHandler,
+      );
+    }
+
+    if (this.galleryPickHandler) {
+      this.element.removeEventListener(
+        "gallery-builder:pick-images",
+        this.galleryPickHandler,
       );
     }
 
@@ -1631,8 +1647,14 @@ export default class extends Controller {
 
   openMediaPicker(event) {
     event.preventDefault();
-    const mediaType = event.currentTarget.dataset.mediaType || "images";
+    this.openMediaPickerFor(event.currentTarget.dataset.mediaType || "images");
+  }
 
+  // Split out so the gallery builder can open the picker without duplicating
+  // the modal handling or the fetch. `openedFor` travels to the server, which
+  // decides what the toolbar's primary button says and does — one definition of
+  // that label rather than a client-side patch after load.
+  openMediaPickerFor(mediaType, openedFor = null) {
     // Close dropdown
     if (this.hasMediaMenuDropdownTarget) {
       this.mediaMenuDropdownTarget.classList.add("hidden");
@@ -1651,7 +1673,10 @@ export default class extends Controller {
     this.mediaPickerContentTarget.innerHTML =
       '<div class="flex items-center justify-center h-full text-gray-400 font-mono text-sm">Loading...</div>';
 
-    fetch(`/admin/medium/picker?media_type=${mediaType}`, {
+    const params = new URLSearchParams({ media_type: mediaType });
+    if (openedFor) params.set("for", openedFor);
+
+    fetch(`/admin/medium/picker?${params}`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
     })
       .then((r) => r.text())

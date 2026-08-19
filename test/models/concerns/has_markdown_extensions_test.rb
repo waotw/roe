@@ -348,6 +348,60 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_match(/forest\.jpg/, result)
   end
 
+  # A caption on a standalone image used to require the `(*…*)` to butt straight
+  # up against the `)`. Inside a gallery a space was fine, so the same line
+  # captioned one image and printed as italic text beside another — with nothing
+  # visible to tell them apart.
+  test "a standalone image caption allows a space before it" do
+    [ "![alt](/media/images/a.jpg)(*A caption*)",
+      "![alt](/media/images/a.jpg) (*A caption*)",
+      "![alt](/media/images/a.jpg)\t(*A caption*)" ].each do |line|
+      doc = Nokogiri::HTML::DocumentFragment.parse(render("#{line}\n"))
+
+      assert_equal "A caption", doc.at_css("figcaption")&.text,
+        "expected a figcaption from: #{line.inspect}"
+    end
+  end
+
+  # The caption belongs to the image on its line. Allowing any whitespace would
+  # let an emphasised paragraph underneath be swallowed as one.
+  test "a caption does not reach across a line break" do
+    doc = Nokogiri::HTML::DocumentFragment.parse(
+      render("![alt](/media/images/a.jpg)\n\n(*Not a caption, just emphasis*)\n"),
+    )
+
+    assert_nil doc.at_css("figcaption")
+  end
+
+  # A footnote's continuation is indented four spaces, and kramdown ejects
+  # anything less back out into the body. The gallery builder writes the block
+  # to match; these pin what "match" has to mean, since the builder itself can't
+  # be tested here.
+  test "a gallery indented into a footnote renders inside it" do
+    block = "    ```gallery\n    ![a](/media/images/a.png)\n    ![b](/media/images/b.jpg)\n    ```"
+
+    [ "Text[^1]\n\n[^1]: \n#{block}\n",              # inserted on the line below the marker
+      "Text[^1]\n\n[^1]: first line\n#{block}\n",    # after a footnote that already has text
+      "Text[^1]\n\n[^1]: \n    ```gallery\n    ![a](/media/images/a.png)\n    aspect_ratio: square\n    ```\n" ].each do |markdown|
+      doc = Nokogiri::HTML::DocumentFragment.parse(render(markdown))
+
+      assert_equal 1, doc.css(".footnotes .gallery").size,
+        "expected the gallery inside the footnote for:\n#{markdown}"
+      assert_equal 1, doc.css(".gallery").size, "and nowhere else"
+    end
+  end
+
+  # What the builder used to produce. Neither renders a gallery at all — the
+  # fence opens on the definition line in one and is indented past its own
+  # contents in the other.
+  test "a gallery fence sharing the footnote definition line renders nothing" do
+    inline = "Text[^1]\n\n[^1]: ```gallery\n![a](/media/images/a.png)\n```\n"
+    over_indented = "Text[^1]\n\n[^1]: first\n        ```gallery\n    ![a](/media/images/a.png)\n    ```\n"
+
+    assert_empty Nokogiri::HTML::DocumentFragment.parse(render(inline)).css(".gallery")
+    assert_empty Nokogiri::HTML::DocumentFragment.parse(render(over_indented)).css(".gallery")
+  end
+
   test "manual gallery with captions" do
     content = MarkdownFixture::GALLERY_WITH_CAPTIONS
     result = render(content)

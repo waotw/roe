@@ -15,6 +15,20 @@ export default class extends Controller {
     if (this.hasSearchTarget) {
       this.searchTarget.focus();
     }
+
+    // Escape closes the picker, like any other modal. On document rather than
+    // this element because focus starts in the search field but doesn't stay
+    // there. It goes through closeModal so the gallery builder hears the same
+    // close event it hears from Cancel — without it, the popover waiting behind
+    // this modal would never learn it had been dismissed.
+    this.onKeydown = (event) => {
+      if (event.key === "Escape") this.closeModal();
+    };
+    document.addEventListener("keydown", this.onKeydown);
+  }
+
+  disconnect() {
+    document.removeEventListener("keydown", this.onKeydown);
   }
 
   closeModal() {

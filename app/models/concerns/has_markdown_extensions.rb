@@ -563,11 +563,18 @@ module HasMarkdownExtensions
   #
   # Syntax:  ![alt](/path.jpg)(*Caption text*)
   #
+  # A space before the caption is allowed, because the two other places that
+  # read this syntax — the consecutive-image grouper and the gallery scanner —
+  # both allow one, and a line that works inside a gallery should not stop
+  # working when it's lifted out. Spaces and tabs only, never a newline: the
+  # caption belongs to the image on its line, and `\s*` would let an emphasised
+  # paragraph underneath be swallowed as one.
+  #
   # Runs before Kramdown so the raw HTML block is passed through
   # unchanged. The image is rendered via ResponsiveImageRenderer so
   # it gets the same srcset/picture treatment as uncaptioned images.
   def process_image_captions(markdown)
-    markdown.gsub(/!\[([^\]]*)\]\(([^)]+)\)\(\*([^*]+)\*\)/) do
+    markdown.gsub(/!\[([^\]]*)\]\(([^)]+)\)[ \t]*\(\*([^*]+)\*\)/) do
       alt     = $1
       src     = $2.strip
       caption = $3.strip

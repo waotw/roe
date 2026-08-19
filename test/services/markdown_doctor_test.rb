@@ -39,6 +39,37 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     assert_empty MarkdownDoctor.diagnose(content)
   end
 
+  # Kramdown opens a code block for a fence indented up to three spaces, and it
+  # doesn't care whether the closer is indented to match. Anchoring the fence
+  # pattern at column zero meant an indented fence wasn't seen at all — so its
+  # partner looked like a lone opener, and correct markup was reported as an
+  # unclosed fence.
+  test "an indented fence is still a fence" do
+    body = "puts \"hi\"\n"
+
+    [ "  ```ruby\n#{body}```\n",     # opener indented, closer flush
+      "   ```ruby\n#{body}```\n",    # three spaces, the most kramdown allows
+      "```ruby\n#{body}  ```\n",     # closer indented, opener flush
+      "  ```ruby\n  #{body}  ```\n" ].each do |content|
+      assert_empty MarkdownDoctor.diagnose(content),
+        "this renders correctly and should not be reported:\n#{content}"
+    end
+  end
+
+  test "an indented fence that really is unclosed is reported at its opener" do
+    issues = MarkdownDoctor.diagnose("  ```ruby\nputs 1\n")
+
+    assert_equal [ :unclosed_fence ], issues.map { |i| i[:type] }
+    assert_equal 1, issues.first[:line], "the opener, not whatever followed it"
+  end
+
+  # Four spaces is an indented code block at top level and a continuation inside
+  # a list or footnote — either way it isn't a fence this should be tracking.
+  test "a four-space fence in a list or footnote is left alone" do
+    assert_empty MarkdownDoctor.diagnose("- item\n\n    ```ruby\n    puts 1\n    ```\n")
+    assert_empty MarkdownDoctor.diagnose("T[^1]\n\n[^1]: note\n\n    ```ruby\n    puts 1\n    ```\n")
+  end
+
   test "a nested list item needs no blank line" do
     assert_empty MarkdownDoctor.diagnose("- parent\n    - child\n")
   end
@@ -228,5 +259,109 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
 
     assert_equal content, fixed, "an unclosed fence must not be guessed at"
     assert_empty applied
+  end
+
+  # --- indentation that was meant and didn't take ----------------------------
+  #
+  # These share a shape: the author indented something deliberately, kramdown
+  # wanted a different amount, and the result still renders — just not where it
+  # was put. Nothing looks broken, which is what makes them worth reporting.
+
+  test "a fence indented into a code block is reported, once" do
+    issues = MarkdownDoctor.diagnose("Text.\n\n    ```ruby\n    puts 1\n    ```\n")
+
+    assert_equal [ :over_indented_fence ], issues.map { |i| i[:type] },
+      "the closer is the same mistake, not a second one"
+    assert_equal 3, issues.first[:line]
+  end
+
+  # The same four spaces under a list item or footnote is a continuation, and
+  # correct. Only at top level does it turn the fence into content.
+  test "an indented fence in a list or footnote is not over-indented" do
+    assert_empty MarkdownDoctor.diagnose("- item\n\n    ```ruby\n    puts 1\n    ```\n")
+    assert_empty MarkdownDoctor.diagnose("T[^1]\n\n[^1]: note\n\n    ```ruby\n    puts 1\n    ```\n")
+  end
+
+  # A fence at column 0 leaves the list the same way a blockquote does. Like the
+  # blockquote rule, it only counts when the list carries on afterwards.
+  test "a column-zero fence between list items is flagged" do
+    issues = MarkdownDoctor.diagnose("- one\n\n```ruby\nputs 1\n```\n\n- two\n")
+
+    assert_equal [ :unindented_fence_in_list ], issues.map { |i| i[:type] }
+    assert_equal 3, issues.first[:line], "the opener, not the closer"
+  end
+
+  test "a fence after the last list item is just a fence" do
+    assert_empty MarkdownDoctor.diagnose("- one\n- two\n\n```ruby\nputs 1\n```\n")
+  end
+
+  test "a footnote continuation short of four spaces is flagged and fixable" do
+    issues = MarkdownDoctor.diagnose("T[^1]\n\n[^1]: first\n\n  second para\n")
+
+    assert_equal [ :under_indented_footnote ], issues.map { |i| i[:type] }
+    assert issues.first[:fixable], "there is one right answer: four spaces"
+
+    fixed, = MarkdownDoctor.new("T[^1]\n\n[^1]: first\n\n  second para\n").fix
+
+    assert_equal "T[^1]\n\n[^1]: first\n\n    second para\n", fixed
+    assert_empty MarkdownDoctor.diagnose(fixed)
+  end
+
+  # An unindented line is also how a footnote ends, so it says nothing.
+  test "body text after a footnote is not a failed continuation" do
+    assert_empty MarkdownDoctor.diagnose("T[^1]\n\n[^1]: first\n\nBody text.\n")
+    assert_empty MarkdownDoctor.diagnose("T[^1]\n\n[^1]: first\n\n    second para\n")
+  end
+
+  # A child has to reach the column its parent's text starts at: two for `- `,
+  # three for `1. `. `1. a` over `  1. b` looks nested and isn't.
+  test "a list item indented too little to nest is flagged" do
+    assert_equal [ :list_indent_too_shallow ],
+      MarkdownDoctor.diagnose("1. a\n  1. b\n").map { |i| i[:type] }
+    assert_equal [ :list_indent_too_shallow ],
+      MarkdownDoctor.diagnose("- a\n - b\n").map { |i| i[:type] }
+  end
+
+  # Not fixable: indenting it further and removing the indent are both one edit,
+  # and only the author knows which was meant.
+  test "a shallow list indent is a warning, not a fix" do
+    assert_not MarkdownDoctor.diagnose("1. a\n  1. b\n").first[:fixable]
+  end
+
+  test "list nesting that works says nothing" do
+    assert_empty MarkdownDoctor.diagnose("- a\n  - b\n")
+    assert_empty MarkdownDoctor.diagnose("1. a\n   1. b\n")
+    assert_empty MarkdownDoctor.diagnose("- a\n  - b\n    - c\n"), "three real levels"
+    assert_empty MarkdownDoctor.diagnose("- a\n- b\n- c\n"), "plain siblings"
+    assert_empty MarkdownDoctor.diagnose("- a\n  - b\n- c\n"), "nested, then back out"
+  end
+
+  # The sample post is what the editor's panel gets tested against by hand, so
+  # a rule missing from it is a rule nobody looks at. Cheaper to fail here than
+  # to notice months later that a check has never been seen working.
+  test "the sample post exercises every rule" do
+    issues = MarkdownDoctor.diagnose(
+      File.read(Rails.root.join("test/fixtures/files/markdown_doctor_sample.md")),
+    )
+
+    assert_empty MarkdownDoctor::ISSUE_TYPES.keys - issues.map { |i| i[:type] },
+      "add a section to markdown_doctor_sample.md for the rules listed above"
+    assert issues.any? { |i| i[:fixable] }, "and something for Fix All to do"
+  end
+
+  # Fix All has to survive a document with this much wrong in it, and leave
+  # nothing fixable behind.
+  test "fixing the sample post settles in one pass" do
+    content = File.read(Rails.root.join("test/fixtures/files/markdown_doctor_sample.md"))
+    fixed, applied = MarkdownDoctor.new(content).fix
+
+    assert_predicate applied.size, :positive?
+    assert_empty MarkdownDoctor.diagnose(fixed).select { |i| i[:fixable] }
+    assert_equal fixed, MarkdownDoctor.new(fixed).fix.first, "and running it again changes nothing"
+  end
+
+  test "indentation inside a code block is content" do
+    assert_empty MarkdownDoctor.diagnose("```\n    ```ruby\n```\n")
+    assert_empty MarkdownDoctor.diagnose("```\n1. a\n  1. b\n```\n")
   end
 end

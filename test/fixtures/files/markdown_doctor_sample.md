@@ -61,13 +61,57 @@ Referencing the duplicate[^dupe] here so only its second definition is at fault.
 
 [^dupe]: Second definition — kramdown keeps this one and drops the first.
 
-## 5. Single backtick alone on a line
+## 5. Fence indented into a code block — NEEDS ATTENTION
+
+Four spaces or more and kramdown reads the line as an indented code block
+instead of a fence, so the backticks are printed rather than obeyed. The same
+four spaces under a list item or a footnote would be a continuation, and fine.
+
+    ```ruby
+    puts "the fence above is content, not a fence"
+    ```
+
+## 6. Code fence escaping a list — NEEDS ATTENTION
+
+A fence at column zero between two list items leaves the list, exactly as an
+unindented blockquote does. The list carries on afterwards, which is what makes
+it a mistake rather than a code block that simply follows a list.
+
+- shopping list item one
+
+```ruby
+puts "this block was meant to belong to item one"
+```
+
+- shopping list item two
+
+## 7. Footnote continuation that misses — FIXABLE
+
+A footnote's second paragraph has to reach four spaces. Two is aiming for it and
+missing, and the paragraph quietly leaves the note.
+
+Referencing the short note[^short] so it isn't reported as unused as well.
+
+[^short]: The first paragraph of this note is fine.
+
+  This second paragraph is indented two spaces, so it isn't part of the note.
+
+## 8. List indented too little to nest — NEEDS ATTENTION
+
+An ordered item's text starts at column three, so a child indented two looks
+nested and isn't — it renders as a flat, renumbered sibling.
+
+1. first item
+  1. this was meant to be nested under the first item
+2. second item
+
+## 9. Single backtick alone on a line
 
 A lone backtick isn't a fence — three or more are needed.
 
 `
 
-## 6. Two-backtick fence
+## 10. Two-backtick fence
 
 Two backticks look like a fence but aren't one.
 
@@ -75,7 +119,7 @@ Two backticks look like a fence but aren't one.
 this was meant to be a code block
 ``
 
-## 7. Fence with five backticks
+## 11. Fence with five backticks
 
 Roe supports three or four, not five.
 
@@ -83,7 +127,7 @@ Roe supports three or four, not five.
 too many backticks to be a valid fence
 `````
 
-## 8. Four-backtick fence with nothing nested inside
+## 12. Four-backtick fence with nothing nested inside
 
 Four backticks exist so a fence can contain another fence. With nothing nested,
 three would have been right.
@@ -92,7 +136,7 @@ three would have been right.
 just some plain text, no inner fence in sight
 ````
 
-## 9. Nested fence using the same length as its wrapper
+## 13. Nested fence using the same length as its wrapper
 
 An outer fence has to be longer than the one it contains, or the first inner
 closer ends the outer block early.
@@ -101,7 +145,7 @@ closer ends the outer block early.
 ```inner
 ```
 
-## 10. Mismatched closing fence
+## 14. Mismatched closing fence
 
 Opened with three backticks, closed with four.
 
@@ -109,7 +153,7 @@ Opened with three backticks, closed with four.
 puts "the closer below doesn't match"
 ````
 
-## 11. Unclosed fence
+## 15. Unclosed fence
 
 Last on purpose: everything after an unclosed fence is swallowed into it, so any
 further sections would go unchecked.

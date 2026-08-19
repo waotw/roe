@@ -56,6 +56,31 @@
               </select>
               <p data-gallery-builder-target="ratioNote" class="hidden text-xs text-red-600 mb-2">Slideshow will ignore aspect ratio</p>
               <input type="text" data-gallery-builder-target="caption" data-action="keydown.enter->gallery-builder#insert" placeholder="Caption this gallery (empty = no caption)" class="w-full mb-2 border border-gray-300 rounded-xs px-2 py-1 text-xs">
+
+              <%# The gallery's images, however they got here: picked from the
+                  media modal, or read out of a selection the author made in the
+                  editor before opening this. Filenames only — the thumbnails
+                  are the picker's job. %>
+              <div data-gallery-builder-target="imageList"
+                   class="hidden mb-2 max-h-32 overflow-y-auto border border-gray-200 bg-gray-50 rounded-xs text-xs font-mono"></div>
+
+              <div class="flex gap-1 mb-2">
+                <%# ADD IMAGES opens the media picker, which hands its selection
+                    back here rather than writing markdown of its own. %>
+                <button type="button"
+                        data-gallery-builder-target="addImages"
+                        data-action="click->gallery-builder#pickImages"
+                        class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs flex-1">
+                  Add Images
+                </button>
+                <button type="button"
+                        data-gallery-builder-target="clear"
+                        data-action="click->gallery-builder#clearImages"
+                        class="hidden uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs flex-1">
+                  Clear
+                </button>
+              </div>
+
               <button type="button" data-action="click->gallery-builder#insert" class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs w-full">Insert</button>
             </div>
           </div>

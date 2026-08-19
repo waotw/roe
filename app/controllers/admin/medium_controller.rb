@@ -4,6 +4,10 @@ class Admin::MediumController < Admin::BaseController
 
   def picker
     @media_type = params[:media_type] || "images"
+    # Who opened the picker. "gallery" means the gallery builder did, and the
+    # selection goes back to it instead of being written into the document —
+    # so the label says that rather than "Insert Selected".
+    @picker_for = params[:for].presence
     @media = Medium.originals_only
                    .where(media_type: @media_type)
                    .order(created_at: :desc)
