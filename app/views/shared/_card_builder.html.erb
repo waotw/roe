@@ -100,7 +100,11 @@
                 <select data-cb-field="<%= key %>"
                         data-action="change->card-builder#fieldChanged"
                         class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
-                  <option value="">— (default)</option>
+                  <%# Says what leaving it unset will actually do, rather than
+                      just "default". Unset stays unset — the key is left out of
+                      the card, which is what lets the card follow the site
+                      setting if that setting changes later. %>
+                  <option value="">— (<%= CardBuilderSchema.default_label(type, key) %>)</option>
                   <option value="true"<%= ' selected' if value == 'true' %>>true</option>
                   <option value="false"<%= ' selected' if value == 'false' %>>false</option>
                 </select>

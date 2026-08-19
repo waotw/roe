@@ -39,10 +39,8 @@ module CardBuilderSchema
         hint: "Body text. Leave blank for an image-only aside." },
       { key: "image", type: :text, label: "Image",
         hint: "Image URL/path to show in the aside." },
-      { key: "link", type: :text, label: "Link",
-        hint: "URL the aside links to. Leave blank and no link will be added." },
-      { key: "link_text", type: :text, label: "Link text",
-        hint: "Custom label for the link. Defaults to →." }
+      { key: "link_url", type: :text, label: "Link URL",
+        hint: "Makes the whole aside a link — image and all. Put links inside the text instead if you only want part of it to be clickable." }
     ],
 
     "post-link" => [
@@ -134,6 +132,38 @@ module CardBuilderSchema
     "post-link"    => "post_link_button_template",
     "product-link" => "product_link_button_template"
   }.freeze
+
+  # Booleans whose default depends on the card's style — off for small, on for
+  # medium and large (show_excerpt: large only). A site that wants one of them
+  # on everywhere can say so in cards.yml; absent, the style rule stands, which
+  # is what every install already has.
+  STYLE_DEFAULT_SETTINGS = {
+    "show_subtitle" => "default_show_subtitle",
+    "show_excerpt"  => "default_show_excerpt"
+  }.freeze
+
+  # true/false when a site setting has fixed this default for every style, nil
+  # when the style rule still decides. A blank setting counts as unset — the
+  # config editor writes an empty string for a field nobody filled in.
+  def self.setting_default(type, key)
+    setting_key = STYLE_DEFAULT_SETTINGS[key.to_s] or return nil
+
+    value = SiteConfig.default("cards", type.to_s)&.[](setting_key)
+    return nil if value.nil? || value.to_s.strip.empty?
+
+    value.to_s.strip.casecmp("true").zero?
+  end
+
+  # What the builder's "—" option will actually do, so the menu says it rather
+  # than leaving the author to guess. Leaving it unset keeps the key out of the
+  # card, which is what lets the card follow the setting later.
+  def self.default_label(type, key)
+    fixed = setting_default(type, key)
+    return "default: #{fixed ? 'on' : 'off'}" unless fixed.nil?
+    return "default: by style" if STYLE_DEFAULT_SETTINGS.key?(key.to_s)
+
+    "default"
+  end
 
   def self.types
     TYPES

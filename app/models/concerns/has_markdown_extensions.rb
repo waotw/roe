@@ -2330,7 +2330,13 @@ module HasMarkdownExtensions
   CARD_EXTRA_KEYS = {
     "player"       => %w[video],
     "post-link"    => %w[subtitle_from_record],
-    "product-link" => %w[subtitle_from_record]
+    "product-link" => %w[subtitle_from_record],
+    # `link` is what `link_url` used to be called, and `link_text` is the label
+    # for a separate call-to-action link. Neither is offered any more — the text
+    # is markdown now, so a link written in it does the job with wording and
+    # placement of the author's choosing — but both still render, because
+    # they're sitting in posts that were written before that was true.
+    "aside"        => %w[link link_text]
   }.freeze
   ACTION_EXTRA_KEYS = { "product" => %w[skus variants] }.freeze
   COLLECTION_EXTRA_KEYS = %w[part scope search].freeze
@@ -2471,6 +2477,17 @@ module HasMarkdownExtensions
     output << "</div>"
 
     output.join("\n")
+  end
+
+  # A style-dependent default, unless cards.yml has fixed it for every style.
+  #
+  # Three levels, narrowest first: the card's own `show_subtitle:` wins over
+  # everything; a site setting fixes the default for all styles; with neither,
+  # the style decides, which is what every install had before the setting
+  # existed.
+  def card_style_default(kind, key, by_style)
+    fixed = CardBuilderSchema.setting_default(kind, key)
+    fixed.nil? ? by_style : fixed
   end
 
   # Wrap a floated pullquote inside the paragraph that follows it, so text runs
@@ -2653,11 +2670,13 @@ module HasMarkdownExtensions
     # Whether the excerpt/description shows. Large shows it by default (existing
     # behaviour); small/medium only when explicitly enabled. product-link maps
     # its show_description onto this and defaults it on for all styles.
-    show_excerpt = collection_truthy?(config[:show_excerpt], default: style == "large")
+    show_excerpt = collection_truthy?(config[:show_excerpt],
+      default: card_style_default(kind, "show_excerpt", style == "large"))
 
     # Whether the subtitle shows. Default per size: off for small (too cramped),
     # on for medium and large. Overridable with `show_subtitle:` in the card.
-    show_subtitle = collection_truthy?(config[:show_subtitle], default: style != "small")
+    show_subtitle = collection_truthy?(config[:show_subtitle],
+      default: card_style_default(kind, "show_subtitle", style != "small"))
 
     # Author and date are only meaningful for posts. For pages, products,
     # and docs the keys were intentionally omitted from config above.
@@ -2918,56 +2937,76 @@ module HasMarkdownExtensions
     match[1]
   end
 
+  # An aside is an image, some markdown, and optionally somewhere to point.
+  #
+  #   image:    the picture
+  #   link_url: where the whole card points, image included
+  #   text:     everything else, in markdown
+  #
+  # When it points somewhere, the card element *is* the anchor rather than
+  # wrapping one around the contents — .card-aside is a grid, and an element
+  # between it and its children would collapse the layout to one column. An
+  # <a> can be display:grid and hold flow content, so the class list simply
+  # moves onto it and every existing rule still matches.
   def render_aside(config, preview: false)
     # Asides took their text straight into the HTML, so `*emphasis*` came out
     # with the asterisks showing and a second paragraph never arrived at all.
     text = render_markdown_fragment(config[:text])
-    image = config[:image] || ""
-    link = config[:link] || ""
-    link_text = config[:link_text] || ""
-    default_link_text = SiteConfig.default("cards", "aside")&.[]("default_link_text") || "→"
+    image = config[:image].to_s
+    link = config[:link_url].presence || config[:link].presence
+    legacy_link_text = config[:link_text].to_s
 
-    # Build the content
-    content = []
-    content << "<img src=\"#{image}\" alt=\"\" class=\"aside-image\">" if image.present?
+    body = []
+    body << %(<div class="aside-text">#{text}</div>) if text.present?
 
-    # Collect text + link as a group so they can be wrapped in
-    # `.aside-body`.
-    body_parts = []
-
-    if text.present?
-      inline = link.present? && link_text.blank? ? inline_markdown_fragment(config[:text]) : nil
-
-      if link.present? && link_text.present?
-        # Case 3: Link with custom link text - text separate from link
-        body_parts << "<div class=\"aside-text\">#{text}</div>"
-        body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
-      elsif inline
-        # Case 2: Link without link text - arrow inline with the text
-        body_parts << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{inline} #{default_link_text}</a></div>"
-      elsif link.present?
-        # Case 2, but the text is more than one paragraph — an arrow can't sit
-        # at the end of a sentence that has several. It becomes its own link,
-        # the way it does when link_text is given.
-        body_parts << "<div class=\"aside-text\">#{text}</div>"
-        body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{default_link_text}</a>"
-      else
-        # Case 1: No link - just text
-        body_parts << "<div class=\"aside-text\">#{text}</div>"
-      end
+    # A card written before `link_url` existed, with its own call-to-action
+    # label. Rendered exactly as it always was, so the post doesn't change
+    # under its author; nothing in the builder writes this any more.
+    if link && legacy_link_text.present?
+      body << %(<a href="#{link}" class="aside-link">#{legacy_link_text}</a>)
+      link = nil
     end
 
-    content << "<div class=\"aside-body\">\n#{body_parts.join("\n")}\n</div>" if body_parts.any?
+    # A link inside a link isn't valid and browsers unpick it badly, so the card
+    # can't be one when the text already holds one. The image is outside the
+    # text though, so it can still carry the link on its own — the reader gets
+    # both, and neither is nested in the other.
+    text_links = link && text.include?("<a ")
+    link_image_only = text_links && image.present?
+    notice = text_links && image.blank? ? aside_link_conflict_warning : ""
 
-    # Determine if this is image-only
-    aside_class = (image.present? && text.blank? && link_text.blank?) ? "card card-aside image-only" : "card card-aside"
+    parts = []
+    if image.present?
+      img = %(<img src="#{image}" alt="" class="aside-image">)
+      parts << (link_image_only ? %(<a href="#{link}" class="aside-image-link">#{img}</a>) : img)
+    end
+    parts << "<div class=\"aside-body\">\n#{body.join("\n")}\n</div>" if body.any?
 
-    <<~HTML
-      <div class="#{aside_class}">
-        #{content.join("\n")}
-      </div>
-    HTML
+    # Whole card, or nothing — the image took it, or there was nowhere to put it.
+    link = nil if text_links
+
+    classes = [ "card", "card-aside" ]
+    classes << "image-only" if image.present? && text.blank? && legacy_link_text.blank?
+    classes << "aside-wrapper" if link
+
+    open = link ? %(<a href="#{link}" class="#{classes.join(' ')}">) : %(<div class="#{classes.join(' ')}">)
+    close = link ? "</a>" : "</div>"
+
+    # {::nomarkdown} because kramdown treats <a> as inline: left to itself it
+    # wraps the opening tag in a paragraph and escapes the closing one, which
+    # tears the card in half. The text inside was rendered to HTML above, so
+    # there is nothing here kramdown needs to look at anyway.
+    [ "", "{::nomarkdown}", "#{notice}#{open}#{parts.join("\n")}#{close}", "{:/nomarkdown}", "" ].join("\n")
   end
+
+  def aside_link_conflict_warning
+    dev_warning(
+      "Nothing left for link_url to link",
+      "`link_url:` makes the whole card a link, but the text already has one in it — a link inside a link isn't valid. With an image it would go on that instead; there isn't one, so `link_url:` does nothing here.",
+      "Either drop `link_url:`, or take the link out of the text and let the card carry it."
+    )
+  end
+
 
   # FORMS
 

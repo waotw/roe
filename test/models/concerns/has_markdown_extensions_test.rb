@@ -678,23 +678,6 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_not_includes doc.text, "postion"
   end
 
-  # A single paragraph still runs into the arrow inline. More than one can't —
-  # so the arrow becomes its own link, as it does when link_text is given.
-  test "a link keeps its inline arrow for one paragraph" do
-    doc = aside("text: read on\nlink: /docs")
-
-    assert_equal "read on →", doc.at_css("a.aside-link-inline")&.text&.strip
-    assert_empty doc.css(".aside-text p")
-  end
-
-  test "a link beside several paragraphs stands on its own" do
-    doc = aside("text: one\n\ntwo\nlink: /docs")
-
-    assert_equal 2, doc.css(".aside-text p").size
-    assert_equal "→", doc.at_css("a.aside-link")&.text&.strip
-    assert_empty doc.css("a.aside-link-inline")
-  end
-
   # Pullquotes read the same `text:`, so they get the paragraphs too — their
   # rendering already ran the text through markdown.
   test "a pullquote holds more than one paragraph" do
@@ -704,6 +687,88 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
 
     assert_equal [ "first para", "second para" ], doc.css(".card-pullquote p").map(&:text)
     assert_equal "— Me", doc.at_css("cite")&.text
+  end
+
+  # An aside points somewhere with `link_url:`, and the card element becomes the
+  # anchor rather than wrapping one around the contents — .card-aside is a grid,
+  # and an element between it and its children collapses the layout to one
+  # column. An <a> can be display:grid and hold flow content, so every existing
+  # rule still matches.
+  test "link_url makes the whole card a link, image included" do
+    doc = aside("image: /media/images/a.jpg\ntext: Read on\nlink_url: /somewhere")
+    card = doc.at_css(".card-aside")
+
+    assert_equal "a", card.name
+    assert_equal "/somewhere", card["href"]
+    assert_includes card["class"], "aside-wrapper"
+    assert card.at_css("img"), "the image is inside the link"
+  end
+
+  # This did nothing at all before: the link was only ever rendered alongside
+  # text, and the image was never wrapped.
+  test "an image-only aside can be linked" do
+    card = aside("image: /media/images/a.jpg\nlink_url: /somewhere").at_css(".card-aside")
+
+    assert_equal "a", card.name
+    assert card.at_css("img")
+  end
+
+  # kramdown treats <a> as inline, so an unguarded anchor gets a paragraph
+  # wrapped round its opening tag and its closing tag escaped into the page.
+  test "a linked aside survives kramdown intact" do
+    html = render("Before.\n\n```card\ntype: aside\ntext: Read on\nlink_url: /somewhere\n```\n\nAfter.\n")
+    doc = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    assert_not_includes doc.text, "</a>", "the closing tag should not be printed as text"
+    assert_equal 1, doc.css("a.card-aside").size
+  end
+
+  test "link is still accepted as link_url" do
+    assert_equal "/somewhere", aside("text: Read on\nlink: /somewhere").at_css(".card-aside")["href"]
+  end
+
+  # Written before link_url existed, with its own call-to-action label. Renders
+  # exactly as it always did — nothing in the builder writes this any more, but
+  # it's sitting in posts.
+  test "an aside with link_text keeps its separate link" do
+    doc = aside("text: Some text\nlink: /somewhere\nlink_text: Read more")
+
+    assert_equal "div", doc.at_css(".card-aside").name, "the card itself isn't a link"
+    assert_equal "Read more", doc.at_css("a.aside-link")&.text
+    assert_equal "/somewhere", doc.at_css("a.aside-link")&.[]("href")
+  end
+
+  # A link inside a link isn't valid, so the card can't be one when the text
+  # already holds one. The image sits outside the text though, so it carries the
+  # link instead — the reader gets both, neither nested in the other.
+  test "when the text has a link, the image carries link_url" do
+    doc = aside("image: /media/images/a.jpg\ntext: See [the docs](/docs)\nlink_url: /somewhere")
+
+    assert_equal "div", doc.at_css(".card-aside").name, "the card itself isn't a link"
+    assert_equal "/somewhere", doc.at_css("a.aside-image-link")&.[]("href")
+    assert doc.at_css("a.aside-image-link img"), "the image is inside it"
+    assert_equal 1, doc.css(".aside-text a").size, "and the text's own link still works"
+  end
+
+  # No image and no room in the text — there's nowhere for it to go, which is
+  # worth saying rather than dropping in silence.
+  test "with no image and a link in the text, link_url has nowhere to go" do
+    markdown = "```card\ntype: aside\ntext: See [the docs](/docs)\nlink_url: /somewhere\n```\n"
+    doc = Nokogiri::HTML::DocumentFragment.parse(render(markdown, preview: true))
+
+    assert_equal "div", doc.at_css(".card-aside").name
+    assert_empty doc.css("a.aside-image-link")
+    assert_equal 1, doc.css(".aside-text a").size, "the text's own link still works"
+    assert_includes doc.at_css("div[style*='dashed']")&.text.to_s, "Nothing left for link_url"
+  end
+
+  # The image only takes the link when the text can't. With plain text the whole
+  # card carries it, image included.
+  test "plain text leaves the link on the whole card" do
+    doc = aside("image: /media/images/a.jpg\ntext: Read on\nlink_url: /somewhere")
+
+    assert_equal "a", doc.at_css(".card-aside").name
+    assert_empty doc.css("a.aside-image-link"), "no second link inside it"
   end
 
   test "aside renders card with aside classes" do
@@ -757,7 +822,7 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_match(/src="\/media\/images\/sidebar\.jpg"/, result)
   end
 
-  test "aside uses default link text when link provided without link_text" do
+  test "a link on its own points the whole card, with no arrow appended" do
     content = <<~MARKDOWN
       ```card
       type: aside
@@ -766,11 +831,15 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       ```
     MARKDOWN
 
-    result = render(content)
+    doc = Nokogiri::HTML::DocumentFragment.parse(render(content))
 
-    # Arrow is added when link is provided but link_text is not
-    assert_match(/→/, result)
-    assert_match(/class="aside-link-inline"/, result)
+    # `link:` used to turn the text itself into a link and tack an arrow on the
+    # end. It now points the whole card instead, so there's no arrow to add and
+    # nothing wrapping the text — a link in the text is markdown's job.
+    assert_equal "a", doc.at_css(".card-aside").name
+    assert_equal "/some-page", doc.at_css(".card-aside")["href"]
+    assert_empty doc.css("a.aside-link-inline")
+    assert_not_includes doc.at_css(".aside-text").text, "→"
   end
 
   # =============================================================================

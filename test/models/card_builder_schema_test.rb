@@ -8,7 +8,9 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
   # option, so guard each type's set.
   SUPPORTED_KEYS = {
     "pullquote"    => %w[text attribution position],
-    "aside"        => %w[text image link link_text],
+    # link/link_text still render for cards written before link_url existed, but
+    # the builder doesn't offer them — see CARD_EXTRA_KEYS.
+    "aside"        => %w[text image link_url link link_text],
     "post-link"    => %w[post style title subtitle show_subtitle excerpt show_excerpt url link_text author date image],
     "product-link" => %w[product style title description show_description url link_text image],
     "player"       => %w[audio title image show_artwork]

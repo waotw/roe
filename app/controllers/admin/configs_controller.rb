@@ -885,6 +885,18 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = File.read(SiteConfig::DEFAULTS_PATH.join("cards.yml"))
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_cards
+    @field_help = build_field_help_for_cards
+
+    # Settings added after an install was created aren't in its cards.yml.
+    # Show them empty so they can be set, without writing to /site/ — the value
+    # lands in the file only when the user saves. Same intent as
+    # @extra_field_defaults in edit_collections, done here because these sit in
+    # a nested section, which that mechanism doesn't reach.
+    section = (@config_hash["post-link"] ||= {})
+    %w[default_show_subtitle default_show_excerpt].each do |key|
+      section[key] = "" unless section.key?(key)
+    end
+
     render :edit
   end
 
@@ -1909,7 +1921,26 @@ class Admin::ConfigsController < Admin::BaseController
   def build_field_options_for_cards
     {
       "post-link.default_style" => [ "small", "medium", "large" ],
+      "post-link.default_show_subtitle" => [ "", "true", "false" ],
+      "post-link.default_show_excerpt" => [ "", "true", "false" ],
       "pullquote.default_position" => [ "center", "left", "right" ]
+    }
+  end
+
+  def build_field_help_for_cards
+    {
+      "post-link.default_show_subtitle" => {
+        title: "Show subtitle",
+        text: ("Leave blank and the card's style decides — off for small, on for medium and large. " \
+               "Set it to have every post-link show or hide the subtitle whatever its style.<br><br>" \
+               "A card can still override this with <code>show_subtitle:</code>.").html_safe
+      },
+      "post-link.default_show_excerpt" => {
+        title: "Show excerpt",
+        text: ("Leave blank and the card's style decides — on for large only. " \
+               "Set it to have every post-link show or hide the excerpt whatever its style.<br><br>" \
+               "A card can still override this with <code>show_excerpt:</code>.").html_safe
+      }
     }
   end
 
