@@ -35,12 +35,18 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     # Both sides now agree on the resolved files — re-baseline, reconcile
     # content on whichever side received writes, and refresh the peer.
     SiteSync::Ledger.write_current!
-    SiteSync::Checker.clear_cache
-    Rails.cache.delete("site_sync:current_fingerprint")
+    invalidate_status_caches
 
     ContentSync.sync_all if pulled
     SiteSync::Exchange.reconcile_peer_content! if pushed
     SiteSync::Exchange.refresh_peer_ledger!
+
+    # Again, now nothing else will touch /site. ContentSync above can rewrite a
+    # file on its way through (a config re-serialized, say), and anything that
+    # read our status in between — an admin page render, the layout banner —
+    # cached an answer computed before that happened. Left alone, the banner
+    # reports drift on a resolve that worked.
+    invalidate_status_caches
 
     write_status(state: :completed, kind: :resolve, started_at: started_at, completed_at: Time.current)
     SiteSync::Exchange.call_peer if SiteSync::Exchange.can_call_peer?
@@ -51,6 +57,13 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   end
 
   private
+
+  # Drop every cached answer about our own sync state. Both are recomputed on
+  # demand — the cost is one /site walk on the next page load.
+  def invalidate_status_caches
+    SiteSync::Checker.clear_cache
+    Rails.cache.delete("site_sync:current_fingerprint")
+  end
 
   # Map each resolved conflict to a concrete action. `local` wins push
   # local's version (or propagate its delete); `live` wins take the peer's.

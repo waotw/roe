@@ -72,11 +72,14 @@ class SiteSyncTransferJob < ApplicationJob
     end
 
     # /site is now in a known-good state matching the other side.
-    # Refresh our ledger + caches so drift indicators clear.
+    # Refresh our ledger + caches so drift indicators clear. Cleared again at
+    # the end — realign_phantom_mtimes! below still changes /site, and anything
+    # that reads the status in between caches an answer from mid-sync. This
+    # early clear is for the paths that never reach the end: a job that fails
+    # partway shouldn't leave the banner describing a state from before it ran.
     update_step(:refreshing_baseline)
     SiteSync::Ledger.write_current!
-    SiteSync::Checker.clear_cache
-    Rails.cache.delete("site_sync:current_fingerprint")
+    invalidate_status_caches
 
     # Reconcile the database against the new on-disk state. rsync only
     # touches files; Post/Page/Product/Medium rows still reference the
@@ -142,6 +145,18 @@ class SiteSyncTransferJob < ApplicationJob
       started_at:   @started_at,
       completed_at: Time.current
     )
+
+    # Once more, now that nothing else is going to touch /site.
+    #
+    # realign_phantom_mtimes! rewrites file mtimes and the ledger with them, but
+    # the caches cleared before it were free to be refilled in the meantime —
+    # by an admin page render, or the layout banner on any navigation, both of
+    # which the "refresh the page to check progress" message invites. A status
+    # cached then is computed against the old mtimes while the ledger holds the
+    # new ones, so the two disagree and the banner reports drift on a sync that
+    # worked. Syncing a second time cleared it, which is what made it look like
+    # the first one hadn't taken.
+    invalidate_status_caches
 
     # Tell the peer about our new state right away — without this,
     # both sides have stale state until the next hourly exchange:
@@ -318,6 +333,13 @@ class SiteSyncTransferJob < ApplicationJob
   # the fingerprints end equal and the sync finishes green. Refreshes the
   # baseline when anything was realigned. Best-effort: a missing peer manifest
   # or hash just skips the realignment (the file resyncs normally next time).
+  # Drop every cached answer about our own sync state. Both are recomputed on
+  # demand — the cost is one /site walk on the next page load.
+  def invalidate_status_caches
+    SiteSync::Checker.clear_cache
+    Rails.cache.delete("site_sync:current_fingerprint")
+  end
+
   def realign_phantom_mtimes!
     peer = SiteSync::Exchange.fetch_peer_manifest
     return unless peer

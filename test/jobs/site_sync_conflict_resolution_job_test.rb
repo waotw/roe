@@ -59,4 +59,39 @@ class SiteSyncConflictResolutionJobTest < ActiveSupport::TestCase
 
     SiteSyncConflictResolutionJob.perform_now(resolutions, conflicts)
   end
+
+
+  # The job clears its status caches, then keeps working — ContentSync can
+  # rewrite a file on its way through. Anything that read our status in between
+  # cached an answer computed before that happened: an admin page render, or the
+  # layout banner on any navigation, both of which "refresh the page to check
+  # progress" invites. Left in place, the banner reports drift on a sync that
+  # worked, and syncing again clears it — which is what made the first one look
+  # like it hadn't taken.
+  test "a status cached after the job starts does not survive it" do
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.stubs(:push_local_to_live!)
+    transport.stubs(:pull_live_to_local!)
+    SiteSync.stubs(:transport).returns(transport)
+
+    # Stands in for a page render landing while the job is still going. Hung off
+    # the last step that can touch /site, which is where the old clear was too
+    # early to help.
+    SiteSync::Checker.unstub(:clear_cache)
+    ContentSync.unstub(:sync_all)
+    ContentSync.stubs(:sync_all).with do
+      Rails.cache.write("site_sync:status", { state: :local_drift })
+      Rails.cache.write("site_sync:current_fingerprint", "stale")
+      true
+    end
+
+    SiteSyncConflictResolutionJob.perform_now(
+      { "ee.md" => "live" }, [ { "path" => "ee.md", "type" => "edit_edit" } ]
+    )
+
+    assert_nil Rails.cache.read("site_sync:status"),
+      "the status cached mid-job should have been cleared at the end"
+    assert_nil Rails.cache.read("site_sync:current_fingerprint")
+  end
 end
