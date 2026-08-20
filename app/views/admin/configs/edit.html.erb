@@ -39,6 +39,13 @@
                config_hash: @config_hash,
                config_schema: @config_schema,
                available_themes: [] %>
+  <% elsif @config_type == 'security' %>
+    <%= render 'shared/config_editor',
+               form_url: admin_update_security_config_path,
+               config_content: @config_content,
+               config_hash: @config_hash,
+               config_schema: @config_schema,
+               available_themes: [] %>
   <% elsif @config_type == 'fonts' %>
     <%= render 'shared/config_editor',
               form_url: admin_fonts_config_path,

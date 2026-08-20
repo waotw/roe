@@ -54,6 +54,7 @@ class ConfigGenerator
     result[:installed].each { |path| puts "✓ Installed #{path}" }
 
     migrate_content_config!
+    migrate_security_config!
   end
 
   # One-time, idempotent migration for the site.yml → content.yml split.
@@ -69,6 +70,28 @@ class ConfigGenerator
     "results_when_opened" => %w[search results_when_opened],
     "soft_line_breaks"    => %w[soft_line_breaks]
   }.freeze
+
+  # ai_crawlers began in site.yml and belongs with the other controls on
+  # automated traffic. Same shape as the content migration below.
+  def migrate_security_config!
+    site_file     = SiteConfig::SITE_FILE
+    security_file = SiteConfig::SECURITY_FILE
+    return unless File.exist?(site_file)
+
+    site = YAML.load_file(site_file) || {}
+    return unless site.key?("ai_crawlers")
+
+    security = (File.exist?(security_file) ? YAML.load_file(security_file) : {}) || {}
+    security["ai_crawlers"] = site.delete("ai_crawlers")
+
+    write_config_yaml(security_file, security)
+    write_config_yaml(site_file, site)
+    SiteConfig.sync_from_file("security")
+    SiteConfig.sync_from_file("site")
+    puts "✓ Migrated ai_crawlers → security.yml"
+  rescue => e
+    Rails.logger.warn "[ConfigGenerator] security migration failed: #{e.class} #{e.message}"
+  end
 
   def migrate_content_config!
     site_file    = SiteConfig::SITE_FILE

@@ -325,6 +325,8 @@ Rails.application.routes.draw do
 
     # Separate config edit routes
     get "configs/site/edit", to: "configs#edit_site", as: "edit_site_config"
+    get "configs/security/edit", to: "configs#edit_security", as: "edit_security_config"
+    patch "configs/security", to: "configs#update_security", as: "update_security_config"
     patch "configs/site", to: "configs#update_site", as: "site_config"
 
     get "configs/content/edit", to: "configs#edit_content", as: "edit_content_config"
@@ -380,6 +382,10 @@ Rails.application.routes.draw do
 
   # Health check
   get "/health", to: "health#check"
+
+  # Served rather than a file in public/, so the AI-crawler setting takes effect
+  # the moment it's saved instead of on the next static build.
+  get "/robots.txt", to: "robots#show", defaults: { format: "text" }
 
   # Member authentication (public-facing)
   post "signin", to: "members/sessions#create"

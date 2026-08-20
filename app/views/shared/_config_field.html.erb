@@ -56,8 +56,11 @@
               <%= 'disabled' if field_depends_on %>
               <% if field_depends_on %>data-depends-on="<%= field_depends_on %>"<% end %>>
         <option value="">Select...</option>
+        <%# Options are bare strings, or [label, value] pairs where the stored
+            value needs explaining — "block_all" says nothing on its own. %>
         <% field_options.each do |option| %>
-          <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
+          <% label, option_value = option.is_a?(Array) ? option : [ option, option ] %>
+          <option value="<%= option_value %>"<% if value.to_s == option_value.to_s %> selected<% end %>><%= label %></option>
         <% end %>
       </select>
       <% if field_hint %>

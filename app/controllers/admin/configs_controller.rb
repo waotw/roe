@@ -157,6 +157,71 @@ class Admin::ConfigsController < Admin::BaseController
     }
   }.freeze
 
+  # security.yml — rate limits for the public endpoints. Field keys are dotted
+  # so the editor buries them into nested YAML (limits.magic_link.to →
+  # limits: { magic_link: { to: … } }), the same way theme.active does.
+  #
+  # Labels say what the limit protects rather than naming the endpoint, because
+  # the person setting it is deciding how much room to give a reader.
+  SECURITY_LIMIT_LABELS = {
+    "magic_link" => [ "Sign-in emails", "per email address" ],
+    "signup"     => [ "Sign-ups", "per connection" ],
+    "checkout"   => [ "Sign-up with checkout", "per connection" ],
+    "token"      => [ "Link and token attempts", "per connection" ]
+  }.freeze
+
+  SECURITY_CONFIG_SCHEMA = {
+    rate_limiting: {
+      label: "Rate Limiting",
+      fields: {
+        "enabled" => {
+          type: :checkbox,
+          label: "Limit repeated requests",
+          hint: "Slows down abuse of the endpoints that send email, create accounts or accept tokens. " \
+                "It is not protection against a denial-of-service attack — a flood is stopped at your host " \
+                "or CDN, before it ever reaches Roe."
+        }
+      }
+    },
+
+    ai_crawlers: {
+      label: "AI Crawlers",
+      fields: {
+        "ai_crawlers" => {
+          type: :select,
+          label: "AI crawlers",
+          options: [
+            [ "Block training and AI answers", "block_all" ],
+            [ "Block training only", "block_training" ],
+            [ "Allow everything", "allow" ]
+          ],
+          hint: "Written into robots.txt. Blocking training keeps your writing out of model training sets; " \
+                "blocking AI answers as well takes the site out of AI search results, which is a real cost. " \
+                "Ordinary search engines are never blocked either way. robots.txt is a request — the large " \
+                "operators honour it, anything spoofing its user agent does not, so anything that must not be " \
+                "read by a machine belongs behind an audience setting instead."
+        }
+      }
+    },
+
+    limits: {
+      label: "Limits",
+      fields: RateLimits::DEFAULTS.each_with_object({}) do |(name, default), fields|
+        label, scope = SECURITY_LIMIT_LABELS.fetch(name, [ name.humanize, "per connection" ])
+        fields["limits.#{name}.to"] = {
+          type: :text,
+          label: "#{label} allowed",
+          hint: "How many, #{scope}. Default #{default['to']}."
+        }
+        fields["limits.#{name}.within"] = {
+          type: :text,
+          label: "#{label} — minutes",
+          hint: "The window those are counted in. Default #{default['within']}."
+        }
+      end.freeze
+    }
+  }.freeze
+
   # Content settings — split into its own content.yml (search nested). Field
   # keys are dotted so the editor buries them into nested YAML
   # (search.all_pages → search: { all_pages: ... }), the same way theme.active
@@ -362,6 +427,14 @@ class Admin::ConfigsController < Admin::BaseController
       }
     ]
 
+    global_files << {
+      name: "security.yml",
+      path: "global/security.yml",
+      type: "security",
+      description: "rate limits for sign-in, sign-up and tokens",
+      edit_path: admin_edit_security_config_path
+    }
+
     # Always show deploy.yml (ships with Roe)
     if File.exist?(SiteConfig::DEPLOY_FILE)
       global_files << {
@@ -556,6 +629,22 @@ class Admin::ConfigsController < Admin::BaseController
 
   def update_site
     update_config("site", SiteConfig::SITE_FILE)
+  end
+
+  # GET — security.yml. Rate limits for the public endpoints, one section per
+  # limit. The file is written on first save; until then the form shows the
+  # defaults that are already in force, so what's on screen is what's running.
+  def edit_security
+    @config_type = "security"
+    @config_content = File.exist?(SiteConfig::SECURITY_FILE) ? File.read(SiteConfig::SECURITY_FILE) : ""
+    @config_hash = (YAML.safe_load(@config_content) if @config_content.present?) || {}
+    @config_schema = SECURITY_CONFIG_SCHEMA
+    @available_themes = []
+    render :edit
+  end
+
+  def update_security
+    update_config("security", SiteConfig::SECURITY_FILE)
   end
 
   # GET — dedicated edit page for content.yml (rendering + search), split

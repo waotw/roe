@@ -1191,10 +1191,9 @@ class StaticGenerator
 
   def generate_robots
     puts "🤖 Generating robots.txt..."
-    host = site_url_base
-    body = "User-agent: *\nAllow: /\n\nSitemap: #{host}/sitemap.xml\n"
+    body = AiCrawlers.robots_txt(sitemap_url: "#{site_url_base}/sitemap.xml")
     write_file("robots.txt", body)
-    puts "  ✓ robots.txt"
+    puts "  ✓ robots.txt (#{AiCrawlers.blocked.size} AI crawlers disallowed)"
   end
 
   # Bake the public search index so client-side site search works with no

@@ -208,6 +208,30 @@
                   </div>
                 </div>
 
+              <% elsif @config_type == 'security' %>
+                <% [ :rate_limiting, :ai_crawlers, :limits ].each do |section| %>
+                  <div class="config-section mb-10">
+                    <h3 class="text-base font-semibold text-gray-900 mb-1"><%= config_schema[section][:label] %></h3>
+                    <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                      <%# A site with no security.yml yet is still rate limited —
+                          RateLimits falls back to its defaults. Show those, so
+                          the form reports what's running rather than blanks. %>
+                      <% config_schema[section][:fields].each do |field_name, field_config| %>
+                        <%= render 'shared/config_field',
+                                 field_name: field_name,
+                                 field_config: field_config,
+                                 value: security_field_value(flattened_config, field_name),
+                                 all_values: flattened_config %>
+                      <% end %>
+                      <% if section == :ai_crawlers %>
+                        <p class="text-xs text-gray-500">
+                          Preview it at <%= link_to "/robots.txt", "/robots.txt", target: "_blank", rel: "noopener", class: "underline" %>.
+                        </p>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+
               <% elsif @config_type == 'content' %>
                 <!-- Content Section -->
                 <div class="config-section mb-10">
