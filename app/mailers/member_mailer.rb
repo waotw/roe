@@ -183,11 +183,28 @@ class MemberMailer
 
         result
       else
-        # Postmark not configured — fall back to Rails ActionMailer (letter_opener in dev)
+        # Postmark not configured — fall back to Rails ActionMailer.
         Rails.logger.info "📬 Postmark not configured, falling back to ActionMailer"
-        FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
-        { success: true, fallback: true }
+        deliver_via_fallback(to: to, subject: subject, html_content: html_content)
       end
+    end
+
+    # ActionMailer is a real delivery path in development, where letter_opener
+    # catches the mail and the sign-in link is right there. In production it's
+    # SMTP against settings nobody filled in — localhost:25, which isn't there —
+    # and Rails raises delivery errors by default. That exception had nothing
+    # catching it, so a members site with no Postmark token answered sign-in
+    # with a 500.
+    #
+    # Now it degrades instead: the page still works, the log says what's wrong,
+    # and the result says the mail didn't go rather than claiming it did.
+    def deliver_via_fallback(to:, subject:, html_content:)
+      FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
+      { success: true, fallback: true }
+    rescue StandardError => e
+      Rails.logger.error "❌ No email delivery configured — '#{subject}' to #{to} was not sent " \
+                         "(#{e.class}: #{e.message}). Add a Postmark token in Settings → Email."
+      { success: false, fallback: true, error: "Email delivery isn't configured" }
     end
 
     def site_url

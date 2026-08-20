@@ -206,7 +206,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     patch admin_mode_newsletters_config_path, params: { mode: "live" }
 
     assert_redirected_to admin_edit_newsletters_config_path(tab: "live")
-    assert_equal "Newsletters mode set to Live", flash[:notice]
+    assert_equal "Email mode set to Live", flash[:notice]
     assert postmark.reload.mode_live?
   end
 

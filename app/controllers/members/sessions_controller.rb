@@ -33,9 +33,20 @@ module Members
         member.regenerate_token!
 
         # Send magic link email immediately (no .deliver_now needed)
-        MemberMailer.magic_link(member)
+        result = MemberMailer.magic_link(member)
 
-        redirect_to_check_email
+        # Nothing was sent — almost always a site with members turned on and no
+        # email configured. Say so rather than sending someone to watch an inbox
+        # for a link that was never going to arrive. Deliberately vague: what's
+        # broken is the site owner's to fix, and the visitor can't act on it.
+        if result.is_a?(Hash) && result[:success] == false
+          # Redirect rather than render: the sign-in form is a Page, and a site
+          # that hasn't got one would blow up on the template instead of showing
+          # the message.
+          redirect_to "/sign-in", alert: "We couldn't send the sign-in email. Please try again shortly."
+        else
+          redirect_to_check_email
+        end
       else
         flash.now[:alert] = "No account found with that email"
         @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")

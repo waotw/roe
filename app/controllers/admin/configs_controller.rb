@@ -553,13 +553,16 @@ class Admin::ConfigsController < Admin::BaseController
       }
     end
 
-    if SiteFeature.newsletters_feature_enabled?
+    # Shown whenever members are on. Sign-in emails go through this whether or
+    # not the site ever sends a newsletter, so gating it on newsletters left the
+    # one setting a members-only site needs hidden from it.
+    if SiteFeature.email_feature_enabled?
       integration_files << {
         name: "postmark.yml",
         path: "integrations/postmark.yml",
-        description: "Postmark test token",
+        description: "Email delivery — sign-in links, confirmations, newsletters",
         edit_path: admin_edit_newsletters_config_path,
-        unconfigured: SiteFeature.newsletters_unconfigured?
+        unconfigured: SiteFeature.email_unconfigured?
       }
     end
 
@@ -1668,7 +1671,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_newsletters_mode
-    update_integration_mode(PostmarkConfig.current, "Newsletters")
+    update_integration_mode(PostmarkConfig.current, "Email")
     redirect_to admin_edit_newsletters_config_path(tab: PostmarkConfig.current.mode)
   end
 

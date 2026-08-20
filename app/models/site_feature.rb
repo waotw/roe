@@ -43,7 +43,21 @@ module SiteFeature
     SiteConfig.feature("members", "payments.enabled") == true
   end
 
-  # Newsletters enabled = members enabled AND newsletter.enabled in members.yml
+  # Email is required by members, not optional alongside them: a magic link IS
+  # the sign-in mechanism, so a members site with no way to send one has no way
+  # to let anyone in. Enabled with members, never separately.
+  #
+  # This used to hang off newsletter.enabled, which meant a site running free
+  # members with newsletters off never had postmark.yml generated and never saw
+  # the setting in Settings — so every sign-in email fell through to a fallback
+  # mailer that reports success and delivers nothing.
+  def email_feature_enabled?
+    members_enabled?
+  end
+
+  # Newsletters enabled = members enabled AND newsletter.enabled in members.yml.
+  # Sending posts as broadcasts, and nothing else — it no longer decides whether
+  # email works at all.
   def newsletters_feature_enabled?
     return false unless members_enabled?
     SiteConfig.feature("members", "newsletter.enabled") == true
@@ -55,9 +69,10 @@ module SiteFeature
     File.exist?(File.join(INTEGRATIONS_PATH, "stripe.yml"))
   end
 
-  def newsletters_integration_file?
+  def email_integration_file?
     File.exist?(File.join(INTEGRATIONS_PATH, "postmark.yml"))
   end
+  alias_method :newsletters_integration_file?, :email_integration_file?
 
   def snipcart_integration_file?
     File.exist?(File.join(INTEGRATIONS_PATH, "snipcart.yml"))
@@ -69,6 +84,12 @@ module SiteFeature
     payments_feature_enabled? && StripeConfig.current.keys_present?
   end
 
+  # Can we actually send anything: the feature is on and Postmark has keys.
+  def email_enabled?
+    email_feature_enabled? && PostmarkConfig.current.keys_present?
+  end
+
+  # Can we send a newsletter: email works AND broadcasts are turned on.
   def newsletters_enabled?
     newsletters_feature_enabled? && PostmarkConfig.current.keys_present?
   end
@@ -91,16 +112,19 @@ module SiteFeature
   # Returns true if ANY enabled integration needs attention for current mode.
 
   def any_integration_unconfigured?
-    payments_unconfigured? || newsletters_unconfigured? || snipcart_unconfigured?
+    payments_unconfigured? || email_unconfigured? || snipcart_unconfigured?
   end
 
   def payments_unconfigured?
     payments_feature_enabled? && !stripe_configured?
   end
 
-  def newsletters_unconfigured?
-    newsletters_feature_enabled? && !postmark_configured?
+  # The orange dot follows members, not newsletters. A members site without
+  # working email is broken whether or not it ever sends a broadcast.
+  def email_unconfigured?
+    email_feature_enabled? && !postmark_configured?
   end
+  alias_method :newsletters_unconfigured?, :email_unconfigured?
 
   def snipcart_unconfigured?
     store_enabled? && !snipcart_configured?

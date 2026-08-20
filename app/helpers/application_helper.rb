@@ -147,6 +147,8 @@ module ApplicationHelper
   def payments_enabled?           = SiteFeature.payments_enabled?
   def memberships_enabled?        = SiteFeature.memberships_enabled?
   def donations_enabled?          = SiteFeature.donations_enabled?
+  def email_enabled?              = SiteFeature.email_enabled?
+  def email_feature_enabled?      = SiteFeature.email_feature_enabled?
   def newsletters_enabled?        = SiteFeature.newsletters_enabled?
   def postmark_configured?        = SiteFeature.postmark_configured?
   def store_enabled?              = SiteFeature.store_enabled?
