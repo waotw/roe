@@ -14,6 +14,10 @@ class MemberMailer
         site_name: site_name
       })
 
+      # Printed in development so the link is usable from the terminal when
+      # there's no browser to open — a remote box, or a preview turned off.
+      Rails.logger.info "🔑 Magic link for #{member.email}: #{signin_url}" if Rails.env.development?
+
       send_email(
         to: member.email,
         to_name: member.name || member.email,
@@ -181,6 +185,14 @@ class MemberMailer
           Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
         end
 
+        # Postmark took it, but a sandbox server records without delivering and
+        # a live one delivers somewhere you aren't. letter_opener is already the
+        # development delivery method — it just never fired here, because it
+        # sits on the fallback path a configured Postmark skips. Hand it a copy
+        # so the mail opens locally with a working link, while the real request
+        # still goes to Postmark and shows up in Activity.
+        preview_locally(to: to, subject: subject, html_content: html_content)
+
         result
       else
         # Postmark not configured — fall back to Rails ActionMailer.
@@ -205,6 +217,17 @@ class MemberMailer
       Rails.logger.error "❌ No email delivery configured — '#{subject}' to #{to} was not sent " \
                          "(#{e.class}: #{e.message}). Add a Postmark token in Settings → Email."
       { success: false, fallback: true, error: "Email delivery isn't configured" }
+    end
+
+    # Development only, and never allowed to affect the send. ROE_EMAIL_PREVIEW=0
+    # turns it off for anyone who'd rather not have a browser tab per email.
+    def preview_locally(to:, subject:, html_content:)
+      return unless Rails.env.development?
+      return if ENV["ROE_EMAIL_PREVIEW"] == "0"
+
+      FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
+    rescue StandardError => e
+      Rails.logger.debug "[MemberMailer] local preview skipped: #{e.class} #{e.message}"
     end
 
     def site_url
