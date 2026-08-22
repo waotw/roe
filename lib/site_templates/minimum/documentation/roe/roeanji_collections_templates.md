@@ -114,6 +114,26 @@ A `grid` Collection also has its own options:
 - `groups` — set to `true` to show grouped products as a single card, such as one book sold as ePub, Paperback, and Hardback
 - `aspect_ratio` — the shape of the product images in the grid
 
+### When to use the `playlist` template
+
+<mark>Music only:</mark> the `playlist` template needs the **Music** feature turned on. Until then the option doesn't appear.
+
+A `playlist` lays out a set of tracks as a numbered list with a single player at the top. Clicking a track loads it into that player, so a visitor can work through a release without the page jumping about.
+
+It's built for [music posts](/documentation/roe/posts#music). A release is a collection filtered to it and ordered by track number:
+
+````markdown
+```collection
+source: posts
+post_type: music
+release: the-quiet-hours
+order: track_number
+template: playlist
+```
+````
+
+`order: track_number` is what puts them in running order. Without it you'll get them by date, which is rarely what a release wants.
+
 ### When to use the `glossary` template
 
 The `glossary` template renders a column of short definitions. Roe's own [glossary](https://go-roe.com/documentation/roe/glossary) is built this way. Most sites won't need it. Each entry shows:

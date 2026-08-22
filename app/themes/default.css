@@ -2439,6 +2439,7 @@ figcaption {
   display: none;
 }
 
+.card-aside .aside-image-link,
 .card-aside .aside-image {
   grid-column: 1;
   grid-row: 1;
@@ -2470,13 +2471,12 @@ a.aside-link-inline {
   color: var(--color-text);
 }
 
-.card-aside .aside-wrapper {
+.card-aside.aside-wrapper {
   text-decoration: none;
   color: inherit;
-  display: block;
 }
 
-.card-aside .aside-wrapper:hover {
+.card-aside.aside-wrapper:hover {
   opacity: 0.7;
 }
 
@@ -2497,6 +2497,7 @@ article .content,
   .card-aside {
     grid-template-columns: 1fr;
   }
+  .card-aside .aside-image-link,
   .card-aside .aside-image {
     grid-column: 1;
     grid-row: 1;

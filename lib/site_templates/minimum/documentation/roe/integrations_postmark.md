@@ -16,17 +16,21 @@ template: links
 
 # Setting up Postmark to work with Roe
 
-Roe has a full featured newsletter system that supports free and paid members. Members can sign up with just their name/email, no password required. 
+Postmark is how Roe sends email. That covers two different things:
+
+- **Sign-in links and confirmations**, required by the Members feature in Roe. Members sign in with their email address.
+- **Newsletters**, if you turn them on.
+
+Members can sign up with just their name and email.
 
 #### Before Postmark
 
-1. You'll need to enable the Members feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE MEMBERS`. You will then set up Members and there you can enable `Newsletters` which turns on Postmark in Roe.
-2. You'll want to make sure that you've added Author Email to: [Admin → Settings → site.yml](/admin/configs/site/edit). This is the email address that will be used by Postmark.
+1. You'll need to enable the Members feature, go to: [Settings](/admin/configs) and click `ENABLE MEMBERS`. Postmark appears in your settings as soon as Members is on — you don't need Newsletters for it. Turn Newsletters on separately if you want to send posts to your list.
+2. You'll want to make sure that you've added Author Email to: [Settings → site.yml](/admin/configs/site/edit). This is the email address that will be used by Postmark.
 
 ## 1. Basic Postmark Setup
 
-Postmark has good documentation. Use this article to get your account set up correctly:  
-[Getting started with Postmark](https://postmarkapp.com/support/article/1002-getting-started-with-postmark). This ensures that your emails are delivered reliably. Make sure to verify the email address you've set in Roe as your Author Email: [Admin → Settings → site.yml](/admin/configs/site/edit)
+Postmark has good documentation. Use this article to get your account set up correctly: [Getting started with Postmark](https://postmarkapp.com/support/article/1002-getting-started-with-postmark). This ensures that your emails are delivered reliably. On Postmark, make sure to verify the Author Email you've set in Roe: [Settings → site.yml](/admin/configs/site/edit)
 
 1. Create a new Server or use the defaults created with your account (you can rename them)
     - [Servers FAQ](https://postmarkapp.com/support/article/1137-servers-faq)
@@ -38,7 +42,7 @@ Postmark has good documentation. Use this article to get your account set up cor
 
 ### 2. Connect Postmark to Roe
 
-1. Go to: [Admin → Settings → postmark.yml](/admin/configs/newsletters/edit)
+1. Go to: [Settings → postmark.yml](/admin/configs/newsletters/edit)
 2. Paste your Server API Token
 3. Click **"Save Configuration"**
 4. You'll see a green confirmation if successful

@@ -5,6 +5,7 @@ url_name: snipcart
 tags: integration
 related:
   - store
+  - products
 ---
 
 ##### Related documentation
@@ -30,7 +31,9 @@ The Store feature lets you sell products directly from your site using [Snipcart
 
 ## The Snipcart side
 
-Snipcart walks you through creating an account when you sign up. This article covers only the piece Roe needs from it.
+Snipcart walks you through setting up an account when you sign up in the "Get started with Snipcart" steps. Go through each step in that list and you'll be ready to test and process real payments.
+
+This article covers only the pieces Roe needs from Snipcart.
 
 Snipcart has a [Test mode and a Live mode ↗](https://docs.snipcart.com/v3/testing/environment), and Roe has the same two modes:
 
@@ -55,6 +58,48 @@ When you make the store public, the domain in your Snipcart dashboard must match
 
 - [Snipcart: Domains & URLs ↗](https://docs.snipcart.com/v3/dashboard/domains-urls)
 - [Roe: Store](/documentation/roe/store)
+
+## Digital goods
+
+A digital good is a file Snipcart delivers after payment — an album, a PDF, a sample pack. You upload the file to Snipcart, and connect it to the product in Roe.
+
+Snipcart identifies each uploaded file by a **GUID**, a long identifier that looks like this:
+
+```
+7235bd18-1745-488e-bdbb-dc4f424c1ca1
+```
+
+A GUID is the only link between your product in Roe and the file in Snipcart, and you copy it into Roe.
+
+### Selling a file
+
+1. Open Snipcart's [Digital Goods ↗](https://app.snipcart.com/dashboard/digital) page and drag your file into the drop zone.
+   Snipcart uploads it and shows you a `GUID`.
+2. Copy the `GUID`.
+3. In Roe, open or create a Product for this file — see [Products](/documentation/roe/products).
+4. In the product's metadata, check the `digital` toggle let Roe know this is a digital good.
+   A `file_guid` field appears below it.
+5. Paste the GUID into `file_guid`.
+6. Save.
+
+The `file_guid` field has a link straight back to Snipcart's Digital Goods page so you can copy/paste it in Roe. Roe warns you in the editor if the GUID is missing or malformed. If `digital` is checked and the `file_guid` has issues, the `ADD TO CART` button won't render. This is to prevent a user from paying for something that won't be delivered.
+
+### What you set in Snipcart, not Roe
+
+Two things about the download live on Snipcart's side, on the same [Digital Goods ↗](https://app.snipcart.com/dashboard/digital) page where you uploaded the file:
+
+- **Access expiry** — how many days the download link keeps working.
+- **Download limit** — how many times a buyer can download the file.
+
+See [Snipcart: Store management ↗](https://docs.snipcart.com/v3/dashboard/store-management) for more info.
+
+### Selling several files as variants in a Product Group
+
+Each variant is its own product with its own SKU, so each one carries its own `file_guid`. A release sold as MP3 and FLAC is two products in a group, each pointed at a different upload. See [Product variants & groups](/documentation/roe/products#product-variants-groups).
+
+### Turning it off
+
+Setting `digital` back to `false` hides the GUID field and Roe will no longer send it to Snipcart. The product goes back to being physical and shipped, and the cart asks for an address again. The GUID stays in the file in case you switch back, but it does nothing while the toggle is off.
 
 ---
 

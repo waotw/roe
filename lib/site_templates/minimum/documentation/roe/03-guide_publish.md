@@ -90,10 +90,10 @@ cPanel allows you to create SSH Keys. We recommend creating the key in cPanel an
 3. Click "Manage SSH Keys"
 4. Click "+ Generate a New Key"
 5. Fill in these options:
-  - Key Name: `id_rsa_roe`
-  - Password: add your own passphrase or password and save it in a safe place
-  - Key Type: `RSA`
-  - Key size: `2048`
+    - Key Name: `id_rsa_roe`
+    - Password: add your own passphrase or password and save it in a safe place
+    - Key Type: `RSA`
+    - Key size: `2048`
 6. Click "Generate Key" 
 7. It will confirm the Key's creation, click "← Go Back"
 

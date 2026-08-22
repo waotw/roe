@@ -23,11 +23,10 @@ Your Post files are in the `/site/posts` folder in your `Roe` folder (where you'
 
 Posts are dated content that appears in feeds and collections. They're the primary content type for:
 
-- Blog articles
+- Blog posts & Newsletters
 - Podcast episodes
-- Video posts
-- Audio/music posts
-- Newsletters
+- Music tracks
+- Video or audio posts
 
 Posts are ordered by date (newest first by default) and appear in your RSS/Atom feeds automatically.
 
@@ -39,14 +38,15 @@ Set the `post_type` in your metadata to control how a post is displayed:
 |------|---------|
 | `article` | Standard blog posts (default) |
 | `podcast` | Podcast episodes with audio player and feed support |
-| `audio` | Music or audio posts |
+| `music` | Tracks, grouped into releases — see [Settings → Music](/documentation/roe/settings-music) |
+| `audio` | Non-podcast audio posts |
 | `video` | Video posts with player |
 
 Changing the post type in the editor reveals different metadata fields. For example, `podcast` shows episode number, duration, and audio file fields.
 
 ## Creating Posts
 
-Create a new post in [Admin → Posts](/admin/posts) or add a `.md` file to `/site/posts`.
+Create a new post in [Admin → Posts](/admin/posts) or add any markdown file (`.md`) to your `site/posts` folder in the Roe folder.
 
 ### Required Metadata
 
@@ -63,7 +63,7 @@ status: published
 | Field | Description |
 |-------|-------------|
 | `date` | Publish date in `YYYY-MM-DD` format. Controls sort order. |
-| `post_type` | `article`, `podcast`, `audio`, or `video` |
+| `post_type` | `article`, `podcast`, `music`, `audio`, or `video` |
 | `author` | Post author (defaults to site author if not set) |
 | `podcast` | Which podcast feed this belongs to (for podcast episodes) |
 | `audio` | Audio file path (for podcast/audio posts) |
@@ -129,6 +129,44 @@ Use [The Editor](/documentation/roe/the-editor) to write post content. The edito
 ## Podcast Episodes
 
 Podcast episodes are posts with `post_type: podcast`. See [Podcasts](/documentation/roe/podcasts) for full details on creating and managing podcast feeds.
+
+## Music
+
+<mark>Music only:</mark> `post_type: music` needs the **Music** feature turned on. Until then it won't appear in the post-type list. Enable the music feature at [Admin → Settings](/admin/configs) — see [Settings → Music](/documentation/roe/settings-music).
+
+A music post is a track. Alongside the usual fields it takes:
+
+- `audio` — the track itself
+- `release` — which release it belongs to, defaults to "singles"
+- `track_number` — its place on that release
+- `duration` — filled in from the audio file
+
+You don't have to set up a release first. Roe seeds one called `singles`, and new music posts use it unless you choose otherwise, so a one-off track works straight away.
+
+A track with no `image` of its own uses the cover are from the release in the player. [Settings → Music](/documentation/roe/settings-music) covers defining releases and what each one can set.
+
+### Credits and codes
+
+These live with the track, because they describe this recording:
+
+| Field | What it's for |
+|-------|---------------|
+| `explicit` | `true` or `false`. Marks the track, and its release's feed, as explicit |
+| `isrc` | The recording's code, e.g. `QMZ123456789` |
+| `songwriters` | Legal names, comma-separated — not stage names |
+| `lyrics` | The full text |
+
+`isrc`, `songwriters` and `lyrics` are stored with the track and not yet shown anywhere. Fill them in if you want the record kept alongside the music; nothing depends on them.
+
+Switching a post to `post_type: music` adds these fields to the editor.
+
+### Showing a release
+
+Use a [collection](/documentation/roe/collections) filtered by `release:`, and order it by `track_number` to get the running order. The [`playlist` template](/documentation/roe/collections_templates#when-to-use-the-playlist-template) lays those out as a track list with a player at the top.
+
+Roe warns you in the editor if a track number is already taken within the same release, so two tracks don't end up sharing the same position.
+
+A release can also be published as a podcast feed, which is a tick box in [Settings → Music](/documentation/roe/settings-music#releasing-music-as-a-podcast-feed). Tracks will appear in the order of the `track_numbers` for each track.
 
 ## Audio & Video Posts
 

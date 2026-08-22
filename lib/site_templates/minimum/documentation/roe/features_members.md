@@ -103,6 +103,14 @@ The upgrade button only appears if payments are enabled in your config.
 
 **Just a link to sign-up?** For a call-to-action that sends readers to the sign-up page rather than embedding the form, use the Roe-anji [`subscribe` button](/documentation/roe/forms-and-buttons#subscribe-button) — a `button` block with `for: subscribe`.
 
+### Email is required
+
+Members sign in with a link sent to their address, so a site with Members turned on needs a way to send email. Set up [Postmark](/documentation/roe/postmark) — it appears in your settings as soon as Members is on.
+
+Newsletters are separate, and optional. Turn them on when you want to send posts to your list; leave them off and sign-in emails still work.
+
+If email isn't set up, Roe shows an orange dot beside your settings and tells anyone trying to sign in that the message couldn't be sent, rather than leaving them watching an inbox.
+
 ### Email Templates
 
 Member emails are customizable Markdown files: [Admin → Emails](/admin/emails)

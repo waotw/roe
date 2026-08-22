@@ -110,7 +110,11 @@ Named feeds are for standard content. A podcast needs its own feed with enclosur
 
 Podcast episodes have their own dedicated RSS feeds with full iTunes/Apple Podcasts support. These are separate from the main blog feed.
 
-See [Podcast Feeds & Tags](/documentation/podcast-feed-tags) for full details on podcast feed URLs, paid/private feeds, and the iTunes tags Roe generates.
+See [Podcast Feeds & Tags](/documentation/roe/podcast-feed-tags) for full details on podcast feed URLs, paid/private feeds, and the iTunes tags Roe generates.
+
+## Music Release Feeds
+
+Music releases can be published as podcast feeds so people can add them to their podcast players. They can be paid/private just like the Podcasts feature so only paying members can access the release.
 
 ## Auto-Discovery
 

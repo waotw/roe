@@ -41,6 +41,21 @@ Admins can access the private feed directly without a token.
 
 <mark>Note:</mark> If a podcast’s `audience` is set to `paid` in podcast.yml, no public feed exists at all — only the private feed.
 
+### Music Release Feed
+
+A music release published as a feed gets the same two URLs a podcast does, derived from the release key:
+
+| Feed | URL | Who can access it |
+|------|-----|-------------------|
+| Public feed | `/music/{release-key}.xml` | Everyone |
+| Private feed | `/music/{release-key}/private.xml?token={member-token}` | Paid members only |
+
+It's the same RSS format, built from the release rather than from `podcast.yml`, so the tags below apply — with the differences noted in [Release Feed Differences](#release-feed-differences).
+
+Paid tracks behave exactly as paid episodes do. The public feed omits their audio, or shows them as teasers when **Show Paid Content** is on; the private feed carries every track with full audio. Paid, active members get their link on a track's page, and admins can open the private feed without a token.
+
+<mark>Note:</mark> If a release's `audience` is `paid`, no public feed exists at all — only the private feed. Turning the feed off removes both.
+
 ---
 
 ## Channel-Level (Podcast Configuration)
@@ -108,3 +123,31 @@ Admins can access the private feed directly without a token.
 | `itunes:season` | `season` | Season number (for seasonal shows) |
 | `itunes:subtitle` | `subtitle` | Short teaser/tagline |
 | `itunes:author` | `author` | Override podcast default author |
+
+---
+
+## Release Feed Differences
+
+A [music release feed](/documentation/roe/settings-music#releasing-music-as-a-podcast-feed) uses the same format, filled in from the release and its tracks instead of from `podcast.yml`. What differs:
+
+| Tag | Where it comes from | Note |
+|:----|:--------------------|:-----|
+| `itunes:category` | Always `Music` | Apple validates categories against a fixed list, so a release's `genre` can't be used here |
+| `itunes:type` | Always `serial` | Players start at track one instead of the newest track |
+| `itunes:episode` | `track_number` | A track's place in the running order |
+| `itunes:explicit` | Any track's `explicit` | One explicit track marks the whole release |
+| `itunes:author`, `itunes:owner` | The release's artist | Falls back to the default artist, then your site author |
+| `itunes:image` | The release's `cover` | |
+| `description` | The release's `synopsis` | |
+| `itunes:owner` email | `author_email` in [site.yml](/admin/configs/site/edit) | Apple emails it to verify you own the feed |
+
+Two tags appear only in a release feed:
+
+| Tag | Value | Why |
+|:----|:------|:----|
+| `podcast:medium` | `music` | Tells apps that read the Podcasting 2.0 namespace to treat the feed as music rather than as a show |
+| `category` | The release's `genre` | Plain RSS, not iTunes. Carries the genre where it can't cause a rejection |
+
+Both are additive and sit in territory Apple and Spotify ignore, so they don't affect distribution. Neither appears in a podcast feed.
+
+Tracks are sorted by `track_number`, with unnumbered tracks last. Only published tracks on that release are included.

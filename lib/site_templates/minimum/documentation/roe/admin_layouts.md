@@ -32,12 +32,10 @@ When you set the Colleciton `template` to `menu`, this Collection will render on
 
 ````markdown
 ```collection
-```collection
 source: pages
 template: menu
 style: horizontal
 order: blog, blog-tags, podcast, about, support, documentation, store
-```
 ```
 ````
 

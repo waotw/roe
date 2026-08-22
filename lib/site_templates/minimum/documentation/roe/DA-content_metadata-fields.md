@@ -73,7 +73,7 @@ Posts are dated content — blog articles, podcast episodes, audio, and video. I
 | Field | Values | Description |
 |-------|--------|-------------|
 | `date` | `YYYY-MM-DD` | Publish date. Controls sort order in collections and feeds. Required for published posts. |
-| `post_type` | `article` `podcast` `audio` `video` | Controls the post layout and which extra fields appear. Defaults to `article`. |
+| `post_type` | `article` `podcast` `music` `audio` `video` | Controls the post layout and which extra fields appear. Defaults to `article`. |
 | `author` | Any text | Post author. Defaults to the site-wide author if not set. |
 
 ### Audience (when Members is enabled)
@@ -137,6 +137,25 @@ A podcast episode with RSS feed support. Adds:
 
 <mark>Note:</mark> The `guid` field is managed by Roe automatically when a podcast episode is published. It is intentionally locked to prevent it from changing, since podcast apps use it to track which episodes a listener has already downloaded.
 
+### `music`
+
+A track, grouped into a release. Needs the Music feature on — see [Settings → Music](/documentation/roe/settings-music). Adds:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `audio` | Yes | Path to the audio file. |
+| `release` | No | Which release this track belongs to. Chosen from the releases in your music config. Defaults to `singles`. |
+| `track_number` | No | Its place in the release's running order. Also becomes the episode number if you create a podcast feed out of the release. |
+| `duration` | No | Duration string (e.g., `3:45`). Extracted from the audio file. |
+| `explicit` | No | `true` or `false`. One explicit track marks its release's whole feed as explicit. |
+| `isrc` | No | The recording's code (e.g., `QMZ123456789`). Stored with the track; not shown anywhere yet. |
+| `songwriters` | No | Legal names, comma-separated. Stored with the track; not shown anywhere yet. |
+| `lyrics` | No | The full text. Stored with the track; not shown anywhere yet. |
+| `image` | No | Track artwork. Falls back to the release's cover. |
+| `guid` | — | Unique track identifier. **Set automatically — do not edit.** |
+
+<mark>Note:</mark> Published tracks get a locked `guid` for the same reason podcast episodes do. A release can be published as a podcast feed, since podcast apps use it to track which episodes a listener has already downloaded.
+
 ---
 
 ## Pages
@@ -165,6 +184,8 @@ Products require a few additional fields for the store to work:
 | `group` | No | Groups variants together (e.g., same book in different formats). Use the same value on all variants. |
 | `variant` | No | Label for this variant (e.g., `Paperback`, `Digital`). |
 | `primary` | `true` `false` | When grouping variants, marks which one shows first in collections. |
+| `digital` | `true` `false` | A downloadable file rather than something you ship. Reveals `file_guid` and drops shipping from the cart. |
+| `file_guid` | When `digital` | The file's GUID from your Snipcart dashboard. See [Digital goods](/documentation/roe/snipcart#digital-goods). |
 
 See [Products](/documentation/roe/products) for a full guide to creating and grouping products.
 

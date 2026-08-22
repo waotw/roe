@@ -45,12 +45,25 @@ Roe does no auto-save; you're in control. Use `cmd/ctrl–s` (or the `SAVE` butt
 
 Hit `cmd/ctrl–p` (or the `PREVIEW` button) to open a live preview in a new tab. It shows your work *including unsaved changes*, so you can see how things look before you save. Put The Editor and the Preview tab side-by-side, while you write and it **refreshes as you type**, so you can see how things will look as you go.
 
-### Table of Contents
+### Table of Contents and Markdown Check
 
-You can access the TOC same as the metadata with the `▶︎` button. This allows you to:
+Below the buttons are two tabs sharing one panel: `Table of Contents` and `Markdown Check`. Open either with its `▶︎`. Only one shows at a time, so opening one closes the other.
 
-- jump to a particular heading and is great for navigating long documents. It will close as soon as you start typing.
-- copy a url that links directly to that heading
+**Table of Contents** lists the headings in what you're writing. Use it to:
+
+- jump to a particular heading, which is a help in a long piece. It closes as soon as you start typing.
+- copy a link that goes straight to that heading
+
+**Markdown Check** helps you format your markdown correctly. A dot tells you where you stand: **green** when your markdown is sound, **amber** when something wants a look. Roe checks when you open a post and again whenever you pause typing so it checks things in real-time.
+
+The `Markdown Check` tab only appears when there's something to say. Open it and you'll find two lists:
+
+- **Fixable** — things with one obvious correction. `FIX ALL` applies them, and `UNDO FIX` puts them back. A missing blank line above a list is the common one.
+- **Needs your attention** — things only you can decide. An unclosed collection block, say: Roe can see that it never closes, but can't guess exactly where you intended to close it.
+
+Click any line number to jump to it.
+
+Fixes are applied in the editor, not to the file — nothing is saved until you save. `cmd/ctrl–z` undoes a fix like any other edit, and closing without saving discards it.
 
 ### Formatting Buttons
 

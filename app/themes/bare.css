@@ -796,6 +796,7 @@ div.flash mark {
 
 .content ul,
 .content ol {
+  margin-top: var(--space-4);
   margin-bottom: var(--space-4);
   padding-left: var(--space-6);
 }
@@ -2203,6 +2204,7 @@ figcaption {
   display: none;
 }
 
+.card-aside .aside-image-link,
 .card-aside .aside-image {
   grid-column: 1;
   grid-row: 1;
@@ -2259,6 +2261,7 @@ article .content,
     grid-template-columns: 1fr;
   }
 
+  .card-aside .aside-image-link,
   .card-aside .aside-image {
     grid-column: 1;
     grid-row: 1;
