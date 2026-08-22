@@ -113,3 +113,18 @@ body {
   background-color: #f9fafb; /* bg-gray-50 — the panel's background */
   border-color: #d1d5db; /* gray-300 — the panel's border */
 }
+
+/* Metadata editor label column.
+
+   Sized to the longest label the current resource type actually has, set as
+   --metadata-label-width on #metadata-container. `ch` is the advance width of
+   one character, and these labels are font-mono, so N characters is exactly
+   Nch. The +1rem covers the label's own px-2.
+
+   A fixed width here meant the column was sized for image_in_header (a post
+   field) even on products and pages, where nothing is close to that long. The
+   fallback keeps JS-built rows sane if the property is ever missing. */
+.metadata-label {
+  width: calc(var(--metadata-label-width, 8rem) + 1rem);
+}
+

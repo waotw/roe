@@ -138,7 +138,7 @@ class Member < ApplicationRecord
       sakura samurai sapphire sensei shore shuriken silver
       slate sonnet spirit spring star stream summer sumimasen
       sumo sunset sushi taiko takoyaki tanuki tatami
-      tempura teru-teru-bozu thunder tiger time tofu topaz
+      tempura thunder tiger time tofu topaz
       torii train true trueromance tsunami umami
       velvet voyage wabisabi wakaresaseya wasabi wind winter
       wolf yakuza yukata zen

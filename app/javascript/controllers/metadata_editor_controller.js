@@ -248,6 +248,11 @@ export default class extends Controller {
     const config = this.knownFieldsValue[fieldName];
     const container = this.fieldsContainerTarget;
 
+    // Adding a field back undoes an earlier removal. Without this, formToYaml
+    // deletes it again at the end (removedFields wins), so a field removed and
+    // then re-added in the same session silently never saved.
+    this.removedFields.delete(fieldName);
+
     const row = document.createElement("div");
     row.className = "metadata-field-row flex items-start gap-2";
     row.dataset.fieldName = fieldName;
@@ -272,7 +277,7 @@ export default class extends Controller {
         </button>`;
 
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label flex-shrink-0 pt-1.5">
         ${config.label}:
       </label>
       ${inputHtml}
@@ -339,7 +344,7 @@ export default class extends Controller {
       <input type="text"
              value=""
              placeholder="field_name"
-             class="font-mono text-xs px-2 py-1 border border-gray-300 w-32"
+             class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
              data-custom-key>
       <input type="text"
              value=""
@@ -733,7 +738,14 @@ export default class extends Controller {
       }
 
       const fieldName = input.dataset.metadataField;
-      let value = input.value.trim();
+      // An unchecked box still has a .value ("on"), so reading that would
+      // write true for every one of them.
+      let value =
+        input.type === "checkbox"
+          ? input.checked
+            ? "true"
+            : "false"
+          : input.value.trim();
       fields[fieldName] = value;
     });
 
@@ -882,7 +894,7 @@ export default class extends Controller {
 
     // Now use all the variables
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label flex-shrink-0 pt-1.5">
         ${config.label}${asterisk}:
       </label>
       ${inputHtml}
@@ -914,7 +926,7 @@ export default class extends Controller {
       <input type="text"
              value="${key}"
              placeholder="field_name"
-             class="font-mono text-xs px-2 py-1 border border-gray-300 w-32"
+             class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
              data-custom-key>
       <input type="text"
              value="${value}"
@@ -1475,7 +1487,7 @@ export default class extends Controller {
     row.dataset.fieldName = "duration";
 
     row.innerHTML = `
-        <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+        <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label flex-shrink-0 pt-1.5">
           duration:
         </label>
         <input type="text"

@@ -109,15 +109,44 @@ class Product < ApplicationRecord
   end
 
   # Snipcart data attributes
-  def snipcart_attributes
-    {
+  # A downloadable product rather than something posted. The toggle is what
+  # decides — `file_guid` is only asked for once it's on, so the two can't
+  # contradict each other.
+  def digital?
+    metadata["digital"] == true || metadata["digital"] == "true"
+  end
+
+  def file_guid
+    metadata["file_guid"].to_s.strip.presence
+  end
+
+  # Every `data-item-*` Snipcart gets, from one place. It used to be built
+  # separately in three (here, ProductButtonRenderer, and the product grid in
+  # HasMarkdownExtensions), which had already drifted — a field added to two of
+  # them would validate on the product's own page and fail from a grid.
+  #
+  # url:      what Snipcart's crawler fetches to verify the order. Callers that
+  #           know the store domain pass an absolute one; public_url otherwise.
+  # quantity: only emitted when a caller sets a default.
+  def snipcart_attributes(url: nil, quantity: nil)
+    attrs = {
       "data-item-id" => sku,
       "data-item-name" => title,
       "data-item-price" => price,
-      "data-item-url" => public_url,
+      "data-item-url" => url.presence || public_url,
       "data-item-description" => description,
       "data-item-image" => image
-    }.compact
+    }
+    attrs["data-item-quantity"] = quantity if quantity.present?
+
+    # A digital good isn't posted, so shipping comes out of the cart. Without
+    # this the buyer is asked for an address to deliver a download to.
+    if digital?
+      attrs["data-item-file-guid"] = file_guid
+      attrs["data-item-shippable"] = "false"
+    end
+
+    attrs.compact.reject { |_, v| v.to_s.strip.empty? }
   end
 
   def self.create_or_update_from_file(file_path)

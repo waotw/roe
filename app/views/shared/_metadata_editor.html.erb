@@ -47,6 +47,26 @@
     metadata_hash['variant'] = '' unless metadata_hash.key?('variant')
     metadata_hash['primary'] = 'false' unless metadata_hash.key?('primary')
   end
+  # Every product gets the digital toggle, so selling a file is a checkbox
+  # rather than something you have to know to add. file_guid rides with it —
+  # the digital-product controller adds and removes that row as the box is
+  # ticked, so the two can't end up in the file without each other.
+  if resource_type == 'product'
+    metadata_hash['digital'] = 'false' unless metadata_hash.key?('digital')
+    digital_on = metadata_hash['digital'] == true || metadata_hash['digital'] == 'true'
+    if digital_on
+      metadata_hash['file_guid'] = '' unless metadata_hash.key?('file_guid')
+    else
+      metadata_hash.delete('file_guid')
+    end
+  end
+
+  # Width of the label column, in characters: the longest label this resource
+  # type has, plus one for the colon. Every known field is measured, not just
+  # the rendered ones, so adding a field from the Add Field menu can't outgrow
+  # the column it lands in.
+  longest_label = known_fields_config.values.map { |c| c[:label].to_s.length }.max.to_i
+  label_column_ch = longest_label + 1
 
   # Separate what's in the file vs what's available
   existing_fields = metadata_hash.keys
@@ -99,7 +119,7 @@
   end
 %>
 <div id="metadata-container"
-     data-controller="metadata-editor<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %>"
+     data-controller="metadata-editor<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' %>"
      data-release-link-settings-path-value="<%= admin_edit_music_config_path %>"
      data-metadata-editor-known-fields-value="<%= known_fields_config.to_json %>"
      data-metadata-editor-default-author-value="<%= ERB::Util.html_escape(default_author) %>"
@@ -113,6 +133,7 @@
      data-metadata-editor-product-categories-value="<%= (ProductCategory.all rescue []).to_json %>"
      data-metadata-editor-product-groups-value="<%= (ProductGroup.all rescue []).to_json %>"
      <% end %>
+     style="--metadata-label-width: <%= label_column_ch %>ch"
      class="mb-5">
   <div class="flex items-center justify-between mb-2">
     <button type="button"
@@ -155,8 +176,13 @@
         <% known_fields_config.each do |field_name, config| %>
           <% next unless metadata_hash.key?(field_name) %>
           <% value = metadata_hash[field_name] %>
-          <div class="metadata-field-row flex items-start gap-2" data-field-name="<%= field_name %>">
-            <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 shrink-0 pt-1.5">
+          <%# items-start suits a text input, whose first line of text sits at
+              the top of a possibly-tall field. A checkbox is a single small
+              box, so it wants centring against its label instead — and the
+              label drops the top padding that exists to line up with text. %>
+          <% checkbox_row = config[:type] == :checkbox %>
+          <div class="metadata-field-row flex <%= checkbox_row ? 'items-center' : 'items-start' %> gap-2" data-field-name="<%= field_name %>">
+            <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 <%= 'pt-1.5' unless checkbox_row %>">
               <%= config[:label] %>:<% if config[:required] %><span class="text-red-600 relative -top-0.5"><sup>*</sup></span><% end %>
             </label>
             <% case config[:type] %>
@@ -218,6 +244,28 @@
                             class: "text-xs text-blue-600 hover:text-blue-800 underline mt-0.5 inline-block" %>
                       <% end %>
                     </div>
+                  <%# Snipcart has no API for digital goods, so the GUID is a
+                      paste from their dashboard — link straight to it. %>
+                  <% elsif field_name == 'file_guid' && resource_type == 'product' %>
+                    <div class="flex-1">
+                      <input type="text"
+                              id="metadata-field-<%= field_name %>"
+                              name="metadata_fields[<%= field_name %>]"
+                              value="<%= ERB::Util.html_escape(display_value) %>"
+                              class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                              data-metadata-field="<%= field_name %>"
+                              placeholder="7235bd18-1745-488e-bdbb-dc4f424c1ca1">
+                      <%# Link and warning share a row under the field. The
+                          warning used to be appended to the field row itself,
+                          which is a flex container — it sat beside the input
+                          and squashed it. %>
+                      <div class="flex items-center gap-3 mt-0.5" data-digital-product-footer>
+                        <a href="https://app.snipcart.com/dashboard/digital"
+                           target="_blank" rel="noopener"
+                           class="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap">Snipcart Digital Goods →</a>
+                      </div>
+                    </div>
+
                   <% elsif media_field_kinds.key?(field_name) %>
                     <%
                       # Autocomplete is offered for kinds we have a clean
@@ -321,6 +369,19 @@
                   <option value="<%= option %>"<% if value.to_s == option.to_s %> selected<% end %>><%= option %></option>
                   <% end %>
                 </select>
+              <%# A real checkbox. formToYaml reads .checked for these — an
+                  unchecked box still has a .value, so reading that would make
+                  every product digital. %>
+              <% when :checkbox %>
+                <label class="flex-1 flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox"
+                         id="metadata-field-<%= field_name %>"
+                         data-metadata-field="<%= field_name %>"
+                         <%= 'checked' if value.to_s == 'true' %>>
+                  <% if config[:hint] %>
+                    <span class="text-xs text-gray-500"><%= config[:hint] %></span>
+                  <% end %>
+                </label>
               <% when :textarea %>
                 <textarea id="metadata-field-<%= field_name %>"
                           name="metadata_fields[<%= field_name %>]"
@@ -345,7 +406,7 @@
               <input type="text"
                   value="<%= field_name %>"
                   placeholder="field_name"
-                  class="font-mono text-xs px-2 py-1 border border-gray-300 w-32"
+                  class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
                   data-custom-key>
               <input type="text"
                   id="metadata-field-<%= field_name.parameterize %>"

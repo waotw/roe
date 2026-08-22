@@ -196,17 +196,10 @@ class ProductButtonRenderer
       "/store/#{product.url_name}"
     end
 
-    attrs = {
-      "data-item-id" => product.sku,
-      "data-item-name" => product.title,
-      "data-item-price" => product.price,
-      "data-item-url" => validation_url,
-      "data-item-quantity" => quantity
-    }
-
-    # Add optional attributes
-    attrs["data-item-description"] = product.description if product.description.present?
-    attrs["data-item-image"] = product.image if product.image.present?
+    # Product#snipcart_attributes is the one place that decides what Snipcart
+    # gets, so a digital good's file GUID and shippable flag reach every button
+    # rather than only the ones someone remembered to update.
+    attrs = product.snipcart_attributes(url: validation_url, quantity: quantity)
 
     attr_string = attrs.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(" ")
 

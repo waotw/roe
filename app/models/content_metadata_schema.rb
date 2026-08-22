@@ -201,6 +201,19 @@ module ContentMetadataSchema
       'sku' => { type: :text, label: 'sku', required: true, hint: 'Product SKU (required for publishing)' },
       'image' => { type: :text, label: 'image', required: true, hint: 'Product image: /media/images/product.jpg' },
       'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
+      # A downloadable product. Turning this on reveals `file_guid` and drops
+      # shipping from the cart. Snipcart has no API for digital goods — the
+      # GUID is a copy-paste from their dashboard, so the editor links there.
+      'digital' => {
+        type: :checkbox,
+        label: 'digital',
+        hint: 'A digital file (e.g. mp3, ePub, PDF, etc.'
+      },
+      'file_guid' => {
+        type: :text,
+        label: 'file_guid',
+        hint: 'The file GUID from your Snipcart dashboard'
+      },
       'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' },
       'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. featured)' },
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' },

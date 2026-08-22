@@ -2028,17 +2028,13 @@ module HasMarkdownExtensions
           domain = SiteConfig.feature("store", "default_domain")
           validation_url = domain ? "https://#{domain}#{product_url}" : product_url
 
+          # Same source as the product page's button and the `button` block —
+          # see Product#snipcart_attributes. Building the list here by hand is
+          # what let a grid button and a page button disagree.
           output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
           output << %Q(              data-turbo="false")
-          output << %Q(              data-item-id="#{display_product.sku}")
-          output << %Q(              data-item-name="#{display_product.title}")
-          output << %Q(              data-item-price="#{display_product.price}")
-          output << %Q(              data-item-url="#{validation_url}")
-          if display_product.respond_to?(:description) && display_product.description.present?
-            output << %Q(              data-item-description="#{display_product.description.gsub('"', '&quot;')}")
-          end
-          if display_product.respond_to?(:image) && display_product.image.present?
-            output << %Q(              data-item-image="#{display_product.image}")
+          display_product.snipcart_attributes(url: validation_url).each do |key, value|
+            output << %Q(              #{key}="#{ERB::Util.html_escape(value)}")
           end
           output << %Q(      >Add to Cart</button>)
         end

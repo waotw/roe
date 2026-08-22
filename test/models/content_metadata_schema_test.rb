@@ -17,7 +17,7 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
     ContentMetadataSchema::TYPES.each do |type|
       fields(type).each do |name, config|
         assert name.present?, "#{type} has a blank field name"
-        assert_includes %i[text textarea select datetime], config[:type],
+        assert_includes %i[text textarea select checkbox datetime], config[:type],
           "#{type}.#{name} has a bad type: #{config[:type].inspect}"
         assert config[:label].present?, "#{type}.#{name} missing label"
         if config[:type] == :select
@@ -178,5 +178,29 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
     Post::POST_TYPES.keys.each do |type|
       assert_includes offered, type.to_s, "collection builder can't filter by `#{type}`"
     end
+  end
+
+  # The metadata label markup is declared in four places — once in the ERB and
+  # three times in the editor JS, which rebuilds rows for added fields, post
+  # type changes, and YAML-to-form. Styling one and missing the others gives a
+  # form whose labels don't line up depending on how the row got there.
+  test "every metadata label is styled the same way" do
+    erb = File.read(Rails.root.join("app/views/shared/_metadata_editor.html.erb"))
+    js  = File.read(Rails.root.join("app/javascript/controllers/metadata_editor_controller.js"))
+
+    labels = (erb + js).scan(/<label class="(font-mono text-xs[^"]*text-gray-700[^"]*)"/).flatten
+    assert_equal 4, labels.size, "expected 4 metadata label declarations, found #{labels.size}"
+
+    labels.each do |cls|
+      assert_includes cls, "metadata-label", "a label is missing the shared column-width class"
+    end
+    # Compare the class tokens, ignoring the two things that legitimately
+    # differ: the ERB one carries a conditional pt-1.5 for checkbox rows, and
+    # shrink-0 / flex-shrink-0 are the same thing in different Tailwind eras.
+    normalized = labels.map do |cls|
+      cls.gsub(/<%=.*?%>/, "").split.map { |c| c == "flex-shrink-0" ? "shrink-0" : c }.reject { |c| c == "pt-1.5" }.sort
+    end
+    assert_equal 1, normalized.uniq.size,
+      "the four declarations have drifted apart: #{normalized.uniq.inspect}"
   end
 end
