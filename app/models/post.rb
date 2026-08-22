@@ -120,10 +120,20 @@ class Post < ApplicationRecord
       metadata_fields: [
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to the audio file (e.g., /media/audio/summer/01-opening.flac)" },
-        { name: "release", type: :text, label: "Release",
-          hint: "The release this track belongs to — its key in music.yml (optional)" },
+        { name: "release", type: :select, label: "Release",
+          hint: "The release this track belongs to. Defaults to singles.",
+          options: -> { ReleaseConfig.release_keys } },
         { name: "track_number", type: :text, label: "Track Number", hint: "Optional" },
-        { name: "duration", type: :text, label: "Duration", hint: 'Optional, e.g. "3:45"' }
+        { name: "duration", type: :text, label: "Duration", hint: 'Optional, e.g. "3:45"' },
+        { name: "explicit", type: :select, label: "Explicit Content",
+          hint: "Flags the track as explicit wherever that's carried.",
+          options: [ "false", "true" ] },
+        { name: "isrc", type: :text, label: "ISRC",
+          hint: "The recording's code, e.g. QMZ123456789. Roe stores it with the track; nothing else reads it yet." },
+        { name: "songwriters", type: :text, label: "Songwriters",
+          hint: "Legal names, comma-separated — not stage names." },
+        { name: "lyrics", type: :textarea, label: "Lyrics",
+          hint: "The full text, if you want it kept with the track." }
       ],
       # Same shape as a podcast episode: the track's player, then the rest of
       # the release. Needs `release:` before the list can be written.
@@ -208,6 +218,11 @@ class Post < ApplicationRecord
 
   # Derived from the `feature:` key above, so a type is defined in exactly one
   # place. Types listed here only appear in the picker when their feature is on.
+  # Post types whose published entries carry an immutable GUID. Both end up in
+  # an RSS feed a podcatcher subscribes to, and a GUID is what it dedupes on —
+  # change one and every subscriber sees that item as new.
+  GUID_POST_TYPES = %w[podcast music].freeze
+
   FEATURE_GATED_TYPES = POST_TYPES.each_with_object({}) { |(type, config), out|
     out[type.to_s] = config[:feature] if config[:feature]
   }.freeze
@@ -885,7 +900,7 @@ class Post < ApplicationRecord
   end
 
   def preserve_podcast_guid
-    return unless metadata["post_type"] == "podcast"
+    return unless GUID_POST_TYPES.include?(metadata["post_type"])
     return unless metadata["status"] == "published"
 
     # Check if GUID is being removed or changed

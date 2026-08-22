@@ -91,18 +91,35 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
     end
   end
 
-  test "default_values parses a button_template, dropping unknowns and the placeholder" do
-    template = "heading: __PLACEHOLDER__\nlimit: 5\ntemplate: list\nbogus: nope"
-    defaults = CollectionBuilderSchema.default_values(template)
+  # The builder used to pre-fill from a `button_template` — a second copy of
+  # these same settings that wasn't on the settings form. It had drifted:
+  # `limit: 5` in the template against `default_limit: 10` in the settings, so
+  # a built collection and a hand-written one disagreed. One source now.
+  test "default_values reads the site's collection defaults" do
+    SiteConfig.stubs(:default).returns(nil)
+    SiteConfig.stubs(:default).with("collections", "default_limit").returns(10)
+    SiteConfig.stubs(:default).with("collections", "default_template").returns("grid")
 
-    assert_equal "5", defaults["limit"]
-    assert_equal "list", defaults["template"]
-    assert_nil defaults["heading"], "placeholder token should not become a default"
-    assert_nil defaults["bogus"], "unknown keys should be ignored"
+    defaults = CollectionBuilderSchema.default_values
+
+    assert_equal "10", defaults["limit"]
+    assert_equal "grid", defaults["template"]
   end
 
-  test "default_values is empty for blank input" do
-    assert_empty CollectionBuilderSchema.default_values("")
-    assert_empty CollectionBuilderSchema.default_values(nil)
+  test "a setting that isn't a builder field is ignored" do
+    SiteConfig.stubs(:default).returns(nil)
+    SiteConfig.stubs(:default).with("collections", "default_bogus").returns("nope")
+
+    assert_empty CollectionBuilderSchema.default_values
+  end
+
+  # A blank setting is "not set" — it must not pre-fill the field with "",
+  # which would look configured and write an empty key into the block.
+  test "blank and missing settings produce no default" do
+    SiteConfig.stubs(:default).returns(nil)
+    assert_empty CollectionBuilderSchema.default_values
+
+    SiteConfig.stubs(:default).with("collections", "default_limit").returns("   ")
+    assert_empty CollectionBuilderSchema.default_values
   end
 end

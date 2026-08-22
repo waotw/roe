@@ -124,15 +124,6 @@ module CardBuilderSchema
     "product-link" => { all: %w[product] }
   }.freeze
 
-  # cards.yml key holding each type's button_template (the author-editable
-  # defaults). post-link's key uses an underscore.
-  TEMPLATE_KEYS = {
-    "pullquote"    => "pullquote_button_template",
-    "aside"        => "aside_button_template",
-    "post-link"    => "post_link_button_template",
-    "product-link" => "product_link_button_template"
-  }.freeze
-
   # Booleans whose default depends on the card's style — off for small, on for
   # medium and large (show_excerpt: large only). A site that wants one of them
   # on everywhere can say so in cards.yml; absent, the style rule stands, which
@@ -181,22 +172,26 @@ module CardBuilderSchema
     CORE[type] || []
   end
 
-  # A type's button_template (raw YAML-ish text from cards.yml) parsed into a
-  # { key => value } hash the builder uses to pre-fill fields. `type:` itself
-  # and the placeholder token are dropped, as are unknown keys. Returns {}.
-  def self.default_values(type, template_text = nil)
-    template_text ||= SiteConfig.default("cards", TEMPLATE_KEYS[type])
-    return {} if template_text.blank?
+  # What the builder shows for each field before the author touches it, read
+  # from the site's card defaults: field `style` takes its value from
+  # `default_style` under that card type in cards.yml.
+  #
+  # This used to be parsed out of a per-type `button_template` — a block of
+  # YAML-ish text that the editor once pasted straight into the document. The
+  # builders replaced that insert path, leaving the templates as a second,
+  # invisible copy of settings the config already had. cards.yml carried both
+  # `default_style: small` and a template saying `style: small`, and only one
+  # of them was on the settings form.
+  #
+  # A value equal to the default is left out of the card on insert (see the
+  # builder's insert()), so the card keeps following the setting if it changes.
+  def self.default_values(type)
+    settings = SiteConfig.default("cards", type.to_s)
+    return {} unless settings.is_a?(Hash)
 
-    keys = fields_for(type).map { |f| f[:key] }
-    template_text.to_s.each_line.each_with_object({}) do |line, acc|
-      next if line.strip.empty?
-
-      key, value = line.split(":", 2).map { |s| s.to_s.strip }
-      next if key.blank? || value.blank?
-
-      value = "" if value == "__PLACEHOLDER__"
-      acc[key] = value if keys.include?(key) && value.present?
+    fields_for(type).each_with_object({}) do |field, acc|
+      value = settings["default_#{field[:key]}"].to_s.strip
+      acc[field[:key]] = value if value.present?
     end
   end
 end

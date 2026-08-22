@@ -4,15 +4,3 @@ post-link:
   default_link_text: "Read full story →"
 pullquote:
   default_position: "center"
-aside_button_template: |-
-  type: aside
-  text: __PLACEHOLDER__
-  image:
-  link_url:
-post_link_button_template: |-
-  type: post-link
-  style: small
-  post:
-pullquote_button_template: |-
-  type: pullquote
-  text: __PLACEHOLDER__

@@ -50,7 +50,9 @@
   end
 %>
 
-<div id="config-container" class="mb-5 bg-white p-8 border border-gray-200" data-controller="config-focus">
+<div id="config-container" class="mb-5 bg-white p-8 border border-gray-200"
+     data-controller="config-focus<%= ' podcast-entries' if @config_type == 'podcast' %>"
+     <% if @config_type == 'podcast' %>data-podcast-entries-add-path-value="<%= add_podcast_admin_configs_path %>"<% end %>>
   <div class="flex items-center justify-between mb-6">
     <div class="flex items-center gap-3">
       <!--<h2 class="text-lg font-semibold text-gray-900">Configuration</h2>-->
@@ -64,12 +66,15 @@
         <% end %>
       </h2>
       <%# Add a fresh blank podcast entry to podcast.yml (podcast config only). %>
+      <%# Client-side — appends a blank show to the form. Nothing is written
+          until Save, so adding one no longer discards unsaved edits. %>
       <% if @config_type == 'podcast' %>
-        <%= button_to "ADD NEW",
-                      add_podcast_admin_configs_path,
-                      method: :post,
-                      form: { class: "inline-flex" },
-                      class: "uppercase text-xs px-1.5 py-0 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem]" %>
+        <button type="button"
+                data-action="podcast-entries#add"
+                class="uppercase text-xs px-1.5 py-0 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem] cursor-pointer">
+          ADD NEW
+        </button>
+        <span class="text-xs text-gray-500">Saved when you click Save.</span>
       <% end %>
     </div>
     <button type="button"
@@ -792,27 +797,12 @@
                 </div>
               <% end %>
 
-              <!-- Templates Section -->
-              <% if templates.any? %>
-                <div>
-                  <h3 class="text-base font-semibold text-gray-800 mb-2 pb-2 border-b border-gray-200">Button Templates</h3>
-                  <p class="text-xs text-amber-600 mt-0 mb-2"><code class="font-mono bg-blue-200 text-gray-800 rounded-xs py-1 px-2">__PLACEHOLDER__</code> will be selected when you use the button in a Post/Page.</p>
-
-                  <div class="space-y-4">
-                    <% templates.each do |key, value| %>
-                      <div class="config-field-row">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                          <%= key.humanize %>
-                        </label>
-                        <textarea name="config_fields[<%= key %>]"
-                                  rows="<%= value.lines.count + 2 %>"
-                                  class="w-full font-mono text-sm p-2 border border-gray-300 bg-gray-50"
-                                  data-config-field="<%= key %>"><%= value %></textarea>
-                      </div>
-                    <% end %>
-                  </div>
-                </div>
-              <% end %>
+              <%# Retired settings (the old button templates) are excluded from
+                  `defaults` above so they don't render as editable fields. The
+                  notice explaining them is rendered by edit.html.erb, outside
+                  this form — its Cleanup button is a button_to, and a form
+                  nested inside another form is invalid HTML that the browser
+                  silently drops. %>
 
             </div>
           <% end %>

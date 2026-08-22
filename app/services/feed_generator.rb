@@ -105,10 +105,19 @@ class FeedGenerator
   def generate_podcast_rss
     require "nokogiri"
 
+    # A music release adds the Podcasting 2.0 namespace so apps that read it
+    # can treat the feed as music rather than as a show. Only declared when
+    # it's used — a podcast feed's XML is unchanged.
+    music = podcast_config["medium"].to_s == "music"
+    namespaces = {
+      "version" => "2.0",
+      "xmlns:itunes" => "http://www.itunes.com/dtds/podcast-1.0.dtd",
+      "xmlns:content" => "http://purl.org/rss/1.0/modules/content/"
+    }
+    namespaces["xmlns:podcast"] = "https://podcastindex.org/namespace/1.0" if music
+
     builder = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
-      xml.rss("version" => "2.0",
-              "xmlns:itunes" => "http://www.itunes.com/dtds/podcast-1.0.dtd",
-              "xmlns:content" => "http://purl.org/rss/1.0/modules/content/") do
+      xml.rss(namespaces) do
         xml.channel do
           # Standard RSS elements
           xml.title podcast_config["title"]
@@ -123,6 +132,17 @@ class FeedGenerator
           xml["itunes"].summary podcast_config["description"]
           xml["itunes"].explicit(podcast_config["explicit"] ? "true" : "false")
           xml["itunes"].type(podcast_config["type"] || "episodic")
+
+          # Music-only extras. Both are additive and in territory Apple and
+          # Spotify ignore: <podcast:medium> is a foreign namespace, and plain
+          # <category> is stock RSS 2.0 that podcast platforms don't read —
+          # they use <itunes:category>, which is still "Music" above. The
+          # genre would be rejected there, since Apple only accepts values
+          # from its own fixed list.
+          if music
+            xml["podcast"].medium "music"
+            xml.category podcast_config["genre"] if podcast_config["genre"].present?
+          end
 
           # iTunes owner
           xml["itunes"].owner do
@@ -187,7 +207,11 @@ class FeedGenerator
 
               xml["itunes"].duration post.metadata["duration"] if post.metadata["duration"].present?
               xml["itunes"].explicit(post.metadata["explicit"] == true ? "true" : "false")
-              xml["itunes"].episode post.metadata["episode_number"] if post.metadata["episode_number"].present?
+              # Music has no episode_number — a track's place in the running
+              # order is its track_number, which is the same idea. A podcast
+              # episode never carries one, so the fallback can't misfire.
+              episode_number = post.metadata["episode_number"].presence || post.metadata["track_number"].presence
+              xml["itunes"].episode episode_number if episode_number.present?
               xml["itunes"].season post.metadata["season"] if post.metadata["season"].present?
               xml["itunes"].episodeType post.metadata["episode_type"] || "full"
 

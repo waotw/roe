@@ -92,8 +92,23 @@ class Documentation < ApplicationRecord
   # /rails/site/... and would never match the stored paths → empty
   # collection on every query. Memoized so we don't realpath() per
   # query; the path doesn't change during the process's lifetime.
+  # Only remembered once the directory is really there.
+  #
+  # RoeSitePaths.normalize falls back to the un-resolved path when realpath
+  # can't find it. Caching that is unrecoverable: on Fly the prefix would stay
+  # /rails/site/documentation for the life of the process while ContentSync
+  # writes /data/site/documentation, so every LIKE matches nothing and the
+  # collection is empty until a restart happens to catch a better moment.
+  #
+  # site/documentation is missing more often than you'd think — before a first
+  # Site Sync brings it across, and in the window around an update.
   def self.normalized_documentation_path
-    @normalized_documentation_path ||= RoeSitePaths.normalize(RoeSitePaths::SITE_DOCUMENTATION_PATH)
+    return @normalized_documentation_path if @normalized_documentation_path
+
+    path = RoeSitePaths::SITE_DOCUMENTATION_PATH
+    resolved = RoeSitePaths.normalize(path)
+    @normalized_documentation_path = resolved if Dir.exist?(path)
+    resolved
   end
 
   # Return all unique tags across documentation records, optionally scoped

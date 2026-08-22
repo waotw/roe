@@ -354,6 +354,9 @@ Rails.application.routes.draw do
     get "configs/music/edit", to: "configs#edit_music", as: "edit_music_config"
     patch "configs/music", to: "configs#update_music", as: "music_config"
 
+    # Drop settings a Roe update stopped reading, from the file they're in.
+    post "configs/cleanup", to: "configs#cleanup", as: "cleanup_config"
+
     # Raw YAML fallback editor for a config whose structured form won't parse.
     get "configs/raw/edit", to: "configs#edit_raw", as: "edit_raw_config"
     patch "configs/raw", to: "configs#update_raw", as: "raw_config"
@@ -464,6 +467,12 @@ Rails.application.routes.draw do
   get "feed/:name.xml", to: "feeds#named", defaults: { format: "xml" }, as: :named_feed
   get "feed/:name.atom", to: "feeds#named", defaults: { format: "xml", atom: true }, as: :named_feed_atom
   get "/podcast/:podcast_key.xml", to: "feeds#podcast", as: :podcast_feed
+  # A music release published as a podcast-format feed. Separate from the
+  # Podcast feature — a release never appears in podcast.yml.
+  get "/music/:release_key.xml", to: "feeds#music_release", as: :music_release_feed
+  # The paid member's copy: full audio for paid tracks, and the only feed a
+  # wholly-paid release has. Mirrors the private podcast feed.
+  get "/music/:release_key/private.xml", to: "feeds#private_music_release", as: :private_music_release_feed
   get "/podcast/:podcast_key/private.xml", to: "feeds#private_podcast", as: :private_podcast_feed
 
   # Theme CSS

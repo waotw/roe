@@ -1,0 +1,70 @@
+<%# Settings a Roe update stopped reading, still sitting in the user's file.
+    Shows what they held, what replaced them, and a button to drop them.
+
+    Nothing here is a prerequisite: the settings that replaced these already
+    have values, so the page works whether or not the button is ever clicked.
+    This is tidying, not repair — which is why it removes rather than warns,
+    and why the file is only written when the user asks.
+
+    Locals:
+      config_type — "cards" / "collections"
+      retired     — { key => value } of the dead keys found in the file
+%>
+<%
+  config_type = local_assigns[:config_type].to_s
+  retired     = local_assigns[:retired] || {}
+
+  # What each retired key's values became. Same shape for both files: a line
+  # like `limit: 5` in the template is now the `default_limit` setting above.
+  replacements = retired.flat_map do |key, text|
+    RetiredConfigSettings.replacements_for(config_type, key, text)
+  end
+%>
+<div class="mt-8 border border-amber-300 bg-amber-50 p-4">
+  <h3 class="text-base font-semibold text-amber-900 mb-1">Unused settings in this file</h3>
+
+  <p class="text-sm text-amber-900 mb-3">
+    This file still has
+    <%= retired.keys.map { |k| "<code>#{ERB::Util.html_escape(k)}</code>" }.to_sentence.html_safe %>.
+    Button templates were replaced by the
+    <%= config_type == "cards" ? "card builder" : "collection builder" %>,
+    so Roe no longer reads them — the Defaults above do that job now. Removing
+    them changes nothing on your site.
+  </p>
+
+  <% if replacements.any? %>
+    <p class="text-sm text-amber-900 mb-2">Your template set these, which the settings above now control:</p>
+    <table class="w-full text-xs font-mono mb-3 bg-white border border-amber-200">
+      <thead>
+        <tr class="text-left border-b border-amber-200">
+          <th class="p-2">Was</th>
+          <th class="p-2">Now</th>
+          <th class="p-2">Current setting</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% replacements.each do |row| %>
+          <tr class="border-b border-amber-100">
+            <td class="p-2"><%= row[:from] %>: <%= row[:value] %></td>
+            <td class="p-2"><%= row[:to] %></td>
+            <td class="p-2 <%= "text-amber-800 font-semibold" if row[:differs] %>">
+              <%= row[:current].presence || "—" %><%= " (differs)" if row[:differs] %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <p class="text-xs text-amber-900 mb-3">
+      Removing these keys changes nothing on your site. Where a value differs, the
+      setting above is what applies — edit it there if the old one was what you wanted.
+    </p>
+  <% end %>
+
+  <%= button_to "Cleanup unused settings",
+                admin_cleanup_config_path(type: config_type),
+                method: :post,
+                form: { data: { turbo: false } },
+                data: { turbo_confirm: "Remove #{retired.keys.to_sentence} from this file? Your Defaults above are untouched." },
+                class: "uppercase text-xs px-2 py-1.5 border border-amber-700 bg-amber-200 hover:bg-amber-300 text-amber-900 font-mono rounded-xs cursor-pointer" %>
+</div>

@@ -484,14 +484,35 @@ module RoeUpdater
         # unchanged docs stay untouched on disk (their previous mtime
         # preserved, no file rewrite). Slight CPU cost — has to hash each
         # file — but at this doc count it's imperceptible.
-        cmd = "rsync -ac --delete #{source.shellescape}/ #{dest.shellescape}/ 2>&1"
+        # `-i` itemizes, so the log can report what actually changed. It used to
+        # count every file in the destination afterwards, which meant an update
+        # touching one doc announced all hundred-odd as though it had rewritten
+        # them — alarming, and wrong about what happened.
+        cmd = "rsync -aci --delete #{source.shellescape}/ #{dest.shellescape}/ 2>&1"
         output = `#{cmd}`
         unless $?.success?
           raise "Doc sync failed (rsync exit #{$?.exitstatus}): #{output}"
         end
 
-        file_count = Dir.glob(File.join(dest, "**", "*")).count { |p| File.file?(p) }
-        log("✓ Synced bundled docs → /site/documentation/roe/ (#{file_count} files)")
+        total = Dir.glob(File.join(dest, "**", "*")).count { |path| File.file?(path) }
+        log(doc_sync_summary(output, total))
+      end
+
+      # Itemized rsync output lists only what it touched: one line per change,
+      # nothing at all for a file it left alone. The second character is the
+      # entry type, so `f` picks out files and skips the directory lines that
+      # ride along with them.
+      def doc_sync_summary(output, total)
+        lines = output.lines.map(&:chomp).reject(&:empty?)
+        updated = lines.count { |line| line[1] == "f" && line.start_with?("<", ">", "c") }
+        deleted = lines.count { |line| line.start_with?("*deleting") }
+
+        return "✓ Bundled docs already current (#{total} files, none changed)" if updated.zero? && deleted.zero?
+
+        parts = []
+        parts << "#{updated} updated" if updated.positive?
+        parts << "#{deleted} removed" if deleted.positive?
+        "✓ Bundled docs: #{parts.join(', ')} of #{total} → /site/documentation/roe/"
       end
 
       # Refresh BOTH VERSION files so they report the new version

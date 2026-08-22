@@ -91,6 +91,23 @@ class ReleaseConfig
       SiteConfig.get("author").presence
   end
 
+  # A release publishes an RSS feed at /music/<key>.xml when `feed: true` and
+  # it has the pieces Apple validates. Both halves matter: the flag is the
+  # user's intent, the fields are whether it would actually be accepted.
+  def self.feed_enabled?(key)
+    release = get(key).to_h
+    truthy?(release["feed"]) && MusicConfigSchema.feed_blockers(release).empty?
+  end
+
+  def self.feed_keys
+    release_keys.select { |k| feed_enabled?(k) }
+  end
+
+  # YAML gives a real boolean; the admin form posts the string "true".
+  def self.truthy?(value)
+    value == true || value.to_s.strip.downcase == "true"
+  end
+
   def self.reload!
     SiteConfig.reload!("features/music")
   end

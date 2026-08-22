@@ -953,6 +953,19 @@ module HasMarkdownExtensions
     CollectionQuery.source_for(config)
   end
 
+  # What to call one item from a collection's source, so a warning about
+  # documentation doesn't tell someone to add the tag to a post. `documentation`
+  # has no singular worth using — "documentation article" is what a reader would
+  # call it.
+  def collection_source_noun(source)
+    case source.to_s
+    when "products" then "product"
+    when "pages" then "page"
+    when "documentation", %r{^documentation/} then "documentation article"
+    else "post"
+    end
+  end
+
   # Resolve a limit/offset directive to an item count. Accepts a strict integer
   # ("11") or a percentage of the matched set ("50%", rounded to the nearest
   # item). Percentages let paired collections split a list into equal parts —
@@ -1041,7 +1054,7 @@ module HasMarkdownExtensions
 
       unknown = requested.reject { |t| existing.include?(t) }
       if unknown.any?
-        source_name = source == "products" ? "product" : "post"
+        source_name = collection_source_noun(source)
         return [ [], 0, dev_warning(
           "Unknown tag#{'s' if unknown.size > 1}",
           "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any #{source_name}.",
@@ -2647,7 +2660,14 @@ module HasMarkdownExtensions
       end
     end
 
-    style = config[:style] || "small"
+    # `default_style` has been on the Cards settings form (and in the docs) all
+    # along, but nothing read it — the fallback was a hardcoded "small". It
+    # looked like it worked because the builder wrote an explicit `style:` into
+    # every card it made. Now that a card at its default leaves the key out,
+    # this is what the setting actually acts on.
+    style = config[:style].presence ||
+            SiteConfig.default("cards", "post-link")&.[]("default_style").presence ||
+            "small"
     title = config[:title] || "Untitled"
     date_raw = config[:date] || ""
     excerpt = config[:excerpt] || ""

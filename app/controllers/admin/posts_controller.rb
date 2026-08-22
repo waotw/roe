@@ -828,9 +828,15 @@ class Admin::PostsController < Admin::BaseController
     requirements
   end
 
+  # Music tracks get one too, on the same immutable terms. A GUID is what a
+  # podcatcher dedupes on, so a release published as a feed needs every track
+  # to keep the same one forever. Generating it for every published track —
+  # not only those on a feed-enabled release — keeps it out of the way of the
+  # feed switch: turning the feed on later would otherwise have to walk the
+  # release and write a GUID into each track, and turning it off and on again
+  # could hand subscribers a fresh set.
   def ensure_podcast_guid(metadata_hash, post)
-    # Only process for podcast posts
-    return metadata_hash unless metadata_hash["post_type"] == "podcast"
+    return metadata_hash unless Post::GUID_POST_TYPES.include?(metadata_hash["post_type"])
 
     # Only process if status is published
     return metadata_hash unless metadata_hash["status"] == "published"

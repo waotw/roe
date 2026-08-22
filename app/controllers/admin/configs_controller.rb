@@ -755,25 +755,14 @@ class Admin::ConfigsController < Admin::BaseController
     render(:edit_feeds, status: :unprocessable_entity)
   end
 
-  # Enable music by creating features/music.yml, seeded with one example
-  # release. Idempotent — if it already exists, just open the editor.
+  # Enable music by installing lib/site_templates/features/music/, which seeds
+  # features/music.yml with an example release — the same path members, store
+  # and podcast take, so the template is the one place the starting file is
+  # defined. The loader skips files that already exist, and the guard keeps the
+  # "enabled" flash for the run that actually creates it.
   def new_music_setup
     unless File.exist?(ReleaseConfig::FILE)
-      FileUtils.mkdir_p(File.dirname(ReleaseConfig::FILE))
-      File.write(ReleaseConfig::FILE, <<~YAML)
-        artist: Your Name
-        audience: free
-
-        releases:
-          singles:
-            title: Singles
-            synopsis: Tracks that aren't part of a release.
-          summer-release:
-            title: Summer Release
-            release_date: 2026-06-01
-            cover: /media/images/summer-release-cover.jpg
-            synopsis: A short description of this release.
-      YAML
+      SiteTemplates::Loader.install(folder: "features/music")
       SiteConfig.sync_from_file("features/music")
       flash[:notice] = "Music enabled. Edit music.yml below to define your releases."
     end
@@ -784,28 +773,42 @@ class Admin::ConfigsController < Admin::BaseController
     unless File.exist?(ReleaseConfig::FILE)
       redirect_to admin_configs_path, alert: "Music isn't enabled yet." and return
     end
-    @config_content = File.read(ReleaseConfig::FILE)
+    load_music_config
     render :edit_music
   end
 
+  # Save from the structured form. `content` is only present when the admin
+  # used the YAML toggle, and takes precedence — that's the escape hatch for
+  # anything the form can't express.
   def update_music
-    content = params[:content].to_s.gsub(/\r\n/, "\n")
+    return update_music_from_yaml if params[:content].present?
 
-    parsed = YAML.safe_load(content, permitted_classes: [ Date, Time ])
-    unless parsed.nil? || parsed.is_a?(Hash)
-      @config_content = content
-      flash.now[:alert] = "music.yml must be a mapping of release name to settings."
-      return render(:edit_music, status: :unprocessable_entity)
+    globals = params.fetch(:music_globals, {}).permit!.to_h
+    posted  = params.fetch(:releases, {}).permit!.to_h.values
+
+    config = globals.filter_map { |k, v| [ k, v.to_s.strip ] if v.to_s.strip.present? }.to_h
+    releases = {}
+    posted.each do |row|
+      key = release_key_for(row)
+      next if key.blank?
+      fields = MusicConfigSchema::RELEASE_KEYS.filter_map do |f|
+        value = row[f].to_s.strip
+        # The feed checkbox posts "true"/"false". Store it as a real boolean,
+        # and leave a false one out entirely so the file only carries what's
+        # actually switched on.
+        next [ f, true ] if f == "feed" && ReleaseConfig.truthy?(value)
+        next nil if f == "feed"
+        [ f, value ] if value.present?
+      end.to_h
+      # A row with nothing but a key is a release the admin added and left
+      # empty; keep it rather than silently dropping their click.
+      releases[key] = fields
     end
+    config["releases"] = releases
 
-    File.write(ReleaseConfig::FILE, content)
-    SiteConfig.sync_from_file("features/music")
+    write_music_config(config)
     flash[:notice] = "Music saved."
-    redirect_to admin_configs_path
-  rescue Psych::SyntaxError => e
-    @config_content = content
-    flash.now[:alert] = "YAML error: #{e.message}"
-    render(:edit_music, status: :unprocessable_entity)
+    redirect_to admin_edit_music_config_path
   end
 
   # Raw YAML editor — the escape hatch a structured editor redirects to when its
@@ -989,6 +992,7 @@ class Admin::ConfigsController < Admin::BaseController
       section[key] = "" unless section.key?(key)
     end
 
+    @retired_settings = RetiredConfigSettings.in_config(@config_hash)
     render :edit
   end
 
@@ -1008,11 +1012,37 @@ class Admin::ConfigsController < Admin::BaseController
     # key isn't already in @config_hash. The default lands in the YAML
     # only when the user clicks save.
     @extra_field_defaults = { "pagination_template" => "list" }
+    @retired_settings = RetiredConfigSettings.in_config(@config_hash)
     render :edit
   end
 
   def update_collections
     update_config("defaults/collections", SiteConfig::DEFAULTS_PATH.join("collections.yml"))
+  end
+
+  # Drop settings a Roe update stopped reading. Only ever runs on a click —
+  # Roe doesn't rewrite files under site/ by itself, and nothing depends on
+  # this having happened.
+  CLEANUP_FILES = {
+    "cards"       => "cards.yml",
+    "collections" => "collections.yml"
+  }.freeze
+
+  def cleanup
+    type = params[:type].to_s
+    filename = CLEANUP_FILES[type]
+    return redirect_to(admin_configs_path, alert: "Nothing to clean up there.") unless filename
+
+    removed = RetiredConfigSettings.strip!(SiteConfig::DEFAULTS_PATH.join(filename))
+
+    if removed.any?
+      SiteConfig.sync_from_file("defaults/#{type}")
+      flash[:notice] = "Removed #{removed.to_sentence} from #{filename}. Your defaults are unchanged."
+    else
+      flash[:notice] = "Nothing to remove — #{filename} is already up to date."
+    end
+
+    redirect_to type == "cards" ? admin_edit_cards_config_path : admin_edit_collections_config_path
   end
 
   def field_options_for(config_type, field_name)
@@ -2155,5 +2185,61 @@ class Admin::ConfigsController < Admin::BaseController
     @config_type = type.split("/").last
     @config_content = content
     render :edit
+  end
+
+  def music_config_hash
+    parsed = YAML.safe_load(File.read(ReleaseConfig::FILE), permitted_classes: [ Date, Time ])
+    parsed.is_a?(Hash) ? parsed : {}
+  rescue Psych::SyntaxError
+    {}
+  end
+
+  def write_music_config(config)
+    File.write(ReleaseConfig::FILE, config.to_yaml.sub(/\A---\n/, ""))
+    SiteConfig.sync_from_file("features/music")
+  end
+
+  # The key input lets an admin rename a release. Blank means "keep the one it
+  # already had"; a brand-new row with no key falls back to its title.
+  def release_key_for(row)
+    typed = row["key"].to_s.strip.parameterize
+    return typed if typed.present?
+    row["original_key"].to_s.strip.presence || row["title"].to_s.strip.parameterize.presence
+  end
+
+  def load_music_config
+    @config_content = File.read(ReleaseConfig::FILE)
+    @config_hash    = music_config_hash
+    raw             = @config_hash["releases"]
+    @releases       = raw.is_a?(Hash) ? raw : {}
+    # Every schema field present so the form draws an input for each, blank or
+    # not — a missing key would render nothing and look like the field doesn't
+    # exist. Same reason edit_podcast backfills its own.
+    @releases = @releases.transform_values do |r|
+      MusicConfigSchema.blank_release.merge(r.is_a?(Hash) ? r.transform_values(&:to_s) : {})
+    end
+    @image_paths = Medium.originals_only.where(media_type: "images").pluck(:file_path).sort
+  end
+
+  def update_music_from_yaml
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+
+    parsed = YAML.safe_load(content, permitted_classes: [ Date, Time ])
+    unless parsed.nil? || parsed.is_a?(Hash)
+      load_music_config
+      @config_content = content
+      flash.now[:alert] = "music.yml must be a mapping with a releases: block."
+      return render(:edit_music, status: :unprocessable_entity)
+    end
+
+    File.write(ReleaseConfig::FILE, content)
+    SiteConfig.sync_from_file("features/music")
+    flash[:notice] = "Music saved."
+    redirect_to admin_configs_path
+  rescue Psych::SyntaxError => e
+    load_music_config
+    @config_content = content
+    flash.now[:alert] = "YAML error: #{e.message}"
+    render(:edit_music, status: :unprocessable_entity)
   end
 end

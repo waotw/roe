@@ -250,4 +250,45 @@ class FeedGeneratorTest < ActiveSupport::TestCase
       assert item.guid.isPermaLink
     end
   end
+
+  # ── Music release feeds must not change podcast feeds ──────────────────────
+
+  # The music branch is gated on `medium`, which a podcast config never sets.
+  # If that gate leaked, every existing show's XML would change underneath its
+  # subscribers — new namespace, extra <category> — which is exactly the
+  # "don't break distribution" line this feature isn't allowed to cross.
+  def podcast_xml(config)
+    FeedGenerator.new(
+      posts: [],
+      format: :podcast,
+      site_config: { title: "S", description: "D", url: "https://example.com", author: "A" },
+      podcast_config: config
+    ).generate
+  end
+
+  test "a podcast feed gains no music elements" do
+    xml = podcast_xml({ "title" => "Show", "description" => "About things", "author" => "A" })
+
+    assert_not_includes xml, "podcastindex.org/namespace", "no foreign namespace declared"
+    assert_not_includes xml, "<podcast:medium>"
+    assert_no_match(/<category>/, xml, "plain RSS category is music-only")
+  end
+
+  # And with the flag, the additions appear — so the gate is doing the work
+  # rather than the elements simply never being emitted.
+  test "a music config adds the namespace, medium and genre" do
+    xml = podcast_xml({ "title" => "Release", "description" => "Tracks", "author" => "A",
+                        "medium" => "music", "genre" => "Shoegaze" })
+
+    assert_includes xml, "https://podcastindex.org/namespace/1.0"
+    assert_includes xml, "<podcast:medium>music</podcast:medium>"
+    assert_includes xml, "<category>Shoegaze</category>"
+  end
+
+  test "a music feed with no genre skips the category rather than emitting an empty one" do
+    xml = podcast_xml({ "title" => "Release", "description" => "Tracks", "author" => "A",
+                        "medium" => "music" })
+
+    assert_no_match(/<category>/, xml)
+  end
 end

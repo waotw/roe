@@ -142,13 +142,14 @@ module ContentMetadataSchema
       'season' => { type: :text, label: 'season', hint: 'Season number' },
       'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' },
 
-      # Music-specific fields. `release` autocompletes the keys in music.yml but
-      # stays free text, so a track can name a release before it's configured.
+      # Music-specific fields. The release list comes from music.yml; the
+      # release-link controller adds a link to that release's settings beside
+      # this select, so the config is one click away from the track.
       'release' => {
-        type: :text,
+        type: :select,
         label: 'release',
         required: required_for_type.call('release'),
-        hint: 'Pick a release or type a new key'
+        options: release_options(metadata_hash['release'])
       },
       'track_number' => {
         type: :text,
@@ -156,6 +157,19 @@ module ContentMetadataSchema
         required: required_for_type.call('track_number'),
         hint: 'Track number within the release'
       },
+      # Credits and codes live with the track, not in music.yml — they describe
+      # this recording, and nothing else shares them.
+      'isrc' => {
+        type: :text,
+        label: 'isrc',
+        hint: 'e.g. QMZ123456789 — the code for this recording'
+      },
+      'songwriters' => {
+        type: :text,
+        label: 'songwriters',
+        hint: 'Legal names, comma-separated — not stage names'
+      },
+      'lyrics' => { type: :textarea, label: 'lyrics' },
 
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this post?' },
       'image_in_header' => { type: :select, label: 'image_in_header', options: ['true', 'false'], hint: 'Show post image in the header?' },
@@ -217,6 +231,21 @@ module ContentMetadataSchema
       'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this page?' },
       'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
+  end
+
+  # Release keys from music.yml, plus whatever the track already names. A value
+  # that isn't configured — an imported track, or one written before its release
+  # existed — has to stay in the list, or opening the editor and saving would
+  # silently clear it.
+  def self.release_options(current)
+    keys = begin
+      ReleaseConfig.release_keys
+    rescue StandardError
+      []
+    end
+    current = current.to_s.strip
+    return keys if current.blank? || keys.include?(current)
+    keys + [ current ]
   end
 
   private_class_method :post_fields, :product_fields, :pages_fields

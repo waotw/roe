@@ -180,23 +180,21 @@ module CollectionBuilderSchema
     opts.respond_to?(:call) ? Array(opts.call) : Array(opts)
   end
 
-  # The install's button_template (raw YAML-ish text from collections.yml),
-  # parsed into a { key => value } hash the builder uses to pre-fill fields —
-  # so a site's commonly-used options become the builder's defaults. Anything
-  # that isn't a known field is ignored. Returns {} when unset/blank.
-  def self.default_values(template_text = nil)
-    template_text ||= SiteConfig.default("collections", "button_template")
-    return {} if template_text.blank?
-
-    keys = FIELDS.map { |f| f[:key] }
-    template_text.to_s.each_line.each_with_object({}) do |line, acc|
-      next if line.strip.empty?
-
-      key, value = line.split(":", 2).map { |s| s.to_s.strip }
-      next if key.blank? || value.blank?
-      # Ignore the placeholder token the raw insert used for cursor-parking.
-      value = "" if value == "__PLACEHOLDER__"
-      acc[key] = value if keys.include?(key) && value.present?
+  # What the builder shows for each field before the author touches it, read
+  # from the site's collection defaults: field `limit` takes its value from
+  # `default_limit`.
+  #
+  # This used to come from a `button_template` — a second copy of the same
+  # settings that wasn't on the settings form and had drifted from it. The
+  # template said `limit: 5` while `default_limit` said 10, so a collection
+  # built here and one written by hand disagreed.
+  #
+  # A value equal to the default is left out of the block on insert (see the
+  # builder's insert()), so the collection follows the setting if it changes.
+  def self.default_values
+    FIELDS.each_with_object({}) do |field, acc|
+      value = SiteConfig.default("collections", "default_#{field[:key]}").to_s.strip
+      acc[field[:key]] = value if value.present?
     end
   end
 end

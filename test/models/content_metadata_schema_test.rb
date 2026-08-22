@@ -49,6 +49,44 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
     end
   end
 
+  # ── release ────────────────────────────────────────────────────────────────
+
+  test "the release select is built from music.yml" do
+    ReleaseConfig.stubs(:release_keys).returns(%w[singles summer-release])
+
+    assert_equal %w[singles summer-release], fields("post")["release"][:options]
+    assert_equal :select, fields("post")["release"][:type]
+  end
+
+  # An imported track, or one written before its release was configured, names
+  # a key that isn't in the list. Dropping it would mean opening the editor and
+  # saving quietly reassigned the track — so the current value stays selectable.
+  test "a release the config doesn't know is kept as an option" do
+    ReleaseConfig.stubs(:release_keys).returns(%w[singles])
+
+    options = fields("post", metadata: { "release" => "from-an-import" })["release"][:options]
+    assert_equal %w[singles from-an-import], options
+  end
+
+  test "a known release isn't duplicated in the list" do
+    ReleaseConfig.stubs(:release_keys).returns(%w[singles summer-release])
+
+    options = fields("post", metadata: { "release" => "singles" })["release"][:options]
+    assert_equal %w[singles summer-release], options
+  end
+
+  test "an unreadable music.yml leaves the select empty rather than raising" do
+    ReleaseConfig.stubs(:release_keys).raises(StandardError, "no config")
+
+    assert_equal [], fields("post")["release"][:options]
+  end
+
+  # Credits belong to the recording, so they live in the track's frontmatter.
+  test "track credits are editor fields on a post" do
+    assert_equal %w[isrc songwriters lyrics], fields("post").keys & %w[isrc songwriters lyrics]
+    assert_equal :textarea, fields("post")["lyrics"][:type]
+  end
+
   # create_fields names a field; where it's defined shouldn't matter. Core
   # fields (image, excerpt, tags…) belong to every post type, so requiring them
   # to be copied into each type's metadata_fields would be exactly the

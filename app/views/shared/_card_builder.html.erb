@@ -2,8 +2,9 @@
     root (alongside `editor`), so the Card dropdown, this modal, and the
     textarea share its scope. Opens pre-set to the type chosen in the dropdown;
     the type selector at the top can change it, which swaps the visible field
-    group. Options come from CardBuilderSchema and pre-fill from each type's
-    button_template. Only non-empty fields of the active type get written. %>
+    group. Options come from CardBuilderSchema and pre-fill from that type's
+    defaults in cards.yml. A field still showing its default is left out of the
+    card, so it keeps following that setting. %>
 <%# Down-chevron styling used by selects across Roe's forms. %>
 <% select_chevron = "appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" %>
 <div data-card-builder-target="modal"
@@ -75,7 +76,7 @@
               <% when :post_search, :product_search %>
                 <% is_product = field[:type] == :product_search %>
                 <div class="relative">
-                  <input type="text" data-cb-field="<%= key %>"
+                  <input type="text" data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                          value="<%= value %>" autocomplete="off"
                          placeholder="<%= is_product ? 'Type to search products…' : 'Type to search posts, pages, products, docs…' %>"
                          data-cb-search-url="<%= is_product ? '/admin/products/search' : '/admin/posts/search' %>"
@@ -87,7 +88,7 @@
                 </div>
 
               <% when :select %>
-                <select data-cb-field="<%= key %>"
+                <select data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                         data-action="change->card-builder#fieldChanged"
                         class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
                   <option value="">—</option>
@@ -97,7 +98,7 @@
                 </select>
 
               <% when :boolean %>
-                <select data-cb-field="<%= key %>"
+                <select data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                         data-action="change->card-builder#fieldChanged"
                         class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
                   <%# Says what leaving it unset will actually do, rather than
@@ -110,12 +111,12 @@
                 </select>
 
               <% when :textarea %>
-                <textarea data-cb-field="<%= key %>" rows="3"
+                <textarea data-cb-field="<%= key %>" data-cb-default="<%= value %>" rows="3"
                           data-action="input->card-builder#fieldChanged"
                           class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>"><%= value %></textarea>
 
               <% else %>
-                <input type="text" data-cb-field="<%= key %>"
+                <input type="text" data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                        value="<%= value %>"
                        data-action="input->card-builder#fieldChanged"
                        class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">

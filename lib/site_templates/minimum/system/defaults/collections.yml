@@ -5,9 +5,3 @@ default_limit: 10
 default_template: list
 items_per_page: 20
 pagination_template: list
-
-button_template: |-
-  heading: __PLACEHOLDER__
-  limit: 5
-  post_type: all
-  template: list

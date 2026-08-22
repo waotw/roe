@@ -12,6 +12,19 @@
         <% elsif current_member&.paid? && current_member&.active? %>
           <a href="/podcast/<%= post.metadata['podcast'] %>/private.xml?token=<%= current_member.access_token %>" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
         <% end %>
+      <%# A music track links to its release's feed, the same way an episode
+          links to its show's. Only when the release actually publishes one —
+          most releases won't. %>
+      <% elsif post.post_type == 'music' && ReleaseConfig.feed_enabled?(post.metadata['release']) %>
+        <% release_key = post.metadata['release'] %>
+        <% if authenticated? || ReleaseConfig.audience_for(release_key) != 'paid' %>
+          <a href="/music/<%= release_key %>.xml" class="feed-link" target="_blank" title="RSS Feed">RSS</a>
+        <% end %>
+        <% if authenticated? %>
+          <a href="/music/<%= release_key %>/private.xml" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+        <% elsif current_member&.paid? && current_member&.active? %>
+          <a href="/music/<%= release_key %>/private.xml?token=<%= current_member.access_token %>" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+        <% end %>
       <% elsif post.post_type == 'newsletter' || post.post_type == 'article' %>
         <a href="/feed.xml" class="feed-link" target="_blank" title="RSS Feed">RSS</a>
       <% end %>

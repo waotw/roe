@@ -8,7 +8,7 @@
       </p>
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-      <%= link_to "← Back to Settings", admin_configs_path, class: "inline-flex items-center uppercase text-sm mb-2 px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none" %>
+      <%= link_to "← BACK TO SETTINGS", admin_configs_path, class: "inline-flex items-center uppercase text-sm mb-2 px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs leading-none text-nowrap" %>
       <% if Rails.env.development? && !File.exist?(File.join(RoeSitePaths::SITE_PATH, 'system', 'global', 'development.yml')) %>
         <%= button_to "Enable Dev Settings",
                       admin_enable_development_admin_configs_path,
@@ -58,12 +58,20 @@
                form_url: admin_cards_config_path,
                config_content: @config_content,
                config_hash: @config_hash %>
+    <% if @retired_settings.present? %>
+      <%= render "admin/configs/retired_settings",
+                 config_type: "cards", retired: @retired_settings %>
+    <% end %>
   <% elsif @config_type == 'collections' %>
     <%= render 'shared/config_editor',
                form_url: admin_collections_config_path,
                config_content: @config_content,
                config_hash: @config_hash,
                extra_field_defaults: @extra_field_defaults %>
+    <% if @retired_settings.present? %>
+      <%= render "admin/configs/retired_settings",
+                 config_type: "collections", retired: @retired_settings %>
+    <% end %>
   <% elsif @config_type == 'members' %>
     <%= render 'shared/config_editor',
                form_url: admin_members_config_path,
@@ -82,12 +90,19 @@
                   class: "uppercase text-xs px-2 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
     </div>
   <% elsif @config_type == 'podcast' %>
+    <%# Everything in this branch that reloads the page is wrapped by
+        config-guard, which warns first when there are unsaved edits. %>
+    <div data-controller="config-guard">
+    <%= render "admin/configs/unsaved_changes_modal" %>
     <div class="px-8 py-4 bg-blue-50 border-b border-blue-200">
       <h4 class="text-sm font-semibold text-blue-900 mb-2">Seed from an RSS feed or Apple Podcasts link</h4>
       <p class="text-xs text-blue-800 mb-3">
         Paste a podcast RSS feed URL (public or private/paid), or an Apple Podcasts link — Roe resolves it to the feed and also fills in the Apple Podcasts and Overcast subscribe links. Either way it auto-fills a podcast.yml entry from the feed's iTunes metadata, and the artwork is downloaded too. The URL is not stored or logged — only the parsed metadata is used. <mark class="bg-white px-0.5 py-0.5 text-amber-700">Running this twice overwrites the existing iTunes metadata</mark> (your subscribe links are kept).
       </p>
-      <%= form_with url: admin_seed_podcast_config_from_rss_path, method: :post, local: true, class: "flex gap-2" do %>
+      <%= form_with url: admin_seed_podcast_config_from_rss_path, method: :post, local: true,
+                    class: "flex gap-2",
+                    data: { action: "submit->config-guard#guard",
+                            guard_message: "Seeding from a feed reloads this page and overwrites the show's details. Anything you've typed and not saved will be lost." } do %>
         <%= text_field_tag :rss_url, nil,
                            class: "flex-1 font-mono text-xs p-2 border border-blue-300",
                            placeholder: "RSS feed URL, or https://podcasts.apple.com/…/id123456789",
@@ -146,6 +161,7 @@
                              },
                              class: "uppercase text-xs px-2 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs" %>
               </div>
+    </div>
   <% elsif @config_type == 'store' %>
     <%= render 'shared/config_editor',
                 form_url: admin_store_config_path,

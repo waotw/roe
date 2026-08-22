@@ -466,15 +466,32 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
   # ── Music ──────────────────────────────────────────────────────────────────
 
-  test "new_music_setup creates music.yml with an example and opens the editor" do
+  test "new_music_setup creates music.yml and opens the editor" do
     music = SiteConfig::FEATURES_PATH.join("music.yml")
     File.delete(music) if File.exist?(music)
 
     get new_music_setup_admin_configs_path
 
     assert File.exist?(music), "music.yml is created"
-    assert_includes File.read(music), "summer-release", "seeded with an example release"
+    assert_includes File.read(music), "singles", "seeded with the default release"
     assert_redirected_to admin_edit_music_config_path
+  end
+
+  # The seed lived in a heredoc here while lib/site_templates/features/music/
+  # held a stale copy with the releases at the top level and no `releases:` key
+  # — which parses to {"singles" => nil}, so ReleaseConfig resolves nothing.
+  # Now that the template is the source of truth, check what it seeds actually
+  # resolves rather than just that the file has words in it.
+  test "the seeded music.yml resolves as releases, not as bare top-level keys" do
+    music = SiteConfig::FEATURES_PATH.join("music.yml")
+    File.delete(music) if File.exist?(music)
+
+    get new_music_setup_admin_configs_path
+
+    assert_equal [ ReleaseConfig::DEFAULT_RELEASE ], ReleaseConfig.release_keys,
+      "a new post defaults to release: #{ReleaseConfig::DEFAULT_RELEASE}, so it has to exist — and nothing else ships"
+    assert_equal "Singles", ReleaseConfig.get("singles")["title"]
+    assert_equal "free", ReleaseConfig.audience_for("singles"), "inherited from the global default"
   end
 
   test "the Enable Music button shows while the feature is off" do
@@ -494,6 +511,167 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "a[href=?]", admin_edit_music_config_path
+  end
+
+  test "edit_music renders a form field for every schema field" do
+    get new_music_setup_admin_configs_path
+    get admin_edit_music_config_path
+
+    assert_response :success
+    MusicConfigSchema.release_fields.each do |field|
+      # A checkbox renders twice on purpose — see the unticking test below.
+      expected = field[:kind] == :checkbox ? 2 : 1
+      assert_select "[name=?]", "releases[0][#{field[:key]}]", { count: expected },
+        "no input for #{field[:key]}"
+    end
+    assert_select "[name=?]", "releases[0][key]", { count: 1 }, "the release key is editable"
+    assert_select "[name=?]", "music_globals[artist]"
+  end
+
+  # Audience only means something with paid memberships configured — the same
+  # test the post and page editors use before showing their own audience field.
+  # Off, it's a control that silently does nothing.
+  test "the audience field is hidden until memberships are configured" do
+    get new_music_setup_admin_configs_path
+
+    SiteFeature.stubs(:memberships_enabled?).returns(false)
+    get admin_edit_music_config_path
+    assert_select "[name=?]", "releases[0][audience]", count: 0
+
+    SiteFeature.stubs(:memberships_enabled?).returns(true)
+    get admin_edit_music_config_path
+    assert_select "[name=?]", "releases[0][audience]", count: 1
+  end
+
+  test "update_music writes form fields under releases:, dropping blanks" do
+    get new_music_setup_admin_configs_path
+
+    patch admin_music_config_path, params: {
+      music_globals: { "artist" => "Yitta Bitta", "audience" => "free" },
+      releases: { "0" => {
+        "original_key" => "singles", "key" => "singles",
+        "title" => "Singles", "synopsis" => "Individual tracks.",
+        "genre" => "", "label" => "", "copyright" => "", "cover" => "", "artist" => "", "release_date" => ""
+      } }
+    }
+
+    written = YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))
+    assert_equal "Yitta Bitta", written["artist"]
+    assert_equal({ "title" => "Singles", "synopsis" => "Individual tracks." }, written["releases"]["singles"],
+      "blank fields are left out rather than written as empty strings")
+    assert_includes ReleaseConfig.release_keys, "singles", "and it still resolves"
+  end
+
+  test "update_music renames a release when the key input changes" do
+    get new_music_setup_admin_configs_path
+
+    patch admin_music_config_path, params: {
+      releases: { "0" => { "original_key" => "singles", "key" => "B Sides", "title" => "B Sides" } }
+    }
+
+    keys = YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))["releases"].keys
+    assert_equal [ "b-sides" ], keys, "the typed key is slugified"
+  end
+
+  test "a release row with a blank key keeps the one it had" do
+    get new_music_setup_admin_configs_path
+
+    patch admin_music_config_path, params: {
+      releases: { "0" => { "original_key" => "singles", "key" => "", "title" => "Singles" } }
+    }
+
+    assert_includes YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))["releases"].keys, "singles"
+  end
+
+  # Adding and removing releases is client-side — the form posts whatever rows
+  # are on the page and update_music rebuilds the list from them. So a row the
+  # browser added saves as a new release, and one it removed simply isn't
+  # posted. These two tests stand in for that round trip.
+  test "a posted row that isn't in the file yet is added" do
+    get new_music_setup_admin_configs_path
+
+    patch admin_music_config_path, params: {
+      releases: {
+        "0" => { "original_key" => "singles", "key" => "singles", "title" => "Singles" },
+        "1" => { "original_key" => "", "key" => "summer-release", "title" => "Summer Release" }
+      }
+    }
+
+    releases = YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))["releases"]
+    assert_equal %w[singles summer-release], releases.keys
+    assert_equal "Summer Release", releases["summer-release"]["title"]
+  end
+
+  test "a release whose row is not posted is dropped" do
+    get new_music_setup_admin_configs_path
+    patch admin_music_config_path, params: {
+      releases: {
+        "0" => { "original_key" => "singles", "key" => "singles", "title" => "Singles" },
+        "1" => { "original_key" => "", "key" => "b-sides", "title" => "B Sides" }
+      }
+    }
+    assert_equal %w[singles b-sides], YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))["releases"].keys
+
+    patch admin_music_config_path, params: {
+      releases: { "0" => { "original_key" => "singles", "key" => "singles", "title" => "Singles" } }
+    }
+
+    assert_equal %w[singles], YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))["releases"].keys
+  end
+
+  # A lone checkbox posts nothing when unticked, so the old value would stick
+  # and the feed could never be switched off from the form. The hidden field
+  # before it is what makes unticking mean false.
+  test "the feed checkbox can be unticked" do
+    get new_music_setup_admin_configs_path
+    patch admin_music_config_path, params: {
+      releases: { "0" => { "original_key" => "singles", "key" => "singles", "title" => "Singles",
+                           "synopsis" => "S", "cover" => "/media/images/c.jpg", "feed" => "true" } }
+    }
+    assert ReleaseConfig.feed_enabled?("singles"), "on first"
+
+    patch admin_music_config_path, params: {
+      releases: { "0" => { "original_key" => "singles", "key" => "singles", "title" => "Singles",
+                           "synopsis" => "S", "cover" => "/media/images/c.jpg", "feed" => "false" } }
+    }
+
+    assert_not ReleaseConfig.feed_enabled?("singles")
+    assert_not YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))["releases"]["singles"].key?("feed"),
+      "an off feed isn't written at all"
+  end
+
+  # The anchor a track's "Edit release →" link jumps to.
+  test "each release renders an id the metadata editor can link to" do
+    get new_music_setup_admin_configs_path
+    get admin_edit_music_config_path
+
+    assert_select "#release-singles", count: 1
+  end
+
+  # The clone source for + New Release. Its inputs carry __INDEX__ so the
+  # controller can renumber them; without the <template> wrapper the browser
+  # would post them as a real release on every save.
+  test "the form ships a blank release template for the add button" do
+    get new_music_setup_admin_configs_path
+    get admin_edit_music_config_path
+
+    assert_select "template[data-music-releases-target=?]", "template" do
+      assert_select "[name=?]", "releases[__INDEX__][key]"
+      assert_select "[name=?]", "releases[__INDEX__][title]"
+    end
+  end
+
+  # The YAML toggle posts to the same action. Without the `content` branch
+  # taking precedence, a YAML save would be read as a form save with no
+  # releases at all and wipe the file.
+  test "the YAML escape hatch still saves, and doesn't go through the form path" do
+    get new_music_setup_admin_configs_path
+
+    patch admin_music_config_path, params: { content: "artist: Me\nreleases:\n  winter:\n    title: Winter\n" }
+
+    written = YAML.safe_load(File.read(SiteConfig::FEATURES_PATH.join("music.yml")))
+    assert_equal [ "winter" ], written["releases"].keys
+    assert_equal "Me", written["artist"]
   end
 
   test "update_music saves a valid YAML mapping" do
@@ -570,5 +748,142 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     type = "features/#{filename.sub(/\.yml$/, "")}"
     SiteConfig.sync_from_file(type)
     SiteConfig.reload!(type)
+  end
+
+  # ── Podcast: unsaved-edit hazards ──────────────────────────────────────────
+
+  def write_podcast(shows)
+    path = SiteConfig::FEATURES_PATH.join("podcast.yml")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, shows.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteConfig.sync_from_file("features/podcast")
+    SiteConfig.reload!("features/podcast")
+  end
+
+  def a_show(title)
+    PodcastConfig.default_entry.merge("title" => title, "description" => "About #{title}")
+  end
+
+  # ADD NEW used to POST, rewrite podcast.yml and reload — losing every unsaved
+  # edit on the page. It's a client-side clone now, so it must not be a form.
+  test "ADD NEW no longer submits a form" do
+    write_podcast("show-one" => a_show("Show One"))
+
+    get admin_edit_podcast_config_path
+
+    assert_response :success
+    assert_select "button[data-action=?]", "podcast-entries#add"
+    assert_select "form[action=?]", add_podcast_admin_configs_path, { count: 0 },
+      "adding a show shouldn't navigate"
+  end
+
+  # The clone source. With no panel to copy, the controller falls back to the
+  # server action — so the path has to reach the page.
+  test "the podcast form carries a panel to clone and a fallback path" do
+    write_podcast("show-one" => a_show("Show One"))
+
+    get admin_edit_podcast_config_path
+
+    assert_select "[data-tabs-target=?][data-tabs-panel=?]", "panel", "show-one"
+    assert_select "[data-podcast-entries-add-path-value=?]", add_podcast_admin_configs_path
+  end
+
+  # Seeding rewrites the show and reloads. Turbo's submit doesn't fire
+  # turbo:before-visit, so the editor's own guard never saw it.
+  test "seeding from RSS is guarded, and the modal is on the page" do
+    write_podcast("show-one" => a_show("Show One"))
+
+    get admin_edit_podcast_config_path
+
+    assert_select "form[action=?][data-action=?]",
+      admin_seed_podcast_config_from_rss_path, "submit->config-guard#guard"
+    assert_select "[data-config-guard-target=?]", "modal", count: 1
+    assert_select "[data-controller=?]", "config-guard"
+  end
+
+  # The server action stays as the empty-file fallback, so it has to keep working.
+  test "add_podcast still appends a show for a config with none" do
+    write_podcast({})
+
+    post add_podcast_admin_configs_path
+
+    assert_equal %w[new-podcast],
+      YAML.load_file(SiteConfig::FEATURES_PATH.join("podcast.yml")).keys
+  end
+
+  # Only ADD went client-side. Removing a show can also delete its draft
+  # episodes, which isn't a config edit and shouldn't wait for Save.
+  test "removing a show is still a server action" do
+    write_podcast("show-one" => a_show("Show One"))
+
+    get admin_edit_podcast_config_path
+
+    assert_select "form[action=?]", delete_podcast_entry_admin_configs_path(key: "show-one")
+  end
+
+  # ── Retired settings cleanup ───────────────────────────────────────────────
+
+  def write_defaults(filename, yaml)
+    FileUtils.mkdir_p(SiteConfig::DEFAULTS_PATH)
+    path = SiteConfig::DEFAULTS_PATH.join(filename)
+    File.write(path, yaml)
+    SiteConfig.sync_from_file("defaults/#{filename.sub(/\.yml$/, "")}")
+    path
+  end
+
+  # Button templates were replaced by the builders. A file written before that
+  # still has the keys; the form should explain them rather than render them as
+  # editable settings that do nothing.
+  test "a leftover button template is explained, not rendered as a field" do
+    write_defaults("collections.yml", "default_limit: 10\nbutton_template: |-\n  limit: 5\n")
+
+    get admin_edit_collections_config_path
+
+    assert_response :success
+    assert_select "textarea[data-config-field=?]", "button_template", { count: 0 },
+      "a dead setting shouldn't look editable"
+    assert_select "form[action=?]", admin_cleanup_config_path(type: "collections")
+    assert_match(/limit/, response.body)
+  end
+
+  test "a clean file shows no cleanup notice" do
+    write_defaults("collections.yml", "default_limit: 10\n")
+
+    get admin_edit_collections_config_path
+
+    assert_select "form[action=?]", admin_cleanup_config_path(type: "collections"), count: 0
+  end
+
+  test "cleanup removes the retired keys and keeps the defaults" do
+    path = write_defaults("collections.yml", "default_limit: 10\nbutton_template: |-\n  limit: 5\n")
+
+    post admin_cleanup_config_path(type: "collections")
+
+    assert_redirected_to admin_edit_collections_config_path
+    assert_equal({ "default_limit" => 10 }, YAML.safe_load(File.read(path)))
+  end
+
+  test "cleanup works on the nested cards file too" do
+    path = write_defaults("cards.yml",
+      "post-link:\n  default_style: small\npost_link_button_template: |-\n  style: small\n")
+
+    post admin_cleanup_config_path(type: "cards")
+
+    assert_equal({ "post-link" => { "default_style" => "small" } }, YAML.safe_load(File.read(path)))
+  end
+
+  test "cleanup on an unknown config type is refused" do
+    post admin_cleanup_config_path(type: "site")
+
+    assert_redirected_to admin_configs_path
+  end
+
+  test "cleanup on an already-clean file says so rather than erroring" do
+    write_defaults("collections.yml", "default_limit: 10\n")
+
+    post admin_cleanup_config_path(type: "collections")
+
+    assert_redirected_to admin_edit_collections_config_path
+    assert_match(/already up to date/, flash[:notice])
   end
 end

@@ -74,10 +74,12 @@ class Admin::PostsEditRenderTest < ActionDispatch::IntegrationTest
     # controller adds the rest of the type's fields on load, driven by this
     # payload — which is exactly what was missing before.
     assert_includes response.body, "track_number"
-    assert_includes response.body, 'data-metadata-field="release"'
-    assert_includes response.body, 'data-autocomplete-target="input"'
-    # A release absent from music.yml survives — the field is not a select.
-    assert_includes response.body, "unconfigured-release"
+    assert_select "select[data-metadata-field=?]", "release" do
+      # `release` is a select built from music.yml, but a key the config
+      # doesn't know still has to be selectable — otherwise opening this post
+      # and saving would quietly reassign the track.
+      assert_select "option[value=?][selected]", "unconfigured-release"
+    end
   end
 
   test "edit view renders the primary actions anchor and the drawer" do

@@ -136,6 +136,10 @@ export default class extends Controller {
     group.querySelectorAll("[data-cb-field]").forEach((el) => {
       const value = el.value.trim();
       if (value === "") return; // only fields with a value get written
+      // A field still showing the site default is left out, so the block keeps
+      // following that setting if it changes later. Changing it back to the
+      // default counts as unchanged — the setting already says that.
+      if (value === (el.dataset.cbDefault ?? "")) return;
       lines.push(`${el.dataset.cbField}: ${value}`);
     });
 

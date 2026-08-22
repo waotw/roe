@@ -99,7 +99,8 @@
   end
 %>
 <div id="metadata-container"
-     data-controller="metadata-editor"
+     data-controller="metadata-editor<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %>"
+     data-release-link-settings-path-value="<%= admin_edit_music_config_path %>"
      data-metadata-editor-known-fields-value="<%= known_fields_config.to_json %>"
      data-metadata-editor-default-author-value="<%= ERB::Util.html_escape(default_author) %>"
      data-metadata-editor-raw-frontmatter-value="<%= ERB::Util.html_escape(item&.raw_frontmatter || '') %>"
@@ -174,15 +175,13 @@
                 %>
                 <%# Fields that suggest known values but still accept anything typed.
                     All reuse the shared `autocomplete` controller, differing only in
-                    the option list. `release` is deliberately not a select: a track
-                    can name a release before it's added to music.yml. %>
+                    the option list. `release` is not here — it's a select now, built
+                    from music.yml by ContentMetadataSchema.release_options. %>
                 <% autocomplete_options =
                      if resource_type == 'product' && field_name == 'group'
                        (ProductGroup.all rescue [])
                      elsif resource_type == 'product' && field_name == 'category'
                        (ProductCategory.all rescue [])
-                     elsif resource_type == 'post' && field_name == 'release'
-                       (ReleaseConfig.release_keys rescue [])
                      end %>
                 <% if autocomplete_options %>
                   <div class="flex-1 relative"

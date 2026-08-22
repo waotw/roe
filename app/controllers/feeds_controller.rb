@@ -87,6 +87,57 @@ class FeedsController < ApplicationController
     render xml: feed_xml
   end
 
+  # A music release as a podcast-format feed. 404 unless the release exists
+  # and its owner ticked the box — an unpublished feed shouldn't be guessable
+  # by URL. Paid releases get the same treatment as paid shows: no public feed.
+  def music_release
+    feed = ReleaseFeed.new(params[:release_key])
+
+    return head :not_found unless feed.exists? && feed.enabled?
+    return head :not_found if feed.paid?
+
+    feed_xml = FeedGenerator.new(
+      posts: feed.tracks,
+      format: :podcast,
+      site_config: site_config,
+      podcast_config: feed.feed_config,
+      include_paid: false,
+      show_paid_teasers: SiteConfig.feature("members", "everyone.show_paid_content") || false
+    ).generate
+
+    response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
+    render xml: feed_xml
+  end
+
+  # The paid member's copy of a release feed: every track, with full audio.
+  # A wholly-paid release has no public feed at all, so this is the only way to
+  # get it — same arrangement as a paid podcast.
+  def private_music_release
+    feed = ReleaseFeed.new(params[:release_key])
+
+    # Admins reach it without a token, for checking their own feed.
+    unless authenticated?
+      member = Member.find_by(access_token: params[:token].to_s.presence)
+      return head :unauthorized unless member&.paid? && member&.active?
+    end
+
+    # The owner not having turned the feed on is a 404 whoever is asking —
+    # there's no feed to be a private copy of.
+    return head :not_found unless feed.exists? && feed.enabled?
+
+    feed_xml = FeedGenerator.new(
+      posts: feed.tracks,
+      format: :podcast,
+      site_config: site_config,
+      podcast_config: feed.feed_config,
+      include_paid: true,
+      show_paid_teasers: false
+    ).generate
+
+    response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
+    render xml: feed_xml
+  end
+
   def private_podcast
     @podcast_key = params[:podcast_key]
 
