@@ -120,6 +120,29 @@ class Product < ApplicationRecord
     metadata["file_guid"].to_s.strip.presence
   end
 
+  # Snipcart file GUIDs are UUIDs. Mirrored in digital_product_controller.js
+  # for the live check in the editor; a guard test keeps the two in step.
+  FILE_GUID_FORMAT = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+  # Whether this product can actually deliver what it sells.
+  #
+  # The two failures are not symmetrical, which is why this exists. A *wrong*
+  # GUID is caught by Snipcart, which refuses the order at checkout — loud, and
+  # nobody is charged. A *missing* one isn't: Roe drops the empty attribute, so
+  # Snipcart sees an ordinary non-shippable product, takes the payment and has
+  # nothing to send. Neither should reach a buyer, so no button renders for
+  # either.
+  def deliverable?
+    return true unless digital?
+    file_guid.present? && file_guid.match?(FILE_GUID_FORMAT)
+  end
+
+  # Why it isn't deliverable, for the admin-facing notice. nil when it is.
+  def delivery_problem
+    return nil if deliverable?
+    file_guid.blank? ? :missing_file_guid : :malformed_file_guid
+  end
+
   # Every `data-item-*` Snipcart gets, from one place. It used to be built
   # separately in three (here, ProductButtonRenderer, and the product grid in
   # HasMarkdownExtensions), which had already drifted — a field added to two of
@@ -296,7 +319,7 @@ class Product < ApplicationRecord
 
   # Guardless version of needs_attention? — used to gate bulk publish on drafts.
   def publish_warnings?
-    missing_required_fields.any? || missing_media_refs.any?
+    missing_required_fields.any? || missing_media_refs.any? || !deliverable?
   end
 
   # The ProductGroup this product belongs to (2+ products sharing a `group:`

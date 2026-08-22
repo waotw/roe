@@ -121,4 +121,90 @@ class DigitalProductTest < ActiveSupport::TestCase
       assert_nil ContentMetadataSchema.fields_for(type)["file_guid"]
     end
   end
+
+  # ── No button when it can't deliver ────────────────────────────────────────
+  #
+  # The two failures aren't symmetrical. Snipcart refuses a *wrong* GUID at
+  # checkout, so nobody is charged. It accepts a *missing* one without
+  # complaint — Roe drops the empty attribute, so Snipcart sees an ordinary
+  # non-shippable product, takes the money and has nothing to send. Neither
+  # should be buyable.
+
+  test "a digital product with no guid can't deliver" do
+    assert_not product("digital" => "true").deliverable?
+    assert_equal :missing_file_guid, product("digital" => "true").delivery_problem
+  end
+
+  test "a digital product with a malformed guid can't deliver" do
+    p = product("digital" => "true", "file_guid" => "not-a-guid")
+
+    assert_not p.deliverable?
+    assert_equal :malformed_file_guid, p.delivery_problem
+  end
+
+  test "a complete digital product, and any physical product, can" do
+    assert product("digital" => "true", "file_guid" => GUID).deliverable?
+    assert product.deliverable?
+    assert product("file_guid" => "junk").deliverable?, "a stray guid on a physical product is inert"
+  end
+
+  # The `button` block.
+  test "the button block renders no add-to-cart for an undeliverable product" do
+    product("digital" => "true", "file_guid" => "").save!
+
+    html = ProductButtonRenderer.new({ "sku" => "WIDG-1" }).render
+
+    assert_not_includes html, "snipcart-add-item", "there must be no way to add it"
+    assert_includes html, "Not available to buy"
+  end
+
+  # The product grid.
+  test "the grid renders no add-to-cart for an undeliverable product" do
+    product("digital" => "true", "file_guid" => "nope", "status" => "published").save!
+    SnipcartConfig.stubs(:current).returns(stub(connected?: true))
+
+    html = Page.new(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "pages", "store.md"),
+      content: "```collection\nsource: products\ntemplate: grid\n```",
+      metadata: { "title" => "Store", "status" => "published" }
+    ).to_html
+
+    assert_not_includes html, "snipcart-add-item",
+      "a grid mustn't sell what the product page refuses to"
+    assert_includes html, "Not available"
+  end
+
+  # And it can't be published into that state in the first place. The base
+  # fixture is missing category/image, which would flag on their own — fill
+  # them in so the GUID is the only thing under test.
+  test "publishing is blocked while it can't deliver" do
+    # Everything else has to be genuinely valid — including the image existing
+    # on disk — or publish_warnings? would be true whatever the GUID says, and
+    # the test would pass without proving anything.
+    image = File.join(RoeSitePaths::SITE_PATH, "media", "images", "w.jpg")
+    FileUtils.mkdir_p(File.dirname(image))
+    File.write(image, "x")
+    complete = { "category" => "music", "image" => "/media/images/w.jpg", "digital" => "true" }
+
+    assert_not product(complete.merge("file_guid" => GUID)).publish_warnings?,
+      "a complete digital product publishes normally"
+
+    assert product(complete.merge("file_guid" => "")).publish_warnings?
+    assert product(complete.merge("file_guid" => "nope")).publish_warnings?
+  end
+
+  # The editor's live check and the server's gate have to agree, or one will
+  # accept what the other rejects.
+  test "the browser check uses the same GUID pattern as the server" do
+    js = File.read(Rails.root.join("app/javascript/controllers/digital_product_controller.js"))
+    js_pattern = js[/static UUID = \/(.+?)\/i;/, 1]
+    assert js_pattern.present?, "could not find the UUID pattern in the controller"
+
+    # Compare the bodies; only the anchors differ (\A..\z in Ruby, ^..$ in JS).
+    strip_anchors = ->(src) { src.sub(/\A(\\A|\^)/, "").sub(/(\\z|\$)\z/, "") }
+
+    assert_equal strip_anchors.call(Product::FILE_GUID_FORMAT.source),
+                 strip_anchors.call(js_pattern),
+                 "the editor's check and the server's gate have drifted apart"
+  end
 end

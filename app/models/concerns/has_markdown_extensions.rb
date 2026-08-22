@@ -2031,6 +2031,15 @@ module HasMarkdownExtensions
           # Same source as the product page's button and the `button` block —
           # see Product#snipcart_attributes. Building the list here by hand is
           # what let a grid button and a page button disagree.
+          #
+          # A digital product that can't deliver gets no button here either,
+          # or a grid would remain a way to buy something the product page
+          # already refuses to sell.
+          if display_product.respond_to?(:deliverable?) && !display_product.deliverable?
+            output << %Q(      <span class="btn-grid is-unavailable">Not available</span>)
+            next
+          end
+
           output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
           output << %Q(              data-turbo="false")
           display_product.snipcart_attributes(url: validation_url).each do |key, value|

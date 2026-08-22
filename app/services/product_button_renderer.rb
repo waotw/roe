@@ -185,6 +185,11 @@ class ProductButtonRenderer
   private
 
   def render_button(product, text, style, quantity)
+    # No button for a digital product that can't deliver — see
+    # Product#deliverable?. A missing GUID is the dangerous case: Snipcart
+    # accepts the order and has nothing to send.
+    return render_undeliverable(product) unless product.deliverable?
+
     # Get the domain for Snipcart validation
     domain = SiteConfig.feature("store", "default_domain")
 
@@ -209,6 +214,17 @@ class ProductButtonRenderer
               #{attr_string}>
         #{ERB::Util.html_escape(text)}
       </button>
+    HTML
+  end
+
+  def render_undeliverable(product)
+    reason = product.delivery_problem == :missing_file_guid ?
+      "has no Snipcart file GUID" : "has a malformed Snipcart file GUID"
+
+    <<~HTML.strip
+      <div class="product-button-error" style="padding: 1rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 0.25rem;">
+        <strong>Not available to buy.</strong> This digital product #{reason}, so it can't be sold yet.
+      </div>
     HTML
   end
 
