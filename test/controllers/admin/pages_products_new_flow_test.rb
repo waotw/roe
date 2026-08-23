@@ -25,7 +25,9 @@ class Admin::PagesProductsNewFlowTest < ActionDispatch::IntegrationTest
     get new_admin_page_path
 
     assert_response :success
-    assert_includes response.body, 'data-controller="new-content"'
+    # Presence, not the exact attribute — the form composes controllers, and
+    # audience-default joins it whenever members are on.
+    assert_select "form[data-controller*=?]", "new-content"
     assert_includes response.body, 'data-new-content-target="title"'
     assert_includes response.body, 'data-new-content-target="filename"'
     assert_not_includes response.body, 'data-new-content-target="postType"',

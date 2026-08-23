@@ -18,7 +18,12 @@
   show_audience  = members_enabled? && resource_type != "product"
 %>
 
-<%= form_with url: url, method: :post, data: { controller: "new-content" } do |f| %>
+<%= form_with url: url, method: :post,
+      data: {
+        controller: "new-content#{' audience-default' if show_audience}",
+        audience_default_paid_podcasts_value: (show_audience ? PodcastConfig.paid_keys : []).to_json,
+        audience_default_paid_releases_value: (show_audience ? ReleaseConfig.paid_keys : []).to_json
+      } do |f| %>
   <div class="max-w-xl space-y-4">
     <div>
       <label class="<%= label_classes %>" for="title">title<%= required_mark %></label>
@@ -58,12 +63,18 @@
     <% end %>
 
     <%# Gated on members being on at all, not on paid memberships being
-        configured — `audience` is meaningful as soon as there are members,
-        and `everyone` is the default. %>
+        configured — `audience` is meaningful as soon as there are members.
+        `everyone` is the default, except on a paid podcast or release, where
+        the audience-default controller flips it to `paid` as soon as you pick
+        one. Creating a public episode on a paid show by clicking past this
+        field is the mistake worth preventing; changing it yourself stops the
+        controller touching it again. %>
     <% if show_audience %>
       <div>
         <label class="<%= label_classes %>" for="fields_audience">audience</label>
-        <select name="fields[audience]" id="fields_audience" class="<%= select_classes %>">
+        <select name="fields[audience]" id="fields_audience" class="<%= select_classes %>"
+                data-audience-default-target="audience"
+                data-action="change->audience-default#userChose">
           <% [ "everyone", "paid" ].each do |value| %>
             <option value="<%= value %>"><%= value %></option>
           <% end %>

@@ -29,7 +29,9 @@ class Admin::PostsNewFlowTest < ActionDispatch::IntegrationTest
     get new_admin_post_path
 
     assert_response :success
-    assert_includes response.body, 'data-controller="new-content"'
+    # Presence, not the exact attribute — audience-default joins this form
+    # whenever members are on, and whether they are depends on test order.
+    assert_select "form[data-controller*=?]", "new-content"
     assert_includes response.body, 'data-new-content-target="title"'
     assert_includes response.body, 'data-new-content-target="postType"'
     # Audio's create field, in its own hidden group.
