@@ -58,9 +58,37 @@ class Member < ApplicationRecord
   # Callbacks
   before_create :set_subscribed_at
   before_create :generate_memorable_token
+  before_create :ensure_media_token
 
   def regenerate_token!
     update!(access_token: self.class.generate_password)
+  end
+
+  # A read-only credential for protected media and private feeds.
+  #
+  # Deliberately NOT access_token: that one signs a member in
+  # (Members::SessionsController#signin_with_token), so putting it in a URL
+  # would mean every protected image on a page carries a working credential for
+  # the account — and those URLs leak through history, Referer headers, shared
+  # links and podcast-app logs. This grants reading files and nothing else.
+  #
+  # Verified against the database on every request rather than being a signed
+  # token, so cancelling or downgrading revokes on the next request.
+  def regenerate_media_token!
+    update!(media_token: self.class.generate_media_token)
+  end
+
+  def self.generate_media_token
+    SecureRandom.uuid
+  end
+
+  # Whether this member may read protected files right now.
+  def may_read_protected_media?
+    active? && paid?
+  end
+
+  def ensure_media_token
+    self.media_token ||= self.class.generate_media_token
   end
 
   def generate_unsubscribe_token

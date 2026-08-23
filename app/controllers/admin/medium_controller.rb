@@ -19,6 +19,13 @@ class Admin::MediumController < Admin::BaseController
     @media = Medium.originals_only
                    .order(created_at: :desc)
 
+    # Files used by both paid and free content. They resolve to free (public
+    # wins), so they sit inside the free set rather than beside it — the
+    # browse page marks them so you can find the ones that are readable when
+    # you meant them not to be. Filtering itself is client-side, alongside
+    # search and sort, so toggling doesn't reset either.
+    @mixed_media_ids = Medium.mixed_audience_ids.to_set
+
     # Reverse index of everything that references each media file — posts,
     # pages, documentation, products, and config files — keyed by path.
     @media_usages = MediaUsageIndex.fetch

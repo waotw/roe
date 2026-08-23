@@ -68,7 +68,22 @@
           <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border border-gray-200 rounded-xs break-all">
             <%= @member.access_token %>
           </dd>
-          <p class="mt-1 text-xs text-gray-500 font-sans">Used to verify member access to premium content</p>
+          <p class="mt-1 text-xs text-gray-500 font-sans">
+            <mark>Signs this member in.</mark> It's the magic-link token — treat it like a password
+            and keep it out of anything shareable.
+          </p>
+        </div>
+
+        <div class="sm:col-span-2">
+          <dt class="text-sm font-medium text-gray-500 uppercase">Media Token</dt>
+          <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border border-gray-200 rounded-xs break-all">
+            <%= @member.media_token %>
+          </dd>
+          <p class="mt-1 text-xs text-gray-500 font-sans">
+            Read-only. Unlocks this member's private feeds and the files behind paid content —
+            it can't sign anyone in. Appears in their feed URLs as
+            <code>?token=…</code>
+          </p>
         </div>
       </dl>
     </div>

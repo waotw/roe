@@ -6,14 +6,13 @@ class Post < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex
+  include IndexesMediaReferences
 
   scope :for_newsletter, -> {
     where("json_extract(metadata, '$.published_to') IN ('newsletter', 'both')")
   }
   scope :newsletter_ready, -> { published.for_newsletter }
 
-  has_many :media_references, dependent: :destroy
-  has_many :media, through: :media_references, source: :medium
   has_many :newsletter_sends, dependent: :destroy
   has_many :newsletter_recipients, through: :newsletter_sends, source: :member
 
@@ -21,7 +20,6 @@ class Post < ApplicationRecord
 
   before_save :preserve_podcast_guid
   after_save :cleanup_podcast_yaml, if: :should_cleanup_yaml?
-  after_save :update_media_references
 
   # Public URL for the post on the live site (matches the `:post` route
   # in config/routes.rb → `posts/:url_name`).
@@ -241,6 +239,44 @@ class Post < ApplicationRecord
 
   def captions
     metadata["captions"]
+  end
+
+  # A post's audience, resolved the way every other default in Roe resolves:
+  # its own value wins, then its show or release, then everyone.
+  #
+  # Overrides HasAudience#audience, which reads the post's own metadata only.
+  # That was the whole of it until podcasts and releases gained an audience of
+  # their own — after which a show marked paid protected its episodes' files
+  # but left their pages readable and their feed entries unfiltered, because
+  # every other gate still asked the post directly.
+  #
+  # An episode that sets its own audience overrides its show, which is what
+  # lets the first three of a paid series be free.
+  def audience
+    own = metadata["audience"].to_s.strip
+    return own if own.present?
+
+    inherited_audience.presence || "everyone"
+  end
+
+  # Whether this post's FILES are protected. Same answer as #audience, kept as
+  # its own name because the media index asks a narrower question and pages and
+  # products answer it without any notion of inheritance.
+  def media_audience
+    audience == "paid" ? "paid" : "free"
+  end
+
+  # The audience of whatever this post belongs to, or nil when it belongs to
+  # nothing that carries one.
+  def inherited_audience
+    case metadata["post_type"]
+    when "podcast"
+      key = metadata["podcast"].to_s.strip
+      PodcastConfig.get(key).to_h["audience"].to_s.strip.presence if key.present?
+    when "music"
+      key = metadata["release"].to_s.strip
+      ReleaseConfig.audience_for(key) if key.present?
+    end
   end
 
   def has_media?
@@ -817,42 +853,7 @@ class Post < ApplicationRecord
     end
   end
 
-  def update_media_references
-    # Extract media paths from content
-    media_paths = extract_media_paths
 
-    # Find matching Medium records
-    referenced_media = Medium.where(file_path: media_paths)
-
-    # Replace all references for this post
-    self.media_references.destroy_all
-    referenced_media.each do |medium|
-      self.media_references.create(medium: medium)
-    end
-  end
-
-  def extract_media_paths
-    paths = []
-
-    # Extract from content
-    if content.present?
-      paths += content.scan(/!\[.*?\]\((\/media\/[^\)]+)\)/).flatten
-      paths += content.scan(/<img[^>]+src=["'](\/media\/[^"']+)["']/).flatten
-      paths += content.scan(/<(?:audio|video)[^>]+src=["'](\/media\/[^"']+)["']/).flatten
-    end
-
-    # Extract from metadata fields (image, audio, video, thumbnail, etc.)
-    if metadata.present?
-      [ "image", "audio", "video", "thumbnail", "cover", "poster" ].each do |field|
-        value = metadata[field]
-        if value.is_a?(String) && value.start_with?("/media/")
-          paths << value
-        end
-      end
-    end
-
-    paths.uniq
-  end
 
   def should_cleanup_yaml?
     metadata["post_type"] == "podcast" && metadata["status"] == "published"

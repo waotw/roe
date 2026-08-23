@@ -32,7 +32,16 @@ class ReleaseFeed
 
   def exists?  = release.present?
   def enabled? = ReleaseConfig.feed_enabled?(key)
-  def paid?    = ReleaseConfig.audience_for(key) == "paid"
+
+  # No public feed when the release has nothing public in it. A paid release
+  # with a free single still gets one, carrying that single — the same sampler
+  # model a podcast uses. Resolved per track, so a track that opts out of a
+  # paid release counts.
+  def paid?
+    return false if SiteConfig.feature("members", "everyone.show_paid_content")
+
+    tracks.none? { |t| t.audience != "paid" }
+  end
 
   # Published tracks on this release, in running order. Tracks without a
   # number sort last rather than jumping to the front on a nil compare.

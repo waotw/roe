@@ -7,9 +7,16 @@ class BulkContentActionsTest < ActionDispatch::IntegrationTest
   end
   teardown { @created.each { |f| File.delete(f) if File.exist?(f) } }
 
+  # `audience` is deliberately set: with memberships configured it's a
+  # site-gated field, so a draft without one has publish warnings and bulk
+  # publish skips it — correctly. Leaving it out made "clean" depend on
+  # whether an earlier test had written a members.yml into the shared test
+  # site, which is a test-order coin flip rather than anything about bulk
+  # publishing.
   def make_post(name, status:, extra: {})
     meta = { "title" => name, "url_name" => name, "status" => status,
-             "post_type" => "article", "date" => "2024-01-01" }.merge(extra)
+             "post_type" => "article", "date" => "2024-01-01",
+             "audience" => "everyone" }.merge(extra)
     slug = ContentWriter.new.write(kind: :post, filename: name, metadata: meta, body: "body")
     @created << File.join(RoeSitePaths::SITE_POSTS_PATH, "#{slug}.md")
     Post.find_by("json_extract(metadata, '$.url_name') = ?", slug)

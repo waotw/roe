@@ -1168,6 +1168,9 @@ class Admin::ConfigsController < Admin::BaseController
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
     SiteConfig.reload!("features/podcast")
+    # The config is gone, so there's nothing to sync from — release the
+    # files its shows were protecting.
+    Medium.recompute_for_config("features/podcast")
 
     flash[:notice] = "Podcast configuration deleted successfully"
     redirect_to admin_configs_path
@@ -1203,11 +1206,16 @@ class Admin::ConfigsController < Admin::BaseController
       File.delete(file_path)
       SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
       SiteConfig.reload!("features/podcast")
+      # The config is gone, so there's nothing to sync from — release the
+      # files its shows were protecting.
+      Medium.recompute_for_config("features/podcast")
       redirect_to admin_configs_path,
                   notice: "Removed “#{title || key}”#{drafts_note}. That was the last podcast, so podcasts are now disabled."
     else
       File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
-      SiteConfig.reload!("features/podcast")
+      # sync, not just reload: removing a show drops the audience its episodes
+      # were inheriting, so their files have to be re-resolved.
+      SiteConfig.sync_from_file("features/podcast")
       redirect_to admin_edit_podcast_config_path, notice: "Removed podcast “#{title || key}”#{drafts_note}."
     end
   end
@@ -1233,7 +1241,7 @@ class Admin::ConfigsController < Admin::BaseController
     config[key] = PodcastConfig.default_entry
 
     File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
-    SiteConfig.reload!("features/podcast")
+    SiteConfig.sync_from_file("features/podcast")
     redirect_to admin_edit_podcast_config_path(tab: key),
                 notice: "Added a new podcast (“#{key}”). Rename its key and fill in the details below."
   end

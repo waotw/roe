@@ -289,6 +289,11 @@ module SeoHelper
     podcast = PodcastConfig.get(podcast_key)
     return nil unless podcast
 
+    # Only advertise a feed that exists. A show with nothing public 404s, and
+    # pointing a podcast client at it just produces a failed fetch — this was
+    # doing that for every paid show.
+    return nil unless PodcastConfig.public_feed?(podcast_key)
+
     {
       href:  podcast_feed_url(podcast_key: podcast_key),
       title: "#{podcast['title']} feed"

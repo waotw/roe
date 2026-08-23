@@ -48,6 +48,9 @@
             <td class="max-w-[12rem] py-1.5 pl-6 md:pl-4 pr-3 text-sm font-medium text-gray-900">
               <div class="flex items-center gap-1.5">
                 <%= link_to page.title || "Untitled", edit_admin_page_path(page), class: "min-w-0 truncate text-blue-600 hover:text-blue-900" %>
+                <% if page.metadata['audience'].to_s == 'paid' %>
+                  <span class="text-green-700 font-semibold shrink-0" title="Paid — members only">$</span>
+                <% end %>
                 <% if local_assigns[:show_member_badge] %>
                   <span class="shrink-0 inline-flex bg-blue-100 px-2 text-xs font-mono leading-5 text-blue-800">Member</span>
                 <% end %>

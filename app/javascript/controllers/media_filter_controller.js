@@ -1,7 +1,17 @@
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["search", "item", "count", "tab", "sortFilter", "grid"];
+  static targets = [
+    "search",
+    "item",
+    "count",
+    "tab",
+    "sortFilter",
+    "grid",
+    "paidToggle",
+    "freeToggle",
+    "audienceNote",
+  ];
   static values = { total: Number };
 
   connect() {
@@ -43,6 +53,45 @@ export default class extends Controller {
     this.applyFilters();
   }
 
+  filterByAudience() {
+    this.applyFilters();
+  }
+
+  // Two predicates, not a union:
+  //   neither → everything
+  //   one     → files with that audience
+  //   both    → files that are somehow both, i.e. referenced by paid content
+  //             but resolved free because something public uses them too
+  //
+  // A file's audience is single-valued, so "both" can't mean an intersection
+  // of the column. It means the mixed flag, which is the case worth finding —
+  // a file you meant to protect that's public because of another reference.
+  matchesAudience(item) {
+    const paid = this.hasPaidToggleTarget && this.paidToggleTarget.checked;
+    const free = this.hasFreeToggleTarget && this.freeToggleTarget.checked;
+
+    if (!paid && !free) return true;
+    if (paid && free) return item.dataset.mixed === "true";
+    if (paid) return item.dataset.audience === "paid";
+    return item.dataset.audience === "free";
+  }
+
+  // Says what the current toggle state actually means, so "both checked shows
+  // fewer than one checked" reads as intended rather than as a bug.
+  updateAudienceNote() {
+    if (!this.hasAudienceNoteTarget) return;
+
+    const paid = this.hasPaidToggleTarget && this.paidToggleTarget.checked;
+    const free = this.hasFreeToggleTarget && this.freeToggleTarget.checked;
+
+    let note = "";
+    if (paid && free) note = " used by both paid and free content";
+    else if (paid) note = " protected from the public";
+    else if (free) note = " readable by anyone";
+
+    this.audienceNoteTarget.textContent = note;
+  }
+
   filterBySearch(event) {
     this.updateURL();
     this.applyFilters();
@@ -69,6 +118,10 @@ export default class extends Controller {
         matches = false;
       }
 
+      if (matches && !this.matchesAudience(item)) {
+        matches = false;
+      }
+
       if (matches) {
         item.style.display = "";
         visibleItems.push(item);
@@ -79,6 +132,7 @@ export default class extends Controller {
 
     this.sortItems(visibleItems);
     this.countTarget.textContent = visibleItems.length;
+    this.updateAudienceNote();
   }
 
   sortItems(items) {

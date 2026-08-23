@@ -137,10 +137,32 @@ module SiteFeature
     SiteConfig.feature("members", "payments.mode").presence || "memberships"
   end
 
+  # Whether the site is SET UP for paid memberships — members.yml says so and
+  # the payments mode includes them. Deliberately does not require Stripe keys.
+  #
+  # It used to. That meant a site with memberships turned on but Stripe not yet
+  # connected got no `audience` field on posts, pages, podcasts or releases —
+  # so you couldn't mark anything paid until after you'd wired up billing, which
+  # is backwards from how people actually set a site up. Roe is file-first: the
+  # config says what the site is, and Stripe is a separate question about
+  # whether it can charge yet.
+  #
+  # Use memberships_configured? for "can actually take money" — see
+  # admin_helper#member_links, which has always ANDed the Stripe check itself.
   def memberships_enabled?
-    payments_enabled? && payments_mode.in?(%w[memberships both])
+    payments_feature_enabled? && payments_mode.in?(%w[memberships both])
   end
 
+  # Memberships are set up AND Stripe is connected, i.e. someone could pay
+  # today. Gate anything that offers a real transaction on this.
+  def memberships_configured?
+    memberships_enabled? && StripeConfig.current.keys_present?
+  end
+
+  # Same split as memberships: configured vs chargeable. Donations differ in
+  # that a donate button with no Stripe behind it is a dead end rather than a
+  # setting, so donations_enabled? keeps requiring keys — the call sites that
+  # render buttons depend on it.
   def donations_enabled?
     payments_enabled? && payments_mode.in?(%w[donations both])
   end

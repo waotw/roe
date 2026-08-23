@@ -284,4 +284,40 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     get "/music/nothing-here/private.xml", params: { token: member.access_token }
     assert_response :not_found
   end
+
+  # A podcast app fetches an enclosure with no cookies, so a protected file is
+  # only reachable if the URL carries its own proof. Without this the private
+  # feed would list tracks the app then can't download.
+  test "private feed enclosures carry the member's media token" do
+    write_music("summer" => complete_release)
+    track("Opening", number: "1", extra: { "audience" => "paid" })
+    m = member
+
+    get "/music/summer/private.xml", params: { token: m.media_token }
+    url = Nokogiri::XML(response.body).at_xpath("//item/enclosure")["url"]
+
+    assert_includes url, "token=#{m.media_token}"
+  end
+
+  # The public feed points only at free files, so a token there would be a
+  # credential handed to anyone who subscribes.
+  test "public feed enclosures carry no token" do
+    write_music("summer" => complete_release)
+    track("Opening", number: "1")
+
+    get "/music/summer.xml"
+    url = Nokogiri::XML(response.body).at_xpath("//item/enclosure")["url"]
+
+    assert_not_includes url, "token="
+  end
+
+  # Feeds already sitting in someone's podcast app were subscribed with the old
+  # token; they have to keep working.
+  test "an existing subscription using the sign-in token still resolves" do
+    write_music("summer" => complete_release)
+    track("Opening", number: "1")
+
+    get "/music/summer/private.xml", params: { token: member.access_token }
+    assert_response :success
+  end
 end

@@ -167,6 +167,13 @@ class SiteConfig < ApplicationRecord
     site_config.save!
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
+
+    # A show or release audience cascades to its episodes' and tracks' files.
+    # Editing podcast.yml saves no post, so without this the media index keeps
+    # the old answer until something unrelated happens to be saved. Hooked here
+    # rather than on reload!, which fires on read paths too.
+    Medium.recompute_for_config(type)
+
     site_config
   rescue => e
     Rails.logger.error "Failed to sync #{type} config: #{e.message}"

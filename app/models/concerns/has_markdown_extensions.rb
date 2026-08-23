@@ -1727,6 +1727,11 @@ module HasMarkdownExtensions
     end
 
     rows = tracks.each_with_index.map do |item, i|
+      # Whether this track's AUDIO is protected, which is what decides if it
+      # plays — not the post's own audience. An episode on a paid show inherits
+      # protection with a blank audience of its own, and a row that looks free
+      # but 403s reads as a broken player.
+      paid   = playlist_track_paid?(item)
       title  = ERB::Util.html_escape(item.title.presence || "Untitled")
       number = ERB::Util.html_escape(player_track_number(item).presence || (i + 1).to_s)
       audio  = ERB::Util.html_escape(item.audio.to_s.strip)
@@ -1735,11 +1740,13 @@ module HasMarkdownExtensions
       dur    = item.respond_to?(:duration) ? item.duration.to_s.strip : ""
       dur_html = dur.present? ? %Q(<span class="player-track-duration">#{ERB::Util.html_escape(dur)}</span>) : ""
 
+      lock = paid ? paid_lock_icon : ""
+
       <<~HTML
-        <li class="player-track" data-player-track data-title="#{title}" data-image="#{image}" data-url="#{url}">
+        <li class="player-track#{paid ? ' is-paid' : ''}" data-player-track data-paid="#{paid}" data-title="#{title}" data-image="#{image}" data-url="#{url}">
           <div class="player-track-meta" data-player-select>
             <span class="player-track-number">#{number}</span>
-            <span class="player-track-title">#{title}</span>
+            <span class="player-track-title">#{title}#{lock}</span>
             <a class="player-track-link" href="#{url}" target="_blank" rel="noopener" aria-label="Open #{title}"></a>
             #{dur_html}
           </div>
@@ -1842,7 +1849,7 @@ module HasMarkdownExtensions
       end
 
     <<~HTML
-      <div class="card-player" data-controller="audio-player" data-audio-player-type-value="audio" data-cover="#{ERB::Util.html_escape(cover)}">
+      <div class="card-player" data-controller="audio-player" data-audio-player-type-value="audio"#{member_upgrade_value} data-cover="#{ERB::Util.html_escape(cover)}">
         <audio data-audio-player-target="audio" preload="metadata" hidden>#{sources_html}</audio>
         <div class="player-body">
           #{figure_html}
@@ -2168,12 +2175,45 @@ module HasMarkdownExtensions
     end
   end
 
+  # A playlist row is marked paid when its audio won't serve to the public.
+  # That's the resolved media audience — a track can be protected by its show
+  # or release without saying so itself — rather than show_paid_indicator?,
+  # which asks whether the POST is paid.
+  # Where to send someone who hits the player's paywall. Blank when the site
+  # has no upgrade page — the notice then says what happened without linking
+  # somewhere that doesn't exist.
+  def member_upgrade_value
+    return "" if @rendering_static
+
+    page = member_upgrade_page
+    return "" unless page&.url_name.present?
+
+    %( data-audio-player-upgrade-url-value="/#{ERB::Util.html_escape(page.url_name)}")
+  end
+
+  def member_upgrade_page
+    pages = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "pages"))
+    [ pages.join("members", "upgrade.md"), pages.join("upgrade.md") ]
+      .filter_map { |path| Page.find_by(file_path: path.to_s) }
+      .first
+  rescue StandardError
+    nil
+  end
+
+  def playlist_track_paid?(item)
+    return false if @rendering_static
+    return false unless SiteConfig.feature_enabled?("members")
+    return false unless item.respond_to?(:media_audience)
+
+    item.media_audience == "paid"
+  end
+
   def show_paid_indicator?(item)
     # Suppress the paid lock in static-site builds — without a member
     # session there's no upgrade flow to drive viewers toward, so the
     # icon is just visual noise.
     return false if @rendering_static
-    return false unless item.metadata["audience"] == "paid"
+    return false unless item.respond_to?(:audience) && item.audience == "paid"
     return false unless SiteConfig.feature_enabled?("members")
 
     # Always show indicator for paid content

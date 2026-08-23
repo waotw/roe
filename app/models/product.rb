@@ -3,6 +3,7 @@ class Product < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex
+  include IndexesMediaReferences
 
   # Validations
   validates :file_path, presence: true, uniqueness: true
@@ -102,6 +103,10 @@ class Product < ApplicationRecord
   def tags
     metadata["tags"] || []
   end
+
+  # Products have no audience field yet. When they get one this can go and the
+  # concern's default takes over; until then a product never protects a file.
+  def media_audience = "free"
 
   # URL helpers
   def public_url

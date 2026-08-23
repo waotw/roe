@@ -62,16 +62,14 @@ class FeedsController < ApplicationController
       return
     end
 
-    # If the whole podcast is paid-only, no public feed exists
-    if podcast_config["audience"] == "paid"
+    # PodcastConfig.public_feed? is the single answer to "is there a public
+    # feed" — the views that link to it ask the same thing.
+    unless PodcastConfig.public_feed?(@podcast_key)
       head :not_found
       return
     end
 
-    # Get all published episodes for this podcast
     episodes = podcast_episodes(@podcast_key)
-
-    # Check members.yml for whether to tease paid episode titles/descriptions
     show_paid_teasers = SiteConfig.feature("members", "everyone.show_paid_content") || false
 
     feed_xml = FeedGenerator.new(
@@ -116,9 +114,10 @@ class FeedsController < ApplicationController
     feed = ReleaseFeed.new(params[:release_key])
 
     # Admins reach it without a token, for checking their own feed.
+    member = nil
     unless authenticated?
-      member = Member.find_by(access_token: params[:token].to_s.presence)
-      return head :unauthorized unless member&.paid? && member&.active?
+      member = member_for_private_feed
+      return head :unauthorized unless member
     end
 
     # The owner not having turned the feed on is a 404 whoever is asking —
@@ -131,7 +130,8 @@ class FeedsController < ApplicationController
       site_config: site_config,
       podcast_config: feed.feed_config,
       include_paid: true,
-      show_paid_teasers: false
+      show_paid_teasers: false,
+      media_token: member&.media_token
     ).generate
 
     response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
@@ -142,21 +142,10 @@ class FeedsController < ApplicationController
     @podcast_key = params[:podcast_key]
 
     # Admins can access private feeds directly without a token
+    member = nil
     unless authenticated?
-      token = params[:token]
-
-      # Token is required for non-admins
-      unless token.present?
-        head :unauthorized
-        return
-      end
-
-      # Look up member by token
-      member = Member.find_by(access_token: token)
-      unless member&.paid? && member&.active?
-        head :unauthorized
-        return
-      end
+      member = member_for_private_feed
+      return head :unauthorized unless member
     end
 
     podcast_config = PodcastConfig.get(@podcast_key)
@@ -174,7 +163,8 @@ class FeedsController < ApplicationController
       site_config: site_config,
       podcast_config: podcast_config,
       include_paid: true,
-      show_paid_teasers: false
+      show_paid_teasers: false,
+      media_token: member&.media_token
     ).generate
 
     response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
@@ -183,20 +173,29 @@ class FeedsController < ApplicationController
 
   private
 
-  # Token gate for a paid feed, mirroring #private_podcast: admins pass through;
-  # everyone else needs a paid, active member's access token. Renders 401 and
-  # returns false when denied.
+  # The paid, active member a private feed request belongs to, or nil.
+  #
+  # Accepts media_token (what private feed URLs carry now) and falls back to
+  # access_token so feeds already subscribed to in someone's podcast app keep
+  # working. access_token is the magic-link SIGN-IN token, which is why new
+  # URLs don't use it — see Member#regenerate_media_token!.
+  def member_for_private_feed
+    token = params[:token].to_s.strip
+    return nil if token.blank?
+
+    member = Member.find_by(media_token: token) || Member.find_by(access_token: token)
+    return nil unless member&.paid? && member&.active?
+
+    member
+  end
+
+  # Token gate for a paid named feed, mirroring #private_podcast: admins pass
+  # through; everyone else needs a paid, active member. Renders 401 and returns
+  # false when denied.
   def authorize_paid_feed!
     return true if authenticated?
 
-    token = params[:token]
-    if token.blank?
-      head :unauthorized
-      return false
-    end
-
-    member = Member.find_by(access_token: token)
-    unless member&.paid? && member&.active?
+    unless member_for_private_feed
       head :unauthorized
       return false
     end

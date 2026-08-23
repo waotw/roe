@@ -146,6 +146,7 @@ module ApplicationHelper
   def members_enabled?            = SiteFeature.members_enabled?
   def payments_enabled?           = SiteFeature.payments_enabled?
   def memberships_enabled?        = SiteFeature.memberships_enabled?
+  def memberships_configured?     = SiteFeature.memberships_configured?
   def donations_enabled?          = SiteFeature.donations_enabled?
   def email_enabled?              = SiteFeature.email_enabled?
   def email_feature_enabled?      = SiteFeature.email_feature_enabled?

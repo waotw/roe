@@ -110,8 +110,13 @@ class MediaUsageIndex
 
         url = resolve_url(source[:path_helper], record)
         label = record_label(record)
+        # Marked in the browser with a $ so it's visible which references are
+        # what protects a file — and, on a file that's readable when you
+        # expected it not to be, which reference is the public one.
+        # Documentation has no audience and never responds to this.
+        paid = record.respond_to?(:media_audience) && record.media_audience == "paid"
         paths.each do |path|
-          index[path] << { kind: source[:kind], type: KIND_LABELS[source[:kind]], label: label, url: with_highlight(url, path), global: false }
+          index[path] << { kind: source[:kind], type: KIND_LABELS[source[:kind]], label: label, url: with_highlight(url, path), global: false, paid: paid }
         end
       end
     end
@@ -128,7 +133,7 @@ class MediaUsageIndex
       each_media_value(data) do |field_key, path|
         base = resolve_url(source[:path_helper])
         label = field_key ? "#{source[:label]} → #{field_key}" : source[:label]
-        index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, field_key), global: true }
+        index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, field_key), global: true, paid: false }
       end
     end
   end

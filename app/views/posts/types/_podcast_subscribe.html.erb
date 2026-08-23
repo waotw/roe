@@ -12,14 +12,14 @@
 %>
 <% key = post.metadata["podcast"] %>
 <% app_links = PodcastConfig.subscribe_links(podcast_config) %>
-<% show_public = key.present? && (authenticated? || podcast_config&.dig("audience") != "paid") %>
+<% show_public = key.present? && (authenticated? || PodcastConfig.public_feed?(key)) %>
 <% private_url =
      if key.blank?
        nil
      elsif authenticated?
        "/podcast/#{key}/private.xml"
      elsif current_member&.paid? && current_member&.active?
-       "/podcast/#{key}/private.xml?token=#{current_member.access_token}"
+       "/podcast/#{key}/private.xml?token=#{current_member.media_token}"
      end %>
 
 <% if app_links.any? || show_public || private_url.present? %>

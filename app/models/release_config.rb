@@ -108,6 +108,14 @@ class ReleaseConfig
     value == true || value.to_s.strip.downcase == "true"
   end
 
+  # Releases that resolve to paid, including via the global default. Tracks
+  # inherit unless they say otherwise.
+  def self.paid_keys
+    release_keys.select { |key| audience_for(key) == "paid" }
+  rescue StandardError
+    []
+  end
+
   def self.reload!
     SiteConfig.reload!("features/music")
   end

@@ -1,13 +1,18 @@
 class FeedGenerator
   attr_reader :posts, :format, :site_config, :podcast_config, :include_paid, :show_paid_teasers
 
-  def initialize(posts:, format: :rss, site_config: {}, podcast_config: nil, include_paid: false, show_paid_teasers: false)
+  # media_token: a member's read credential, appended to enclosure URLs in a
+  # private feed. Podcast apps fetch enclosures with no cookies, so a protected
+  # file is only reachable if the URL carries its own proof. Nil for public
+  # feeds, which never point at protected files anyway.
+  def initialize(posts:, format: :rss, site_config: {}, podcast_config: nil, include_paid: false, show_paid_teasers: false, media_token: nil)
     @posts = posts
     @format = format.to_sym
     @site_config = default_site_config.merge(site_config)
     @podcast_config = podcast_config
     @include_paid = include_paid
     @show_paid_teasers = show_paid_teasers
+    @media_token = media_token
   end
 
   def generate
@@ -192,7 +197,7 @@ class FeedGenerator
               # Audio enclosure — omit for paid episodes in public feed
               if post.metadata["audio"].present? && (!is_paid || include_paid)
                 xml.enclosure(
-                  url:    audio_full_url(post.metadata["audio"]),
+                  url:    with_media_token(audio_full_url(post.metadata["audio"])),
                   length: audio_byte_length(post),
                   type:   audio_content_type(post)
                 )
@@ -318,6 +323,18 @@ class FeedGenerator
 
     # Fallback: first paragraph or truncated content
     feed_description(post)
+  end
+
+  attr_reader :media_token
+
+  # Appends the member's read token to a local /media/ URL. Remote URLs are
+  # left alone — they aren't ours to authorize.
+  def with_media_token(url)
+    return url if media_token.blank?
+    return url if url.to_s.match?(%r{\Ahttps?://}) && !url.to_s.include?("/media/")
+
+    separator = url.include?("?") ? "&" : "?"
+    "#{url}#{separator}token=#{CGI.escape(media_token)}"
   end
 
   def audio_full_url(audio_path)

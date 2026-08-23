@@ -1,36 +1,42 @@
 namespace :media do
-  desc "Backfill media references for existing posts"
+  desc "Rebuild media references and recompute which files are protected"
   task backfill_references: :environment do
-    puts "🔗 Backfilling media references..."
+    puts "🔗 Rebuilding media references..."
 
-    total = Post.count
+    # The index only updates when content is saved, so an install that had
+    # content before this feature landed has no references for its pages and
+    # products, and stale audiences on its media. Everything below runs the
+    # same code a save runs — update_media_references, which recomputes each
+    # touched file's audience.
+    #
+    # Run this once after upgrading, or any time the index looks wrong.
+    models = [ Post, Page, Product ]
+    total = models.sum(&:count)
     processed = 0
-    references_created = 0
 
-    Post.find_each do |post|
-      # Extract media paths from content
-      media_paths = post.send(:extract_media_paths)
-
-      if media_paths.any?
-        # Find matching Medium records
-        referenced_media = Medium.where(file_path: media_paths)
-
-        # Create references
-        referenced_media.each do |medium|
-          unless post.media_references.exists?(medium: medium)
-            post.media_references.create(medium: medium)
-            references_created += 1
-          end
-        end
-
-        puts "  ✓ #{post.title || post.file_path}: #{referenced_media.count} media files"
+    models.each do |model|
+      model.find_each do |record|
+        record.send(:update_media_references)
+        processed += 1
+        print "\r  Progress: #{processed}/#{total}" if processed % 10 == 0
       end
-
-      processed += 1
-      print "\r  Progress: #{processed}/#{total}" if processed % 10 == 0
     end
 
-    puts "\n\n✅ Done! Created #{references_created} references for #{total} posts"
+    puts "\r  Progress: #{processed}/#{total}"
+    puts
+    puts "  References: #{MediaReference.group(:referenceable_type).count.inspect}"
+    puts "  Protected:  #{Medium.paid.count} of #{Medium.count} files"
+
+    mixed = Medium.mixed_audience_ids
+    if mixed.any?
+      puts
+      puts "  ⚠ #{mixed.size} file(s) are used by BOTH paid and free content, so they"
+      puts "    stay public. Find them with the Paid + Free toggles on the media page:"
+      Medium.where(id: mixed).limit(10).pluck(:file_path).each { |path| puts "      #{path}" }
+      puts "      …" if mixed.size > 10
+    end
+
+    puts "\n✅ Done."
   end
 
   desc "Show media reference statistics"

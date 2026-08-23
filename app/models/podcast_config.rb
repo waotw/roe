@@ -105,6 +105,41 @@ class PodcastConfig
   end
 
   # Clear cache
+  # Whether this show serves a public feed.
+  #
+  # Not "is the show flagged paid" — a paid show with free openers has a public
+  # feed carrying those, which is how someone samples it and then subscribes.
+  # No public feed only when there's nothing public in it.
+  #
+  # Teasers count: a title and description with no audio is a legitimate thing
+  # to advertise.
+  #
+  # Lives here because FeedsController#podcast and the two views that link to
+  # the feed all need the same answer, and they had drifted — the controller
+  # started serving a feed the views still hid.
+  def self.public_feed?(key)
+    return false if key.to_s.strip.blank?
+    return true if SiteConfig.feature("members", "everyone.show_paid_content")
+
+    published_episodes(key).any? { |episode| episode.audience != "paid" }
+  end
+
+  def self.published_episodes(key)
+    Post
+      .published
+      .where("json_extract(metadata, '$.post_type') = ?", "podcast")
+      .where("json_extract(metadata, '$.podcast') = ?", key.to_s)
+  end
+
+  # Shows whose audience is paid. Their episodes inherit it unless they say
+  # otherwise, so this is what "which posts are paid by inheritance" resolves
+  # against — in Ruby and in the SQL that filters collections.
+  def self.paid_keys
+    all_podcasts.filter_map { |key, show| key if show.is_a?(Hash) && show["audience"].to_s.strip == "paid" }
+  rescue StandardError
+    []
+  end
+
   def self.reload!
     SiteConfig.reload!("features/podcast")
   end

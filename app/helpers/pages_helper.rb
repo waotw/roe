@@ -22,7 +22,7 @@ module PagesHelper
   private
 
   def should_truncate_content?(item)
-    return false unless item.metadata["audience"] == "paid"
+    return false unless item.audience == "paid"
     return false if current_member&.paid? && current_member&.active?
     return false if authenticated? # Admins can see everything
 

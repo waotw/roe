@@ -17,7 +17,8 @@ class SiteController < ApplicationController
   # Check if user can access paid content
   def check_paid_access!(item)
     return unless helpers.members_enabled?
-    return unless item.metadata["audience"] == "paid"
+    # Resolved, not the raw field — an episode inherits its show's audience.
+    return unless item.audience == "paid"
 
     # Admins can see all paid content
     return if authenticated?

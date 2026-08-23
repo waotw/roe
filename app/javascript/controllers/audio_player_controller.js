@@ -23,6 +23,7 @@ export default class extends Controller {
     type: String, // "audio" or "video"
     speed: { type: Number, default: 1 },
     skipSeconds: { type: Number, default: 15 },
+    upgradeUrl: String,
   };
 
   // Available playback speeds
@@ -39,12 +40,14 @@ export default class extends Controller {
     this._boundTimeUpdate = this.onTimeUpdate.bind(this);
     this._boundDurationChange = this.onDurationChange.bind(this);
     this._boundEnded = this.onEnded.bind(this);
+    this._boundError = this.onMediaError.bind(this);
     this._boundPlay = this.onPlay.bind(this);
     this._boundPause = this.onPause.bind(this);
 
     this.mediaEl.addEventListener("timeupdate", this._boundTimeUpdate);
     this.mediaEl.addEventListener("durationchange", this._boundDurationChange);
     this.mediaEl.addEventListener("ended", this._boundEnded);
+    this.mediaEl.addEventListener("error", this._boundError, true);
     this.mediaEl.addEventListener("play", this._boundPlay);
     this.mediaEl.addEventListener("pause", this._boundPause);
 
@@ -128,6 +131,11 @@ export default class extends Controller {
 
     this.currentIndex = index;
     this.element.classList.remove("is-ended");
+    this.clearPaywall();
+    // Server-side marking only says the track IS paid, not whether THIS viewer
+    // can play it — a paid member can. So the notice waits for playback to
+    // actually fail rather than pre-judging.
+    this.currentTrackPaid = row.getAttribute("data-paid") === "true";
     this.mediaEl.src = src;
     this.mediaEl.load();
 
@@ -152,7 +160,9 @@ export default class extends Controller {
       }
     }
 
-    this.tracks.forEach((t, j) => t.classList.toggle("is-playing", j === index));
+    this.tracks.forEach((t, j) =>
+      t.classList.toggle("is-playing", j === index),
+    );
 
     if (autoplay) this.mediaEl.play();
   }
@@ -165,10 +175,51 @@ export default class extends Controller {
       "durationchange",
       this._boundDurationChange,
     );
+    this.mediaEl.removeEventListener("error", this._boundError);
     this.mediaEl.removeEventListener("ended", this._boundEnded);
     this.mediaEl.removeEventListener("play", this._boundPlay);
     this.mediaEl.removeEventListener("pause", this._boundPause);
     document.removeEventListener("keydown", this._boundKeydown);
+  }
+
+  // ========== PAYWALL ==========
+
+  // The audio 403s for anyone not entitled to it, which on its own just looks
+  // like a broken player. An <audio> element can't see the status code, so a
+  // failure on a track the server marked paid is treated as the paywall.
+  onMediaError() {
+    if (!this.currentTrackPaid) return;
+    this.showPaywall();
+  }
+
+  showPaywall() {
+    this.element.classList.add("is-paywalled");
+
+    let notice = this.element.querySelector("[data-player-paywall]");
+    if (!notice) {
+      notice = document.createElement("p");
+      notice.dataset.playerPaywall = "";
+      notice.className = "player-paywall";
+      const body = this.element.querySelector(".player-body") || this.element;
+      body.insertAdjacentElement("afterend", notice);
+    }
+
+    notice.innerHTML = this.paywallMessage;
+  }
+
+  clearPaywall() {
+    this.element.classList.remove("is-paywalled");
+    this.element.querySelector("[data-player-paywall]")?.remove();
+  }
+
+  // upgradeUrlValue is set by the renderer when the site has a members
+  // upgrade page; without one, say what's happening and stop there rather
+  // than linking somewhere that doesn't exist.
+  get paywallMessage() {
+    const label = "This track is for paid members.";
+    if (!this.hasUpgradeUrlValue || !this.upgradeUrlValue) return label;
+
+    return `${label} <a href="${this.upgradeUrlValue}">Upgrade to listen</a>.`;
   }
 
   // ========== PLAYBACK CONTROLS ==========
@@ -214,16 +265,19 @@ export default class extends Controller {
 
   toggleFullscreen() {
     const container = this.element;
-    
+
     if (!document.fullscreenElement) {
-      container.requestFullscreen?.().then(() => {
-        container.classList.add('is-fullscreen');
-      }).catch(err => {
-        console.warn('Fullscreen error:', err);
-      });
+      container
+        .requestFullscreen?.()
+        .then(() => {
+          container.classList.add("is-fullscreen");
+        })
+        .catch((err) => {
+          console.warn("Fullscreen error:", err);
+        });
     } else {
       document.exitFullscreen?.().then(() => {
-        container.classList.remove('is-fullscreen');
+        container.classList.remove("is-fullscreen");
       });
     }
   }
