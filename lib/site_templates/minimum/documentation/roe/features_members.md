@@ -135,9 +135,24 @@ Member emails are customizable Markdown files: [Admin → Emails](/admin/emails)
 - `@magic_link` and `@confirmation_link` are full URLs that members click to complete actions
 - Templates support full Markdown formatting including links, headings, and emphasis
 
+## Member tokens
+
+Each member has two tokens associtated with their membership.
+
+| Token | What it does |
+|-------|--------------|
+| **Access token** | Signs them in. It's what a magic-link email carries — treat it like a password. |
+| **Media token** | Gives them access to `paid` feeds, files and content. |
+
+A site owner can see them for any member here: [Admin → Members](/admin/members).
+
+A member's private feed addresses are listed on their account page: a paid feed from [feeds.yml](/documentation/roe/feeds-rss-atom), a podcast with paid episodes, or a music release with paid tracks. Each has a Copy button, and **Refresh your private links** issues a fresh set if one gets shared — the old links stop working straight away. The benefit of a media token is that they don't have to sign in to their account to access files. This is what allows them to subsribe in a podcast or RSS reader without being signed in.
+
+Cancelling an account will invalidate both tokens. A cancelled or downgraded member's media token stops opening files immediately.
+
 ## Static Site Generation
 
-If you're using static site generation, `SSG` + `MEMBERS` is an advanced feature still in development.
+Currently, the members system is not supported for SSG. You can only have public files in your static site but you can use the Store feature to sell tracks and other digital files: [Feature → Store](/documentation/roe/store)
 
 ## Next Steps
 

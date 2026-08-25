@@ -55,7 +55,7 @@ status: published
 | `excerpt` | Short description |
 | `image` | Featured image path |
 
-See [Metadata Fields](/documentation/roe/metadata-fields) for the full list.
+See [Metadata Fields](/documentation/roe/metadata-properties) for the full list.
 
 ## Special Pages
 

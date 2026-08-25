@@ -1473,6 +1473,29 @@ ol.player-tracks {
   font-size: var(--text-sm);
 }
 
+/* Paid tracks in a playlist, and the player's paywall notice.
+   A protected track's audio 403s, which on its own just looks like the player
+   is broken — the lock says why before you press play, and the notice says it
+   again if you do. */
+.player-track.is-paid .player-track-title {
+  opacity: 0.7;
+}
+
+.player-track .paid-lock-icon {
+  margin-left: 0.35em;
+  vertical-align: -0.2em;
+  width: var(--space-4);
+  height: var(--space-4);
+  opacity: 0.6;
+}
+
+.content p.player-paywall {
+  margin: 1rem 0 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
+}
+
 /* Collection Grids */
 
 .collection-grid {
@@ -3488,6 +3511,60 @@ hr.clear-floats {
 .checkout-form-wrapper.is-guest .member-checkout,
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
+}
+
+/* Private podcast feeds on the member account page. The URL sits in a
+   readonly input so it can be selected and copied on a phone, where a
+   copy button alone isn't always reachable. */
+.private-feeds {
+  margin: 1.5rem 0;
+}
+
+.private-feeds-note {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.private-feeds-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+
+.private-feed {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.private-feed-title {
+  flex: 0 0 100%;
+  font-weight: 600;
+}
+
+.private-feed-url {
+  flex: 1 1 20rem;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+}
+
+.private-feeds-regenerate {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.private-feeds-regenerate-form {
+  display: inline;
 }
 
 /* Alerts */

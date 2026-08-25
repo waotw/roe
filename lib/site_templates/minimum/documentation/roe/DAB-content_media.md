@@ -36,6 +36,7 @@ The Media Browser lives at [Admin → Media](/admin/medium/browse). It's the hom
 - **Type tabs** — filter by `Images`, `Audio`, `Video`, or `Unused` (files not referenced anywhere).
 - **Sort** — by upload date, filename, or file size.
 - **Search** — filter the list by filename.
+- **`$ Paid` / `Free`** — filter by who can read the file (see [Audiences](#audiences)).
 
 Each file shows a preview plus a few actions:
 
@@ -50,6 +51,25 @@ Double-click a file's name to rename it. Roe doesn't just rename the file — it
 ### Usage tracking
 
 Roe keeps track of where each media file is used. The **Used in** list on each file shows exactly where this file is referenced, and the **Unused** tab collects files that haven't been used anywhere; handy for finding the images you just uploaded or cleaning things up.
+
+### Audiences
+
+When a post or page has `audience: paid`, the files referenced in that post/page are private: only `paid` members or site owners that are signed in can access the files — see [Paid content](/documentation/roe/paid-content#files-behind-paid-content) for more information. 
+
+<mark>Note:</mark> If a file is referenced in a post/page that has `audience: everyone` and that same file shows up in a post/page that has `audience: paid`, that file will be visible publically.
+
+The media browser has two toggles to show paid and free files:
+
+| Toggles | Shows |
+|---------|-------|
+| neither | everything |
+| `$ Paid` | files only paid content uses |
+| `Free` | files anyone can read |
+| both | files used by **both** paid and free content |
+
+That last combination is a useful one. A file used by both stays public. If you meant for something to be private and it shows up when both `$ Paid` and `Free` are checked, that file is public.
+
+Each media file has a "Used in" list which shows which posts/pages reference this file. A `$` indicates when those pages or posts are `audience: paid`.
 
 ### Uploading
 

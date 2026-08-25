@@ -19,7 +19,7 @@ template: links
 
 ## Metadata Section
 
-The `metadata` for the post/page/product can be edited through a form or you can access the YAML directly through the `RAW` button. Click the `▶︎` to see the metadata, click the `▼` to hide it. If you're very curious, you can see a detailed walkthrough of all fields: [Metadata Fields](/documentation/roe/metadata-fields)
+The `metadata` for the post/page/product can be edited through a form or you can access the YAML directly through the `RAW` button. Click the `▶︎` to see the metadata, click the `▼` to hide it. If you're very curious, you can see a detailed walkthrough of all fields: [Metadata Fields](/documentation/roe/metadata-properties)
 
 As you change things, certain new metadata fields may show up: changing `post_type` from `article` to `podcast` will show fields related to podcasts.
 

@@ -937,7 +937,7 @@ div.flash mark {
   font-size: 0.9em;
   background-color: var(--color-code-bg);
   color: var(--color-code-text);
-  padding: var(--space-1) calc(var(--space-2) * 0.7);
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
   border: 1px solid var(--color-border);
 }
 
@@ -967,7 +967,7 @@ div.flash mark {
 
 .content figure img,
 .content figure picture {
-  /*margin-bottom: var(--space-1);*/
+  margin-bottom: var(--space-2);
 }
 
 .content hr {
@@ -1592,6 +1592,29 @@ p.collection-more a:hover {
 }
 .player-track-link:hover {
   opacity: 1;
+}
+
+/* Paid tracks in a playlist, and the player's paywall notice.
+   A protected track's audio 403s, which on its own just looks like the player
+   is broken — the lock says why before you press play, and the notice says it
+   again if you do. */
+.player-track.is-paid .player-track-title {
+  opacity: 0.7;
+}
+
+.player-track .paid-lock-icon {
+  margin-left: 0.35em;
+  vertical-align: -0.2em;
+  width: var(--space-4);
+  height: var(--space-4);
+  opacity: 0.6;
+}
+
+.content p.player-paywall {
+  margin: var(--space-2) 0 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
 }
 
 /* Collection Glossary */
@@ -3348,7 +3371,7 @@ p.podcast-audio-fallback {
 /* Subscribe block spacing — used on episode pages and on podcast-connected
    pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
 .podcast-subscribe {
-  margin-top: var(--space-6);
+  margin: var(--space-4) 0;
   font-size: 0.85rem;
 }
 
@@ -3485,7 +3508,7 @@ p.podcast-audio-fallback {
 
 .content.documentation table {
   font-size: var(--text-sm);
-  line-height: 2;
+  line-height: 1.75;
 }
 
 /* =============== UTILITIES ================ */
@@ -3798,6 +3821,63 @@ hr.clear-floats {
 .checkout-form-wrapper.is-guest .member-checkout,
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
+}
+
+/* Private podcast feeds on the member account page. The URL sits in a
+   readonly input so it can be selected and copied on a phone, where a
+   copy button alone isn't always reachable. */
+
+.private-feeds {
+  margin: var(--space-6) 0;
+}
+
+.private-feeds-note {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, currentColor);
+  opacity: 0.8;
+}
+
+.private-feeds-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0 0;
+}
+
+.private-feed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.private-feed-title {
+  flex: 0 0 100%;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.private-feed-url {
+  flex: 1 1 20rem;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+}
+
+.private-feeds-regenerate {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.private-feeds-regenerate-form {
+  display: inline;
 }
 
 /* Alerts */
