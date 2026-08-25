@@ -4,6 +4,16 @@ module Admin
                                        :upgrade_to_paid, :downgrade_to_free,
                                        :cancel_membership, :reactivate_membership ]
 
+    # A deleted account is a record, not a member. There's no one left to
+    # upgrade, bill or sign in, and editing it would put a name and address
+    # back on a row whose whole point is that it no longer has one.
+    #
+    # The page hides these controls; this is what makes them actually refuse,
+    # since a hidden button is still a reachable URL.
+    before_action :reject_deleted_account, only: [ :edit, :update, :destroy,
+                                                   :upgrade_to_paid, :downgrade_to_free,
+                                                   :cancel_membership, :reactivate_membership ]
+
     def index
       @members = Member.order(created_at: :desc)
 
@@ -49,9 +59,24 @@ module Admin
       end
     end
 
+    # Removing a member must not take the site's own records with it.
+    #
+    # A plain destroy did: newsletter_sends is `dependent: :destroy`, so the
+    # delivery history went too, while donations were left pointing at a row
+    # that no longer existed — still carrying the donor's real email. That
+    # deleted the useful part and kept the private part.
+    #
+    # So: erase members with nothing behind them, anonymise the rest. Same
+    # path a member takes deleting their own account (Member#anonymize!).
     def destroy
-      @member.destroy
-      redirect_to admin_members_path, notice: "Member deleted"
+      if @member.erasable?
+        @member.destroy
+        redirect_to admin_members_path, notice: "Member deleted"
+      else
+        @member.anonymize!
+        redirect_to admin_member_path(@member),
+          notice: "Member deleted. Their payment and newsletter records are kept without their name on them."
+      end
     end
 
     # Manual upgrade to paid tier
@@ -89,6 +114,13 @@ module Admin
 
     def set_member
       @member = Member.find(params[:id])
+    end
+
+    def reject_deleted_account
+      return unless @member.anonymized?
+
+      redirect_to admin_member_path(@member),
+        alert: "This account was deleted. Its payment and newsletter records are kept, but the account itself can't be changed."
     end
 
     def member_params

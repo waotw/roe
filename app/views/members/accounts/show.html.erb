@@ -43,14 +43,11 @@
     <summary>Delete my account</summary>
 
     <p>
-      This removes your name and email address. It can't be undone, and you'll
-      be signed out straight away.
+      This removes all user identifiable information from this website. It can't be undone, and you'll
+      be signed out immediately.
     </p>
     <p>
-      Records of payments and emails sent to you are kept without your name on
-      them, so <%= site_title %> keeps its accounts straight.
-      <strong>Stripe and your email provider keep their own copies of your
-      address</strong> — ask <%= site_title %> if you need those removed too.
+      This website will keep historical data like email deliveries and transaction history but your email address and name are removed from those records.
     </p>
 
     <%= form_with url: delete_account_path, method: :delete, class: "account-delete-form" do |f| %>

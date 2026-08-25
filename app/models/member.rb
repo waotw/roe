@@ -80,6 +80,38 @@ class Member < ApplicationRecord
 
   def anonymized? = status_deleted?
 
+  # What this member has behind them that the site needs to keep — in the
+  # owner's words, for the admin to show before they delete anyone.
+  #
+  # Deleting a member does one of two things depending on this list, and "it
+  # depends" is no use to someone holding the button. A cancelled membership
+  # reads like there's nothing left, when there may well be a payment from
+  # last year underneath it.
+  def retained_records
+    records = []
+
+    if paid_at? || paid_amount_cents.to_i.positive? || stripe_payment_intent_id.present?
+      records << [ "a", format_money(paid_amount_cents, paid_currency), "payment",
+                   paid_at && "from #{paid_at.strftime('%B %Y')}" ].compact.join(" ")
+    end
+
+    donations.count.then { |n| records << "#{n} #{'donation'.pluralize(n)}" if n.positive? }
+    newsletter_sends.count.then { |n| records << "#{n} #{'newsletter'.pluralize(n)}" if n.positive? }
+
+    records
+  end
+
+  # Whether this member can be removed outright rather than anonymised.
+  #
+  # A spam signup or a typo'd address has nothing behind it, and leaving a
+  # permanent "Deleted account" row for one is just litter in the members
+  # list. Anything with money or mail behind it is a different case: those
+  # records are the site's own accounts, and they have to survive the person.
+  #
+  # Derived from the list rather than repeating its conditions — the two would
+  # drift, and the page would then explain one outcome while doing the other.
+  def erasable? = retained_records.empty?
+
   # Erase the person, keep the record.
   #
   # Not a destroy: newsletter_sends is `dependent: :destroy`, so deleting the
@@ -318,6 +350,8 @@ class Member < ApplicationRecord
   end
 
   private
+
+  def format_money(cents, currency) = MemberPayments.money(cents, currency)
 
   def generate_memorable_token
     self.access_token ||= self.class.generate_password
