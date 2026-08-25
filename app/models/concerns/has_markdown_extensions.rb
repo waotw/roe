@@ -635,8 +635,8 @@ module HasMarkdownExtensions
     end
     return "" if named.empty?
 
-    dev_warning("Gallery #{'directive'.pluralize(named.size)} not understood", named.join(" "),
-      "A line a gallery doesn't recognise isn't kept as text either — it's dropped with the images.")
+    dev_warning("Gallery #{'option'.pluralize(named.size)} not understood", named.join(" "),
+      "Unrecognized options are ignored.")
   end
 
   # Spell-checked, never restricted: a theme is free to define a
@@ -653,8 +653,8 @@ module HasMarkdownExtensions
     return "" unless near
 
     dev_warning("Unknown aspect ratio",
-      "`aspect_ratio: #{ratio}` doesn't match a shape Roe knows. Did you mean `#{near}`?",
-      "Shapes: #{GalleryBuilderSchema::MENU_RATIOS.map { |r| r[:value] }.join(', ')} — or any ratio class your theme defines.")
+      "Did you mean `#{near}`?",
+      "Options: #{GalleryBuilderSchema::RATIOS.join(', ')}.")
   end
 
   # A gallery-level `caption:` directive wraps the whole gallery in a
@@ -1215,8 +1215,8 @@ module HasMarkdownExtensions
     if show_block_warnings? && config[:offset].present? && parse_letter_range(config[:offset])
       return [ [], 0, dev_warning(
         "Letter range on offset",
-        "`offset: #{config[:offset]}` looks like a letter range, but ranges filter and belong on `limit:`.",
-        "Use `limit: #{config[:offset]}` — each column filters its own range (e.g. `limit: a-m` then `limit: n-z`)."
+        "`offset: #{config[:offset]}` looks like a letter range, use `limit:` instead.",
+        "(e.g. `limit: a-m` then `limit: n-z`)."
       ) ]
     end
 
@@ -2469,7 +2469,7 @@ module HasMarkdownExtensions
     dev_warning(
       "#{'Option'.pluralize(keys.size)} from another block",
       keys.map { |key| "`#{key}:` belongs to #{homes_phrase(other_homes(key, context))}, not #{context}." }.join(" "),
-      "An option a block doesn't recognise is ignored."
+      "An option a block doesn't recognize is ignored."
     )
   end
 
@@ -2488,7 +2488,7 @@ module HasMarkdownExtensions
     dev_warning(
       "Unrecognised #{'option'.pluralize(suspect.size)}",
       suspect.map { |key, near| "`#{key}:` isn't an option for #{context} — did you mean `#{near}:`?" }.join(" "),
-      "Unrecognised options are ignored, so the block renders without them."
+      "Unrecognized options are ignored."
     )
   end
 
@@ -2701,7 +2701,7 @@ module HasMarkdownExtensions
         return render_error_card("Content not found: #{config[:post]}") if preview
         return dev_warning("Content not found",
           "No post, page, product, or documentation with url_name '#{config[:post]}' exists.",
-          "Check the url_name in the content's front matter.")
+          "Check the url_name in the content's metadata.")
       end
     end
 
@@ -3066,9 +3066,9 @@ module HasMarkdownExtensions
 
   def aside_link_conflict_warning
     dev_warning(
-      "Nothing left for link_url to link",
-      "`link_url:` makes the whole card a link, but the text already has one in it — a link inside a link isn't valid. With an image it would go on that instead; there isn't one, so `link_url:` does nothing here.",
-      "Either drop `link_url:`, or take the link out of the text and let the card carry it."
+      "Aside already has a link in the text.",
+      "`link_url:` makes the whole card a link, but the text already has one in it — a link inside a link isn't valid. Add an image and the `link:` will be assigned to the image.",
+      "Or remove `link_url:`."
     )
   end
 
@@ -3143,8 +3143,7 @@ module HasMarkdownExtensions
     return "" unless f && t && f != t
 
     dev_warning("Conflicting selector",
-      "This block sets both `for: #{f}` and `type: #{t}` — `for` wins.",
-      "They mean the same thing here; keep just one.")
+      "This block sets both `for: #{f}` and `type: #{t}` — `for` wins.")
   end
 
   def default_button_text(form_type)
@@ -3228,12 +3227,46 @@ module HasMarkdownExtensions
   def render_paid_content_form(text, button_text)
     # This will act as a content gate - everything after this is paid
     <<~HTML
-      <!-- PAID_CONTENT_GATE -->
+      #{paid_content_warnings}<!-- PAID_CONTENT_GATE -->
       <div class="paid-content-gate">
         <p>#{text}</p>
         <a href="/upgrade" class="btn-primary">#{button_text}</a>
       </div>
     HTML
+  end
+
+  # The paywall renders wherever it's written, but its upgrade button only goes
+  # somewhere useful once payments actually work. Writing the block before
+  # that is fine — the gate is a boundary in the article, and the preview needs
+  # to show it — so this explains the gap instead of hiding the option.
+  #
+  # Editor previews and development only, like every other block warning; a
+  # reader never sees it.
+  def paid_content_warnings
+    return "" unless show_block_warnings?
+
+    unless SiteFeature.members_enabled?
+      return dev_warning(
+        "Without Members enabled, there is no reason for a paywall.",
+        "When you enable Members, the post will cut off here for visitors, non-paid members",
+        "Click `ENABLE MEMBERS` in Settings, then set this post's `audience` to `paid`."
+      )
+    end
+
+    unless SiteFeature.payments_enabled?
+      return dev_warning(
+        "Paywall can't take payment yet",
+        "The upgrade button has nowhere to send anyone until Stripe is connected.",
+        "Connect Stripe in Settings → stripe.yml."
+      )
+    end
+
+    return "" if audience == "paid"
+
+    dev_warning(
+      "Paywall is set on a post that is available to `everyone`",
+      "Set `audience: paid` in the metadata and the paywall will hide everything below."
+    )
   end
 
   def render_signup_form(button_text, upgrade_button_text = nil)
@@ -3539,7 +3572,7 @@ module HasMarkdownExtensions
     unless SiteFeature.members_enabled?
       return dev_warning("Subscribe button unavailable",
         "Members aren't enabled, so there's no sign-up page to link to.",
-        "Enable members in members.yml.")
+        "Go to Settings → Roe and click `ENABLE MEMBERS`.")
     end
 
     label = ERB::Util.html_escape(config["label"].presence || "Subscribe")

@@ -759,7 +759,8 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_equal "div", doc.at_css(".card-aside").name
     assert_empty doc.css("a.aside-image-link")
     assert_equal 1, doc.css(".aside-text a").size, "the text's own link still works"
-    assert_includes doc.at_css("div[style*='dashed']")&.text.to_s, "Nothing left for link_url"
+    # The wording is editable; that it warns and names link_url isn't.
+    assert_includes doc.at_css("div[style*='dashed']")&.text.to_s, "link_url"
   end
 
   # The image only takes the link when the text can't. With plain text the whole

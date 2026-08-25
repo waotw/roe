@@ -128,10 +128,14 @@
                   <button type="button"
                           data-action="click->action-builder#open"
                           data-action-block="form"
-                          class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Form</button>
+                          class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Member form</button>
                 <% end %>
-                <% if payments_enabled? %>
-                  <%# Shortcut: opens the Form modal already set to paid_content. %>
+                <%# Shortcut: opens the member-form modal already set to
+                    paid_content. Gated on payments being configured rather
+                    than on Stripe working — a paywall marks where an article's
+                    free part ends, which is worth writing before billing
+                    exists. The block warns if it can't take payment yet. %>
+                <% if payments_feature_enabled? %>
                   <button type="button"
                           data-action="click->action-builder#open"
                           data-action-block="form"

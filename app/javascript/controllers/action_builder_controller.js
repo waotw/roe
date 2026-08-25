@@ -78,8 +78,10 @@ export default class extends Controller {
       sel.disabled = !match;
     });
     if (this.hasTitleTarget) {
+      // "form" is the block name in the markup; the label says what it's for,
+      // since every kind behind it is a member form.
       this.titleTarget.textContent =
-        this.block === "form" ? "Insert form" : "Insert button";
+        this.block === "form" ? "Insert member form" : "Insert button";
     }
 
     // Honour a preset kind when its option exists in the active select.

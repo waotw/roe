@@ -6,6 +6,12 @@ require "test_helper"
 # feed addresses were only reachable from an episode page, which is the wrong
 # place when you've dropped the feed from your podcast app and want it back.
 class Members::AccountFeedsTest < ActionDispatch::IntegrationTest
+  # Private feeds only exist when the members system is on. Stated here rather
+  # than inherited from whichever earlier test happened to write a members.yml
+  # into the shared test site — this file failed on its own and passed in the
+  # full suite, which is the wrong way round.
+  setup { SiteFeature.stubs(:members_enabled?).returns(true) }
+
   teardown do
     path = SiteConfig::FEATURES_PATH.join("podcast.yml")
     File.delete(path) if File.exist?(path)

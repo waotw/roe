@@ -29,7 +29,15 @@ module ActionBuilderSchema
     { value: "checkout",     label: "Checkout",    feature: :members },
     { value: "donate",       label: "Donate",      feature: :members },
     { value: "unsubscribe",  label: "Unsubscribe", feature: :members },
-    { value: "paid_content", label: "Paywall",     feature: :payments }
+    # A paywall marks where the free part of an article ends — a content
+    # structure, not a transaction. Writing one before Stripe is connected is
+    # reasonable and useful; the upgrade button it renders is what needs keys,
+    # and the block warns about that itself.
+    #
+    # It was the only kind here requiring working Stripe keys — Checkout and
+    # Donate, which do take money, ask only for :members. So the one that
+    # needed them least was the one gated hardest.
+    { value: "paid_content", label: "Paywall",     feature: :payments_configured }
   ].freeze
 
   FIELDS_BY_KIND = {
@@ -105,21 +113,30 @@ module ActionBuilderSchema
     BUTTON_KINDS.select { |k| feature_on?(k[:feature], store: store, members: members) }
   end
 
-  # Form kinds available given the enabled features (paywall needs payments,
-  # the rest need members).
-  def self.form_kinds(members:, payments:)
-    FORM_KINDS.select { |k| feature_on?(k[:feature], members: members, payments: payments) }
+  # Form kinds available given the enabled features.
+  #
+  # payments: Stripe is connected and can charge — for the kinds that take
+  #   money.
+  # payments_configured: members.yml turns payments on, whatever Stripe's
+  #   state — for the paywall, which only marks a boundary in the writing.
+  def self.form_kinds(members:, payments:, payments_configured: payments)
+    FORM_KINDS.select do |k|
+      feature_on?(k[:feature], members: members, payments: payments,
+                               payments_configured: payments_configured)
+    end
   end
 
   def self.fields_for(kind)
     FIELDS_BY_KIND[kind] || []
   end
 
-  def self.feature_on?(feature, store: false, members: false, payments: false)
+  def self.feature_on?(feature, store: false, members: false, payments: false,
+                       payments_configured: payments)
     case feature
-    when :store    then store
-    when :members  then members
-    when :payments then payments
+    when :store               then store
+    when :members             then members
+    when :payments            then payments
+    when :payments_configured then payments_configured
     else true
     end
   end
