@@ -213,10 +213,10 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     write_music("summer" => complete_release)
     track("Opening", number: "1")
 
-    get "/music/summer/private.xml", params: { token: member(tier: :free).access_token }
+    get "/music/summer/private.xml", params: { token: member(tier: :free).media_token }
     assert_response :unauthorized
 
-    get "/music/summer/private.xml", params: { token: member(status: :cancelled).access_token }
+    get "/music/summer/private.xml", params: { token: member(status: :cancelled).media_token }
     assert_response :unauthorized
   end
 
@@ -231,7 +231,7 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     write_music("summer" => complete_release)
     track("Opening", number: "1")
 
-    get "/music/summer/private.xml", params: { token: member.access_token }
+    get "/music/summer/private.xml", params: { token: member.media_token }
     assert_response :success
   end
 
@@ -242,7 +242,7 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     track("Free Track", number: "1")
     track("Paid Track", number: "2", extra: { "audience" => "paid" })
 
-    get "/music/summer/private.xml", params: { token: member.access_token }
+    get "/music/summer/private.xml", params: { token: member.media_token }
     private_feed = Nokogiri::XML(response.body)
     assert_equal %w[Free\ Track Paid\ Track], private_feed.xpath("//item/title").map(&:text)
     assert_equal 2, private_feed.xpath("//item/enclosure").size, "both tracks playable"
@@ -263,7 +263,7 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     get "/music/summer.xml"
     assert_response :not_found
 
-    get "/music/summer/private.xml", params: { token: member.access_token }
+    get "/music/summer/private.xml", params: { token: member.media_token }
     assert_response :success
     assert_equal 1, Nokogiri::XML(response.body).xpath("//item/enclosure").size
   end
@@ -274,14 +274,14 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     write_music("summer" => complete_release("feed" => false))
     track("Opening", number: "1")
 
-    get "/music/summer/private.xml", params: { token: member.access_token }
+    get "/music/summer/private.xml", params: { token: member.media_token }
     assert_response :not_found
   end
 
   test "an unknown release is a 404 on the private feed too" do
     write_music("summer" => complete_release)
 
-    get "/music/nothing-here/private.xml", params: { token: member.access_token }
+    get "/music/nothing-here/private.xml", params: { token: member.media_token }
     assert_response :not_found
   end
 
@@ -311,13 +311,14 @@ class MusicReleaseFeedTest < ActionDispatch::IntegrationTest
     assert_not_includes url, "token="
   end
 
-  # Feeds already sitting in someone's podcast app were subscribed with the old
-  # token; they have to keep working.
-  test "an existing subscription using the sign-in token still resolves" do
+  # The sign-in token is not a feed key. It was accepted for a while so URLs
+  # from before the two-token split kept working; that's gone, because a feed
+  # URL travels and this one hands over the account.
+  test "the sign-in token does not open a private feed" do
     write_music("summer" => complete_release)
     track("Opening", number: "1")
 
     get "/music/summer/private.xml", params: { token: member.access_token }
-    assert_response :success
+    assert_response :unauthorized
   end
 end

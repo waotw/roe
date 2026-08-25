@@ -38,7 +38,7 @@ class FeedGenerator
       maker.channel.updated = posts.first&.date&.to_time || Time.now
       maker.channel.managingEditor = site_config[:author] if site_config[:author].present?
 
-      posts.each do |post|
+      visible_posts.each do |post|
         maker.items.new_item do |item|
           item.title = post.title
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
@@ -48,6 +48,10 @@ class FeedGenerator
           else
             feed_description(post)
           end
+
+          # The article itself. A reader shows this rather than the summary,
+          # which is what makes a paid feed worth subscribing to.
+          item.content_encoded = feed_item_content(post)
 
           item.pubDate = post.date.to_time if post.date
           item.author = post.author if post.author
@@ -71,7 +75,7 @@ class FeedGenerator
       maker.channel.author = site_config[:author]
       maker.channel.id = site_config[:url]
 
-      posts.each do |post|
+      visible_posts.each do |post|
         maker.items.new_item do |item|
           item.title = post.title
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
@@ -81,6 +85,10 @@ class FeedGenerator
           else
             feed_description(post)
           end
+
+          # Atom's equivalent of content:encoded.
+          item.content.content = feed_item_content(post)
+          item.content.type = "html"
 
           item.updated = post.date.to_time if post.date
           item.author = post.author if post.author
@@ -243,6 +251,49 @@ class FeedGenerator
       url: SiteConfig.site_url.presence || "https://example.com",
       author: SiteConfig.get("author_name").presence || SiteConfig.get("author_email").presence || "Site Author"
     }
+  end
+
+  # Full rendered HTML for a feed item, cut at the paywall where one applies.
+  #
+  # Three cases:
+  #   free post                    → everything
+  #   paid post, token-gated feed  → everything (they've paid)
+  #   paid post shown as a preview → up to the paywall gate, then a line saying
+  #                                  where the rest is
+  #
+  # Without this, every RSS item carried a 200-character summary and nothing
+  # else, so a paid feed gave subscribers the same list of links a free one did.
+  def feed_item_content(post)
+    html = post.to_html.to_s
+    return gate_free_content(html) unless post.audience == "paid"
+    return gate_free_content(html) if include_paid
+
+    preview_before_gate(html)
+  end
+
+  # A free post can still carry a paywall block — the author may have written
+  # one and then published to everyone. Drop the gate itself; keep the content.
+  def gate_free_content(html)
+    html.gsub(/<!-- PAID_CONTENT_GATE -->.*?<\/div>/m, "")
+  end
+
+  # Everything above the gate, plus a line pointing at the rest. When the post
+  # has no gate there's nothing free to show, so the summary stands alone —
+  # never the article.
+  def preview_before_gate(html)
+    free_part = html.include?("<!-- PAID_CONTENT_GATE -->") ? html.split("<!-- PAID_CONTENT_GATE -->").first : ""
+
+    "#{free_part}<p><em>The rest of this is for members.</em></p>"
+  end
+
+  # Paid posts a public feed may advertise. Follows the same
+  # `everyone.show_paid_content` setting collections use, so a site that would
+  # rather not market to non-members turns it off in one place and every
+  # surface agrees.
+  def visible_posts
+    return posts if include_paid || show_paid_teasers
+
+    posts.reject { |post| post.respond_to?(:audience) && post.audience == "paid" }
   end
 
   def feed_description(post)

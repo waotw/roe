@@ -7,7 +7,8 @@ class FeedsController < ApplicationController
     feed_xml = FeedGenerator.new(
       posts: @posts,
       format: :rss,
-      site_config: site_config
+      site_config: site_config,
+      show_paid_teasers: show_paid_content?
     ).generate
 
     response.headers["Content-Type"] = "application/rss+xml; charset=utf-8"
@@ -20,7 +21,8 @@ class FeedsController < ApplicationController
     feed_xml = FeedGenerator.new(
       posts: @posts,
       format: :atom,
-      site_config: site_config
+      site_config: site_config,
+      show_paid_teasers: show_paid_content?
     ).generate
 
     response.headers["Content-Type"] = "application/atom+xml; charset=utf-8"
@@ -43,14 +45,41 @@ class FeedsController < ApplicationController
 
     fmt = params[:atom] ? :atom : :rss
     feed_xml = FeedGenerator.new(
-      posts: FeedContent.for(feed, include_paid: include_paid),
+      posts: FeedContent.for(feed, include_paid: include_paid, show_paid_teasers: show_paid_content?),
       format: fmt,
-      site_config: site_config
+      site_config: site_config,
+      include_paid: include_paid,
+      show_paid_teasers: show_paid_content?
     ).generate
 
     response.headers["Content-Type"] =
       fmt == :atom ? "application/atom+xml; charset=utf-8" : "application/rss+xml; charset=utf-8"
     render xml: feed_xml
+  end
+
+  # A member's copy of the main feed: the same posts, with paid articles in
+  # full rather than cut at their paywall.
+  #
+  # Podcasts have had this since paid episodes existed; articles only had the
+  # public half, so someone who'd paid still read previews in their reader.
+  def private_rss
+    return head :not_found unless SiteFeature.members_enabled?
+    return head :unauthorized unless member_for_private_feed
+
+    posts = Post.feed_posts.order(Arel.sql("json_extract(metadata, '$.date') DESC")).limit(20)
+    render_private_feed(posts)
+  end
+
+  # The same, for a feed defined in feeds.yml. A feed that's already
+  # `audience: paid` is gated at its own URL and doesn't need this.
+  def private_named
+    return head :not_found unless SiteFeature.members_enabled?
+
+    feed = FeedConfig.get(params[:name])
+    return head :not_found unless feed
+    return head :unauthorized unless member_for_private_feed
+
+    render_private_feed(FeedContent.for(feed, include_paid: true))
   end
 
   def podcast
@@ -173,17 +202,44 @@ class FeedsController < ApplicationController
 
   private
 
+  # include_paid: the caller has already established who's asking.
+  def render_private_feed(posts)
+    fmt = params[:atom] ? :atom : :rss
+
+    feed_xml = FeedGenerator.new(
+      posts: posts,
+      format: fmt,
+      site_config: site_config,
+      include_paid: true
+    ).generate
+
+    response.headers["Content-Type"] =
+      fmt == :atom ? "application/atom+xml; charset=utf-8" : "application/rss+xml; charset=utf-8"
+    render xml: feed_xml
+  end
+
+  # Whether a public feed may advertise paid posts as previews. The same
+  # members.yml setting collections follow, so turning off marketing to
+  # non-members turns it off everywhere at once.
+  def show_paid_content?
+    SiteConfig.feature("members", "everyone.show_paid_content") || false
+  end
+
   # The paid, active member a private feed request belongs to, or nil.
   #
-  # Accepts media_token (what private feed URLs carry now) and falls back to
-  # access_token so feeds already subscribed to in someone's podcast app keep
-  # working. access_token is the magic-link SIGN-IN token, which is why new
-  # URLs don't use it — see Member#regenerate_media_token!.
+  # media_token only. access_token signs a member in, so accepting it here
+  # would mean a feed URL — which travels through podcast apps, shared links
+  # and logs — doubling as a credential for the account.
+  #
+  # Private feed URLs briefly carried access_token, and this accepted it for a
+  # while so those subscriptions kept working. Removed: a reader whose feed
+  # stops can copy the current URL from their account page, which is a smaller
+  # cost than leaving the sign-in token working as a feed key.
   def member_for_private_feed
     token = params[:token].to_s.strip
     return nil if token.blank?
 
-    member = Member.find_by(media_token: token) || Member.find_by(access_token: token)
+    member = Member.find_by(media_token: token)
     return nil unless member&.paid? && member&.active?
 
     member

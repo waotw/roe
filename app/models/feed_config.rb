@@ -18,7 +18,9 @@
 class FeedConfig
   # Names that collide with the built-in /feed.* routes or read oddly as a
   # slug. A feed may not use one.
-  RESERVED_NAMES = %w[feed xml atom rss].freeze
+  # "private" is reserved because /feed/private.xml is the members' copy of the
+  # main feed — a feed by that name would shadow it.
+  RESERVED_NAMES = %w[feed xml atom rss private].freeze
 
   FILE = SiteConfig::FEATURES_PATH.join("feeds.yml")
 

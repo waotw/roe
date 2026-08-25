@@ -37,6 +37,7 @@
 
   <div class="account-actions">
     <%= link_to "Edit Account", account_edit_path, class: "btn-outline" %>
+
     <% if @member.free? %>
       <%= button_to "Upgrade to Paid", create_checkout_path,
           class: "btn-primary",
@@ -48,4 +49,50 @@
     <% if @member.free? %>
       <p class="upgrade-link">Find out about <a href="/upgrade">paid membership</a></p>
     <% end %>
+
+  <%# Private feed addresses, one per podcast or release with paid content.
+      Its own section rather than part of .account-actions — that's a row of
+      buttons, and this landed between "Edit Account" and "Sign Out".
+
+      The URL carries the member's token, which the note says plainly. The
+      token is never shown on its own: it means nothing without a feed address
+      and showing it invites pasting it somewhere it doesn't belong. %>
+  <% if @private_feeds.any? %>
+    <div class="private-feeds">
+      <h2>Your private podcast feeds</h2>
+      <p class="private-feeds-note">
+        Add these to your podcast app to get paid episodes. Each link is
+        personal to you — anyone you share it with gets your paid episodes too.
+      </p>
+
+      <ul class="private-feeds-list">
+        <% @private_feeds.each do |feed| %>
+          <li class="private-feed" data-controller="clipboard">
+            <span class="private-feed-title"><%= feed.title %></span>
+            <input type="text" class="private-feed-url" readonly
+                   value="<%= request.base_url %><%= feed.url %>"
+                   data-clipboard-target="source"
+                   onclick="this.select()">
+            <button type="button" class="btn-secondary"
+                    data-action="click->clipboard#copy">Copy</button>
+          </li>
+        <% end %>
+      </ul>
+
+      <%# Rotating the token invalidates every link above at once. That's
+          destructive in a way a member can't undo, so it confirms first and
+          says exactly what breaks. %>
+      <p class="private-feeds-regenerate">
+        <%= button_to "Refresh your private links",
+              regenerate_media_token_path,
+              method: :post,
+              class: "btn-secondary",
+              form_class: "private-feeds-regenerate-form",
+              data: { turbo_confirm: "Create new feed links? Your current links will stop working straight away, and you'll need to update your podcast app." } %>
+        <span class="private-feeds-note">
+          If you're private link has been compromised, click the above button and you'll get a fresh set of links. The old links will stop working so you'll need to resubscribe in your podcast player.
+        </span>
+      </p>
+    </div>
+  <% end %>
 </div>

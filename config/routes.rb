@@ -412,6 +412,9 @@ Rails.application.routes.draw do
   get "account/edit", to: "members/accounts#edit"
   patch "account", to: "members/accounts#update"
   get "account/confirm-email", to: "members/accounts#confirm_email", as: :confirm_email
+  # New private feed URLs, when the old ones have been shared or leaked.
+  post "account/feeds/regenerate", to: "members/accounts#regenerate_media_token",
+       as: :regenerate_media_token
   get "/unsubscribe/:token", to: "members/subscriptions#unsubscribe", as: :unsubscribe
   post "/unsubscribe/:token", to: "members/subscriptions#confirm_unsubscribe"
   post "webhooks/postmark/:token", to: "webhooks/postmark#create", as: :admin_postmark_webhook
@@ -464,6 +467,13 @@ Rails.application.routes.draw do
   get "feed.xml", to: "feeds#rss", defaults: { format: "xml" }
   get "feed.atom", to: "feeds#atom", defaults: { format: "xml" }, as: :feed_atom
   # Named feeds from feeds.yml — a collection query served as RSS/Atom.
+  # Members' copies, carrying full paid articles. Declared before the :name
+  # routes so /feed/private.xml isn't read as a feed named "private".
+  get "feed/private.xml",  to: "feeds#private_rss", defaults: { format: "xml" }, as: :private_feed
+  get "feed/private.atom", to: "feeds#private_rss", defaults: { format: "xml", atom: true }, as: :private_feed_atom
+  get "feed/:name/private.xml",  to: "feeds#private_named", defaults: { format: "xml" }, as: :private_named_feed
+  get "feed/:name/private.atom", to: "feeds#private_named", defaults: { format: "xml", atom: true }, as: :private_named_feed_atom
+
   get "feed/:name.xml", to: "feeds#named", defaults: { format: "xml" }, as: :named_feed
   get "feed/:name.atom", to: "feeds#named", defaults: { format: "xml", atom: true }, as: :named_feed_atom
   get "/podcast/:podcast_key.xml", to: "feeds#podcast", as: :podcast_feed

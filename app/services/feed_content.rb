@@ -7,18 +7,22 @@
 # uses) hard-excludes paid content so it can't leak. A paid feed passes true
 # once the caller has authenticated the request.
 class FeedContent
-  def self.for(feed_config, include_paid: false)
-    new(feed_config, include_paid: include_paid).posts
+  # show_paid_teasers: keep paid posts in a public feed so they can be shown as
+  # previews. Off (the default) they're dropped entirely, which is what a site
+  # that would rather not advertise to non-members wants.
+  def self.for(feed_config, include_paid: false, show_paid_teasers: false)
+    new(feed_config, include_paid: include_paid, show_paid_teasers: show_paid_teasers).posts
   end
 
-  def initialize(feed_config, include_paid: false)
+  def initialize(feed_config, include_paid: false, show_paid_teasers: false)
     @config = (feed_config || {}).symbolize_keys
     @include_paid = include_paid
+    @show_paid_teasers = show_paid_teasers
   end
 
   def posts
     records = CollectionQuery.new(@config).records || []
-    records = exclude_paid(records) unless @include_paid
+    records = exclude_paid(records) unless @include_paid || @show_paid_teasers
     ordered = CollectionQuery.order_items(records, @config[:order].presence || "date")
     limit.positive? ? ordered.first(limit) : ordered
   end

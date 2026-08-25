@@ -7,6 +7,7 @@ module Members
 
     def show
       @member = current_member
+      @private_feeds = PrivateFeeds.for(@member)
     end
 
     def edit
@@ -38,6 +39,18 @@ module Members
           render :edit, status: :unprocessable_entity
         end
       end
+    end
+
+    # Issue a new media token, invalidating every private feed URL the member
+    # has handed out. The whole reason media_token is separate from the
+    # sign-in token is that these URLs travel — so being able to rotate one
+    # without touching the other is the point.
+    def regenerate_media_token
+      current_member.regenerate_media_token!
+
+      redirect_to account_path,
+        notice: "New feed links created. Your old links have stopped working — " \
+                "update your podcast app with the new ones below."
     end
 
     def confirm_email
