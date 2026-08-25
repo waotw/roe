@@ -32,6 +32,9 @@
             <% if @member.active? %>
               <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Active</span>
             <% else %>
+            <% elsif @member.anonymized? %>
+              <span class="inline-flex bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">Deleted</span>
+            <% else %>
               <span class="inline-flex bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">Cancelled</span>
             <% end %>
           </dd>
@@ -133,6 +136,17 @@
                 method: :patch,
                 class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs",
                 form: { data: { turbo_confirm: "Cancel this membership?" } } %>
+
+          <% elsif @member.anonymized? %>
+
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Account Deleted</h4>
+              <p class="text-sm text-gray-500 font-sans">
+                This person deleted their own account. Their name and email address
+                are gone; the payment and delivery records below are kept. It can't
+                be reactivated — there's no one left to sign in.
+              </p>
+            </div>
 
           <% else %>
 

@@ -35,6 +35,32 @@
     </div>
   </div>
 
+  <%# Deleting is last, separated, and asks for a typed word — it can't be
+      undone and shouldn't sit next to Edit Account where a mis-click lands.
+      The copy names what survives, including the copies Stripe and Postmark
+      keep, so nobody assumes this reached further than it does. %>
+  <details class="account-delete">
+    <summary>Delete my account</summary>
+
+    <p>
+      This removes your name and email address. It can't be undone, and you'll
+      be signed out straight away.
+    </p>
+    <p>
+      Records of payments and emails sent to you are kept without your name on
+      them, so <%= site_title %> keeps its accounts straight.
+      <strong>Stripe and your email provider keep their own copies of your
+      address</strong> — ask <%= site_title %> if you need those removed too.
+    </p>
+
+    <%= form_with url: delete_account_path, method: :delete, class: "account-delete-form" do |f| %>
+      <label for="confirm_delete">Type <strong>DELETE</strong> to confirm</label>
+      <%= f.text_field :confirm, id: "confirm_delete", autocomplete: "off",
+            class: "account-delete-input", placeholder: "DELETE" %>
+      <%= f.submit "Delete my account", class: "btn-secondary account-delete-button" %>
+    <% end %>
+  </details>
+
   <div class="account-actions">
     <%= link_to "Edit Account", account_edit_path, class: "btn-outline" %>
 

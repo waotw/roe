@@ -1,11 +1,16 @@
 class Member < ApplicationRecord
   # Enums (integer-backed for SQLite performance)
   enum :tier, { free: 0, paid: 1 }, prefix: true
-  enum :status, { active: 0, cancelled: 1 }, prefix: true
+  # `deleted` is the member asking to be forgotten. The row stays so delivery
+  # records and payments keep a valid owner; everything identifying them is
+  # cleared. See #anonymize!.
+  enum :status, { active: 0, cancelled: 1, deleted: 2 }, prefix: true
   enum :newsletter_status, { subscribed: 0, unsubscribed: 1, bounced: 2 }, prefix: true
 
   belongs_to :import, optional: true
 
+  # No dependent: — a donation is a payment record and outlives the account.
+  has_many :donations
   has_many :newsletter_sends, dependent: :destroy
   has_many :newsletters_received, through: :newsletter_sends, source: :post
 
@@ -62,6 +67,60 @@ class Member < ApplicationRecord
 
   def regenerate_token!
     update!(access_token: self.class.generate_password)
+  end
+
+  # Placeholder identity for a deleted account. `.invalid` is reserved by
+  # RFC 2606 precisely so it can never resolve — no mail can escape to it —
+  # and the id keeps it unique, since a constant would collide on the second
+  # deletion against the unique index on email.
+  ANONYMIZED_DOMAIN = "deleted.invalid"
+  ANONYMIZED_NAME   = "Deleted account"
+
+  def self.anonymized_email_for(id) = "deleted-#{id}@#{ANONYMIZED_DOMAIN}"
+
+  def anonymized? = status_deleted?
+
+  # Erase the person, keep the record.
+  #
+  # Not a destroy: newsletter_sends is `dependent: :destroy`, so deleting the
+  # row would take every delivery record with it, and donations point here
+  # with no such rule and would be left dangling. Anonymising in place keeps
+  # both valid and keeps the money countable.
+  #
+  # Tokens are regenerated rather than nulled — access_token is NOT NULL and
+  # both are unique-indexed — which also has the effect of killing their magic
+  # links and private feed URLs at once.
+  #
+  # Kept on purpose: paid_at, paid_amount_cents, refunded_*, subscribed_at,
+  # tier and stripe_payment_intent_id. The last is how a later refund still
+  # finds this row (see WebhooksController#handle_charge_refunded); it names a
+  # transaction, not a person. stripe_customer_id names the person, so it goes.
+  #
+  # Stripe and Postmark keep their own copies of the address. Roe doesn't
+  # reach into either: deleting a Stripe customer is irreversible and would
+  # damage the payment history this is trying to preserve.
+  def anonymize!
+    transaction do
+      donations.find_each do |donation|
+        donation.update_columns(email: self.class.anonymized_email_for(id))
+      end
+
+      update!(
+        email: self.class.anonymized_email_for(id),
+        name: ANONYMIZED_NAME,
+        pending_email: nil,
+        password_digest: nil,
+        email_confirmation_token: nil,
+        email_confirmation_sent_at: nil,
+        stripe_customer_id: nil,
+        metadata: {},
+        access_token: self.class.generate_password,
+        media_token: self.class.generate_media_token,
+        newsletter_status: :unsubscribed,
+        status: :deleted,
+        cancelled_at: cancelled_at || Time.current
+      )
+    end
   end
 
   # A read-only credential for protected media and private feeds.

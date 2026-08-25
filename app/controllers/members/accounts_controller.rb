@@ -53,6 +53,24 @@ module Members
                 "update your podcast app with the new ones below."
     end
 
+    # Delete the account: erase the person, keep the record. See
+    # Member#anonymize! for what survives and why.
+    #
+    # Typing DELETE is the confirmation. A dialog is too easy to click past for
+    # something with no undo, and the word has to be produced deliberately.
+    def destroy
+      unless params[:confirm].to_s.strip.upcase == "DELETE"
+        redirect_to account_path, alert: "Type DELETE to confirm you want to delete your account."
+        return
+      end
+
+      current_member.anonymize!
+      reset_session
+
+      redirect_to root_path,
+        notice: "Your account has been deleted. Your name and email address have been removed."
+    end
+
     def confirm_email
       @member = current_member
       token = params[:token]

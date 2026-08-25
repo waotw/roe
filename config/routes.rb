@@ -415,6 +415,7 @@ Rails.application.routes.draw do
   # New private feed URLs, when the old ones have been shared or leaked.
   post "account/feeds/regenerate", to: "members/accounts#regenerate_media_token",
        as: :regenerate_media_token
+  delete "account", to: "members/accounts#destroy", as: :delete_account
   get "/unsubscribe/:token", to: "members/subscriptions#unsubscribe", as: :unsubscribe
   post "/unsubscribe/:token", to: "members/subscriptions#confirm_unsubscribe"
   post "webhooks/postmark/:token", to: "webhooks/postmark#create", as: :admin_postmark_webhook

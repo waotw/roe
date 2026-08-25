@@ -41,6 +41,7 @@
         <option value="all">All Statuses</option>
         <option value="active"<% if params[:status] == 'active' %> selected<% end %>>Active</option>
         <option value="cancelled"<% if params[:status] == 'cancelled' %> selected<% end %>>Cancelled</option>
+        <option value="deleted"<% if params[:status] == 'deleted' %> selected<% end %>>Deleted</option>
       </select>
     </div>
 
@@ -129,6 +130,8 @@
                   <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
                     <% if member.active? %>
                       <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Active</span>
+                    <% elsif member.anonymized? %>
+                      <span class="inline-flex bg-gray-200 px-2 text-xs font-semibold leading-5 text-gray-700">Deleted</span>
                     <% else %>
                       <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">Cancelled</span>
                     <% end %>
