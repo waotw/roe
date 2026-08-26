@@ -24,26 +24,36 @@ class DeployDiagnosticsTest < ActiveSupport::TestCase
     assert_nil DeployDiagnostics.for_status(nil)
   end
 
-  test "the SSH refusal is recognised and explained" do
+  # This reads like an SSH problem and isn't. Docker only reaches for the remote
+  # builder because the local daemon wasn't there to build with, so the useful
+  # answer is "start Docker" — not "edit ~/.ssh/config", which would send
+  # someone to fix a path they don't use and may never have set up.
+  test "the dial-stdio refusal is reported as Docker being down" do
     d = DeployDiagnostics.for(SSH_FAILURE)
 
-    assert_equal "The deploy server refused the SSH connection", d.title
-    assert_match(/ssh/i, d.explanation)
+    assert_equal "Docker isn't running on this computer", d.title
+    assert_match "Docker Desktop", d.steps.join("\n")
+    assert_no_match(/ssh\/config|IdentityFile/, d.steps.join("\n"),
+                    "don't send them to fix SSH for a Docker problem")
+  end
+
+  test "the bare daemon error says the same thing" do
+    d = DeployDiagnostics.for("Cannot connect to the Docker daemon at unix:///var/run/docker.sock.")
+
+    assert_equal "Docker isn't running on this computer", d.title
   end
 
   # The point of the panel: commands you can copy, not adapt.
-  test "the steps carry this site's own host and key" do
-    d = DeployDiagnostics.for(SSH_FAILURE, host: "dev.roecms.com",
-                              user: "root", key: "/Users/me/.ssh/roe_do")
+  test "the steps carry this site's own host" do
+    d = DeployDiagnostics.for("Host key verification failed.", host: "dev.roecms.com", user: "root")
     steps = d.steps.join("\n")
 
     assert_match "dev.roecms.com", steps
-    assert_match "/Users/me/.ssh/roe_do", steps
     assert_no_match(/%\{/, steps, "a placeholder was left unfilled")
   end
 
   test "an unknown host falls back to a placeholder rather than blowing up" do
-    d = DeployDiagnostics.for(SSH_FAILURE)
+    d = DeployDiagnostics.for("Host key verification failed.")
 
     assert_no_match(/%\{/, d.steps.join("\n"))
     assert_match "your-server.com", d.steps.join("\n")
@@ -80,17 +90,13 @@ class DeployDiagnosticsTest < ActiveSupport::TestCase
     end
   end
 
-  # The SSH signature also matches the bare dial-stdio wording, which is what
-  # Docker prints when it doesn't pass the underlying ssh error through.
   test "the dial-stdio wording alone is enough" do
     d = DeployDiagnostics.for("docker system dial-stdio] has exited with exit status 255")
 
-    assert_equal "The deploy server refused the SSH connection", d.title
+    assert_equal "Docker isn't running on this computer", d.title
   end
 
   test "the error field is read as well as the log" do
-    d = DeployDiagnostics.for("", "Permission denied (publickey).")
-
-    assert_not_nil d
+    assert_not_nil DeployDiagnostics.for("", "Host key verification failed.")
   end
 end

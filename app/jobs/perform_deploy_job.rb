@@ -71,11 +71,10 @@ class PerformDeployJob < ApplicationJob
       # deploy just works instead of failing at the last step.
       ensure_kamal_secrets!
 
-      # Cache reset before bootstrap + build. Runs over the same SSH
-      # connection Kamal already uses, so no new auth/setup. Failures
-      # are logged but don't abort — a flaky prune shouldn't block a
-      # deploy attempt the user explicitly asked to retry.
-      clear_remote_build_cache if reset_cache
+      # Cache reset before bootstrap + build. Prunes locally, because that's
+      # where builds run. Failures are logged but don't abort — a flaky prune
+      # shouldn't block a deploy the user explicitly asked to retry.
+      clear_build_cache if reset_cache
 
       # Kamal analog: rewrite the ROE_BOOTSTRAP line in .kamal/secrets
       # with current admin + sync_token before kamal builds the image.
@@ -83,6 +82,23 @@ class PerformDeployJob < ApplicationJob
       # when there's no admin to package (the prod initializer no-ops on
       # an empty payload).
       sync_kamal_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
+    end
+
+    # Fail before the build, not four minutes into it. Kamal reports a missing
+    # local Docker or an unusable SSH key as whatever it failed to reach next,
+    # which reads as a problem with the server rather than this computer.
+    if target == "kamal" && (blockers = DeployPreflight.new.blockers).any?
+      Rails.logger.warn "[PerformDeployJob] Preflight failed: #{blockers.map(&:title).join('; ')}"
+      write_status(
+        state:        :failed,
+        target:       target,
+        version_tag:  version_tag,
+        finished_at:  Time.current,
+        log:          blockers.map { |b| "[preflight] #{b.title}" }.join("\n"),
+        error:        blockers.map(&:title).join(". ") + ".",
+        preflight:    blockers.map { |b| { title: b.title, explanation: b.explanation, steps: b.steps } }
+      )
+      return
     end
 
     cmd = build_command(target, version_tag, reset_cache: reset_cache)
@@ -288,8 +304,8 @@ class PerformDeployJob < ApplicationJob
     when "kamal"
       # --version bypasses git SHA versioning so the deploy always uses
       # the files on disk, no commit required. Cache reset for Kamal
-      # happens out-of-band via clear_remote_build_cache (SSH prune
-      # before kamal runs); the command itself stays unchanged.
+      # happens out-of-band via clear_build_cache (a local prune before
+      # kamal runs); the command itself stays unchanged.
       "bundle exec kamal deploy --version=#{version_tag}"
     when "fly"
       # Fly's builder cache lives on their infrastructure, not on a
@@ -302,47 +318,34 @@ class PerformDeployJob < ApplicationJob
     end
   end
 
-  # SSH into the Kamal deploy server and clear BuildKit + builder cache.
-  # Same SSH connection Kamal already uses for deploys, so it inherits
-  # whatever auth (keys, ssh-agent) is already configured — no new setup
-  # required for users.
+  # Clear BuildKit + builder cache on the machine that does the building —
+  # this one.
   #
-  # Best-effort: failures here are logged but never raise, because the
-  # whole point is to recover from a stuck state and the user is going
-  # to retry the deploy regardless. A failed prune just means the next
-  # build might still hit the cache issue; we don't want to fail the
-  # retry on top of that.
-  def clear_remote_build_cache
-    config  = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
-    servers = Array(config.dig("kamal", "servers")).map(&:to_s).reject(&:blank?)
-    server  = servers.first
-
-    unless server.present?
-      Rails.logger.warn "[PerformDeployJob] No Kamal server configured — can't clear remote build cache"
-      return
-    end
-
-    Rails.logger.info "[PerformDeployJob] Clearing remote build cache on #{server}"
+  # This used to SSH into the deploy server and prune there, back when
+  # deploy.yml configured a remote builder. That builder is gone (it pointed
+  # at the same small droplet that serves the site), so the cache this needs
+  # to clear is local. Pruning the server cleared a cache nothing was using
+  # while leaving the real one untouched — the button did nothing.
+  #
+  # Best-effort: failures are logged but never raise. The whole point is to
+  # recover from a stuck state and the user is retrying regardless, so a
+  # failed prune shouldn't fail the retry on top of it.
+  def clear_build_cache
+    Rails.logger.info "[PerformDeployJob] Clearing local build cache"
 
     Bundler.with_original_env do
-      # StrictHostKeyChecking=accept-new auto-accepts a host key on
-      # first connect (so the job doesn't hang at an interactive
-      # prompt) but refuses if the key changes from a known value
-      # (defends against MITM).
       output, status = Open3.capture2e(
-        "ssh",
-        "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "BatchMode=yes",
-        "root@#{server}",
-        "docker buildx prune --force --all && docker builder prune --force --all"
+        "docker", "buildx", "prune", "--force", "--all"
       )
 
       if status.success?
-        Rails.logger.info "[PerformDeployJob] Remote build cache cleared on #{server}"
+        Rails.logger.info "[PerformDeployJob] Local build cache cleared"
       else
-        Rails.logger.warn "[PerformDeployJob] Cache clear failed on #{server}: #{output.lines.first&.strip}"
+        Rails.logger.warn "[PerformDeployJob] Cache clear failed: #{output.lines.first&.strip}"
       end
     end
+  rescue StandardError => e
+    Rails.logger.warn "[PerformDeployJob] Cache clear failed: #{e.message}"
   end
 
   def run_with_streaming(cmd, target:, version_tag:, env: {})
@@ -415,8 +418,24 @@ class PerformDeployJob < ApplicationJob
     end
   end
 
+  # Tracks how many times in a row a deploy has failed, which is what tells
+  # the failure panel whether a cold build is worth offering. One failure is
+  # usually something you go and fix; a second means the cheap retry isn't
+  # working.
+  #
+  # Counted here rather than compared by content because every non-zero exit
+  # writes the same error string — comparing those would call every failure a
+  # repeat. The count carries through the :running state on a retry (merge
+  # keeps it) and resets on success or dismissal.
   def write_status(attrs)
     current = Rails.cache.read(STATUS_CACHE_KEY) || {}
+
+    attrs = case attrs[:state]
+    when :failed    then attrs.merge(consecutive_failures: current[:consecutive_failures].to_i + 1)
+    when :completed then attrs.merge(consecutive_failures: 0)
+    else attrs
+    end
+
     Rails.cache.write(STATUS_CACHE_KEY, current.merge(attrs), expires_in: STATUS_TTL)
   end
 end

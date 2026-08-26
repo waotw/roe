@@ -16,39 +16,37 @@
 class DeployDiagnostics
   Diagnosis = Struct.new(:title, :explanation, :steps, :docs, keyword_init: true)
 
-  # `docker system dial-stdio` is the remote builder connecting over SSH. It
-  # shells out to the plain `ssh` binary, which — unlike Kamal — never reads
-  # the `ssh.keys` setting in config/deploy.yml. So a deploy key that works for
-  # Kamal is invisible here, and the connection falls back to your default
-  # identities and is refused.
+  # `docker system dial-stdio` is Docker reaching for the *remote* builder. It
+  # only gets there because the local Docker daemon wasn't available to build
+  # with — so the useful answer is "start Docker", not "fix your SSH".
   #
-  # It bites hardest from inside Roe: the Rails process usually has no
-  # SSH_AUTH_SOCK, so there's no agent to fall back on either, and the same
-  # deploy run by hand from a terminal succeeds.
-  SSH_AUTH = {
-    match: /Permission denied \(publickey\)|dial-stdio.*exit status 255/mi,
-    title: "The deploy server refused the SSH connection",
+  # Kamal's own connection to the server is unrelated: it goes through net-ssh
+  # with the key named in deploy.yml, needs no agent, and is working fine if the
+  # deploy got this far. Sending someone to edit ~/.ssh/config here would have
+  # them fixing a path they don't use and may never have set up.
+  #
+  # DeployPreflight raises this same message when it catches the problem before
+  # a deploy starts, and reads it from here rather than keeping its own copy —
+  # every message a deploy can produce is edited in this file, once.
+  DOCKER_DOWN = {
+    match: /Cannot connect to the Docker daemon|Is the docker daemon running|docker daemon is not running|dial-stdio.*exit status 255|error during connect.*docker_engine/mi,
+    title: "Docker isn't running on this computer",
     explanation:
-      "Docker connects to your server over SSH to build the image, and it uses the " \
-      "plain <code>ssh</code> command rather than the key named in " \
-      "<code>config/deploy.yml</code>. If that key isn't offered by default, the " \
-      "server turns the connection away. This often works from a terminal and fails " \
-      "here, because Roe runs without access to your SSH agent.",
+    "Roe builds your site's image with Docker before sending it to your server. " \
+    "Docker has to be running here for a deploy to work.",
     steps: [
-      "Add the host to <code>~/.ssh/config</code> so every SSH connection uses the right key:",
-      "<pre>Host %{host}\n  User %{user}\n  IdentityFile %{key}\n  IdentitiesOnly yes</pre>",
-      "Check it works: <code>ssh %{user}@%{host} true</code> — no output means success.",
+      "Open Docker Desktop and wait for it to load.",
       "Then deploy again."
     ]
   }.freeze
 
   SIGNATURES = [
-    SSH_AUTH,
+    DOCKER_DOWN,
     {
       match: /Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED/i,
       title: "The server's identity isn't recognised",
       explanation:
-        "SSH won't connect to a host it hasn't seen before, or one whose key has " \
+        "SSH won't connect to a host it doesn't recognize, or one whose key has " \
         "changed since last time. If you've just rebuilt or replaced the server, the " \
         "change is expected. If you haven't, stop and find out why it changed.",
       steps: [
@@ -108,6 +106,56 @@ class DeployDiagnostics
       ]
     }
   ].freeze
+
+  # Failures where a stale or corrupt build cache is a plausible culprit.
+  #
+  # Kept separate from SIGNATURES because this answers a different question.
+  # SIGNATURES asks "what went wrong"; this asks "is it worth spending several
+  # minutes on a cold build". A failure can be diagnosed and still not be a
+  # cache problem — Docker being off is the clearest example.
+  CACHE_TROUBLE = /
+    failed\ to\ compute\ cache\ key
+    |error\ importing\ cache
+    |failed\ to\ (solve|export|copy)
+    |cache\ (import|export)\ failed
+    |content\ digest\ sha256:[a-f0-9]+\ not\ found
+    |layer\ does\ not\ exist
+    |unexpected\ EOF
+    |invalid\ tar\ header
+    |manifest\ unknown
+  /xi
+
+  # Whether to offer a cold build, and lead with it.
+  #
+  # Two signals, either sufficient:
+  #
+  #   the log names something cache-shaped — the reliable case, but our
+  #   pattern list will never be complete; and
+  #
+  #   the deploy has now failed twice — which covers everything the list
+  #   misses. One failure is usually something you go and fix (start Docker,
+  #   add the token). A second identical trip through means the cheap fix
+  #   isn't working, and that's when a cold build stops being a waste.
+  #
+  # The count matters as much as the patterns. Without it, an unrecognised
+  # cache failure would leave someone retrying a warm build forever with no
+  # way out offered.
+  REPEATED_FAILURES = 2
+
+  def self.cache_suspect?(status)
+    return false if status.blank?
+
+    text = [ status[:log], status[:error] ].compact.join("\n")
+    return true if text.match?(CACHE_TROUBLE)
+
+    # The count is a fallback for failures we can't read, not an override of
+    # ones we can. Docker being off and failing twice is still Docker being
+    # off — offering a cold build there sends someone away for several minutes
+    # to fix something that was never the problem.
+    return false if self.for(text).present?
+
+    status[:consecutive_failures].to_i >= REPEATED_FAILURES
+  end
 
   def self.for(log, error = nil, host: nil, user: nil, key: nil)
     new(log, error, host: host, user: user, key: key).diagnosis

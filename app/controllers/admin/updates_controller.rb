@@ -245,7 +245,7 @@ class Admin::UpdatesController < Admin::BaseController
   end
 
   # Same flow as start_deploy but with reset_cache: true so the job
-  # prunes the remote build cache (Kamal SSH prune / Fly --no-cache)
+  # prunes the build cache (Kamal: local buildx prune / Fly: --no-cache)
   # before invoking the deploy command. Exposed as a separate action
   # so the failed-state UI has a distinct button — users intent
   # "retry, but force a clean build" rather than "deploy normally."

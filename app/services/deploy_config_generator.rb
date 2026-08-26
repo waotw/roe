@@ -153,7 +153,6 @@ class DeployConfigGenerator
     image_name   = config.dig("kamal", "image_name").presence || app_name
     servers      = Array(config.dig("kamal", "servers")).map(&:to_s).reject(&:blank?)
     ssl          = config["ssl"] != false
-    first_server = servers.first.presence || "YOUR_SERVER_IP"
     image        = reg_username.present? ? "#{reg_username}/#{image_name}" : image_name
 
     servers_yaml = if servers.any?
@@ -234,7 +233,20 @@ class DeployConfigGenerator
 
       builder:
         arch: amd64
-        remote: ssh://root@#{first_server}
+        # No `remote:` builder. It would point at the same droplet that runs
+        # the site — one small box asked to build and serve at once, at the
+        # moment it can least afford it — and a remote build needs memory a
+        # 1GB droplet doesn't have. Requiring a second droplet just to deploy
+        # isn't a trade worth making.
+        #
+        # It also cost more than it gave: with `remote:` set, a stopped local
+        # Docker made Kamal reach for the server instead and fail with
+        # "Permission denied (publickey)", which reads as a broken deploy key.
+        # Without it the error names the actual problem.
+        #
+        # Builds run on the deploying computer, so Docker has to be running
+        # there. DeployPreflight checks that before a deploy starts.
+        #
         # Passes the Dockerfile's CACHE_BUST ARG through from a Kamal-
         # owned env var. PerformDeployJob sets KAMAL_CACHE_BUST to a
         # fresh timestamp when the user clicks "Clear deploy cache +

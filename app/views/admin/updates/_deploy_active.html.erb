@@ -32,16 +32,30 @@
     <div class="flex items-center justify-between mb-2">
       <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
       <div class="flex gap-2">
-        <%# Single retry button — clears the remote build cache, then
-            re-runs the deploy. For Kamal it SSHes into the deploy server
-            and runs docker buildx prune; for Fly it appends --no-cache.
-            Cache contamination is the most common recoverable failure,
-            so making it the default retry path is the right tradeoff. %>
-        <%= button_to "Clear deploy cache + retry",
-                      admin_reset_and_retry_deploy_path,
+        <%# A plain retry is always here — most failures are fixed outside Roe
+            and then simply re-run, and those want a warm cache.
+
+            The cold build only appears once there's a reason: the log names
+            something cache-shaped, or the deploy has failed twice running, so
+            the cheap retry has been tried and didn't work. Then it leads, and
+            the plain retry steps back. Offering it every time charged everyone
+            several minutes for a case most people never hit. %>
+        <% cold_build = DeployDiagnostics.cache_suspect?(@deploy_status) %>
+        <% primary   = "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
+        <% secondary = "uppercase text-xs font-mono px-3 py-1.5 border border-gray-400 bg-white hover:bg-gray-100 text-gray-700 rounded-xs" %>
+
+        <%= button_to "Retry deploy",
+                      admin_start_deploy_path,
                       method: :post,
-                      data: { turbo_confirm: "This will clear the remote build cache and re-deploy. The first build will take a few extra minutes (no cache hits). Continue?" },
-                      class: "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
+                      class: cold_build ? secondary : primary %>
+
+        <% if cold_build %>
+          <%= button_to "Retry without cache",
+                        admin_reset_and_retry_deploy_path,
+                        method: :post,
+                        data: { turbo_confirm: "This clears the build cache first, so the build runs from scratch and takes several extra minutes. Continue?" },
+                        class: primary %>
+        <% end %>
         <%= button_to "Dismiss",
                       admin_dismiss_deploy_path,
                       method: :post,
@@ -56,7 +70,21 @@
         that failed, not the thing to go and fix. Where the log matches a
         failure we recognise, say what it means and what to do; anything else
         falls through to the raw log as before. %>
-    <% if (diagnosis = DeployDiagnostics.for_status(@deploy_status)) %>
+    <% if (preflight = @deploy_status[:preflight]).present? %>
+      <% preflight.each do |issue| %>
+        <div class="bg-white border border-red-300 rounded-xs p-3 mb-3">
+          <h4 class="text-xs font-semibold text-red-900 uppercase font-mono mb-1">
+            <%= issue[:title] %>
+          </h4>
+          <p class="text-xs text-gray-700 font-sans mb-2"><%= sanitize issue[:explanation] %></p>
+          <ol class="text-xs text-gray-700 font-sans list-decimal list-inside space-y-1">
+            <% issue[:steps].each do |step| %>
+              <li><%= sanitize step, tags: %w[code pre strong em] %></li>
+            <% end %>
+          </ol>
+        </div>
+      <% end %>
+    <% elsif (diagnosis = DeployDiagnostics.for_status(@deploy_status)) %>
       <div class="bg-white border border-red-300 rounded-xs p-3 mb-3">
         <h4 class="text-xs font-semibold text-red-900 uppercase font-mono mb-1">
           <%= diagnosis.title %>
