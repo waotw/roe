@@ -293,50 +293,108 @@
           panel above ("in sync · last synced …") is the success signal, so
           there's no transient banner to dismiss. %>
       <% when :conflicts %>
-        <% conflicts = Array(@transfer_status[:conflicts]) %>
+        <%# Deletions and edits are different questions and get asked
+            separately — deletions first, because they're the ones that
+            destroy something. Mirrors how Sync History orders them. %>
+        <% conflicts  = Array(@transfer_status[:conflicts]) %>
+        <% deletions  = conflicts.select { |c| c["local"].nil? || c["peer"].nil? } %>
+        <% edits      = conflicts - deletions %>
         <div class="bg-amber-50 border border-amber-300 rounded-xs p-6 mb-6">
           <h3 class="text-sm font-semibold text-amber-900 mb-1">
-            ⚠️ <%= kind_label %> paused — <%= conflicts.size %> conflict<%= "s" if conflicts.size != 1 %>
+            ⚠️ <%= kind_label %> paused —
+            <%= [ ("#{deletions.size} deletion#{"s" if deletions.size != 1}" if deletions.any?),
+                  ("#{edits.size} conflict#{"s" if edits.size != 1}" if edits.any?) ].compact.join(" and ") %>
           </h3>
-          <p class="text-sm text-amber-800 mb-4">
-            These files changed on <strong>both</strong> this machine and live since the last sync,
-            so nothing was overwritten. Pick which version wins for each, then apply.
-          </p>
 
           <%= form_with url: admin_resolve_site_sync_conflicts_path, method: :post, data: { turbo: false } do %>
-            <div class="space-y-2 mb-4">
-              <% conflicts.each do |c| %>
-                <% type_label = { "edit_edit" => "edited on both sides",
-                                  "edit_delete" => "edited here, deleted on live",
-                                  "delete_edit" => "deleted here, edited on live" }[c["type"]] || c["type"] %>
-                <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-xs px-3 py-2">
-                  <div class="min-w-0">
-                    <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
-                    <p class="text-[11px] text-gray-500">
-                      <%= type_label %><%
-                        %><% if c["newer"] == "local" %> · yours is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
-                    </p>
+
+            <% if deletions.any? %>
+              <%# "Deleted here, still on live" and its mirror. Which side is
+                  which comes from where the file still exists, so the copy
+                  names the actual environments rather than saying "one side". %>
+              <% gone_from_live  = deletions.select { |c| c["peer"].nil? } %>
+              <% gone_from_local = deletions.select { |c| c["local"].nil? } %>
+              <p class="text-sm text-amber-800 mb-3">
+                <% if gone_from_live.any? && gone_from_local.any? %>
+                  These files were deleted on one side but remain on the other.
+                <% elsif gone_from_live.any? %>
+                  These files were deleted on <strong>live</strong> but remain on <strong>local</strong>.
+                <% else %>
+                  These files were deleted on <strong>local</strong> but remain on <strong>live</strong>.
+                <% end %>
+                Confirm that you want to delete or keep these files.
+              </p>
+
+              <div class="space-y-2 mb-5">
+                <% deletions.each do |c| %>
+                  <% deleted_on = c["peer"].nil? ? "live" : "local" %>
+                  <div class="flex items-center justify-between gap-3 bg-white border border-red-300 rounded-xs px-3 py-2">
+                    <div class="min-w-0">
+                      <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
+                      <p class="text-[11px] text-red-700">This file was deleted on <%= deleted_on %></p>
+                    </div>
+                    <%# Keep defaults to the side that still has the file, so
+                        clicking straight through never destroys anything. %>
+                    <div class="flex gap-3 shrink-0 text-xs">
+                      <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="resolutions[<%= c["path"] %>]"
+                               value="<%= c["peer"].nil? ? "local" : "live" %>" checked> Keep
+                      </label>
+                      <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="resolutions[<%= c["path"] %>]"
+                               value="<%= c["peer"].nil? ? "live" : "local" %>"> Delete
+                      </label>
+                    </div>
                   </div>
-                  <div class="flex gap-3 shrink-0 text-xs">
-                    <label class="flex items-center gap-1 cursor-pointer">
-                      <input type="radio" name="resolutions[<%= c["path"] %>]" value="local" <%= "checked" if c["newer"] != "live" %>> Keep mine
-                    </label>
-                    <label class="flex items-center gap-1 cursor-pointer">
-                      <input type="radio" name="resolutions[<%= c["path"] %>]" value="live" <%= "checked" if c["newer"] == "live" %>> Keep live
-                    </label>
+                <% end %>
+              </div>
+            <% end %>
+
+            <% if edits.any? %>
+              <p class="text-sm text-amber-800 mb-3">
+                These files changed on <strong>both</strong> this machine and live since the last sync,
+                so nothing was overwritten. Pick which version wins for each, then apply.
+              </p>
+
+              <div class="space-y-2 mb-4">
+                <% edits.each do |c| %>
+                  <% type_label = { "edit_edit" => "edited on both sides",
+                                    "edit_delete" => "edited here, deleted on live",
+                                    "delete_edit" => "deleted here, edited on live" }[c["type"]] || c["type"] %>
+                  <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-xs px-3 py-2">
+                    <div class="min-w-0">
+                      <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
+                      <p class="text-[11px] text-gray-500">
+                        <%= type_label %><%
+                          %><% if c["newer"] == "local" %> · yours is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
+                      </p>
+                    </div>
+                    <div class="flex gap-3 shrink-0 text-xs">
+                      <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="resolutions[<%= c["path"] %>]" value="local" <%= "checked" if c["newer"] != "live" %>> Keep mine
+                      </label>
+                      <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="resolutions[<%= c["path"] %>]" value="live" <%= "checked" if c["newer"] == "live" %>> Keep live
+                      </label>
+                    </div>
                   </div>
-                </div>
-              <% end %>
-            </div>
+                <% end %>
+              </div>
+            <% end %>
+
             <div class="flex flex-wrap gap-2">
               <button type="submit"
                       class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs rounded-xs cursor-pointer">
                 APPLY CHOICES
               </button>
-              <button type="submit" name="resolve_all" value="recent"
-                      class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer">
-                RESOLVE ALL BY MOST-RECENT
-              </button>
+              <%# Most-recent is meaningless for a deletion — there's only one
+                  side — so it's offered only when there's an edit to judge. %>
+              <% if edits.any? %>
+                <button type="submit" name="resolve_all" value="recent"
+                        class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer">
+                  RESOLVE ALL BY MOST-RECENT
+                </button>
+              <% end %>
             </div>
           <% end %>
 
@@ -570,7 +628,15 @@
       so you can verify the wiring is working. %>
   <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
     <div class="flex items-center justify-between mb-3 gap-4">
-      <h2 class="text-lg font-semibold text-gray-900">Public/Local Site Sync</h2>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Public/Local Site Sync</h2>
+        <%# Only once there's something to read — a link to an empty page is
+            just a dead end on a screen that already has plenty on it. %>
+        <% if SiteSync::History.exist? %>
+          <%= link_to "View sync history →", admin_site_sync_history_path,
+                class: "text-xs text-blue-600 hover:text-blue-900 font-sans" %>
+        <% end %>
+      </div>
       <%# Synchronous exchange ping — handy for testing without
           waiting on the hourly job or the 60s on-render debounce.
           Only meaningful on the side that initiates (dev). %>

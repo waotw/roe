@@ -322,6 +322,35 @@ class Admin::SiteSyncController < Admin::BaseController
   # Bi-directional sync: reconcile with live and apply the safe changes
   # both ways in one pass. Conflicts stop it (nothing overwritten), so no
   # typed confirmation is needed — both sides are backed up first anyway.
+  # A read-only record of what past syncs moved. Its own page because the Site
+  # Sync screen is already dense, and because this is something you go looking
+  # for after the fact rather than something you watch.
+  def history
+    @events = SiteSync::History.recent
+  end
+
+  # Take specific files back out of the snapshot a sync took before it wrote.
+  # Local only — the snapshot is of this machine, so it can't speak to what a
+  # sync did on live.
+  def restore_from_history
+    result = SiteSync::HistoryRestore.call(
+      snapshot_name: params[:snapshot],
+      paths:         params[:paths]
+    )
+
+    flash[:notice] = "Restored #{result.restored.size} file#{'s' unless result.restored.size == 1} " \
+                     "from #{result.snapshot}."
+    if result.skipped.any?
+      flash[:alert] = "Couldn't restore #{result.skipped.size}: they're missing from that " \
+                      "restore point or not Site Sync's to write."
+    end
+
+    redirect_to admin_site_sync_history_path
+  rescue SiteSync::HistoryRestore::Error => e
+    flash[:alert] = e.message
+    redirect_to admin_site_sync_history_path
+  end
+
   def sync
     if transfer_in_progress?
       flash[:alert] = "A sync is already running. Wait for it to finish."

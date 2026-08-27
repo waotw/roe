@@ -128,6 +128,12 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Transport",
           options: [ "http", "rsync" ],
           hint: "Protocol that Site Sync uses to sync files to/from a live site. HTTP (recommended) works over HTTPS with a shared token. rsync requires SSH to host."
+        },
+        "sync_confirm_deletions_over" => {
+          type: :text,
+          label: "Confirm deletions over",
+          placeholder: "0",
+          hint: "Site Sync deletes files. If a file is deleted on your Live site and you sync the site, it will be deleted locally and vice-versa. This is a threshold for when you will be warned about file deletions. 0 means you'll be warned everytime. '5' means you'll be warned if 6 or more files will be deleted. Set to 'never' to turn off warnings."
         }
       }
     },

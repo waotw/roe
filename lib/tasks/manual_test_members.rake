@@ -11,6 +11,15 @@
 #   bin/rails members:seed_manual_test    # build them (safe to re-run)
 #   bin/rails members:clear_manual_test   # remove every trace
 #
+# On a deployed site — where a podcast app can actually reach the feeds — the
+# same tasks need an explicit opt-in:
+#
+#   kamal app exec "ROE_ALLOW_TEST_MEMBERS=1 bin/rails members:seed_manual_test"
+#
+# Note that the id manifest lives in tmp/, which a container loses on restart.
+# Cleanup still finds anyone still named @example.test, but a member you delete
+# during testing is renamed and would be missed — remove those from the admin.
+#
 # Deleting a seeded member during testing renames them, so their address is no
 # longer recognisable. The ids are kept in tmp/ for that reason; the cleanup
 # matches on either, and touches nothing outside this set.
@@ -19,13 +28,31 @@ module ManualTestMembers
   MANIFEST = "tmp/manual_test_members.json"
 
   def self.manifest = Rails.root.join(MANIFEST)
+
+  # Development, or an explicit opt-in elsewhere.
+  #
+  # Testing account deletion properly needs a public URL — a podcast app can't
+  # reach localhost — so these have to be creatable on a deployed site too.
+  # But "create fake members" is the last thing anyone wants to run against a
+  # real member list by accident, so it takes a deliberate flag, following the
+  # same shape as ROE_ALLOW_DEV_UPDATE.
+  #
+  #   kamal app exec "ROE_ALLOW_TEST_MEMBERS=1 bin/rails members:seed_manual_test"
+  def self.allowed?
+    Rails.env.development? || ENV["ROE_ALLOW_TEST_MEMBERS"] == "1"
+  end
+
+  def self.refusal
+    "Refusing to run in #{Rails.env}. Set ROE_ALLOW_TEST_MEMBERS=1 if you mean it — " \
+    "this writes fake members into whatever database it's pointed at."
+  end
 end
 
 namespace :members do
 
-  desc "Create throwaway members for testing account deletion (development only)"
+  desc "Create throwaway members for testing account deletion (development, or ROE_ALLOW_TEST_MEMBERS=1)"
   task seed_manual_test: :environment do
-    abort "Development only — refusing to run in #{Rails.env}." unless Rails.env.development?
+    abort ManualTestMembers.refusal unless ManualTestMembers.allowed?
 
     posts = Post.published.order(created_at: :desc).to_a
     abort "No published posts to build a newsletter history from." if posts.empty?
@@ -114,7 +141,7 @@ namespace :members do
 
   desc "Remove the throwaway members created by members:seed_manual_test"
   task clear_manual_test: :environment do
-    abort "Development only — refusing to run in #{Rails.env}." unless Rails.env.development?
+    abort ManualTestMembers.refusal unless ManualTestMembers.allowed?
 
     # By address for the ones still named, by id for any deleted during
     # testing — anonymising renames them, so the address alone would miss them.

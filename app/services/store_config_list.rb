@@ -12,9 +12,35 @@
 class StoreConfigList
   STORE_PATH = -> { File.join(RoeSitePaths::SITE_PATH, "system/features/store.yml") }
 
+  # Read from the file, not from SiteConfig.
+  #
+  # `write` edits store.yml directly, so reading the database asks a different
+  # source than the one being written — and the two diverge exactly when it
+  # matters. After a sync brings in a new store.yml, ContentSync refreshes
+  # site.yml only, so the database still holds the pre-sync list while the file
+  # holds the new one. A product saving then judges its category against the
+  # stale list and rewrites the file from it, which both drops whatever the
+  # sync brought in and leaves store.yml modified moments after the ledger was
+  # written — the drift that shows up right after a sync that worked.
+  #
+  # It also breaks within a single run: two products saving in a row both read
+  # the same stale list, so the second one's write drops the first one's value.
+  #
+  # SiteConfig is the fallback for a missing or unparseable file, since a
+  # slightly stale list beats none at all for the editor's autocomplete.
   def self.all(key)
-    value = SiteConfig.feature("store", key) || []
+    value = file_value(key) || SiteConfig.feature("store", key) || []
     value.is_a?(String) ? value.split(",").map(&:strip).reject(&:blank?) : value
+  end
+
+  def self.file_value(key)
+    path = STORE_PATH.call
+    return nil unless File.exist?(path)
+
+    (YAML.load_file(path) || {})[key]
+  rescue Psych::SyntaxError, Errno::EACCES => e
+    Rails.logger.warn "[StoreConfigList] Couldn't read #{key} from store.yml: #{e.message}"
+    nil
   end
 
   # Add a value if not already present (case-insensitively). No-op on blank or
@@ -62,9 +88,14 @@ class StoreConfigList
         next
       end
       if in_block
-        # Indented `- item` or blank lines stay inside the block (skip, already
-        # replaced); the first non-indented line ends it.
-        next if line.match?(/\A[ \t]+-\s/) || line.match?(/\A[ \t]*\Z/)
+        # A `- item` — indented OR at column 0, since a block sequence may sit
+        # at the parent key's indent and that's valid YAML — or a blank line:
+        # still inside the block, so skip it, we've already emitted the
+        # replacement. Requiring indentation here missed column-0 items and
+        # left them behind, producing a second, stale list and a file that no
+        # longer parses. ProductCategory's copy was fixed for this; this one,
+        # written to generalize it, kept the original bug.
+        next if line.match?(/\A[ \t]*-\s/) || line.match?(/\A[ \t]*\Z/)
 
         in_block = false
       end

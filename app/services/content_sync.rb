@@ -4,8 +4,7 @@ class ContentSync
   end
 
   def sync_all
-    sync_site_config
-    sync_defaults
+    sync_configs
     sync_posts
     sync_pages
     sync_documentation
@@ -511,39 +510,23 @@ class ContentSync
     :error
   end
 
-  def sync_defaults
-    defaults_path = SiteConfig::DEFAULTS_PATH
-    return unless Dir.exist?(defaults_path)
-
-    puts "\n⚙️  Syncing default configurations"
+  # Rebuild every database-backed config from the files.
+  #
+  # This used to sync site.yml and the defaults only, which left every
+  # features/*.yml row holding pre-sync values after a transfer — the files on
+  # disk said one thing and the running app read another, until a restart.
+  #
+  # It has to happen before content syncs, not just eventually: Product's
+  # after_save appends its category to store.yml, and with a stale store config
+  # in the database it rewrote the file from the wrong list. That corrupted
+  # store.yml and left it modified moments after the sync recorded its ledger,
+  # which is the drift that appeared right after a sync that had worked.
+  def sync_configs
+    puts "\n⚙️  Syncing configuration"
     puts "=" * 60
 
-    Dir.glob(defaults_path.join("*.yml")).each do |file|
-      type = File.basename(file, ".yml")
-      result = SiteConfig.sync_from_file("defaults/#{type}")
-
-      if result
-        puts "  ✓ #{type.capitalize} defaults synced"
-      else
-        puts "  ✗ #{type.capitalize} defaults sync failed"
-      end
-    end
-
-    puts "=" * 60
-  end
-
-  def sync_site_config
-    return unless File.exist?(SiteConfig::SITE_FILE)  # Changed from FILE_PATH
-
-    puts "\n⚙️  Syncing site configuration"
-    puts "=" * 60
-
-    result = SiteConfig.sync_from_file("site")  # Added 'site' argument
-
-    if result
-      puts "  ✓ Site config synced"
-    else
-      puts "  ✗ Site config sync failed"
+    SiteConfig.db_backed_types.each do |type|
+      puts(SiteConfig.sync_from_file(type) ? "  ✓ #{type}" : "  ✗ #{type} failed")
     end
 
     puts "=" * 60

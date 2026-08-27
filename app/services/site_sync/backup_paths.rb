@@ -17,7 +17,14 @@ module SiteSync
 
     ROOT_NAME = "backups".freeze
 
+    # Under RAILS_ENV=test this moves to tmp/, matching how SITE_PATH is
+    # redirected (see config/application.rb): a test run must never read,
+    # write or prune the developer's real backups. It anchored to ROE_ROOT
+    # directly, which meant anything exercising BackupManager pointed at the
+    # real directory — and prune! deletes old snapshots.
     def root
+      return File.join(RoeSitePaths::ROE_ROOT, "tmp", "test_backups", ROOT_NAME) if Rails.env.test?
+
       File.join(RoeSitePaths::ROE_ROOT, ROOT_NAME)
     end
 

@@ -70,8 +70,6 @@
   </div>
   <!-- End Stimulus controller -->
 
-  <%= render 'shared/delete_file_modal', resource: @page, resource_type: 'page' %>
-
   <%# Trigger preview-window refresh for both plain saves AND save-and-
       publish (controller flashes "Page published" in that case). %>
   <% if flash[:notice]&.match?(/\APage (saved|published)/) %>

@@ -1,0 +1,57 @@
+<%# One side of a sync event. Deletions are listed first and marked — they're
+    the only entry someone is ever urgently looking for.
+
+    `restorable` is true only for the Live → Local side, and only when the
+    snapshot that sync took still exists. The snapshot is of THIS machine as it
+    stood before the sync wrote, so it can put back what a sync did here and
+    can say nothing about what it did on live.
+
+    `states` marks what's already back. A row that matches the snapshot has
+    nothing left to take, so it's disabled and labelled rather than offered
+    again — restoring an identical file twice is a no-op that looks like work,
+    and on a long list you'd lose track of what you'd done. %>
+<div class="px-4 py-3">
+  <h3 class="text-xs font-semibold text-gray-700 uppercase mb-2"><%= title %></h3>
+
+  <% states ||= {} %>
+
+  <% if !direction.any? %>
+    <p class="text-xs text-gray-400 font-sans">Nothing</p>
+  <% else %>
+    <% [ [ direction.deleted, "Deleted", "−", "red" ], [ direction.changed, "Changed", "·", "gray" ] ].each do |paths, label, mark, tone| %>
+      <% next if paths.empty? %>
+      <p class="text-[11px] font-semibold uppercase mb-1 <%= tone == "red" ? "text-red-700" : "text-gray-500" %>">
+        <%= label %> (<%= paths.size %>)
+      </p>
+      <ul class="mb-3 space-y-0.5">
+        <% paths.each do |path| %>
+          <% state = states[path] %>
+          <li class="text-xs break-all <%= tone == "red" ? "text-red-800" : "text-gray-700" %>">
+            <% if restorable && state == :restorable %>
+              <label class="flex items-start gap-1.5 cursor-pointer">
+                <input type="checkbox" name="paths[]" value="<%= path %>" class="mt-0.5">
+                <span><%= mark %> <%= path %></span>
+              </label>
+            <% elsif restorable && state == :restored %>
+              <span class="flex items-start gap-1.5 text-gray-400">
+                <input type="checkbox" disabled class="mt-0.5">
+                <span><%= mark %> <%= path %>
+                  <span class="ml-1 text-[10px] uppercase font-semibold text-green-700">Restored</span>
+                </span>
+              </span>
+            <% elsif restorable && state == :unavailable %>
+              <span class="flex items-start gap-1.5 text-gray-400">
+                <input type="checkbox" disabled class="mt-0.5">
+                <span><%= mark %> <%= path %>
+                  <span class="ml-1 text-[10px] uppercase font-semibold text-gray-400">Not in restore point</span>
+                </span>
+              </span>
+            <% else %>
+              <%= mark %> <%= path %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  <% end %>
+</div>

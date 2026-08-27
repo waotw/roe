@@ -17,6 +17,25 @@ module SiteSync
     # and `peer` are the {size,mtime} entries (nil = absent on that side).
     Conflict = Struct.new(:path, :type, :local, :peer, keyword_init: true)
 
+    # How many deletions a sync may apply without asking. Set in site.yml as
+    # `sync_confirm_deletions_over`; this is the fallback when it's unset.
+    #
+    # Deleting in Roe is deliberate — you delete a post, you meant it — so
+    # propagating that needs no ceremony, and a prompt on every routine delete
+    # would just train people to click through. But a sync that proposes thirty
+    # deletions has misread something, and nobody deletes thirty files by hand
+    # without noticing.
+    #
+    # 0 by default: confirm everything. That's the safe end of the dial, and
+    # it's where a new install should start — after a sync destroyed 9 episodes
+    # and 23 audio files on 2026-08-26 by inferring a deletion that never
+    # happened, the case for a cautious default makes itself.
+    #
+    #   0   → confirm every deletion (default)
+    #   20  → confirm only bulk deletions
+    #   nil → never confirm, propagate deletions silently
+    DEFAULT_CONFIRM_DELETIONS_OVER = 0
+
     EDIT_EDIT   = :edit_edit     # both sides edited, content differs
     EDIT_DELETE = :edit_delete   # edited locally, deleted on the peer
     DELETE_EDIT = :delete_edit   # deleted locally, edited on the peer
@@ -32,6 +51,20 @@ module SiteSync
     end
 
     class << self
+      # Read per-sync rather than memoized: someone changing the setting
+      # expects the next sync to use it, not the next boot.
+      #
+      # A blank setting means "unset" and falls back. An explicit 0 does not —
+      # `to_i` would flatten both to 0, which happens to be the default today
+      # but would quietly mean "confirm everything" if the default ever moved.
+      def confirm_deletions_over
+        raw = SiteConfig.get("sync_confirm_deletions_over")
+        return DEFAULT_CONFIRM_DELETIONS_OVER if raw.nil? || raw.to_s.strip.empty?
+        return nil if raw.to_s.strip.downcase.in?(%w[never off none])
+
+        Integer(raw, exception: false) || DEFAULT_CONFIRM_DELETIONS_OVER
+      end
+
       def reconcile(baseline:, local:, peer:)
         baseline ||= {}
         local    ||= {}
@@ -65,6 +98,53 @@ module SiteSync
           pull_delete: pull_delete.sort,
           conflicts:   conflicts.sort_by(&:path),
           converged:   converged.sort
+        )
+      end
+
+      # Turn every planned deletion into a conflict the admin has to confirm.
+      #
+      # A deletion is the only propagation that destroys something, and it is
+      # *inferred*, not observed. "Absent on the peer, present in the baseline"
+      # is a guess that the peer deleted it — and the guess is only as good as
+      # the baseline. When a file reaches the baseline without ever reaching
+      # the peer, the peer's absence is read as a deletion that never happened,
+      # and the file is destroyed on the only side that had it. That is exactly
+      # how 9 episodes and 23 audio files were lost on 2026-08-26: nothing was
+      # deleted on live, because live never had them.
+      #
+      # The baseline fix keeps un-transferred files out. This is the net under
+      # it: even with a wrong baseline, a deletion now has to be confirmed.
+      #
+      # The existing conflict types already carry the right semantics:
+      #
+      #   pull_delete (gone on the peer, still here) → edit_delete
+      #     keep mine = push it back, keep live = accept the deletion
+      #   push_delete (deleted here, still on the peer) → delete_edit
+      #     keep mine = propagate my delete, keep live = restore it
+      #
+      # so build_plan, the resolution job and the UI handle these without
+      # knowing they came from here.
+      def require_delete_confirmation(result, baseline:, local:, peer:)
+        planned = result.pull_delete.size + result.push_delete.size
+        threshold = confirm_deletions_over
+        return result if threshold.nil?
+        return result if planned <= threshold
+
+        extra = result.pull_delete.map do |path|
+          Conflict.new(path: path, type: EDIT_DELETE, local: local[path], peer: nil)
+        end + result.push_delete.map do |path|
+          Conflict.new(path: path, type: DELETE_EDIT, local: nil, peer: peer[path])
+        end
+
+        return result if extra.empty?
+
+        Result.new(
+          push:        result.push,
+          push_delete: [],
+          pull:        result.pull,
+          pull_delete: [],
+          conflicts:   (result.conflicts + extra).sort_by(&:path),
+          converged:   result.converged
         )
       end
 

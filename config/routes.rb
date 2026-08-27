@@ -65,6 +65,8 @@ Rails.application.routes.draw do
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
+    get "site_sync/history", to: "site_sync#history", as: "site_sync_history"
+    post "site_sync/history/restore", to: "site_sync#restore_from_history", as: "restore_from_site_sync_history"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
     patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
