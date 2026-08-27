@@ -47,7 +47,7 @@ class SiteSyncTransferJob < ApplicationJob
 
     def initialize(conflicts)
       @conflicts = conflicts
-      super("#{conflicts.size} unresolved conflict(s)")
+      super("#{conflicts.size} conflict(s)")
     end
   end
 

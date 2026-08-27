@@ -59,9 +59,22 @@ class Members::AccountFeedsTest < ActionDispatch::IntegrationTest
     urls = css_select("input.private-feed-url").map { |el| el["value"] }
     assert urls.any? { |u| u.include?(m.media_token) }, "the token rides in the URL"
 
-    stripped = response.body.gsub(/value="[^"]*"/, "")
-    assert_not_includes stripped, m.media_token, "and appears nowhere else on the page"
-    assert_not_includes response.body, m.access_token, "the sign-in token never appears at all"
+    # Every occurrence must be a query parameter of a complete feed address —
+    # `?token=` plainly, or `%3Ftoken%3D` where the URL is itself encoded
+    # inside another (the overcast:// add link does this). Anything else is the
+    # token standing on its own, which is what this guards against.
+    #
+    # Checked this way rather than by stripping `value="…"`: that only knew
+    # about the input, so the iOS deep links — which are feed addresses too —
+    # read as a leak the moment they were added.
+    body = response.body
+    body.to_enum(:scan, m.media_token).each do
+      before = Regexp.last_match.pre_match[-14..].to_s
+      assert_match(/token=\z|token%3D\z/i, before,
+        "the token appears outside a feed URL: …#{before}")
+    end
+
+    assert_not_includes body, m.access_token, "the sign-in token never appears at all"
   end
 
   test "a free member sees no feeds" do

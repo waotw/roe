@@ -193,6 +193,38 @@ class Admin::MemberDeletionTest < ActionDispatch::IntegrationTest
     assert m.anonymized?, "the account came back from deleted"
   end
 
+  # A refusal has to be an answer, not a loop.
+  #
+  # The guard redirected with the default 302, which preserves the method for
+  # everything but POST — so a refused PATCH was re-issued as a PATCH to the
+  # member page, which routes to #update, which this guard also refuses.
+  # A browser fetch got ERR_TOO_MANY_REDIRECTS rather than the reason.
+  test "refusing a non-GET request redirects with 303, not 302" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    m.anonymize!
+
+    [ ->(x) { upgrade_to_paid_admin_member_path(x) },
+      ->(x) { downgrade_to_free_admin_member_path(x) },
+      ->(x) { cancel_membership_admin_member_path(x) },
+      ->(x) { reactivate_membership_admin_member_path(x) } ].each do |path|
+      patch path.call(m)
+
+      assert_response :see_other, "#{path.call(m)} would loop on a method-preserving redirect"
+      assert_redirected_to admin_member_path(m)
+    end
+  end
+
+  test "the refusal says why once it lands" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    m.anonymize!
+
+    patch upgrade_to_paid_admin_member_path(m)
+    follow_redirect!
+
+    assert_response :success, "the follow-up must be a GET that renders"
+    assert_match(/This account was deleted/, flash[:alert].to_s)
+  end
+
   test "the record itself stays readable" do
     m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
     m.anonymize!
@@ -225,6 +257,172 @@ class Admin::MemberDeletionTest < ActionDispatch::IntegrationTest
 
     assert_match "Payment History", response.body
     assert_match "not made any payments", response.body
+  end
+
+  # ── The confirmation ─────────────────────────────────────────────────────
+
+  # Deleting a member can't be undone and may be keeping payment records, so it
+  # asked less of you than deleting a draft post did. Same modal now.
+  test "Delete Member opens the type-DELETE modal" do
+    m = member
+    get admin_member_path(m)
+
+    assert_match 'data-action="delete"', response.body
+    assert_match 'data-resource-type="member"', response.body
+    assert_match 'id="delete-modal-member"', response.body
+    assert_match 'id="delete-confirmation-input-member"', response.body
+    assert_no_match(/turbo_confirm|turbo-confirm/, response.body[/Delete Member.{0,500}/m].to_s)
+  end
+
+  test "the modal posts to this member, not to a guessed path" do
+    m = member
+    get admin_member_path(m)
+    modal = response.body[/id="delete-modal-member".*?<\/div>\s*<\/div>\s*<\/div>/m]
+
+    assert_match admin_member_path(m), modal
+  end
+
+  # The two outcomes are different enough that one message would be wrong for
+  # one of them, so the modal says which it is.
+  test "the modal describes the outcome that actually applies" do
+    get admin_member_path(member)
+    assert_match "removed entirely", response.body
+    assert_match "DELETE PERMANENTLY", response.body
+
+    paid = member(email: "kept@example.com", tier: :paid, paid_at: 1.week.ago,
+                  paid_amount_cents: 5000, paid_currency: "usd")
+    get admin_member_path(paid)
+
+    assert_match "All user identifiable information will be removed", response.body
+    assert_match "DELETE MEMBER", response.body
+    assert_no_match "DELETE PERMANENTLY", response.body,
+      "nothing is permanently deleted here — the record survives"
+  end
+
+  # Figures belong on the page, not in the dialog. Quoting one payment forced
+  # prose that read wrong for a single record — "A $25.00 payment ... without
+  # their name on them".
+  test "the modal names kinds, not amounts" do
+    m = member(tier: :paid, paid_at: Time.utc(2025, 12, 1), paid_amount_cents: 2500,
+               paid_currency: "usd")
+    get admin_member_path(m)
+    modal = response.body[/id="delete-modal-member".*?<\/div>\s*<\/div>\s*<\/div>/m]
+
+    assert_match "Payment history will be kept", modal
+    assert_no_match(/\$25\.00/, modal, "amounts are on the page behind the dialog")
+    assert_no_match(/December 2025/, modal)
+    assert_match "$25.00", response.body, "...and still on the page itself"
+  end
+
+  test "the sentence matches what this member actually has" do
+    payments_only = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    assert_equal "Payment history will be kept without any user identifiable information.",
+                 payments_only.retained_records_summary
+
+    deliveries_only = member(email: "d@example.com")
+    NewsletterSend.create!(member: deliveries_only, post: post_for_send, sent_at: Time.current)
+    assert_equal "Delivery history will be kept without any user identifiable information.",
+                 deliveries_only.retained_records_summary
+
+    both = member(email: "b@example.com", tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    NewsletterSend.create!(member: both, post: post_for_send, sent_at: Time.current)
+    assert_equal "Payment and delivery history will be kept without any user identifiable information.",
+                 both.retained_records_summary
+  end
+
+  # A donation is a payment even without a membership payment.
+  test "a donation counts as payment history" do
+    donor = member(email: "donor@example.com")
+    Donation.create!(member: donor, email: donor.email, amount_cents: 2000,
+                     currency: "usd", stripe_payment_intent_id: "pi_kinds")
+
+    assert_equal [ :payments ], donor.retained_record_kinds
+  end
+
+  # Nothing kept is the erasable path, which reads entirely differently.
+  test "a member with nothing behind them has no summary" do
+    assert_nil member.retained_records_summary
+  end
+
+  test "a deleted account offers no modal at all" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    m.anonymize!
+
+    get admin_member_path(m)
+
+    assert_no_match 'data-action="delete"', response.body
+    assert_no_match 'id="delete-modal-member"', response.body
+  end
+
+  # ── Who deleted it ───────────────────────────────────────────────────────
+  #
+  # "This person deleted their own account" is plainly wrong when the site
+  # owner deleted it from the admin. Most deletions will be member-initiated,
+  # but not all.
+
+  test "an admin deletion says so" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    delete admin_member_path(m)
+
+    assert_equal :admin, m.reload.deleted_by
+    get admin_member_path(m)
+
+    assert_match "Member deleted by site admin", response.body
+    assert_no_match "deleted their own account", response.body
+  end
+
+  test "a member deleting their own account says so" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    m.anonymize!(by: :member)
+
+    get admin_member_path(m)
+
+    assert_match "This person deleted their own account", response.body
+    assert_no_match "by site admin", response.body
+  end
+
+  # Accounts deleted before this was recorded have no answer — neutral wording
+  # rather than a guess.
+  test "an older deletion with no record of who is described neutrally" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    m.anonymize!
+    m.update_columns(metadata: {})
+
+    assert_nil m.reload.deleted_by
+    get admin_member_path(m)
+
+    assert_match "This account was deleted", response.body
+    assert_no_match "by site admin", response.body
+    assert_no_match "deleted their own account", response.body
+  end
+
+  # It read like they'd died.
+  test "no path claims there's no one left to sign in" do
+    [ :admin, :member, nil ].each do |by|
+      m = member(email: "who#{by}@example.com", tier: :paid, paid_at: 1.week.ago,
+                 paid_amount_cents: 5000)
+      by ? m.anonymize!(by: by) : (m.anonymize!; m.update_columns(metadata: {}))
+
+      get admin_member_path(m)
+
+      assert_match "It can't be reactivated.", response.body
+      assert_no_match "no one left to sign in", response.body, "still there for #{by.inspect}"
+    end
+  end
+
+  # metadata is cleared to drop anything stashed in it; this is the one thing
+  # deliberately written back, and it isn't personal data.
+  test "recording who deleted it doesn't reintroduce anything identifying" do
+    m = member(tier: :paid, paid_at: 1.week.ago, paid_amount_cents: 5000)
+    m.update!(metadata: { "note" => "something about them" })
+
+    m.anonymize!(by: :admin)
+
+    assert_equal({ "deleted_by" => "admin" }, m.reload.metadata)
+  end
+
+  test "a live member has no deleted_by" do
+    assert_nil member.deleted_by
   end
 
   test "an already-deleted account isn't offered for deletion again" do

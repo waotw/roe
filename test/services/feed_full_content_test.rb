@@ -42,7 +42,9 @@ class FeedFullContentTest < ActiveSupport::TestCase
 
     assert_includes feed, "free opening paragraph", "the free part is the preview"
     assert_not_includes feed, "paid remainder", "the rest is not"
-    assert_includes feed, "for members"
+    # That a line points at the rest, not its exact wording — the copy in
+    # FeedGenerator#preview_before_gate is the site owner's to edit.
+    assert_match(/rest of this is for/i, feed, "the cut should say where the rest is")
   end
 
   test "a token-gated feed carries the whole thing" do

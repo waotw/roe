@@ -23,16 +23,38 @@
      end %>
 
 <% if app_links.any? || show_public || private_url.present? %>
+  <%# data-platforms marks where a link is worth showing; the controller hides
+      the rest. Overcast's web page can't subscribe you to anything, and Apple
+      Podcasts has no Android app — so both are dead ends where they're hidden.
+      Everything else works everywhere and is left unmarked.
+
+      Feed links become copy-to-clipboard on a phone: tapping one otherwise
+      opens a wall of XML, when what you wanted was the URL to paste into a
+      podcast app. %>
   <% links = capture do %>
-    <div class="subscribe-links">
+    <div class="subscribe-links" data-controller="subscribe-links">
       <% app_links.each do |link| %>
-        <a href="<%= link[:url] %>" class="feed-link" target="_blank" rel="noopener"><%= link[:label] %></a>
+        <a href="<%= link[:url] %>" class="feed-link" target="_blank" rel="noopener"
+           <%= tag.attributes(data: { platforms: PodcastConfig.link_platforms(link[:field]) }) if PodcastConfig.link_platforms(link[:field]) %>><%= link[:label] %></a>
       <% end %>
       <% if show_public %>
-        <a href="/podcast/<%= key %>.xml" class="feed-link" target="_blank" rel="noopener">RSS Feed</a>
+        <a href="/podcast/<%= key %>.xml" class="feed-link" target="_blank" rel="noopener"
+           data-copy-on-mobile>RSS Feed</a>
       <% end %>
       <% if private_url.present? %>
-        <a href="<%= private_url %>" class="feed-link feed-link-private" target="_blank" rel="noopener">Private RSS Feed (Paid)</a>
+        <a href="<%= private_url %>" class="feed-link feed-link-private" target="_blank" rel="noopener"
+           data-copy-on-mobile>Private RSS Feed (Paid)</a>
+
+        <%# One tap instead of copy-paste-hunt-for-the-add-feed-screen. This is
+            the step that actually hurts on a phone, and it's the same pattern
+            Substack uses for its private feeds. iOS only: neither scheme is
+            registered anywhere else, and a scheme with no handler fails
+            silently — so these sit beside the copy link, never replacing it. %>
+        <% full_private = "#{SiteConfig.site_url.to_s.chomp('/')}#{private_url}" %>
+        <a href="podcast://<%= full_private.sub(%r{\Ahttps?://}, '') %>"
+           class="feed-link feed-link-app" data-platforms="ios" hidden>Add to Apple Podcasts</a>
+        <a href="overcast://x-callback-url/add?url=<%= CGI.escape(full_private) %>"
+           class="feed-link feed-link-app" data-platforms="ios" hidden>Add to Overcast</a>
       <% end %>
     </div>
   <% end %>

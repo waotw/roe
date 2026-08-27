@@ -28,7 +28,10 @@ class MemberAnonymizeTest < ActiveSupport::TestCase
     assert_equal "Deleted account", m.name
     assert_nil m.stripe_customer_id
     assert_nil m.password_digest
-    assert_empty m.metadata
+    # metadata is cleared of anything stashed in it, then carries one thing on
+    # purpose: who performed the deletion, which the admin panel reports and
+    # which isn't personal data.
+    assert_equal({ "deleted_by" => "member" }, m.metadata)
     assert m.status_deleted?
   end
 

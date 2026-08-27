@@ -73,7 +73,7 @@ module Admin
         @member.destroy
         redirect_to admin_members_path, notice: "Member deleted"
       else
-        @member.anonymize!
+        @member.anonymize!(by: :admin)
         redirect_to admin_member_path(@member),
           notice: "Member deleted. Their payment and newsletter records are kept without their name on them."
       end
@@ -119,6 +119,8 @@ module Admin
     def reject_deleted_account
       return unless @member.anonymized?
 
+      # Non-GET refusals redirect with 303 — see ApplicationController#redirect_to,
+      # which applies it to every such redirect rather than this one alone.
       redirect_to admin_member_path(@member),
         alert: "This account was deleted. Its payment and newsletter records are kept, but the account itself can't be changed."
     end

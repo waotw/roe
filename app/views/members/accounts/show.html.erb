@@ -90,14 +90,30 @@
 
       <ul class="private-feeds-list">
         <% @private_feeds.each do |feed| %>
-          <li class="private-feed" data-controller="clipboard">
+          <li class="private-feed" data-controller="clipboard subscribe-links">
+            <% full_url = "#{request.base_url}#{feed.url}" %>
             <span class="private-feed-title"><%= feed.title %></span>
             <input type="text" class="private-feed-url" readonly
-                   value="<%= request.base_url %><%= feed.url %>"
+                   value="<%= full_url %>"
                    data-clipboard-target="source"
                    onclick="this.select()">
             <button type="button" class="btn-secondary"
                     data-action="click->clipboard#copy">Copy</button>
+
+            <%# One tap instead of copy, switch app, find the add-by-URL screen,
+                paste. That sequence is the worst part of a paid podcast on a
+                phone, and it's where people give up.
+
+                Audio feeds only — an article feed in a podcast app is nothing
+                but confusion. iOS only too: neither scheme is registered
+                elsewhere, and one with no handler fails silently, so these sit
+                beside Copy rather than replacing it. %>
+            <% if feed.kind.in?([ :podcast, :release ]) %>
+              <a class="btn-secondary private-feed-app" data-platforms="ios" hidden
+                 href="podcast://<%= full_url.sub(%r{\Ahttps?://}, '') %>">Apple Podcasts</a>
+              <a class="btn-secondary private-feed-app" data-platforms="ios" hidden
+                 href="overcast://x-callback-url/add?url=<%= CGI.escape(full_url) %>">Overcast</a>
+            <% end %>
           </li>
         <% end %>
       </ul>

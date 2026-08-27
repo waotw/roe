@@ -64,7 +64,7 @@ module Members
         return
       end
 
-      current_member.anonymize!
+      current_member.anonymize!(by: :member)
       reset_session
 
       redirect_to root_path,

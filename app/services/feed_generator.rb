@@ -1,4 +1,8 @@
 class FeedGenerator
+  # Where PodcastConfigSeeder writes downloaded artwork, and what
+  # /system/images/:filename serves.
+  SYSTEM_IMAGE_DIR = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images").freeze
+
   attr_reader :posts, :format, :site_config, :podcast_config, :include_paid, :show_paid_teasers
 
   # media_token: a member's read credential, appended to enclosure URLs in a
@@ -163,12 +167,18 @@ class FeedGenerator
             xml["itunes"].email podcast_config["email"]
           end
 
-          # iTunes artwork — channel-level cover. The /system/images/* path
-          # podcast.yml uses falls outside the variant pipeline so this
-          # tends to fall through to the original; episode-level art below
-          # gets the xl-variant treatment.
+          # iTunes artwork — channel-level cover, always the original file.
+          #
+          # No variant. Apple wants a square JPEG or PNG between 1400 and 3000
+          # pixels, and whoever set this artwork chose a file that meets that;
+          # substituting a derived copy second-guesses them. Worse, variants
+          # live under media/images/variants/, which Site Sync excludes and
+          # ContentSync prunes — so a feed could advertise a URL that exists
+          # when the feed renders and 404s when Apple fetches it days later.
+          # Directories get their cover art from a URL they cache and re-check
+          # rarely; a miss at the wrong moment is a show with no artwork.
           if podcast_config["artwork"].present?
-            artwork_url = image_full_url(podcast_config["artwork"], variant: :xl)
+            artwork_url = image_full_url(podcast_config["artwork"])
             xml["itunes"].image(href: artwork_url)
             xml.image do
               xml.url artwork_url
@@ -228,10 +238,11 @@ class FeedGenerator
               xml["itunes"].season post.metadata["season"] if post.metadata["season"].present?
               xml["itunes"].episodeType post.metadata["episode_type"] || "full"
 
-              # Episode artwork (optional override). xl variant — Apple
-              # wants podcast art at >=1400px square; xl is 1800px max.
+              # Episode artwork (optional override). The original, same as the
+              # channel art above — Apple applies the same size rules per
+              # episode, and the same variant fragility applies.
               if post.metadata["image"].present?
-                xml["itunes"].image(href: image_full_url(post.metadata["image"], variant: :xl))
+                xml["itunes"].image(href: image_full_url(post.metadata["image"]))
               end
             end
           end
@@ -264,7 +275,7 @@ class FeedGenerator
   # Without this, every RSS item carried a 200-character summary and nothing
   # else, so a paid feed gave subscribers the same list of links a free one did.
   def feed_item_content(post)
-    html = post.to_html.to_s
+    html = post.to_html(feed: true).to_s
     return gate_free_content(html) unless post.audience == "paid"
     return gate_free_content(html) if include_paid
 
@@ -283,7 +294,7 @@ class FeedGenerator
   def preview_before_gate(html)
     free_part = html.include?("<!-- PAID_CONTENT_GATE -->") ? html.split("<!-- PAID_CONTENT_GATE -->").first : ""
 
-    "#{free_part}<p><em>The rest of this is for members.</em></p>"
+    "#{free_part}<p><em>The rest of this is for paying members.</em></p>"
   end
 
   # Paid posts a public feed may advertise. Follows the same
@@ -416,25 +427,40 @@ class FeedGenerator
     post.metadata["audio_type"].presence || audio_mime_type(post.metadata["audio"].to_s)
   end
 
-  # Build an absolute URL for an image. Pass `variant:` to point at a
-  # generated variant (xl is right for podcast feed art — Apple wants
-  # square cover at >=1400px and our xl is 1800px). When the variant
-  # doesn't exist (e.g. /system/images/* podcast cover art that lives
-  # outside the variant pipeline) we fall back to the original path.
-  def image_full_url(image_path, variant: nil)
-    resolved = variant ? resolve_variant_web_path(image_path, variant) : image_path
+  # An absolute URL for an image, always the original file.
+  #
+  # This used to take a `variant:` and point podcast art at the xl rendition.
+  # The parameter is gone rather than merely unused: artwork has a spec the
+  # site owner met deliberately, and variants live under
+  # media/images/variants/ — excluded from Site Sync, pruned by ContentSync —
+  # so a feed could advertise a URL that resolved at render time and 404'd when
+  # Apple fetched it days later. Removing the capability is what stops it
+  # coming back.
+  def image_full_url(image_path)
+    resolved = system_asset_web_path(image_path) || image_path
     clean_path = resolved.start_with?("/") ? resolved[1..-1] : resolved
     "#{site_config[:url]}/#{clean_path}"
   end
 
-  def resolve_variant_web_path(image_path, variant_name)
-    return image_path unless ImageVariantGenerator.available?
-    return image_path unless ImageVariantGenerator::VARIANTS.key?(variant_name.to_sym)
+  # A bare filename means a system asset, not a file at the site root.
+  #
+  # PodcastConfigSeeder downloads channel artwork into system/assets/images/
+  # and stores just the filename in podcast.yml — that's the contract. This
+  # joined it straight onto the site URL, producing
+  # https://site/the-briefcase-podcast-artwork.jpg, which 404s. Apple and
+  # Overcast both fall back to no artwork without complaining, so a podcast
+  # simply showed up blank.
+  #
+  # Anything containing a slash is already a path (music covers are written as
+  # /media/images/…) and is left alone. A filename with no matching asset falls
+  # through too, so a stale entry keeps its old behaviour rather than gaining a
+  # confidently wrong URL.
+  def system_asset_web_path(image_path)
+    name = image_path.to_s.strip
+    return nil if name.empty? || name.include?("/")
+    return nil unless File.file?(File.join(SYSTEM_IMAGE_DIR, name))
 
-    filesystem_path = ImageVariantGenerator.variant_path_for(image_path, variant_name)
-    return image_path unless File.exist?(filesystem_path)
-
-    filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    "/system/images/#{name}"
   end
 
   def audio_file_path(audio_path)

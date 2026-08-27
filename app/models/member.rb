@@ -80,6 +80,16 @@ class Member < ApplicationRecord
 
   def anonymized? = status_deleted?
 
+  # :member, :admin, or nil for accounts deleted before this was recorded —
+  # the admin panel falls back to neutral wording rather than guessing.
+  def deleted_by
+    return nil unless anonymized?
+
+    metadata["deleted_by"].presence&.to_sym
+  end
+
+  def deleted_by_admin? = deleted_by == :admin
+
   # What this member has behind them that the site needs to keep — in the
   # owner's words, for the admin to show before they delete anyone.
   #
@@ -87,10 +97,17 @@ class Member < ApplicationRecord
   # depends" is no use to someone holding the button. A cancelled membership
   # reads like there's nothing left, when there may well be a payment from
   # last year underneath it.
+  # A membership payment, by any of the three marks one leaves behind. Asked
+  # the same way by #retained_records and #retained_record_kinds so they can't
+  # disagree about whether there was one.
+  def membership_payment?
+    paid_at? || paid_amount_cents.to_i.positive? || stripe_payment_intent_id.present?
+  end
+
   def retained_records
     records = []
 
-    if paid_at? || paid_amount_cents.to_i.positive? || stripe_payment_intent_id.present?
+    if membership_payment?
       records << [ "a", format_money(paid_amount_cents, paid_currency), "payment",
                    paid_at && "from #{paid_at.strftime('%B %Y')}" ].compact.join(" ")
     end
@@ -99,6 +116,37 @@ class Member < ApplicationRecord
     newsletter_sends.count.then { |n| records << "#{n} #{'newsletter'.pluralize(n)}" if n.positive? }
 
     records
+  end
+
+  # The same question as #retained_records, answered in kinds rather than
+  # figures: :payments, :deliveries, or both.
+  #
+  # The confirmation dialog wants "Payment and delivery history will be kept",
+  # not "a $25.00 payment from December 2025 ... them" — the amounts are on the
+  # page behind the dialog, and quoting one payment forces prose that reads
+  # wrong for a single record. Derived from the same checks so the two can't
+  # end up disagreeing about what's there.
+  def retained_record_kinds
+    kinds = []
+    kinds << :payments   if membership_payment? || donations.any?
+    kinds << :deliveries if newsletter_sends.any?
+    kinds
+  end
+
+  # A sentence naming what survives, or nil when nothing does — that's the
+  # erasable case, which reads entirely differently and is the caller's to
+  # handle.
+  def retained_records_summary
+    kinds = retained_record_kinds
+    return nil if kinds.empty?
+
+    subject = case kinds
+    when [ :payments, :deliveries ] then "Payment and delivery history"
+    when [ :payments ]              then "Payment history"
+    else                                 "Delivery history"
+    end
+
+    "#{subject} will be kept without any user identifiable information."
   end
 
   # Whether this member can be removed outright rather than anonymised.
@@ -131,7 +179,15 @@ class Member < ApplicationRecord
   # Stripe and Postmark keep their own copies of the address. Roe doesn't
   # reach into either: deleting a Stripe customer is irreversible and would
   # damage the payment history this is trying to preserve.
-  def anonymize!
+  # `by` records who asked: :member (they deleted their own account) or
+  # :admin (the site owner deleted it from the admin). The admin panel says
+  # which, and "this person deleted their own account" is plainly wrong when
+  # it was the owner who did it.
+  #
+  # Kept in metadata rather than a new column: metadata is cleared here anyway
+  # to drop anything stashed in it, and who performed the deletion isn't
+  # personal data. No migration, and it survives with the record.
+  def anonymize!(by: :member)
     transaction do
       donations.find_each do |donation|
         donation.update_columns(email: self.class.anonymized_email_for(id))
@@ -145,7 +201,7 @@ class Member < ApplicationRecord
         email_confirmation_token: nil,
         email_confirmation_sent_at: nil,
         stripe_customer_id: nil,
-        metadata: {},
+        metadata: { "deleted_by" => by.to_s },
         access_token: self.class.generate_password,
         media_token: self.class.generate_media_token,
         newsletter_status: :unsubscribed,

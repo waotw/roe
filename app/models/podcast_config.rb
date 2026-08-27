@@ -54,14 +54,30 @@ class PodcastConfig
   # All subscribe-related fields (the app URLs + the display toggle).
   SUBSCRIBE_FIELDS = (SUBSCRIBE_APPS.keys + %w[subscribe_display]).freeze
 
-  # Ordered [{ label:, url: }] for every app/service field a podcast has
-  # filled in (blank ones dropped). Feed links are added by the template.
+  # Where each app link is worth showing, or nil for "everywhere".
+  #
+  #   Overcast  — its web page can't subscribe a visitor to anything, so on a
+  #               desktop the link is a dead end. iOS only.
+  #   Apple     — no Android app; podcasts.apple.com there is a browser page
+  #               offering nothing useful. Desktop and iOS.
+  #
+  # Spotify, YouTube, Pocket Casts and Amazon all open their native app on both
+  # phones and work in a desktop browser, so they're unmarked.
+  LINK_PLATFORMS = {
+    "overcast"       => "ios",
+    "apple_podcasts" => "desktop ios"
+  }.freeze
+
+  def self.link_platforms(field) = LINK_PLATFORMS[field.to_s]
+
+  # Ordered [{ label:, url:, field: }] for every app/service field a podcast
+  # has filled in (blank ones dropped). Feed links are added by the template.
   def self.subscribe_links(config)
     return [] unless config
 
     SUBSCRIBE_APPS.filter_map do |field, label|
       url = config[field].to_s.strip
-      { label: label, url: url } if url.present?
+      { label: label, url: url, field: field } if url.present?
     end
   end
 

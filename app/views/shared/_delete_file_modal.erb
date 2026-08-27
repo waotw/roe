@@ -4,14 +4,32 @@
   #   admin_post_path / admin_page_path resolved from resource_type).
   # delete_message: replaces the "permanently delete the file from
   #   content/<type>s/" sentence — useful for layouts, configs, etc.
+  # Resolved for the three types this partial knows, and refused for anything
+  # else. It used to fall through to admin_page_path for unknown types, which
+  # meant a caller that forgot delete_path got a confirm dialog wired to delete
+  # a *page* — a plausible-looking wrong answer on a button whose whole job is
+  # destroying something. Every other caller already passes delete_path, so
+  # nothing depended on the fallback.
+  #
+  # Raising rather than returning nil: resource_type is a literal at every call
+  # site, never user input, so an unknown one is a bug to fix now, not a state
+  # to degrade gracefully around.
   delete_path    = local_assigns[:delete_path] ||
                    case resource_type
                    when 'post'    then admin_post_path(resource)
                    when 'product' then admin_product_path(resource)
-                   else admin_page_path(resource)
+                   when 'page'    then admin_page_path(resource)
+                   else
+                     raise ArgumentError,
+                       "delete_file_modal: no delete path for resource_type #{resource_type.inspect} — " \
+                       "pass delete_path: explicitly"
                    end
   delete_message = local_assigns[:delete_message] ||
                    "This will permanently delete the file from <code class=\"bg-gray-100 px-1\">content/#{resource_type}s/</code>.".html_safe
+  # Not everything this modal confirms is a permanent removal — deleting a
+  # member who has payments behind them anonymises the record instead. The
+  # button should say what will happen.
+  confirm_label  = local_assigns[:confirm_label] || "DELETE PERMANENTLY"
 %>
 <div id="delete-modal-<%= resource_type %>" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="bg-white p-6  shadow-xl max-w-md w-full mx-4">
@@ -36,7 +54,7 @@
               class="px-4 py-2 border font-mono border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 rounded-xs">
         CANCEL
       </button>
-      <%= button_to "DELETE PERMANENTLY",
+      <%= button_to confirm_label,
           delete_path,
           method: :delete,
           id: "delete-confirm-btn-#{resource_type}",

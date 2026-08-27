@@ -8,7 +8,7 @@ module HasMarkdownExtensions
   PRODUCT_GRID_IMAGE_SIZES =
     "(min-width: 901px) 220px, (min-width: 769px) 30vw, (min-width: 401px) 45vw, 100vw".freeze
 
-  def to_html(preview: false, context: nil, static: false)
+  def to_html(preview: false, context: nil, static: false, feed: false)
     # Store context for use by form renderers
     @render_context = context
 
@@ -22,6 +22,13 @@ module HasMarkdownExtensions
     # keyword through all of them to answer one question isn't worth it.
     # Defaults to false, so any caller that doesn't ask for warnings gets none.
     @rendering_preview = preview
+
+    # Whether this render is going into a feed. Warnings are for the person
+    # editing the site; a feed is machine output that leaves the building.
+    # `static` already suppresses them but can't be reused here — it also
+    # strips dynamic blocks, and a feed needs the paywall gate marker intact
+    # for FeedGenerator#preview_before_gate to split on.
+    @rendering_feed = feed
 
     # In static-site mode, strip dynamic blocks that require a Rails
     # backend (forms, paywalls, product buttons). Done before any other
@@ -143,6 +150,7 @@ module HasMarkdownExtensions
     # Clear render context to prevent data leaking between requests
     @render_context = nil
     @rendering_static = nil
+    @rendering_feed = nil
   end
 
   # IDs that belong to injected third-party mount points and must never be
@@ -3668,8 +3676,13 @@ module HasMarkdownExtensions
   #
   # Static output is excluded outright rather than by trusting the preview flag
   # to be false: a generated file outlives the request that made it.
+  # Warnings are for whoever is building the site, in a browser. Development
+  # alone isn't enough of a test: a feed rendered on a dev machine was shipping
+  # the "Stripe isn't connected" notice into content:encoded, so it arrived in
+  # a real reader as part of the article.
   def show_block_warnings?
     return false if @rendering_static
+    return false if @rendering_feed
 
     Rails.env.development? || @rendering_preview.present?
   end
