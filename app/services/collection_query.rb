@@ -59,11 +59,9 @@ class CollectionQuery
     when "title"
       items.to_a.sort_by { |item| item.title.to_s.downcase }
     when "date"
-      # Newest first (default). nil dates sort to the end via a nil-safe sentinel.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
+      items.to_a.sort_by { |item| date_key(item, descending: true) }
     when "date-asc"
-      # Oldest first. nil dates sort to the end.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
+      items.to_a.sort_by { |item| date_key(item, descending: false) }
     when *NUMBERED_SORTS.keys
       # Ordered-media sorts: same behaviour, one per medium (see NUMBERED_SORTS).
       # Numeric so 10 follows 9; unnumbered items sort to the end alphabetically
@@ -77,6 +75,42 @@ class CollectionQuery
     end
   end
 
+  # The sort key for date ordering: [undated?, when, tie-break].
+  #
+  # Undated leads the key rather than riding on a sentinel timestamp, because
+  # negating for descending order flips a sentinel too — -Float::INFINITY
+  # sorts first, so undated posts jumped to the top of a newest-first list.
+  # A separate leading flag keeps them last whichever way the dates run.
+  #
+  # The full timestamp, not the date: two posts on the same day used to produce
+  # identical keys, and Ruby's sort_by is unstable, so the order fell out of
+  # whatever the database returned. That differs between a site built up over
+  # months and one rebuilt in a single sync — which is how one collection came
+  # out in two different orders on local and live.
+  def self.date_key(item, descending:)
+    seconds = sort_seconds(item)
+
+    [ seconds ? 0 : 1,
+      seconds ? (descending ? -seconds : seconds) : 0,
+      tie_break(item) ]
+  end
+
+  # Seconds since the epoch, or nil when the item carries no date at all.
+  def self.sort_seconds(item)
+    moment = item.timestamp if item.respond_to?(:timestamp)
+    moment ||= item.date&.to_time if item.respond_to?(:date)
+
+    moment&.to_f
+  end
+
+  # The tie-break for identical timestamps. url_name because it comes from the
+  # content itself — a database id or row order would put the two sides back
+  # where they started. Ascending in both directions, so a tie reads the same
+  # way whichever end you sort from.
+  def self.tie_break(item)
+    (item.respond_to?(:url_name) ? item.url_name : nil).to_s
+  end
+
   # Order by an explicit, comma-separated list of url_names. Listed items come
   # first, in list order; the rest fall to the end alphabetically by title, so
   # nothing is dropped. A blank list falls back to date-descending.
@@ -84,7 +118,7 @@ class CollectionQuery
     wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
 
     if wanted.empty?
-      return items.to_a.sort_by { |i| i.respond_to?(:date) && i.date ? i.date : Date.new(0) }.reverse
+      return items.to_a.sort_by { |i| date_key(i, descending: true) }
     end
 
     position = {}

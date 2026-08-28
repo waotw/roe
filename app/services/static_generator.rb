@@ -828,20 +828,17 @@ class StaticGenerator
     collection
   end
 
+  # Delegates to CollectionQuery so the static site and the Rails site put a
+  # collection in the same order.
+  #
+  # This was a second implementation of the same four keywords — the others in
+  # SQL against the raw `$.date` string. That worked by accident for ISO dates
+  # (lexicographic order matches chronological for same-shaped strings) but
+  # had no tie-break for identical values, and couldn't see an explicit `time:`
+  # at all. So a static build could order a collection differently from the
+  # site it was generated from.
   def apply_collection_order(items, order_by)
-    case order_by
-    when "filename"
-      items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, ".md")
-        filename =~ /^(\d+)/ ? [ $1.to_i, filename ] : [ Float::INFINITY, filename ]
-      end
-    when "title"
-      items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
-    when "date-asc"
-      items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
-    else
-      items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
-    end
+    CollectionQuery.order_items(items, order_by)
   end
 
   def generate_title_from_config(config)

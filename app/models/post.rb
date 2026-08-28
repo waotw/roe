@@ -547,6 +547,50 @@ class Post < ApplicationRecord
     end
   end
 
+  # The full moment this post is dated to. Nil only when it has no date at all.
+  #
+  # #date returns a Date, so two posts on the same day had identical sort keys
+  # — and Ruby's sort_by is not stable, so the order then came down to whatever
+  # the database happened to return. A site built up over months and one
+  # rebuilt in a single sync hand back different orders, which is how the same
+  # collection came out differently on local and live. The times were in the
+  # metadata the whole time and were being thrown away.
+  #
+  # Three accepted forms, all parsed the same way:
+  #
+  #   date: 2026-08-27                 → midnight
+  #   date: 2026-08-14T13:45Z          → that instant (what a date picker writes)
+  #   date: 2026-08-27, time: 13:45    → combined
+  #
+  # An explicit `time:` wins over a time inside `date:`, because writing it as
+  # its own field is the more deliberate statement of the two.
+  def timestamp
+    day = date
+    return nil unless day
+
+    explicit = metadata["time"].to_s.strip
+    if explicit.present?
+      # A `time:` carrying a whole date is unusual but unambiguous — take it
+      # as written rather than splicing a date onto it.
+      return parse_timestamp(explicit) || day.to_time if explicit.match?(/\d{4}-\d{2}-\d{2}/)
+
+      combined = parse_timestamp("#{day.iso8601}T#{explicit}")
+      return combined if combined
+    end
+
+    parse_timestamp(metadata["date"]) || day.to_time
+  end
+
+  # Lenient on purpose: an unparseable value falls back to the date rather than
+  # raising, matching how #date treats a bad string.
+  def parse_timestamp(value)
+    return nil if value.blank?
+
+    Time.zone.parse(value.to_s)
+  rescue ArgumentError, TypeError
+    nil
+  end
+
   def author
     metadata["author"]
   end
