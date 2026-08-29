@@ -24,9 +24,39 @@ If any of these don't help, please visit: [Support](/support) and we'll get you 
 
 The `flyctl` install didn't add `fly` to your PATH. Reopen your terminal, or run `source ~/.zshrc` (or `~/.bash_profile`) to pick up the updated PATH.
 
-#### Error: Could not list Fly secrets — fly auth login required
+#### You're not signed in to Fly
+{: #fly-signed-out}
 
-Your session token expired. Run `fly auth login` again from your terminal, then retry the deploy.
+Your session expired, or you haven't signed in on this computer yet. Roe checks before a deploy starts, because `fly deploy` without a session produces no output and never finishes — it looks like a hang rather than a failure.
+
+1. Open a terminal. Any folder will do.
+2. Run `fly auth login`. It opens your browser.
+3. Sign in. You'll see "Your CLI is connected now. Feel free to close this tab."
+4. Back in the terminal you'll see `successfully logged in as <your email>`.
+5. Deploy again.
+
+The older message **Could not list Fly secrets — fly auth login required** means the same thing.
+
+#### Roe couldn't reach Fly
+{: #fly-unreachable}
+
+The `fly` command couldn't get an answer from Fly's API, so there's no way to tell whether you're signed in. Signing in again won't help — `fly auth login` uses the same connection and fails the same way. A typical error looks like:
+
+```
+Error: Post "https://api.fly.io/api/v1/cli_sessions": EOF
+```
+
+`EOF` means the connection closed before Fly answered. You may also see `i/o timeout`, `no such host`, or `dial tcp`.
+
+Work through these in order:
+
+1. **Try again in a minute**. This is often momentary, and a retry works.
+2. **Confirm it isn't an issue with Roe**. Run fly auth whoami directly in a terminal. This should return the email address used to sign into Fly.
+3. **Check status.fly.io**. If Fly is having an incident we know it's not on Roe's side.
+4. **Turn off any VPN, then retry**. VPNs can block or intercept API traffic.
+5. **Try a different network**. Work and school networks may filter outbound connections. Tethering to your phone is a quick way to route around that issue.
+
+If `fly auth whoami` works in the terminal but Roe still reports it can't reach Fly, that's worth reporting — see [Support](/support).
 
 #### Deploy hangs at "Machine checks"
 

@@ -4029,8 +4029,38 @@ hr.clear-floats {
 }
 
 .paid-content-gate a {
-  color: var(--color-link);
   text-decoration: none;
+}
+
+/* Deleting an account — separated from the account actions, and behind a
+   disclosure, because it can't be undone. */
+
+.account-delete {
+  margin: var(--space-8) 0 var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.account-delete summary {
+  cursor: pointer;
+  color: var(--color-text-muted, currentColor);
+}
+
+.account-delete-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.account-delete-input {
+  font-family: var(--font-mono);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
 }
 
 /* ========== STORE — PRODUCT PAGE ========== */

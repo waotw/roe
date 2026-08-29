@@ -58,7 +58,7 @@ Roe is built with [Ruby](/documentation/roe/glossary#ruby), so most of what it i
 
 | What | Why Roe needs it | How it arrives |
 |------|------------------|----------------|
-| **Ruby 3.2.2** | The language Roe is written in. Nothing else runs until Ruby is in place. | Installed and pinned by [mise](/documentation/roe/glossary#mise) (below) |
+| **Ruby 4.0.5** | The language Roe is written in. Nothing else runs until Ruby is in place. | Installed and pinned by [mise](/documentation/roe/glossary#mise) (below) |
 | **mise** | A version manager that installs the exact Ruby version Roe needs, without disturbing any other Ruby on your system. | `brew install mise`, or the standalone installer `curl https://mise.run \| sh` |
 | **[Git](/documentation/roe/glossary#git)** | Roe's built-in updater uses Git to fetch new releases. | `xcode-select --install` or `brew install git` (macOS); your package manager (Linux) |
 | **[A C compiler and build tools](/documentation/roe/glossary#build-tools-c-compiler)** | Needed to build Ruby's libraries and any Ruby add-ons written in C. | Xcode Command Line Tools (macOS); `build-essential` or your distribution's equivalent (Linux) |
