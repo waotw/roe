@@ -595,7 +595,7 @@ class StaticGenerator
     @documentation_back_path_for_static ||= begin
       if Page.public_pages.any? { |p| p.url_name == "documentation" }
         "/documentation"
-      elsif Documentation.include_roe_docs?
+      elsif Documentation.roe_docs_published?
         "/roe/documentation"
       else
         # No docs landing is published (user authored none, Roe's are excluded).
@@ -614,8 +614,8 @@ class StaticGenerator
   # docs list the dynamic route produces.
   def generate_documentation_index
     # The /roe/documentation index lists Roe's bundled docs; skip it when they
-    # aren't published (search.roe_docs off) so it can't link to missing pages.
-    return unless defined?(Documentation) && Documentation.include_roe_docs?
+    # aren't published so it can't link to pages the build didn't produce.
+    return unless defined?(Documentation) && Documentation.roe_docs_published?
 
     puts "📚 Generating /roe/documentation/ index..."
     markdown_path = Rails.root.join("app", "views", "documentation", "index.md")

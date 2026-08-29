@@ -31,6 +31,10 @@ module SiteSync
     #                       same reason.
     EXCLUDED_PATHS = %w[system/secrets media/images/variants].freeze
 
+    # Roe's bundled documentation — 85 files a site may not want to carry.
+    # Kept off the wire unless the site publishes them.
+    ROE_DOCS_PATH = "documentation/roe/"
+
     # Filenames excluded wherever they appear in the tree:
     #   - .DS_Store       macOS noise that appears in every browsed dir
     #   - .sync-state.json the ledger itself; otherwise the ledger's mtime
@@ -105,8 +109,25 @@ module SiteSync
         parts = relative_path.split("/")
         return true if EXCLUDED_DIRS.include?(parts.first)
         return true if EXCLUDED_FILES.include?(parts.last)
+        return true if roe_docs_excluded? && relative_path.start_with?(ROE_DOCS_PATH)
 
         EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
+      end
+
+      # Read once and held for the walk rather than per file — excluded? is
+      # called for every file under /site, and a config lookup each time would
+      # be the slowest thing in building a manifest. current_manifest clears it
+      # first, so a changed setting applies to the next sync, not the next boot.
+      def roe_docs_excluded?
+        return @roe_docs_excluded unless @roe_docs_excluded.nil?
+
+        @roe_docs_excluded = !Documentation.roe_docs_published?
+      rescue StandardError
+        @roe_docs_excluded = false # a config read must never stop a sync
+      end
+
+      def reset_roe_docs_cache!
+        @roe_docs_excluded = nil
       end
     end
 
@@ -120,6 +141,8 @@ module SiteSync
 
     def current_manifest
       return {} unless Dir.exist?(@site_path)
+
+      self.class.reset_roe_docs_cache!
 
       manifest = {}
       prefix = @site_path.end_with?("/") ? @site_path : "#{@site_path}/"

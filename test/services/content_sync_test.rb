@@ -267,7 +267,15 @@ class ContentSyncTest < ActiveSupport::TestCase
     assert_equal "Test Doc", result.title
   end
 
-  test "sync_documentation excludes documentation/roe unless opted in, and purges stale roe docs" do
+  # The old behaviour was to skip documentation/roe and delete any rows already
+  # there whenever the docs setting was off. The files stayed on disk but the
+  # records didn't, so every /documentation/roe/… URL 404'd — including the
+  # admin's help links, with nothing in the setting's name to suggest it.
+  #
+  # The database is a local index of what's on local disk now. Whether those
+  # files reach the live site is Site Sync's business (Ledger::ROE_DOCS_PATH),
+  # and whether they're findable is search's.
+  test "sync_documentation indexes documentation/roe whatever the docs setting" do
     roe_raw  = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "roe", "zz-roe-sync-test.md")
     root_raw = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "zz-root-sync-test.md")
     [ roe_raw, root_raw ].each do |p|
@@ -277,17 +285,15 @@ class ContentSyncTest < ActiveSupport::TestCase
     roe  = RoeSitePaths.normalize(roe_raw)
     root = RoeSitePaths.normalize(root_raw)
 
-    # Pre-seed the roe doc as if a previous opt-in had synced it.
-    Documentation.create_or_update_from_file(roe_raw)
-    assert Documentation.exists?(file_path: roe)
-
-    Documentation.stubs(:include_roe_docs?).returns(false)
+    Documentation.stubs(:roe_docs_published?).returns(false)
     Dir.stubs(:glob).returns([ root_raw, roe_raw ])
 
     ContentSync.new.send(:sync_documentation)
 
-    assert Documentation.exists?(file_path: root), "a root doc still syncs"
-    assert_not Documentation.exists?(file_path: roe), "documentation/roe is excluded and purged when opted out"
+    assert Documentation.exists?(file_path: root), "a root doc syncs"
+    assert Documentation.exists?(file_path: roe),
+      "Roe's docs are indexed locally even when they aren't published — otherwise " \
+      "the pages 404 on the machine they're sitting on"
   ensure
     [ roe_raw, root_raw ].each { |p| File.delete(p) if p && File.exist?(p) }
   end

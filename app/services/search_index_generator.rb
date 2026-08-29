@@ -61,10 +61,10 @@ class SearchIndexGenerator
     value == true || value == "true"
   end
 
-  # Roe's bundled docs (documentation/roe) are excluded by default; the Roe
-  # project's own site sets `search_roe_docs: true` to include them. This is
-  # the SAME set the static build publishes (Documentation.publishable), so
-  # "excluded from search" and "excluded from the static site" never disagree.
+  # Roe's bundled docs (documentation/roe) are excluded by default. Search is
+  # the narrowest of the three settings: a site can publish Roe's docs without
+  # putting them in its own search results, which is the middle position on
+  # the dial. Documentation.publishable already asks the search question.
   def searchable_documentation
     Documentation.publishable
   end

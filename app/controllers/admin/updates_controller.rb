@@ -66,7 +66,7 @@ class Admin::UpdatesController < Admin::BaseController
     end
 
     # Deploy section
-    @deploy_status       = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
+    @deploy_status       = DeployWatchdog.status
     @last_deploy_time    = load_last_deploy_time
     @deploy_config       = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
     @deploy_issues       = deploy_prerequisites(@deploy_config)
@@ -193,7 +193,7 @@ class Admin::UpdatesController < Admin::BaseController
   # ── Deploy actions ────────────────────────────────────────────────────────
 
   def start_deploy
-    if Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)&.dig(:state) == :running
+    if DeployWatchdog.status&.dig(:state) == :running
       flash[:alert] = "A deploy is already in progress. Wait for it to finish."
       redirect_to admin_updates_path
       return
@@ -250,7 +250,7 @@ class Admin::UpdatesController < Admin::BaseController
   # so the failed-state UI has a distinct button — users intent
   # "retry, but force a clean build" rather than "deploy normally."
   def reset_and_retry_deploy
-    if Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)&.dig(:state) == :running
+    if DeployWatchdog.status&.dig(:state) == :running
       flash[:alert] = "A deploy is already in progress. Wait for it to finish."
       redirect_to admin_updates_path
       return
@@ -292,7 +292,7 @@ class Admin::UpdatesController < Admin::BaseController
   end
 
   def deploy_status
-    status = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
+    status = DeployWatchdog.status
     render json: (status || { state: nil })
   end
 

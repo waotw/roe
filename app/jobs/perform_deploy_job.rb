@@ -23,6 +23,17 @@ class PerformDeployJob < ApplicationJob
   LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, "system", "global", ".last_deploy.yml")
 
   def perform(target:, version_tag:, admin_user_id: nil, reset_cache: false)
+    # Refuse to run a deploy nobody is waiting for.
+    #
+    # Solid Queue puts an in-flight job back on the queue when a worker shuts
+    # down cleanly (Process::Executor#release_all_claimed_executions), so
+    # quitting Roe mid-deploy can hand this job straight back for the next boot
+    # to pick up. A deploy is not safe to resume unattended hours later: it
+    # auto-commits the working tree, pushes secrets and builds an image, all
+    # with nobody watching. Dropping it is the right default — the button is
+    # still there.
+    return unless claim_deploy!(version_tag)
+
     # Stage VERSION FIRST. Kamal builds from the git tree, not the raw
     # working directory — anything not committed is silently absent
     # from the build context. If we auto-commit BEFORE staging VERSION
@@ -84,10 +95,14 @@ class PerformDeployJob < ApplicationJob
       sync_kamal_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
     end
 
-    # Fail before the build, not four minutes into it. Kamal reports a missing
-    # local Docker or an unusable SSH key as whatever it failed to reach next,
-    # which reads as a problem with the server rather than this computer.
-    if target == "kamal" && (blockers = DeployPreflight.new.blockers).any?
+    # Fail before the build, not four minutes into it.
+    #
+    # Kamal reports a missing local Docker as whatever it failed to reach next,
+    # which reads as a problem with the server rather than this computer. Fly
+    # is worse: with an expired session `fly deploy` produces no output and
+    # never returns, so the page sits with an empty log and no way back. Both
+    # are cheaper to catch here than to diagnose from a stuck screen.
+    if (blockers = DeployPreflight.new.blockers(target)).any?
       Rails.logger.warn "[PerformDeployJob] Preflight failed: #{blockers.map(&:title).join('; ')}"
       write_status(
         state:        :failed,
@@ -118,6 +133,37 @@ class PerformDeployJob < ApplicationJob
   end
 
   private
+
+  # True when this job is the deploy the page is currently showing, and hasn't
+  # already had a go.
+  #
+  # Three ways it can be false, all meaning "don't deploy":
+  #
+  #   no status      — dismissed, or the TTL passed. Nobody is watching.
+  #   another tag    — a newer deploy superseded this one.
+  #   already begun  — this job ran before and was re-queued by a restart.
+  #
+  # The last is the one that matters, and it's why this records the attempt
+  # rather than just reading. Solid Queue doesn't count a released execution as
+  # a retry, so `executions` stays 1 and can't tell a resumed job from a fresh
+  # one. A marker in the status can.
+  def claim_deploy!(version_tag)
+    status = Rails.cache.read(STATUS_CACHE_KEY)
+
+    reason =
+      if status.nil?                                        then "no deploy status — it was dismissed or expired"
+      elsif status[:version_tag].to_s != version_tag.to_s   then "superseded by a newer deploy"
+      elsif status[:job_started_at].present?                then "already started once — Roe restarted while it was running"
+      end
+
+    if reason
+      Rails.logger.warn "[PerformDeployJob] Skipping deploy #{version_tag}: #{reason}"
+      return false
+    end
+
+    write_status(job_started_at: Time.current)
+    true
+  end
 
   # Commits any staged or unstaged changes so Kamal's build context is current.
   # Uses inline git config so it works even when git user isn't globally

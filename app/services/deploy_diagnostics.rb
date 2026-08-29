@@ -42,6 +42,43 @@ class DeployDiagnostics
 
   SIGNATURES = [
     DOCKER_DOWN,
+    # Fly's own wording when the session is gone. DeployPreflight catches this
+    # before a deploy starts, so this is the safety net for a session that
+    # expires mid-deploy — or for a log from before the preflight existed.
+    # Before the signed-out signature: a login that dies at the network level
+    # reports an error too, and answering it with "sign in again" sends someone
+    # to a command that fails the same way.
+    {
+      match: %r{api\.fly\.io.*?: EOF|Post "https://api\.fly\.io[^"]*": (EOF|.*timeout)|dial tcp.*fly\.io}i,
+      title: "Roe couldn't reach Fly",
+      explanation:
+        "The <code>fly</code> command couldn't get an answer from Fly's API. This isn't an " \
+        "account problem — signing in again uses the same connection and fails the same way.",
+      steps: [
+        "Try again in a minute — this is often momentary.",
+        "Check status.fly.io for an outage.",
+        "If you're on a VPN or a work network, try without it.",
+        "Confirm directly: <code>fly auth whoami</code>. The same error means it isn't Roe."
+      ]
+    },
+    {
+      # Fly's own wording only. A generic /authenticat/ would also match the
+      # registry failure further down ("unauthorized: authentication required")
+      # and, sitting above it, would answer a Kamal problem with "run fly auth
+      # login".
+      match: /You must be authenticated to view this|failed retrieving current user|fly auth login/i,
+      title: "Your Fly session has expired",
+      explanation:
+        "Fly signed you out, so the deploy had no permission to run. A deploy started " \
+        "without a session doesn't fail — it hangs with no output — which is why Roe now " \
+        "checks before starting.",
+      steps: [
+        "Open a terminal — any folder will do.",
+        "Run <code>fly auth login</code>. It opens your browser.",
+        "Sign in to Fly, then return to the terminal.",
+        "Then deploy again."
+      ]
+    },
     {
       match: /Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED/i,
       title: "The server's identity isn't recognised",

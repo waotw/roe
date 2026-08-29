@@ -257,10 +257,18 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Include all pages in search",
           hint: "By default only pages linked in the navigation or footer are searchable. Turn on to index every published page."
         },
-        "search.roe_docs" => {
-          type: :checkbox,
-          label: "Include bundled Roe documentation in search",
-          hint: "Roe's own documentation (documentation/roe) is excluded from search by default. Turn on to include it."
+        "docs.roe" => {
+          type: :select,
+          label: "Roe's own documentation",
+          options: [ "local", "published", "searchable" ],
+          hint: "What happens to Roe's 85 bundled docs (documentation/roe) on your site. " \
+                "<strong>local</strong> — kept on this computer, not sent to your live site. " \
+                "<strong>published</strong> — sent to your live site and built into a static one, " \
+                "but left out of your search results. " \
+                "<strong>searchable</strong> — sent, built, and findable in search.<br><br>" \
+                "One setting rather than separate switches, because search on your live site needs " \
+                "the files to be there. Your own documentation is always sent and searchable. " \
+                "Help links in the admin work at every setting — those read Roe's copy from the app."
         },
         "search.results_when_opened" => {
           type: :checkbox,
@@ -1384,6 +1392,10 @@ class Admin::ConfigsController < Admin::BaseController
     @deploy_secrets      = DeploySecrets.current
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
+    # Only asked when the CLI exists and Fly is the target: it's a network round
+    # trip to Fly's API, and asking without a `fly` binary would report "not
+    # signed in", sending someone to log in to a tool they haven't installed.
+    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     # Local SSH keys for the kamal.ssh picker. Kamal supports an array
@@ -1472,6 +1484,10 @@ class Admin::ConfigsController < Admin::BaseController
     @deploy_secrets      = DeploySecrets.current
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
+    # Only asked when the CLI exists and Fly is the target: it's a network round
+    # trip to Fly's API, and asking without a `fly` binary would report "not
+    # signed in", sending someone to log in to a tool they haven't installed.
+    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     render :edit_deploy, status: :unprocessable_entity
@@ -2110,6 +2126,14 @@ class Admin::ConfigsController < Admin::BaseController
         text: ("Paste your show's page URL on each platform. Leave any blank to hide it. The public RSS feed (and the private paid feed, if applicable) are added automatically.").html_safe
       }
     }
+  end
+
+  # The saved target, so the Fly session check only runs on a Fly site.
+  def fly_target?
+    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    (config["target"].presence || "kamal").to_s == "fly"
+  rescue StandardError
+    false
   end
 
   def build_field_hints_for_members

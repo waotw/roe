@@ -226,16 +226,14 @@ class ContentSync
     # this, every sync after a file change would create a duplicate.
     markdown_files = relative_paths.map { |path| RoeSitePaths.normalize(path) }
 
-    # Roe ships its own docs under documentation/roe. A site doesn't need them
-    # in its DB — and a production site definitely doesn't — unless it opts in
-    # via search.roe_docs, the same gate search and the static build use. Skip
-    # syncing them, and drop any left over from a previous opt-in so the index
-    # stays in step with what's searchable/publishable.
-    unless Documentation.include_roe_docs?
-      roe_prefix = File.join(Documentation.normalized_documentation_path, "roe", "")
-      markdown_files = markdown_files.reject { |path| path.start_with?(roe_prefix) }
-      purge_roe_documentation
-    end
+    # Every doc on disk is indexed, Roe's included.
+    #
+    # This used to skip documentation/roe and delete any rows already there
+    # whenever the docs setting was off. The files stayed on disk but the
+    # records didn't, so every /documentation/roe/… URL 404'd — including the
+    # help links in the admin, and with nothing in the setting's name to
+    # suggest it. Whether those files reach the live site is Site Sync's
+    # business now, and whether they're findable is search's.
 
     return if markdown_files.empty?
 
@@ -399,19 +397,6 @@ class ContentSync
         orphan.destroy
       end
     end
-  end
-
-  # Remove Roe docs (documentation/roe) previously synced under an opt-in.
-  # They're filtered out of the glob when search.roe_docs is off, so they'd
-  # never be re-seen to orphan; drop them explicitly instead (and precisely,
-  # rather than letting the fuzzy orphan-rename detector repoint them onto a
-  # user's doc of the same basename).
-  def purge_roe_documentation
-    roe_docs = Documentation.in_directory("roe")
-    return unless roe_docs.exists?
-
-    puts "🧹 Roe docs disabled (search.roe_docs) — removing #{roe_docs.count} from index"
-    roe_docs.destroy_all
   end
 
   def handle_orphaned_documentation(current_files)

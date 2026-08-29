@@ -19,6 +19,21 @@
           Started <%= time_ago_in_words(@deploy_status[:started_at]) %> ago
         </span>
       <% end %>
+      <%# The way out.
+          
+          DeployWatchdog turns an abandoned deploy into a failed one, which has
+          its own buttons, so this is the backstop for the case the watchdog
+          can't see: the queue is unreadable, or a deploy really is running and
+          the user wants to stop watching it. Without this the running state is
+          a dead end by construction — no dismiss here, and Start Deploy
+          refuses while one is in progress. That's how a user sat on this panel
+          for a day. %>
+      <%= button_to "Dismiss",
+                    admin_dismiss_deploy_path,
+                    method: :post,
+                    form_class: @deploy_status[:started_at] ? "" : "ml-auto",
+                    data: { turbo_confirm: "This clears the deploy from this page. It doesn't stop a deploy that's genuinely still running — check your terminal if you're unsure. Continue?" },
+                    class: "uppercase text-xs font-mono px-2 py-1 border border-amber-400 bg-white hover:bg-amber-100 text-amber-800 rounded-xs" %>
     </div>
     <p class="text-xs text-amber-800 mb-3">Please don't close this window. The page updates automatically.</p>
     <div class="bg-white border border-amber-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
@@ -79,7 +94,10 @@
           <p class="text-xs text-gray-700 font-sans mb-2"><%= sanitize issue[:explanation] %></p>
           <ol class="text-xs text-gray-700 font-sans list-decimal list-inside space-y-1">
             <% issue[:steps].each do |step| %>
-              <li><%= sanitize step, tags: %w[code pre strong em] %></li>
+              <%# `a` is allowed because these steps are developer-authored constants in
+                  DeployPreflight and DeployDiagnostics, never user input — and a step
+                  that says "see the troubleshooting page" is no use without the link. %>
+              <li><%= sanitize step, tags: %w[code pre strong em a], attributes: %w[href target rel] %></li>
             <% end %>
           </ol>
         </div>
@@ -92,7 +110,10 @@
         <p class="text-xs text-gray-700 font-sans mb-2"><%= sanitize diagnosis.explanation %></p>
         <ol class="text-xs text-gray-700 font-sans list-decimal list-inside space-y-1">
           <% diagnosis.steps.each do |step| %>
-            <li><%= sanitize step, tags: %w[code pre strong em] %></li>
+            <%# `a` is allowed because these steps are developer-authored constants in
+                  DeployPreflight and DeployDiagnostics, never user input — and a step
+                  that says "see the troubleshooting page" is no use without the link. %>
+              <li><%= sanitize step, tags: %w[code pre strong em a], attributes: %w[href target rel] %></li>
           <% end %>
         </ol>
       </div>

@@ -143,26 +143,60 @@ class Documentation < ApplicationRecord
     segments.length > 1 ? segments.first.presence : nil
   end
 
-  # Roe ships its own documentation under documentation/roe. On a user's site
-  # that's noise, so it's excluded from BOTH search and the static build by
-  # default; `search_roe_docs: true` opts it back in. One rule, two consumers
-  # (SearchIndexGenerator and StaticGenerator) — so "excluded from search"
-  # always means "not published to the static site."
-  def self.include_roe_docs?
-    value = SiteConfig.content("search.roe_docs")
-    value == true || value == "true"
+  # What happens to Roe's own documentation (documentation/roe) on a user's
+  # site. Roe ships 85 files most sites don't want to publish, so the default
+  # is to keep them out of the way.
+  #
+  # One dial rather than separate switches, because the three outcomes are
+  # nested and independent controls could be set to states that can't exist:
+  #
+  #   :local      not synced to live, not built, not searchable
+  #   :published  synced and built, but not in search
+  #   :searchable synced, built, and findable
+  #
+  # Search on live requires the files to be on live, so "searchable but not
+  # synced" is not a thing anyone can have. Naming that in the type stops it
+  # being a support question.
+  #
+  # None of this affects the admin: help links read Roe's docs from the copy
+  # inside the app (see BundledDocumentation), so they work at every setting.
+  ROE_DOCS_MODES = %w[local published searchable].freeze
+
+  def self.roe_docs_mode
+    value = SiteConfig.content("docs.roe").to_s.strip.downcase
+    return value if ROE_DOCS_MODES.include?(value)
+
+    # Legacy `search.roe_docs: true` meant "search and static build", which is
+    # this dial's top setting. Anything else — false, absent, unreadable —
+    # meant the default.
+    legacy = SiteConfig.content("search.roe_docs")
+    (legacy == true || legacy == "true") ? "searchable" : "local"
   end
 
-  # Published docs that should be exposed — to search and to the static site.
+  # Does documentation/roe travel to the live site, and get built into a
+  # static one? Site Sync and StaticGenerator both ask this.
+  def self.roe_docs_published? = roe_docs_mode != "local"
+
+  # …and is it findable once there?
+  def self.roe_docs_searchable? = roe_docs_mode == "searchable"
+
+  # Published docs that should be exposed to search.
   def self.publishable
-    return published if include_roe_docs?
+    return published if roe_docs_searchable?
     published.where("file_path NOT LIKE ?", "%/documentation/roe/%")
   end
 
-  # Should this doc be published (to search / the static site)? Roe's bundled
-  # docs (documentation/roe) are gated behind include_roe_docs?.
+  # Should this doc go into the static build? Follows the sync setting rather
+  # than the search one: a file that isn't on the live site can't be built
+  # into it, so "published" and "built" are the same question.
   def publishable?
     return true unless url_scope == "roe"
-    self.class.include_roe_docs?
+    self.class.roe_docs_published?
+  end
+
+  # Should this doc be indexed for search?
+  def searchable?
+    return true unless url_scope == "roe"
+    self.class.roe_docs_searchable?
   end
 end
