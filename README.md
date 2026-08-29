@@ -22,7 +22,7 @@ Full documentation, instructions and troubleshooting are at [go-roe.com/document
 
 Roe runs on **macOS**, **Linux**, and **Windows via WSL2**. To launch Roe you need:
 
-- **Ruby 3.2.2** — managed for you with [mise](https://mise.jdx.dev)
+- **Ruby 4.0.5** — managed for you with [mise](https://mise.jdx.dev)
 - **Git**
 - **A C compiler & build tools** (to install Ruby and gems)
   - macOS: Xcode Command Line Tools

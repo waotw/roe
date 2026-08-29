@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG RUBY_VERSION=3.2.2
+# Keep in step with .ruby-version. Nothing passes this in at build time —
+# DeployConfigGenerator sends only CACHE_BUST — so this literal decides what
+# production runs. A mismatch doesn't fail the build, it just deploys a
+# different Ruby than the one developed against, which is why it's called out
+# here rather than left to be noticed.
+ARG RUBY_VERSION=4.0.5
 FROM ruby:$RUBY_VERSION-slim AS base
 
 LABEL fly_launch_runtime="rails"

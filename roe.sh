@@ -848,7 +848,7 @@ install_mise() {
 # Runs from APP_DIR so rbenv/.ruby-version is honoured.
 check_ruby() {
     local required
-    required=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
     local req_major req_minor req_patch
     IFS='.' read -r req_major req_minor req_patch <<< "$required"
 
@@ -916,7 +916,7 @@ usage() {
 # tooling) is handled in the friendlier setup flow once Ruby is present.
 print_requirements_summary() {
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
 
     log_step "Checking what's already installed"
 
@@ -950,7 +950,7 @@ cmd_check() {
 
     local all_good=true
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
 
     print_requirements_summary
 
@@ -1110,7 +1110,7 @@ cmd_setup() {
     log_step "Checking Requirements"
 
     local all_good=true
-    check_ruby    || { log_error "Ruby $(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")+ required"; all_good=false; }
+    check_ruby    || { log_error "Ruby $(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")+ required"; all_good=false; }
     check_git     || { log_error "Git required"; all_good=false; }
     check_bundler || { log_error "Bundler required"; all_good=false; }
 
@@ -1515,7 +1515,7 @@ cmd_console() {
 
 cmd_status() {
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
 
     echo -e "${BOLD}Roe Status${NC}"
     echo "=============="

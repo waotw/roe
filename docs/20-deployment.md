@@ -327,7 +327,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2.2'
+          ruby-version: .ruby-version
           bundler-cache: true
       
       - name: Build Static Site
