@@ -1722,20 +1722,7 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     postmark = PostmarkConfig.current
-
-    # Not apply_live_keys: that writes `<field>_live`, which suits Stripe's
-    # paired secret_key_test / secret_key_live columns. Postmark is shaped
-    # differently — the test token lives in postmark.yml and the live one is
-    # the single encrypted `server_token` column — so there is no
-    # server_token_live= to call, and asking for one raised NoMethodError
-    # before anything could be saved. Hence "live keys don't save" while test
-    # keys, which take the file path, worked fine.
-    token = params.dig(:live, :server_token).to_s
-    if token.blank? || token == "•" * 16
-      flash[:notice] = "No change — the live token was left as it was."
-      redirect_to admin_edit_newsletters_config_path(tab: "live") and return
-    end
-    postmark.server_token = token
+    apply_live_keys(postmark, params[:live] || {}, %w[server_token])
 
     if postmark.save
       postmark.verify!

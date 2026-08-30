@@ -32,6 +32,30 @@ class PostmarkConfig < ApplicationRecord
     safe_encrypted_read(:server_token)
   end
 
+  # The admin's live-key UI addresses every field as `<schema key>_live` — the
+  # form input, the masking, and apply_live_keys all build that name. Postmark's
+  # column is `server_token`, which is Postmark's own term and worth keeping, so
+  # the model speaks the shared convention instead of the column being renamed
+  # or Postmark being special-cased in three separate places.
+  #
+  # Without these, the page saved nothing, showed an empty field where a saved
+  # token should read as bullets, and left Live Mode greyed out forever — all
+  # from the same missing name, and all silently.
+  def server_token_live
+    live_server_token
+  end
+
+  def server_token_live=(value)
+    self.server_token = value
+  end
+
+  # Whether Live Mode can be selected. StripeConfig has had this all along;
+  # PostmarkConfig never did, and the view's `respond_to?(:live_mode_ready?) &&`
+  # guard turned that into a permanently disabled radio button.
+  def live_mode_ready?
+    live_server_token.present?
+  end
+
   # Active token based on mode — live wins in production when live token present
   def server_token
     if mode_live? && live_server_token.present?

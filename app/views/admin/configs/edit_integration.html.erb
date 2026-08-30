@@ -320,9 +320,21 @@
             </p>
             <div class="space-y-4 pl-4 border-l-2 border-gray-200">
               <% live_section[:fields].each do |field_name, field_config| %>
-                <% current_value = integration_record&.public_send("#{field_name}_live").to_s rescue '' %>
+                <%# `rescue ''` used to wrap this read, so a model with no
+                    `<field>_live` reader rendered an empty box — indistinguishable
+                    from "nothing saved yet". That's how a saved Postmark token
+                    looked like a failed save. Name the problem instead. %>
+                <% reader  = "#{field_name}_live" %>
+                <% wired   = integration_record.respond_to?(reader) %>
+                <% current_value = wired ? integration_record.public_send(reader).to_s : "" %>
                 <% masked = current_value.present? %>
                 <div>
+                <% unless wired %>
+                  <p class="text-xs text-red-700 mb-1">
+                    <strong><%= integration_record.class.name %> has no <code><%= reader %></code>.</strong>
+                    This field can't show or save a value until the model provides it.
+                  </p>
+                <% end %>
                   <label class="block text-sm font-medium text-gray-700 mb-1">
                     <%= field_config[:label] %>
                   </label>

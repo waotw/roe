@@ -41,13 +41,48 @@ class PostmarkLiveTokenTest < ActionDispatch::IntegrationTest
     assert_equal "live-abc-123", PostmarkConfig.current.live_server_token
   end
 
+  # The admin addresses every live field as `<schema key>_live` — the form
+  # input, the masking, and apply_live_keys all build that name. Postmark's
+  # column is `server_token`, so the model has to answer to both.
+  test "the model answers to the name the admin uses" do
+    config = PostmarkConfig.current
+    config.update!(server_token: "live-abc-123")
+
+    assert_equal "live-abc-123", config.server_token_live
+    assert_equal "live-abc-123", config.live_server_token
+  end
+
+  # A saved token has to read back as bullets. Reading back blank looks exactly
+  # like a save that didn't happen, which is how this was reported.
+  test "a saved token shows as masked, not empty" do
+    PostmarkConfig.current.update!(server_token: "live-abc-123")
+
+    get admin_edit_newsletters_config_path(tab: "live")
+
+    assert_response :success
+    assert_select "input[name='live[server_token]'][value=?]", "•" * 16
+  end
+
+  # Live Mode stayed greyed out no matter what was saved: the view guards on
+  # respond_to?(:live_mode_ready?), and PostmarkConfig never defined it.
+  test "live mode becomes selectable once a token is saved" do
+    config = PostmarkConfig.current
+    assert_not config.live_mode_ready?, "precondition — no token yet"
+
+    config.update!(server_token: "live-abc-123")
+
+    assert config.live_mode_ready?
+  end
+
   # The mismatch that caused this should be loud where it happens, not a
   # NoMethodError surfacing inside a redirect.
-  test "apply_live_keys refuses a record without paired columns" do
+  test "apply_live_keys refuses a record without a live writer" do
     controller = Admin::ConfigsController.new
+    record = PostmarkConfig.current
+    record.singleton_class.undef_method(:server_token_live=)
 
     error = assert_raises(ArgumentError) do
-      controller.send(:apply_live_keys, PostmarkConfig.current, { "server_token" => "x" }, %w[server_token])
+      controller.send(:apply_live_keys, record, { "server_token" => "x" }, %w[server_token])
     end
 
     assert_match "server_token_live=", error.message
