@@ -1,4 +1,45 @@
 module AdminHelper
+  # Renders a settings field's hint as markdown.
+  #
+  # These are written in the schema (Admin::ConfigsController) and were being
+  # printed with `<%= %>`, so the HTML in them arrived on the page as visible
+  # source — `<strong>`, `<br>` and `<code>` shown literally rather than
+  # applied. Roe reads markdown everywhere else a person writes prose; a
+  # settings hint is prose too.
+  #
+  # Kramdown passes inline HTML straight through, so every hint written with
+  # tags keeps working exactly as it did — this only adds `**bold**`,
+  # `` `code` `` and `[links](/documentation/roe/...)` on top.
+  #
+  # Only inline markdown is available in practice: hints are Ruby strings
+  # joined with `\`, so kramdown sees one long line with no blank lines to
+  # break paragraphs on. `<br>` remains the way to force a break. A hint that
+  # genuinely needs a list wants a heredoc, or more likely wants to be a
+  # documentation link instead.
+  #
+  # Not every hint goes through here. edit_integration.html.erb prints hints
+  # both as text and as `placeholder="..."` attributes, and markdown in an
+  # attribute would put literal `<strong>` inside the input box — so that
+  # screen stays plain text throughout rather than splitting the two uses.
+  #
+  # Hints are app-defined rather than read from site.yml or a kit template, so
+  # sanitize isn't a trust boundary today. It's here so that stays safe if one
+  # ever does come from a file.
+  HINT_TAGS       = %w[strong em b i code a br span small].freeze
+  HINT_ATTRIBUTES = %w[href target rel title].freeze
+
+  def config_hint(text)
+    return nil if text.blank?
+
+    html = Kramdown::Document.new(text.to_s, input: "GFM").to_html.strip
+    # Kramdown wraps output in <p>, and these render inside a <p> already —
+    # nesting one in the other is invalid and browsers close the outer tag
+    # early, which breaks the styling. Same strip used for image captions.
+    html = html.gsub(%r{\A<p>(.*)</p>\z}m, '\1')
+
+    sanitize(html, tags: HINT_TAGS, attributes: HINT_ATTRIBUTES)
+  end
+
   def useful_links
     links = {}
 

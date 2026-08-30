@@ -12,40 +12,36 @@
     end
   end
 
-  # Flatten nested structures for easier form handling
+  # Flatten nested structures so a field named "docs.roe" can look up its
+  # current value, matching the dotted names the schema uses.
+  #
+  # This used to name each nestable key explicitly — fonts, theme,
+  # grouped_products, snipcart, search — and anything absent from that list
+  # fell through to the else branch and stayed a Hash. So a new nested setting
+  # rendered with no value: the select fell back to its "Select..." placeholder
+  # every time, including straight after a successful save, which reads exactly
+  # like the save being ignored. `docs.roe` was the one that hit it.
+  #
+  # formToYaml() below already splits dotted names generically when writing, so
+  # the allowlist meant reading and writing disagreed about which settings could
+  # nest. Doing the same thing generically here keeps them in step and means the
+  # next nested setting needs no change at all.
+  #
+  # Two levels covers everything in use (fonts.heading.family is the deepest).
+  # The unflattened key is kept alongside so anything reading a whole hash is
+  # unaffected.
   flattened_config = {}
 
   config_hash.each do |key, value|
-    if key == 'fonts' && value.is_a?(Hash)
-      # Fonts are 2 levels: fonts.heading.family
-      value.each do |role, role_data|
-        next unless role_data.is_a?(Hash)
-        role_data.each do |variant, variant_value|
-          flattened_config["fonts.#{role}.#{variant}"] = variant_value
-        end
+    flattened_config[key] = value
+    next unless value.is_a?(Hash)
+
+    value.each do |sub_key, sub_value|
+      if sub_value.is_a?(Hash)
+        sub_value.each { |leaf, leaf_value| flattened_config["#{key}.#{sub_key}.#{leaf}"] = leaf_value }
+      else
+        flattened_config["#{key}.#{sub_key}"] = sub_value
       end
-    elsif key == 'theme' && value.is_a?(Hash)
-      # Theme is 1 level: theme.active
-      value.each do |field, field_value|
-        flattened_config["theme.#{field}"] = field_value
-      end
-    elsif key == 'grouped_products' && value.is_a?(Hash)
-      # Grouped products is 1 level: grouped_products.button_text
-      value.each do |field, field_value|
-        flattened_config["grouped_products.#{field}"] = field_value
-      end
-    elsif key == 'snipcart' && value.is_a?(Hash)
-      # Snipcart settings are 1 level: snipcart.load_strategy
-      value.each do |field, field_value|
-        flattened_config["snipcart.#{field}"] = field_value
-      end
-    elsif key == 'search' && value.is_a?(Hash)
-      # Search is 1 level: search.all_pages, search.roe_docs, ...
-      value.each do |field, field_value|
-        flattened_config["search.#{field}"] = field_value
-      end
-    else
-      flattened_config[key] = value
     end
   end
 %>
@@ -745,7 +741,7 @@
                                 <% end %>
                                 <!-- Add hint text here ↓ -->
                                 <% if @field_hints&.key?(nested_field_key) %>
-                                  <p class="text-xs text-gray-500 mt-1"><%= @field_hints[nested_field_key] %></p>
+                                  <p class="text-xs text-gray-500 mt-1"><%= config_hint(@field_hints[nested_field_key]) %></p>
                                 <% end %>
                               </div>
                             <% end %>

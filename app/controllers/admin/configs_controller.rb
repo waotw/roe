@@ -259,16 +259,16 @@ class Admin::ConfigsController < Admin::BaseController
         },
         "docs.roe" => {
           type: :select,
-          label: "Roe's own documentation",
+          label: "Roe's documentation",
           options: [ "local", "published", "searchable" ],
-          hint: "What happens to Roe's 85 bundled docs (documentation/roe) on your site. " \
-                "<strong>local</strong> — kept on this computer, not sent to your live site. " \
-                "<strong>published</strong> — sent to your live site and built into a static one, " \
-                "but left out of your search results. " \
-                "<strong>searchable</strong> — sent, built, and findable in search.<br><br>" \
-                "One setting rather than separate switches, because search on your live site needs " \
-                "the files to be there. Your own documentation is always sent and searchable. " \
-                "Help links in the admin work at every setting — those read Roe's copy from the app."
+          # Matches Documentation.roe_docs_mode's fallback. Without it an unset
+          # setting shows the empty "Select..." option, which reads as "off"
+          # rather than as the default it actually is.
+          default: "local",
+          hint: "What happens to Roe's bundled documentation (documentation/roe) on your site.<br>" \
+                "**local (default)** — kept on this computer, not sent to your live site.<br>" \
+                "<strong>published</strong> — sent to your live site but left out of your search results.<br>" \
+                "<strong>searchable</strong> — sent to your live site and in search."
         },
         "search.results_when_opened" => {
           type: :checkbox,
