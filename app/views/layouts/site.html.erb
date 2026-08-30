@@ -155,6 +155,12 @@
               open-cart click handler to — without it the icon is inert.
               `snipcart-link` is kept only as a CSS styling hook
               (themes target it); it carries no behaviour on its own. %>
+          <%# Deliberately NOT data-turbo="false". Turbo ignores popstate events
+              whose state it didn't write (History#onPopState checks
+              `event.state.turbo`), so Snipcart's own routing never provokes a
+              visit. Opting the link out instead hands `href="#"` back to the
+              browser, which adds a history entry Snipcart didn't make — and
+              closing the cart then pops into it and re-opens. %>
           <a href="#" class="site-action snipcart-link snipcart-checkout" title="Cart" aria-label="Cart">
             <%= inline_system_svg("cart-icon.svg") || "Cart" %>
             <sup class="snipcart-items-count"></sup>
@@ -173,6 +179,20 @@
       <% snipcart = SnipcartConfig.current %>
 
       <% if snipcart.current_snippet.present? %>
+        <%# Snipcart's own container, rendered here rather than left to its
+            loader to append.
+
+            Snipcart appends this div to <body> itself, and Turbo Drive replaces
+            <body> on every navigation — so the cart's container was destroyed
+            on the first click through the site. Snipcart notices and says so:
+            "The #snipcart div was removed from the document."
+
+            Its loader does `document.querySelector("#snipcart")` and only
+            creates one when absent, so it adopts this element and sets its own
+            data attributes on it. data-turbo-permanent then carries the same
+            element across navigations instead of it being swapped out. %>
+        <div id="snipcart" hidden data-turbo-permanent></div>
+
         <%= snipcart.current_snippet_html %>
 
         <script nonce="<%= safe_csp_nonce %>">
@@ -180,6 +200,58 @@
           if (window.SnipcartSettings) {
             window.SnipcartSettings.currency = '<%= snipcart.currency.downcase %>';
           }
+        </script>
+
+        <script nonce="<%= safe_csp_nonce %>">
+          // Let Snipcart own the browser history while its cart is open.
+          //
+          // Snipcart runs Vue Router on the History API. Opening the cart pushes
+          // an entry of its own; closing it calls history.back(), which pops onto
+          // the entry Turbo wrote for this page. Turbo sees its own state there
+          // (History#onPopState checks event.state.turbo) and answers with a
+          // restoration visit — restoring a snapshot taken before Snipcart
+          // mounted. The body is replaced, #snipcart goes with it ("The #snipcart
+          // div was removed from the document"), Snipcart re-initialises and the
+          // cart re-opens with its close button bound to detached nodes.
+          //
+          // data-turbo-permanent isn't enough on its own: Turbo relocates
+          // permanent elements during a render, and a move still reads as a
+          // removal to Snipcart's observer.
+          //
+          // So detach Turbo's popstate listener for exactly as long as the cart
+          // is open. Everything else about Turbo stays on. The open state is read
+          // from the classes Snipcart puts on <html>, which the theme already
+          // uses to hide .site-actions behind the cart pane.
+          (function () {
+            var root = document.documentElement;
+            var OPEN = ["snipcart-cart--opened", "snipcart-sidecart--opened"];
+            var stopped = false;
+
+            function cartOpen() {
+              return OPEN.some(function (name) { return root.classList.contains(name); });
+            }
+
+            function sync() {
+              var history = window.Turbo && Turbo.session && Turbo.session.history;
+              // Turbo absent or restructured: leave history alone rather than throw.
+              if (!history || typeof history.stop !== "function") return;
+
+              if (cartOpen()) {
+                if (!stopped) { history.stop(); stopped = true; }
+              } else if (stopped) {
+                // On the next tick, so the popstate that closed the cart is done
+                // being handled before Turbo starts listening again. Re-attaching
+                // inside this callback would hand Turbo the very event we're
+                // shielding it from.
+                setTimeout(function () { history.start(); stopped = false; }, 0);
+              }
+            }
+
+            new MutationObserver(sync).observe(root, {
+              attributes: true,
+              attributeFilter: ["class"]
+            });
+          })();
         </script>
       <% end %>
     <% end %>

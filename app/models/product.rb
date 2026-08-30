@@ -162,7 +162,7 @@ class Product < ApplicationRecord
       "data-item-name" => title,
       "data-item-price" => price,
       "data-item-url" => url.presence || public_url,
-      "data-item-description" => description,
+      "data-item-description" => snipcart_description,
       "data-item-image" => image
     }
     attrs["data-item-quantity"] = quantity if quantity.present?
@@ -175,6 +175,40 @@ class Product < ApplicationRecord
     end
 
     attrs.compact.reject { |_, v| v.to_s.strip.empty? }
+  end
+
+  # The line a shopper reads against this item in the cart.
+  #
+  # Two problems with sending `description` straight through. Every variant in
+  # a group shares a title, so a cart holding three sizes of the same tee shows
+  # three identical rows with nothing to tell them apart — the size lives in
+  # `variant` and never reached Snipcart. And variant files are usually written
+  # with an empty description (the group's copy sits on the primary), so the
+  # attribute was dropped by the reject above and only the primary carried one.
+  #
+  # So: lead with this product's own variant, and fall back to the group's
+  # description when the variant doesn't set its own.
+  def snipcart_description
+    detail = description.presence || group_primary_description
+    [ variant.presence, detail.presence ].compact.join(" — ").presence
+  end
+
+  # The group's shared copy, which lives on whichever member is flagged
+  # primary. Memoized because a variant list asks every button for it.
+  #
+  # `primary` is matched in Ruby rather than SQL: it's stored as a real boolean
+  # or the string "true" depending on how the file was written, and json_extract
+  # would have to match both.
+  def group_primary_description
+    return @group_primary_description if defined?(@group_primary_description)
+
+    @group_primary_description =
+      if group.blank? || primary?
+        nil
+      else
+        self.class.where("json_extract(metadata, \'$.group\') = ?", group)
+            .find(&:primary?)&.description
+      end
   end
 
   def self.create_or_update_from_file(file_path)
