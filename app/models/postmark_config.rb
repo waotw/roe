@@ -91,6 +91,25 @@ class PostmarkConfig < ApplicationRecord
     update!(webhook_token: SecureRandom.hex(32))
   end
 
+  # Backfill the token on a record that never got one.
+  #
+  # generate_webhook_token is a before_create, so it only ever ran for records
+  # made after it was added. An install whose PostmarkConfig row predates it —
+  # PostmarkConfig.current is first_or_create!, so the row is made once and kept
+  # forever — has no token, and nothing regenerates it.
+  #
+  # The admin hides the whole Webhook URL section when the token is blank
+  # (the path is nil, so even the explanatory box is skipped), which reads as
+  # "this install doesn't do webhooks" rather than "something is missing". So
+  # repair it on the way in rather than waiting to be asked.
+  def ensure_webhook_token!
+    return webhook_token if safe_encrypted_read(:webhook_token).present?
+
+    regenerate_webhook_token!
+    Rails.logger.info "[PostmarkConfig] Backfilled a missing webhook token"
+    webhook_token
+  end
+
   # ── Test config file ─────────────────────────────────────────────────────
 
   def self.test_config

@@ -110,18 +110,27 @@
       until live keys are saved. Production-only for Stripe/Postmark; always
       available for Snipcart (public snippet, runs live locally + on static). %>
   <% if mode_selectable %>
+    <%# What "live" costs differs per integration, so say the real thing.
+        "no real charges" on the Postmark page described Stripe's stakes on a
+        screen that never takes a payment. %>
+    <%
+      test_consequence, live_consequence = case @config_type
+        when 'newsletters' then [ "no email delivered", "real email sent!" ]
+        else                    [ "no real charges",    "real charges!"    ]
+      end
+    %>
     <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
       <h3 class="text-base font-semibold text-gray-900 mb-3">Active Mode</h3>
       <p class="text-xs text-gray-500 mt-1">Here you change which mode you are in.<br>This allows you to use Test Mode on the live site before switching to Live Mode.</p>
       <%= form_with url: mode_update_path, method: :patch, class: "flex items-center gap-6" do |f| %>
         <label class="flex items-center gap-2">
           <%= f.radio_button :mode, "test", checked: integration_record.mode_test?, class: "form-radio" %>
-          <span class="text-sm">Test Mode (no real charges)</span>
+          <span class="text-sm">Test Mode (<%= test_consequence %>)</span>
         </label>
         <label class="flex items-center gap-2">
           <%= f.radio_button :mode, "live", checked: integration_record.mode_live?, disabled: !live_ready, class: "form-radio" %>
           <span class="text-sm <%= live_ready ? 'font-semibold text-red-600' : 'text-gray-400' %>">
-            Live Mode <%= live_ready ? '(real charges!)' : '(add live keys to enable)' %>
+            Live Mode <%= live_ready ? "(#{live_consequence})" : '(add live keys to enable)' %>
           </span>
         </label>
         <%= f.submit "Update Mode",
@@ -231,7 +240,7 @@
         wonder why the Live tab is greyed out. Skipped in production
         where the tab is interactive. %>
     <% unless is_production %>
-      <p class="text-sm pl-2 mb-2 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">DO NOT PUT LIVE KEYS IN TEXT MODE.</p>
+      <p class="text-sm pl-2 mb-2 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">DO NOT PUT LIVE KEYS IN TEST MODE.</p>
       <ul class="text-sm text-gray-500 italic mb-4 list-disc ml-4">
         <li>Test keys are stored as plain text in <code class="text-xs font-mono">site/system/integrations/<%= @config_type %>.yml</code>.</li>
         <li>Live keys are stored encrypted in the database.</li>

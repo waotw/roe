@@ -1679,6 +1679,9 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content   = File.read(path)
     @config_hash      = (YAML.load(@config_content) || {})["test"] || {}
     @postmark_config  = PostmarkConfig.current
+    # Older installs have a row from before generate_webhook_token existed, and
+    # without a token the Webhook URL section doesn't render at all.
+    @postmark_config.ensure_webhook_token!
     @postmark_config.verify! if @postmark_config.keys_present? && @postmark_config.verified_at.nil?
     @schema           = NEWSLETTERS_CONFIG_SCHEMA
     render :edit_integration
@@ -1719,7 +1722,20 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     postmark = PostmarkConfig.current
-    apply_live_keys(postmark, params[:live] || {}, %w[server_token])
+
+    # Not apply_live_keys: that writes `<field>_live`, which suits Stripe's
+    # paired secret_key_test / secret_key_live columns. Postmark is shaped
+    # differently — the test token lives in postmark.yml and the live one is
+    # the single encrypted `server_token` column — so there is no
+    # server_token_live= to call, and asking for one raised NoMethodError
+    # before anything could be saved. Hence "live keys don't save" while test
+    # keys, which take the file path, worked fine.
+    token = params.dig(:live, :server_token).to_s
+    if token.blank? || token == "•" * 16
+      flash[:notice] = "No change — the live token was left as it was."
+      redirect_to admin_edit_newsletters_config_path(tab: "live") and return
+    end
+    postmark.server_token = token
 
     if postmark.save
       postmark.verify!
@@ -1960,11 +1976,22 @@ class Admin::ConfigsController < Admin::BaseController
   # the bare field (e.g. "publishable_key"); the model attribute gets
   # "_live" appended. Skip masked placeholders so the user can save
   # the form without re-entering already-stored secrets.
+  # Writes `<field>_live` for integrations that keep test and live keys in
+  # paired columns (Stripe). An integration stored some other way doesn't
+  # belong here — say so plainly rather than raising NoMethodError from inside
+  # a redirect, where it reads as "the form didn't save".
   def apply_live_keys(record, params_hash, fields)
     fields.each do |field|
+      writer = "#{field}_live="
+      unless record.respond_to?(writer)
+        raise ArgumentError,
+          "#{record.class.name} has no #{writer} — it doesn't store live keys in " \
+          "paired columns, so it needs its own save path rather than apply_live_keys."
+      end
+
       value = params_hash[field]
       next if value.blank? || value == "•" * 16
-      record.public_send("#{field}_live=", value)
+      record.public_send(writer, value)
     end
   end
 
