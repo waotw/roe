@@ -140,7 +140,7 @@ class SnipcartConfig < ApplicationRecord
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
     existing = full_config
     existing["test"] = config_data
-    File.write(TEST_CONFIG_PATH, existing.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(TEST_CONFIG_PATH, existing.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   def self.save_live_snippet(snippet)
@@ -148,7 +148,7 @@ class SnipcartConfig < ApplicationRecord
     existing = full_config
     existing["live"] ||= {}
     existing["live"]["snippet"] = snippet
-    File.write(TEST_CONFIG_PATH, existing.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(TEST_CONFIG_PATH, existing.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   def self.clear_test_config

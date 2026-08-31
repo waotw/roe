@@ -42,6 +42,18 @@ class Admin::SiteSyncController < Admin::BaseController
     peer_fp         = @peer_state&.dig(:fingerprint)
     @in_sync_with_peer = local_fp.present? && peer_fp.present? && local_fp == peer_fp
 
+    # The fingerprint covers size + mtime, so a file with identical bytes and a
+    # different timestamp reads as a difference — and warns about drift that
+    # a sync then can't clear, because there's nothing to transfer. When the
+    # cheap check disagrees, confirm the bytes before believing it. Only the
+    # differing paths get hashed, and only in the already-failing case; the
+    # in-sync path is untouched.
+    @peer_agreement = nil
+    unless @in_sync_with_peer
+      @peer_agreement = SiteSync::PeerAgreement.verify(local_fingerprint: local_fp, peer_fingerprint: peer_fp)
+      @in_sync_with_peer = true if @peer_agreement&.in_sync
+    end
+
     # First sync: no shared baseline has ever been written (.sync-state.json
     # absent), the peer is reachable, and the two sides aren't already
     # identical. Without a common ancestor, a normal reconcile would flag every

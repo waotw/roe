@@ -709,7 +709,7 @@ class Admin::ConfigsController < Admin::BaseController
     }
 
     FileUtils.mkdir_p(File.dirname(SiteConfig::CUSTOM_CODE_FILE))
-    File.write(SiteConfig::CUSTOM_CODE_FILE, config.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(SiteConfig::CUSTOM_CODE_FILE, config.to_yaml.sub(/\A---\s*\n/, ""))
     SiteConfig.sync_from_file("custom_code")
     Rails.cache.clear
 
@@ -723,7 +723,7 @@ class Admin::ConfigsController < Admin::BaseController
   def new_feeds_setup
     unless File.exist?(FeedConfig::FILE)
       FileUtils.mkdir_p(File.dirname(FeedConfig::FILE))
-      File.write(FeedConfig::FILE, <<~YAML)
+      SiteFile.write(FeedConfig::FILE, <<~YAML)
         articles:
           title: Articles
           source: posts
@@ -759,7 +759,7 @@ class Admin::ConfigsController < Admin::BaseController
       return render(:edit_feeds, status: :unprocessable_entity)
     end
 
-    File.write(FeedConfig::FILE, content)
+    SiteFile.write(FeedConfig::FILE, content)
     SiteConfig.sync_from_file("features/feeds")
     flash[:notice] = "Feeds saved."
     redirect_to admin_configs_path
@@ -846,7 +846,7 @@ class Admin::ConfigsController < Admin::BaseController
 
     path = SiteConfig.file_path_for(@raw_type)
     FileUtils.mkdir_p(File.dirname(path))
-    File.write(path, content)
+    SiteFile.write(path, content)
     SiteConfig.sync_from_file(@raw_type)
     redirect_to structured_edit_path(@raw_type), notice: "Saved. The settings form should open now."
   rescue Psych::SyntaxError => e
@@ -1226,7 +1226,7 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path,
                   notice: "Removed “#{title || key}”#{drafts_note}. That was the last podcast, so podcasts are now disabled."
     else
-      File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
+      SiteFile.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
       # sync, not just reload: removing a show drops the audience its episodes
       # were inheriting, so their files have to be re-resolved.
       SiteConfig.sync_from_file("features/podcast")
@@ -1254,7 +1254,7 @@ class Admin::ConfigsController < Admin::BaseController
     end
     config[key] = PodcastConfig.default_entry
 
-    File.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
     SiteConfig.sync_from_file("features/podcast")
     redirect_to admin_edit_podcast_config_path(tab: key),
                 notice: "Added a new podcast (“#{key}”). Rename its key and fill in the details below."
@@ -1527,7 +1527,7 @@ class Admin::ConfigsController < Admin::BaseController
       existing["dev_host"] = dev_host
     end
 
-    File.write(SiteConfig::DEVELOPMENT_FILE, existing.to_yaml)
+    SiteFile.write(SiteConfig::DEVELOPMENT_FILE, existing.to_yaml)
     SiteConfig.sync_from_file("development")
 
     flash[:notice] = "Development configuration updated successfully"
@@ -1565,7 +1565,7 @@ class Admin::ConfigsController < Admin::BaseController
       # purposes). Commented out by default; most setups don't need
       # it because the allowed_hosts fallback works.
       FileUtils.mkdir_p(SiteConfig::DEVELOPMENT_FILE.dirname)
-      File.write(SiteConfig::DEVELOPMENT_FILE, <<~YAML)
+      SiteFile.write(SiteConfig::DEVELOPMENT_FILE, <<~YAML)
         allowed_hosts:
           - your-site.ngrok-free.app
 
@@ -1846,7 +1846,7 @@ class Admin::ConfigsController < Admin::BaseController
   # so generated ones shouldn't either — purely stylistic, but keeps
   # diffs clean across the codebase.
   def write_yaml(path, data)
-    File.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   # Extract just the canonical podcast fields from form params,
@@ -1878,7 +1878,7 @@ class Admin::ConfigsController < Admin::BaseController
       lines << format_yaml_field(field, value, indent: 1)
     end
 
-    File.write(path, lines.join("\n") + "\n")
+    SiteFile.write(path, lines.join("\n") + "\n")
   end
 
   # Draft podcast episodes belonging to a given show (never published ones).
@@ -2189,7 +2189,7 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     # Write to file
-    File.write(file_path, content)
+    SiteFile.write(file_path, content)
 
     # Sync to database and clear cache
     SiteConfig.sync_from_file(type)
@@ -2247,7 +2247,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def write_music_config(config)
-    File.write(ReleaseConfig::FILE, config.to_yaml.sub(/\A---\n/, ""))
+    SiteFile.write(ReleaseConfig::FILE, config.to_yaml.sub(/\A---\n/, ""))
     SiteConfig.sync_from_file("features/music")
   end
 
@@ -2284,7 +2284,7 @@ class Admin::ConfigsController < Admin::BaseController
       return render(:edit_music, status: :unprocessable_entity)
     end
 
-    File.write(ReleaseConfig::FILE, content)
+    SiteFile.write(ReleaseConfig::FILE, content)
     SiteConfig.sync_from_file("features/music")
     flash[:notice] = "Music saved."
     redirect_to admin_configs_path
