@@ -4,7 +4,20 @@ module HasMetadata
   included do
     before_save :ensure_url_name_in_metadata
 
-    # Status scopes
+    # Status scopes.
+    #
+    # A missing status counts as a draft, matching #status below — the reader
+    # has always defaulted to "draft" while these matched the raw JSON, so an
+    # item with no status belonged to no scope at all. It went missing from
+    # every total, and #status called it a draft while `drafts` didn't contain
+    # it. Two answers to the same question.
+    #
+    # Draft is the safe direction: an item nobody gave a status to shouldn't be
+    # public. That's already how it behaves when served —
+    # SiteController#check_draft_access! refuses anything not published or
+    # unlisted — so this brings the queries in line with what the app does.
+    DRAFT_SQL = "COALESCE(NULLIF(json_extract(metadata, '$.status'), ''), 'draft')".freeze
+
     scope :published, -> {
       where("json_extract(metadata, '$.status') = ?", "published")
     }
@@ -14,11 +27,11 @@ module HasMetadata
     }
 
     scope :drafts, -> {
-      where("json_extract(metadata, '$.status') = ?", "draft")
+      where("#{DRAFT_SQL} = ?", "draft")
     }
 
     scope :not_draft, -> {
-      where("json_extract(metadata, '$.status') != ?", "draft")
+      where("#{DRAFT_SQL} != ?", "draft")
     }
 
     scope :public_items, -> {

@@ -1,9 +1,15 @@
 class Admin::DashboardController < Admin::BaseController
   def index
-    @posts_count = Post.count
-    @published_posts_count = Post.published.count
-    @draft_posts_count = Post.drafts.count
-    @pages_count = Page.count
+    @content_blocks = content_blocks
+
+    # Backups: recorded when they change, not walked on every page load —
+    # see SiteSync::BackupStats.
+    @backup_stats  = SiteSync::BackupStats.current
+    @database_size = database_bytes
+
+    # Pages Roe installed that lost their status and now 404 for logged-out
+    # visitors. Surfaced rather than repaired silently — see PageStatusRepair.
+    @pages_needing_status = PageStatusRepair.count
 
     return unless SiteFeature.payments_enabled?
 
@@ -49,5 +55,70 @@ class Admin::DashboardController < Admin::BaseController
     stripe_base = test_mode ? "https://dashboard.stripe.com/test" : "https://dashboard.stripe.com"
     @stripe_refunds_url = "#{stripe_base}/payments?status%5B0%5D=refunded"
     @stripe_disputes_url = "#{stripe_base}/disputes"
+  end
+
+  private
+
+  # Published / Unlisted / Drafts, plus anything belonging to none of them.
+  #
+  # The status scopes match the raw JSON exactly, while #status defaults a
+  # missing value to "draft" — so a page with no status is in no scope at all
+  # and used to vanish from the totals. Counting the remainder means the
+  # column always adds up to Total, and an odd one is visible rather than lost.
+  # One block per thing worth counting separately.
+  #
+  # Posts is scoped to articles whenever a type has its own block, so the grid
+  # partitions rather than double-counting — an episode shouldn't be in both
+  # Posts and Episodes. Episodes, Tracks and Products only appear when there's
+  # something in them, so a blog stays a two-block grid.
+  def content_blocks
+    blocks = []
+
+    typed = [
+      [ "Episodes", "podcast", ->(s) { admin_posts_path(type: "podcast", status: s) } ],
+      [ "Tracks",   "music",   ->(s) { admin_posts_path(type: "music",   status: s) } ]
+    ].select { |_label, type, _path| Post.by_type(type).any? }
+
+    posts_scope = typed.any? ? Post.by_type("article") : Post.all
+    posts_label = typed.any? ? "Articles" : "Posts"
+    posts_filter = typed.any? ?
+      ->(s) { admin_posts_path(type: "article", status: s) } :
+      ->(s) { admin_posts_path(status: s) }
+
+    blocks << block(posts_label, posts_scope, admin_posts_path, posts_filter)
+
+    typed.each do |label, type, filter|
+      blocks << block(label, Post.by_type(type), admin_posts_path(type: type), filter)
+    end
+
+    blocks << block("Pages", Page.all, admin_pages_path, ->(_s) { admin_pages_path })
+    blocks << block("Products", Product.all, admin_products_path, ->(_s) { admin_products_path }) if Product.any?
+
+    blocks
+  end
+
+  def block(label, scope, index_path, filter_path)
+    { label: label, index_path: index_path, filter_path: filter_path, stats: content_breakdown(scope) }
+  end
+
+  def content_breakdown(model)
+    published = model.published.count
+    unlisted  = model.unlisted.count
+    drafts    = model.drafts.count
+    total     = model.count
+
+    {
+      published: published,
+      unlisted:  unlisted,
+      drafts:    drafts,
+      unset:     total - published - unlisted - drafts,
+      total:     total
+    }
+  end
+
+  def database_bytes
+    File.size(ActiveRecord::Base.connection_db_config.database)
+  rescue StandardError
+    nil
   end
 end

@@ -303,6 +303,20 @@ class Admin::PagesController < Admin::BaseController
   #   render template: 'pages/show', layout: 'site'
   # end
 
+  # Sets the status Roe ships on pages that lost theirs. Narrow by design —
+  # see PageStatusRepair. Surfaced from the dashboard rather than run on boot,
+  # so nobody's files change without them asking.
+  def repair_statuses
+    repaired = PageStatusRepair.repair!
+
+    flash[:notice] = if repaired.any?
+      "Repaired #{helpers.pluralize(repaired.size, 'page')}. They're reachable again."
+    else
+      "Nothing to repair — every page Roe installed has a status."
+    end
+    redirect_to admin_root_path
+  end
+
   private
 
   # Pages sorted for the index: by layout/navigation.md order when that file

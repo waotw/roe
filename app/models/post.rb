@@ -779,22 +779,17 @@ class Post < ApplicationRecord
     published_to_newsletter? || published_to_both?
   end
 
-  # Class methods for filtering by type
-  def self.articles
-    where("json_extract(metadata, '$.type') = ?", "article")
-  end
-
-  def self.music
-    where("json_extract(metadata, '$.type') = ?", "music")
-  end
-
-  def self.podcasts
-    where("json_extract(metadata, '$.type') = ?", "podcast")
-  end
-
-  def self.images
-    where("json_extract(metadata, '$.type') = ?", "image")
-  end
+  # Class methods for filtering by type.
+  #
+  # These queried `$.type` for years; the key is `$.post_type`, so every one of
+  # them returned nothing. Nothing called them, which is why it went unnoticed
+  # — a helper that silently returns an empty set is indistinguishable from a
+  # site with no podcasts. Delegating to by_type keeps one definition of where
+  # the type lives.
+  def self.articles = by_type("article")
+  def self.music    = by_type("music")
+  def self.podcasts = by_type("podcast")
+  def self.images   = by_type("image")
 
   # Class methods for filtering by status
   def self.unlisted

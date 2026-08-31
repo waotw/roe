@@ -193,12 +193,22 @@ module SiteSync
 
       def prune!
         snapshots = list
-        return if snapshots.size <= BACKUP_RETENTION
 
-        snapshots[BACKUP_RETENTION..].each do |s|
-          FileUtils.rm_rf(s[:path])
-          Rails.logger.info "[SiteSync::BackupManager] Pruned old snapshot: #{s[:name]}"
+        if snapshots.size > BACKUP_RETENTION
+          snapshots[BACKUP_RETENTION..].each do |s|
+            FileUtils.rm_rf(s[:path])
+            Rails.logger.info "[SiteSync::BackupManager] Pruned old snapshot: #{s[:name]}"
+          end
         end
+
+        # Recorded here rather than computed when the dashboard renders — the
+        # size needs a walk of every file under backups/ to deduplicate hard
+        # links, which isn't a page-load cost. This is the single point where
+        # the set of backups changes: `create` calls it, and pruning is the
+        # only thing that removes one. Deliberately outside the guard above so
+        # a create that didn't prune still updates, and both numbers are
+        # recomputed together so a count and a size can't disagree.
+        BackupStats.refresh!
       end
 
       # ── Encrypted database restore ──────────────────────────────────────
