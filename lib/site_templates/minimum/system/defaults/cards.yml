@@ -1,6 +1,6 @@
 post-link:
-  default_image: ""
+  default_image: ''
   default_style: small
-  default_link_text: "Read full story →"
+  default_link_text: Read full story →
 pullquote:
-  default_position: "center"
+  default_position: center

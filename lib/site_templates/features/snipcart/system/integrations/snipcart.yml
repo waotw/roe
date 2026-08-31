@@ -2,7 +2,7 @@ test:
   snippet: |
     <!-- Snipcart Test Mode -->
     <script src="https://cdn.snipcart.com/themes/v3.7.2/default/snipcart.js"></script>
-  secret_key: ""
+  secret_key: ''
 live:
   snippet: |
     <!-- Snipcart Live Mode -->
