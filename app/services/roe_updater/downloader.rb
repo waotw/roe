@@ -8,11 +8,9 @@ module RoeUpdater
       def download_version(version, status_record)
         cleanup_staging
 
-        # Single source of truth for the repo location lives on
-        # VersionChecker so the download host stays in sync with the
-        # update-check host. If we ever move providers again, one
-        # constant changes and both paths follow.
-        git_url = "https://codeberg.org/#{RoeUpdater::VersionChecker::CODEBERG_REPO}"
+        # Same source as the update check, so the host a version was found on
+        # is the host it's downloaded from.
+        git_url = RoeUpdater::Forge.https_url
 
         status_record.update!(
           current_step: "Downloading Roe #{version}...",

@@ -1,6 +1,8 @@
 module RoeUpdater
   class VersionChecker
-    CODEBERG_REPO = "waotw/roe"
+    # Kept as an alias so anything still referencing it resolves to the
+    # configured forge rather than a second, drifting copy of the answer.
+    CODEBERG_REPO = RoeUpdater::Forge::DEFAULT_REPO
     CACHE_KEY = "roe_latest_version"
     CACHE_TTL = 1.hour
     # Persistent flag — no TTL. Set by CheckForUpdatesJob when an update
@@ -146,7 +148,7 @@ module RoeUpdater
         }.compact
 
         # Try HTTPS first (works for public repos without auth)
-        https_url = "https://codeberg.org/#{CODEBERG_REPO}"
+        https_url = RoeUpdater::Forge.https_url
 
         begin
           stdout, stderr, status = nil, nil, nil
@@ -162,7 +164,7 @@ module RoeUpdater
         end
 
         # HTTPS failed (private repo or timeout), try SSH
-        ssh_url = "git@codeberg.org:#{CODEBERG_REPO}.git"
+        ssh_url = RoeUpdater::Forge.ssh_url
 
         begin
           output, status = nil, nil
@@ -253,7 +255,7 @@ module RoeUpdater
         release = fetch_release_metadata(original) || {}
         {
           version:      version,
-          url:          release[:html_url] || "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{original}",
+          url:          release[:html_url] || RoeUpdater::Forge.release_page_url(original),
           notes:        build_summary(release[:name], release[:body]),
           published_at: release[:published_at] || Time.now.iso8601
         }
@@ -275,7 +277,7 @@ module RoeUpdater
         require "net/http"
         require "json"
 
-        url = URI("https://codeberg.org/api/v1/repos/#{CODEBERG_REPO}/releases/tags/#{tag}")
+        url = URI(RoeUpdater::Forge.api_release_url(tag))
 
         response = nil
         Timeout.timeout(5) do
@@ -406,7 +408,7 @@ module RoeUpdater
       def mock_release
         {
           version: "0.2.0",
-          url: "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/v0.2.0",
+          url: RoeUpdater::Forge.release_page_url("v0.2.0"),
           notes: "## What's New\n\n- Feature A\n- Feature B\n- Bug fixes\n\nView full changelog on Codeberg.",
           published_at: Time.now.iso8601
         }
