@@ -140,6 +140,14 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
   # shown regardless of post_type). Deriving it would mean touching the editor
   # JS, so pin it instead.
   test "the controller's coreFieldNames all exist in the post schema" do
+    # show_sidebar is only in the schema when a sidebar exists, so compare
+    # against the schema at its fullest — otherwise this fails on a site
+    # without one, for a field that's correctly listed.
+    sidebar = Sidebar.path
+    FileUtils.mkdir_p(File.dirname(sidebar))
+    had_sidebar = File.exist?(sidebar)
+    File.write(sidebar, "---\nscope: all\n---\n\nSidebar\n") unless had_sidebar
+
     js = File.read(Rails.root.join("app/javascript/controllers/metadata_editor_controller.js"))
     listed = js[/coreFieldNames\s*=\s*\[(.*?)\]/m, 1].to_s.scan(/"([^"]+)"/).flatten
     assert listed.any?, "could not parse coreFieldNames out of the controller"
@@ -148,6 +156,8 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
     listed.each do |name|
       assert_includes known, name, "coreFieldNames lists `#{name}`, which the schema doesn't define"
     end
+  ensure
+    FileUtils.rm_f(sidebar) if sidebar && !had_sidebar
   end
 
   # ContentTemplate::REQUIRED drives what new files get; it carries default

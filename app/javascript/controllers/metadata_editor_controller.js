@@ -257,13 +257,25 @@ export default class extends Controller {
     row.className = "metadata-field-row flex items-start gap-2";
     row.dataset.fieldName = fieldName;
 
-    // Use default author if adding author field
+    // What a field starts as when added from the menu.
+    //
+    // A field carrying its own `default` wins — show_sidebar sets one per
+    // resource type, because adding it only ever means "do the opposite of
+    // what the scope already does".
+    //
+    // Otherwise a checkbox starts ticked: adding `image_in_header` and leaving
+    // it unticked writes what not adding it would have written, so the click
+    // would accomplish nothing. Reaching for a field is a statement of intent.
     const defaultValue =
       initialValue !== null
         ? initialValue
         : fieldName === "author" && config.default_from_config
           ? this.defaultAuthorValue
-          : "";
+          : config.default !== undefined && config.default !== null
+            ? config.default
+            : config.type === "checkbox"
+              ? "true"
+              : "";
 
     const inputHtml = this.buildInputHtml(fieldName, config, defaultValue);
 
@@ -276,11 +288,25 @@ export default class extends Controller {
           ×
         </button>`;
 
+    // Field and note share one column, mirroring the ERB partial — the note
+    // then lines up with the field without anything having to reproduce the
+    // label's width. A row built here used to be flat, so a field added from
+    // the menu rendered without its note while the same field rendered on page
+    // load had one.
+    const noteHtml = config.note
+      ? `<p class="text-xs text-gray-500 mt-1 mb-0.5">${config.note}</p>`
+      : "";
+
     row.innerHTML = `
       <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label flex-shrink-0 pt-1.5">
         ${config.label}:
       </label>
-      ${inputHtml}
+      <div class="flex-1 min-w-0">
+        <div class="flex ${config.type === "checkbox" ? "items-center" : "items-start"} gap-2">
+          ${inputHtml}
+        </div>
+        ${noteHtml}
+      </div>
       ${deleteButton}
     `;
 

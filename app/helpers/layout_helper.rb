@@ -24,35 +24,39 @@ module LayoutHelper
     ""
   end
 
-  # Check if sidebar should be shown for current content
+  # Whether the sidebar shows for what's being rendered now.
+  #
+  # The file always wins. Without a setting, Sidebar's scope decides — so the
+  # field only ever exists to say the opposite of what the scope already does:
+  # `false` on a page the scope covers, `true` on a post it doesn't.
+  #
+  # `true` used to do nothing. Only `false` was handled, so the editor offered
+  # a choice with no effect, and a sidebar scoped to pages couldn't be turned
+  # on for one post.
   def show_sidebar?
-    return false unless File.exist?(sidebar_file_path)
+    return false unless Sidebar.exists?
 
-    # Check post/page metadata for override
-    content = @post || @page || @doc
+    content = @post || @page || @doc || @product
     if content.respond_to?(:metadata)
-      # If show_sidebar is explicitly false, hide it
-      return false if content.metadata["show_sidebar"] == false
+      # The metadata editor writes strings ("false"), so comparing to a boolean
+      # missed every setting made through the admin.
+      case content.metadata["show_sidebar"].to_s
+      when "true"  then return true
+      when "false" then return false
+      end
     end
 
-    # Check sidebar scope from frontmatter
-    scope = sidebar_scope
-    return true if scope.include?("all")
+    Sidebar.covers?(current_content_type)
+  end
 
-    # Determine current content type
-    current_type = if @post
-      "posts"
-    elsif @page
-      "pages"
-    elsif @doc
-      "documentation"
-    elsif @product
-      "products"
-    else
-      "unknown"
-    end
+  # Which of Sidebar::TYPES is being rendered.
+  def current_content_type
+    return "posts" if @post
+    return "pages" if @page
+    return "documentation" if @doc
+    return "products" if @product
 
-    scope.include?(current_type)
+    "unknown"
   end
 
   # Get sidebar position from frontmatter (default: left)
@@ -88,20 +92,7 @@ module LayoutHelper
   # Supports: 'all', 'pages', 'posts', 'products', 'documentation'
   # Can be a single value or array: 'pages, posts' or ['pages', 'posts']
   def sidebar_scope
-    return @sidebar_scope if defined?(@sidebar_scope)
-
-    scope_value = parse_sidebar_frontmatter["scope"] || "all"
-
-    # Handle both string and array inputs
-    @sidebar_scope = case scope_value
-    when String
-      # Split by comma and clean up whitespace
-      scope_value.split(",").map(&:strip)
-    when Array
-      scope_value
-    else
-      [ "all" ]
-    end
+    @sidebar_scope ||= Sidebar.scope
   end
 
   # Render sidebar with proper positioning class

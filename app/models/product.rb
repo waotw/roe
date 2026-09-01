@@ -121,6 +121,22 @@ class Product < ApplicationRecord
     metadata["digital"] == true || metadata["digital"] == "true"
   end
 
+  # Shipping weight in whole grams, as Snipcart requires: "The weight in grams
+  # of the product. Mandatory if you use any integrated shipping provider we
+  # support" — integers only, no decimals.
+  #
+  # Rounded rather than passed through, because a decimal is dropped silently
+  # by Snipcart and a shop owner would only find out from a wrong postage
+  # quote. Zero and negatives are treated as absent for the same reason: a
+  # weight of 0 quotes free shipping rather than refusing to quote.
+  def weight
+    raw = metadata["weight"].to_s.strip
+    return nil if raw.blank?
+
+    grams = raw.to_f.round
+    grams.positive? ? grams : nil
+  end
+
   def file_guid
     metadata["file_guid"].to_s.strip.presence
   end
@@ -166,6 +182,11 @@ class Product < ApplicationRecord
       "data-item-image" => image
     }
     attrs["data-item-quantity"] = quantity if quantity.present?
+
+    # Snipcart can't quote postage without this, and ignores it on anything
+    # non-shippable — so it's sent whenever it's set rather than being gated on
+    # the digital flag.
+    attrs["data-item-weight"] = weight if weight.present?
 
     # A digital good isn't posted, so shipping comes out of the cart. Without
     # this the buyer is asked for an address to deliver a download to.

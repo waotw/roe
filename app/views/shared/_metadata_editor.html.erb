@@ -52,6 +52,9 @@
   # the digital-product controller adds and removes that row as the box is
   # ticked, so the two can't end up in the file without each other.
   if resource_type == 'product'
+    # Shipping can't be quoted without a weight, and a field you have to know
+    # to add from a menu is a field most shops won't have.
+    metadata_hash['weight'] = '' unless metadata_hash.key?('weight')
     metadata_hash['digital'] = 'false' unless metadata_hash.key?('digital')
     digital_on = metadata_hash['digital'] == true || metadata_hash['digital'] == 'true'
     if digital_on
@@ -70,7 +73,11 @@
 
   # Separate what's in the file vs what's available
   existing_fields = metadata_hash.keys
-  available_known_fields = known_fields_config.keys - existing_fields
+  # `available: false` keeps a field out of the Add Field menu while leaving it
+  # known — show_sidebar uses it on a site with no sidebar, so an existing value
+  # still renders as its proper control instead of dropping to a custom field.
+  available_known_fields = (known_fields_config.keys - existing_fields)
+                             .reject { |name| known_fields_config[name][:available] == false }
   custom_fields = metadata_hash.reject { |k, v| known_fields_config.key?(k) }
 
   # Fields that reference media files on disk. Used to attach the
@@ -185,6 +192,12 @@
             <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 <%= 'pt-1.5' unless checkbox_row %>">
               <%= config[:label] %>:<% if config[:required] %><span class="text-red-600 relative -top-0.5"><sup>*</sup></span><% end %>
             </label>
+            <%# Field and note share one column, so the note lines up with the
+                field by construction. It used to be a separate row indented by
+                a spacer that copied the label's width — two rules that had to
+                agree, and didn't. %>
+            <div class="flex-1 min-w-0">
+              <div class="flex <%= checkbox_row ? 'items-center' : 'items-start' %> gap-2">
             <% case config[:type] %>
               <% when :text %>
                 <%
@@ -323,15 +336,22 @@
                          data-unique-field-target="warning"><% if unique_conflicts[field_name] %>⚠ Already used by “<%= unique_conflicts[field_name] %>”.<% end %></p>
                     </div>
                   <% else %>
-                  <!-- Regular text input -->
-                    <input type="text"
-                            id="metadata-field-<%= field_name %>"
-                            name="metadata_fields[<%= field_name %>]"
-                            value="<%= ERB::Util.html_escape(display_value) %>"
-                            class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'bg-gray-200 text-gray-600' if config[:readonly] %>"
-                            data-metadata-field="<%= field_name %>"
-                            <% if config[:readonly] %>readonly<% end %>
-                            <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                  <!-- Regular text input. `suffix` puts a unit after the field
+                       (weight: [ 500 ] grams) rather than inside the label,
+                       which sets the width of the label column for every row. -->
+                    <div class="flex-1 flex items-center gap-2">
+                      <input type="text"
+                              id="metadata-field-<%= field_name %>"
+                              name="metadata_fields[<%= field_name %>]"
+                              value="<%= ERB::Util.html_escape(display_value) %>"
+                              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'bg-gray-200 text-gray-600' if config[:readonly] %>"
+                              data-metadata-field="<%= field_name %>"
+                              <% if config[:readonly] %>readonly<% end %>
+                              <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <% if config[:suffix] %>
+                        <span class="font-mono text-xs text-gray-500 shrink-0"><%= config[:suffix] %></span>
+                      <% end %>
+                    </div>
                   <% end %>
             <% when :date %>
               <input type="date"
@@ -389,6 +409,15 @@
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="<%= field_name %>"><%= ERB::Util.html_escape(value.to_s) %></textarea>
               <% end %>
+              </div>
+              <%# In small text under the field, rather than riding in the
+                  placeholder — a placeholder long enough to explain something
+                  is wider than the field, and it vanishes the moment you start
+                  typing, which is when you most want it. %>
+              <% if config[:note] %>
+                <p class="text-xs text-gray-500 mt-1 mb-0.5"><%= config[:note] %></p>
+              <% end %>
+            </div>
               <% if !config[:required] %>
                 <button type="button"
                       data-action="click->metadata-editor#removeMetadataField"

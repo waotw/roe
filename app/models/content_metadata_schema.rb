@@ -62,11 +62,53 @@ module ContentMetadataSchema
   def self.fields_for(resource_type, metadata: {})
     metadata = {} unless metadata.is_a?(Hash)
 
-    case resource_type.to_s
+    base = case resource_type.to_s
     when "post"    then post_fields(metadata)
     when "product" then product_fields
     else                pages_fields
     end
+
+    # Each list carries a placeholder entry so this merge replaces it in place.
+    # Hash#merge keeps an existing key's position, and that position is the
+    # order the editor writes frontmatter in — appending would have shuffled
+    # show_sidebar to the end of every file that has it on the next save, which
+    # is a real content change and Site Sync drift nobody asked for.
+    base.merge(sidebar_field(resource_type))
+  end
+
+  # The `show_sidebar` field, or nothing when there's no sidebar to talk about.
+  #
+  # Defaults to the opposite of what the scope already does, because that's the
+  # only reason to add it: if the sidebar already covers pages, adding the field
+  # to a page is how you turn it off; on a post it doesn't cover, adding it is
+  # how you turn it on. Defaulting to the current behaviour would make the click
+  # do nothing.
+  def self.sidebar_field(resource_type)
+    # Always defined, so a value already in a file renders as the checkbox it
+    # is. Only *offered* in the Add Field menu when there's a sidebar to talk
+    # about — a field that can't do anything shouldn't be on the menu, but a
+    # value someone already set shouldn't degrade into a custom text field
+    # because they later deleted their sidebar.
+    unless Sidebar.exists?
+      return {
+        'show_sidebar' => {
+          type: :checkbox, label: 'show_sidebar', available: false,
+          note: 'This site has no sidebar (site/layout/sidebar.md), so this setting does nothing.'
+        }
+      }
+    end
+
+    covered = Sidebar.covers?(resource_type)
+    {
+      'show_sidebar' => {
+        type: :checkbox,
+        label: 'show_sidebar',
+        default: covered ? 'false' : 'true',
+        note: covered ?
+          "The sidebar already shows here. Untick to hide it on this #{resource_type}." :
+          "The sidebar doesn't show here. Tick to show it on this #{resource_type}."
+      }
+    }
   end
 
   def self.post_fields(metadata_hash)
@@ -137,7 +179,7 @@ module ContentMetadataSchema
                 'Imported from Substack feed — read-only to preserve subscriber dedup' :
                 'Auto-generated UUID. Locked once the post is published.'
       },
-      'explicit' => { type: :select, label: 'explicit', options: ['false', 'true'], hint: 'Explicit content?' },
+      'explicit' => { type: :checkbox, label: 'explicit', hint: 'Explicit content?' },
       'episode_number' => { type: :text, label: 'episode_number', hint: 'Episode number' },
       'season' => { type: :text, label: 'season', hint: 'Season number' },
       'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' },
@@ -171,8 +213,8 @@ module ContentMetadataSchema
       },
       'lyrics' => { type: :textarea, label: 'lyrics' },
 
-      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this post?' },
-      'image_in_header' => { type: :select, label: 'image_in_header', options: ['true', 'false'], hint: 'Show post image in the header?' },
+      'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
+      'image_in_header' => { type: :checkbox, label: 'image_in_header', hint: 'Show post image in the header?' },
       'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   end
@@ -214,12 +256,24 @@ module ContentMetadataSchema
         label: 'file_guid',
         hint: 'The file GUID from your Snipcart dashboard'
       },
+      # Snipcart requires weight in grams, as a whole number, and won't quote
+      # postage without it. The unit sits after the input rather than in the
+      # label: label width sets the whole column (longest label + 1 in the
+      # metadata editor), so "weight (grams)" would have widened every row on
+      # every product form to carry one field's unit.
+      'weight' => {
+        type: :text,
+        label: 'weight',
+        suffix: 'grams',
+        hint: '500',
+        note: 'Whole grams. Needed for Snipcart shipping rates — leave blank for digital products.'
+      },
       'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' },
       'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. featured)' },
-      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this product?' },
+      'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
       'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
       'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
-      'primary' => { type: :select, label: 'primary', options: ['false', 'true'], hint: 'Only the group\'s primary should be true (default: false)' },
+      'primary' => { type: :checkbox, label: 'primary', note: 'Only one product in a group should be checked as primary.' },
       'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   end
@@ -241,7 +295,7 @@ module ContentMetadataSchema
       },
       'image' => { type: :text, label: 'image', hint: 'Page image: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
-      'show_sidebar' => { type: :select, label: 'show_sidebar', options: ['true', 'false'], hint: 'Show sidebar on this page?' },
+      'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
       'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   end
