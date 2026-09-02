@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_22_000200) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -141,17 +141,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_000200) do
   end
 
   create_table "newsletter_sends", force: :cascade do |t|
+    t.datetime "attempted_at"
     t.datetime "created_at", null: false
+    t.string "error"
     t.integer "import_id"
     t.integer "member_id", null: false
     t.string "message_id"
     t.integer "post_id", null: false
-    t.datetime "sent_at", null: false
+    t.datetime "sent_at"
+    t.string "status", default: "sent", null: false
     t.datetime "updated_at", null: false
     t.index ["import_id"], name: "index_newsletter_sends_on_import_id"
     t.index ["member_id"], name: "index_newsletter_sends_on_member_id"
     t.index ["message_id"], name: "index_newsletter_sends_on_message_id"
     t.index ["post_id", "member_id"], name: "index_newsletter_sends_on_post_id_and_member_id", unique: true
+    t.index ["post_id", "status"], name: "index_newsletter_sends_on_post_id_and_status"
     t.index ["post_id"], name: "index_newsletter_sends_on_post_id"
   end
 

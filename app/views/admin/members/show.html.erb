@@ -344,11 +344,16 @@
     <div class="px-4 py-5 sm:p-6">
       <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Newsletter Delivery History</h3>
 
+      <%# Counted by status. A failed send is a row too now, and calling those
+          "delivered" is the same miscount the post panel had. %>
       <% newsletter_sends = @member.newsletter_sends.includes(:post).recent %>
+      <% delivered_count = newsletter_sends.count(&:sent?) %>
+      <% failed_count = newsletter_sends.count(&:failed?) %>
 
       <% if newsletter_sends.any? %>
         <p class="mt-2 text-sm text-gray-600 font-sans">
-          <%= newsletter_sends.count %> newsletter<%= newsletter_sends.count == 1 ? '' : 's' %> delivered to this member
+          <%= pluralize(delivered_count, "newsletter") %> delivered to this member<%
+            %><% if failed_count.positive? %>, <span class="text-red-700"><%= failed_count %> failed</span><% end %>
         </p>
 
         <div class="mt-5 border border-gray-200 rounded-xs overflow-hidden">
@@ -381,12 +386,20 @@
                     </div>
                   </td>
                   <td class="px-4 py-3 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">
-                      <%= send.sent_at.strftime("%b %d, %Y") %>
-                    </div>
-                    <div class="text-xs text-gray-500">
-                      <%= send.sent_at.strftime("%I:%M %p") %>
-                    </div>
+                    <% if send.failed? %>
+                      <div class="text-sm text-red-700">Failed</div>
+                      <div class="text-xs text-red-600"><%= send.error.presence || "no reason recorded" %></div>
+                      <% if send.attempted_at %>
+                        <div class="text-xs text-gray-500"><%= send.attempted_at.strftime("%b %d, %Y") %></div>
+                      <% end %>
+                    <% else %>
+                      <div class="text-sm text-gray-900">
+                        <%= send.sent_at.strftime("%b %d, %Y") %>
+                      </div>
+                      <div class="text-xs text-gray-500">
+                        <%= send.sent_at.strftime("%I:%M %p") %>
+                      </div>
+                    <% end %>
                   </td>
                   <td class="px-4 py-3 whitespace-nowrap">
                     <% if send.import_id.present? %>

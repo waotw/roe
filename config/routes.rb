@@ -135,9 +135,6 @@ Rails.application.routes.draw do
         patch :set_duration
         post :duplicate
         post :send_test_email
-        get :resend_modal
-        post :confirm_resend
-        post :resend_newsletter
         get :newsletter_status
       end
     end

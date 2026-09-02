@@ -285,7 +285,6 @@ class Admin::PostsController < Admin::BaseController
     @preview_path = preview_admin_post_path(@post)
 
     # Calculate new members count for newsletter status
-    calculate_new_members_count
   end
 
   def update
@@ -425,121 +424,8 @@ class Admin::PostsController < Admin::BaseController
     return_to.call
   end
 
-  def resend_newsletter
-    @post = Post.find(params[:id])
-
-    # Find last send time
-    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
-
-    unless last_send
-      flash[:error] = "This newsletter hasn't been sent yet"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Find new members who joined after last send
-    new_members = Member.newsletter_subscribed
-                        .active
-                        .where("subscribed_at > ?", last_send)
-
-    # If this is a Substack-imported post, exclude Substack-imported members.
-    # Belt-and-suspenders: import_id FK + durable metadata flag (the latter
-    # survives if the Import record is ever deleted).
-    if @post.metadata["substack_post_id"].present?
-      new_members = new_members.where(import_id: nil).not_substack_imported
-    end
-
-    # Filter by audience if needed
-    new_members = new_members.paid_tier if @post.audience == "paid"
-
-    if new_members.empty?
-      flash[:notice] = "No new members to send to"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Queue newsletter sending job
-    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
-
-    flash[:notice] = "Newsletter queued for #{new_members.count} new #{'member'.pluralize(new_members.count)}"
-    redirect_to edit_admin_post_path(@post)
-  end
-
-  def confirm_resend
-    @post = Post.find(params[:id])
-
-    # Find last send time
-    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
-
-    unless last_send
-      flash[:error] = "This newsletter hasn't been sent yet"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Find members who haven't received this newsletter yet
-    received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
-    new_members = Member.newsletter_subscribed
-                        .active
-                        .where.not(id: received_member_ids)
-
-    # If this is a Substack-imported post, exclude Substack-imported members.
-    # Belt-and-suspenders: import_id FK + durable metadata flag.
-    if @post.metadata["substack_post_id"].present?
-      new_members = new_members.where(import_id: nil).not_substack_imported
-    end
-
-    # Filter by audience if needed
-    new_members = new_members.paid_tier if @post.audience == "paid"
-
-    if new_members.empty?
-      flash[:notice] = "No new members to send to"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Queue newsletter sending job
-    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
-
-    head :ok
-  end
-
-  def resend_modal
-    @post = Post.find(params[:id])
-
-    # Find last send time (for display purposes)
-    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
-
-    unless last_send
-      flash[:error] = "This newsletter hasn't been sent yet"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Find members who haven't received this newsletter yet
-    received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
-    @new_members = Member.newsletter_subscribed
-                         .active
-                         .where.not(id: received_member_ids)
-                         .order(subscribed_at: :desc)
-
-    # Filter by audience if needed
-    @new_members = @new_members.paid_tier if @post.audience == "paid"
-
-    # If this is a Substack-imported post, exclude Substack-imported members.
-    # Belt-and-suspenders: import_id FK + durable metadata flag.
-    if @post.metadata["substack_post_id"].present?
-      @new_members = @new_members.where(import_id: nil).not_substack_imported
-    end
-
-    @new_members_count = @new_members.count
-
-    if @new_members_count == 0
-      flash[:notice] = "No new members to send to"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    render partial: "resend_modal", layout: false
-  end
-
   def newsletter_status
     @post = Post.find(params[:id])
-    calculate_new_members_count
     render partial: "newsletter_status", layout: false
   end
 
@@ -665,29 +551,6 @@ class Admin::PostsController < Admin::BaseController
   end
 
   private
-
-  def calculate_new_members_count
-    # Calculate new members count with same logic as resend_modal
-    if @post.persisted? && NewsletterSend.exists?(post: @post)
-      received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
-      new_members = Member.newsletter_subscribed
-                          .active
-                          .where.not(id: received_member_ids)
-
-      # Filter by audience if needed
-      new_members = new_members.paid_tier if @post.audience == "paid"
-
-      # If this is a Substack-imported post, exclude Substack-imported members.
-      # Belt-and-suspenders: import_id FK + durable metadata flag.
-      if @post.metadata["substack_post_id"].present?
-        new_members = new_members.where(import_id: nil).not_substack_imported
-      end
-
-      @new_members_count = new_members.count
-    else
-      @new_members_count = 0
-    end
-  end
 
   def should_send_newsletter?(post)
     published_to = post.metadata["published_to"] || post.published_to
