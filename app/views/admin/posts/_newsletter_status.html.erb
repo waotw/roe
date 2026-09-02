@@ -52,14 +52,39 @@
             the panel stays one line until someone wants the detail; open, it
             lists every reason rather than a truncated few. %>
         <% if failed_count > 0 && !sending_job %>
-          <% reasons = NewsletterSend.for_post(@post).failed.group(:error).count.sort_by { |_, n| -n } %>
+          <%
+            failures = NewsletterSend.for_post(@post).failed.includes(:member)
+                                     .sort_by { |f| [ f.error.to_s, f.member&.email.to_s ] }
+            reasons = failures.group_by { |f| f.error.presence || "no reason recorded" }
+          %>
           <details class="mt-1 text-xs">
             <summary class="cursor-pointer text-red-700">Details</summary>
-            <ul class="mt-1 ml-4 list-disc text-red-700">
-              <% reasons.each do |reason, count| %>
-                <li><%= count %> × <%= reason.presence || "no reason recorded" %></li>
+            <%# Grouped by reason, because the reason decides what to do — an
+                inactive recipient needs their address fixed or their account
+                disabled, a 500 just needs retrying. Each member links through,
+                since the count alone tells you nothing you can act on. %>
+            <div class="mt-1 ml-4 space-y-2">
+              <% reasons.each do |reason, sends| %>
+                <div>
+                  <div class="text-red-700"><%= sends.size %> × <%= reason %></div>
+                  <ul class="ml-4 list-disc text-red-700">
+                    <% sends.each do |send| %>
+                      <li>
+                        <% if send.member %>
+                          <%= link_to send.member.email, admin_member_path(send.member),
+                                class: "underline hover:text-red-900" %>
+                          <% if send.member.name.present? %>
+                            <span class="text-gray-500">(<%= send.member.name %>)</span>
+                          <% end %>
+                        <% else %>
+                          <span class="text-gray-500">member removed</span>
+                        <% end %>
+                      </li>
+                    <% end %>
+                  </ul>
+                </div>
               <% end %>
-            </ul>
+            </div>
           </details>
         <% end %>
 
