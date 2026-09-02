@@ -121,6 +121,26 @@ class Product < ApplicationRecord
     metadata["digital"] == true || metadata["digital"] == "true"
   end
 
+  # Normalise weight before the file is written, so what's on disk is exactly
+  # what Snipcart receives.
+  #
+  # #weight rounds on read, which meant typing 499.6 stored 499.6 in the file
+  # and sent 500 in the HTML — the file and the shop disagreeing, with nothing
+  # in the editor to say which one counted. Rounding here means the field reads
+  # back as 500 after saving, so the answer is visible rather than needing to
+  # be explained.
+  #
+  # Anything that produces no attribute (blank, zero, negative, junk) is stored
+  # blank for the same reason: the file shouldn't claim a weight that isn't used.
+  def self.format_metadata_yaml(metadata)
+    metadata = metadata.dup
+    if metadata.key?("weight")
+      grams = metadata["weight"].to_s.strip.to_f.round
+      metadata["weight"] = grams.positive? ? grams : ""
+    end
+    super(metadata)
+  end
+
   # Shipping weight in whole grams, as Snipcart requires: "The weight in grams
   # of the product. Mandatory if you use any integrated shipping provider we
   # support" — integers only, no decimals.

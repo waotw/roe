@@ -93,7 +93,7 @@ module ContentMetadataSchema
       return {
         'show_sidebar' => {
           type: :checkbox, label: 'show_sidebar', available: false,
-          note: 'This site has no sidebar (site/layout/sidebar.md), so this setting does nothing.'
+          hint: 'This site has no sidebar (site/layout/sidebar.md), so this setting does nothing.'
         }
       }
     end
@@ -104,7 +104,11 @@ module ContentMetadataSchema
         type: :checkbox,
         label: 'show_sidebar',
         default: covered ? 'false' : 'true',
-        note: covered ?
+        # hint, not note: the ERB renders a checkbox's hint beside the box,
+        # inside the label, which reads better than a line underneath — the
+        # same treatment image_in_header and explicit already get. `note` is
+        # for text fields, where there's no room alongside.
+        hint: covered ?
           "The sidebar already shows here. Untick to hide it on this #{resource_type}." :
           "The sidebar doesn't show here. Tick to show it on this #{resource_type}."
       }
@@ -273,7 +277,7 @@ module ContentMetadataSchema
       'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
       'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
       'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
-      'primary' => { type: :checkbox, label: 'primary', note: 'Only one product in a group should be checked as primary.' },
+      'primary' => { type: :checkbox, label: 'primary', hint: 'Only one product in a group should be checked as primary.' },
       'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
     }
   end

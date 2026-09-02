@@ -27,7 +27,7 @@ class SidebarFieldDefaultTest < ActiveSupport::TestCase
       assert field, "#{type}: an existing value still has to render as a checkbox"
       assert_equal :checkbox, field[:type], type
       assert_equal false, field[:available], "#{type}: shouldn't be offered in the menu"
-      assert_match(/no sidebar/i, field[:note], type)
+      assert_match(/no sidebar/i, field[:hint], type)
     end
   end
 
@@ -44,7 +44,7 @@ class SidebarFieldDefaultTest < ActiveSupport::TestCase
 
     assert_equal :checkbox, field[:type]
     assert_equal "false", field[:default]
-    assert_match(/already shows/i, field[:note])
+    assert_match(/already shows/i, field[:hint])
   end
 
   test "an uncovered type defaults to ticked — you're adding it to show" do
@@ -53,7 +53,7 @@ class SidebarFieldDefaultTest < ActiveSupport::TestCase
     field = ContentMetadataSchema.fields_for("post")["show_sidebar"]
 
     assert_equal "true", field[:default]
-    assert_match(/doesn't show/i, field[:note])
+    assert_match(/doesn't show/i, field[:hint])
   end
 
   test "with no scope everything is covered, so everything defaults to unticked" do

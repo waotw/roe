@@ -945,6 +945,6 @@ class Admin::PostsController < Admin::BaseController
 
   def normalize_and_write(file_path, content)
     normalized = content.gsub(/\r\n/, "\n")
-    File.write(file_path, normalized)
+    SiteFile.write(file_path, normalized)
   end
 end

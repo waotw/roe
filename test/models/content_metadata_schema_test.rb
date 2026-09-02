@@ -204,11 +204,17 @@ class ContentMetadataSchemaTest < ActiveSupport::TestCase
     labels.each do |cls|
       assert_includes cls, "metadata-label", "a label is missing the shared column-width class"
     end
-    # Compare the class tokens, ignoring the two things that legitimately
-    # differ: the ERB one carries a conditional pt-1.5 for checkbox rows, and
-    # shrink-0 / flex-shrink-0 are the same thing in different Tailwind eras.
+    # Compare the class tokens, ignoring what legitimately differs: the
+    # conditional pt-1.5 that checkbox rows drop — written as ERB in the
+    # partial and as a template expression in the JS — and shrink-0 vs
+    # flex-shrink-0, the same thing in different Tailwind eras.
     normalized = labels.map do |cls|
-      cls.gsub(/<%=.*?%>/, "").split.map { |c| c == "flex-shrink-0" ? "shrink-0" : c }.reject { |c| c == "pt-1.5" }.sort
+      cls.gsub(/<%=.*?%>/, "")
+         .gsub(/\$\{.*?\}/, "")
+         .split
+         .map { |c| c == "flex-shrink-0" ? "shrink-0" : c }
+         .reject { |c| c == "pt-1.5" }
+         .sort
     end
     assert_equal 1, normalized.uniq.size,
       "the four declarations have drifted apart: #{normalized.uniq.inspect}"

@@ -80,12 +80,28 @@ class MetadataNoteTest < ActionDispatch::IntegrationTest
     assert_select "select[data-metadata-field='show_sidebar']", count: 0
   end
 
-  test "primary's explanation is a note, not dropdown instructions" do
+  # A checkbox's explanation goes beside the box (hint), not under the row
+  # (note) — there's room alongside, and it reads better. `note` is for text
+  # fields, where there isn't.
+  test "primary explains itself beside the checkbox" do
     field = ContentMetadataSchema.fields_for("product")["primary"]
 
     assert_equal :checkbox, field[:type]
-    assert_match(/only one product/i, field[:note].to_s)
+    assert_match(/only one product/i, field[:hint].to_s)
+    assert_nil field[:note], "a checkbox's explanation belongs beside it, not below"
     assert_nil field[:options], "a checkbox has no options to choose between"
+  end
+
+  # The convention, pinned: checkboxes explain beside, text fields below.
+  test "checkbox fields use hint, not note" do
+    %w[post page product].each do |type|
+      ContentMetadataSchema.fields_for(type).each do |name, config|
+        next unless config[:type] == :checkbox
+
+        assert_nil config[:note],
+          "#{type}/#{name}: a checkbox explains itself beside the box (hint), not under the row"
+      end
+    end
   end
 
   # The old approach — a spacer copying the label's width — is gone.

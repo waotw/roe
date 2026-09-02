@@ -92,10 +92,18 @@ export default class extends Controller {
   // metadata-editor's own buildInputHtml, which knows nothing about either —
   // so create it when it's missing and both paths look the same.
   footerFor(guid) {
-    const wrapper = guid.parentElement;
-    if (!wrapper) return null;
+    // The row's column — the div holding the field and anything that belongs
+    // under it. Appending here puts the footer below the input's flex row.
+    //
+    // This used to insert after the input itself, which only stacked when the
+    // input's parent happened to be a block. A row built by buildInputHtml
+    // returns a bare <input>, so its parent is the flex row and the footer
+    // landed beside the field, squashing it.
+    const row = guid.closest(".metadata-field-row");
+    const column = row?.querySelector(":scope > div.flex-1") || guid.parentElement;
+    if (!column) return null;
 
-    let footer = wrapper.querySelector("[data-digital-product-footer]");
+    let footer = column.querySelector("[data-digital-product-footer]");
     if (footer) return footer;
 
     footer = document.createElement("div");
@@ -111,7 +119,7 @@ export default class extends Controller {
     link.textContent = "Snipcart Digital Goods →";
 
     footer.appendChild(link);
-    guid.insertAdjacentElement("afterend", footer);
+    column.appendChild(footer);
     return footer;
   }
 

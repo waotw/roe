@@ -60,7 +60,7 @@ class Admin::ProductsController < Admin::BaseController
     yaml_content = metadata.to_yaml.sub(/\A---\n/, "")
     content = "---\n#{yaml_content}\n---\n#{body}"
 
-    File.write(file_path, content)
+    SiteFile.write(file_path, content)
     ContentSync.sync_file(file_path)
 
     relative_path = file_path.to_s.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
@@ -119,7 +119,7 @@ class Admin::ProductsController < Admin::BaseController
     rescue => e
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
-      File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
+      SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
       redirect_to edit_admin_product_path(@product)
       return
     end
@@ -128,7 +128,7 @@ class Admin::ProductsController < Admin::BaseController
     was_published = @product.status == "published"
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
-    File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
+    SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
 
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     @product.reload
@@ -208,7 +208,7 @@ class Admin::ProductsController < Admin::BaseController
     new_rel = File.join(rel_dir, "#{base_name}-#{n}.md")
 
     metadata["title"] = base_title.present? ? "#{base_title} #{n}" : "Untitled #{n}"
-    File.write(File.join(RoeSitePaths::SITE_PATH, new_rel),
+    SiteFile.write(File.join(RoeSitePaths::SITE_PATH, new_rel),
                "---\n#{Product.format_metadata_yaml(metadata)}\n---\n#{parsed.content}")
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, new_rel))
 
@@ -425,7 +425,7 @@ class Admin::ProductsController < Admin::BaseController
   def save_product_to_file(product)
     yaml_content = product.metadata.to_yaml.sub(/\A---\n/, "")
     full_content = "---\n#{yaml_content}\n---\n#{product.content}"
-    File.write(File.join(RoeSitePaths::SITE_PATH, product.file_path), full_content)
+    SiteFile.write(File.join(RoeSitePaths::SITE_PATH, product.file_path), full_content)
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, product.file_path))
   end
 

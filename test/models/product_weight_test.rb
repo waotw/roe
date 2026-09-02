@@ -20,6 +20,31 @@ class ProductWeightTest < ActiveSupport::TestCase
 
   # Snipcart drops decimals silently, and the shop owner finds out from a wrong
   # postage quote rather than an error.
+  # #weight rounded on read, so the file kept 499.6 while the HTML said 500 —
+  # the file and the shop disagreeing with nothing to say which counted.
+  test "the saved file stores what Snipcart will actually receive" do
+    yaml = Product.format_metadata_yaml({ "title" => "Book", "weight" => "499.6" })
+
+    assert_match(/^weight: 500$/, yaml)
+  end
+
+  test "a weight that produces no attribute is stored blank, not as typed" do
+    [ "0", "-5", "heavy", "" ].each do |input|
+      yaml = Product.format_metadata_yaml({ "title" => "Book", "weight" => input })
+
+      assert_match(/^weight: ""$/, yaml,
+        "#{input.inspect} sends no data-item-weight, so the file shouldn't claim one")
+    end
+  end
+
+  test "normalising doesn't disturb the rest of the metadata" do
+    yaml = Product.format_metadata_yaml({ "title" => "Book", "sku" => "BK-1", "weight" => "500.4" })
+
+    assert_match(/^title: /, yaml)
+    assert_match(/^sku: /, yaml)
+    assert_match(/^weight: 500$/, yaml)
+  end
+
   test "a decimal is rounded rather than passed through" do
     assert_equal 500, product(weight: "499.6").weight
     assert_equal 2, product(weight: "2.4").weight
