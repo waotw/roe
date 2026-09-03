@@ -678,7 +678,21 @@
                                 %>
 
                                 <% field_options_key = @field_options&.key?(nested_field_key) ? nested_field_key : subkey %>
-                                <% if @field_options&.key?(field_options_key) %>
+                                <%# An on/off setting that reads as on/off. Everything else here is a
+                                    two-option select, which is fine for a genuine choice (memberships
+                                    vs donations) but makes a plain yes/no look like a decision. A
+                                    checkbox writes true/false through formToYaml's existing checkbox
+                                    branch, so the YAML is identical either way. %>
+                                <% if @field_checkboxes&.include?(nested_field_key) %>
+                                  <%# No caption beside it — the field's own label is already
+                                      rendered above, the same as every other control here. %>
+                                  <input type="checkbox"
+                                         name="config_fields[<%= key %>][<%= subkey %>]"
+                                         value="true"
+                                         class="w-4 h-4"
+                                         data-config-field="<%= nested_field_key %>"
+                                         <%= 'checked' if subvalue.to_s == 'true' %>>
+                                <% elsif @field_options&.key?(field_options_key) %>
                                   <!-- Select dropdown (no extra wrapper/label) -->
                                   <select name="config_fields[<%= key %>][<%= subkey %>]"
                                           class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"

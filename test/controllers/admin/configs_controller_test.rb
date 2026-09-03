@@ -725,6 +725,62 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_configs_path
   end
 
+  # ── Members: Display section ───────────────────────────────────────────────
+
+  # Every members.yml written before this setting existed has no display key at
+  # all, so the section has to be seeded on the way into the form or the option
+  # is invisible to every site that already runs members.
+  test "the members editor shows Display for a members.yml that has no display key" do
+    get admin_edit_members_config_path
+
+    assert_response :success
+    assert_includes response.body, "Display"
+    assert_select "input[type=checkbox][data-config-field='display.always_show_member_icon']", 1
+  end
+
+  test "the icon setting starts unchecked" do
+    get admin_edit_members_config_path
+
+    assert_select "input[data-config-field='display.always_show_member_icon']", 1
+    assert_select "input[data-config-field='display.always_show_member_icon'][checked]", 0,
+      "opt-in — an existing site's header must not change on upgrade"
+  end
+
+  test "a members.yml that turns the icon on renders it checked" do
+    File.write(SiteConfig::FEATURES_PATH.join("members.yml"),
+               "display:\n  always_show_member_icon: true\npayments:\n  enabled: false\n")
+
+    get admin_edit_members_config_path
+
+    assert_select "input[data-config-field='display.always_show_member_icon'][checked]", 1,
+      "a saved setting that renders unchecked reads exactly like the save being ignored"
+  end
+
+  # It's a yes/no, and the two-option select the other booleans use makes a
+  # yes/no look like a decision between two things.
+  test "the icon setting is a checkbox, not a select" do
+    get admin_edit_members_config_path
+
+    assert_select "input[type=checkbox][data-config-field='display.always_show_member_icon']", 1
+    assert_select "select[data-config-field='display.always_show_member_icon']", 0
+  end
+
+  # The form posts YAML that formToYaml built from the checkbox, so this is the
+  # shape the save path actually receives. Worth asserting end to end: a setting
+  # that renders correctly but doesn't persist reads to the user as the save
+  # being ignored, which is exactly how the docs.roe select failed.
+  test "turning the icon on saves and reads back as on" do
+    patch admin_members_config_path,
+          params: { content: "display:\n  always_show_member_icon: true\npayments:\n  enabled: false\n" }
+
+    assert SiteFeature.always_show_member_icon?, "saved, then read back as off"
+
+    patch admin_members_config_path,
+          params: { content: "display:\n  always_show_member_icon: false\npayments:\n  enabled: false\n" }
+
+    assert_not SiteFeature.always_show_member_icon?, "turning it back off has to stick too"
+  end
+
   private
 
   def ensure_feature_file(filename)

@@ -144,6 +144,7 @@ module ApplicationHelper
   # Feature flag predicates — delegated to SiteFeature so models can use
   # the same checks without pulling in the helper context.
   def members_enabled?            = SiteFeature.members_enabled?
+  def always_show_member_icon?    = SiteFeature.always_show_member_icon?
   def payments_enabled?           = SiteFeature.payments_enabled?
   def memberships_enabled?        = SiteFeature.memberships_enabled?
   def memberships_configured?     = SiteFeature.memberships_configured?

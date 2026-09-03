@@ -143,13 +143,25 @@
     <script src="/javascript/footnotes.js" nonce="<%= safe_csp_nonce %>" defer></script>
     <%# Cart icon shows in both dynamic and static — Snipcart is entirely
         client-side so it works on static product pages. Member icon only
-        appears in dynamic mode (current_member is forced to nil during
-        static rendering, so this short-circuits naturally). %>
+        appears in dynamic mode: signed in, current_member is forced to nil
+        during static rendering so it short-circuits naturally; signed out,
+        it's excluded explicitly, because a static export has no session and
+        the sign-in page it points at can't work there. %>
+    <%# Signed out, the icon is only worth showing if there's somewhere for it to
+        go — same rule the paywall's sign-in line follows. url_for is nil when
+        the site has no sign-in page, and a header icon onto a 404 is worse
+        than no icon. %>
+    <% member_signin_url = if current_member || Current.static_generation || !always_show_member_icon?
+                            nil
+                          else
+                            MemberPages.url_for("signin")
+                          end %>
+    <% show_member_icon = current_member.present? || member_signin_url.present? %>
     <%# site-wide search is always available, so .site-actions always renders;
         cart/member remain conditional within it. %>
     <div class="site-actions">
       <%= render "shared/site_search", search_scope: site_search_scope %>
-      <% if snipcart_connected? || current_member %>
+      <% if snipcart_connected? || show_member_icon %>
         <% if snipcart_connected? %>
           <%# `snipcart-checkout` is the class Snipcart v3 binds the
               open-cart click handler to — without it the icon is inert.
@@ -166,8 +178,12 @@
             <sup class="snipcart-items-count"></sup>
           </a>
         <% end %>
+        <%# Same classes either way, so a theme styling .member-link doesn't have
+            to know whether anyone is signed in. %>
         <% if current_member %>
           <%= link_to inline_system_svg("member-icon.svg") || "Account", account_path, class: "site-action member-link", title: "My Account", aria_label: "My Account" %>
+        <% elsif member_signin_url %>
+          <%= link_to inline_system_svg("member-icon.svg") || "Sign In", member_signin_url, class: "site-action member-link", title: "Sign In", aria_label: "Sign In" %>
         <% end %>
       <% end %>
     </div>

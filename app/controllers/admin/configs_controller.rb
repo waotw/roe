@@ -1270,9 +1270,10 @@ class Admin::ConfigsController < Admin::BaseController
 
     @config_type = "members"
     @config_content = File.read(members_config_path)
-    @config_hash = YAML.load(@config_content) || {}
+    @config_hash = with_members_display_defaults(YAML.load(@config_content) || {})
     @field_options = build_field_options_for_members
-    @field_hints = build_field_hints_for_members  # ← Add this
+    @field_hints = build_field_hints_for_members
+    @field_checkboxes = MEMBERS_CHECKBOX_FIELDS
 
     render :edit
   end
@@ -2110,6 +2111,18 @@ class Admin::ConfigsController < Admin::BaseController
     }
   end
 
+  # Settings that read as on/off rather than as a choice between two things.
+  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon" ].freeze
+
+  # Display defaults for a members.yml written before this section existed.
+  # Merged ahead of the file's own keys so the section renders first, and only
+  # for keys the file doesn't already set — saving the form writes it back, so
+  # this seeds the setting once rather than on every load.
+  def with_members_display_defaults(config)
+    display = { "always_show_member_icon" => false }.merge(config["display"] || {})
+    { "display" => display }.merge(config)
+  end
+
   def build_field_options_for_members
     {
       "payments.enabled" => [ "false", "true" ],
@@ -2161,7 +2174,8 @@ class Admin::ConfigsController < Admin::BaseController
       "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       "payments.donation_amounts" => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
       "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Postmark account & configuration)",
-      "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it."
+      "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.",
+      "display.always_show_member_icon" => "Keep the account icon in the site header for everyone, not just signed-in members. Signed out, it links to your sign-in page. Leave this off and the icon appears only once someone signs in."
     }
   end
 

@@ -63,6 +63,15 @@ module SiteFeature
     SiteConfig.feature("members", "newsletter.enabled") == true
   end
 
+  # The account icon in the site header. Off by default, which shows it only to
+  # someone already signed in — a site with a handful of members doesn't want a
+  # permanent sign-in affordance in the header. On, it's there for everyone and
+  # points at the sign-in page until they are.
+  def always_show_member_icon?
+    return false unless members_enabled?
+    SiteConfig.feature("members", "display.always_show_member_icon") == true
+  end
+
   # ── Integration files present ───────────────────────────────────────────
 
   def payments_integration_file?
