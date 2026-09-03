@@ -3090,9 +3090,36 @@ module HasMarkdownExtensions
         render_form(form_config)
       rescue => e
         Rails.logger.error "Form YAML parsing error: #{e.message}"
-        dev_warning("Form YAML parse error", e.message, yaml_content.strip)
+        dev_warning("This form's settings couldn't be read",
+                    block_yaml_explanation(yaml_content, e),
+                    yaml_content.strip)
       end
     end
+  end
+
+  # Psych's own wording — "did not find expected key while parsing a block
+  # mapping at line 1 column 1" — describes its parser, not the mistake, and
+  # names a line number that's wrong because the block is re-joined before it
+  # gets here. So: name the line that actually broke, and where the cause is
+  # recognisable, say what to type instead.
+  #
+  # The recurring one is a value opening with `[`. YAML reads that as a list,
+  # so `signin_text: [Sign in], If you want` is a sequence followed by stray
+  # text. Anywhere else in the value is fine — `Already a member? [Sign in].`
+  # parses — which makes it a confusing failure to hit.
+  def block_yaml_explanation(yaml_content, error)
+    offender = yaml_content.to_s.lines.find { |l| l =~ /^\s*[\w-]+:\s*\[/ }
+
+    if offender
+      key = offender[/^\s*([\w-]+):/, 1]
+      value = offender.split(":", 2).last.to_s.strip
+      return "`#{key}` starts with `[`, which YAML reads as a list. " \
+             "Wrap the value in quotes: `#{key}: \"#{value}\"`. " \
+             "Square brackets anywhere else in the line are fine."
+    end
+
+    "#{error.message.sub(/\A\(<unknown>\):\s*/, '')} — check for a stray `:` or a value " \
+    "that needs quoting."
   end
 
   def render_form(config)
@@ -3103,7 +3130,8 @@ module HasMarkdownExtensions
     when "paid_content"
       text = config["text"] || "This is premium content. Upgrade to continue reading."
       button_text = config["button-text"] || config["button_text"] || "Become a paid member"
-      render_paid_content_form(text, button_text)
+      signin_text = config["signin-text"] || config["signin_text"]
+      render_paid_content_form(text, button_text, signin_text)
     when "signup"
       upgrade_text = config["upgrade-button-text"] || config["upgrade_button_text"]
       render_signup_form(button_text, upgrade_text)
@@ -3232,15 +3260,56 @@ module HasMarkdownExtensions
     HTML
   end
 
-  def render_paid_content_form(text, button_text)
+  def render_paid_content_form(text, button_text, signin_text = nil)
     # This will act as a content gate - everything after this is paid
     <<~HTML
       #{paid_content_warnings}<!-- PAID_CONTENT_GATE -->
       <div class="paid-content-gate">
         <p>#{text}</p>
-        <a href="/upgrade" class="btn-primary">#{button_text}</a>
+        <a href="#{MemberPages.url_for!('upgrade')}" class="btn-primary">#{button_text}</a>
+        #{paid_content_signin_line(signin_text)}
       </div>
     HTML
+  end
+
+  # "Already a member? [Sign in]." — always, not on request.
+  #
+  # A paywall offering only "Become a paid member" strands someone who has
+  # already paid: they have no way in from the page they landed on, and the
+  # upgrade page has to load before they can discover one. Somebody paying
+  # twice, or leaving, is a worse default than an extra line of text.
+  #
+  # No option to switch it off. It doesn't render when it can't work — members
+  # disabled, or no sign-in page to link to — which is the only case anyone
+  # would reasonably want it gone, and CSS can hide it otherwise. `[Sign in]`
+  # names the linked words without naming the URL, so renaming the page can't
+  # leave a dead link in every paid post.
+  DEFAULT_SIGNIN_TEXT = "Already a member? [Sign in]."
+
+  def paid_content_signin_line(signin_text)
+    # Only condition that earns its place: don't link to a page that isn't
+    # there. A members-enabled check would be redundant — a paywall on a site
+    # without members is already broken, and paid_content_warnings says so.
+    url = MemberPages.url_for("signin")
+    return "" if url.blank?
+
+    sentence = signin_text.presence || DEFAULT_SIGNIN_TEXT
+    %(<p class="paid-content-signin">#{link_bracketed_text(sentence, url)}</p>)
+  end
+
+  # Turns `Already a member? [Sign in].` into a sentence with those words
+  # linked. Roe supplies the URL; the author supplies the words. A bare
+  # sentence with no brackets gets the whole thing linked, so a missing pair
+  # still produces something clickable rather than dead text.
+  def link_bracketed_text(sentence, url)
+    escaped = CGI.escape_html(sentence)
+    href = CGI.escape_html(url)
+
+    if escaped =~ /\[([^\]]+)\]/
+      escaped.sub(/\[([^\]]+)\]/) { %(<a href="#{href}">#{Regexp.last_match(1)}</a>) }
+    else
+      %(<a href="#{href}">#{escaped}</a>)
+    end
   end
 
   # The paywall renders wherever it's written, but its upgrade button only goes
@@ -3289,7 +3358,7 @@ module HasMarkdownExtensions
     if @rendering_static
       return <<~HTML
         <div class="signup-link-block">
-          <a href="/sign-up" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+          <a href="#{MemberPages.url_for!('signup')}" class="btn-primary">#{CGI.escape_html(button_text)}</a>
         </div>
       HTML
     end
@@ -3356,7 +3425,7 @@ module HasMarkdownExtensions
     if @rendering_static
       return <<~HTML
         <div class="signin-link-block">
-          <a href="/sign-in" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+          <a href="#{MemberPages.url_for!('signin')}" class="btn-primary">#{CGI.escape_html(button_text)}</a>
         </div>
       HTML
     end
@@ -3393,7 +3462,7 @@ module HasMarkdownExtensions
         </form>
 
         <div class="non-member-checkout">
-          <a href="/sign-up" class="btn-primary" data-turbo="false">#{non_member_button_text}</a>
+          <a href="#{MemberPages.url_for!('signup')}" class="btn-primary" data-turbo="false">#{non_member_button_text}</a>
         </div>
       </div>
     HTML
@@ -3584,7 +3653,7 @@ module HasMarkdownExtensions
     end
 
     label = ERB::Util.html_escape(config["label"].presence || "Subscribe")
-    url   = ERB::Util.html_escape(config["url"].presence || "/sign-up")
+    url   = ERB::Util.html_escape(config["url"].presence || MemberPages.url_for!("signup"))
     css   = ([ "btn-primary" ] + action_button_style_classes(config, "members")).join(" ")
 
     %(<a class="#{css}" href="#{url}">#{label}</a>)
