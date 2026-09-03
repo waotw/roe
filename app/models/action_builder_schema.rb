@@ -104,7 +104,9 @@ module ActionBuilderSchema
       { key: "text", type: :textarea, label: "Message",
         hint: "Shown above the upgrade button." },
       { key: "button-text", type: :text, label: "Button text",
-        hint: "Defaults to “Become a paid member”." }
+        hint: "Defaults to “Become a paid member”." },
+      { key: "signin-text", type: :text, label: "Sign-in text",
+        hint: "Defaults to “Already a member? [Sign in].” The words in [square brackets] become the link." }
     ]
   }.freeze
 
