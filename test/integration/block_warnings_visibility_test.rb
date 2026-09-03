@@ -6,10 +6,13 @@ require "test_helper"
 # to be development-only, which meant anyone running Roe on a server saw nothing
 # at all when a block quietly rendered empty.
 #
-# They now show in the editor preview in any environment, and nowhere else. This
-# runs in the test environment, so every assertion here is about the preview
-# flag rather than Rails.env — in development the warning would show either way,
-# and that's the case that was never in doubt.
+# They now show in the editor preview in any environment, and nowhere else.
+#
+# This runs in the test environment, where warnings are off, so a bare
+# assert_not passes whether or not suppression works. Assertions here are
+# therefore either about the preview flag (which turns warnings on in any
+# environment) or made under a stubbed development environment (where something
+# has to actively turn them off).
 class BlockWarningsVisibilityTest < ActionDispatch::IntegrationTest
   # An unknown collection source: the block renders nothing, with no clue why.
   BROKEN = "```collection\nsource: blogs\n```\n"
@@ -26,6 +29,13 @@ class BlockWarningsVisibilityTest < ActionDispatch::IntegrationTest
   teardown { File.delete(@path) if File.exist?(@path) }
 
   def warning?(body) = body.include?("⚠️")
+
+  def in_development
+    Rails.env.stubs(:development?).returns(true)
+    yield
+  ensure
+    Rails.env.unstub(:development?)
+  end
 
   test "a published page never shows a block warning" do
     get "/posts/broken-block"
@@ -74,12 +84,27 @@ class BlockWarningsVisibilityTest < ActionDispatch::IntegrationTest
     assert warning?(response.body)
   end
 
+  # The whole point of the feature: someone writing on their own machine finds
+  # out the block is broken without opening the preview.
+  test "a published page does show the warning in development" do
+    in_development { get "/posts/broken-block" }
+
+    assert_response :success
+    assert warning?(response.body),
+      "a local author browsing their own site is the case this was built for"
+  end
+
   # Static output outlives the request that made it, so it's excluded outright
   # rather than by trusting the preview flag to be false.
   test "a static render is silent whatever it is asked for" do
-    assert_not warning?(@post.to_html(preview: true, static: true)),
-      "a generated file must not carry a warning into the world"
-    assert_not warning?(@post.to_html),
-      "and the default is silence"
+    in_development do
+      assert_not warning?(@post.to_html(static: true)),
+        "a generated file must not carry a warning into the world"
+      assert_not warning?(@post.to_html(preview: true, static: true)),
+        "not even when the render that produced it was a preview"
+
+      assert warning?(@post.to_html),
+        "precondition — without static, this same render warns"
+    end
   end
 end
