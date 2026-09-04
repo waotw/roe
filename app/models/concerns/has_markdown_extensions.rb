@@ -3126,6 +3126,10 @@ module HasMarkdownExtensions
     form_type = roeanji_kind(config)
     button_text = config["button-text"] || config["button_text"] || default_button_text(form_type)
 
+    if (unavailable = members_disabled_warning(form_type))
+      return unavailable
+    end
+
     result = case form_type
     when "paid_content"
       text = config["text"] || "This is premium content. Upgrade to continue reading."
@@ -3180,6 +3184,32 @@ module HasMarkdownExtensions
 
     dev_warning("Conflicting selector",
       "This block sets both `for: #{f}` and `type: #{t}` — `for` wins.")
+  end
+
+  # Every member form needs Members on: signing in, signing up, checking out,
+  # donating and unsubscribing all act on a member, and without the feature the
+  # form posts to a route that isn't there. They rendered anyway, so the page
+  # looked finished and failed on submit.
+  #
+  # Which kinds need it is already declared once, in the schema that builds the
+  # form menu — asked here rather than restated, so a new member form is covered
+  # by existing it. The paywall declares :payments_configured and warns about
+  # members itself (see paid_content_warnings), so it isn't caught here.
+  #
+  # Members off means members.yml doesn't exist at all, which is why the hint
+  # points at the button that creates it rather than at a setting inside it.
+  def members_disabled_warning(form_type)
+    return nil if SiteFeature.members_enabled?
+
+    kind = ActionBuilderSchema::FORM_KINDS.find { |k| k[:value] == form_type }
+    return nil unless kind && kind[:feature] == :members
+
+    return "" unless show_block_warnings?
+
+    dev_warning(
+      "#{kind[:label]} form unavailable",
+      "Members isn't enabled, so this form has no reason to exist. Click `ENABLE MEMBERS` in Settings to turn the feature on."
+    )
   end
 
   def default_button_text(form_type)
