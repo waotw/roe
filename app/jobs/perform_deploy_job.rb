@@ -20,6 +20,28 @@ class PerformDeployJob < ApplicationJob
 
   STATUS_CACHE_KEY = "deploy:status".freeze
   STATUS_TTL       = 24.hours
+
+  # A deploy that goes quiet for this long is treated as hung and stopped.
+  #
+  # Deliberately generous. DeployWatchdog declines to guess "stuck" from log
+  # silence for good reason — a quiet `docker build` layer can run for minutes
+  # — and killing a working deploy is far worse than letting a dead one sit.
+  # This isn't that guess: nothing here infers a stall mid-deploy and reports
+  # it, it only stops a command that has produced nothing at all for ten
+  # minutes, which no real build stage does.
+  STALL_TIMEOUT = 10.minutes
+
+  # How often to look up from the read while it's quiet.
+  STALL_POLL = 1
+
+  # How long a stalled command gets to exit on TERM before it's KILLed. A wedged
+  # CLI often ignores TERM; a healthy one uses this to clean up after itself.
+  TERM_GRACE = 2
+
+  # Written into both the log and the error so DeployDiagnostics can recognise
+  # a stall. It has to be a marker we plant: every other signature matches text
+  # the failing command printed, and a stall is defined by printing nothing.
+  STALL_MARKER = "roe: deploy stalled".freeze
   LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, "system", "global", ".last_deploy.yml")
 
   def perform(target:, version_tag:, admin_user_id: nil, reset_cache: false)
@@ -394,31 +416,76 @@ class PerformDeployJob < ApplicationJob
     Rails.logger.warn "[PerformDeployJob] Cache clear failed: #{e.message}"
   end
 
+  # Overridable so a test doesn't have to wait ten minutes to prove the timeout.
+  def stall_timeout = STALL_TIMEOUT
+  def term_grace    = TERM_GRACE
+
+  # TERM the whole group, not just the child. `kamal deploy` and `fly deploy`
+  # are front ends — the thing actually hung is usually a docker or ssh
+  # grandchild, and killing the parent alone orphans it still holding the
+  # resource. pgroup: true on spawn is what makes the negative pid work.
+  def terminate_process_group(pid)
+    Process.kill("TERM", -pid)
+    sleep term_grace
+    Process.kill("KILL", -pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    # Already gone, or not ours to signal — either way there's nothing to stop.
+  end
+
   def run_with_streaming(cmd, target:, version_tag:, env: {})
     log         = ""
     last_write  = Time.current
     success     = false
+    stalled     = false
 
     begin
       Bundler.with_original_env do
         # Pass the explicit env hash as Open3's first arg so it merges
         # over the inherited ENV without us having to hand-roll the
         # subprocess setup. Empty hash is a no-op.
-        Open3.popen2e(env, cmd, chdir: Rails.root.to_s) do |stdin, stdout_err, wait_thr|
+        # pgroup: true so the deploy and everything it spawns share a group we
+        # can stop as one. Without it a stall timeout can only kill the front
+        # end and leaves the wedged child running.
+        Open3.popen2e(env, cmd, chdir: Rails.root.to_s, pgroup: true) do |stdin, stdout_err, wait_thr|
           stdin.close
 
-          stdout_err.each_line do |line|
-            log += line
+          last_output = Time.current
+          buffer      = +""
 
-            # Throttle cache writes — once per second is plenty for the
-            # polling interval (2 s) and avoids hammering the cache store.
-            if Time.current - last_write >= 1.0
-              write_status(state: :running, target: target, version_tag: version_tag, log: log)
-              last_write = Time.current
+          # Read with a deadline rather than each_line, which blocks forever on
+          # a command that never writes and never exits — the whole bug.
+          loop do
+            if stdout_err.wait_readable(STALL_POLL)
+              begin
+                buffer << stdout_err.readpartial(4096)
+              rescue EOFError
+                break
+              end
+              last_output = Time.current
+
+              # readpartial lands on chunk boundaries, not line ones. Emit whole
+              # lines and hold the remainder for the next read.
+              while (newline = buffer.index("\n"))
+                log += buffer.slice!(0..newline)
+              end
+
+              # Throttle cache writes — once per second is plenty for the
+              # polling interval (2 s) and avoids hammering the cache store.
+              if Time.current - last_write >= 1.0
+                write_status(state: :running, target: target, version_tag: version_tag, log: log)
+                last_write = Time.current
+              end
+            elsif Time.current - last_output >= stall_timeout
+              stalled = true
+              terminate_process_group(wait_thr.pid)
+              break
             end
           end
 
-          success = wait_thr.value.success?
+          log += buffer # whatever it printed without a trailing newline
+          # Short-circuit: after a kill there's no exit status worth reading,
+          # and a stalled deploy failed whatever the process eventually says.
+          success = !stalled && wait_thr.value.success?
         end
       end
     rescue => e
@@ -452,15 +519,29 @@ class PerformDeployJob < ApplicationJob
       File.write(LAST_DEPLOY_FILE, yaml)
       Rails.logger.info "[PerformDeployJob] #{target} deploy completed successfully"
     else
+      minutes = (stall_timeout / 60).round
+
+      # The log is kept exactly as collected. On a stall it's the only evidence
+      # there is, and it's usually where the deploy got to before going quiet.
+      log += "\n[#{STALL_MARKER}] no output for #{minutes} minutes — Roe stopped the deploy.\n" if stalled
+
       write_status(
         state:        :failed,
         target:       target,
         version_tag:  version_tag,
         log:          log,
         completed_at: Time.current,
-        error:        "Deploy command exited with a non-zero status. See log for details."
+        error:        if stalled
+          [ "The deploy stopped responding — no output for #{minutes} minutes, " \
+            "so Roe stopped it (#{STALL_MARKER}).",
+            # Stopping mid-deploy leaves the same residue as Roe quitting
+            # mid-deploy, so it gets the same warning.
+            DeployWatchdog.cleanup_hint(target) ].compact.join(" ")
+        else
+          "Deploy command exited with a non-zero status. See log for details."
+        end
       )
-      Rails.logger.error "[PerformDeployJob] #{target} deploy failed"
+      Rails.logger.error "[PerformDeployJob] #{target} deploy #{stalled ? 'stalled and was stopped' : 'failed'}"
     end
   end
 

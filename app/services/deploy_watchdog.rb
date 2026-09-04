@@ -35,6 +35,24 @@ class DeployWatchdog
     "restarted while it was running. Nothing was left running in the background. " \
     "It's safe to deploy again."
 
+  # An interrupted deploy can leave the target holding something it only
+  # releases when it finishes: Kamal a deploy lock, Fly a machine lease. The
+  # next deploy then fails on that, reading as a fresh problem.
+  #
+  # Said here rather than recognised later. Kamal's lock has a signature in
+  # DeployDiagnostics because its wording is known; Fly's is a compiled CLI
+  # whose text we can't read, so there is nothing to match on. But at this
+  # point we don't need to match anything — we know a deploy was interrupted
+  # and we know which target it was.
+  CLEANUP_HINT = {
+    "kamal" => "If your next deploy says the deploy lock is already in place, " \
+               "this one left it behind: release it with `kamal lock release`.",
+    "fly"   => "If your next deploy is blocked on a machine lease, this one left " \
+               "it behind: clear it with `fly machine leases clear`."
+  }.freeze
+
+  def self.cleanup_hint(target) = CLEANUP_HINT[target.to_s]
+
   # Read the deploy status, correcting it first if it's describing a deploy
   # that isn't happening. Every reader goes through here so there's one
   # definition of "is a deploy running" rather than one per caller.
@@ -51,7 +69,7 @@ class DeployWatchdog
     failed = status.merge(
       state:        :failed,
       completed_at: Time.current,
-      error:        ABANDONED_MESSAGE,
+      error:        [ ABANDONED_MESSAGE, self.class.cleanup_hint(status[:target]) ].compact.join(" "),
       abandoned:    true
     )
     Rails.cache.write(PerformDeployJob::STATUS_CACHE_KEY, failed, expires_in: PerformDeployJob::STATUS_TTL)

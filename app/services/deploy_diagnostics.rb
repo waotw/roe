@@ -41,6 +41,50 @@ class DeployDiagnostics
   }.freeze
 
   SIGNATURES = [
+    # First, and matched on a marker Roe writes rather than on command output:
+    # a stall is defined by the command printing nothing, so there is no log
+    # text to recognise. Everything below reads what the failure said; this one
+    # reads the fact that it said nothing.
+    {
+      match: /roe: deploy stalled/,
+      title: "The deploy stopped responding",
+      explanation:
+        "The deploy command produced no output for several minutes, so Roe stopped it and " \
+        "freed the job. The log above is everything it managed to print before going quiet — " \
+        "usually the last thing it did is the thing it got stuck on. A stall like this is " \
+        "typically a command waiting on something that will never answer: a prompt nobody can " \
+        "see, a connection with no timeout of its own, or a builder that went away mid-build.",
+      steps: [
+        "Deploy again — a stall is often momentary, such as a slow registry or a builder that dropped.",
+        "If it stops at the same point every time, run the deploy command yourself in a terminal — a prompt Roe can't show you will be visible there.",
+        "Check for anything waiting on input: an unknown SSH host key or an expired login will wait forever rather than fail.",
+        "Nothing was left running — Roe stops the whole process group, so it's safe to deploy again."
+      ]
+    },
+    # Kamal holds a deploy lock on the primary host for the length of a deploy
+    # and releases it at the end. A deploy that was interrupted — stalled and
+    # stopped, or killed with Roe — never gets to release it, so the *next*
+    # deploy fails here. It reads as a new problem when it's the residue of an
+    # old one, which is why it's near the top: the lock message can accompany
+    # almost anything.
+    #
+    # Both strings are kamal's own (Kamal::Cli::Base#raise_if_locked): it says
+    # "Deploy lock already in place!" and raises "Deploy lock found. ...".
+    {
+      match: /Deploy lock already in place|Deploy lock found/i,
+      title: "A previous deploy is still holding the lock",
+      explanation:
+        "Kamal takes a lock on the server while it deploys and releases it when it finishes. " \
+        "A deploy that was interrupted — stopped for going quiet, or ended when Roe quit — " \
+        "never released it, so this deploy can't start. Nothing is wrong with the server or " \
+        "with this deploy; the lock is left over.",
+      steps: [
+        "Check who holds it: <code>kamal lock status</code>.",
+        "Release it: <code>kamal lock release</code>.",
+        "Deploy again — it will pick up from wherever the interrupted one got to.",
+        "If you didn't interrupt anything, make sure a deploy isn't running somewhere else before releasing."
+      ]
+    },
     DOCKER_DOWN,
     # Fly's own wording when the session is gone. DeployPreflight catches this
     # before a deploy starts, so this is the safety net for a session that
