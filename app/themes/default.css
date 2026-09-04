@@ -336,6 +336,11 @@ p:has(.site-logo) {
 
 /* ================ SITE ACTIONS (cart, member icon) ================= */
 
+html.snipcart-cart--opened .site-actions,
+html.snipcart-sidecart--opened .site-actions {
+  display: none;
+}
+
 .site-actions {
   position: absolute;
   top: var(--space-4);
@@ -3584,6 +3589,7 @@ hr.clear-floats {
 .btn-primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-2);
   background: var(--color-heading);
   color: var(--color-bg);
   border: 1px solid var(--color-heading);
@@ -3816,6 +3822,7 @@ hr.clear-floats {
 
 .checkout-form-wrapper {
   margin-top: var(--space-6);
+  margin-bottom: var(--space-2);
 }
 
 .checkout-form-wrapper.is-guest .member-checkout,
@@ -4028,8 +4035,16 @@ hr.clear-floats {
   border-bottom: 1px solid var(--color-border);
 }
 
+.paid-content-gate p {
+  margin-bottom: var(--space-2);
+}
+
 .paid-content-gate a {
-  text-decoration: none;
+  /*text-decoration: none;*/
+}
+
+.paid-content-signin {
+  font-size: var(--text-xs);
 }
 
 /* Deleting an account — separated from the account actions, and behind a

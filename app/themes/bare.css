@@ -317,6 +317,11 @@ p:has(.site-logo) {
 
 /* ================ SITE ACTIONS ================= */
 
+html.snipcart-cart--opened .site-actions,
+html.snipcart-sidecart--opened .site-actions {
+  display: none;
+}
+
 .site-actions {
   position: absolute;
   top: var(--space-4);
@@ -3719,7 +3724,6 @@ hr.clear-floats {
   color: var(--color-link);
   text-decoration: none;
 }
-
 
 /* Deleting an account — separated from the account actions, and behind a
    disclosure, because it can't be undone. */
