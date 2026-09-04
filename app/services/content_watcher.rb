@@ -16,15 +16,30 @@ class ContentWatcher
     File.join(RoeSitePaths::SITE_PATH, "theme")
   ].freeze
 
-    # Define what file types we process
-    ALLOWED_EXTENSIONS = %w[
-      md yml
-      jpg jpeg png gif webp svg
+    # What ContentWatcher processes, split by what each half answers.
+    #
+    # The media half used to be written twice — here, and again as an inline
+    # regex in process_file — so the two could disagree about what a media file
+    # is. A type in one but not the other is either watched and never recorded,
+    # or recorded and never removed when the file is deleted. Derived from one
+    # list now, so they can't drift.
+    CONTENT_EXTENSIONS = %w[md yml].freeze
+
+    # Keep in step with what the media browser accepts on upload
+    # (Admin::MediumController#determine_media_type) and what ContentSync moves.
+    # bmp was accepted by both of those and missing here, so a .bmp deleted from
+    # disk stayed in the media browser — the bug this list is now shaped to
+    # prevent, found while closing the report of it for video.
+    MEDIA_EXTENSIONS = %w[
+      jpg jpeg png gif webp svg bmp
       mp3 m4a wav ogg flac aac
       mp4 webm ogv mov avi mkv
     ].freeze
 
+    ALLOWED_EXTENSIONS = (CONTENT_EXTENSIONS + MEDIA_EXTENSIONS).freeze
+
     EXTENSION_PATTERN = /\.(#{ALLOWED_EXTENSIONS.join('|')})$/i
+    MEDIA_PATTERN     = /\.(#{MEDIA_EXTENSIONS.join('|')})$/i
 
   def self.start
     # Listen calls realpath on every watched dir at startup, so a single
@@ -229,7 +244,7 @@ class ContentWatcher
         puts "\n   ✓ Product saved: #{result.title || File.basename(file)}\n"
       end
 
-    elsif absolute_file.include?("site/media") && absolute_file.match?(/\.(jpg|jpeg|png|gif|webp|svg|mp3|m4a|wav|ogg|flac|aac|mp4|webm|ogv|mov|avi|mkv)$/i)
+    elsif absolute_file.include?("site/media") && absolute_file.match?(MEDIA_PATTERN)
       # Skip variant files - they shouldn't be tracked in media table
       if absolute_file.include?("/variants/")
         puts "DEBUG: Skipping variant file: #{absolute_file}"
@@ -283,8 +298,10 @@ class ContentWatcher
 
         renames[old_file] = new_file if new_file
 
-      # Handle media files (images)
-      elsif old_file.match?(/\.(jpg|jpeg|png|gif|webp|svg|mp3|m4a|wav|ogg|flac|aac|mp4|webm|ogv|mov|avi|mkv)$/i)
+      # Handle media files. Third copy of the same list until now — a type
+      # missing here isn't seen as a rename, so it reads as a delete plus an
+      # add and the record is destroyed and recreated instead of moved.
+      elsif old_file.match?(MEDIA_PATTERN)
         old_basename = File.basename(old_file, File.extname(old_file))
         old_ext = File.extname(old_file)
 

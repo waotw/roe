@@ -62,6 +62,38 @@ class ContentWatcherTest < ActiveSupport::TestCase
     assert_match pattern, "video.mkv"
   end
 
+  # The media list existed in three places — the constant, process_file's media
+  # branch, and detect_renames — and they could disagree about what a media
+  # file is. bmp was in the uploader and ContentSync but missing from two of
+  # the three, so a .bmp deleted from disk stayed in the media browser and a
+  # renamed one read as a delete plus an add.
+  test "every media type the watcher knows is watched, recorded and renameable" do
+    ContentWatcher::MEDIA_EXTENSIONS.each do |ext|
+      path = "site/media/images/example.#{ext}"
+
+      assert_match ContentWatcher::EXTENSION_PATTERN, path,
+        ".#{ext} isn't watched, so deleting it would leave it in the media browser"
+      assert_match ContentWatcher::MEDIA_PATTERN, path,
+        ".#{ext} wouldn't be recorded as media, or recognised as a rename"
+    end
+  end
+
+  # The uploader is what decides a file can exist in site/media at all, so
+  # anything it accepts has to be something the watcher will notice.
+  test "the watcher covers everything the media browser accepts on upload" do
+    accepted = %w[png jpg jpeg webp gif svg bmp mp3 m4a wav ogg flac aac mp4 webm ogv mov avi mkv]
+
+    missing = accepted.reject { |ext| "x.#{ext}".match?(ContentWatcher::MEDIA_PATTERN) }
+
+    assert_empty missing,
+      "uploadable but unwatched — deleting one of these leaves it in the media browser: #{missing.join(', ')}"
+  end
+
+  test "the allowed list is the content and media lists, not a third copy" do
+    assert_equal ContentWatcher::CONTENT_EXTENSIONS + ContentWatcher::MEDIA_EXTENSIONS,
+                 ContentWatcher::ALLOWED_EXTENSIONS
+  end
+
   test "EXTENSION_PATTERN does not match disallowed extensions" do
     pattern = ContentWatcher::EXTENSION_PATTERN
 
