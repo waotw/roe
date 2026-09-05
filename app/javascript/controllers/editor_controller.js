@@ -33,7 +33,6 @@ if (!window.EditorState || !window.EditorState.saveElement) {
         `editorState:${window.location.pathname}`,
         JSON.stringify(state),
       );
-
     },
 
     restore(textareaId) {
@@ -113,7 +112,6 @@ export default class extends Controller {
   };
 
   connect() {
-
     // Leave-guard modal state (see handleTurboBeforeVisit).
     this.confirmedLeave = false;
     this.pendingVisitUrl = null;
@@ -226,7 +224,8 @@ export default class extends Controller {
     // The gallery builder asks for images; the editor owns the modal, so it
     // does the opening. The selection comes back as media-picker:insert-gallery,
     // which the gallery builder listens for itself.
-    this.galleryPickHandler = () => this.openMediaPickerFor("images", "gallery");
+    this.galleryPickHandler = () =>
+      this.openMediaPickerFor("images", "gallery");
     this.element.addEventListener(
       "gallery-builder:pick-images",
       this.galleryPickHandler,
@@ -437,7 +436,6 @@ export default class extends Controller {
   }
 
   disconnect() {
-
     // Remove global keyboard handler
     document.removeEventListener("keydown", this.globalKeydownHandler);
     document.removeEventListener(
@@ -812,8 +810,7 @@ export default class extends Controller {
     const currentlyShowingPublish = publishButton !== null;
     if (currentlyShowingPublish === shouldShowPublish) return; // no change
 
-    const postId =
-      publishButton?.dataset.editorPostId || this.resourceIdValue;
+    const postId = publishButton?.dataset.editorPostId || this.resourceIdValue;
     if (!postId) return;
 
     // Type-generic base path: post -> /admin/posts, page -> /admin/pages, etc.
@@ -1025,8 +1022,8 @@ export default class extends Controller {
     doneButton.type = "button";
     doneButton.id = "footnote-done-button";
     doneButton.className =
-      "fixed bottom-8 right-12 z-50 uppercase text-base px-1.5 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs";
-    doneButton.innerHTML = "✓ Done with Footnote";
+      "fixed bottom-18 left-12 z-50 uppercase text-base px-1.5 py-1 border border-green-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs";
+    doneButton.innerHTML = "Close Footnote";
     doneButton.dataset.returnPosition = returnPosition;
 
     // Click handler to return to original position
@@ -1048,7 +1045,6 @@ export default class extends Controller {
   }
 
   returnFromFootnote(returnPosition) {
-
     let targetPosition = returnPosition;
     const pending = this.pendingFootnote;
 
@@ -1273,8 +1269,7 @@ export default class extends Controller {
         // previous empty `>` separator line, then land on a new empty line
         // preserving any leading indentation (so footnotes keep their indent).
         const currentLineStart = beforeCursor.length - currentLine.length;
-        const previousLineStart =
-          currentLineStart - previousLine.length - 1;
+        const previousLineStart = currentLineStart - previousLine.length - 1;
         this.textareaTarget.value =
           content.substring(0, previousLineStart) +
           "\n" +
@@ -1288,11 +1283,7 @@ export default class extends Controller {
 
     // Continue the blockquote on a new line
     event.preventDefault();
-    document.execCommand(
-      "insertText",
-      false,
-      "\n" + leadingSpace + "> ",
-    );
+    document.execCommand("insertText", false, "\n" + leadingSpace + "> ");
     return true;
   }
 
@@ -1321,7 +1312,6 @@ export default class extends Controller {
       this.textareaTarget.value = newContent;
       this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
         cursorPos - spacesToRemove;
-
     }
   }
 
@@ -1547,7 +1537,6 @@ export default class extends Controller {
   }
 
   insertProductTemplate(product) {
-
     // Get template and currency symbol
     const template = this.productTemplateValue || "";
     const currencySymbol = this.getCurrencySymbol();
@@ -1590,7 +1579,6 @@ export default class extends Controller {
     this.savedCursorBeforeModal = null;
 
     this.closeProductModal();
-
   }
 
   closeProductModal() {
@@ -2006,7 +1994,6 @@ export default class extends Controller {
   // ========== FORM ACTIONS ==========
 
   save(event) {
-
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
 
@@ -2043,7 +2030,6 @@ export default class extends Controller {
     // The preview is kept current by the debounced live updates; the post-save
     // reload re-pushes the saved content (see the data-trigger="refresh" path
     // in connect). No pre-submit broadcast needed here.
-
   }
 
   restoreScrollPosition() {
@@ -2439,7 +2425,6 @@ export default class extends Controller {
   }
 
   wrapSelectionWithSavedPosition(prefix, suffix, placeholder = "") {
-
     // Check if textarea currently has focus and a selection
     const hasFocus = document.activeElement === this.textareaTarget;
     const hasSelection =
@@ -2605,7 +2590,6 @@ export default class extends Controller {
         return;
       }
     }
-
   }
 
   // ========== TEST EMAIL METHODS ==========
