@@ -10,6 +10,13 @@ require "test_helper"
 # These render with preview: true, which is how the editor renders. The
 # published side is covered by BlockWarningsVisibilityTest.
 class BlockConfigWarningsTest < ActiveSupport::TestCase
+  # These are about option names, not feature gating — but a form block whose
+  # feature is off now warns about that instead, and short-circuits before it
+  # ever looks at the options. members_enabled? is File.exist?(members.yml) in
+  # the test site, and a sibling test deletes that file, so without pinning it
+  # these pass or fail on run order.
+  setup { SiteFeature.stubs(:members_enabled?).returns(true) }
+
   class TestModel
     include HasMarkdownExtensions
     include HasInlineFootnotes

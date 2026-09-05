@@ -8,29 +8,39 @@ module RoeUpdater
       def download_version(version, status_record)
         cleanup_staging
 
-        # Same source as the update check, so the host a version was found on
-        # is the host it's downloaded from.
-        git_url = RoeUpdater::Forge.https_url
-
         status_record.update!(
           current_step: "Downloading Roe #{version}...",
           log: (status_record.log || "") + "→ Downloading version #{version}...\n"
         )
 
-        clone_cmd = "git clone --depth 1 --branch v#{version} #{git_url} '#{STAGING_PATH}' 2>&1"
-        output = `#{clone_cmd}`
+        # Same list as the update check, walked the same way. Falling through
+        # here matters on its own: a mirror can answer `ls-remote` and still
+        # fail the clone — stale, half-synced, or dropping the connection on a
+        # bigger transfer — and stopping at the first failure would strand an
+        # update that another mirror could finish.
+        last_output = nil
 
-        unless $?.success?
-          raise DownloadError, "Git clone failed: #{output}"
+        RoeUpdater::Forge.mirrors.each do |git_url|
+          cleanup_staging # a failed clone can leave a partial directory behind
+
+          last_output = `git clone --depth 1 --branch v#{version} #{git_url} '#{STAGING_PATH}' 2>&1`
+          next unless $?.success?
+
+          begin
+            verify_download
+          rescue DownloadError => e
+            last_output = "#{e.message} (from #{git_url})"
+            next
+          end
+
+          status_record.update!(
+            log: (status_record.log || "") + "✓ Downloaded version #{version}\n"
+          )
+          return STAGING_PATH
         end
 
-        verify_download
+        raise DownloadError, "Git clone failed from every mirror. Last error: #{last_output}"
 
-        status_record.update!(
-          log: (status_record.log || "") + "✓ Downloaded version #{version}\n"
-        )
-
-        STAGING_PATH
       rescue => e
         cleanup_staging
         raise DownloadError, "Download failed: #{e.message}"

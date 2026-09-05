@@ -147,20 +147,22 @@ module RoeUpdater
           "HOME" => ENV["HOME"]
         }.compact
 
-        # Try HTTPS first (works for public repos without auth)
-        https_url = RoeUpdater::Forge.https_url
-
-        begin
-          stdout, stderr, status = nil, nil, nil
+        # Try every mirror over HTTPS, in order (works for public repos without
+        # auth). An unreachable host fails in seconds, so walking the list costs
+        # nothing on the happy path and is the whole point on the sad one.
+        RoeUpdater::Forge.mirrors.each do |https_url|
+          stdout, status = nil, nil
           Timeout.timeout(10) do
-            stdout, stderr, status = Open3.capture3(env, "git", "ls-remote", "--tags", https_url)
+            stdout, _stderr, status = Open3.capture3(env, "git", "ls-remote", "--tags", https_url)
           end
 
-          if status.success? && stdout.present?
+          if status&.success? && stdout.present?
             return parse_git_tags_output(stdout)
           end
+
+          Rails.logger.debug "[VersionChecker] No tags from #{https_url}, trying the next mirror"
         rescue Timeout::Error
-          Rails.logger.debug "[VersionChecker] HTTPS fetch timed out"
+          Rails.logger.debug "[VersionChecker] #{https_url} timed out, trying the next mirror"
         end
 
         # HTTPS failed (private repo or timeout), try SSH
@@ -277,8 +279,18 @@ module RoeUpdater
         require "net/http"
         require "json"
 
-        url = URI(RoeUpdater::Forge.api_release_url(tag))
+        # Try each mirror that has a known API shape. Release notes are
+        # best-effort — every path here already returns nil on failure — so a
+        # mirror that doesn't answer just means trying the next one.
+        RoeUpdater::Forge.api_release_urls(tag).each do |api_url|
+          notes = fetch_release_metadata_from(URI(api_url))
+          return notes if notes
+        end
 
+        nil
+      end
+
+      def fetch_release_metadata_from(url)
         response = nil
         Timeout.timeout(5) do
           http = Net::HTTP.new(url.host, url.port)
