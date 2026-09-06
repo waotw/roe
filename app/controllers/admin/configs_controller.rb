@@ -257,6 +257,11 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Include all pages in search",
           hint: "By default only pages linked in the navigation or footer are searchable. Turn on to index every published page."
         },
+        "search.results_when_opened" => {
+          type: :checkbox,
+          label: "Show results before typing",
+          hint: "By default, search doesn't show results until you type but if you want results to show up before typing, enable this option."
+        },
         "docs.roe" => {
           type: :select,
           label: "Roe's documentation",
@@ -269,11 +274,6 @@ class Admin::ConfigsController < Admin::BaseController
                 "**local (default)** — kept on this computer, not sent to your live site.<br>" \
                 "<strong>published</strong> — sent to your live site but left out of your search results.<br>" \
                 "<strong>searchable</strong> — sent to your live site and in search."
-        },
-        "search.results_when_opened" => {
-          type: :checkbox,
-          label: "Show results before typing",
-          hint: "By default, search doesn't show results until you type but if you want results to show up before typing, enable this option."
         }
       }
     }

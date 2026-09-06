@@ -45,6 +45,19 @@ module SiteSync
         deleted = Array(diff[:deleted])
         return if changed.empty? && deleted.empty?
 
+        # Roe's docs when the setting says local-only. Not part of the diff —
+        # both sides exclude them from their manifests, so neither can see what
+        # live still has, and it's sent every push because it can't be detected.
+        #
+        # Added AFTER the early return on purpose: this rides along with a sync
+        # that's already happening rather than causing one, or an install set to
+        # `local` would push on every check forever with nothing to do.
+        #
+        # Deliberately quiet — the docs ship with Roe, so this can't lose
+        # anything, and the setting is the instruction.
+        purge = Ledger.roe_docs_to_purge
+        deleted += purge
+
         total = changed.size
         on_progress&.call(completed: 0, total: total)
 
@@ -68,6 +81,13 @@ module SiteSync
           Exchange.with_retries(label: "upload batch #{i + 1}/#{batches.length}") do
             result = Exchange.upload_files(archive_bytes: archive, manifest: manifest, deleted: del)
             raise HttpTransportError, "upload to peer failed" if result.nil?
+
+            # The peer reports what it actually removed, which is how a purge
+            # stays silent when there was nothing left to remove.
+            if i == last && purge.any? && (removed = result["deleted"].to_i) > 0
+              Rails.logger.info "[SiteSync::HttpTransport] removed #{removed} Roe documentation " \
+                                "file(s) from live (docs.roe: local)"
+            end
           end
 
           done += paths.size
@@ -117,8 +137,11 @@ module SiteSync
 
         SiteWriter.delete_paths(root: RoeSitePaths::SITE_PATH, paths: deleted) if deleted.any?
 
-        # We changed our own /site — rewrite our ledger so drift clears.
-        Ledger.write_current!
+        # We changed our own /site — rewrite our ledger so drift clears. Only
+        # what the peer also has: a pull leaves local-only files untouched on
+        # disk, and recording them here would make them look deleted on the peer
+        # next time round.
+        Ledger.write_confirmed!(Exchange.fetch_peer_manifest&.dig("files"), context: "pull")
         true
       end
 

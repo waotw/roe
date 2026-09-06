@@ -70,6 +70,21 @@ module SiteSync
         local    ||= {}
         peer     ||= {}
 
+        # Roe's own docs, when this side is set to keep them local, are out of
+        # scope rather than deleted. They're excluded from our manifest, so
+        # their absence would otherwise read as us deleting them and ask before
+        # propagating — 113 files to confirm, for a setting the user just chose
+        # deliberately. Excluding them here means no push, no pull, no conflict;
+        # HttpTransport removes live's copies quietly on the next push.
+        #
+        # Safe to be silent about only because these ship with Roe: they're
+        # always on this computer, and turning the setting back on restores them.
+        if SiteSync::Ledger.roe_docs_excluded?
+          baseline = baseline.reject { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
+          local    = local.reject    { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
+          peer     = peer.reject     { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
+        end
+
         push = []; push_delete = []; pull = []; pull_delete = []; conflicts = []; converged = []
 
         (baseline.keys | local.keys | peer.keys).each do |path|

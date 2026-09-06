@@ -265,8 +265,14 @@ module SiteSync
         # retried — they won't fix themselves. Retries use brief
         # exponential backoff (1s, then 2s) so we don't compound a
         # struggling peer.
+        # Send our manifest with it. The peer is about to rewrite its baseline,
+        # and without knowing what we hold it can only record its own full
+        # state — which puts every file we don't have into its baseline, to be
+        # read as our deletion next sync. Ours is the confirmation it needs.
+        body = { manifest: SiteSync::Ledger.new.current_manifest }.to_json
+
         with_retries(label: "refresh_peer_ledger", max_retries: 2) do
-          response = post_to_peer(uri, "{}")
+          response = post_to_peer(uri, body)
           if response.nil?
             raise "no response (network error)"
           elsif response.is_a?(Net::HTTPSuccess)
@@ -645,7 +651,12 @@ module SiteSync
         return if recorded && recorded["fingerprint"] == current_fp
 
         Rails.logger.info "[SiteSync::Exchange] self-heal: peer fingerprint matches ours, refreshing local ledger"
-        SiteSync::Ledger.write_current!
+        # Equal fingerprints mean equal manifests, so confirming against the
+        # peer is a formality here — but it goes through the same path as every
+        # other baseline write rather than being a second, locally-argued rule.
+        # If the fetch fails there's simply no write, which is what this method
+        # already tolerates: it only ever cleared cosmetic drift.
+        SiteSync::Ledger.write_confirmed!(fetch_peer_manifest&.dig("files"), context: "self-heal")
         SiteSync::Checker.clear_cache
         Rails.cache.delete("site_sync:current_fingerprint")
       rescue => e

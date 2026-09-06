@@ -417,7 +417,10 @@ class SiteSyncTransferJob < ApplicationJob
 
     if realigned.positive?
       Rails.logger.info "[SiteSyncTransferJob] realigned #{realigned} phantom-mtime file(s)"
-      SiteSync::Ledger.write_current!
+      # write_current! here undid the confirmed baseline written moments earlier,
+      # putting every peer-absent file back in. The peer manifest is already in
+      # hand, so confirm against it.
+      SiteSync::Ledger.write_confirmed!(peer_files, context: "phantom-mtime realign")
     end
   rescue => e
     # Never let a realignment hiccup fail a sync that already succeeded.
