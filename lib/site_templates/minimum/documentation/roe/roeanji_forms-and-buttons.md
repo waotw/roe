@@ -198,6 +198,6 @@ button_text: Become a paid member
 | `for` | Yes | `paid_content` |
 | `text` | No | Message shown above the upgrade button |
 | `button_text` | No | Add any text you like — default "Become a paid member" |
-| `signin_text` | No | Add any text you like — default "Already a member, [sign in]" |
+| `signin_text` | No | Add any text you like — default "Already a member? [Sign in]" |
 
 When adding `signin_text`, the text between the `[]` will become a link to `/sign-in` automatically.

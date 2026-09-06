@@ -20,7 +20,12 @@ template: links
 
 ## Display
 
-`Always show member icon` - Check this box to keep the account icon visible at all times. When `uchecked`, the member icon will only show up for signed-in members. 
+`Always show member icon`
+
+- When `checked` the member/account icon is visible at all times
+  - if signed-out it links to the `/sign-in` page.
+  - if signed-in it links to their account page.
+- When `unchecked`, the member icon will only show up for signed-in members. 
 
 ## Payments
 

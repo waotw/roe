@@ -28,7 +28,7 @@ These instructions cover macOS, Linux, and Windows. Windows support is new and I
 
 ## Download Roe
 
-[Download Roe](https://github.com/waotw/roe/releases/latest).
+[Download Roe](https://github.com/waotw/roe/releases/latest/download/roe.zip).
 
 The download is a single zip file. Inside it are two main folders, plus a few supporting files:
 
