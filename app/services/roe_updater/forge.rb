@@ -56,7 +56,27 @@ module RoeUpdater
 
         return [ "https://#{host}/#{repo}" ] if ENV["ROE_FORGE_HOST"].present? || ENV["ROE_FORGE_REPO"].present?
 
-        DEFAULT_MIRRORS
+        # An install that is itself a mirror must not ask itself. go-roe.com is
+        # the first entry AND a Roe site, so without this it makes a request
+        # that leaves the machine, comes back through its own proxy, and tells
+        # it nothing — before either real forge is tried.
+        #
+        # Never returns empty: a site misconfigured to match every mirror would
+        # otherwise lose the ability to update at all, which is worse than a
+        # wasted request.
+        usable = DEFAULT_MIRRORS.reject { |url| own_site?(url) }
+        usable.any? ? usable : DEFAULT_MIRRORS
+      end
+
+      def own_site?(url)
+        site = URI.parse(SiteConfig.site_url.to_s).host
+        return false if site.blank?
+
+        URI.parse(url).host == site
+      rescue StandardError
+        # Forge is used from rake tasks and boot paths where SiteConfig may not
+        # be available. Not knowing means not skipping.
+        false
       end
 
       # The preferred mirror. Kept for callers that want one URL and for

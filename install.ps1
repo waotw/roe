@@ -1,10 +1,14 @@
 # Roe one-line installer for Windows.
 #
-#   irm https://raw.githubusercontent.com/waotw/roe/development/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/waotw/roe/main/install.ps1 | iex
 #
 # The short go-roe.com/install.ps1 and /install URLs aren't serving yet, so
 # both URLs below point at the repo. Swap them back once those are live —
 # nothing else in this script needs to change.
+#
+# main, not development: development carries nightlies, and someone installing
+# Roe for the first time on Windows should be bootstrapped by the same code
+# that ships in a stable release.
 #
 # Roe is a Linux application. On Windows it runs inside WSL — Microsoft's
 # built-in Linux environment — where it behaves exactly as it does on a Mac.
@@ -22,8 +26,8 @@
 
 $ErrorActionPreference = 'Stop'
 
-$InstallUrl   = 'https://raw.githubusercontent.com/waotw/roe/development/install.sh'
-$BootstrapUrl = 'https://raw.githubusercontent.com/waotw/roe/development/install.ps1'
+$InstallUrl   = 'https://raw.githubusercontent.com/waotw/roe/main/install.sh'
+$BootstrapUrl = 'https://raw.githubusercontent.com/waotw/roe/main/install.ps1'
 $Distro     = if ($env:ROE_WSL_DISTRO) { $env:ROE_WSL_DISTRO } else { 'Ubuntu' }
 
 function Say  { param($m) Write-Host $m }

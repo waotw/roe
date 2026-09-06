@@ -134,6 +134,9 @@ module RoeUpdater
         nil
       end
 
+      MIRROR_TIMEOUT = 5
+      RELEASE_NOTES_TIMEOUT = 3
+
       def fetch_via_git_tags
         return nil unless git_available?
 
@@ -152,7 +155,10 @@ module RoeUpdater
         # nothing on the happy path and is the whole point on the sad one.
         RoeUpdater::Forge.mirrors.each do |https_url|
           stdout, status = nil, nil
-          Timeout.timeout(10) do
+          # Shorter than a single-host check would justify: there's another
+          # mirror behind this one, so abandoning a slow one costs less than
+          # waiting on it. Three mirrors at 10s each was a 30s worst case.
+          Timeout.timeout(MIRROR_TIMEOUT) do
             stdout, _stderr, status = Open3.capture3(env, "git", "ls-remote", "--tags", https_url)
           end
 
@@ -292,7 +298,9 @@ module RoeUpdater
 
       def fetch_release_metadata_from(url)
         response = nil
-        Timeout.timeout(5) do
+        # Release notes are cosmetic — the update works without them — so this
+        # gets the smallest budget of anything in the check.
+        Timeout.timeout(RELEASE_NOTES_TIMEOUT) do
           http = Net::HTTP.new(url.host, url.port)
           http.use_ssl = true
           http.open_timeout = 3

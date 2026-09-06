@@ -76,6 +76,36 @@ class RoeUpdater::ForgeTest < ActiveSupport::TestCase
                  RoeUpdater::Forge.api_release_url("v0.3.0", "https://github.com/waotw/roe")
   end
 
+  # go-roe.com is the first mirror AND a Roe site. Asking itself sends a request
+  # out through DNS and back through its own proxy to learn nothing, before
+  # either real forge is tried — and it was the slowest part of that install's
+  # update check.
+  test "a site that is itself a mirror doesn't ask itself" do
+    SiteConfig.stubs(:site_url).returns("https://go-roe.com")
+
+    assert_not_includes RoeUpdater::Forge.mirrors, "https://go-roe.com/roe.git"
+    assert_includes RoeUpdater::Forge.mirrors, "https://github.com/waotw/roe"
+  end
+
+  test "every other install still prefers go-roe.com" do
+    SiteConfig.stubs(:site_url).returns("https://someone-elses-site.com")
+
+    assert_equal "https://go-roe.com/roe.git", RoeUpdater::Forge.mirrors.first
+  end
+
+  # Losing the ability to update is worse than a wasted request.
+  test "a site matching every mirror still gets a list" do
+    RoeUpdater::Forge.stubs(:own_site?).returns(true)
+
+    assert_equal RoeUpdater::Forge::DEFAULT_MIRRORS, RoeUpdater::Forge.mirrors
+  end
+
+  test "an unreadable site url doesn't skip anything" do
+    SiteConfig.stubs(:site_url).raises(StandardError)
+
+    assert_equal RoeUpdater::Forge::DEFAULT_MIRRORS, RoeUpdater::Forge.mirrors
+  end
+
   test "the mirror list can be replaced outright" do
     ENV["ROE_FORGE_URLS"] = "https://one.example/roe, https://two.example/roe"
 
