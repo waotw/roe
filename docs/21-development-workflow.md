@@ -3,7 +3,7 @@
 **Status:** Pre-1.0 (0.x)
 **Audience:** Roe maintainers & contributors — internal, not part of the public site docs.
 
-Roe develops in the open on Codeberg ([`waotw/roe`](https://codeberg.org/waotw/roe)). This document covers how versions are tagged, how the branch/release flow works, and how the in-app update system consumes it.
+Roe develops in the open on GitHub ([`waotw/roe`](https://github.com/waotw/roe)). This document covers how versions are tagged, how the branch/release flow works, and how the in-app update system consumes it.
 
 Push/PR access to `development` and `main` is invite-only (trusted contributors). If you don't have it, reach out first — outside contributions are handled case-by-case.
 

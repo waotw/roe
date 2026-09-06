@@ -43,7 +43,7 @@ class UpdatePreflightChecker
           "non-empty staging/ would block validate_prerequisites — clean it up before testing")
 
     section "Codeberg connectivity"
-    check_codeberg_reachable
+    check_mirrors_reachable
     check_update_check
 
     section "Database files"
@@ -141,26 +141,31 @@ class UpdatePreflightChecker
     @failures << "version file unreadable"
   end
 
-  def check_codeberg_reachable
+  # Checks the same list the updater walks, in the same order — a preflight
+  # that hardcoded one host reported it reachable while the updater looked
+  # somewhere else entirely, which is a green light for the wrong thing.
+  #
+  # Passes if ANY mirror answers, because that's the condition the updater
+  # needs. Which one answered is worth printing: falling through to the last
+  # mirror works but means the ones before it are down.
+  def check_mirrors_reachable
     if ENV["ROE_MOCK_UPDATE"].present?
-      info("ROE_MOCK_UPDATE=#{ENV['ROE_MOCK_UPDATE']}", "skipping live Codeberg check (mock active)")
+      info("ROE_MOCK_UPDATE=#{ENV['ROE_MOCK_UPDATE']}", "skipping live mirror check (mock active)")
       return
     end
 
-    # Build the URL inline from CODEBERG_REPO rather than pulling a
-    # separate GIT_REMOTE_URL constant — VersionChecker only exposes
-    # the repo slug, and tying the preflight to that single source of
-    # truth keeps the two from drifting apart.
-    git_url = "https://codeberg.org/#{RoeUpdater::VersionChecker::CODEBERG_REPO}"
-    output  = `git ls-remote --tags #{git_url} 2>&1`
-    if $?.success?
-      tag_count = output.lines.count
-      puts "  ✓ codeberg.org reachable: #{tag_count} tag refs found"
-    else
-      puts "  ✗ Cannot reach codeberg.org for tag listing"
-      puts "     #{output.lines.first&.strip}"
-      @failures << "codeberg unreachable"
+    RoeUpdater::Forge.mirrors.each do |git_url|
+      output = `git ls-remote --tags #{git_url} 2>&1`
+      if $?.success?
+        puts "  ✓ #{git_url} reachable: #{output.lines.count} tag refs found"
+        return
+      end
+
+      puts "  · #{git_url} didn't answer, trying the next mirror"
     end
+
+    puts "  ✗ No mirror could list tags"
+    @failures << "no update mirror reachable"
   end
 
   def check_update_check

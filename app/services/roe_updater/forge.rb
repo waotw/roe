@@ -26,12 +26,17 @@ module RoeUpdater
   # both of which work against any git host over HTTPS. Only #api_release_url
   # is forge-specific, and release notes degrade gracefully when it misses.
   class Forge
-    DEFAULT_HOST = "codeberg.org"
+    DEFAULT_HOST = "github.com"
     DEFAULT_REPO = "waotw/roe"
 
     # Ordered. First that answers wins.
+    #
+    # Codeberg stays last rather than being dropped: it's where installs from
+    # before the move still point, and it costs nothing to keep answering for
+    # them. Removing it is what would strand people, not keeping it.
     DEFAULT_MIRRORS = [
       "https://go-roe.com/roe.git",
+      "https://github.com/waotw/roe",
       "https://codeberg.org/waotw/roe"
     ].freeze
 

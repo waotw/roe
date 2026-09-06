@@ -1,6 +1,6 @@
 # Roe one-line installer for Windows.
 #
-#   irm https://codeberg.org/waotw/roe/raw/branch/development/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/waotw/roe/development/install.ps1 | iex
 #
 # The short go-roe.com/install.ps1 and /install URLs aren't serving yet, so
 # both URLs below point at the repo. Swap them back once those are live —
@@ -22,8 +22,8 @@
 
 $ErrorActionPreference = 'Stop'
 
-$InstallUrl   = 'https://codeberg.org/waotw/roe/raw/branch/development/install.sh'
-$BootstrapUrl = 'https://codeberg.org/waotw/roe/raw/branch/development/install.ps1'
+$InstallUrl   = 'https://raw.githubusercontent.com/waotw/roe/development/install.sh'
+$BootstrapUrl = 'https://raw.githubusercontent.com/waotw/roe/development/install.ps1'
 $Distro     = if ($env:ROE_WSL_DISTRO) { $env:ROE_WSL_DISTRO } else { 'Ubuntu' }
 
 function Say  { param($m) Write-Host $m }

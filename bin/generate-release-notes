@@ -173,9 +173,9 @@ generate_notes() {
     echo "---"
     echo ""
     if [ -n "$PREVIOUS_TAG" ]; then
-        echo "**Full Changelog**: https://codeberg.org/waotw/roe/compare/$PREVIOUS_TAG...$CURRENT_TAG"
+        echo "**Full Changelog**: https://github.com/waotw/roe/compare/$PREVIOUS_TAG...$CURRENT_TAG"
     else
-        echo "**Full Changelog**: https://codeberg.org/waotw/roe/releases/tag/$CURRENT_TAG"
+        echo "**Full Changelog**: https://github.com/waotw/roe/releases/tag/$CURRENT_TAG"
     fi
 }
 

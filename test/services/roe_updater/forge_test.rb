@@ -40,20 +40,28 @@ class RoeUpdater::ForgeTest < ActiveSupport::TestCase
     end
   end
 
-  test "Codeberg stays reachable for installs that predate any move" do
+  # Where Roe lives now. Codeberg and Sourcehut both bar AI-assisted projects.
+  test "GitHub is in the list" do
+    assert_includes RoeUpdater::Forge.mirrors, "https://github.com/waotw/roe"
+  end
+
+  # Dropping it is what would strand an install that predates the move — it
+  # still points at Codeberg and can only be repointed by an update it can't
+  # fetch from anywhere else.
+  test "Codeberg stays reachable for installs that predate the move" do
     assert_includes RoeUpdater::Forge.mirrors, "https://codeberg.org/waotw/roe"
   end
 
-  test "ssh and the legacy host/repo readers are unchanged" do
-    assert_equal "codeberg.org", RoeUpdater::Forge.host
+  test "the ssh fallback follows the move" do
+    assert_equal "github.com", RoeUpdater::Forge.host
     assert_equal "waotw/roe", RoeUpdater::Forge.repo
-    assert_equal "git@codeberg.org:waotw/roe.git", RoeUpdater::Forge.ssh_url
+    assert_equal "git@github.com:waotw/roe.git", RoeUpdater::Forge.ssh_url
   end
 
   # go-roe.com redirects the git path only, so a release page or API call aimed
   # at it 404s rather than failing over.
   test "human links and API calls skip the redirect and name a real forge" do
-    assert_equal "https://codeberg.org/waotw/roe/releases/tag/v0.3.0",
+    assert_equal "https://github.com/waotw/roe/releases/tag/v0.3.0",
                  RoeUpdater::Forge.release_page_url("v0.3.0")
     assert_nil RoeUpdater::Forge.api_release_url("v0.3.0", "https://go-roe.com/roe.git")
     assert_not_includes RoeUpdater::Forge.api_release_urls("v0.3.0").join(" "), "go-roe.com"
@@ -94,7 +102,7 @@ class RoeUpdater::ForgeTest < ActiveSupport::TestCase
   test "a blank override falls back rather than producing a broken URL" do
     ENV["ROE_FORGE_HOST"] = ""
 
-    assert_equal "codeberg.org", RoeUpdater::Forge.host
+    assert_equal "github.com", RoeUpdater::Forge.host
   end
 
   # The download list has to be the list the version was found on.

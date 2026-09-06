@@ -1,3 +1,5 @@
+require "open3"
+
 module RoeUpdater
   class Downloader
     class DownloadError < StandardError; end
@@ -23,8 +25,16 @@ module RoeUpdater
         RoeUpdater::Forge.mirrors.each do |git_url|
           cleanup_staging # a failed clone can leave a partial directory behind
 
-          last_output = `git clone --depth 1 --branch v#{version} #{git_url} '#{STAGING_PATH}' 2>&1`
-          next unless $?.success?
+          # Array form, no shell. The staging path contains whatever the install
+          # directory is called — this repo lives under "/Volumes/S&M 2019/",
+          # where an unquoted word would split into other commands — and the
+          # version and URL are interpolated values. Passing argv directly
+          # removes the quoting question rather than answering it, which is
+          # also why Brakeman stops flagging this line.
+          last_output, status = Open3.capture2e(
+            "git", "clone", "--depth", "1", "--branch", "v#{version}", git_url, STAGING_PATH
+          )
+          next unless status.success?
 
           begin
             verify_download

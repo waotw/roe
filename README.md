@@ -11,7 +11,7 @@ Only install Roe with `git` if you plan on developing Roe itself. To build sites
 If you plan to develop Roe: use the following command and it will install all dependencies.
 
 ```bash
-git clone https://codeberg.org/waotw/roe.git
+git clone https://github.com/waotw/roe.git
 cd roe
 ./bin/setup
 ```

@@ -28,7 +28,7 @@ These instructions cover macOS, Linux, and Windows. Windows support is new and I
 
 ## Download Roe
 
-[Download Roe](https://codeberg.org/waotw/roe/releases/download/v0.2.0/roe-0.2.0.zip).
+[Download Roe](https://github.com/waotw/roe/releases/latest).
 
 The download is a single zip file. Inside it are two main folders, plus a few supporting files:
 
