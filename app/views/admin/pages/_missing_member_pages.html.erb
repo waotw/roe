@@ -1,0 +1,75 @@
+<%# Member pages Roe needs but can't find, or can only guess at.
+
+    Two states, because they're different problems:
+
+      missing — nothing anywhere. Members can't do this thing at all.
+      guessed — a page carries the form, so it works, but the dedicated page
+                is gone and the link now points somewhere incidental.
+
+    Roe wants a dedicated page for each of these. The form fallback exists so
+    the account icon keeps working when someone reorganises their pages, not so
+    the page can be dispensed with — an incidental form can be edited away by
+    someone who has no idea it was holding up the sign-in link.
+
+    Locals:
+      missing — array of stems, e.g. ["signin"]
+      guessed — { stem => Page } Roe settled on
+%>
+<%
+  missing = Array(local_assigns[:missing])
+  guessed = local_assigns[:guessed] || {}
+  return if missing.empty? && guessed.empty?
+
+  labels = { "signin" => "sign in", "signup" => "sign up", "upgrade" => "upgrade",
+             "donate" => "donate", "unsubscribe" => "unsubscribe" }
+  name_for = ->(stem) { labels[stem] || stem }
+%>
+<div class="mt-8 border border-amber-300 bg-amber-50 p-4">
+  <% if missing.any? %>
+    <%# data-member-pages: a hook tests can assert on. The copy here belongs to
+        whoever is writing it and should be free to change without breaking a
+        test that only cares which state is being shown. %>
+    <h3 data-member-pages="missing" class="text-base font-semibold text-amber-900 mb-1">
+      <%= "A page".pluralize(missing.size) %> your members need
+      <%= missing.size == 1 ? "is" : "are" %> missing
+    </h3>
+
+    <p class="text-sm text-amber-900 mb-3">
+      Members is on, but there's nowhere for people to
+      <strong><%= missing.map(&name_for).to_sentence %></strong>.
+      Roe looks for a page that sets <code>page_type</code>, then the filename it
+      ships, then any page containing the matching form — so
+      <%= missing.size == 1 ? "this page was" : "these pages were" %>
+      deleted rather than renamed. Renaming is fine; Roe follows it.
+    </p>
+  <% end %>
+
+  <% if guessed.any? %>
+    <h3 data-member-pages="guessed" class="text-base font-semibold text-amber-900 mb-1 <%= "mt-4" if missing.any? %>">
+      Roe cannot find a <%= "page".pluralize(guessed.size) %> for <%= guessed.keys.map(&name_for).to_sentence %>
+    </h3>
+
+    <p class="text-sm text-amber-900 mb-2">
+      There's no dedicated page for
+      <strong><%= guessed.keys.map(&name_for).to_sentence %></strong>,
+      so Roe is using
+      <%= guessed.map { |stem, page| link_to("/#{page.url_name}", edit_admin_page_path(page), class: "underline font-mono") }.to_sentence.html_safe %>; <%= guessed.size == 1 ? "a page that happens to contain the form" : "pages that happen to contain the form" %>.
+    </p>
+
+    <p class="text-sm text-amber-900 mb-3">
+      Removing the <%= guessed.keys.map(&name_for).to_sentence %> form from that page would mean that members have no way to <%= guessed.keys.map(&name_for).to_sentence %>. Give Roe a dedicated page for <%= guessed.keys.map(&name_for).to_sentence %>.
+    </p>
+  <% end %>
+
+  <div class="flex items-center gap-3">
+    <%= button_to "Restore Roe's default #{"page".pluralize(missing.size + guessed.size)}",
+                  restore_member_pages_admin_pages_path,
+                  method: :post,
+                  form: { data: { turbo_confirm: "Add back the member pages Roe ships? Any page you already have is left alone." } },
+                  class: "inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono text-xs rounded-xs cursor-pointer" %>
+
+    <span class="text-xs text-amber-800">
+      Or add <code>page_type: <%= (missing + guessed.keys).first %></code> to the page you want used.
+    </span>
+  </div>
+</div>

@@ -25,18 +25,6 @@
     </div>
   </div>
 
-  <% if flash[:notice] %>
-    <div class="mb-5 px-2.5 py-1 border border-gray-300 bg-green-100">
-      <%= flash[:notice] %>
-    </div>
-  <% end %>
-
-  <% if flash[:alert] %>
-    <div class="mb-5 px-2.5 py-1 border border-red-300 bg-red-100">
-      <%= flash[:alert] %>
-    </div>
-  <% end %>
-
   <!-- Fonts List -->
   <% if @fonts.any? %>
     <div class="space-y-2">

@@ -78,8 +78,5 @@
 
   <%# Trigger preview-window refresh for both plain saves AND save-and-
       publish (controller flashes "Product published" in that case). %>
-  <% if flash[:notice]&.match?(/\AProduct (saved|published)/) %>
-    <div id="product-saved-trigger" data-trigger="refresh" style="display: none;"></div>
-  <% end %>
 </body>
 </html>

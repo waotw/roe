@@ -111,8 +111,5 @@
   <%# Trigger preview-window refresh for plain saves AND save-and-publish
       (controller flashes "Post published" or "Post published. Newsletter
       is being sent in the background." in those cases). %>
-  <% if flash[:notice]&.match?(/\APost (saved|published)/) %>
-    <div id="post-saved-trigger" data-trigger="refresh" style="display: none;"></div>
-  <% end %>
 </body>
 </html>
