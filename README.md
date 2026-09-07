@@ -6,7 +6,7 @@ Roe is a file-backed CMS with first-class support for blogs, podcasts, paid memb
 
 ## Installation
 
-Only install Roe with `git` if you plan on developing Roe itself. To build sites with Roe, download it [here](https://go-roe.com) and follow this document: [Installing Roe](https://go-roe.com/documentation/roe/guide-installation)
+To build sites with Roe, download it [here](https://go-roe.com) and follow this document: [Installing Roe](https://go-roe.com/documentation/roe/guide-installation). Only install Roe with `git` if you plan on developing Roe itself. 
 
 If you plan to develop Roe: use the following command and it will install all dependencies.
 
@@ -28,7 +28,7 @@ Roe runs on **macOS**, **Linux**, and **Windows via WSL2**. To launch Roe you ne
   - macOS: Xcode Command Line Tools
   - Linux: `build-essential` (or your distribution's equivalent)
 
-The install script (`./roe.sh check`) installs and configures all of the above for you.
+The install script (`./roe.sh check`) installs and configures all of the above for you on macOS and Linux. For Windows see below.
 
 Roe's Ruby gems are installed automatically by Bundler during setup — there's nothing to install by hand.
 
