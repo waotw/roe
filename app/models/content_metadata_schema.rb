@@ -282,6 +282,10 @@ module ContentMetadataSchema
     }
   end
 
+  # Purposes Roe knows how to look for. A page naming one of these can be
+  # moved, renamed and re-titled and still be found.
+  PAGE_TYPES = %w[signin signup upgrade account donate unsubscribe store].freeze
+
   def self.pages_fields
     {
       'title' => { type: :text, label: 'title', required: true },
@@ -300,7 +304,21 @@ module ContentMetadataSchema
       'image' => { type: :text, label: 'image', hint: 'Page image: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },
       'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
-      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
+      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' },
+      # What the page is FOR, as distinct from what it's called. Roe finds
+      # certain pages by purpose — the one members sign in on, the one the
+      # store lives at — and without this it guesses from the filename or the
+      # URL, both of which Roe tells people they're free to change.
+      #
+      # Offered in the Add Field menu rather than rendered on every page: most
+      # pages have no job beyond being themselves. Feature templates ship it
+      # already set.
+      'page_type' => {
+        type: :select,
+        label: 'page_type',
+        options: [ '' ] + PAGE_TYPES,
+        hint: 'Only for pages Roe has to find — sign-in, the store. Survives renaming the page.'
+      }
     }
   end
 

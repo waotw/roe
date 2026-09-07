@@ -2,6 +2,7 @@
 title: Sign In
 url_name: sign-in
 status: published
+page_type: signin
 audience: everyone
 ---
 

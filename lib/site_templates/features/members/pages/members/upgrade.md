@@ -2,6 +2,7 @@
 title: Upgrade
 url_name: upgrade
 status: published
+page_type: upgrade
 audience: everyone
 ---
 

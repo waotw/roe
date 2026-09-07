@@ -82,7 +82,27 @@ class Page < ApplicationRecord
   # True for pages stored under site/pages/members/ — used by the public
   # page view to add a `member-page` CSS class so theme styles can target
   # signup / signin / upgrade / donate / etc. distinctly from regular pages.
+  # What this page is FOR, as distinct from what it's called.
+  #
+  # Roe needs to find certain pages — the one members sign in on, the one the
+  # store lives at — and it used to infer them from the filename, the url_name
+  # or the directory. Every one of those is something Roe's own documentation
+  # tells people they can change: rename store.md to bookshop.md and the theme's
+  # `.page-store` selector stops matching; move signin.md and the sign-in link
+  # disappears.
+  #
+  # Optional by design. Nothing requires it, the fallbacks below still work, and
+  # an existing site keeps behaving exactly as it did. It's what a page can say
+  # when it wants to be found reliably.
+  def page_type = metadata["page_type"].to_s.strip.presence
+
+  # A page belongs to the members feature. Declared type first; the old path
+  # check stays for every page written before page_type existed.
+  MEMBER_PAGE_TYPES = %w[signin signup upgrade donate unsubscribe account].freeze
+
   def member_page?
+    return true if page_type.in?(MEMBER_PAGE_TYPES)
+
     file_path.to_s.include?("/site/pages/members/")
   end
 

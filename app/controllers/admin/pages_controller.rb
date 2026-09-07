@@ -13,8 +13,56 @@ class Admin::PagesController < Admin::BaseController
     # not in the nav fall to the end, alphabetically.
     @member_pages, @content_pages = ordered_pages.partition { |page| member_page?(page) }
 
+    # Empty on a healthy site. Non-empty means Members is on and a page it needs
+    # can't be found by declaration, by the form it renders, or by filename —
+    # which is a broken site, not a preference.
+    @missing_member_pages = MemberPages.missing
+
+    # Working, but through a page that merely happens to carry the form. Roe
+    # expects a dedicated page — it's the thing least likely to move — so this
+    # is worth saying even though nothing is broken.
+    @guessed_member_pages = MemberPages.guessed
+
     @title = "Pages"
     @description = "All pages on your site."
+  end
+
+  # Put back the member pages Roe ships, for a site missing one.
+  #
+  # The loader is skip-if-exists, so this only ever writes files that aren't
+  # there — a customised sign-in page is never overwritten by the stock one.
+  # That's what makes this safe to offer as a button rather than a warning
+  # about a destructive action.
+  def restore_member_pages
+    # Both states are restorable, and only checking `missing` was a bug: a site
+    # working through an incidental form has nothing missing, so the button
+    # reported "nothing to restore" while the warning it sat under stayed up.
+    missing = MemberPages.missing
+    guessed = MemberPages.guessed.keys
+
+    if missing.empty? && guessed.empty?
+      redirect_to admin_pages_path, notice: "Nothing to restore — every member page Roe needs is already there."
+      return
+    end
+
+    result = SiteTemplates::Loader.install(
+      folder: "features/members", destination: RoeSitePaths::SITE_PATH
+    )
+    installed = Array(result[:installed])
+    ContentSync.sync_all
+
+    if installed.any?
+      redirect_to admin_pages_path,
+                  notice: "Restored #{installed.size} member #{"file".pluralize(installed.size)}."
+    else
+      stems = (missing + guessed).uniq
+      redirect_to admin_pages_path,
+                  alert: "Couldn't restore #{"the page".pluralize(stems.size)} for #{stems.join(', ')}. " \
+                         "#{"It".pluralize(stems.size)} may need creating by hand — add `page_type:` so Roe can find #{stems.size == 1 ? "it" : "them"}."
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Admin::PagesController] restore_member_pages failed: #{e.class} #{e.message}"
+    redirect_to admin_pages_path, alert: "Restore failed: #{e.message}"
   end
 
   def new
@@ -378,10 +426,11 @@ class Admin::PagesController < Admin::BaseController
     requirements
   end
 
-  def member_page?(page)
-    # Check if the parent directory is 'members'
-    Pathname.new(page.file_path).parent.basename.to_s == "members"
-  end
+  # Page#member_page? believes a declared page_type wherever the file lives, and
+  # falls back to the members/ directory. Duplicating the path check here meant
+  # a member page moved or renamed dropped out of the Member Pages group in the
+  # index while still behaving as one everywhere else.
+  def member_page?(page) = page.member_page?
 
   def sanitize_filename(filename)
     filename = filename.to_s.sub(/\.md$/, "")

@@ -115,16 +115,9 @@ module AdminHelper
 
   private
 
-  # Member-facing pages currently live in two places — site/pages/<name>.md
-  # (legacy) and site/pages/members/<name>.md (canonical going forward).
-  # Prefer the new location, fall back to the legacy one.
-  def find_member_page(stem)
-    pages_path = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "pages"))
-    [ pages_path.join("members", "#{stem}.md"), pages_path.join("#{stem}.md") ]
-      .map { |p| Page.find_by(file_path: p.to_s) }
-      .compact
-      .first
-  end
+  # MemberPages owns this question — it checks a declared page_type and the form
+  # the page renders before falling back to the filename this used to assume.
+  def find_member_page(stem) = MemberPages.find(stem)
 
   def stripe_membership_ready?
     stripe_config = StripeConfig.current

@@ -1144,7 +1144,18 @@ class StaticGenerator
   # (signup, signin, donate, checkout flows) which depend on Rails
   # endpoints that don't exist in a static build.
   def static_pages_scope
-    Page.not_draft.where.not("file_path LIKE ?", "%/pages/members/%")
+    # Excluded by what the page IS, not only where it sits. A sign-in page moved
+    # out of pages/members/ still depends on Rails endpoints a static build
+    # hasn't got, so baking it produces a page whose form silently fails.
+    #
+    # Expressed in SQL rather than Page#member_page? because callers chain
+    # .pluck and .to_a onto this — rejecting in Ruby returns an Array and breaks
+    # them. COALESCE matters: a NULL page_type is not IN the list under SQL's
+    # three-valued logic, which would have excluded every ordinary page.
+    Page.not_draft
+        .where.not("file_path LIKE ?", "%/pages/members/%")
+        .where("COALESCE(json_extract(metadata, '$.page_type'), '') NOT IN (?)",
+               Page::MEMBER_PAGE_TYPES)
   end
 
   # ============================================================================

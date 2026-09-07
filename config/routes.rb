@@ -144,6 +144,7 @@ Rails.application.routes.draw do
       collection do
         post :bulk_destroy
         post :bulk_publish
+        post :restore_member_pages
       end
       member do
         post :publish_modal
