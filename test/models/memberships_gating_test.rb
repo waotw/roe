@@ -65,7 +65,9 @@ class MembershipsGatingTest < ActiveSupport::TestCase
     stripe(false)
 
     assert ContentMetadataSchema.fields_for("post")["audience"][:required]
-    assert ContentMetadataSchema.fields_for("page")["audience"][:required]
+    # Offered on pages, not demanded: a page is public unless someone says
+    # otherwise, so requiring it flagged every published page on a members site.
+    assert ContentMetadataSchema.fields_for("page").key?("audience")
     assert_includes MusicConfigSchema.release_fields.map { |f| f[:key] }, "audience"
   end
 end

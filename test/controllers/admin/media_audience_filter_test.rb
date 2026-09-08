@@ -15,14 +15,17 @@ class Admin::MediaAudienceFilterTest < ActionDispatch::IntegrationTest
     Medium.find_or_create_by!(file_path: path) { |m| m.media_type = "images" }
   end
 
+  # Referenced from the body, not the image field. A featured image is public
+  # whatever the record's audience — rendered above the paywall and published
+  # as og:image — so it can't be used to mint a paid file.
   def content(model, audience:, path:)
     dir = model == Post ? "posts" : "pages"
     n = model.count
     model.create!(
       file_path: File.join(RoeSitePaths::SITE_PATH, dir, "c#{n}.md"),
-      content: "Body.",
+      content: "Body. ![m](#{path})",
       metadata: { "title" => "C#{n}", "url_name" => "c#{n}", "status" => "published",
-                  "audience" => audience, "image" => path }
+                  "audience" => audience }
     )
   end
 

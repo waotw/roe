@@ -1,6 +1,7 @@
 require "ostruct"
 
 class Post < ApplicationRecord
+  include ResolvesMediaAudience
   include HasAudience
   include HasMetadata
   include HasMarkdownExtensions
@@ -265,6 +266,7 @@ class Post < ApplicationRecord
   def media_audience
     audience == "paid" ? "paid" : "free"
   end
+
 
   # The audience of whatever this post belongs to, or nil when it belongs to
   # nothing that carries one.

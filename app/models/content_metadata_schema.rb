@@ -294,12 +294,18 @@ module ContentMetadataSchema
       'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
       'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. nav, footer)' },
       'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
+      # A page is public unless someone says otherwise, so this is optional and
+      # defaults to everyone. Requiring it put a red asterisk on every page and
+      # a "missing required field" warning on every published one, for a choice
+      # almost nobody needs to make. Posts keep it required: on a paid site
+      # "free or paid?" is worth forcing, because getting it wrong silently is
+      # expensive in both directions.
       'audience' => {
         type: :select,
         label: 'audience',
-        options: ['everyone', 'paid'],
-        hint: 'Who should see this page?',
-        required: SiteFeature.memberships_enabled?
+        options: [ 'everyone', 'paid' ],
+        default: 'everyone',
+        hint: 'Who should see this page? Public unless set to paid.'
       },
       'image' => { type: :text, label: 'image', hint: 'Page image: /media/images/image-file.png' },
       'excerpt' => { type: :textarea, label: 'excerpt' },

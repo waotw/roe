@@ -54,6 +54,12 @@ if should_run
         SiteJavascript.seed! # copy shipped JS into site/javascript so the site is self-contained
         ContentSync.sync_all
 
+        # A file's audience is cached, so a change to what counts as protected
+        # would otherwise leave old rows serving 403 for images that are now
+        # public — a paid post's featured image among them. Only paid rows can
+        # be stale, so this is a handful of records, not the library.
+        Medium.recompute_paid!
+
         # Sync Stripe product/price if payments are enabled in members.yml
         # but price_id is missing from the DB — happens when the DB is reset,
         # after an update wipe, or when members.yml is edited directly.

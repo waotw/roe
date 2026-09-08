@@ -25,12 +25,15 @@ class ProtectedMediaTest < ActionDispatch::IntegrationTest
     )
   end
 
+  # Referenced from the BODY. The image field is deliberately not used here:
+  # a featured image is public by design (rendered above the paywall and
+  # published as og:image), so it can't stand in for protected media.
   def page_referencing(audience:, path: AUDIO)
     Page.create!(
       file_path: File.join(RoeSitePaths::SITE_PATH, "pages", "pg#{Page.count}.md"),
-      content: "Body.",
+      content: "Body. ![a](#{path})",
       metadata: { "title" => "Pg#{Page.count}", "url_name" => "pg#{Page.count}",
-                  "status" => "published", "audience" => audience, "image" => path }
+                  "status" => "published", "audience" => audience }
     )
   end
 
@@ -49,9 +52,139 @@ class ProtectedMediaTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "a paid page's image is not served to the public" do
+  test "a paid page's body media is not served to the public" do
     write_file
     page_referencing(audience: "paid")
+
+    get AUDIO
+    assert_response :forbidden
+  end
+
+  # ── What a paid record still shows everyone ────────────────────────────────
+
+  # Rendered in the header above the paywall, and published by Roe as og:image
+  # and in collection listings. Returning 403 for a URL Roe advertises isn't
+  # protection — it's a broken page and a broken social card.
+  test "a paid post's featured image is public" do
+    image = "/media/images/hero.jpg"
+    Medium.find_or_create_by!(file_path: image) { |m| m.media_type = "images" }
+    FileUtils.mkdir_p(File.join(RoeSitePaths::SITE_PATH, "media", "images"))
+    File.write(File.join(RoeSitePaths::SITE_PATH, "media", "images", "hero.jpg"), "IMG")
+    Post.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "posts", "hero-post.md"),
+      content: "Body.",
+      metadata: { "title" => "Hero", "url_name" => "hero-post", "status" => "published",
+                  "audience" => "paid", "image" => image }
+    )
+
+    get image
+    assert_response :success
+  end
+
+  # audience is a cached column, so sites that ran the old rule have images
+  # sitting at "paid" that should now be public. Nothing recomputes them on
+  # their own, so a deploy alone would leave the 403 in place.
+  test "a boot recompute frees a featured image marked paid under the old rule" do
+    image = "/media/images/stale.jpg"
+    medium = Medium.find_or_create_by!(file_path: image) { |m| m.media_type = "images" }
+    FileUtils.mkdir_p(File.join(RoeSitePaths::SITE_PATH, "media", "images"))
+    File.write(File.join(RoeSitePaths::SITE_PATH, "media", "images", "stale.jpg"), "IMG")
+    Post.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "posts", "stale-post.md"),
+      content: "Body.",
+      metadata: { "title" => "Stale", "url_name" => "stale-post", "status" => "published",
+                  "audience" => "paid", "image" => image }
+    )
+    medium.update_column(:audience, "paid") # the state an existing site is in
+
+    get image
+    assert_response :forbidden, "precondition — the stale row is what returns 403"
+
+    Medium.recompute_paid!
+
+    assert_equal "free", medium.reload.audience
+    get image
+    assert_response :success, "a deploy left the image unreachable"
+  end
+
+  # Only paid rows can be stale — every rule moves files toward public — so the
+  # recompute visits a handful rather than the whole library.
+  test "the recompute leaves genuinely paid media alone" do
+    write_file
+    post_referencing(audience: "paid")
+    medium = Medium.find_by(file_path: AUDIO)
+    assert_equal "paid", medium.audience
+
+    Medium.recompute_paid!
+
+    assert_equal "paid", medium.reload.audience, "the recompute unprotected real paid media"
+  end
+
+  # Moving the paywall changes which side a file is on without changing which
+  # files are referenced, so the recompute has to re-ask rather than diff the
+  # reference list.
+  test "moving the paywall down frees the media it reveals" do
+    write_file
+    post = Post.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "posts", "moving.md"),
+      content: "Intro\n\n```form\nfor: paid_content\n```\n\nGated ![a](#{AUDIO})",
+      metadata: { "title" => "Moving", "url_name" => "moving", "status" => "published",
+                  "audience" => "paid" }
+    )
+    assert_equal "paid", Medium.find_by(file_path: AUDIO).audience
+
+    # Same file, same reference — only the gate moved.
+    post.update!(content: "Intro ![a](#{AUDIO})\n\n```form\nfor: paid_content\n```\n\nGated text")
+
+    assert_equal "free", Medium.find_by(file_path: AUDIO).audience,
+      "the file is above the paywall now and still isn't being served"
+    get AUDIO
+    assert_response :success
+  end
+
+  test "moving the paywall up protects the media it hides" do
+    write_file
+    post = Post.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "posts", "moving2.md"),
+      content: "Intro ![a](#{AUDIO})\n\n```form\nfor: paid_content\n```\n\nGated text",
+      metadata: { "title" => "Moving2", "url_name" => "moving2", "status" => "published",
+                  "audience" => "paid" }
+    )
+    assert_equal "free", Medium.find_by(file_path: AUDIO).audience
+
+    post.update!(content: "Intro\n\n```form\nfor: paid_content\n```\n\nGated ![a](#{AUDIO})")
+
+    assert_equal "paid", Medium.find_by(file_path: AUDIO).audience,
+      "the file moved behind the paywall and is still public"
+  end
+
+  # A free video above the gate with the article paid after it is a normal
+  # shape, and the point of choosing where the block goes.
+  test "media above the paywall is public even on a paid post" do
+    free = "/media/images/preview.jpg"
+    Medium.find_or_create_by!(file_path: free) { |m| m.media_type = "images" }
+    FileUtils.mkdir_p(File.join(RoeSitePaths::SITE_PATH, "media", "images"))
+    File.write(File.join(RoeSitePaths::SITE_PATH, "media", "images", "preview.jpg"), "IMG")
+    Post.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "posts", "gated.md"),
+      content: "Free ![p](#{free})\n\n```form\nfor: paid_content\n```\n\nPaid ![a](#{AUDIO})",
+      metadata: { "title" => "Gated", "url_name" => "gated", "status" => "published",
+                  "audience" => "paid" }
+    )
+
+    get free
+    assert_response :success
+  end
+
+  # The other half of the same post: below the gate stays shut.
+  test "media below the paywall is still protected" do
+    write_file
+    Post.create!(
+      file_path: File.join(RoeSitePaths::SITE_PATH, "posts", "gated2.md"),
+      content: "Free intro\n\n```form\nfor: paid_content\n```\n\nPaid ![a](#{AUDIO})",
+      metadata: { "title" => "Gated2", "url_name" => "gated2", "status" => "published",
+                  "audience" => "paid" }
+    )
 
     get AUDIO
     assert_response :forbidden

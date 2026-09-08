@@ -14,6 +14,10 @@
 class MemberPages
   # stem → the file Roe installs it as. Both locations are checked because a
   # page can be moved out of members/ and still work.
+  # `account` is here for url_for!'s sake only: /account is a controller route
+  # with an ERB view, not a Page, so find("account") never resolves and falls
+  # through to CONVENTIONAL — which is the real route, so callers get the right
+  # answer by a different path than the rest.
   STEMS = %w[signin signup upgrade donate unsubscribe account].freeze
 
   # What Roe ships each page's url_name as, used only when the page is absent.

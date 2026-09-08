@@ -1,4 +1,5 @@
 class Page < ApplicationRecord
+  include ResolvesMediaAudience
   include HasAudience
   include HasMetadata
   include HasMarkdownExtensions
@@ -112,10 +113,11 @@ class Page < ApplicationRecord
   # Returns names of site-gated metadata fields that are blank but should
   # be set on a published page. Pages support paid audience but never
   # newsletter delivery, so we only check audience here.
-  def missing_site_gated_fields
-    return [] unless SiteFeature.memberships_enabled?
-    metadata["audience"].to_s.strip.blank? ? [ "audience" ] : []
-  end
+  # Nothing. A blank audience already means public — site_controller gates only
+  # on `audience == "paid"` — so flagging it warned about a page that was
+  # working exactly as intended. Kept as a method because callers ask for it and
+  # a page may gain genuinely required fields later.
+  def missing_site_gated_fields = []
 
   def media_refs
     MEDIA_FIELDS.filter_map do |field|

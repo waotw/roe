@@ -34,7 +34,15 @@ module CollectionBuilderSchema
       hint: "Which content to pull from. Defaults to posts." },
 
     { key: "post_type", type: :select, label: "Post type",
-      options: %w[all article audio video podcast music],
+      # Derived, not listed. This was hand-maintained and fell behind when music
+      # was added — the filter couldn't offer a type the site had.
+      #
+      # From POST_TYPES rather than Post.post_type_options: that method hides a
+      # type whose feature is off, which is right for the editor's picker and
+      # wrong here. A collection is authored once and read forever; a filter
+      # that disappears when a feature is toggled would silently change what an
+      # existing collection matches.
+      options: [ "all" ] + Post::POST_TYPES.keys.map(&:to_s),
       hint: "Filter posts by type. Only applies when the source is posts.",
       depends_on: { field: "source", value: "posts" } },
 

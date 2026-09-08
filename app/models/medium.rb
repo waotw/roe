@@ -115,6 +115,20 @@ class Medium < ApplicationRecord
     recompute_audience!(ids)
   end
 
+  # Re-resolve every file currently marked paid.
+  #
+  # audience is a cached column, so a change to what counts as protected leaves
+  # existing rows saying the old thing. Only paid rows can be stale: every rule
+  # here moves files toward public — a featured image, anything above a paywall
+  # — and nothing that resolved free could later become paid. So this visits the
+  # small set rather than the whole library, which is what makes it cheap enough
+  # to run on boot instead of asking someone to run a task.
+  #
+  # Idempotent: a row that resolves to what it already holds isn't written.
+  def self.recompute_paid!
+    recompute_audience!(paid.pluck(:id))
+  end
+
   # Recalculate the cached audience for the given media.
   #
   # A file is protected only when it has references and every one of them is
@@ -128,7 +142,18 @@ class Medium < ApplicationRecord
 
     where(id: ids).includes(media_references: :referenceable).find_each do |medium|
       audiences = medium.media_references.filter_map do |ref|
-        ref.referenceable&.media_audience
+        record = ref.referenceable
+        next unless record
+
+        # Ask about THIS file, not the record as a whole. A paid post's featured
+        # image and anything above its paywall are public — see
+        # ResolvesMediaAudience. Records without the concern (products,
+        # documentation) answer for themselves as before.
+        if record.respond_to?(:media_audience_for)
+          record.media_audience_for(medium.file_path)
+        else
+          record.media_audience
+        end
       end
 
       resolved = audiences.any? && audiences.all?("paid") ? "paid" : "free"
