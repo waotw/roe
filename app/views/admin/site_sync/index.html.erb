@@ -765,8 +765,12 @@
         local_changes = (@peer_reachable && @status[:state] == :local_drift) ? @status[:local] : nil
         # Neither side reports drift but the fingerprints still differ:
         # the ledgers diverged and a sync realigns them.
+        # out_of_sync? rather than !in_sync? — an unknown answer is not a
+        # divergence. The cached peer state can predate our last sync, and
+        # reading that as drift is what produced this warning after a sync
+        # that worked, with no files to show because there were none.
         ledger_diverged = @peer_drift.blank? && local_changes.nil? &&
-                          @status[:state] == :clean && !@in_sync_with_peer
+                          @status[:state] == :clean && @sync_conclusion.out_of_sync?
         has_changes = @peer_drift || local_changes.present? || ledger_diverged
 
         # While a sync is actively running, the status panel up top owns the
@@ -932,7 +936,20 @@
         </div>
       <% elsif @in_sync_with_peer && !sync_running %>
         <p class="text-sm text-green-800">
-          ✓ Local content matches <%= SiteSync::Exchange.peer_label %>.
+          ✓ Local content matches <%= SiteSync::Exchange.peer_label %><% if @sync_conclusion.as_of %> as of <%= time_ago_in_words(@sync_conclusion.as_of) %> ago<% end %>.
+        </p>
+      <% elsif @sync_conclusion.undecided? && !sync_running %>
+        <%# The honest third answer. The peer last spoke before our own last
+            sync, so its fingerprint describes content we have since sent.
+            Say that, rather than claim a drift we can't substantiate. %>
+        <p class="text-sm text-gray-700">
+          Can't confirm against <%= SiteSync::Exchange.peer_label %> yet —
+          <% if @sync_conclusion.as_of %>
+            it last reported <%= time_ago_in_words(@sync_conclusion.as_of) %> ago, before the most recent sync.
+          <% else %>
+            it hasn't reported in yet.
+          <% end %>
+          A refresh is already on its way; REFRESH SYNC STATUS checks now.
         </p>
       <% end %>
 

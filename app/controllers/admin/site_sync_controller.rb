@@ -34,25 +34,14 @@ class Admin::SiteSyncController < Admin::BaseController
     @deploy_target_label   = SiteSync.deploy_target_label
     @last_exchange_result  = SiteSync::Exchange.last_exchange_result
 
-    # Cross-side fingerprint comparison — the authoritative "are dev
-    # and live actually in sync" signal. Local-only drift (@status,
-    # @peer_drift) tells us each side's filesystem-vs-own-ledger
-    # state; this tells us whether the two filesystems agree.
-    local_fp        = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil
-    peer_fp         = @peer_state&.dig(:fingerprint)
-    @in_sync_with_peer = local_fp.present? && peer_fp.present? && local_fp == peer_fp
-
-    # The fingerprint covers size + mtime, so a file with identical bytes and a
-    # different timestamp reads as a difference — and warns about drift that
-    # a sync then can't clear, because there's nothing to transfer. When the
-    # cheap check disagrees, confirm the bytes before believing it. Only the
-    # differing paths get hashed, and only in the already-failing case; the
-    # in-sync path is untouched.
-    @peer_agreement = nil
-    unless @in_sync_with_peer
-      @peer_agreement = SiteSync::PeerAgreement.verify(local_fingerprint: local_fp, peer_fingerprint: peer_fp)
-      @in_sync_with_peer = true if @peer_agreement&.in_sync
-    end
+    # The one shared answer — same object the banner, the nav dot and the
+    # imports publish panel use, so no two surfaces can disagree on the same
+    # render. It walks the site once, compares against the cached peer
+    # fingerprint, and falls back to PeerAgreement when they differ. Pass the
+    # peer state already read above rather than reading the cache twice.
+    @sync_conclusion   = SiteSync::Conclusion.current(peer_state: @peer_state)
+    @in_sync_with_peer = @sync_conclusion.in_sync?
+    @peer_agreement    = @sync_conclusion.agreement
 
     # First sync: no shared baseline has ever been written (.sync-state.json
     # absent), the peer is reachable, and the two sides aren't already
@@ -65,12 +54,7 @@ class Admin::SiteSyncController < Admin::BaseController
     # When the local ledger was last written = the last successful sync.
     # Persists across cache expiry (unlike the transient transfer status),
     # so the always-on status line can show "last synced …".
-    @last_synced_at = begin
-      version = SiteSync::Ledger.recorded&.dig("version")
-      version.present? ? Time.parse(version.to_s) : nil
-    rescue StandardError
-      nil
-    end
+    @last_synced_at = @sync_conclusion.last_synced_at
 
     # Live config for the form (token + peer_url). first_or_create!
     # auto-generates a token on first access, so the form always has
