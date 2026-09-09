@@ -1,4 +1,18 @@
 class Admin::PostsController < Admin::BaseController
+  include BulkContentActions
+  include CreatesContent
+
+  # Bulk-action wiring (see BulkContentActions).
+  def bulk_model = Post
+  def bulk_index_path = admin_posts_path
+  def bulk_label = "post"
+  def prepare_publish_metadata(record, metadata) = ensure_podcast_guid(metadata, record)
+
+  def bulk_publish_side_effect(record)
+    return false unless should_send_newsletter?(record)
+    QueueNewsletterBatchesJob.perform_later(record.id)
+    true
+  end
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
@@ -57,6 +71,18 @@ class Admin::PostsController < Admin::BaseController
     # ALWAYS set preview mode
     @preview_mode = true
     @preview_id = "post-#{@post.id}"
+
+    # Podcast episodes need their show config so the player can resolve show
+    # artwork, subscribe links, etc. — mirror PostsController#show.
+    if @post.post_type == "podcast" && @post.metadata["podcast"].present?
+      @podcast_config = PodcastConfig.get(@post.metadata["podcast"])
+      @podcast_episodes = Post
+        .published
+        .where("json_extract(metadata, '$.post_type') = ?", "podcast")
+        .where("json_extract(metadata, '$.podcast') = ?", @post.metadata["podcast"])
+        .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
+        .to_a
+    end
 
     render template: "posts/show", layout: "site"
   end
@@ -136,8 +162,37 @@ class Admin::PostsController < Admin::BaseController
     @template = ContentTemplate.template_content("post")
   end
 
+  # Is this episode/track/chapter number (or url_name) already in use? Advisory
+  # only — nothing here blocks a save; the writer is told and decides.
+  def check_unique
+    scopes = params[:scopes].respond_to?(:to_unsafe_h) ? params[:scopes].to_unsafe_h : {}
+    conflict = Post.conflicting_post(
+      field: params[:field],
+      value: params[:value],
+      scopes: scopes,
+      exclude_url_name: params[:exclude]
+    )
+
+    render json: { taken: conflict.present?, conflict: conflict&.title }
+  end
+
   def create
+    title_param = params[:title].to_s.strip
     filename = sanitize_filename(params[:filename])
+
+    # The two fields derive from each other: type a filename and the title
+    # follows, or type only a title and the filename follows from it. Without
+    # this a title-only submission wrote "posts/.md" — a dotfile, which
+    # File.extname reads as having no extension, so the front matter parser
+    # couldn't pick a syntax and died on nil.to_sym.
+    filename = sanitize_filename(title_param.parameterize) if filename.blank?
+
+    if filename.blank?
+      flash.now[:error] = "Give the post a filename or a title"
+      render :new, status: :unprocessable_entity
+      return
+    end
+
     file_path = File.join(RoeSitePaths::SITE_PATH, "posts/#{filename}.md")
 
     if File.exist?(file_path)
@@ -148,8 +203,26 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    title = filename_to_title(filename)
-    metadata, body = ContentTemplate.frontmatter_for("post", "title" => title)
+    # The form's title field is optional — blank means "use the one derived
+    # from the filename", which is what its placeholder was showing.
+    title = title_param.presence || filename_to_title(filename)
+
+    # post_type and the type's create fields come from the new-post form and go
+    # straight into the frontmatter, so ContentScaffold can write a body that
+    # actually works: a player that has audio to play, a track list that knows
+    # which release to gather.
+    overrides = { "title" => title }
+    overrides["post_type"] = params[:post_type] if Post.post_type_options.include?(params[:post_type].to_s)
+    overrides.merge!(create_field_overrides("post", post_type: overrides["post_type"]))
+
+    # A track with no release still belongs somewhere: `singles`. Without it the
+    # scaffold can't write a track list (an unfiltered one would gather every
+    # track on the site), and singles would have no collection to appear in.
+    if overrides["post_type"] == "music" && overrides["release"].blank?
+      overrides["release"] = ReleaseConfig::DEFAULT_RELEASE
+    end
+
+    metadata, body = ContentTemplate.frontmatter_for("post", overrides)
 
     # Ensure podcast GUID (if podcast type + published)
     metadata = ensure_podcast_guid(metadata, Post.new)
@@ -212,7 +285,6 @@ class Admin::PostsController < Admin::BaseController
     @preview_path = preview_admin_post_path(@post)
 
     # Calculate new members count for newsletter status
-    calculate_new_members_count
   end
 
   def update
@@ -352,121 +424,8 @@ class Admin::PostsController < Admin::BaseController
     return_to.call
   end
 
-  def resend_newsletter
-    @post = Post.find(params[:id])
-
-    # Find last send time
-    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
-
-    unless last_send
-      flash[:error] = "This newsletter hasn't been sent yet"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Find new members who joined after last send
-    new_members = Member.newsletter_subscribed
-                        .active
-                        .where("subscribed_at > ?", last_send)
-
-    # If this is a Substack-imported post, exclude Substack-imported members.
-    # Belt-and-suspenders: import_id FK + durable metadata flag (the latter
-    # survives if the Import record is ever deleted).
-    if @post.metadata["substack_post_id"].present?
-      new_members = new_members.where(import_id: nil).not_substack_imported
-    end
-
-    # Filter by audience if needed
-    new_members = new_members.paid_tier if @post.audience == "paid"
-
-    if new_members.empty?
-      flash[:notice] = "No new members to send to"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Queue newsletter sending job
-    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
-
-    flash[:notice] = "Newsletter queued for #{new_members.count} new #{'member'.pluralize(new_members.count)}"
-    redirect_to edit_admin_post_path(@post)
-  end
-
-  def confirm_resend
-    @post = Post.find(params[:id])
-
-    # Find last send time
-    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
-
-    unless last_send
-      flash[:error] = "This newsletter hasn't been sent yet"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Find members who haven't received this newsletter yet
-    received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
-    new_members = Member.newsletter_subscribed
-                        .active
-                        .where.not(id: received_member_ids)
-
-    # If this is a Substack-imported post, exclude Substack-imported members.
-    # Belt-and-suspenders: import_id FK + durable metadata flag.
-    if @post.metadata["substack_post_id"].present?
-      new_members = new_members.where(import_id: nil).not_substack_imported
-    end
-
-    # Filter by audience if needed
-    new_members = new_members.paid_tier if @post.audience == "paid"
-
-    if new_members.empty?
-      flash[:notice] = "No new members to send to"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Queue newsletter sending job
-    QueueNewsletterBatchesJob.perform_later(@post.id, new_members.pluck(:id))
-
-    head :ok
-  end
-
-  def resend_modal
-    @post = Post.find(params[:id])
-
-    # Find last send time (for display purposes)
-    last_send = NewsletterSend.where(post: @post).maximum(:sent_at)
-
-    unless last_send
-      flash[:error] = "This newsletter hasn't been sent yet"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    # Find members who haven't received this newsletter yet
-    received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
-    @new_members = Member.newsletter_subscribed
-                         .active
-                         .where.not(id: received_member_ids)
-                         .order(subscribed_at: :desc)
-
-    # Filter by audience if needed
-    @new_members = @new_members.paid_tier if @post.audience == "paid"
-
-    # If this is a Substack-imported post, exclude Substack-imported members.
-    # Belt-and-suspenders: import_id FK + durable metadata flag.
-    if @post.metadata["substack_post_id"].present?
-      @new_members = @new_members.where(import_id: nil).not_substack_imported
-    end
-
-    @new_members_count = @new_members.count
-
-    if @new_members_count == 0
-      flash[:notice] = "No new members to send to"
-      redirect_to edit_admin_post_path(@post) and return
-    end
-
-    render partial: "resend_modal", layout: false
-  end
-
   def newsletter_status
     @post = Post.find(params[:id])
-    calculate_new_members_count
     render partial: "newsletter_status", layout: false
   end
 
@@ -537,6 +496,20 @@ class Admin::PostsController < Admin::BaseController
     redirect_to edit_admin_post_path(@post)
   end
 
+  # Client-side duration backfill (episode_durations controller reads the
+  # audio/video metadata in the browser and posts it here). Only fills a blank
+  # value — never clobbers a real one.
+  def set_duration
+    post = Post.find(params[:id])
+    duration = params[:duration].to_s.strip
+
+    return head :unprocessable_entity unless duration.match?(/\A\d{1,3}:\d{2}(:\d{2})?\z/)
+    return head :no_content if post.metadata["duration"].to_s.strip.present?
+
+    write_metadata_field(post, "duration", duration)
+    head :ok
+  end
+
   def search
     query = params[:q].to_s.downcase
     title_match = "%#{query}%"
@@ -578,29 +551,6 @@ class Admin::PostsController < Admin::BaseController
   end
 
   private
-
-  def calculate_new_members_count
-    # Calculate new members count with same logic as resend_modal
-    if @post.persisted? && NewsletterSend.exists?(post: @post)
-      received_member_ids = NewsletterSend.where(post: @post).pluck(:member_id)
-      new_members = Member.newsletter_subscribed
-                          .active
-                          .where.not(id: received_member_ids)
-
-      # Filter by audience if needed
-      new_members = new_members.paid_tier if @post.audience == "paid"
-
-      # If this is a Substack-imported post, exclude Substack-imported members.
-      # Belt-and-suspenders: import_id FK + durable metadata flag.
-      if @post.metadata["substack_post_id"].present?
-        new_members = new_members.where(import_id: nil).not_substack_imported
-      end
-
-      @new_members_count = new_members.count
-    else
-      @new_members_count = 0
-    end
-  end
 
   def should_send_newsletter?(post)
     published_to = post.metadata["published_to"] || post.published_to
@@ -741,9 +691,15 @@ class Admin::PostsController < Admin::BaseController
     requirements
   end
 
+  # Music tracks get one too, on the same immutable terms. A GUID is what a
+  # podcatcher dedupes on, so a release published as a feed needs every track
+  # to keep the same one forever. Generating it for every published track —
+  # not only those on a feed-enabled release — keeps it out of the way of the
+  # feed switch: turning the feed on later would otherwise have to walk the
+  # release and write a GUID into each track, and turning it off and on again
+  # could hand subscribers a fresh set.
   def ensure_podcast_guid(metadata_hash, post)
-    # Only process for podcast posts
-    return metadata_hash unless metadata_hash["post_type"] == "podcast"
+    return metadata_hash unless Post::GUID_POST_TYPES.include?(metadata_hash["post_type"])
 
     # Only process if status is published
     return metadata_hash unless metadata_hash["status"] == "published"
@@ -839,8 +795,19 @@ class Admin::PostsController < Admin::BaseController
     end
   end
 
+  # Set a single frontmatter field on a post's file and re-sync.
+  def write_metadata_field(post, key, value)
+    content = File.read(post.file_path)
+    return unless content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)/m
+
+    metadata = YAML.safe_load($1, permitted_classes: [ Date, Time, Symbol ]) || {}
+    metadata[key] = value
+    normalize_and_write(post.file_path, "---\n#{Post.format_metadata_yaml(metadata)}\n---\n#{$2}")
+    ContentSync.sync_file(post.file_path)
+  end
+
   def normalize_and_write(file_path, content)
     normalized = content.gsub(/\r\n/, "\n")
-    File.write(file_path, normalized)
+    SiteFile.write(file_path, normalized)
   end
 end

@@ -1,4 +1,10 @@
 class Admin::PagesController < Admin::BaseController
+  include BulkContentActions
+  include CreatesContent
+
+  def bulk_model = Page
+  def bulk_index_path = admin_pages_path
+  def bulk_label = "page"
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
@@ -7,8 +13,56 @@ class Admin::PagesController < Admin::BaseController
     # not in the nav fall to the end, alphabetically.
     @member_pages, @content_pages = ordered_pages.partition { |page| member_page?(page) }
 
+    # Empty on a healthy site. Non-empty means Members is on and a page it needs
+    # can't be found by declaration, by the form it renders, or by filename —
+    # which is a broken site, not a preference.
+    @missing_member_pages = MemberPages.missing
+
+    # Working, but through a page that merely happens to carry the form. Roe
+    # expects a dedicated page — it's the thing least likely to move — so this
+    # is worth saying even though nothing is broken.
+    @guessed_member_pages = MemberPages.guessed
+
     @title = "Pages"
     @description = "All pages on your site."
+  end
+
+  # Put back the member pages Roe ships, for a site missing one.
+  #
+  # The loader is skip-if-exists, so this only ever writes files that aren't
+  # there — a customised sign-in page is never overwritten by the stock one.
+  # That's what makes this safe to offer as a button rather than a warning
+  # about a destructive action.
+  def restore_member_pages
+    # Both states are restorable, and only checking `missing` was a bug: a site
+    # working through an incidental form has nothing missing, so the button
+    # reported "nothing to restore" while the warning it sat under stayed up.
+    missing = MemberPages.missing
+    guessed = MemberPages.guessed.keys
+
+    if missing.empty? && guessed.empty?
+      redirect_to admin_pages_path, notice: "Nothing to restore — every member page Roe needs is already there."
+      return
+    end
+
+    result = SiteTemplates::Loader.install(
+      folder: "features/members", destination: RoeSitePaths::SITE_PATH
+    )
+    installed = Array(result[:installed])
+    ContentSync.sync_all
+
+    if installed.any?
+      redirect_to admin_pages_path,
+                  notice: "Restored #{installed.size} member #{"file".pluralize(installed.size)}."
+    else
+      stems = (missing + guessed).uniq
+      redirect_to admin_pages_path,
+                  alert: "Couldn't restore #{"the page".pluralize(stems.size)} for #{stems.join(', ')}. " \
+                         "#{"It".pluralize(stems.size)} may need creating by hand — add `page_type:` so Roe can find #{stems.size == 1 ? "it" : "them"}."
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Admin::PagesController] restore_member_pages failed: #{e.class} #{e.message}"
+    redirect_to admin_pages_path, alert: "Restore failed: #{e.message}"
   end
 
   def new
@@ -16,7 +70,21 @@ class Admin::PagesController < Admin::BaseController
   end
 
   def create
+    title_param = params[:title].to_s.strip
     filename = sanitize_filename(params[:filename])
+
+    # The two derive from each other: a filename gives a title, a title gives a
+    # filename. Without this a title-only submission wrote "pages/.md", which
+    # File.extname reads as having no extension — the front matter parser then
+    # can't pick a syntax and dies on nil.to_sym.
+    filename = sanitize_filename(title_param.parameterize) if filename.blank?
+
+    if filename.blank?
+      flash.now[:error] = "Give the page a filename or a title"
+      render :new, status: :unprocessable_entity
+      return
+    end
+
     file_path = File.join(RoeSitePaths::SITE_PATH, "pages/#{filename}.md")
 
     if File.exist?(file_path)
@@ -27,8 +95,9 @@ class Admin::PagesController < Admin::BaseController
       return
     end
 
-    title = filename_to_title(filename)
-    metadata, body = ContentTemplate.frontmatter_for("page", "title" => title)
+    title = title_param.presence || filename_to_title(filename)
+    overrides = { "title" => title }.merge(create_field_overrides("page"))
+    metadata, body = ContentTemplate.frontmatter_for("page", overrides)
 
     # Use formatted YAML
     yaml_content = Page.format_metadata_yaml(metadata)
@@ -282,6 +351,20 @@ class Admin::PagesController < Admin::BaseController
   #   render template: 'pages/show', layout: 'site'
   # end
 
+  # Sets the status Roe ships on pages that lost theirs. Narrow by design —
+  # see PageStatusRepair. Surfaced from the dashboard rather than run on boot,
+  # so nobody's files change without them asking.
+  def repair_statuses
+    repaired = PageStatusRepair.repair!
+
+    flash[:notice] = if repaired.any?
+      "Repaired #{helpers.pluralize(repaired.size, 'page')}. They're reachable again."
+    else
+      "Nothing to repair — every page Roe installed has a status."
+    end
+    redirect_to admin_root_path
+  end
+
   private
 
   # Pages sorted for the index: by layout/navigation.md order when that file
@@ -343,10 +426,11 @@ class Admin::PagesController < Admin::BaseController
     requirements
   end
 
-  def member_page?(page)
-    # Check if the parent directory is 'members'
-    Pathname.new(page.file_path).parent.basename.to_s == "members"
-  end
+  # Page#member_page? believes a declared page_type wherever the file lives, and
+  # falls back to the members/ directory. Duplicating the path check here meant
+  # a member page moved or renamed dropped out of the Member Pages group in the
+  # index while still behaving as one everywhere else.
+  def member_page?(page) = page.member_page?
 
   def sanitize_filename(filename)
     filename = filename.to_s.sub(/\.md$/, "")
@@ -367,8 +451,12 @@ class Admin::PagesController < Admin::BaseController
     end
   end
 
+  # nil-safe: the form's filename is optional now (it follows the title), so a
+  # submission can arrive without one at all.
   def sanitize_filename(filename)
-    filename = filename.sub(/\.md$/, "")
+    filename = filename.to_s.sub(/\.md$/, "")
+    return "" if filename.blank?
+
     File.basename(filename)
   end
 
@@ -386,6 +474,6 @@ class Admin::PagesController < Admin::BaseController
 
   def normalize_and_write(file_path, content)
     normalized = content.gsub(/\r\n/, "\n")
-    File.write(file_path, normalized)
+    SiteFile.write(file_path, normalized)
   end
 end

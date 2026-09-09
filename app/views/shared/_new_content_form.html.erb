@@ -1,0 +1,123 @@
+<%# The NEW <thing> form, shared by posts, pages and products.
+    Locals: resource_type, url, submit_label.
+
+    Title first — the filename follows from it and is the last thing you pass
+    on the way out. Only what Roe needs to write something that works; the rest
+    waits for the metadata editor once the file exists.
+
+    Posts pick a post_type and get that type's fields; pages and products have
+    no sub-types, so their fields come straight from ContentMetadataSchema. %>
+<%
+  input_classes  = "w-full bg-white font-mono text-sm p-1.5 border border-gray-300"
+  chevron        = "appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
+  select_classes = "#{input_classes} #{chevron}"
+  label_classes  = "block font-mono text-xs text-gray-700 mb-1"
+  required_mark  = '<span class="text-red-600 relative -top-0.5"><sup>*</sup></span>'.html_safe
+  typed          = resource_type == "post"
+  # Products sit outside the members system, so they have no audience.
+  show_audience  = members_enabled? && resource_type != "product"
+%>
+
+<%= form_with url: url, method: :post,
+      data: {
+        controller: "new-content#{' audience-default' if show_audience}",
+        audience_default_paid_podcasts_value: (show_audience ? PodcastConfig.paid_keys : []).to_json,
+        audience_default_paid_releases_value: (show_audience ? ReleaseConfig.paid_keys : []).to_json
+      } do |f| %>
+  <div class="max-w-xl space-y-4">
+    <div>
+      <label class="<%= label_classes %>" for="title">title<%= required_mark %></label>
+      <%= f.text_field :title, id: "title", autofocus: true,
+            class: input_classes,
+            data: { new_content_target: "title", action: "input->new-content#syncFilename" } %>
+    </div>
+
+    <% if typed %>
+      <div>
+        <label class="<%= label_classes %>" for="post_type">post_type</label>
+        <%= f.select :post_type, Post.post_type_options, {},
+              id: "post_type",
+              class: select_classes,
+              data: { new_content_target: "postType", action: "change->new-content#syncType" } %>
+      </div>
+
+      <%# One group per type, all rendered and all but the selected one hidden
+          (and disabled, so a hidden type's field can't be submitted). %>
+      <% Post.post_type_options.each do |type| %>
+        <% fields = Post.create_fields_for_type(type) %>
+        <% next if fields.empty? %>
+        <div class="space-y-4" hidden
+             data-new-content-target="typeGroup"
+             data-post-type="<%= type %>">
+          <% fields.each do |field| %>
+            <%= render "shared/new_content_field",
+                  field: field, id: "fields_#{type}_#{field[:name]}" %>
+          <% end %>
+        </div>
+      <% end %>
+    <% else %>
+      <% ContentMetadataSchema.create_fields_for(resource_type).each do |field| %>
+        <%= render "shared/new_content_field",
+              field: field, id: "fields_#{field[:name]}" %>
+      <% end %>
+    <% end %>
+
+    <%# Gated on members being on at all, not on paid memberships being
+        configured — `audience` is meaningful as soon as there are members.
+        `everyone` is the default, except on a paid podcast or release, where
+        the audience-default controller flips it to `paid` as soon as you pick
+        one. Creating a public episode on a paid show by clicking past this
+        field is the mistake worth preventing; changing it yourself stops the
+        controller touching it again. %>
+    <% if show_audience %>
+      <div>
+        <label class="<%= label_classes %>" for="fields_audience">audience</label>
+        <select name="fields[audience]" id="fields_audience" class="<%= select_classes %>"
+                data-audience-default-target="audience"
+                data-action="change->audience-default#userChose">
+          <% [ "everyone", "paid" ].each do |value| %>
+            <option value="<%= value %>"><%= value %></option>
+          <% end %>
+        </select>
+      </div>
+    <% end %>
+
+    <%# Last, and already filled in: the filename tracks the title until you
+        edit it yourself, after which it's left alone. %>
+    <div>
+      <label class="<%= label_classes %>" for="filename">filename<%= required_mark %></label>
+      <div class="flex items-baseline gap-1">
+        <%= f.text_field :filename, id: "filename", placeholder: "a-new-#{resource_type}",
+              class: "flex-1 bg-white font-mono text-sm p-1.5 border border-gray-300",
+              data: { new_content_target: "filename", action: "input->new-content#filenameEdited" } %>
+        <span class="font-mono text-sm text-gray-500">.md</span>
+      </div>
+      <p class="mt-1 text-xs text-gray-500">Follows the title. Hyphens or underscores instead of spaces.</p>
+    </div>
+  </div>
+
+  <%# Same modal shell as the editor's; the picker renders itself inside and
+      reports a choice by bubbling an event to this form. %>
+  <div data-new-content-target="pickerModal"
+       class="fixed inset-0 z-50 items-center justify-center"
+       style="display: none;">
+    <div class="absolute inset-0 bg-black/50"
+         data-action="click->new-content#closePicker"></div>
+    <div class="relative bg-white border border-gray-300 shadow-xl flex flex-col"
+         style="width: 80vw; height: 80vh; max-width: 1200px;">
+      <div data-new-content-target="pickerContent" class="flex flex-col h-full">
+        <div class="flex items-center justify-center h-full text-gray-400 font-mono text-sm">Loading…</div>
+      </div>
+      <button type="button"
+              data-action="click->new-content#closePicker"
+              class="absolute top-3 right-3 w-7 h-7 flex items-center justify-center border border-gray-400 bg-white hover:bg-gray-100 text-gray-600 text-sm font-mono z-10">
+        ×
+      </button>
+    </div>
+  </div>
+
+  <p class="mt-6">
+    <button type="submit" class="uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs"><%= submit_label %></button>
+    <span class="text-gray-500 text-xs">(Enter/Return)</span>
+  </p>
+<% end %>

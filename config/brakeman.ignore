@@ -3,296 +3,43 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "022636caf6f664fd586c0e5372c7b06c25447d9293b3ee062eb4ce3b47a67cb4",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/products_controller.rb",
-      "line": 57,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ProductsController",
-        "method": "edit"
-      },
-      "user_input": "Product.find(params[:id]).file_path",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "02bfbf06725be9dd39e3224b82d8667a023b83228ac194c9ded3f51266ca80c5",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 208,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.rm(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "destroy"
-      },
-      "user_input": "params[:id]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "05f038594ff3fc303271d935dabc7d3bc7a9ce784f5884f36e0714fb76242c38",
-      "check_name": "SendFile",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/system/themes_controller.rb",
-      "line": 45,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "send_file((File.join(RoeSitePaths::SITE_PATH, \"theme\", \"#{File.basename(params[:filename].to_s)}.#{(\"js\" or \"css\")}\") or if File.exist?(Rails.root.join(\"app\", \"themes\", \"#{File.basename(params[:filename].to_s)}.#{(\"js\" or \"css\")}\")) then\n  Rails.root.join(\"app\", \"themes\", \"#{File.basename(params[:filename].to_s)}.#{(\"js\" or \"css\")}\")\nelse\n  head(:not_found)\n  return\nend), :type => ((\"application/javascript\" or \"text/css\")), :disposition => \"inline\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "System::ThemesController",
-        "method": "show"
-      },
-      "user_input": "params[:filename].to_s",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "06719c107840d326338ca14f936a2332b6995f460d8619fb074d55e19e93ce72",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 284,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "system(\"command -v #{cmd} > /dev/null 2>&1\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.command_available?"
-      },
-      "user_input": "cmd",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "07fff5f39a29b01285e3f837c291deaf9b5ec97730026198d3379e18a4546819",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 217,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "system(\"#{mise_bin} where ruby@#{version} > /dev/null 2>&1\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.ruby_available?"
-      },
-      "user_input": "mise_bin",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "0a51b5d3a6e9f27d469c4aeda0782079ca9a40c8413f80252b6c2d1b7027f091",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 299,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "system(\"#{mise} settings set ruby.compile false > /dev/null 2>&1\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.configure_mise"
-      },
-      "user_input": "mise",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "0aac2c0cfb848e01a49a3f1334e0c4a88dff47aad23c6e480756f42e92f070f9",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/system_assets_controller.rb",
-      "line": 80,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"), params[:id])",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::SystemAssetsController",
-        "method": "destroy"
-      },
-      "user_input": "params[:asset_type]",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "0aac2c0cfb848e01a49a3f1334e0c4a88dff47aad23c6e480756f42e92f070f9",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/system_assets_controller.rb",
-      "line": 80,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"), params[:id])",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::SystemAssetsController",
-        "method": "destroy"
-      },
-      "user_input": "params[:id]",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "0e7376f07294a38878178830115f2e5dcce79163cd9331c58a6fa746aa69b221",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/medium_controller.rb",
-      "line": 194,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(File.join(RoeSitePaths::SITE_PATH, Medium.find_by(:id => id).file_path.to_s.sub(/^\\//, \"\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::MediumController",
-        "method": "bulk_destroy"
-      },
-      "user_input": "Medium.find_by(:id => id).file_path",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "0f94ce93d1f4607ab6f91de0442a3825fa6a25b7b84acf5ef8c38e35806f6ca1",
+      "fingerprint": "73e8cb7b110bb4e5ea08e693e4eea2313406479f719782866ecde4d0701478a5",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 957,
+      "line": 614,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"store.yml\"))",
+      "code": "File.read(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "delete_store"
+        "method": "edit_podcast"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"store.yml\")",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "10f323b24455201dabae091046cf6ca8011e3caa2ae018af8b9598a70c56b34c",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/downloader.rb",
-      "line": 23,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"git clone --depth 1 --branch v#{version} #{\"https://codeberg.org/#{RoeUpdater::VersionChecker::CODEBERG_REPO}\"} '#{STAGING_PATH}' 2>&1\"}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::Downloader",
-        "method": "self.download_version"
-      },
-      "user_input": "version",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "165ee652e55ba35fbd74c66ee8dab05e96572a49b70daa2f2f1c4f9c3b280159",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 247,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{mise_bin} install \"ruby@#{version}\" 2>&1`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.install_required_ruby"
-      },
-      "user_input": "mise_bin",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
       ],
       "note": ""
     },
     {
       "warning_type": "Remote Code Execution",
       "warning_code": 25,
-      "fingerprint": "18351318580e2d74e776c9cf09754f0d7ca557711f69526f3576a95832021875",
+      "fingerprint": "d83aad61527eb3d06e801011d671c9afdb9ae6549c2aed81c7286fedb757b0e2",
       "check_name": "Deserialize",
       "message": "`YAML.load` called with model attribute",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 942,
+      "line": 615,
       "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
-      "code": "YAML.load(File.read(SiteConfig::FEATURES_PATH.join(\"store.yml\")))",
+      "code": "YAML.load(File.read(SiteConfig::FEATURES_PATH.join(\"podcast.yml\")))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "edit_store"
+        "method": "edit_podcast"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"store.yml\")",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
       "confidence": "Medium",
       "cwe_id": [
         502
@@ -302,112 +49,20 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "1a5dc6df96f8f5b0863419eed331c1b6baa2a598801ff77833bda2e44c0deb82",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/pages_controller.rb",
-      "line": 217,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(Page.find(params[:id]).file_path)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::PagesController",
-        "method": "destroy"
-      },
-      "user_input": "Page.find(params[:id]).file_path",
-      "confidence": "Medium",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "1f3ae55d890665da02d14f80bdaabd15c093684e01c3ec23f3daf4edddf1ec5f",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 75,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.cp(Rails.root.join(\"app/themes\").join(\"#{params[:id]}.css\"), Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "activate"
-      },
-      "user_input": "params[:id]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "23effe19dfdd93ee935556c4dc0f3f44a8725137e5c6be7ff3609e74d05e6eef",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/migration_tester.rb",
-      "line": 47,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"staging\")}' && RAILS_ENV=#{Rails.env} ROE_SITE_PATH='#{TEST_SITE_PATH}' bundle exec rails db:migrate 2>&1\"}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::MigrationTester",
-        "method": "self.test_migrations"
-      },
-      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"staging\")",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "2a8150cda7a43e0cd3d4939bbd4d88be902eb110e1eede945e55203b2e7ac88c",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/backup_manager.rb",
-      "line": 94,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`sqlite3 '#{original}' \".restore '#{File.join(File.join(env_dir, \"backup\", most_recent_backup_timestamp), File.basename(original))}'\" 2>&1`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::BackupManager",
-        "method": "self.restore_databases"
-      },
-      "user_input": "original",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": "dest is an internal generated backup path, single-quote-escaped; not user input"
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "36da8350126fd4c73ac8fff083ce5ffc2fbc7ada0909bc0c351bcbb4b021fca1",
+      "fingerprint": "6d5ff3ef6a95148739a48437f05445cd031239e6639af7bb1d0b95de67170804",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 941,
+      "line": 687,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(SiteConfig::FEATURES_PATH.join(\"store.yml\"))",
+      "code": "File.read(SiteConfig::DEFAULTS_PATH.join(\"cards.yml\"))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "edit_store"
+        "method": "edit_cards"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"store.yml\")",
+      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"cards.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -415,23 +70,92 @@
       "note": ""
     },
     {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "391c5e01fe8404ec2d6a9869ba4058a06c9d9189e2aee3d8e3b23a59073d82f8",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 118,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{(params[:custom_name].strip or generate_unique_theme_name(params[:id]))}.css\")",
+      "warning_type": "Remote Code Execution",
+      "warning_code": 25,
+      "fingerprint": "ee51817429e885c0431faf29b7ed933af524d1703fc3b6dd1b76c677bd34e1b5",
+      "check_name": "Deserialize",
+      "message": "`YAML.load` called with model attribute",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 688,
+      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
+      "code": "YAML.load(File.read(SiteConfig::DEFAULTS_PATH.join(\"cards.yml\")))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
+        "class": "Admin::ConfigsController",
+        "method": "edit_cards"
       },
-      "user_input": "params[:custom_name].strip",
-      "confidence": "High",
+      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"cards.yml\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        502
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "40db83ecbbc894404dafbe30927a380ad8ed76bed00d23b937dc31cfdf6179b0",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 699,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(SiteConfig::DEFAULTS_PATH.join(\"collections.yml\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "edit_collections"
+      },
+      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"collections.yml\")",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Remote Code Execution",
+      "warning_code": 25,
+      "fingerprint": "97019894db9626bda1f89f1bb75c6ddf31beed555bf878a011bec9ba7108702d",
+      "check_name": "Deserialize",
+      "message": "`YAML.load` called with model attribute",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 700,
+      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
+      "code": "YAML.load(File.read(SiteConfig::DEFAULTS_PATH.join(\"collections.yml\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "edit_collections"
+      },
+      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"collections.yml\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        502
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "5c0a942538f4c09bb6f9924f4dbbca5b4d0df15ae9222935fa6b4198cb4cbf5b",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 836,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "delete_podcast"
+      },
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
+      "confidence": "Weak",
       "cwe_id": [
         22
       ],
@@ -440,20 +164,20 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "3bd635b92f74a53596655371d207f355d983b7d7f79ad11849261bb72f9167aa",
-      "check_name": "SendFile",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/site_sync_controller.rb",
-      "line": 148,
+      "fingerprint": "9a3dc469e73b6711ac379c25d93adaf04d71d5b3e57cc4bd12d4995c35c13bd7",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 853,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "send_file(SiteSync::DatabaseBackup.resolve(params[:name].to_s), :type => \"application/octet-stream\", :disposition => \"attachment\", :filename => File.basename(SiteSync::DatabaseBackup.resolve(params[:name].to_s)))",
+      "code": "File.read(SiteConfig::FEATURES_PATH.join(\"members.yml\"))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::SiteSyncController",
-        "method": "download_backup_database"
+        "class": "Admin::ConfigsController",
+        "method": "edit_members"
       },
-      "user_input": "params[:name].to_s",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"members.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -484,385 +208,21 @@
       "note": ""
     },
     {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "3bee97bf112b7e647b99c904701358619410063bb230bb0256b60db6f1fe196d",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/site_sync/fly_rsync.rb",
-      "line": 435,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{cmd}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "SiteSync::FlyRsync",
-        "method": "self.run"
-      },
-      "user_input": "cmd",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "40db83ecbbc894404dafbe30927a380ad8ed76bed00d23b937dc31cfdf6179b0",
+      "fingerprint": "7c452e04e3acf4410af56484673e05a517665c619011c7dd8fc08b83e5d34a31",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 699,
+      "line": 898,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(SiteConfig::DEFAULTS_PATH.join(\"collections.yml\"))",
+      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"members.yml\"))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "edit_collections"
+        "method": "delete_members"
       },
-      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"collections.yml\")",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "440e1e8b5b1d935e0cf49283d7d9d54beaed434143fd27f9252591a89be4e215",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/products_controller.rb",
-      "line": 229,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.rename(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path), File.join(RoeSitePaths::SITE_PATH, File.join(File.dirname(Product.find(params[:id]).file_path), \"#{sanitize_filename(params[:new_filename])}.md\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ProductsController",
-        "method": "rename"
-      },
-      "user_input": "Product.find(params[:id]).file_path",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "44198f7747caa1b701fbcda27db9109ac64a8f64d4a35de502162fa739f565c9",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/site_sync/backup_manager.rb",
-      "line": 76,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "SiteSync::BackupManager",
-        "method": "self.create"
-      },
-      "user_input": "[\"/db\", \"/.git\", \"/.sync-state.json\", \"/.sync-backups\", \"/media/images/variants\", (\"/\" + SNAPSHOT_META_FILENAME), \".DS_Store\"].map do\n \"--exclude=#{Shellwords.escape(e)}\"\n end.join(\" \")",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "458b397e7152af7f2610c79e91898e63ce8ceb5ecf122e79481c85d0fa3c7b76",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 105,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.cp(Rails.root.join(\"app/themes\").join(\"#{params[:id]}.css\"), Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
-      },
-      "user_input": "params[:id]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "458b397e7152af7f2610c79e91898e63ce8ceb5ecf122e79481c85d0fa3c7b76",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 181,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.cp(Rails.root.join(\"app/themes\").join(\"#{params[:id]}.css\"), Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
-      },
-      "user_input": "params[:id]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "45ec5b55f8812552382ebb0951efd2e6d12fa08907616ce622f8447373e4e504",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/medium_controller.rb",
-      "line": 238,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.rename(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.delete_prefix(\"/\")), File.join(File.dirname(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.delete_prefix(\"/\"))), \"#{sanitize_media_filename(params[:new_filename])}#{File.extname(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.delete_prefix(\"/\")))}\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::MediumController",
-        "method": "rename"
-      },
-      "user_input": "Medium.find(params[:id]).file_path",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "463ffcf732233fb1e4580c4dff7a39bac545dd0cb480b330ae86e7a2c5d498e7",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/pages_controller.rb",
-      "line": 119,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(Page.find(params[:id]).file_path)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::PagesController",
-        "method": "duplicate"
-      },
-      "user_input": "Page.find(params[:id]).file_path",
-      "confidence": "Medium",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "48d448ed2c2e4bb672746e6f77942523e198bee9180af0f1f1cdd524e69bd353",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/site_sync/backup_manager.rb",
-      "line": 172,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "SiteSync::BackupManager",
-        "method": "self.restore"
-      },
-      "user_input": "[\"/db\", \"/.git\", \"/.sync-state.json\", \"/.sync-backups\", \"/media/images/variants\", (\"/\" + SNAPSHOT_META_FILENAME), \".DS_Store\"].map do\n \"--exclude=#{Shellwords.escape(e)}\"\n end.join(\" \")",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "49f43069793594a48a83b7f1d8b1326b4b1e6d39068537c06e274eb1b1ff96af",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 166,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{(params[:custom_name].strip or \"#{params[:id].capitalize} preserved\").gsub(/\\s+/, \" \").strip.parameterize}.css\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
-      },
-      "user_input": "params[:custom_name].strip",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "4a746b6140ff4a2ed16fdb9e1f199e843523732b1533e2e7f47b75605d7ffa2b",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/products_controller.rb",
-      "line": 244,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ProductsController",
-        "method": "destroy"
-      },
-      "user_input": "Product.find(params[:id]).file_path",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "4c0672991cf4d9c37c08f5189f88663690c81bf5908735532fa22a4a629df235",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/documentation_controller.rb",
-      "line": 39,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(Post.find(params[:id]).file_path)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::DocumentationController",
-        "method": "edit"
-      },
-      "user_input": "Post.find(params[:id]).file_path",
-      "confidence": "Medium",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "4fe19ddb682e2b0806aaef654c8ac3932bf7f2220ebee260e5581ed86573763b",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/products_controller.rb",
-      "line": 177,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ProductsController",
-        "method": "duplicate"
-      },
-      "user_input": "Product.find(params[:id]).file_path",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "50ccf30aff1074610db455200d890e098e1bbdf1342581e716d34b23d6c590b5",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/imports_controller.rb",
-      "line": 285,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.mkdir_p(File.dirname(File.join(RoeSitePaths::SITE_PATH, \"media\", ((((\"images\" or \"audio\") or \"video\") or \"images\") or (Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"].split(\"/\")[2]), ((((\"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}-cover#{(File.extname(params[:url]) or \".jpg\")}\" or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp3\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp4\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}#{(File.extname(params[:url]) or \".bin\")}\") or File.basename((Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"])))))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ImportsController",
-        "method": "attempt_download"
-      },
-      "user_input": "params[:item_index]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "54227189ab086afe31dc4d462b8cb2bf1277e24150f63810eb0b70f693b5de7b",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/migration_tester.rb",
-      "line": 27,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"staging\")}' && bundle install --quiet 2>&1\"}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::MigrationTester",
-        "method": "self.test_migrations"
-      },
-      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"staging\")",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "54455b1740ac5eff4ad19f1d5d313e74b4acb3d8c80339cd5cddcfe033e37d08",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/imports_controller.rb",
-      "line": 273,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "Net::HTTP.new(URI.parse(params[:url]).host, URI.parse(params[:url]).port)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ImportsController",
-        "method": "attempt_download"
-      },
-      "user_input": "params[:url]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "55ad081fac4485d6b6df9cebfa2dba80f32389cda9b5994e4f76aa37ca91ab52",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "config/initializers/content_management.rb",
-      "line": 55,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "YAML.load_file(SiteConfig::FEATURES_PATH.join(\"members.yml\"))",
-      "render_path": null,
-      "location": null,
       "user_input": "SiteConfig::FEATURES_PATH.join(\"members.yml\")",
       "confidence": "Weak",
       "cwe_id": [
@@ -873,43 +233,20 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "565816bc5f5619ddb2938af09ce91e43741caafd40fe4979f7510d1c35ad1e9e",
-      "check_name": "SendFile",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/system/images_controller.rb",
-      "line": 8,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "send_file(File.join(RoeSitePaths::SITE_PATH, \"system\", \"assets\", \"images\", params[:filename]), :type => image_mime_type(params[:filename]), :disposition => \"inline\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "System::ImagesController",
-        "method": "show"
-      },
-      "user_input": "params[:filename]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "5c0a942538f4c09bb6f9924f4dbbca5b4d0df15ae9222935fa6b4198cb4cbf5b",
+      "fingerprint": "36da8350126fd4c73ac8fff083ce5ffc2fbc7ada0909bc0c351bcbb4b021fca1",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 836,
+      "line": 941,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"))",
+      "code": "File.read(SiteConfig::FEATURES_PATH.join(\"store.yml\"))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "delete_podcast"
+        "method": "edit_store"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"store.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -917,367 +254,45 @@
       "note": ""
     },
     {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "5f90bbf019b90f3e39fc4146f20f33591f5dd3587f9a121b4ee8d351be90a23d",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/site_sync/kamal_rsync.rb",
-      "line": 395,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{cmd}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "SiteSync::KamalRsync",
-        "method": "self.run"
-      },
-      "user_input": "cmd",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "5fb4ba7ba322601bae4776a83aecf4c424e0fcb6c648d4d7bcee498f003de25f",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 44,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "update"
-      },
-      "user_input": "params[:id]",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "6223f4b9f01aa9c5c822bbc92cb1d0f87eec663450c0ac64b68a2d04f6c26397",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 298,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "system(\"#{mise} settings set idiomatic_version_file_enable_tools ruby > /dev/null 2>&1\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.configure_mise"
-      },
-      "user_input": "mise",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "SQL Injection",
-      "warning_code": 0,
-      "fingerprint": "6401d817bb8583419bdf2cbbe63adc8db2776ba58193bf44a007300ecc247d63",
-      "check_name": "SQL",
-      "message": "Possible SQL injection",
-      "file": "app/services/site_sync/backup_manager.rb",
-      "line": 314,
-      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
-      "code": "ActiveRecord::Base.connection.execute(\"VACUUM INTO '#{dest.gsub(\"'\", \"''\")}'\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "SiteSync::BackupManager",
-        "method": "self.vacuum_into"
-      },
-      "user_input": "dest.gsub(\"'\", \"''\")",
-      "confidence": "Medium",
-      "cwe_id": [
-        89
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "64fbaf14f11589cf959d35a3ded31b15d5d7c837edd5f0821d1d4912d59dc2b9",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/imports_controller.rb",
-      "line": 427,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "Dir.glob(File.join(File.join(RoeSitePaths::SITE_PATH, \"media\", (((\"images\" or \"audio\") or \"video\") or \"images\")), (((\"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}-cover.*\" or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp3\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp4\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}*\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ImportsController",
-        "method": "resolve_manually"
-      },
-      "user_input": "params[:item_index]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "6729b803eb3b4b2614988f954cce92a38618ae8d248b73db5906a6d6b9388b5f",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 37,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "edit"
-      },
-      "user_input": "params[:id]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "6a8828065833faa16d9496a6d92b2399b4ea2f3aba23448b27eaee7ee9eeb374",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/jobs/perform_deploy_job.rb",
-      "line": 336,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "Open3.capture2e(\"ssh\", \"-o\", \"StrictHostKeyChecking=accept-new\", \"-o\", \"BatchMode=yes\", \"root@#{Array(((YAML.load_file(SiteConfig::DEPLOY_FILE) or {}) or {}).dig(\"kamal\", \"servers\")).map(&:to_s).reject(&:blank?).first}\", \"docker buildx prune --force --all && docker builder prune --force --all\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "PerformDeployJob",
-        "method": "clear_remote_build_cache"
-      },
-      "user_input": "Array(((YAML.load_file(SiteConfig::DEPLOY_FILE) or {}) or {}).dig(\"kamal\", \"servers\")).map(&:to_s).reject(&:blank?).first",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "6ad2b4c67d8e05b8c062da904e68fd3e82d7efbc1ff35a50f38203371da607d6",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/imports_controller.rb",
-      "line": 35,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.open(Rails.root.join(\"tmp\", \"imports\").join(\"#{Time.current.to_i}_#{params[:import][:archive_file].original_filename}\"), \"wb\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ImportsController",
-        "method": "create"
-      },
-      "user_input": "params[:import][:archive_file].original_filename",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "6c5cc215adb23bdc17dcc5cfada5b69417a4c33e12c40694794682c0fbc16ac8",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/posts_controller.rb",
-      "line": 334,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "Pathname.new(Post.find(params[:id]).file_path)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::PostsController",
-        "method": "rename"
-      },
-      "user_input": "Post.find(params[:id]).file_path",
-      "confidence": "Medium",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "6d5ff3ef6a95148739a48437f05445cd031239e6639af7bb1d0b95de67170804",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
+      "warning_type": "Remote Code Execution",
+      "warning_code": 25,
+      "fingerprint": "18351318580e2d74e776c9cf09754f0d7ca557711f69526f3576a95832021875",
+      "check_name": "Deserialize",
+      "message": "`YAML.load` called with model attribute",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 687,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(SiteConfig::DEFAULTS_PATH.join(\"cards.yml\"))",
+      "line": 942,
+      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
+      "code": "YAML.load(File.read(SiteConfig::FEATURES_PATH.join(\"store.yml\")))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "edit_cards"
+        "method": "edit_store"
       },
-      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"cards.yml\")",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "6e830a45f2f6396f933faf45fef47fecffc69e0e6df4dc22b73421cf716fce64",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/system_assets_controller.rb",
-      "line": 42,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::SystemAssetsController",
-        "method": "create"
-      },
-      "user_input": "params[:asset_type]",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "702fb94560cc21d3fef5e2112a4b10e8d52951aa51afdb03d0d3c6cc7a086111",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 195,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "destroy"
-      },
-      "user_input": "params[:id]",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "7113f002d53d359f93e008d8f00bdc65421ba33a6aa0baa218a8e169ef95658d",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 571,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"current\")}' && RAILS_ENV=#{Rails.env} #{ruby_target_prefix}bundle exec rails assets:precompile 2>&1\"}`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.build_assets"
-      },
-      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"current\")",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"store.yml\")",
       "confidence": "Medium",
       "cwe_id": [
-        77
+        502
       ],
       "note": ""
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "73e8cb7b110bb4e5ea08e693e4eea2313406479f719782866ecde4d0701478a5",
+      "fingerprint": "0f94ce93d1f4607ab6f91de0442a3825fa6a25b7b84acf5ef8c38e35806f6ca1",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 614,
+      "line": 957,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"))",
+      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"store.yml\"))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "edit_podcast"
+        "method": "delete_store"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "748cba24c5f8212c8d1136f8ce55af8fab413465ae7ef1483e7fcbda450005f4",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/backup_manager.rb",
-      "line": 37,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`sqlite3 '#{db}' \".backup '#{File.join(File.join(env_dir, \"backup\", Time.now.strftime(\"%Y%m%d_%H%M%S\")), File.basename(db))}'\" 2>&1`",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "RoeUpdater::BackupManager",
-        "method": "self.backup_databases"
-      },
-      "user_input": "db",
-      "confidence": "Medium",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "77a5ed6a7f537e09651977fa03bd5661c5671cd57a8ccd22ab8fd3c4a2bf9d7a",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/system_assets_controller.rb",
-      "line": 43,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.mkdir_p(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::SystemAssetsController",
-        "method": "create"
-      },
-      "user_input": "params[:asset_type]",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"store.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -1310,20 +325,20 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "7c452e04e3acf4410af56484673e05a517665c619011c7dd8fc08b83e5d34a31",
+      "fingerprint": "f50c7a76d79f3a6d2d6279228aa2a40f621beb6c0ce743a7e6408650ddeb970c",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 898,
+      "line": 1430,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"members.yml\"))",
+      "code": "FileUtils.mkdir_p(File.dirname(SiteConfig::FEATURES_PATH.join(\"podcast.yml\")))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "delete_members"
+        "method": "write_single_podcast_entry"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"members.yml\")",
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -1333,17 +348,40 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "7d0990ca8ba5816d4d66937db20c20d09cb1d7ba2cee53d5c9aca750b1ebd11d",
+      "fingerprint": "4c0672991cf4d9c37c08f5189f88663690c81bf5908735532fa22a4a629df235",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/posts_controller.rb",
-      "line": 479,
+      "file": "app/controllers/admin/documentation_controller.rb",
+      "line": 39,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(Post.find(params[:id]).file_path)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::DocumentationController",
+        "method": "edit"
+      },
+      "user_input": "Post.find(params[:id]).file_path",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "dd1f88c1fb4f77e72a2f29ac5e7c0dcb15f87d73c24600eef5daec479d6ba25f",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/documentation_controller.rb",
+      "line": 63,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
       "code": "File.delete(Post.find(params[:id]).file_path)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::PostsController",
+        "class": "Admin::DocumentationController",
         "method": "destroy"
       },
       "user_input": "Post.find(params[:id]).file_path",
@@ -1356,20 +394,250 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "808323523af13dcb7179f54f654a0e8754823a92fbecf6fe5eefca5421404fce",
-      "check_name": "SendFile",
+      "fingerprint": "c27003670421e52ac7dddf053fa9cd31083f7a4a553f5a340e9c78511b6db2e8",
+      "check_name": "FileAccess",
       "message": "Parameter value used in file name",
-      "file": "app/controllers/system/fonts_controller.rb",
-      "line": 12,
+      "file": "app/controllers/admin/emails_controller.rb",
+      "line": 70,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "send_file(File.join(RoeSitePaths::SITE_PATH, \"system/assets/fonts\", params[:filename]), :type => font_mime_type(params[:filename]), :disposition => \"inline\", :filename => params[:filename])",
+      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, \"emails\", \"#{params[:id]}.md\"))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "System::FontsController",
-        "method": "show"
+        "class": "Admin::EmailsController",
+        "method": "edit"
       },
-      "user_input": "params[:filename]",
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "ebaff6d9249cec27fee053c02821c7b96e5c5d70953bcf3444872db5f62a5bb8",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/emails_controller.rb",
+      "line": 105,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, \"emails\", \"#{params[:id]}.md\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::EmailsController",
+        "method": "preview"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "6ad2b4c67d8e05b8c062da904e68fd3e82d7efbc1ff35a50f38203371da607d6",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/imports_controller.rb",
+      "line": 35,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.open(Rails.root.join(\"tmp\", \"imports\").join(\"#{Time.current.to_i}_#{params[:import][:archive_file].original_filename}\"), \"wb\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ImportsController",
+        "method": "create"
+      },
+      "user_input": "params[:import][:archive_file].original_filename",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "54455b1740ac5eff4ad19f1d5d313e74b4acb3d8c80339cd5cddcfe033e37d08",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/imports_controller.rb",
+      "line": 273,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "Net::HTTP.new(URI.parse(params[:url]).host, URI.parse(params[:url]).port)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ImportsController",
+        "method": "attempt_download"
+      },
+      "user_input": "params[:url]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "50ccf30aff1074610db455200d890e098e1bbdf1342581e716d34b23d6c590b5",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/imports_controller.rb",
+      "line": 285,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.mkdir_p(File.dirname(File.join(RoeSitePaths::SITE_PATH, \"media\", ((((\"images\" or \"audio\") or \"video\") or \"images\") or (Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"].split(\"/\")[2]), ((((\"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}-cover#{(File.extname(params[:url]) or \".jpg\")}\" or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp3\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp4\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}#{(File.extname(params[:url]) or \".bin\")}\") or File.basename((Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"])))))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ImportsController",
+        "method": "attempt_download"
+      },
+      "user_input": "params[:item_index]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "9142755097bd1a556230349a0be0d06206bf9707f5e689e5216da9a8a2b496f8",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/imports_controller.rb",
+      "line": 286,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.open(File.join(RoeSitePaths::SITE_PATH, \"media\", ((((\"images\" or \"audio\") or \"video\") or \"images\") or (Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"].split(\"/\")[2]), ((((\"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}-cover#{(File.extname(params[:url]) or \".jpg\")}\" or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp3\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp4\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}#{(File.extname(params[:url]) or \".bin\")}\") or File.basename((Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"]))), \"wb\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ImportsController",
+        "method": "attempt_download"
+      },
+      "user_input": "params[:item_index]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "64fbaf14f11589cf959d35a3ded31b15d5d7c837edd5f0821d1d4912d59dc2b9",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/imports_controller.rb",
+      "line": 427,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "Dir.glob(File.join(File.join(RoeSitePaths::SITE_PATH, \"media\", (((\"images\" or \"audio\") or \"video\") or \"images\")), (((\"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}-cover.*\" or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp3\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp4\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}*\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ImportsController",
+        "method": "resolve_manually"
+      },
+      "user_input": "params[:item_index]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Dangerous Send",
+      "warning_code": 23,
+      "fingerprint": "ac144d5ec7715a96cddb5372355fea2c3459017ae674fed70461a98ad266fd22",
+      "check_name": "Send",
+      "message": "User controlled method execution",
+      "file": "app/controllers/admin/layouts_controller.rb",
+      "line": 134,
+      "link": "https://brakemanscanner.org/docs/warning_types/dangerous_send/",
+      "code": "send(\"admin_layout_#{params[:file_key]}_edit_path\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::LayoutsController",
+        "method": "generate_missing"
+      },
+      "user_input": "params[:file_key]",
+      "confidence": "High",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "c4f3418114eadc5ad291134cb30176180b2a0a2e4003b2b1611eba280668ffd0",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/medium_controller.rb",
+      "line": 169,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.to_s.sub(/^\\//, \"\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::MediumController",
+        "method": "destroy"
+      },
+      "user_input": "Medium.find(params[:id]).file_path",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "0e7376f07294a38878178830115f2e5dcce79163cd9331c58a6fa746aa69b221",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/medium_controller.rb",
+      "line": 194,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(File.join(RoeSitePaths::SITE_PATH, Medium.find_by(:id => id).file_path.to_s.sub(/^\\//, \"\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::MediumController",
+        "method": "bulk_destroy"
+      },
+      "user_input": "Medium.find_by(:id => id).file_path",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "45ec5b55f8812552382ebb0951efd2e6d12fa08907616ce622f8447373e4e504",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/medium_controller.rb",
+      "line": 238,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.rename(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.delete_prefix(\"/\")), File.join(File.dirname(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.delete_prefix(\"/\"))), \"#{sanitize_media_filename(params[:new_filename])}#{File.extname(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.delete_prefix(\"/\")))}\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::MediumController",
+        "method": "rename"
+      },
+      "user_input": "Medium.find(params[:id]).file_path",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -1402,20 +670,66 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "83375d18fd1608f7cfc6d679980a55524c9c3ab7ae64b73786fde2dd64e55618",
+      "fingerprint": "463ffcf732233fb1e4580c4dff7a39bac545dd0cb480b330ae86e7a2c5d498e7",
       "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/system_assets_controller.rb",
-      "line": 62,
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/pages_controller.rb",
+      "line": 119,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.open(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\")).join(\"#{File.basename(sanitize_filename(params[:file].original_filename), File.extname(sanitize_filename(params[:file].original_filename)))}-#{1}#{File.extname(sanitize_filename(params[:file].original_filename))}\"), \"wb\")",
+      "code": "File.read(Page.find(params[:id]).file_path)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::SystemAssetsController",
-        "method": "create"
+        "class": "Admin::PagesController",
+        "method": "duplicate"
       },
-      "user_input": "params[:file].original_filename",
+      "user_input": "Page.find(params[:id]).file_path",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "b18a6e261d8dc62c3fd43db779d2b9b92cdc115d05cf64d2f0ac510b3a5409d9",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/pages_controller.rb",
+      "line": 161,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "Pathname.new(Page.find(params[:id]).file_path)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::PagesController",
+        "method": "rename"
+      },
+      "user_input": "Page.find(params[:id]).file_path",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "fd8fa72c1ad0f3c389600cdb28bd844e2ece52a5f618d128387ef5199947312b",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/pages_controller.rb",
+      "line": 170,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.rename(Pathname.new(Page.find(params[:id]).file_path), Pathname.new(Page.find(params[:id]).file_path).dirname.join(\"#{sanitize_filename(params[:new_filename])}.md\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::PagesController",
+        "method": "rename"
+      },
+      "user_input": "Page.find(params[:id]).file_path",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -1425,44 +739,21 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "90985f879e19a6b6265b9a61f7661a6c43d7268fa1e33f9a257dc70d2b6b13c5",
-      "check_name": "SendFile",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/media_controller.rb",
-      "line": 46,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "send_file(resolve_media_path(params[:path].to_s), :disposition => \"inline\", :type => ((Mime::Type.lookup_by_extension(File.extname(resolve_media_path(params[:path].to_s)).delete_prefix(\".\")).to_s or \"application/octet-stream\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "MediaController",
-        "method": "show"
-      },
-      "user_input": "params[:path].to_s",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": "path validated by resolve_media_path containment check (File.expand_path + within?)"
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "9142755097bd1a556230349a0be0d06206bf9707f5e689e5216da9a8a2b496f8",
+      "fingerprint": "1a5dc6df96f8f5b0863419eed331c1b6baa2a598801ff77833bda2e44c0deb82",
       "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/imports_controller.rb",
-      "line": 286,
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/pages_controller.rb",
+      "line": 217,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.open(File.join(RoeSitePaths::SITE_PATH, \"media\", ((((\"images\" or \"audio\") or \"video\") or \"images\") or (Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"].split(\"/\")[2]), ((((\"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}-cover#{(File.extname(params[:url]) or \".jpg\")}\" or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp3\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}.mp4\") or \"#{(Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"slug\"]}#{(File.extname(params[:url]) or \".bin\")}\") or File.basename((Import.find(params[:id]).stats[\"missing_media\"] or [])[params[:item_index].to_i][\"items\"].first[\"expected_path\"]))), \"wb\")",
+      "code": "File.delete(Page.find(params[:id]).file_path)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::ImportsController",
-        "method": "attempt_download"
+        "class": "Admin::PagesController",
+        "method": "destroy"
       },
-      "user_input": "params[:item_index]",
-      "confidence": "Weak",
+      "user_input": "Page.find(params[:id]).file_path",
+      "confidence": "Medium",
       "cwe_id": [
         22
       ],
@@ -1515,68 +806,68 @@
       "note": ""
     },
     {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "94e8a83249bf9ef5a3679849b7e61d4a8a60039c7e0f877f54f7eed0143a0fff",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 544,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"current\")}' && #{ruby_target_prefix}bundle install 2>&1\"}`",
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "f129ed2c8dfe9dc3b90629ca083ddf8d9b544c5d85684ac21291bc62db716d84",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/posts_controller.rb",
+      "line": 290,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(Post.find(params[:id]).file_path)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.install_gems"
+        "class": "Admin::PostsController",
+        "method": "duplicate"
       },
-      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"current\")",
+      "user_input": "Post.find(params[:id]).file_path",
       "confidence": "Medium",
       "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Remote Code Execution",
-      "warning_code": 25,
-      "fingerprint": "97019894db9626bda1f89f1bb75c6ddf31beed555bf878a011bec9ba7108702d",
-      "check_name": "Deserialize",
-      "message": "`YAML.load` called with model attribute",
-      "file": "app/controllers/admin/configs_controller.rb",
-      "line": 700,
-      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
-      "code": "YAML.load(File.read(SiteConfig::DEFAULTS_PATH.join(\"collections.yml\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ConfigsController",
-        "method": "edit_collections"
-      },
-      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"collections.yml\")",
-      "confidence": "Medium",
-      "cwe_id": [
-        502
+        22
       ],
       "note": ""
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "9a3dc469e73b6711ac379c25d93adaf04d71d5b3e57cc4bd12d4995c35c13bd7",
+      "fingerprint": "6c5cc215adb23bdc17dcc5cfada5b69417a4c33e12c40694794682c0fbc16ac8",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/configs_controller.rb",
-      "line": 853,
+      "file": "app/controllers/admin/posts_controller.rb",
+      "line": 334,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(SiteConfig::FEATURES_PATH.join(\"members.yml\"))",
+      "code": "Pathname.new(Post.find(params[:id]).file_path)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::ConfigsController",
-        "method": "edit_members"
+        "class": "Admin::PostsController",
+        "method": "rename"
       },
-      "user_input": "SiteConfig::FEATURES_PATH.join(\"members.yml\")",
+      "user_input": "Post.find(params[:id]).file_path",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "bd0b7733b526d5da9008b8f1e4fe01e495e0e430b71f9f8372a1f565266d43fa",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/posts_controller.rb",
+      "line": 343,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.rename(Pathname.new(Post.find(params[:id]).file_path), Pathname.new(Post.find(params[:id]).file_path).dirname.join(\"#{sanitize_filename(params[:new_filename])}.md\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::PostsController",
+        "method": "rename"
+      },
+      "user_input": "Post.find(params[:id]).file_path",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -1584,82 +875,347 @@
       "note": ""
     },
     {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "a92640c772bcab9b480be4642901feb2710745f38fba663e8b84cd66c9273910",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/update_orchestrator.rb",
-      "line": 380,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"staging\")}' && RAILS_ENV=development ROE_SITE_PATH='#{RoeSitePaths::SITE_PATH}' bundle exec rails db:migrate 2>&1\"}`",
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "7d0990ca8ba5816d4d66937db20c20d09cb1d7ba2cee53d5c9aca750b1ebd11d",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/posts_controller.rb",
+      "line": 479,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(Post.find(params[:id]).file_path)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "RoeUpdater::UpdateOrchestrator",
-        "method": "self.run_migrations"
+        "class": "Admin::PostsController",
+        "method": "destroy"
       },
-      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"staging\")",
+      "user_input": "Post.find(params[:id]).file_path",
       "confidence": "Medium",
       "cwe_id": [
-        77
+        22
       ],
       "note": ""
     },
     {
-      "warning_type": "Dangerous Send",
-      "warning_code": 23,
-      "fingerprint": "ac144d5ec7715a96cddb5372355fea2c3459017ae674fed70461a98ad266fd22",
-      "check_name": "Send",
-      "message": "User controlled method execution",
-      "file": "app/controllers/admin/layouts_controller.rb",
-      "line": 134,
-      "link": "https://brakemanscanner.org/docs/warning_types/dangerous_send/",
-      "code": "send(\"admin_layout_#{params[:file_key]}_edit_path\")",
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "022636caf6f664fd586c0e5372c7b06c25447d9293b3ee062eb4ce3b47a67cb4",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/products_controller.rb",
+      "line": 57,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::LayoutsController",
-        "method": "generate_missing"
+        "class": "Admin::ProductsController",
+        "method": "edit"
       },
-      "user_input": "params[:file_key]",
-      "confidence": "High",
+      "user_input": "Product.find(params[:id]).file_path",
+      "confidence": "Weak",
       "cwe_id": [
-        77
+        22
       ],
       "note": ""
     },
     {
-      "warning_type": "Cross-Site Scripting",
-      "warning_code": 2,
-      "fingerprint": "af21e368a1ad7651c790a704ee1a69fba74fc504c111b04a8186dea70921083b",
-      "check_name": "CrossSiteScripting",
-      "message": "Unescaped model attribute",
-      "file": "app/views/pages/show.html.erb",
-      "line": 19,
-      "link": "https://brakemanscanner.org/docs/warning_types/cross_site_scripting",
-      "code": "render_page_content(Page.find(params[:id]), :context => (({ :member => (@member) } or nil)))",
-      "render_path": [
-        {
-          "type": "controller",
-          "class": "Admin::PagesController",
-          "method": "preview",
-          "line": 256,
-          "file": "app/controllers/admin/pages_controller.rb",
-          "rendered": {
-            "name": "pages/show",
-            "file": "app/views/pages/show.html.erb"
-          }
-        }
-      ],
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "4fe19ddb682e2b0806aaef654c8ac3932bf7f2220ebee260e5581ed86573763b",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/products_controller.rb",
+      "line": 177,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path))",
+      "render_path": null,
       "location": {
-        "type": "template",
-        "template": "pages/show"
+        "type": "method",
+        "class": "Admin::ProductsController",
+        "method": "duplicate"
       },
-      "user_input": "Page.find(params[:id])",
+      "user_input": "Product.find(params[:id]).file_path",
       "confidence": "Weak",
       "cwe_id": [
-        79
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "440e1e8b5b1d935e0cf49283d7d9d54beaed434143fd27f9252591a89be4e215",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/products_controller.rb",
+      "line": 229,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.rename(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path), File.join(RoeSitePaths::SITE_PATH, File.join(File.dirname(Product.find(params[:id]).file_path), \"#{sanitize_filename(params[:new_filename])}.md\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ProductsController",
+        "method": "rename"
+      },
+      "user_input": "Product.find(params[:id]).file_path",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "4a746b6140ff4a2ed16fdb9e1f199e843523732b1533e2e7f47b75605d7ffa2b",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/products_controller.rb",
+      "line": 244,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(File.join(RoeSitePaths::SITE_PATH, Product.find(params[:id]).file_path))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ProductsController",
+        "method": "destroy"
+      },
+      "user_input": "Product.find(params[:id]).file_path",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "3bd635b92f74a53596655371d207f355d983b7d7f79ad11849261bb72f9167aa",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/site_sync_controller.rb",
+      "line": 148,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(SiteSync::DatabaseBackup.resolve(params[:name].to_s), :type => \"application/octet-stream\", :disposition => \"attachment\", :filename => File.basename(SiteSync::DatabaseBackup.resolve(params[:name].to_s)))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SiteSyncController",
+        "method": "download_backup_database"
+      },
+      "user_input": "params[:name].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "6e830a45f2f6396f933faf45fef47fecffc69e0e6df4dc22b73421cf716fce64",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/system_assets_controller.rb",
+      "line": 42,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SystemAssetsController",
+        "method": "create"
+      },
+      "user_input": "params[:asset_type]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "77a5ed6a7f537e09651977fa03bd5661c5671cd57a8ccd22ab8fd3c4a2bf9d7a",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/system_assets_controller.rb",
+      "line": 43,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.mkdir_p(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SystemAssetsController",
+        "method": "create"
+      },
+      "user_input": "params[:asset_type]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "83375d18fd1608f7cfc6d679980a55524c9c3ab7ae64b73786fde2dd64e55618",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/system_assets_controller.rb",
+      "line": 62,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.open(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\")).join(\"#{File.basename(sanitize_filename(params[:file].original_filename), File.extname(sanitize_filename(params[:file].original_filename)))}-#{1}#{File.extname(sanitize_filename(params[:file].original_filename))}\"), \"wb\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SystemAssetsController",
+        "method": "create"
+      },
+      "user_input": "params[:file].original_filename",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "0aac2c0cfb848e01a49a3f1334e0c4a88dff47aad23c6e480756f42e92f070f9",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/system_assets_controller.rb",
+      "line": 80,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"), params[:id])",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SystemAssetsController",
+        "method": "destroy"
+      },
+      "user_input": "params[:asset_type]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "0aac2c0cfb848e01a49a3f1334e0c4a88dff47aad23c6e480756f42e92f070f9",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/system_assets_controller.rb",
+      "line": 80,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"), params[:id])",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SystemAssetsController",
+        "method": "destroy"
+      },
+      "user_input": "params[:id]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "eaad02f493b06f466b027d5a1a8cd870f8444130f356012712fe8234546481f1",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/system_assets_controller.rb",
+      "line": 91,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"), params[:id]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SystemAssetsController",
+        "method": "destroy"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "dd4d87f1927b75c655d7b6ee9ceb569d567f1bc58bfd079460d27aabd6fd74a7",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 30,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "edit"
+      },
+      "user_input": "params[:id]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "6729b803eb3b4b2614988f954cce92a38618ae8d248b73db5906a6d6b9388b5f",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 37,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "edit"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "5fb4ba7ba322601bae4776a83aecf4c424e0fcb6c648d4d7bcee498f003de25f",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 44,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "update"
+      },
+      "user_input": "params[:id]",
+      "confidence": "High",
+      "cwe_id": [
+        22
       ],
       "note": ""
     },
@@ -1689,21 +1245,90 @@
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "b18a6e261d8dc62c3fd43db779d2b9b92cdc115d05cf64d2f0ac510b3a5409d9",
+      "fingerprint": "1f3ae55d890665da02d14f80bdaabd15c093684e01c3ec23f3daf4edddf1ec5f",
       "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/pages_controller.rb",
-      "line": 161,
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 75,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "Pathname.new(Page.find(params[:id]).file_path)",
+      "code": "FileUtils.cp(Rails.root.join(\"app/themes\").join(\"#{params[:id]}.css\"), Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::PagesController",
-        "method": "rename"
+        "class": "Admin::ThemesController",
+        "method": "activate"
       },
-      "user_input": "Page.find(params[:id]).file_path",
-      "confidence": "Medium",
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "c7df5d5c0e6ee64b1d921fad2c37a1a2265a0b0da1426b81a02227fe9cac5191",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 103,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "reset"
+      },
+      "user_input": "params[:id]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "458b397e7152af7f2610c79e91898e63ce8ceb5ecf122e79481c85d0fa3c7b76",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 105,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.cp(Rails.root.join(\"app/themes\").join(\"#{params[:id]}.css\"), Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "reset"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "391c5e01fe8404ec2d6a9869ba4058a06c9d9189e2aee3d8e3b23a59073d82f8",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 118,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{(params[:custom_name].strip or generate_unique_theme_name(params[:id]))}.css\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "reset"
+      },
+      "user_input": "params[:custom_name].strip",
+      "confidence": "High",
       "cwe_id": [
         22
       ],
@@ -1733,25 +1358,738 @@
       "note": ""
     },
     {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "bd0b7733b526d5da9008b8f1e4fe01e495e0e430b71f9f8372a1f565266d43fa",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/posts_controller.rb",
-      "line": 343,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.rename(Pathname.new(Post.find(params[:id]).file_path), Pathname.new(Post.find(params[:id]).file_path).dirname.join(\"#{sanitize_filename(params[:new_filename])}.md\"))",
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "c7df5d5c0e6ee64b1d921fad2c37a1a2265a0b0da1426b81a02227fe9cac5191",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 138,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::PostsController",
-        "method": "rename"
+        "class": "Admin::ThemesController",
+        "method": "reset"
       },
-      "user_input": "Post.find(params[:id]).file_path",
+      "user_input": "params[:id]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "49f43069793594a48a83b7f1d8b1326b4b1e6d39068537c06e274eb1b1ff96af",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 166,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{(params[:custom_name].strip or \"#{params[:id].capitalize} preserved\").gsub(/\\s+/, \" \").strip.parameterize}.css\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "reset"
+      },
+      "user_input": "params[:custom_name].strip",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "f753ab77597cf9c6354cb94e528ace672d93f73573ac11a783abedb49902d1d1",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 177,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "reset"
+      },
+      "user_input": "params[:id]",
       "confidence": "Weak",
       "cwe_id": [
         22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "458b397e7152af7f2610c79e91898e63ce8ceb5ecf122e79481c85d0fa3c7b76",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 181,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.cp(Rails.root.join(\"app/themes\").join(\"#{params[:id]}.css\"), Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "reset"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "702fb94560cc21d3fef5e2112a4b10e8d52951aa51afdb03d0d3c6cc7a086111",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 195,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "destroy"
+      },
+      "user_input": "params[:id]",
+      "confidence": "High",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "02bfbf06725be9dd39e3224b82d8667a023b83228ac194c9ded3f51266ca80c5",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 208,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.rm(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "destroy"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "f0bd4e978c94ffa0cffb98dc8e8f952e1751a6115e6763e8b3f79af0636993bd",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/media_controller.rb",
+      "line": 37,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.open(resolve_media_path(params[:path].to_s), \"rb\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "MediaController",
+        "method": "show"
+      },
+      "user_input": "params[:path].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "path validated by resolve_media_path containment check (File.expand_path + within?)"
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "90985f879e19a6b6265b9a61f7661a6c43d7268fa1e33f9a257dc70d2b6b13c5",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/media_controller.rb",
+      "line": 46,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(resolve_media_path(params[:path].to_s), :disposition => \"inline\", :type => ((Mime::Type.lookup_by_extension(File.extname(resolve_media_path(params[:path].to_s)).delete_prefix(\".\")).to_s or \"application/octet-stream\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "MediaController",
+        "method": "show"
+      },
+      "user_input": "params[:path].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "path validated by resolve_media_path containment check (File.expand_path + within?)"
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "808323523af13dcb7179f54f654a0e8754823a92fbecf6fe5eefca5421404fce",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/system/fonts_controller.rb",
+      "line": 12,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(File.join(RoeSitePaths::SITE_PATH, \"system/assets/fonts\", params[:filename]), :type => font_mime_type(params[:filename]), :disposition => \"inline\", :filename => params[:filename])",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "System::FontsController",
+        "method": "show"
+      },
+      "user_input": "params[:filename]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "565816bc5f5619ddb2938af09ce91e43741caafd40fe4979f7510d1c35ad1e9e",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/system/images_controller.rb",
+      "line": 8,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(File.join(RoeSitePaths::SITE_PATH, \"system\", \"assets\", \"images\", params[:filename]), :type => image_mime_type(params[:filename]), :disposition => \"inline\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "System::ImagesController",
+        "method": "show"
+      },
+      "user_input": "params[:filename]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "05f038594ff3fc303271d935dabc7d3bc7a9ce784f5884f36e0714fb76242c38",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/system/themes_controller.rb",
+      "line": 45,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file((File.join(RoeSitePaths::SITE_PATH, \"theme\", \"#{File.basename(params[:filename].to_s)}.#{(\"js\" or \"css\")}\") or if File.exist?(Rails.root.join(\"app\", \"themes\", \"#{File.basename(params[:filename].to_s)}.#{(\"js\" or \"css\")}\")) then\n  Rails.root.join(\"app\", \"themes\", \"#{File.basename(params[:filename].to_s)}.#{(\"js\" or \"css\")}\")\nelse\n  head(:not_found)\n  return\nend), :type => ((\"application/javascript\" or \"text/css\")), :disposition => \"inline\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "System::ThemesController",
+        "method": "show"
+      },
+      "user_input": "params[:filename].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "ed1c52e3e0b1eff59493a0c0d1ed3ec67affd07da44cb6457e16e4acf089e303",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/jobs/perform_deploy_job.rb",
+      "line": 221,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "Open3.capture3(\"fly\", \"secrets\", \"set\", \"--stage\", \"ROE_BOOTSTRAP=#{JSON.generate(build_bootstrap_payload(User.find_by(:id => admin_user_id)))}\", :chdir => Rails.root.to_s)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "PerformDeployJob",
+        "method": "sync_fly_bootstrap_data"
+      },
+      "user_input": "User.find_by(:id => admin_user_id)",
+      "confidence": "High",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "6a8828065833faa16d9496a6d92b2399b4ea2f3aba23448b27eaee7ee9eeb374",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/jobs/perform_deploy_job.rb",
+      "line": 336,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "Open3.capture2e(\"ssh\", \"-o\", \"StrictHostKeyChecking=accept-new\", \"-o\", \"BatchMode=yes\", \"root@#{Array(((YAML.load_file(SiteConfig::DEPLOY_FILE) or {}) or {}).dig(\"kamal\", \"servers\")).map(&:to_s).reject(&:blank?).first}\", \"docker buildx prune --force --all && docker builder prune --force --all\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "PerformDeployJob",
+        "method": "clear_remote_build_cache"
+      },
+      "user_input": "Array(((YAML.load_file(SiteConfig::DEPLOY_FILE) or {}) or {}).dig(\"kamal\", \"servers\")).map(&:to_s).reject(&:blank?).first",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "748cba24c5f8212c8d1136f8ce55af8fab413465ae7ef1483e7fcbda450005f4",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/backup_manager.rb",
+      "line": 37,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`sqlite3 '#{db}' \".backup '#{File.join(File.join(env_dir, \"backup\", Time.now.strftime(\"%Y%m%d_%H%M%S\")), File.basename(db))}'\" 2>&1`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::BackupManager",
+        "method": "self.backup_databases"
+      },
+      "user_input": "db",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "2a8150cda7a43e0cd3d4939bbd4d88be902eb110e1eede945e55203b2e7ac88c",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/backup_manager.rb",
+      "line": 94,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`sqlite3 '#{original}' \".restore '#{File.join(File.join(env_dir, \"backup\", most_recent_backup_timestamp), File.basename(original))}'\" 2>&1`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::BackupManager",
+        "method": "self.restore_databases"
+      },
+      "user_input": "original",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": "dest is an internal generated backup path, single-quote-escaped; not user input"
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "861f637451087769d1cf1357a2d1be0d15f560491c847641a50fe70eb91f2651",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/downloader.rb",
+      "line": 35,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "Open3.capture2e(\"git\", \"clone\", \"--depth\", \"1\", \"--branch\", \"v#{version}\", git_url, STAGING_PATH)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::Downloader",
+        "method": "self.download_version"
+      },
+      "user_input": "version",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": "Argv form — no shell, so nothing here is interpolated into a command line. version comes from a tag Roe published and git_url from Forge.mirrors, a compiled-in list. Brakeman flags Open3 with any interpolated argument regardless of the array form."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "54227189ab086afe31dc4d462b8cb2bf1277e24150f63810eb0b70f693b5de7b",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/migration_tester.rb",
+      "line": 27,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"staging\")}' && bundle install --quiet 2>&1\"}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::MigrationTester",
+        "method": "self.test_migrations"
+      },
+      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"staging\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "23effe19dfdd93ee935556c4dc0f3f44a8725137e5c6be7ff3609e74d05e6eef",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/migration_tester.rb",
+      "line": 47,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"staging\")}' && RAILS_ENV=#{Rails.env} ROE_SITE_PATH='#{TEST_SITE_PATH}' bundle exec rails db:migrate 2>&1\"}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::MigrationTester",
+        "method": "self.test_migrations"
+      },
+      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"staging\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "f6e0b591c679bbc88d9c7f1604400ccd2f1afdda2b903a3d79f010d68c5d2ab3",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/migration_tester.rb",
+      "line": 75,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{\"rsync -av --delete --exclude='media/images/variants/' '#{RoeSitePaths::SITE_PATH}/' '#{TEST_SITE_PATH}/' 2>&1\"}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::MigrationTester",
+        "method": "self.copy_site_to_test"
+      },
+      "user_input": "RoeSitePaths::SITE_PATH",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "07fff5f39a29b01285e3f837c291deaf9b5ec97730026198d3379e18a4546819",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 217,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"#{mise_bin} where ruby@#{version} > /dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.ruby_available?"
+      },
+      "user_input": "mise_bin",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "165ee652e55ba35fbd74c66ee8dab05e96572a49b70daa2f2f1c4f9c3b280159",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 247,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{mise_bin} install \"ruby@#{version}\" 2>&1`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.install_required_ruby"
+      },
+      "user_input": "mise_bin",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "06719c107840d326338ca14f936a2332b6995f460d8619fb074d55e19e93ce72",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 284,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"command -v #{cmd} > /dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.command_available?"
+      },
+      "user_input": "cmd",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "6223f4b9f01aa9c5c822bbc92cb1d0f87eec663450c0ac64b68a2d04f6c26397",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 298,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"#{mise} settings set idiomatic_version_file_enable_tools ruby > /dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.configure_mise"
+      },
+      "user_input": "mise",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "0a51b5d3a6e9f27d469c4aeda0782079ca9a40c8413f80252b6c2d1b7027f091",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 299,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "system(\"#{mise} settings set ruby.compile false > /dev/null 2>&1\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.configure_mise"
+      },
+      "user_input": "mise",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "a92640c772bcab9b480be4642901feb2710745f38fba663e8b84cd66c9273910",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 380,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"staging\")}' && RAILS_ENV=development ROE_SITE_PATH='#{RoeSitePaths::SITE_PATH}' bundle exec rails db:migrate 2>&1\"}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.run_migrations"
+      },
+      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"staging\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "94e8a83249bf9ef5a3679849b7e61d4a8a60039c7e0f877f54f7eed0143a0fff",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 544,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"current\")}' && #{ruby_target_prefix}bundle install 2>&1\"}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.install_gems"
+      },
+      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"current\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "7113f002d53d359f93e008d8f00bdc65421ba33a6aa0baa218a8e169ef95658d",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/roe_updater/update_orchestrator.rb",
+      "line": 571,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{\"cd '#{File.join(RoeSitePaths::ROE_ROOT, \"current\")}' && RAILS_ENV=#{Rails.env} #{ruby_target_prefix}bundle exec rails assets:precompile 2>&1\"}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RoeUpdater::UpdateOrchestrator",
+        "method": "self.build_assets"
+      },
+      "user_input": "File.join(RoeSitePaths::ROE_ROOT, \"current\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "44198f7747caa1b701fbcda27db9109ac64a8f64d4a35de502162fa739f565c9",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/site_sync/backup_manager.rb",
+      "line": 76,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::BackupManager",
+        "method": "self.create"
+      },
+      "user_input": "[\"/db\", \"/.git\", \"/.sync-state.json\", \"/.sync-backups\", \"/media/images/variants\", (\"/\" + SNAPSHOT_META_FILENAME), \".DS_Store\"].map do\n \"--exclude=#{Shellwords.escape(e)}\"\n end.join(\" \")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "48d448ed2c2e4bb672746e6f77942523e198bee9180af0f1f1cdd524e69bd353",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/site_sync/backup_manager.rb",
+      "line": 172,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::BackupManager",
+        "method": "self.restore"
+      },
+      "user_input": "[\"/db\", \"/.git\", \"/.sync-state.json\", \"/.sync-backups\", \"/media/images/variants\", (\"/\" + SNAPSHOT_META_FILENAME), \".DS_Store\"].map do\n \"--exclude=#{Shellwords.escape(e)}\"\n end.join(\" \")",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "6401d817bb8583419bdf2cbbe63adc8db2776ba58193bf44a007300ecc247d63",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/site_sync/backup_manager.rb",
+      "line": 314,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"VACUUM INTO '#{dest.gsub(\"'\", \"''\")}'\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::BackupManager",
+        "method": "self.vacuum_into"
+      },
+      "user_input": "dest.gsub(\"'\", \"''\")",
+      "confidence": "Medium",
+      "cwe_id": [
+        89
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "3bee97bf112b7e647b99c904701358619410063bb230bb0256b60db6f1fe196d",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/site_sync/fly_rsync.rb",
+      "line": 435,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{cmd}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::FlyRsync",
+        "method": "self.run"
+      },
+      "user_input": "cmd",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": ""
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "5f90bbf019b90f3e39fc4146f20f33591f5dd3587f9a121b4ee8d351be90a23d",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/site_sync/kamal_rsync.rb",
+      "line": 395,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{cmd}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::KamalRsync",
+        "method": "self.run"
+      },
+      "user_input": "cmd",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
       ],
       "note": ""
     },
@@ -1790,45 +2128,52 @@
       "note": ""
     },
     {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "c27003670421e52ac7dddf053fa9cd31083f7a4a553f5a340e9c78511b6db2e8",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/emails_controller.rb",
-      "line": 70,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, \"emails\", \"#{params[:id]}.md\"))",
-      "render_path": null,
+      "warning_type": "Cross-Site Scripting",
+      "warning_code": 2,
+      "fingerprint": "af21e368a1ad7651c790a704ee1a69fba74fc504c111b04a8186dea70921083b",
+      "check_name": "CrossSiteScripting",
+      "message": "Unescaped model attribute",
+      "file": "app/views/pages/show.html.erb",
+      "line": 19,
+      "link": "https://brakemanscanner.org/docs/warning_types/cross_site_scripting",
+      "code": "render_page_content(Page.find(params[:id]), :context => (({ :member => (@member) } or nil)))",
+      "render_path": [
+        {
+          "type": "controller",
+          "class": "Admin::PagesController",
+          "method": "preview",
+          "line": 256,
+          "file": "app/controllers/admin/pages_controller.rb",
+          "rendered": {
+            "name": "pages/show",
+            "file": "app/views/pages/show.html.erb"
+          }
+        }
+      ],
       "location": {
-        "type": "method",
-        "class": "Admin::EmailsController",
-        "method": "edit"
+        "type": "template",
+        "template": "pages/show"
       },
-      "user_input": "params[:id]",
+      "user_input": "Page.find(params[:id])",
       "confidence": "Weak",
       "cwe_id": [
-        22
+        79
       ],
       "note": ""
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "c4f3418114eadc5ad291134cb30176180b2a0a2e4003b2b1611eba280668ffd0",
+      "fingerprint": "55ad081fac4485d6b6df9cebfa2dba80f32389cda9b5994e4f76aa37ca91ab52",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/medium_controller.rb",
-      "line": 169,
+      "file": "config/initializers/content_management.rb",
+      "line": 55,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(File.join(RoeSitePaths::SITE_PATH, Medium.find(params[:id]).file_path.to_s.sub(/^\\//, \"\")))",
+      "code": "YAML.load_file(SiteConfig::FEATURES_PATH.join(\"members.yml\"))",
       "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::MediumController",
-        "method": "destroy"
-      },
-      "user_input": "Medium.find(params[:id]).file_path",
+      "location": null,
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"members.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
@@ -1836,350 +2181,327 @@
       "note": ""
     },
     {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "c7df5d5c0e6ee64b1d921fad2c37a1a2265a0b0da1426b81a02227fe9cac5191",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 103,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "0d485009d7335ce90f2948e59848225bfc1b0a511a258de6c593bf935751402d",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/system/javascripts_controller.rb",
+      "line": 27,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(SiteJavascript.path(\"#{File.basename(params[:filename].to_s)}.#{(\"css\" or \"js\")}\"), :type => ((\"application/javascript\" or \"text/css\")), :disposition => \"inline\")",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
+        "class": "System::JavascriptsController",
+        "method": "show"
       },
-      "user_input": "params[:id]",
-      "confidence": "High",
+      "user_input": "params[:filename].to_s",
+      "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": ""
+      "note": "File.basename in the controller and again in SiteJavascript.path, with the extension fixed to js/css. A traversal collapses to a bare name inside site/javascript or app/site_js, and a name that isn't there 404s."
     },
     {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "c7df5d5c0e6ee64b1d921fad2c37a1a2265a0b0da1426b81a02227fe9cac5191",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 138,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "19aaa52f7336703676f65410b0427015bcfbb29daa4612bbba51ee49eccb93fd",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/post.rb",
+      "line": 199,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "regular_posts.where(\"CAST(json_extract(metadata, '$.#{field.to_s}') AS TEXT) = ?\", value.to_s.strip)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
+        "class": "Post",
+        "method": "Post.conflicting_post"
       },
-      "user_input": "params[:id]",
-      "confidence": "High",
+      "user_input": "field",
+      "confidence": "Weak",
       "cwe_id": [
-        22
+        89
       ],
-      "note": ""
+      "note": "field is interpolated only after UNIQUE_FIELDS[field] returns non-nil, so only whitelisted names reach the query; scope names come from that same table, and every value is a bound parameter."
     },
     {
-      "warning_type": "Remote Code Execution",
-      "warning_code": 25,
-      "fingerprint": "d83aad61527eb3d06e801011d671c9afdb9ae6549c2aed81c7286fedb757b0e2",
-      "check_name": "Deserialize",
-      "message": "`YAML.load` called with model attribute",
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "33a917304d5d898a12b61139275d4c1331f097d1e8d743df25e41cb3fac428d5",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 615,
-      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
-      "code": "YAML.load(File.read(SiteConfig::FEATURES_PATH.join(\"podcast.yml\")))",
+      "line": 1245,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "YAML.load_file(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"), :permitted_classes => ([Date, Time]))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "edit_podcast"
+        "method": "add_podcast"
       },
       "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
-      "confidence": "Medium",
-      "cwe_id": [
-        502
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "dd1f88c1fb4f77e72a2f29ac5e7c0dcb15f87d73c24600eef5daec479d6ba25f",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/documentation_controller.rb",
-      "line": 63,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(Post.find(params[:id]).file_path)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::DocumentationController",
-        "method": "destroy"
-      },
-      "user_input": "Post.find(params[:id]).file_path",
-      "confidence": "Medium",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Path Traversal",
-      "warning_code": 125,
-      "fingerprint": "dd4d87f1927b75c655d7b6ee9ceb569d567f1bc58bfd079460d27aabd6fd74a7",
-      "check_name": "Pathname",
-      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 30,
-      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
-      "code": "Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\")",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "edit"
-      },
-      "user_input": "params[:id]",
-      "confidence": "High",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "eaad02f493b06f466b027d5a1a8cd870f8444130f356012712fe8234546481f1",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/system_assets_controller.rb",
-      "line": 91,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.delete(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"system/assets\")).join((params[:asset_type] or \"fonts\"), params[:id]))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::SystemAssetsController",
-        "method": "destroy"
-      },
-      "user_input": "params[:id]",
       "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": ""
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "ebaff6d9249cec27fee053c02821c7b96e5c5d70953bcf3444872db5f62a5bb8",
-      "check_name": "FileAccess",
-      "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/emails_controller.rb",
-      "line": 105,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(File.join(RoeSitePaths::SITE_PATH, \"emails\", \"#{params[:id]}.md\"))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::EmailsController",
-        "method": "preview"
-      },
-      "user_input": "params[:id]",
-      "confidence": "Weak",
-      "cwe_id": [
-        22
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "ed1c52e3e0b1eff59493a0c0d1ed3ec67affd07da44cb6457e16e4acf089e303",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/jobs/perform_deploy_job.rb",
-      "line": 221,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "Open3.capture3(\"fly\", \"secrets\", \"set\", \"--stage\", \"ROE_BOOTSTRAP=#{JSON.generate(build_bootstrap_payload(User.find_by(:id => admin_user_id)))}\", :chdir => Rails.root.to_s)",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "PerformDeployJob",
-        "method": "sync_fly_bootstrap_data"
-      },
-      "user_input": "User.find_by(:id => admin_user_id)",
-      "confidence": "High",
-      "cwe_id": [
-        77
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "Remote Code Execution",
-      "warning_code": 25,
-      "fingerprint": "ee51817429e885c0431faf29b7ed933af524d1703fc3b6dd1b76c677bd34e1b5",
-      "check_name": "Deserialize",
-      "message": "`YAML.load` called with model attribute",
-      "file": "app/controllers/admin/configs_controller.rb",
-      "line": 688,
-      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
-      "code": "YAML.load(File.read(SiteConfig::DEFAULTS_PATH.join(\"cards.yml\")))",
-      "render_path": null,
-      "location": {
-        "type": "method",
-        "class": "Admin::ConfigsController",
-        "method": "edit_cards"
-      },
-      "user_input": "SiteConfig::DEFAULTS_PATH.join(\"cards.yml\")",
-      "confidence": "Medium",
-      "cwe_id": [
-        502
-      ],
-      "note": ""
-    },
-    {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "f0bd4e978c94ffa0cffb98dc8e8f952e1751a6115e6763e8b3f79af0636993bd",
+      "fingerprint": "610df42229f0e211c5aa61c8786fcd8447568b2c5eba3945514bdf1f215d2191",
       "check_name": "FileAccess",
       "message": "Parameter value used in file name",
       "file": "app/controllers/media_controller.rb",
-      "line": 37,
+      "line": 90,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
       "code": "File.open(resolve_media_path(params[:path].to_s), \"rb\")",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "MediaController",
-        "method": "show"
+        "method": "send_data_stream"
       },
       "user_input": "params[:path].to_s",
       "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": "path validated by resolve_media_path containment check (File.expand_path + within?)"
+      "note": "resolve_media_path expands the candidate and requires within?(root, candidate), which compares on a separator boundary. Traversal attempts return nil and 404."
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "f129ed2c8dfe9dc3b90629ca083ddf8d9b544c5d85684ac21291bc62db716d84",
+      "fingerprint": "64cd07cd23c028e1de7dc1879e48fb7a0694490dc4af32562e22463031b7be4a",
       "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/posts_controller.rb",
-      "line": 290,
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/file_imports_controller.rb",
+      "line": 81,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(Post.find(params[:id]).file_path)",
+      "code": "FileUtils.rm_rf(safe_dir(params[:token]))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::PostsController",
-        "method": "duplicate"
+        "class": "Admin::FileImportsController",
+        "method": "run"
       },
-      "user_input": "Post.find(params[:id]).file_path",
-      "confidence": "Medium",
+      "user_input": "params[:token]",
+      "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": ""
+      "note": "safe_dir returns nil unless the token matches /\\A[a-f0-9]{16}\\z/ and the directory already exists under IMPORTS_ROOT."
     },
     {
-      "warning_type": "File Access",
-      "warning_code": 16,
-      "fingerprint": "f50c7a76d79f3a6d2d6279228aa2a40f621beb6c0ce743a7e6408650ddeb970c",
-      "check_name": "FileAccess",
-      "message": "Model attribute used in file name",
+      "warning_type": "Remote Code Execution",
+      "warning_code": 25,
+      "fingerprint": "9da99a59c2ca03c606e746974bb7ca041acf8f74ffc0814e049f7d3bea0a9723",
+      "check_name": "Deserialize",
+      "message": "`YAML.load` called with parameter value",
       "file": "app/controllers/admin/configs_controller.rb",
-      "line": 1430,
-      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "FileUtils.mkdir_p(File.dirname(SiteConfig::FEATURES_PATH.join(\"podcast.yml\")))",
+      "line": 845,
+      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
+      "code": "YAML.load(params[:content].to_s.gsub(/\\r\\n/, \"\\n\"))",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Admin::ConfigsController",
-        "method": "write_single_podcast_entry"
+        "method": "update_raw"
+      },
+      "user_input": "params[:content].to_s.gsub(/\\r\\n/, \"\\n\")",
+      "confidence": "High",
+      "cwe_id": [
+        502
+      ],
+      "note": "Psych 5 YAML.load is safe_load — no arbitrary classes, no aliases (checked against Psych 5.4.0). The parse is only a syntax check before the file is written."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "a9f2d22499e1cd7b2d3e70aebce2b882b44263ed915e4ba95999981df1770cb8",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 848,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.mkdir_p(File.dirname(SiteConfig.file_path_for(params[:type].to_s)))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_raw"
+      },
+      "user_input": "SiteConfig.file_path_for(params[:type].to_s)",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "b5a313ce3443e90002ff44e5a52f009d049119fc40db53e79988fcafbc6191a2",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 1220,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "delete_podcast_entry"
       },
       "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": ""
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
     },
     {
-      "warning_type": "Command Injection",
-      "warning_code": 14,
-      "fingerprint": "f6e0b591c679bbc88d9c7f1604400ccd2f1afdda2b903a3d79f010d68c5d2ab3",
-      "check_name": "Execute",
-      "message": "Possible command injection",
-      "file": "app/services/roe_updater/migration_tester.rb",
-      "line": 75,
-      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
-      "code": "`#{\"rsync -av --delete --exclude='media/images/variants/' '#{RoeSitePaths::SITE_PATH}/' '#{TEST_SITE_PATH}/' 2>&1\"}`",
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "b85a58b0512301a3e0cb8e8c939efcb4a9391410e39d23c9fa7203f110f050da",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/post.rb",
+      "line": 206,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "regular_posts.where(\"CAST(json_extract(metadata, '$.#{field.to_s}') AS TEXT) = ?\", value.to_s.strip).where(\"IFNULL(CAST(json_extract(metadata, '$.#{scope_field}') AS TEXT), '') = ?\", (scopes or {}).transform_keys(&:to_s)[scope_field].to_s.strip)",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "RoeUpdater::MigrationTester",
-        "method": "self.copy_site_to_test"
+        "class": "Post",
+        "method": "Post.conflicting_post"
       },
-      "user_input": "RoeSitePaths::SITE_PATH",
-      "confidence": "Medium",
+      "user_input": "scope_field",
+      "confidence": "Weak",
       "cwe_id": [
-        77
+        89
       ],
-      "note": ""
+      "note": "field is interpolated only after UNIQUE_FIELDS[field] returns non-nil, so only whitelisted names reach the query; scope names come from that same table, and every value is a bound parameter."
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "f753ab77597cf9c6354cb94e528ace672d93f73573ac11a783abedb49902d1d1",
-      "check_name": "FileAccess",
+      "fingerprint": "da528eedaef5ddc832c0b535b432f8732f7bc4f2147591fda3e51c3a760a80da",
+      "check_name": "SendFile",
       "message": "Parameter value used in file name",
-      "file": "app/controllers/admin/themes_controller.rb",
-      "line": 177,
+      "file": "app/controllers/media_controller.rb",
+      "line": 70,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.read(Pathname.new(File.join(RoeSitePaths::SITE_PATH, \"theme\")).join(\"#{params[:id]}.css\"))",
+      "code": "send_file(resolve_media_path(params[:path].to_s), :disposition => \"inline\", :type => ((Mime::Type.lookup_by_extension(File.extname(resolve_media_path(params[:path].to_s)).delete_prefix(\".\")).to_s or \"application/octet-stream\")))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::ThemesController",
-        "method": "reset"
+        "class": "MediaController",
+        "method": "serve_whole_file"
       },
-      "user_input": "params[:id]",
+      "user_input": "params[:path].to_s",
       "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": ""
+      "note": "resolve_media_path expands the candidate and requires within?(root, candidate), which compares on a separator boundary. Traversal attempts return nil and 404."
     },
     {
       "warning_type": "File Access",
       "warning_code": 16,
-      "fingerprint": "fd8fa72c1ad0f3c389600cdb28bd844e2ece52a5f618d128387ef5199947312b",
+      "fingerprint": "e09542e6bdf6bdab3f982b4f178b0149191fc7a8c850801b258b2717590bef69",
       "check_name": "FileAccess",
       "message": "Model attribute used in file name",
-      "file": "app/controllers/admin/pages_controller.rb",
-      "line": 170,
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 835,
       "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
-      "code": "File.rename(Pathname.new(Page.find(params[:id]).file_path), Pathname.new(Page.find(params[:id]).file_path).dirname.join(\"#{sanitize_filename(params[:new_filename])}.md\"))",
+      "code": "File.read(SiteConfig.file_path_for(params[:type].to_s))",
       "render_path": null,
       "location": {
         "type": "method",
-        "class": "Admin::PagesController",
-        "method": "rename"
+        "class": "Admin::ConfigsController",
+        "method": "edit_raw"
       },
-      "user_input": "Page.find(params[:id]).file_path",
+      "user_input": "SiteConfig.file_path_for(params[:type].to_s)",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "e6c006422ee8f956281844364e75c8888ee888f4b8aae21d793136dd05dcb500",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 1204,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "YAML.load_file(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"), :permitted_classes => ([Date, Time]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "delete_podcast_entry"
+      },
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
       "confidence": "Weak",
       "cwe_id": [
         22
       ],
-      "note": ""
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 70,
+      "fingerprint": "fe6708ef5ddddfde2416695bf06c0621b7c30eade3ea92569822ca9328fe6f21",
+      "check_name": "MassAssignment",
+      "message": "Specify exact keys allowed for mass assignment instead of using `permit!` which allows any keys",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 801,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.fetch(:releases, {}).permit!",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_music"
+      },
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [
+        915
+      ],
+      "note": "No model involved: the permitted hash is filtered to stripped strings and written to the music YAML config. Admin-only, and the same file has a raw YAML editor anyway."
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 70,
+      "fingerprint": "ffb3230c19d82eac3e2e3fc748b8cc63c6c3bab93b8301d40949bcd130ae6485",
+      "check_name": "MassAssignment",
+      "message": "Specify exact keys allowed for mass assignment instead of using `permit!` which allows any keys",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 800,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.fetch(:music_globals, {}).permit!",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_music"
+      },
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [
+        915
+      ],
+      "note": "No model involved: the permitted hash is filtered to stripped strings and written to the music YAML config. Admin-only, and the same file has a raw YAML editor anyway."
     }
   ],
-  "brakeman_version": "8.0.5"
+  "brakeman_version": "8.0.6"
 }

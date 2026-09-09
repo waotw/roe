@@ -100,16 +100,29 @@ The Site Sync page shows:
 - **Live changes** — Files modified on live since last sync
 - **Push/Pull buttons** — Available when connection is healthy
 
+### Sync history
+
+There is a `View sync history →` link on the [Site Sync](/admin/site_sync) page. This shows you a running log of every change a sync makes from live → local and from local → live. This page allows you to restore any file, deleted or changed by any sync from a backup that is made just before the sites sync.
+
+- select the file you want to restore
+- click `RESTORE SELECTED`
+
+### Deleted files warning
+
+Site sync deletes files. If a file is deleted on your live site, sync will delete locally and vice-versa. To prevent accidentally delting files, Roe has a warning in place which allows you to confirm all deletions. You can set a threshold for this in Settings → [site.yml](/admin/configs/site/edit) in the `Site Sync` section or turn it off entirely.
+
 ### Best Practices
 
 - **Work locally, sync to live** — Do your writing and editing locally, then push
-- **Sync before deploying** — Make sure your content is synced before updating Roe
-- **Pull before major edits** — If you edit on live, pull to local first to avoid conflicts
-- **The live database is separate** — Your local and live databases are independent. Site Sync handles the database content as part of the sync process.
+- **Sync before deploying** — Make sure your content is synced before updating or deploying Roe
+- **Pull before major edits** — If you edit on live, sync to local often to keep things in sync
+- **Use Sync history to restore files** — If you sync and want to rollback a file, you can use the [Sync history](/admin/site_sync/history) page to restore a file to a backup made just before files are synced.
 
 ## Static Site Sync
 
-Roe can build a [static site](/documentation/glossary#ssg) which you can upload to almost any webhost. You can enable static site generation [Admin → Settings → site.yml](/admin/configs/site/edit) page. <mark>Note:</mark> This section will only be present if Static Site Sync is enabled.
+Roe can build a [static site](/documentation/glossary#ssg) which you can upload to almost any webhost. You can enable static site generation [Admin → Settings → site.yml](/admin/configs/site/edit) page.
+
+<mark>Note:</mark> This section will only be present if Static Site Sync is enabled.
 
 ### Sync Status
 

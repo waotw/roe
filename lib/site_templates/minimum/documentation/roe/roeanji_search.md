@@ -32,9 +32,9 @@ Set these in [Admin → Settings → Search](/admin/configs/site/edit) (or direc
 
 | Option | Description |
 |--------|-------------|
-| `search_all_pages` | `false/unchecked` (default) only pages linked in your navigation/footer.<br>`true/checked` every published page. |
-| `search_roe_docs` | `false/unchecked` (default) excludes Roe's own documentation from search.<br>`true/checked` includes it. |
-| `Show results before typing` | `false/unchecked` (default) no results when search is opened<br>`true/check` see results immediately, then filter as you type. |
+| Include all pages in search | `unchecked = false` (default) only pages linked in your header/footer.<br>`checked = true` every published page. |
+| Roe's documentation |`local` (default) excludes Roe's documentation from from your live site and search.<br>`published` include it in your live site.<br>`searchable` include it in your site and search |
+| Show results before typing | `unchecked = false` (default) no results when search is opened<br>`checked = true` see results first, then filter as you type. |
 
 ### What is in search results
 

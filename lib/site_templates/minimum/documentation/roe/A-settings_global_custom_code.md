@@ -1,5 +1,5 @@
 ---
-title: Global → Custom Code
+title: Settings → Custom Code
 status: published
 url_name: custom-code
 tags: settings

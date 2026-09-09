@@ -108,10 +108,15 @@ class MediaUsageIndex
         paths = paths_in(record.content) | paths_in_metadata(record.metadata)
         next if paths.empty?
 
-        url = public_send(source[:path_helper], record)
+        url = resolve_url(source[:path_helper], record)
         label = record_label(record)
+        # Marked in the browser with a $ so it's visible which references are
+        # what protects a file — and, on a file that's readable when you
+        # expected it not to be, which reference is the public one.
+        # Documentation has no audience and never responds to this.
+        paid = record.respond_to?(:media_audience) && record.media_audience == "paid"
         paths.each do |path|
-          index[path] << { kind: source[:kind], type: KIND_LABELS[source[:kind]], label: label, url: with_highlight(url, path), global: false }
+          index[path] << { kind: source[:kind], type: KIND_LABELS[source[:kind]], label: label, url: with_highlight(url, path), global: false, paid: paid }
         end
       end
     end
@@ -126,9 +131,9 @@ class MediaUsageIndex
       next unless data.is_a?(Hash)
 
       each_media_value(data) do |field_key, path|
-        base = public_send(source[:path_helper])
+        base = resolve_url(source[:path_helper])
         label = field_key ? "#{source[:label]} → #{field_key}" : source[:label]
-        index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, field_key), global: true }
+        index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, field_key), global: true, paid: false }
       end
     end
   end
@@ -209,7 +214,23 @@ class MediaUsageIndex
   end
 
   def append_query(url, param, value)
+    return url if url.blank?
+
     sep = url.include?("?") ? "&" : "?"
     "#{url}#{sep}#{param}=#{CGI.escape(value)}"
+  end
+
+  # Resolve an edit-path helper, tolerating routes not being available yet.
+  # The index is also built during the boot-time ContentSync that drives
+  # variant pruning — before the routes are drawn — where the url helpers
+  # raise NoMethodError. The media→usage mapping (which prune_all! needs)
+  # doesn't depend on URLs; those are only for the admin backlink UI, which
+  # rebuilds the index once routes exist. So degrade to a nil link rather
+  # than letting the whole index (and the prune) blow up.
+  def resolve_url(helper, *args)
+    public_send(helper, *args)
+  rescue NoMethodError, NameError => e
+    Rails.logger.debug { "[MediaUsageIndex] url helper #{helper} unavailable: #{e.message}" }
+    nil
   end
 end

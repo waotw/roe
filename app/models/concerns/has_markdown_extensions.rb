@@ -8,7 +8,7 @@ module HasMarkdownExtensions
   PRODUCT_GRID_IMAGE_SIZES =
     "(min-width: 901px) 220px, (min-width: 769px) 30vw, (min-width: 401px) 45vw, 100vw".freeze
 
-  def to_html(preview: false, context: nil, static: false)
+  def to_html(preview: false, context: nil, static: false, feed: false)
     # Store context for use by form renderers
     @render_context = context
 
@@ -16,6 +16,19 @@ module HasMarkdownExtensions
     # can suppress dynamic-only affordances without threading the flag
     # through every render_* method signature.
     @rendering_static = static
+
+    # Whether this render is an editor preview. Same reasoning as the flag
+    # above: dev_warning is reached from a dozen renderers and threading a
+    # keyword through all of them to answer one question isn't worth it.
+    # Defaults to false, so any caller that doesn't ask for warnings gets none.
+    @rendering_preview = preview
+
+    # Whether this render is going into a feed. Warnings are for the person
+    # editing the site; a feed is machine output that leaves the building.
+    # `static` already suppresses them but can't be reused here — it also
+    # strips dynamic blocks, and a feed needs the paywall gate marker intact
+    # for FeedGenerator#preview_before_gate to split on.
+    @rendering_feed = feed
 
     # In static-site mode, strip dynamic blocks that require a Rails
     # backend (forms, paywalls, product buttons). Done before any other
@@ -91,9 +104,23 @@ module HasMarkdownExtensions
       hard_wrap: soft_breaks
     ).to_html
 
-    # Restore code blocks (now as HTML)
+    # Restore code blocks (now as HTML). See
+    # docs/04-markdown-extensions.md#code-block-protection for why the
+    # wrapping paragraph goes too, and why gsub takes a block.
+    #
+    # Take the wrapping paragraph with the token where there is one. Kramdown
+    # wraps a bare placeholder in <p>, and <pre> can't live inside <p> — so
+    # replacing only the token produces `<p><pre>…</pre></p>`, which the next
+    # Nokogiri pass rewrites to `<p></p><pre>…</pre>`, leaving a stray empty
+    # paragraph before every code block on the site. The bare-token pass after
+    # it handles placements Kramdown doesn't wrap, e.g. inside a list item.
+    #
+    # Both use the BLOCK form of gsub on purpose: with a string replacement
+    # Ruby reads \0, \1 and \\ in the replacement as backreferences, which
+    # silently mangles any code block containing them.
     code_blocks.each do |token, html_code|
-      html.gsub!(token, html_code)
+      html.gsub!(%r{<p>\s*#{Regexp.escape(token)}\s*</p>}) { html_code }
+      html.gsub!(token) { html_code }
     end
 
     # Restore pullquote splits
@@ -123,6 +150,7 @@ module HasMarkdownExtensions
     # Clear render context to prevent data leaking between requests
     @render_context = nil
     @rendering_static = nil
+    @rendering_feed = nil
   end
 
   # IDs that belong to injected third-party mount points and must never be
@@ -147,6 +175,10 @@ module HasMarkdownExtensions
   # widely browser-supported container/codec combos.
   AUDIO_EMBED_EXTENSIONS = %w[.mp3 .m4a .aac .ogg .oga .wav .flac].freeze
   VIDEO_EMBED_EXTENSIONS = %w[.mp4 .m4v .webm .ogv .mov].freeze
+
+  # Written in the paragraph that follows a floated pullquote to choose where the
+  # text wraps around it, instead of letting Roe pick a sentence near the middle.
+  PULLQUOTE_SPLIT_MARKER = "||"
 
   def render_audio_embed(src, alt)
     label = alt.to_s.strip
@@ -209,6 +241,29 @@ module HasMarkdownExtensions
 
       ResponsiveImageRenderer.render(src, alt: alt, class: css_class, sizes: sizes)
     end
+  end
+
+  # Fingerprint of the members every ```collection block in this record's body
+  # currently resolves to. The static generator stores this in its manifest so
+  # it can regenerate an aggregation page (e.g. the glossary) when a
+  # collection's membership — or a shown member's content — changes, even
+  # though this record's own updated_at didn't. Returns nil when the body
+  # embeds no collections.
+  #
+  # Each block contributes its ordered, displayed members as
+  # "Class:id:updated_at" tuples, so add/remove, reorder, and edits to a shown
+  # member all move the digest. The block's own config (query, limit, order)
+  # lives in this body, so a config change already bumps this record's
+  # updated_at and needs no separate tracking here.
+  def embedded_collection_fingerprint
+    blocks = content.to_s.scan(/^ *```collection\r?\n(.*?)```/m).map(&:first)
+    return nil if blocks.empty?
+
+    parts = blocks.map do |config_text|
+      items, = resolve_collection_items(parse_collection_config(config_text))
+      Array(items).map { |i| "#{i.class.name}:#{i.id}:#{i.updated_at.to_i}" }.join(",")
+    end
+    Digest::SHA1.hexdigest(parts.join("|"))
   end
 
   private
@@ -302,11 +357,19 @@ module HasMarkdownExtensions
     end.join("\n")
   end
 
+  # Footnote quirks (empty trailing <p>, ids on <sup>, repeat references):
+  # see docs/04-markdown-extensions.md#known-quirks
   def add_footnote_backlinks(html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    # Find all footnote list items
-    footnotes = doc.css(".footnotes ol li")
+    # Only the footnote list's OWN items, so a list inside a footnote doesn't
+    # shift the numbering. The child combinator has to reach all the way up:
+    # `.footnotes ol > li` still matches the items of a nested <ol>, because
+    # that <ol> is itself a descendant of .footnotes — which numbered a
+    # footnote containing an ordered list as several footnotes, and pushed
+    # every note after it out of step. `<ul>` never triggered it, which is why
+    # it looked fixed.
+    footnotes = doc.css(".footnotes > ol > li")
 
     footnotes.each_with_index do |li, index|
       footnote_id = li["id"] # e.g., "fn:1"
@@ -327,9 +390,65 @@ module HasMarkdownExtensions
       # Insert at the very beginning of the <li>
       li.prepend_child(backlink)
       li.prepend_child(Nokogiri::XML::Text.new(" ", doc)) # Add space after number
+
+      append_extra_returns(doc, li, footnote_id, number)
     end
 
     doc.to_html
+  end
+
+  # A footnote referenced more than once has only one place the leading number
+  # can point, so on its own it always returns you to the first mention — even
+  # if you arrived from the third.
+  #
+  # Kramdown ids repeat references `fnref:name`, `fnref:name:1`, `fnref:name:2`,
+  # so every mention is addressable. When there's more than one, add a return
+  # link per mention at the end of the note. That works with no JavaScript, and
+  # doubles as a way to visit the other mentions.
+  #
+  # site_js/footnotes.js then enhances it: clicking a reference repoints this
+  # note's leading number at that specific mention, so the number returns you
+  # where you actually came from. Markup is untouched for single-reference
+  # footnotes, which is nearly all of them.
+  def append_extra_returns(doc, li, footnote_id, number)
+    references = doc.css(%(a[href="##{footnote_id}"]))
+    return if references.size < 2
+
+    returns = Nokogiri::XML::Node.new("span", doc)
+    returns["class"] = "footnote-returns"
+
+    references.each_with_index do |ref, i|
+      # Kramdown hangs the id on the wrapping <sup>, not the <a>:
+      #   <sup id="fnref:reuse"><a href="#fn:reuse" class="footnote">1</a></sup>
+      ref_id = ref["id"].presence || ref.parent&.[]("id")
+      next if ref_id.blank?
+
+      link = Nokogiri::XML::Node.new("a", doc)
+      link["href"] = "##{ref_id}"
+      link["class"] = "footnote-return"
+      link["role"] = "doc-backlink"
+      link["aria-label"] = "Return to mention #{i + 1} of reference #{number}"
+      link.inner_html = %(<span aria-hidden="true">↩</span><sup>#{i + 1}</sup>)
+
+      returns.add_child(link)
+    end
+
+    return if returns.element_children.empty?
+
+    # Kramdown already makes a home for a backlink. With
+    # footnote_backlinks_inline it appends to the note's last paragraph, and
+    # when the note ends in a block (quote, list, code, table, image) it adds a
+    # paragraph to hold it — which, since footnote_backlink is "", arrives
+    # empty. Put the links in that paragraph either way: after the text where
+    # there is text, and filling the empty slot otherwise. Appending to the <li>
+    # instead would leave the phantom paragraph sitting between the block and
+    # the links.
+    last = li.element_children.last
+    if last && last.name == "p"
+      last.add_child(returns)
+    else
+      li.add_child(returns)
+    end
   end
 
   # GALLERIES
@@ -452,11 +571,18 @@ module HasMarkdownExtensions
   #
   # Syntax:  ![alt](/path.jpg)(*Caption text*)
   #
+  # A space before the caption is allowed, because the two other places that
+  # read this syntax — the consecutive-image grouper and the gallery scanner —
+  # both allow one, and a line that works inside a gallery should not stop
+  # working when it's lifted out. Spaces and tabs only, never a newline: the
+  # caption belongs to the image on its line, and `\s*` would let an emphasised
+  # paragraph underneath be swallowed as one.
+  #
   # Runs before Kramdown so the raw HTML block is passed through
   # unchanged. The image is rendered via ResponsiveImageRenderer so
   # it gets the same srcset/picture treatment as uncaptioned images.
   def process_image_captions(markdown)
-    markdown.gsub(/!\[([^\]]*)\]\(([^)]+)\)\(\*([^*]+)\*\)/) do
+    markdown.gsub(/!\[([^\]]*)\]\(([^)]+)\)[ \t]*\(\*([^*]+)\*\)/) do
       alt     = $1
       src     = $2.strip
       caption = $3.strip
@@ -477,12 +603,13 @@ module HasMarkdownExtensions
   # Fenced-gallery directives understood at the top/bottom of a ```gallery```
   # block (a `key: value` line that isn't a markdown image). Whitelisted so
   # stray "Word: text" lines stay content, not config.
-  GALLERY_DIRECTIVES = %w[slideshow caption aspect_ratio].freeze
+  GALLERY_DIRECTIVES = GalleryBuilderSchema::DIRECTIVES
 
   def render_gallery(content, preview: false, index: 0)
-    config, image_rows = parse_gallery(content)
+    config, image_rows, strays = parse_gallery(content)
     return (preview ? "<!-- Empty gallery -->" : "") if image_rows.flatten.empty?
 
+    notice = gallery_directive_warning(strays) + gallery_ratio_warning(config["aspect_ratio"])
     ratio_class = gallery_ratio_class(config["aspect_ratio"])
 
     body =
@@ -497,8 +624,45 @@ module HasMarkdownExtensions
     # {::nomarkdown} passes the raw HTML through kramdown untouched; the
     # later process_responsive_images sweep turns each <img data-sizes> into
     # a responsive <picture> (grid thumbs get small/medium variants, the
-    # zoom overlay's data-sizes="100vw" pulls the largest).
-    [ "", "{::nomarkdown}", body, "{:/nomarkdown}", "" ].join("\n")
+    # zoom overlay's data-sizes="100vw" pulls the largest). The notice goes
+    # outside that wrapper — it's already HTML, and "" when warnings are off.
+    [ notice, "", "{::nomarkdown}", body, "{:/nomarkdown}", "" ].join("\n")
+  end
+
+  # A directive line the gallery threw away. `carousel:` is the one people
+  # actually write, so it's named outright rather than left to spelling.
+  def gallery_directive_warning(strays)
+    return "" if strays.blank? || !show_block_warnings?
+
+    named = strays.filter_map do |key|
+      if (real = GalleryBuilderSchema::ALIASES[key])
+        "`#{key}:` isn't a gallery directive — use `#{real}:`."
+      elsif (near = nearest_term(key, GALLERY_DIRECTIVES))
+        "`#{key}:` isn't a gallery directive — did you mean `#{near}:`?"
+      end
+    end
+    return "" if named.empty?
+
+    dev_warning("Gallery #{'option'.pluralize(named.size)} not understood", named.join(" "),
+      "Unrecognized options are ignored.")
+  end
+
+  # Spell-checked, never restricted: a theme is free to define a
+  # `gallery-ratio-<anything>` class, so only a near-miss of a known shape is
+  # worth mentioning. An unknown value renders a class no stylesheet defines,
+  # which does nothing at all and looks exactly like the default.
+  def gallery_ratio_warning(value)
+    return "" if value.blank? || !show_block_warnings?
+
+    ratio = value.to_s.strip.downcase
+    return "" if GalleryBuilderSchema::RATIOS.include?(ratio)
+
+    near = nearest_term(ratio, GalleryBuilderSchema::RATIOS)
+    return "" unless near
+
+    dev_warning("Unknown aspect ratio",
+      "Did you mean `#{near}`?",
+      "Options: #{GalleryBuilderSchema::RATIOS.join(', ')}.")
   end
 
   # A gallery-level `caption:` directive wraps the whole gallery in a
@@ -520,22 +684,31 @@ module HasMarkdownExtensions
   # Split a gallery body into [config, image_rows]. Directive lines are
   # pulled out first; the rest is grouped into rows by blank lines (blank
   # line = new grid row), each row scanned for `![alt](src) (*caption*)`.
+  # Returns [config, image_rows, strays] — strays being `key: value` lines that
+  # look like a directive but aren't one. The whitelist above means those aren't
+  # merely ignored: they fall through to the image scanner, match nothing, and
+  # are dropped with the row. Collected here so render_gallery can say so.
   def parse_gallery(content)
     config = {}
     image_lines = []
+    strays = []
 
     content.to_s.each_line do |line|
       m = line.match(/\A\s*([a-z_]+)\s*:\s*(.+?)\s*\z/i)
-      if m && line !~ /!\[/ && GALLERY_DIRECTIVES.include?(m[1].downcase)
-        config[m[1].downcase] = m[2]
-      else
-        image_lines << line
+      if m && line !~ /!\[/
+        key = m[1].downcase
+        if GALLERY_DIRECTIVES.include?(key)
+          config[key] = m[2]
+          next
+        end
+        strays << key
       end
+      image_lines << line
     end
 
     rows = image_lines.join.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
     image_rows = rows.map { |row| scan_gallery_images(row) }.reject(&:empty?)
-    [ config, image_rows ]
+    [ config, image_rows, strays ]
   end
 
   def scan_gallery_images(row)
@@ -654,7 +827,10 @@ module HasMarkdownExtensions
       config = parse_collection_config(config_text)
       # A `search: true` collection renders a search icon (inside the
       # collection, beside the heading) — see render_collection/collection_header.
-      render_collection(config)
+      # A misspelled key is silently dropped, so `limitt: 3` renders the whole
+      # list with no hint that a limit was asked for. Prefixed, never
+      # substituted: the collection itself is fine.
+      unrecognised_option_warnings(config, "collection blocks") + render_collection(config)
     end
   end
 
@@ -764,71 +940,107 @@ module HasMarkdownExtensions
     config
   end
 
-  def apply_tag_filters(collection, tag_string)
-    return collection if tag_string.blank?
-
-    # Split by comma and clean up whitespace
-    tags = tag_string.split(",").map(&:strip)
-
-    # Separate positive and negative tags
-    positive_tags = tags.reject { |t| t.start_with?("-") }
-    negative_tags = tags.select { |t| t.start_with?("-") }.map { |t| t[1..-1] } # Remove the '-'
-
-    # Apply positive tags (OR logic - any of these tags)
-    if positive_tags.any?
-      collection = collection.tagged_with(positive_tags)
-    end
-
-    # Apply negative tags (exclude all of these, but keep untagged posts)
-    negative_tags.each do |neg_tag|
-      collection = collection.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{neg_tag}%"
-      )
-    end
-
-    collection
-  end
-
-  def apply_category_filter(collection, category)
-    collection.where("json_extract(metadata, '$.category') = ?", category.strip)
-  end
-
-  def apply_podcast_filter(collection, podcast_key)
-    collection.where("json_extract(metadata, '$.podcast') = ?", podcast_key.strip)
-  end
-
-  # Normalize a collection's `collection:` name filter (comma string or array)
-  # into the same downcased tokens HasMetadata#collection_names returns.
+  # Selection helpers (tag/podcast/category filters) now live in CollectionQuery,
+  # shared with named feeds. This name-normalizer is still called elsewhere in
+  # the renderer (menu curation), so it delegates rather than duplicating.
   def normalize_collection_names(value)
-    list = value.is_a?(Array) ? value : value.to_s.split(",")
-    list.map { |c| c.to_s.strip.downcase }
-        .reject(&:empty?)
-        .uniq
+    CollectionQuery.normalize_names(value)
   end
 
   def render_collection(config)
-    heading = config[:heading]
+    display_items, total_count, warning = resolve_collection_items(config)
+    return warning if warning
+
+    render_resolved_collection(config, display_items, total_count)
+  end
+
+  # Default source for a collection, shared by resolve_collection_items and
+  # render_resolved_collection. Delegates to CollectionQuery so collections and
+  # feeds resolve the source identically.
+  def collection_source(config)
+    CollectionQuery.source_for(config)
+  end
+
+  # What to call one item from a collection's source, so a warning about
+  # documentation doesn't tell someone to add the tag to a post. `documentation`
+  # has no singular worth using — "documentation article" is what a reader would
+  # call it.
+  def collection_source_noun(source)
+    case source.to_s
+    when "products" then "product"
+    when "pages" then "page"
+    when "documentation", %r{^documentation/} then "documentation article"
+    else "post"
+    end
+  end
+
+  # Resolve a limit/offset directive to an item count. Accepts a strict integer
+  # ("11") or a percentage of the matched set ("50%", rounded to the nearest
+  # item). Percentages let paired collections split a list into equal parts —
+  # `limit: 50%` on one, `offset: 50%` on the next — without hardcoding counts
+  # as the set grows. Both sides round identically, so the halves meet with no
+  # gap or overlap. Blank/garbage → 0.
+  def collection_count(value, total)
+    str = value.to_s.strip
+    if str.end_with?("%")
+      (str.chomp("%").to_f / 100.0 * total).round
+    else
+      str.to_i
+    end
+  end
+
+  # Parse a `limit: a-g` alphabetical range (or a single `limit: c`) into
+  # [first, last] downcased letters, or nil when the value isn't a letter range.
+  # Reversed ranges ("g-a") are tolerated.
+  def parse_letter_range(value)
+    m = value.to_s.strip.downcase.match(/\A([a-z])(?:\s*-\s*([a-z]))?\z/)
+    return nil unless m
+    a = m[1]
+    b = m[2] || a
+    a <= b ? [ a, b ] : [ b, a ]
+  end
+
+  # True when the item's title starts with a letter within [first, last].
+  # Non-letter initials (numbers, symbols) fall outside every letter range.
+  def title_initial_in_range?(item, range)
+    initial = item.title.to_s.strip.downcase[0]
+    return false unless initial
+    initial.between?(range[0], range[1])
+  end
+
+  # Parse a `part: k/m` column directive into the Range of the ordered set that
+  # column k of m occupies, or nil when it isn't a valid k/m (1 <= k <= m).
+  # Boundaries are floored from the shared total, so the m slices partition the
+  # set with no gaps or overlaps and sizes differing by at most one item.
+  def parse_part(value, total)
+    m = value.to_s.strip.match(%r{\A(\d+)\s*/\s*(\d+)\z})
+    return nil unless m
+    k, n = m[1].to_i, m[2].to_i
+    return nil if n < 1 || k < 1 || k > n
+    ((k - 1) * total / n)...(k * total / n)
+  end
+
+  # Resolve a parsed collection config to its final displayed members.
+  # Returns [display_items, total_count, warning] — warning is dev-only HTML
+  # that replaces the collection when the config is invalid (nil on the happy
+  # path); total_count is the pre-offset/limit size (drives the "View all"
+  # link). Shared by render_collection and embedded_collection_fingerprint so
+  # change detection and rendering never disagree on membership.
+  def resolve_collection_items(config)
     menu_template = config[:template].to_s.strip == "menu"
-    # Menus are almost always pages, so a menu with no explicit source
-    # defaults to pages (a plain feed still defaults to posts).
-    source = config[:source] || (menu_template ? "pages" : nil) ||
-             SiteConfig.default("collections", "default_source") || "posts"
+    source = collection_source(config)
     order_by = config[:order] || SiteConfig.default("collections", "default_order") || "date"
     # A menu is a menu, not a feed: with no explicit `order:` (usually a
     # url_name list), fall back to alphabetical rather than by date.
     order_by = "title" if config[:order].blank? && menu_template
     tags = config[:tags]
-    category = config[:category]
-    podcast_key = config[:podcast]
 
     # Get post_type from config or default, treating 'all' as nil (no filter)
     post_type = config[:post_type]
     post_type = nil if post_type == "all"
 
     # Validate tags in dev — warn about tags that don't exist on the source
-    tag_warning = ""
-    if Rails.env.development? && tags.present?
+    if show_block_warnings? && tags.present?
       requested = tags.split(",").map(&:strip)
                       .reject { |t| t.start_with?("-") }  # ignore exclusions
 
@@ -850,73 +1062,42 @@ module HasMarkdownExtensions
 
       unknown = requested.reject { |t| existing.include?(t) }
       if unknown.any?
-        source_name = source == "products" ? "product" : "post"
-        return dev_warning(
+        source_name = collection_source_noun(source)
+        return [ [], 0, dev_warning(
           "Unknown tag#{'s' if unknown.size > 1}",
           "#{unknown.map { |t| "'#{t}'" }.join(', ')} #{'does' if unknown.size == 1}#{'do' if unknown.size > 1} not exist on any #{source_name}.",
           "Existing tags: #{existing.any? ? existing.join(', ') : '(none yet)'}. " \
           "Add the tag to at least one #{source_name}'s metadata and it will show up in this collection."
-        )
+        ) ]
       end
     end
 
     # Validate post_type in dev — catches typos like 'articles' instead of 'article'
-    if Rails.env.development? && post_type.present? && source == "posts"
+    if show_block_warnings? && post_type.present? && source == "posts"
       valid_types = Post.post_type_options
       unless valid_types.include?(post_type)
-        return dev_warning(
+        return [ [], 0, dev_warning(
           "Unknown post_type",
           "'#{post_type}' is not a recognised post type.",
           "Valid types: #{valid_types.join(', ')}"
-        )
+        ) ]
       end
     end
 
-    # Get base collection
-    items = case source
-    when "posts"
-      collection = Post.published.regular_posts
-      collection = collection.by_type(post_type) if post_type
-      collection = apply_podcast_filter(collection, podcast_key) if podcast_key.present?
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when "pages"
-      collection = Page.public_pages
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when "documentation"
-      collection = Documentation.public_documentation.root
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when /^documentation\//
-      dir = source.sub("documentation/", "")
-      collection = Documentation.public_documentation.in_directory(dir)
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    when "products"
-      collection = Product.published
-      collection = apply_category_filter(collection, category) if category
-      collection = apply_tag_filters(collection, tags) if tags
-      collection
-    else
-      if Rails.env.development?
+    # Base selection (source + post_type/podcast/tags/category + `collection:`
+    # membership) lives in CollectionQuery, shared with named feeds so the two
+    # can never disagree about membership. The rendering-only steps below
+    # (related, menus, ordering, limit/offset) stay here. A nil result means an
+    # unknown source — warn in dev, render empty in prod, as before.
+    items = CollectionQuery.new(config).records
+    if items.nil?
+      if show_block_warnings?
         valid = %w[posts pages documentation documentation/roe products]
-        return dev_warning("Unknown collection source",
+        return [ [], 0, dev_warning("Unknown collection source",
           "'#{source}' is not a valid source.",
-          "Valid sources: #{valid.join(', ')}")
+          "Valid sources: #{valid.join(', ')}") ]
       end
-      []
-    end
-
-    # Filter by `collection:` membership. Like tags, but a placement concept —
-    # content stays invisible until a collection gathers it by name. Menus do
-    # their own membership below (list unioned with tagged), so this plain
-    # filter only applies to the other templates.
-    if config[:collection].present? && !menu_template
-      wanted = normalize_collection_names(config[:collection])
-      items = items.to_a.select do |item|
-        item.respond_to?(:collection_names) && (item.collection_names & wanted).any?
-      end
+      items = []
     end
 
     # `related: true` — filter the source collection to items that
@@ -983,11 +1164,11 @@ module HasMarkdownExtensions
       has_list  = config[:order].present? && !sort_keyword?(config[:order])
       has_label = config[:collection].present?
       unless has_list || has_label
-        return dev_warning(
+        return [ [], 0, dev_warning(
           "Empty menu collection",
           "This collection has template set to menu but has no order: list and no collection: name, so there's nothing to show.",
           "Add an order: list of url_names, or give it a collection: name and add the same collection: to the pages, posts, or products you want to show up here."
-        )
+        ) ]
       end
       items = curate_menu(items, config[:order], config[:collection])
     elsif !related_filter || config[:order].present?
@@ -995,47 +1176,99 @@ module HasMarkdownExtensions
     end
 
     # Apply offset and limit
-    offset_value = config[:offset].to_i
     limit_value = config[:limit]
     # A menu should list every matching item — a capped menu is a bug, not
     # a feature. Other templates keep the configured default limit.
     limit_value = "all" if limit_value.blank? && config[:template].to_s.strip == "menu"
     default_limit = SiteConfig.default("collections", "default_limit") || 10
-    show_more = config[:show_more] == "true" || config[:show_more] == true
 
     # Convert to array if needed
     items_array = items.is_a?(Array) ? items : items.to_a
+
+    # limit: a-g — an alphabetical range on the title's first letter (also a
+    # single letter, "limit: c"). It filters rather than counts, so it narrows
+    # the set and shows all of it — splits a glossary into A–G / H–P sections.
+    # Titles that don't start with a letter fall outside every letter range.
+    if (letter_range = parse_letter_range(config[:limit]))
+      items_array = items_array.select { |item| title_initial_in_range?(item, letter_range) }
+      limit_value = "all"
+    end
+
     total_count = items_array.count
 
-    # Apply offset (skip first N items)
+    # k/m — an equal column slice of the matched set (column k of m), from
+    # shared floored boundaries so the m columns never gap or overlap and differ
+    # by at most one item. Written as `limit: 1/2` (it's just another way to say
+    # what shows up) or the explicit `part: 1/2`; `part:` wins if both are set.
+    # A slice fully determines what's shown, so offset and a numeric limit don't
+    # apply. The "invalid" nudge fires only for an explicit `part:` — a non-k/m
+    # `limit:` is a normal count/percentage/letter range, handled below.
+    part_value = config[:part].presence || config[:limit]
+    if (part_range = parse_part(part_value, total_count))
+      return [ items_array[part_range] || [], total_count, nil ]
+    elsif config[:part].present? && show_block_warnings?
+      return [ [], 0, dev_warning(
+        "Invalid part",
+        "`part: #{config[:part]}` isn't a valid column slice. Use `k/m` with k from 1 to m (e.g. `part: 2/3`).",
+        "For equal columns, give each block the same m: `1/3`, `2/3`, `3/3` — on `part:` or `limit:`."
+      ) ]
+    end
+
+    # Apply offset (skip first N items). offset and limit each accept a strict
+    # integer or a percentage of the matched set ("50%") — see collection_count.
+    offset_value = collection_count(config[:offset], total_count)
+
+    # A letter range belongs on `limit:` (it filters); on `offset:` it silently
+    # parses to 0, so steer the author before they get a confusing result.
+    if show_block_warnings? && config[:offset].present? && parse_letter_range(config[:offset])
+      return [ [], 0, dev_warning(
+        "Letter range on offset",
+        "`offset: #{config[:offset]}` looks like a letter range, use `limit:` instead.",
+        "(e.g. `limit: a-m` then `limit: n-z`)."
+      ) ]
+    end
+
     items_array = items_array[offset_value..-1] || [] if offset_value > 0
 
     # Offset skipped past everything: the collection has content, but `offset`
     # is at least as large as the item count, so nothing is left to show. Flag
     # it locally (prod still renders the empty collection as before) so the
     # author can spot a too-large offset instead of staring at a blank block.
-    if Rails.env.development? && offset_value > 0 && total_count > 0 && items_array.empty?
+    if show_block_warnings? && offset_value > 0 && total_count > 0 && items_array.empty?
       max_offset = total_count - 1
       hint = if max_offset < 1
         "Remove `offset` — this collection has only #{total_count} #{'item'.pluralize(total_count)}."
       else
         "Either remove `offset` altogether, or reduce it to `offset: #{max_offset}` or lower to see content."
       end
-      return dev_warning(
+      return [ [], 0, dev_warning(
         "Collection offset skips all content",
         "This collection uses `offset: #{offset_value}` but has only #{total_count} #{'item'.pluralize(total_count)}, so there's nothing left to show here.",
         hint
-      )
+      ) ]
     end
 
     if limit_value.to_s.downcase == "all"
       display_items = items_array
     elsif limit_value
-      limit_int = limit_value.to_i
-      display_items = items_array.take(limit_int)
+      display_items = items_array.take(collection_count(limit_value, total_count))
+    elsif offset_value > 0
+      # A bare offset with no limit slices off a remainder — show all of it,
+      # not the default page cap (which is meant for uncapped feeds). This is
+      # what lets `limit: 50%` / `offset: 50%` two-column splits balance and
+      # cover every item.
+      display_items = items_array
     else
       display_items = items_array.take(default_limit)
     end
+
+    [ display_items, total_count, nil ]
+  end
+
+  def render_resolved_collection(config, display_items, total_count)
+    heading = config[:heading]
+    source  = collection_source(config)
+    show_more = config[:show_more] == "true" || config[:show_more] == true
 
     # Render based on template, default to 'grid' for products, otherwise use configured default
     default_template = source == "products" ? "grid" : (SiteConfig.default("collections", "default_template") || "list")
@@ -1049,7 +1282,7 @@ module HasMarkdownExtensions
     # All other templates emit Markdown/IAL and need markdown="1".
     output = []
 
-    if template == "compact" || template == "glossary" || template == "menu"
+    if template == "compact" || template == "glossary" || template == "menu" || template == "player" || template == "playlist"
       output << "<div class=\"collection #{template}\">"
       output << collection_header(config, heading, markdown: false)
       output << list_markdown
@@ -1086,68 +1319,17 @@ module HasMarkdownExtensions
       output << "</div>"
     end
 
-    tag_warning + output.join("\n")
+    output.join("\n")
   end
 
+  # Ordering lives in CollectionQuery, shared with feeds. These thin wrappers
+  # keep the call sites in resolve_collection_items and curate_menu unchanged.
   def apply_collection_order(items, order_by)
-    case order_by
-    when "filename"
-      items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, ".md")
-        # Extract leading number if present
-        if filename =~ /^(\d+)/
-          [ $1.to_i, filename ]
-        else
-          [ Float::INFINITY, filename ]
-        end
-      end
-    when "title"
-      # Alphabetical by title. In-memory sort so this works whether
-      # `items` is an ActiveRecord relation (regular collections) or
-      # a plain Array (which `related: true` produces after its
-      # bidirectional dedup pass). Collection blocks operate on small
-      # N already, so the cost over SQL ORDER BY is negligible.
-      items.to_a.sort_by { |item| item.title.to_s.downcase }
-    when "date"
-      # Newest first (default). nil dates sort to the end via a
-      # nil-safe sentinel — matches the NULLS LAST behaviour of the
-      # previous SQL form.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(0) }.reverse
-    when "date-asc"
-      # Oldest first. nil dates sort to the end.
-      items.to_a.sort_by { |item| item.respond_to?(:date) && item.date ? item.date : Date.new(9999) }
-    else
-      # Anything that isn't a known sort keyword is an explicit url_name order
-      # list, e.g. `order: blog, about, store` — the menu spelled out by hand.
-      apply_explicit_order(items, order_by)
-    end
+    CollectionQuery.order_items(items, order_by)
   end
 
-  # Order items by an explicit, comma-separated list of url_names (a
-  # collection's `order:` when it isn't a sort keyword). Listed items come
-  # first, in list order; anything the list doesn't name falls to the end,
-  # alphabetically by title, so nothing is ever silently dropped. A blank list
-  # falls back to date-descending (the normal default).
-  def apply_explicit_order(items, order_list)
-    wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
-
-    if wanted.empty?
-      return items.to_a.sort_by { |i| i.respond_to?(:date) && i.date ? i.date : Date.new(0) }.reverse
-    end
-
-    position = {}
-    wanted.each_with_index { |name, i| position[name] ||= i }
-
-    items.to_a.sort_by do |item|
-      slug = item.respond_to?(:url_name) ? item.url_name.to_s.downcase : ""
-      [ position.fetch(slug, Float::INFINITY), item.title.to_s.downcase ]
-    end
-  end
-
-  # A collection's `order:` is a sort mode when it's one of these keywords;
-  # anything else is read as an explicit url_name list.
   def sort_keyword?(value)
-    %w[date date-asc title filename].include?(value.to_s.strip.downcase)
+    CollectionQuery.sort_keyword?(value)
   end
 
   # A menu's membership: its `order:` url_name list (those items, in that order)
@@ -1199,6 +1381,10 @@ module HasMarkdownExtensions
       render_links(items)
     when "menu"
       render_menu(items, config)
+    when "player", "playlist"
+      # `player` is now a card (the transport); as a collection template it's an
+      # alias for `playlist` (the list). The transport comes from a `player` card.
+      render_playlist(items, config)
     when "full"
       render_full(items, config)
     when "list"
@@ -1518,7 +1704,189 @@ module HasMarkdownExtensions
       %Q(  <li class="collection-menu-item"><a href="#{item_path(item)}">#{title}</a></li>)
     end.join("\n")
 
-    %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+    list = %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+
+    # In a layout file (header/footer/sidebar) a menu IS site navigation — wrap
+    # it in a <nav> landmark. In a page body it's a content list, so leave the
+    # bare <ul>. Label the landmark with the collection's (invisible) name when
+    # set, so multiple navs stay distinguishable for assistive tech.
+    return list unless is_a?(LayoutMarkdown)
+
+    name = config[:collection].to_s.split(",").first.to_s.strip
+    aria = name.present? ? %Q( aria-label="#{ERB::Util.html_escape(name)}") : ""
+    %Q(<nav class="collection-nav"#{aria}>\n#{list}\n</nav>)
+  end
+
+  # A single-player playlist over a collection of audio posts — music tracks or
+  # podcast episodes. The template emits every element and its DOM order; the
+  # theme's CSS controls the entire look (symbols, layout, type). Structure:
+  # header (cover/title/artist) ▸ now-playing ▸ transport (toggle/times/playhead)
+  # ▸ the track list. Each row also carries a native <audio controls> as the
+  # no-JS fallback; player.js hides those (adds .is-enhanced) and drives one
+  # active track through the transport, auto-advancing on end.
+  # The track/episode list on its own — `template: playlist`. Each row is a
+  # native <audio controls> (no-JS fallback) plus data attributes (title, image,
+  # url; audio via the <audio> src) so a `player` can adopt it as its queue.
+  # This is the list half of the old combined player; the transport is the
+  # `player` card.
+  def render_playlist(items, config)
+    tracks = items.select do |item|
+      item.respond_to?(:audio) && item.audio.to_s.strip.present?
+    end
+
+    rows = tracks.each_with_index.map do |item, i|
+      # Whether this track's AUDIO is protected, which is what decides if it
+      # plays — not the post's own audience. An episode on a paid show inherits
+      # protection with a blank audience of its own, and a row that looks free
+      # but 403s reads as a broken player.
+      paid   = playlist_track_paid?(item)
+      title  = ERB::Util.html_escape(item.title.presence || "Untitled")
+      number = ERB::Util.html_escape(player_track_number(item).presence || (i + 1).to_s)
+      audio  = ERB::Util.html_escape(item.audio.to_s.strip)
+      image  = ERB::Util.html_escape(player_item_image(item))
+      url    = ERB::Util.html_escape(item_path(item))
+      dur    = item.respond_to?(:duration) ? item.duration.to_s.strip : ""
+      dur_html = dur.present? ? %Q(<span class="player-track-duration">#{ERB::Util.html_escape(dur)}</span>) : ""
+
+      lock = paid ? paid_lock_icon : ""
+
+      <<~HTML
+        <li class="player-track#{paid ? ' is-paid' : ''}" data-player-track data-paid="#{paid}" data-title="#{title}" data-image="#{image}" data-url="#{url}">
+          <div class="player-track-meta" data-player-select>
+            <span class="player-track-number">#{number}</span>
+            <span class="player-track-title">#{title}#{lock}</span>
+            <a class="player-track-link" href="#{url}" target="_blank" rel="noopener" aria-label="Open #{title}"></a>
+            #{dur_html}
+          </div>
+          <audio class="player-track-audio" controls preload="none" src="#{audio}"></audio>
+        </li>
+      HTML
+    end.join
+
+    %Q(<ol class="player-tracks" data-playlist>\n#{rows}</ol>)
+  end
+
+  # The release/podcast cover for the player — the artwork fallback when a track
+  # has no image of its own. The association key comes from the block first, then
+  # the current post/page (which usually carries it), so the artwork "just works"
+  # on a podcast/release page. Empty when unscoped.
+  def player_cover(config)
+    release_key = config[:release].presence || player_context_key("release")
+    podcast_key = config[:podcast].presence || player_context_key("podcast")
+    raw =
+      if release_key.present?
+        ReleaseConfig.get(release_key).to_h["cover"]
+      elsif podcast_key.present?
+        PodcastConfig.get(podcast_key).to_h["artwork"]
+      end
+    resolve_player_image(raw)
+  end
+
+  # A post's own artwork (podcast episode / track image), if set.
+  def player_item_image(item)
+    return "" unless item.respond_to?(:metadata)
+    resolve_player_image(item.metadata["image"])
+  end
+
+  # Config/metadata image references may be a bare filename (served from
+  # /system/images/<name>), an absolute path, or a full URL. Normalize all three
+  # — mirrors ApplicationHelper#config_image_path (kept in sync), but callable
+  # from the model without a view context / route helpers.
+  def resolve_player_image(value)
+    v = value.to_s.strip
+    return "" if v.empty? || v == "none"
+    return v if v.start_with?("http://", "https://", "/")
+    "/system/images/#{v}"
+  end
+
+  # A key from the current post/page metadata (self) when this markdown renders
+  # in a content context; nil in a layout or when the key is absent.
+  def player_context_key(key)
+    return nil unless respond_to?(:metadata) && metadata.is_a?(Hash)
+    metadata[key].to_s.strip.presence
+  end
+
+  # Artwork for the player card: explicit `image:` → the current post's own
+  # image → the release/podcast cover (association-resolved). Empty for none.
+  def player_card_artwork(config)
+    explicit = resolve_player_image(config[:image])
+    return explicit if explicit.present?
+    own = respond_to?(:metadata) ? resolve_player_image(metadata["image"]) : ""
+    return own if own.present?
+    player_cover(config)
+  end
+
+  # `card` with `type: player` — the transport. Plays an explicit `audio:` (or a
+  # bare `video:`), else the current post's audio/video. Reuses the audio-player
+  # Stimulus controller and the .collection-player TUI base. The list is a
+  # separate `playlist` collection; a later step lets this adopt one.
+  def render_player_card(config, preview: false)
+    audio_src = config[:audio].presence || (respond_to?(:audio) ? audio.to_s.strip.presence : nil)
+    video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
+
+    if audio_src.blank? && video_src.present?
+      # Minimal native video for now; the full video transport is a follow-up.
+      return %Q(<div class="card-player card-player-video"><video class="player-video" controls preload="metadata" src="#{ERB::Util.html_escape(video_src)}"></video></div>)
+    end
+
+    card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
+    title_html  = ERB::Util.html_escape(card_title)
+    info_url    = ERB::Util.html_escape(respond_to?(:url_name) ? item_path(self) : "#")
+
+    # Own audio → <source> tags. With none, the transport still renders empty so
+    # it can adopt a `playlist` on the page (the JS loads the first track).
+    sources_html =
+      if audio_src.present?
+        s = ERB::Util.html_escape(audio_src)
+        %Q(<source src="#{s}" type="audio/mpeg"><source src="#{s}" type="audio/mp4"><source src="#{s}" type="audio/ogg">)
+      else
+        ""
+      end
+
+    show_artwork = config[:show_artwork].to_s.strip.downcase != "false"
+    cover        = player_cover(config)
+    art          = show_artwork ? player_card_artwork(config) : ""
+    figure_html  =
+      if show_artwork
+        img = art.present? ?
+          %Q(<img class="player-cover" data-audio-player-target="artwork" src="#{ERB::Util.html_escape(art)}" alt="">) :
+          %Q(<img class="player-cover" data-audio-player-target="artwork" alt="" hidden>)
+        %Q(<figure class="player-figure">#{img}</figure>)
+      else
+        ""
+      end
+
+    <<~HTML
+      <div class="card-player" data-controller="audio-player" data-audio-player-type-value="audio"#{member_upgrade_value} data-cover="#{ERB::Util.html_escape(cover)}">
+        <audio data-audio-player-target="audio" preload="metadata" hidden>#{sources_html}</audio>
+        <div class="player-body">
+          #{figure_html}
+          <div class="player-main">
+            <div class="player-now">
+              <span class="player-now-title" data-audio-player-target="title">#{title_html}</span>
+              <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener">[info]</a>
+            </div>
+            <div class="player-transport">
+              <button type="button" class="player-toggle" data-audio-player-target="playButton" data-action="click->audio-player#togglePlay" data-playing="false" aria-label="Play"></button>
+              <span class="player-time player-time-current" data-audio-player-target="currentTime">0:00</span>
+              <div class="player-progress" data-audio-player-target="progressBar" data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub" role="slider" aria-label="Seek" tabindex="0">
+                <div class="player-progress-fill" data-audio-player-target="progressFill"></div>
+                <div class="player-progress-handle" data-audio-player-target="progressHandle"></div>
+              </div>
+              <span class="player-time player-time-duration" data-audio-player-target="duration">0:00</span>
+              <button type="button" class="player-speed" data-audio-player-target="speedButton" data-action="click->audio-player#cycleSpeed" aria-label="Playback speed">1×</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    HTML
+  end
+
+  # A track/episode's number for the player row: track_number, then
+  # episode_number, else blank.
+  def player_track_number(item)
+    return "" unless item.respond_to?(:metadata)
+    (item.metadata["track_number"].presence || item.metadata["episode_number"].presence).to_s
   end
 
   def render_product_grid(items, config)
@@ -1574,7 +1942,7 @@ module HasMarkdownExtensions
                      display_product.missing_media_refs.any? { |r| r[:field] == "image" }
       broken_image = image_url.blank? || missing_file
 
-      if broken_image && Rails.env.development?
+      if broken_image && show_block_warnings?
         variant_label = display_product.respond_to?(:variant) ? display_product.variant.presence : nil
         primary_flag  = display_product.respond_to?(:primary?) && display_product.primary?
         name_parts    = [ display_product.title.presence || "Untitled" ]
@@ -1675,17 +2043,22 @@ module HasMarkdownExtensions
           domain = SiteConfig.feature("store", "default_domain")
           validation_url = domain ? "https://#{domain}#{product_url}" : product_url
 
+          # Same source as the product page's button and the `button` block —
+          # see Product#snipcart_attributes. Building the list here by hand is
+          # what let a grid button and a page button disagree.
+          #
+          # A digital product that can't deliver gets no button here either,
+          # or a grid would remain a way to buy something the product page
+          # already refuses to sell.
+          if display_product.respond_to?(:deliverable?) && !display_product.deliverable?
+            output << %Q(      <span class="btn-grid is-unavailable">Not available</span>)
+            next
+          end
+
           output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
           output << %Q(              data-turbo="false")
-          output << %Q(              data-item-id="#{display_product.sku}")
-          output << %Q(              data-item-name="#{display_product.title}")
-          output << %Q(              data-item-price="#{display_product.price}")
-          output << %Q(              data-item-url="#{validation_url}")
-          if display_product.respond_to?(:description) && display_product.description.present?
-            output << %Q(              data-item-description="#{display_product.description.gsub('"', '&quot;')}")
-          end
-          if display_product.respond_to?(:image) && display_product.image.present?
-            output << %Q(              data-item-image="#{display_product.image}")
+          display_product.snipcart_attributes(url: validation_url).each do |key, value|
+            output << %Q(              #{key}="#{ERB::Util.html_escape(value)}")
           end
           output << %Q(      >Add to Cart</button>)
         end
@@ -1810,12 +2183,45 @@ module HasMarkdownExtensions
     end
   end
 
+  # A playlist row is marked paid when its audio won't serve to the public.
+  # That's the resolved media audience — a track can be protected by its show
+  # or release without saying so itself — rather than show_paid_indicator?,
+  # which asks whether the POST is paid.
+  # Where to send someone who hits the player's paywall. Blank when the site
+  # has no upgrade page — the notice then says what happened without linking
+  # somewhere that doesn't exist.
+  def member_upgrade_value
+    return "" if @rendering_static
+
+    page = member_upgrade_page
+    return "" unless page&.url_name.present?
+
+    %( data-audio-player-upgrade-url-value="/#{ERB::Util.html_escape(page.url_name)}")
+  end
+
+  def member_upgrade_page
+    pages = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "pages"))
+    [ pages.join("members", "upgrade.md"), pages.join("upgrade.md") ]
+      .filter_map { |path| Page.find_by(file_path: path.to_s) }
+      .first
+  rescue StandardError
+    nil
+  end
+
+  def playlist_track_paid?(item)
+    return false if @rendering_static
+    return false unless SiteConfig.feature_enabled?("members")
+    return false unless item.respond_to?(:media_audience)
+
+    item.media_audience == "paid"
+  end
+
   def show_paid_indicator?(item)
     # Suppress the paid lock in static-site builds — without a member
     # session there's no upgrade flow to drive viewers toward, so the
     # icon is just visual noise.
     return false if @rendering_static
-    return false unless item.metadata["audience"] == "paid"
+    return false unless item.respond_to?(:audience) && item.audience == "paid"
     return false unless SiteConfig.feature_enabled?("members")
 
     # Always show indicator for paid content
@@ -1881,20 +2287,50 @@ module HasMarkdownExtensions
     end
   end
 
+  # An option line: a lowercase identifier, a colon, and the rest of the line.
+  # Lowercase on purpose — prose that opens with "Note: …" is a sentence, not an
+  # option, and capitalising is how people write it.
+  CARD_OPTION_RE = /\A[ \t]*([a-z_][a-z0-9_]*)[ \t]*:[ \t]?(.*)\z/
+
+  # Keys whose value runs on until the next option or the end of the block.
+  # Prose, in other words. Everything else is a single value on its own line,
+  # where a stray line underneath is far more likely to be a mistake than a
+  # continuation — a second line under `image:` would just break the path.
+  CARD_PROSE_KEYS = %w[text].freeze
+
+  # Cards are `key: value` lines, except that a prose value carries on over
+  # blank lines and all until the next option. That's what lets an aside hold
+  # more than one paragraph.
+  #
+  # Unrecognised keys are still parsed as keys rather than swallowed into the
+  # text above them, or a misspelled `postion:` would silently become part of
+  # the card's prose instead of being reported.
   def parse_card_config(text)
     config = {}
-    text.split("\n").each do |line|
-      next if line.strip.empty?
-      key, value = line.split(":", 2).map(&:strip)
-      config[key.to_sym] = value if key && value
+    current = nil
+
+    text.to_s.split("\n").each do |line|
+      if (option = line.match(CARD_OPTION_RE))
+        current = option[1]
+        config[current.to_sym] = option[2].to_s
+      elsif current && CARD_PROSE_KEYS.include?(current)
+        config[current.to_sym] = "#{config[current.to_sym]}\n#{line}"
+      end
     end
-    config
+
+    config.transform_values(&:strip)
   end
 
   def render_card(config, preview: false)
     type = config[:type] || "pullquote"
 
-    case type
+    # Prefixed rather than substituted, and "" whenever warnings are off, so a
+    # published page renders exactly what it rendered before. A card with a
+    # misspelled option still draws — it just draws without that option, which
+    # is the whole reason the mistake is so easy to miss.
+    notice = card_warnings(type, config)
+
+    body = case type
     when "pullquote"
       render_pullquote(config)
     when "aside"
@@ -1903,9 +2339,165 @@ module HasMarkdownExtensions
       render_post_link(config, preview: preview)
     when "product-link"
       render_product_link(config, preview: preview)
+    when "player"
+      render_player_card(config, preview: preview)
     else
       preview ? "<!-- Unknown card type -->" : ""
     end
+
+    notice + body
+  end
+
+  # Why a card didn't come out the way it was written. An unknown type renders
+  # nothing at all and a dropped option renders the default, both without a word
+  # of explanation — the failures worth catching are the quiet ones.
+  def card_warnings(type, config)
+    return "" unless show_block_warnings?
+
+    valid_types = CardBuilderSchema::TYPES.map { |t| t[:value] }
+    unless valid_types.include?(type)
+      return dev_warning(
+        "Unknown card type",
+        "'#{type}' is not a card type.#{did_you_mean(type, valid_types)}",
+        "Valid types: #{valid_types.join(', ')}"
+      )
+    end
+
+    [ missing_card_fields_warning(type, config),
+      unrecognised_option_warnings(config, "#{type} cards") ].join
+  end
+
+  def missing_card_fields_warning(type, config)
+    rules = CardBuilderSchema::REQUIRED[type] or return ""
+    present = ->(key) { config[key.to_sym].present? }
+
+    if (missing = Array(rules[:all]).reject(&present)).any?
+      return dev_warning(
+        missing.one? ? "Card is missing a required value" : "Card is missing required values",
+        "`#{type}` cards need #{missing.map { |k| "`#{k}:`" }.to_sentence}.")
+    end
+
+    if rules[:any] && Array(rules[:any]).none?(&present)
+      return dev_warning("Card has nothing to show",
+        "`#{type}` cards need at least one of #{Array(rules[:any]).map { |k| "`#{k}:`" }.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')}.")
+    end
+
+    ""
+  end
+
+  # Keys the renderers read that the builder modals don't offer. Both halves of
+  # the option warning depend on this being right: without them a working block
+  # is told its option isn't real, and — now that a stray key can be reported as
+  # belonging somewhere else — a misfiled one would name the wrong home.
+  #
+  # `video` is read by render_player_card, `subtitle_from_record` by
+  # render_post_link (which product-link delegates to), `skus`/`variants` by
+  # ProductButtonRenderer, and the collection three by the collection renderer.
+  CARD_EXTRA_KEYS = {
+    "player"       => %w[video],
+    "post-link"    => %w[subtitle_from_record],
+    "product-link" => %w[subtitle_from_record],
+    # `link` is what `link_url` used to be called, and `link_text` is the label
+    # for a separate call-to-action link. Neither is offered any more — the text
+    # is markdown now, so a link written in it does the job with wording and
+    # placement of the author's choosing — but both still render, because
+    # they're sitting in posts that were written before that was true.
+    "aside"        => %w[link link_text]
+  }.freeze
+  ACTION_EXTRA_KEYS = { "product" => %w[skus variants] }.freeze
+  COLLECTION_EXTRA_KEYS = %w[part scope search].freeze
+
+  # Every option Roe understands, grouped by the block it belongs to. Built from
+  # the same schemas that drive the builder modals, so there's no second
+  # vocabulary to drift out of step with the first.
+  def option_contexts
+    @option_contexts ||= begin
+      contexts = {}
+
+      CardBuilderSchema::FIELDS_BY_TYPE.each_key do |type|
+        contexts["#{type} cards"] = card_keys_for(type)
+      end
+
+      ActionBuilderSchema::FIELDS_BY_KIND.each do |kind, fields|
+        keys = fields.map { |f| f[:key] } + ACTION_EXTRA_KEYS.fetch(kind, []) + %w[for type]
+        # The action renderers read `button-text` and `button_text` alike, so
+        # both spellings are legitimate however the schema happens to write it.
+        contexts[action_context_name(kind)] =
+          keys.flat_map { |key| [ key, key.tr("-", "_"), key.tr("_", "-") ] }.uniq
+      end
+
+      contexts["collection blocks"] =
+        CollectionBuilderSchema::FIELDS.map { |f| f[:key] }.uniq + COLLECTION_EXTRA_KEYS
+
+      contexts
+    end
+  end
+
+  def action_context_name(kind)
+    button = ActionBuilderSchema::BUTTON_KINDS.any? { |k| k[:value] == kind }
+    "#{kind} #{button ? 'buttons' : 'forms'}"
+  end
+
+  def card_keys_for(type)
+    fields = CardBuilderSchema::FIELDS_BY_TYPE[type].to_a.map { |f| f[:key] }
+    (fields + Array(CardBuilderSchema::CORE[type]) +
+      CARD_EXTRA_KEYS.fetch(type, []) + [ "type" ]).uniq
+  end
+
+  # Options a block doesn't understand. Two different mistakes, told apart
+  # because they need different answers:
+  #
+  #   `attribution:` on an aside  — a real option, written on the wrong block
+  #   `postion:` on a pullquote   — not an option anywhere, but nearly one
+  #
+  # Anything else is left alone. The schemas describe what the modals offer and
+  # the renderers read a few keys besides, so "unlisted" doesn't mean "wrong" —
+  # and a warning that cries wolf gets ignored along with the ones that matter.
+  def unrecognised_option_warnings(config, context)
+    return "" unless show_block_warnings?
+
+    known = option_contexts[context] or return ""
+    strays = config.keys.map(&:to_s).reject { |key| known.include?(key) }
+    return "" if strays.empty?
+
+    misplaced, unheard_of = strays.partition { |key| other_homes(key, context).any? }
+    misplaced_option_warning(misplaced, context) +
+      misspelled_option_warning(unheard_of, context, known)
+  end
+
+  def other_homes(key, context)
+    option_contexts.select { |name, keys| name != context && keys.include?(key) }.keys
+  end
+
+  # A key that is a real option somewhere else. No guessing involved — Roe knows
+  # exactly where it belongs, so it says so rather than offering a correction.
+  def misplaced_option_warning(keys, context)
+    return "" if keys.empty?
+
+    dev_warning(
+      "#{'Option'.pluralize(keys.size)} from another block",
+      keys.map { |key| "`#{key}:` belongs to #{homes_phrase(other_homes(key, context))}, not #{context}." }.join(" "),
+      "An option a block doesn't recognize is ignored."
+    )
+  end
+
+  # A common key like `text:` is valid on half a dozen blocks, and naming them
+  # all buries the only part that matters: not this one.
+  def homes_phrase(homes)
+    return homes.to_sentence(two_words_connector: " and ", last_word_connector: ", and ") if homes.size <= 3
+
+    "#{homes.first(2).to_sentence} and #{homes.size - 2} other blocks"
+  end
+
+  def misspelled_option_warning(keys, context, known)
+    suspect = keys.filter_map { |key| (near = nearest_term(key, known)) && [ key, near ] }
+    return "" if suspect.empty?
+
+    dev_warning(
+      "Unrecognised #{'option'.pluralize(suspect.size)}",
+      suspect.map { |key, near| "`#{key}:` isn't an option for #{context} — did you mean `#{near}:`?" }.join(" "),
+      "Unrecognized options are ignored."
+    )
   end
 
   # A product-link is a live post-link card pointed at a product. post-link
@@ -1953,82 +2545,128 @@ module HasMarkdownExtensions
     output.join("\n")
   end
 
+  # A style-dependent default, unless cards.yml has fixed it for every style.
+  #
+  # Three levels, narrowest first: the card's own `show_subtitle:` wins over
+  # everything; a site setting fixes the default for all styles; with neither,
+  # the style decides, which is what every install had before the setting
+  # existed.
+  def card_style_default(kind, key, by_style)
+    fixed = CardBuilderSchema.setting_default(kind, key)
+    fixed.nil? ? by_style : fixed
+  end
+
+  # Wrap a floated pullquote inside the paragraph that follows it, so text runs
+  # down both sides of the quote instead of only beside its second half.
   def merge_floated_pullquotes(html)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
-    # Find all floated pullquotes (left or right position)
-    floated_pullquotes = doc.css(".pullquote-left, .pullquote-right")
+    doc.css(".pullquote-left, .pullquote-right").each do |pullquote|
+      paragraph = pullquote.next_element
+      next unless paragraph&.name == "p"
 
-    floated_pullquotes.each do |pullquote|
-      # Get the next sibling element
-      next_element = pullquote.next_element
+      first_half, second_half = split_paragraph_for_quote(paragraph)
+      # A break with nothing on one side of it isn't a wrap, it's an empty
+      # paragraph beside a quote. Leave the pullquote as its own block.
+      next if first_half.empty? || second_half.empty?
 
-      # Check if it's a paragraph
-      if next_element && next_element.name == "p"
-        # Get the paragraph HTML
-        para_html = next_element.inner_html
+      wrapper = Nokogiri::XML::Node.new("div", doc)
+      wrapper["class"] = "pullquote-merge"
+      wrapper.add_child(paragraph_from(doc, first_half))
+      wrapper.add_child(pullquote.dup)
+      wrapper.add_child(paragraph_from(doc, second_half))
 
-        # Check for manual split marker
-        if para_html.include?("||")
-          # Manual split - use the || marker
-          parts = para_html.split("||", 2)
-          first_half = parts[0].strip
-          second_half = parts[1].strip
-        else
-          # Automatic split - use smart detection
-          split_point = find_split_point(para_html)
-          first_half = para_html[0...split_point].strip
-          second_half = para_html[split_point..-1].strip
-        end
-
-        # Create a wrapper div to hold all three parts
-        wrapper = Nokogiri::XML::Node.new("div", doc)
-        wrapper["class"] = "pullquote-merge"
-
-        # Create first paragraph
-        first_p = Nokogiri::XML::Node.new("p", doc)
-        first_p.inner_html = first_half
-
-        # Create second paragraph
-        second_p = Nokogiri::XML::Node.new("p", doc)
-        second_p.inner_html = second_half
-
-        # Build the structure
-        wrapper.add_child(first_p)
-        wrapper.add_child(pullquote.dup) # Duplicate the pullquote
-        wrapper.add_child(second_p)
-
-        # Replace the original paragraph with the wrapper
-        next_element.replace(wrapper)
-
-        # Remove the original pullquote
-        pullquote.remove
-      end
+      paragraph.replace(wrapper)
+      pullquote.remove
     end
 
     doc.to_html
   end
 
-  def find_split_point(text)
-    # Remove HTML tags for better sentence detection
-    plain_text = Nokogiri::HTML(text).text
+  def paragraph_from(doc, nodes)
+    paragraph = Nokogiri::XML::Node.new("p", doc)
+    nodes.each { |node| paragraph.add_child(node) }
+    paragraph
+  end
 
-    middle = plain_text.length / 2
+  # Decide where the paragraph breaks, honouring a manual `||` marker if there
+  # is one and otherwise picking a sentence boundary near the middle.
+  #
+  # The offset is measured in the paragraph's TEXT, so it can only be applied to
+  # the paragraph's NODES. This used to slice the HTML string with it, which cut
+  # wherever the tags had pushed that offset along: mid-word, mid-element, or
+  # straight through a footnote reference's attribute list — which is how
+  # `class="footnote" rel="footnote" role="doc-noteref">` came to be rendered as
+  # body text in a reader's post. Text offsets and markup offsets are different
+  # coordinate systems; the tags aren't in the text.
+  def split_paragraph_for_quote(paragraph)
+    text = paragraph.text
+
+    marker = text.index(PULLQUOTE_SPLIT_MARKER)
+    return split_children(paragraph, marker, marker + PULLQUOTE_SPLIT_MARKER.length) if marker
+
+    point = find_split_point(text)
+    return [ [], [] ] unless point
+
+    split_children(paragraph, point, point)
+  end
+
+  # Divide a paragraph's children in two at a plain-text offset. `cut_at` ends
+  # the first half and `resume_at` begins the second, so the `||` marker can be
+  # dropped in the gap between them.
+  def split_children(paragraph, cut_at, resume_at)
+    before = []
+    after = []
+    consumed = 0
+
+    paragraph.children.to_a.each do |node|
+      length = node.text.length
+
+      if consumed >= cut_at
+        after << node
+      elsif consumed + length <= cut_at
+        before << node
+      elsif node.text?
+        head = node.text[0...(cut_at - consumed)].rstrip
+        tail = (node.text[(resume_at - consumed)..] || "").lstrip
+        before << Nokogiri::XML::Text.new(head, node.document) unless head.empty?
+        after << Nokogiri::XML::Text.new(tail, node.document) unless tail.empty?
+      else
+        # An element straddles the break — a link, emphasis, a footnote marker.
+        # There's no valid place to cut inside one, so it crosses over whole and
+        # the break lands just before it.
+        after << node
+      end
+
+      consumed += length
+    end
+
+    [ before, after ]
+  end
+
+  # An offset into `text`, the paragraph's plain text — never an index into
+  # markup. Prefers the end of a sentence near the middle, then the nearest word
+  # boundary either side of it.
+  #
+  # nil when there's no boundary to break on at all. The old fallback was the
+  # midpoint itself, which cut whatever word happened to be there in half — a
+  # one-word paragraph beside a pullquote came out as "Sho" / "rt.". A quote
+  # that stays where it is reads better than a broken word.
+  def find_split_point(text)
+    middle = text.length / 2
 
     # Look for ". " near the middle (within 30% either way for more flexibility)
     search_start = [ (middle * 0.7).to_i, 0 ].max
-    search_end = [ (middle * 1.3).to_i, plain_text.length ].min
+    search_end = [ (middle * 1.3).to_i, text.length ].min
 
-    sentence_end = plain_text[search_start..search_end]&.index(". ")
+    sentence_end = text[search_start..search_end]&.index(". ")
+    return search_start + sentence_end + 2 if sentence_end
 
-    if sentence_end
-      # Find this position in the original HTML text
-      search_start + sentence_end + 2
-    else
-      # Fallback: try to split at a space near middle
-      space_pos = plain_text[middle..-1]&.index(" ")
-      space_pos ? middle + space_pos : middle
-    end
+    after = text.index(" ", middle)
+    return after + 1 if after
+
+    before = text.rindex(" ", middle)
+    before ? before + 1 : nil
   end
 
   ### POST LINKS
@@ -2071,11 +2709,18 @@ module HasMarkdownExtensions
         return render_error_card("Content not found: #{config[:post]}") if preview
         return dev_warning("Content not found",
           "No post, page, product, or documentation with url_name '#{config[:post]}' exists.",
-          "Check the url_name in the content's front matter.")
+          "Check the url_name in the content's metadata.")
       end
     end
 
-    style = config[:style] || "small"
+    # `default_style` has been on the Cards settings form (and in the docs) all
+    # along, but nothing read it — the fallback was a hardcoded "small". It
+    # looked like it worked because the builder wrote an explicit `style:` into
+    # every card it made. Now that a card at its default leaves the key out,
+    # this is what the setting actually acts on.
+    style = config[:style].presence ||
+            SiteConfig.default("cards", "post-link")&.[]("default_style").presence ||
+            "small"
     title = config[:title] || "Untitled"
     date_raw = config[:date] || ""
     excerpt = config[:excerpt] || ""
@@ -2098,11 +2743,13 @@ module HasMarkdownExtensions
     # Whether the excerpt/description shows. Large shows it by default (existing
     # behaviour); small/medium only when explicitly enabled. product-link maps
     # its show_description onto this and defaults it on for all styles.
-    show_excerpt = collection_truthy?(config[:show_excerpt], default: style == "large")
+    show_excerpt = collection_truthy?(config[:show_excerpt],
+      default: card_style_default(kind, "show_excerpt", style == "large"))
 
     # Whether the subtitle shows. Default per size: off for small (too cramped),
     # on for medium and large. Overridable with `show_subtitle:` in the card.
-    show_subtitle = collection_truthy?(config[:show_subtitle], default: style != "small")
+    show_subtitle = collection_truthy?(config[:show_subtitle],
+      default: card_style_default(kind, "show_subtitle", style != "small"))
 
     # Author and date are only meaningful for posts. For pages, products,
     # and docs the keys were intentionally omitted from config above.
@@ -2336,48 +2983,103 @@ module HasMarkdownExtensions
 
   ### ASIDES
 
+  # Render a fragment the way the document itself is rendered, so a line break,
+  # a bare URL or an em dash behaves the same inside a card as outside one.
+  # Footnote options are deliberately left off: a footnote defined inside a card
+  # would build its own list there rather than joining the page's.
+  def render_markdown_fragment(text)
+    return "" if text.to_s.strip.empty?
+
+    soft_breaks = soft_line_breaks?
+    Kramdown::Document.new(
+      text.to_s.strip,
+      input: soft_breaks ? "GFM" : "kramdown",
+      hard_wrap: soft_breaks
+    ).to_html.strip
+  end
+
+  # The same, with the wrapping <p> removed, for somewhere a paragraph can't go
+  # — inside a link, say. Returns nil when the text is more than one paragraph
+  # and there's nothing to unwrap.
+  def inline_markdown_fragment(text)
+    html = render_markdown_fragment(text)
+    match = html.match(%r{\A<p>(.*)</p>\z}m)
+    return nil unless match
+    return nil if match[1].include?("<p>")
+
+    match[1]
+  end
+
+  # An aside is an image, some markdown, and optionally somewhere to point.
+  #
+  #   image:    the picture
+  #   link_url: where the whole card points, image included
+  #   text:     everything else, in markdown
+  #
+  # When it points somewhere, the card element *is* the anchor rather than
+  # wrapping one around the contents — .card-aside is a grid, and an element
+  # between it and its children would collapse the layout to one column. An
+  # <a> can be display:grid and hold flow content, so the class list simply
+  # moves onto it and every existing rule still matches.
   def render_aside(config, preview: false)
-    text = config[:text] || ""
-    image = config[:image] || ""
-    link = config[:link] || ""
-    link_text = config[:link_text] || ""
-    default_link_text = SiteConfig.default("cards", "aside")&.[]("default_link_text") || "→"
+    # Asides took their text straight into the HTML, so `*emphasis*` came out
+    # with the asterisks showing and a second paragraph never arrived at all.
+    text = render_markdown_fragment(config[:text])
+    image = config[:image].to_s
+    link = config[:link_url].presence || config[:link].presence
+    legacy_link_text = config[:link_text].to_s
 
-    # Build the content
-    content = []
-    content << "<img src=\"#{image}\" alt=\"\" class=\"aside-image\">" if image.present?
+    body = []
+    body << %(<div class="aside-text">#{text}</div>) if text.present?
 
-    # Collect text + link as a group so they can be wrapped in
-    # `.aside-body`.
-    body_parts = []
-
-    if text.present?
-      if link.present?
-        if link_text.present?
-          # Case 3: Link with custom link text - text separate from link
-          body_parts << "<div class=\"aside-text\">#{text}</div>"
-          body_parts << "<a href=\"#{link}\" class=\"aside-link\">#{link_text}</a>"
-        else
-          # Case 2: Link without link text - arrow inline with text
-          body_parts << "<div class=\"aside-text\"><a href=\"#{link}\" class=\"aside-link-inline\">#{text} #{default_link_text}</a></div>"
-        end
-      else
-        # Case 1: No link - just text
-        body_parts << "<div class=\"aside-text\">#{text}</div>"
-      end
+    # A card written before `link_url` existed, with its own call-to-action
+    # label. Rendered exactly as it always was, so the post doesn't change
+    # under its author; nothing in the builder writes this any more.
+    if link && legacy_link_text.present?
+      body << %(<a href="#{link}" class="aside-link">#{legacy_link_text}</a>)
+      link = nil
     end
 
-    content << "<div class=\"aside-body\">\n#{body_parts.join("\n")}\n</div>" if body_parts.any?
+    # A link inside a link isn't valid and browsers unpick it badly, so the card
+    # can't be one when the text already holds one. The image is outside the
+    # text though, so it can still carry the link on its own — the reader gets
+    # both, and neither is nested in the other.
+    text_links = link && text.include?("<a ")
+    link_image_only = text_links && image.present?
+    notice = text_links && image.blank? ? aside_link_conflict_warning : ""
 
-    # Determine if this is image-only
-    aside_class = (image.present? && text.blank? && link_text.blank?) ? "card card-aside image-only" : "card card-aside"
+    parts = []
+    if image.present?
+      img = %(<img src="#{image}" alt="" class="aside-image">)
+      parts << (link_image_only ? %(<a href="#{link}" class="aside-image-link">#{img}</a>) : img)
+    end
+    parts << "<div class=\"aside-body\">\n#{body.join("\n")}\n</div>" if body.any?
 
-    <<~HTML
-      <div class="#{aside_class}">
-        #{content.join("\n")}
-      </div>
-    HTML
+    # Whole card, or nothing — the image took it, or there was nowhere to put it.
+    link = nil if text_links
+
+    classes = [ "card", "card-aside" ]
+    classes << "image-only" if image.present? && text.blank? && legacy_link_text.blank?
+    classes << "aside-wrapper" if link
+
+    open = link ? %(<a href="#{link}" class="#{classes.join(' ')}">) : %(<div class="#{classes.join(' ')}">)
+    close = link ? "</a>" : "</div>"
+
+    # {::nomarkdown} because kramdown treats <a> as inline: left to itself it
+    # wraps the opening tag in a paragraph and escapes the closing one, which
+    # tears the card in half. The text inside was rendered to HTML above, so
+    # there is nothing here kramdown needs to look at anyway.
+    [ "", "{::nomarkdown}", "#{notice}#{open}#{parts.join("\n")}#{close}", "{:/nomarkdown}", "" ].join("\n")
   end
+
+  def aside_link_conflict_warning
+    dev_warning(
+      "Aside already has a link in the text.",
+      "`link_url:` makes the whole card a link, but the text already has one in it — a link inside a link isn't valid. Add an image and the `link:` will be assigned to the image.",
+      "Or remove `link_url:`."
+    )
+  end
+
 
   # FORMS
 
@@ -2388,20 +3090,52 @@ module HasMarkdownExtensions
         render_form(form_config)
       rescue => e
         Rails.logger.error "Form YAML parsing error: #{e.message}"
-        dev_warning("Form YAML parse error", e.message, yaml_content.strip)
+        dev_warning("This form's settings couldn't be read",
+                    block_yaml_explanation(yaml_content, e),
+                    yaml_content.strip)
       end
     end
+  end
+
+  # Psych's own wording — "did not find expected key while parsing a block
+  # mapping at line 1 column 1" — describes its parser, not the mistake, and
+  # names a line number that's wrong because the block is re-joined before it
+  # gets here. So: name the line that actually broke, and where the cause is
+  # recognisable, say what to type instead.
+  #
+  # The recurring one is a value opening with `[`. YAML reads that as a list,
+  # so `signin_text: [Sign in], If you want` is a sequence followed by stray
+  # text. Anywhere else in the value is fine — `Already a member? [Sign in].`
+  # parses — which makes it a confusing failure to hit.
+  def block_yaml_explanation(yaml_content, error)
+    offender = yaml_content.to_s.lines.find { |l| l =~ /^\s*[\w-]+:\s*\[/ }
+
+    if offender
+      key = offender[/^\s*([\w-]+):/, 1]
+      value = offender.split(":", 2).last.to_s.strip
+      return "`#{key}` starts with `[`, which YAML reads as a list. " \
+             "Wrap the value in quotes: `#{key}: \"#{value}\"`. " \
+             "Square brackets anywhere else in the line are fine."
+    end
+
+    "#{error.message.sub(/\A\(<unknown>\):\s*/, '')} — check for a stray `:` or a value " \
+    "that needs quoting."
   end
 
   def render_form(config)
     form_type = roeanji_kind(config)
     button_text = config["button-text"] || config["button_text"] || default_button_text(form_type)
 
+    if (unavailable = members_disabled_warning(form_type))
+      return unavailable
+    end
+
     result = case form_type
     when "paid_content"
       text = config["text"] || "This is premium content. Upgrade to continue reading."
       button_text = config["button-text"] || config["button_text"] || "Become a paid member"
-      render_paid_content_form(text, button_text)
+      signin_text = config["signin-text"] || config["signin_text"]
+      render_paid_content_form(text, button_text, signin_text)
     when "signup"
       upgrade_text = config["upgrade-button-text"] || config["upgrade_button_text"]
       render_signup_form(button_text, upgrade_text)
@@ -2416,11 +3150,14 @@ module HasMarkdownExtensions
     when "donate"
       render_donate_form(button_text)
     else
-      dev_warning("Unknown form type", "'#{form_type}' is not a recognised form type.",
-        "Valid types: signup, signin, checkout, donate, unsubscribe, paid_content")
+      kinds = ActionBuilderSchema::FORM_KINDS.map { |k| k[:value] }
+      dev_warning("Unknown form type",
+        "'#{form_type}' is not a recognised form type.#{did_you_mean(form_type, kinds)}",
+        "Valid types: #{kinds.join(', ')}")
     end
 
-    roeanji_kind_conflict_warning(config) + result.to_s
+    roeanji_kind_conflict_warning(config) +
+      unrecognised_option_warnings(config, action_context_name(form_type)) + result.to_s
   rescue => e
     Rails.logger.error "Form rendering error: #{e.message}"
     dev_warning("Form rendering error", e.message)
@@ -2446,8 +3183,33 @@ module HasMarkdownExtensions
     return "" unless f && t && f != t
 
     dev_warning("Conflicting selector",
-      "This block sets both `for: #{f}` and `type: #{t}` — `for` wins.",
-      "They mean the same thing here; keep just one.")
+      "This block sets both `for: #{f}` and `type: #{t}` — `for` wins.")
+  end
+
+  # Every member form needs Members on: signing in, signing up, checking out,
+  # donating and unsubscribing all act on a member, and without the feature the
+  # form posts to a route that isn't there. They rendered anyway, so the page
+  # looked finished and failed on submit.
+  #
+  # Which kinds need it is already declared once, in the schema that builds the
+  # form menu — asked here rather than restated, so a new member form is covered
+  # by existing it. The paywall declares :payments_configured and warns about
+  # members itself (see paid_content_warnings), so it isn't caught here.
+  #
+  # Members off means members.yml doesn't exist at all, which is why the hint
+  # points at the button that creates it rather than at a setting inside it.
+  def members_disabled_warning(form_type)
+    return nil if SiteFeature.members_enabled?
+
+    kind = ActionBuilderSchema::FORM_KINDS.find { |k| k[:value] == form_type }
+    return nil unless kind && kind[:feature] == :members
+
+    return "" unless show_block_warnings?
+
+    dev_warning(
+      "#{kind[:label]} form unavailable",
+      "Members isn't enabled, so this form has no reason to exist. Click `ENABLE MEMBERS` in Settings to turn the feature on."
+    )
   end
 
   def default_button_text(form_type)
@@ -2461,7 +3223,7 @@ module HasMarkdownExtensions
 
   def render_donate_form(button_text)
     unless SiteFeature.donations_enabled?
-      if Rails.env.development?
+      if show_block_warnings?
         reason = if !SiteFeature.payments_feature_enabled?
           "payments not enabled in members.yml"
         elsif !SiteFeature.payments_mode&.in?(%w[donations both])
@@ -2528,15 +3290,90 @@ module HasMarkdownExtensions
     HTML
   end
 
-  def render_paid_content_form(text, button_text)
+  def render_paid_content_form(text, button_text, signin_text = nil)
     # This will act as a content gate - everything after this is paid
     <<~HTML
-      <!-- PAID_CONTENT_GATE -->
+      #{paid_content_warnings}<!-- PAID_CONTENT_GATE -->
       <div class="paid-content-gate">
         <p>#{text}</p>
-        <a href="/upgrade" class="btn-primary">#{button_text}</a>
+        <a href="#{MemberPages.url_for!('upgrade')}" class="btn-primary">#{button_text}</a>
+        #{paid_content_signin_line(signin_text)}
       </div>
     HTML
+  end
+
+  # "Already a member? [Sign in]." — always, not on request.
+  #
+  # A paywall offering only "Become a paid member" strands someone who has
+  # already paid: they have no way in from the page they landed on, and the
+  # upgrade page has to load before they can discover one. Somebody paying
+  # twice, or leaving, is a worse default than an extra line of text.
+  #
+  # No option to switch it off. It doesn't render when it can't work — members
+  # disabled, or no sign-in page to link to — which is the only case anyone
+  # would reasonably want it gone, and CSS can hide it otherwise. `[Sign in]`
+  # names the linked words without naming the URL, so renaming the page can't
+  # leave a dead link in every paid post.
+  DEFAULT_SIGNIN_TEXT = "Already a member? [Sign in]."
+
+  def paid_content_signin_line(signin_text)
+    # Only condition that earns its place: don't link to a page that isn't
+    # there. A members-enabled check would be redundant — a paywall on a site
+    # without members is already broken, and paid_content_warnings says so.
+    url = MemberPages.url_for("signin")
+    return "" if url.blank?
+
+    sentence = signin_text.presence || DEFAULT_SIGNIN_TEXT
+    %(<p class="paid-content-signin">#{link_bracketed_text(sentence, url)}</p>)
+  end
+
+  # Turns `Already a member? [Sign in].` into a sentence with those words
+  # linked. Roe supplies the URL; the author supplies the words. A bare
+  # sentence with no brackets gets the whole thing linked, so a missing pair
+  # still produces something clickable rather than dead text.
+  def link_bracketed_text(sentence, url)
+    escaped = CGI.escape_html(sentence)
+    href = CGI.escape_html(url)
+
+    if escaped =~ /\[([^\]]+)\]/
+      escaped.sub(/\[([^\]]+)\]/) { %(<a href="#{href}">#{Regexp.last_match(1)}</a>) }
+    else
+      %(<a href="#{href}">#{escaped}</a>)
+    end
+  end
+
+  # The paywall renders wherever it's written, but its upgrade button only goes
+  # somewhere useful once payments actually work. Writing the block before
+  # that is fine — the gate is a boundary in the article, and the preview needs
+  # to show it — so this explains the gap instead of hiding the option.
+  #
+  # Editor previews and development only, like every other block warning; a
+  # reader never sees it.
+  def paid_content_warnings
+    return "" unless show_block_warnings?
+
+    unless SiteFeature.members_enabled?
+      return dev_warning(
+        "Without Members enabled, there is no reason for a paywall.",
+        "When you enable Members, the post will cut off here for visitors, non-paid members",
+        "Click `ENABLE MEMBERS` in Settings, then set this post's `audience` to `paid`."
+      )
+    end
+
+    unless SiteFeature.payments_enabled?
+      return dev_warning(
+        "Paywall can't take payment yet",
+        "The upgrade button has nowhere to send anyone until Stripe is connected.",
+        "Connect Stripe in Settings → stripe.yml."
+      )
+    end
+
+    return "" if audience == "paid"
+
+    dev_warning(
+      "Paywall is set on a post that is available to `everyone`",
+      "Set `audience: paid` in the metadata and the paywall will hide everything below."
+    )
   end
 
   def render_signup_form(button_text, upgrade_button_text = nil)
@@ -2551,7 +3388,7 @@ module HasMarkdownExtensions
     if @rendering_static
       return <<~HTML
         <div class="signup-link-block">
-          <a href="/sign-up" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+          <a href="#{MemberPages.url_for!('signup')}" class="btn-primary">#{CGI.escape_html(button_text)}</a>
         </div>
       HTML
     end
@@ -2618,7 +3455,7 @@ module HasMarkdownExtensions
     if @rendering_static
       return <<~HTML
         <div class="signin-link-block">
-          <a href="/sign-in" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+          <a href="#{MemberPages.url_for!('signin')}" class="btn-primary">#{CGI.escape_html(button_text)}</a>
         </div>
       HTML
     end
@@ -2655,7 +3492,7 @@ module HasMarkdownExtensions
         </form>
 
         <div class="non-member-checkout">
-          <a href="/sign-up" class="btn-primary" data-turbo="false">#{non_member_button_text}</a>
+          <a href="#{MemberPages.url_for!('signup')}" class="btn-primary" data-turbo="false">#{non_member_button_text}</a>
         </div>
       </div>
     HTML
@@ -2717,7 +3554,8 @@ module HasMarkdownExtensions
         buttons << {
           config: config,
           kind: roeanji_kind(config, default: "product"),
-          conflict: roeanji_kind_conflict_warning(config),
+          conflict: roeanji_kind_conflict_warning(config) +
+            unrecognised_option_warnings(config, action_context_name(roeanji_kind(config, default: "product"))),
           start_pos: start_pos,
           end_pos: end_pos,
           match: $~
@@ -2725,7 +3563,7 @@ module HasMarkdownExtensions
       rescue => e
         Rails.logger.error "Button parsing error: #{e.message}"
         # Replace the failed button block with a dev warning
-        if Rails.env.development?
+        if show_block_warnings?
           buttons << {
             config: {},
             kind: "product",
@@ -2826,9 +3664,10 @@ module HasMarkdownExtensions
     return render_share_button(button[:config], context)   if button[:kind] == "share"
     return render_members_button(button[:config], context) if button[:kind] == "subscribe"
 
+    kinds = ActionBuilderSchema::BUTTON_KINDS.map { |k| k[:value] }
     dev_warning("Unknown button type",
-      "'#{button[:kind]}' is not a recognised button type.",
-      "Valid: product (the default when no for/type is given), share, subscribe.")
+      "'#{button[:kind]}' is not a recognised button type.#{did_you_mean(button[:kind], kinds)}",
+      "Valid: #{kinds.join(', ')} — product is the default when no for/type is given.")
   end
 
   # A "Subscribe" button that links to the members sign-up page (subscribing to
@@ -2840,11 +3679,11 @@ module HasMarkdownExtensions
     unless SiteFeature.members_enabled?
       return dev_warning("Subscribe button unavailable",
         "Members aren't enabled, so there's no sign-up page to link to.",
-        "Enable members in members.yml.")
+        "Go to Settings → Roe and click `ENABLE MEMBERS`.")
     end
 
     label = ERB::Util.html_escape(config["label"].presence || "Subscribe")
-    url   = ERB::Util.html_escape(config["url"].presence || "/sign-up")
+    url   = ERB::Util.html_escape(config["url"].presence || MemberPages.url_for!("signup"))
     css   = ([ "btn-primary" ] + action_button_style_classes(config, "members")).join(" ")
 
     %(<a class="#{css}" href="#{url}">#{label}</a>)
@@ -2915,13 +3754,53 @@ module HasMarkdownExtensions
     config
   end
 
-  # Renders an amber dev-only warning box.
-  # Silent (returns "") in production so no debug info leaks.
+  # Renders an amber warning box explaining why a Roe block didn't render.
   #
   #   dev_warning("Title", "What went wrong", "optional hint or context")
   #
+  # Shown while writing — in development, and in an editor preview whatever the
+  # environment. Silent everywhere else, which is the important half: a
+  # published URL never shows these, so a reader can't be handed a diagnostic
+  # and a self-hosted site can't leak one. Static builds are excluded outright
+  # rather than relying on the preview flag being false, because a generated
+  # file outlives the request that made it.
+  #
+  # Without the preview case these were invisible to anyone not running Roe
+  # locally — the writer whose block silently rendered nothing got no
+  # explanation at all.
+  # Whether this render should explain itself. One definition, because the
+  # answer is needed both here and at the call sites — several of which build an
+  # expensive message, or take a different branch entirely, and shouldn't do
+  # that work only for dev_warning to discard it.
+  #
+  # Static output is excluded outright rather than by trusting the preview flag
+  # to be false: a generated file outlives the request that made it.
+  # Warnings are for whoever is building the site, in a browser. Development
+  # alone isn't enough of a test: a feed rendered on a dev machine was shipping
+  # the "Stripe isn't connected" notice into content:encoded, so it arrived in
+  # a real reader as part of the article.
+  def show_block_warnings?
+    return false if @rendering_static
+    return false if @rendering_feed
+
+    Rails.env.development? || @rendering_preview.present?
+  end
+
+  # The closest term in `vocabulary`, or nil if nothing is close. Ruby's own
+  # spell checker — the one behind NoMethodError's "did you mean?" — so the
+  # threshold for "close" is the same one people already read every day, and
+  # there's no similarity metric of our own to tune.
+  def nearest_term(word, vocabulary)
+    DidYouMean::SpellChecker.new(dictionary: vocabulary).correct(word).first
+  end
+
+  # " Did you mean 'x'?", or "" — written to sit on the end of a sentence.
+  def did_you_mean(word, vocabulary)
+    (near = nearest_term(word, vocabulary)) ? " Did you mean '#{near}'?" : ""
+  end
+
   def dev_warning(title, message, hint = nil)
-    return "" unless Rails.env.development?
+    return "" unless show_block_warnings?
 
     hint_html = hint ? "<br><span style='color:#78350f'>#{dev_warning_text(hint)}</span>" : ""
     <<~HTML

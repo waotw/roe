@@ -26,13 +26,13 @@ class SiteSyncTransferJob < ApplicationJob
     starting:            "Starting…",
     computing_diff:      "Computing what changed…",
     backing_up_live:     "Backing up live (only the files about to change)…",
-    backing_up_live_full: "Backing up live (full tree — no diff available)…",
     pushing_to_live:     "Pushing changed files to live…",
     pushing_to_live_full: "Pushing to live (full tree)…",
     backing_up_local:    "Backing up local…",
     pulling_from_live:   "Pulling changed files from live…",
     pulling_from_live_full: "Pulling from live (full tree)…",
     refreshing_baseline: "Refreshing sync baseline…",
+    realigning_mtimes:   "Aligning file timestamps…",
     reconciling_content: "Updating the database to match new files…",
     notifying_peer:      "Notifying peer to refresh its ledger…",
     backing_up_database: "Backing up live database (encrypted)…"
@@ -47,7 +47,7 @@ class SiteSyncTransferJob < ApplicationJob
 
     def initialize(conflicts)
       @conflicts = conflicts
-      super("#{conflicts.size} unresolved conflict(s)")
+      super("#{conflicts.size} conflict(s)")
     end
   end
 
@@ -57,25 +57,33 @@ class SiteSyncTransferJob < ApplicationJob
 
   def perform(kind)
     kind = kind.to_sym
-    raise ArgumentError, "kind must be :push, :pull or :sync" unless [ :push, :pull, :sync ].include?(kind)
+    raise ArgumentError, "kind must be :push, :pull, :sync or :clone" unless [ :push, :pull, :sync, :clone ].include?(kind)
 
     @started_at = Time.current
     @kind = kind
     @original_diff = nil  # set during perform_push/pull/sync when computed
+    # What moved, in each direction, for the history log. Set by each
+    # perform_* method so the record reflects what was actually planned.
+    @to_live = @to_local = { modified: [], added: [], deleted: [] }
+    @local_snapshot = nil
     update_step(:starting)
 
     case kind
     when :push then perform_push
     when :pull then perform_pull
     when :sync then perform_sync
+    when :clone then perform_clone
     end
 
     # /site is now in a known-good state matching the other side.
-    # Refresh our ledger + caches so drift indicators clear.
+    # Refresh our ledger + caches so drift indicators clear. Cleared again at
+    # the end — realign_phantom_mtimes! below still changes /site, and anything
+    # that reads the status in between caches an answer from mid-sync. This
+    # early clear is for the paths that never reach the end: a job that fails
+    # partway shouldn't leave the banner describing a state from before it ran.
     update_step(:refreshing_baseline)
-    SiteSync::Ledger.write_current!
-    SiteSync::Checker.clear_cache
-    Rails.cache.delete("site_sync:current_fingerprint")
+    write_confirmed_baseline!
+    invalidate_status_caches
 
     # Reconcile the database against the new on-disk state. rsync only
     # touches files; Post/Page/Product/Medium rows still reference the
@@ -86,7 +94,7 @@ class SiteSyncTransferJob < ApplicationJob
     # until the app restarts.
     update_step(:reconciling_content)
     case @kind
-    when :push then SiteSync::Exchange.reconcile_peer_content!
+    when :push, :clone then SiteSync::Exchange.reconcile_peer_content!
     when :pull then ContentSync.sync_all
     when :sync
       # Reconcile whichever side(s) actually received writes.
@@ -106,6 +114,18 @@ class SiteSyncTransferJob < ApplicationJob
     #     sides agree they're in sync now.
     update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
+
+    # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
+    # config file re-serialized by ContentSync) can leave a file byte-identical
+    # but with a fresher mtime — which the size+mtime drift check reads as a
+    # phantom "ledgers diverged" even though the content matches. Stamp the
+    # local mtime to the peer's for any such byte-identical file so the two
+    # fingerprints end genuinely equal and the sync finishes green. Only the
+    # side that can reach the peer runs this (production never initiates).
+    if SiteSync::Exchange.can_call_peer?
+      update_step(:realigning_mtimes)
+      realign_phantom_mtimes!
+    end
 
     # Phase ②: pull a fresh encrypted copy of the live database so the
     # local /site always carries a current, restorable DB blob. Distinct
@@ -130,6 +150,20 @@ class SiteSyncTransferJob < ApplicationJob
       completed_at: Time.current
     )
 
+    record_history(:completed)
+
+    # Once more, now that nothing else is going to touch /site.
+    #
+    # realign_phantom_mtimes! rewrites file mtimes and the ledger with them, but
+    # the caches cleared before it were free to be refilled in the meantime —
+    # by an admin page render, or the layout banner on any navigation, both of
+    # which the "refresh the page to check progress" message invites. A status
+    # cached then is computed against the old mtimes while the ledger holds the
+    # new ones, so the two disagree and the banner reports drift on a sync that
+    # worked. Syncing a second time cleared it, which is what made it look like
+    # the first one hadn't taken.
+    invalidate_status_caches
+
     # Tell the peer about our new state right away — without this,
     # both sides have stale state until the next hourly exchange:
     # the peer's banner doesn't know we just pushed, and OUR peer_state
@@ -145,6 +179,7 @@ class SiteSyncTransferJob < ApplicationJob
     # overwritten. Surface the conflicts for the admin to resolve; don't
     # re-raise (retrying blindly won't help).
     Rails.logger.warn "[SiteSyncTransferJob #{kind}] blocked: #{e.message}"
+    record_history(:blocked, error: e.message)
     write_status(
       state:        :conflicts,
       kind:         @kind,
@@ -195,6 +230,7 @@ class SiteSyncTransferJob < ApplicationJob
     # clobbers an independent edit on live; that's what pull is for.
     diff = { modified: [], added: result.push, deleted: result.push_delete }
     @original_diff = diff
+    @to_live = diff
     if diff_empty?(diff)
       Rails.logger.info "[SiteSyncTransferJob push] nothing safe to push"
       return
@@ -216,6 +252,7 @@ class SiteSyncTransferJob < ApplicationJob
     # Pull only the peer-only changes; local-only changes stay put.
     diff = { modified: [], added: result.pull, deleted: result.pull_delete }
     @original_diff = diff
+    @to_local = diff
     if diff_empty?(diff)
       Rails.logger.info "[SiteSyncTransferJob pull] nothing safe to pull"
       return
@@ -224,7 +261,7 @@ class SiteSyncTransferJob < ApplicationJob
     # Local backup is fast (no network), so always do the full
     # snapshot — it's a complete restore point.
     update_step(:backing_up_local)
-    SiteSync::BackupManager.create
+    @local_snapshot = SiteSync::BackupManager.create
 
     update_step(:pulling_from_live)
     SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
@@ -243,6 +280,8 @@ class SiteSyncTransferJob < ApplicationJob
     pull_diff = { modified: [], added: result.pull, deleted: result.pull_delete }
     @pushed = !diff_empty?(push_diff)
     @pulled = !diff_empty?(pull_diff)
+    @to_live  = push_diff
+    @to_local = pull_diff
     @original_diff = {
       modified: [],
       added:    push_diff[:added] + pull_diff[:added],
@@ -258,10 +297,134 @@ class SiteSyncTransferJob < ApplicationJob
 
     if @pulled
       update_step(:backing_up_local)
-      SiteSync::BackupManager.create
+      @local_snapshot = SiteSync::BackupManager.create
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: pull_diff, on_progress: progress_proc)
     end
+  end
+
+  # First-sync mirror (a "clone"): make the peer an exact copy of this
+  # (initiating) side. No reconcile and no conflicts — on a first sync there's
+  # no shared ancestor, so the initiator is the source of truth by definition.
+  # Pushes every file that differs AND deletes every peer file not present
+  # locally, which is what clears a fresh deploy's starter/seed content. The
+  # peer content it's about to overwrite/delete is snapshotted first (just that
+  # set, not the whole tree) so even a mis-clicked clone is recoverable; the
+  # generic perform flow afterwards writes the shared baseline on both sides, so
+  # subsequent syncs are clean 3-way merges.
+  def perform_clone
+    update_step(:computing_diff)
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    raise PeerUnreachable if peer.nil?
+
+    # Ledger.diff(local, peer): added = local-only, modified = differ,
+    # deleted = peer-only. That set IS the mirror — apply it and peer == local.
+    diff = SiteSync::Ledger.diff(SiteSync::Ledger.current, peer["files"] || {})
+    @original_diff = diff
+    @to_live = diff
+    @pushed = !diff_empty?(diff)
+    return unless @pushed # already identical — nothing to clone
+
+    # Safety net: snapshot only the peer files this mirror will OVERWRITE or
+    # DELETE — its own content that isn't coming from local. Added files are new
+    # to the peer (nothing to lose) and unchanged files are recoverable from
+    # local, so `modified + deleted` is the complete recovery set — no need to
+    # pull the whole tree. On a fresh peer that's near-empty; on a retry it
+    # shrinks as files converge (already-mirrored files leave the diff).
+    update_step(:backing_up_live)
+    SiteSync.transport.backup_live_to_local!(files: diff[:modified] + diff[:deleted], on_progress: progress_proc)
+
+    update_step(:pushing_to_live_full)
+    SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
+  end
+
+  # A peer-side rewrite during reconcile can leave a file byte-identical but
+  # with a fresher mtime — a phantom "diverged" under the size+mtime check. For
+  # any file whose size matches the peer but mtime differs AND whose content
+  # hash matches, stamp the local mtime to the peer's (cheap, no re-transfer) so
+  # the fingerprints end equal and the sync finishes green. Refreshes the
+  # baseline when anything was realigned. Best-effort: a missing peer manifest
+  # or hash just skips the realignment (the file resyncs normally next time).
+  # Drop every cached answer about our own sync state. Both are recomputed on
+  # demand — the cost is one /site walk on the next page load.
+  def invalidate_status_caches
+    SiteSync::Checker.clear_cache
+    Rails.cache.delete("site_sync:current_fingerprint")
+  end
+
+  # The baseline records what BOTH sides hold — not what this side holds.
+  #
+  # It used to be written straight from the local tree, which quietly asserted
+  # that every local file had reached the peer. Anything that hadn't — skipped
+  # by a partial resolve, missed by a transfer — entered the baseline anyway,
+  # and on the next sync its absence on the peer read as a deletion. Nothing
+  # had been deleted; the peer had simply never had it. The file was then
+  # destroyed on the only side that did.
+  #
+  # So: intersect with what the peer actually reports holding. A local file the
+  # peer doesn't have stays out of the baseline, which keeps it classified as a
+  # push next time rather than as someone else's deletion.
+  #
+  # If the peer can't be reached we keep the previous baseline for the paths we
+  # can't confirm rather than guessing — an out-of-date baseline costs a
+  # re-push, a wrong one costs the file.
+  def write_confirmed_baseline!
+    local = SiteSync::Ledger.current
+    peer  = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
+
+    if peer.nil?
+      Rails.logger.warn "[SiteSyncTransferJob #{@kind}] peer manifest unavailable — baseline left as-is"
+      return
+    end
+
+    confirmed = local.select { |path, _| peer.key?(path) }
+    unconfirmed = local.size - confirmed.size
+    if unconfirmed.positive?
+      Rails.logger.info "[SiteSyncTransferJob #{@kind}] #{unconfirmed} local file(s) not on the peer — " \
+                        "left out of the baseline so they stay a push, not a deletion"
+    end
+
+    SiteSync::Ledger.write_manifest!(confirmed)
+  rescue => e
+    # Never fail a transfer that worked over a baseline refresh.
+    Rails.logger.warn "[SiteSyncTransferJob #{@kind}] confirmed baseline skipped: #{e.class} #{e.message}"
+  end
+
+  def realign_phantom_mtimes!
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    return unless peer
+    peer_files = peer["files"] || {}
+    local = SiteSync::Ledger.current
+
+    candidates = local.keys.select do |rel|
+      l = local[rel]
+      p = peer_files[rel]
+      p && l["size"] == p["size"] && l["mtime"] != p["mtime"]
+    end
+    return if candidates.empty?
+
+    peer_hashes = SiteSync::Exchange.fetch_peer_file_hashes(candidates)
+    realigned = 0
+    candidates.each do |rel|
+      full = File.join(RoeSitePaths::SITE_PATH, rel)
+      next unless File.file?(full)
+      next unless Digest::SHA256.hexdigest(File.read(full)) == peer_hashes[rel]
+
+      t = Time.at(peer_files[rel]["mtime"].to_i)
+      File.utime(t, t, full)
+      realigned += 1
+    end
+
+    if realigned.positive?
+      Rails.logger.info "[SiteSyncTransferJob] realigned #{realigned} phantom-mtime file(s)"
+      # write_current! here undid the confirmed baseline written moments earlier,
+      # putting every peer-absent file back in. The peer manifest is already in
+      # hand, so confirm against it.
+      SiteSync::Ledger.write_confirmed!(peer_files, context: "phantom-mtime realign")
+    end
+  rescue => e
+    # Never let a realignment hiccup fail a sync that already succeeded.
+    Rails.logger.warn "[SiteSyncTransferJob] phantom-mtime realign skipped: #{e.class} #{e.message}"
   end
 
   # Three-way reconcile against the peer, with edit/edit conflicts confirmed
@@ -279,6 +442,13 @@ class SiteSyncTransferJob < ApplicationJob
       peer:     peer["files"] || {}
     )
 
+    # Nothing gets deleted without someone saying so. See
+    # Reconciler.require_delete_confirmation — a deletion is inferred from the
+    # baseline, and a wrong baseline turns that inference into data loss.
+    result = SiteSync::Reconciler.require_delete_confirmation(
+      result, baseline: baseline, local: SiteSync::Ledger.current, peer: peer["files"] || {}
+    )
+
     candidates = SiteSync::Reconciler.hash_candidates(result)
     if candidates.any?
       result = SiteSync::Reconciler.confirm(
@@ -293,6 +463,21 @@ class SiteSyncTransferJob < ApplicationJob
 
   # Flatten conflicts for the status cache: which side is newer (by mtime,
   # UTC seconds) drives the "resolve all by most-recent" default in the UI.
+  # The log entry. Everything here was already computed; it was being written
+  # to a cache key that expires, so after a sync there was no way to answer
+  # "what did that just do?".
+  def record_history(outcome, error: nil)
+    SiteSync::History.record!(
+      kind:     @kind,
+      outcome:  outcome,
+      to_live:  @to_live,
+      to_local: @to_local,
+      snapshot: @local_snapshot,
+      error:    error,
+      at:       @started_at || Time.current
+    )
+  end
+
   def serialize_conflicts(conflicts)
     conflicts.map do |c|
       lm = c.local && c.local["mtime"]

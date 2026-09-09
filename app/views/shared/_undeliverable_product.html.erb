@@ -1,0 +1,21 @@
+<%# Shown in place of an Add to Cart button when a digital product can't
+    deliver what it sells. Admins get the reason; visitors get nothing that
+    reads as an error on their part. Mirrors the "Store not configured"
+    fallback in _snipcart_button. %>
+<div class="product-notice warning">
+  <p>
+    <% if authenticated? %>
+      <strong>Not available to buy.</strong>
+      <% if product.delivery_problem == :missing_file_guid %>
+        This is a digital product with no file GUID, so Snipcart would take
+        payment and have nothing to send.
+      <% else %>
+        This product's file GUID isn't a valid Snipcart GUID, so checkout
+        would fail.
+      <% end %>
+      Fix it in <%= link_to "the product's metadata", edit_admin_product_path(product) %>.
+    <% else %>
+      <strong>Not available to buy.</strong> Please check back later.
+    <% end %>
+  </p>
+</div>

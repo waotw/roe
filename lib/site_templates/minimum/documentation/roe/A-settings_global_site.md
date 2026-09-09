@@ -1,12 +1,12 @@
 ---
-title: "Global → Site"
+title: "Settings → Site"
 status: published
 tags: settings
 ---
 
 # Edit your Global Site Settings
 
-Your Global Site Settings cover the basics of your whole site — its name, branding, theme, and more. Edit them in the Admin at [Settings → Global → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
+Your Global Site Settings cover the basics of your whole site — its name, branding, theme, and more. Edit them in the Admin at [Settings → Site](/admin/configs/site/edit). Click `SAVE` when you're done.
 
 ## Site Information
 
@@ -33,6 +33,10 @@ Your Global Site Settings cover the basics of your whole site — its name, bran
 ## Site Sync
 
 - `Transport` — how Site Sync moves files to and from your live site: `http` (recommended; works over HTTPS with a shared token) or `rsync` (needs SSH access to the host).
+- `Confirm deletions over` — If you delete a file on your live site, that deletion will be synced to local and vice-versa. Roe can warn you if too many files are being deleted. This settings is the threshold for the warning.
+  - Defaults to `0` so it warns every time.
+  - Set to any number, and it warns if the number of files deleted is over that number.
+  - Set to `never` to avoid any warnings.
 
 ## Updates
 

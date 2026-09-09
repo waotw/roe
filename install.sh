@@ -3,7 +3,7 @@
 #
 # Serve this at a stable URL and install Roe with a single command:
 #
-#   curl -fsSL https://roecms.com/install | bash
+#   curl -fsSL https://go-roe.com/install | bash
 #
 # It finds the latest Roe release, downloads the installer zip, unpacks
 # it, and hands you off to `./roe.sh check` to finish setup (install
@@ -20,8 +20,10 @@
 # non-match is expected, so failures are handled explicitly with `die`.
 set -uo pipefail
 
-CODEBERG_REPO="${ROE_REPO:-waotw/roe}"
-API_BASE="https://codeberg.org/api/v1/repos/${CODEBERG_REPO}"
+REPO="${ROE_REPO:-waotw/roe}"
+# GitHub answers on a separate API host; Forgejo and Gitea answer on the forge
+# itself. Overridable so a fork or a mirror needs no edit here.
+API_BASE="${ROE_API_BASE:-https://api.github.com/repos/${REPO}}"
 INSTALL_PARENT="${ROE_INSTALL_DIR:-$(pwd)}"
 
 # ── Output helpers (plain when not a tty) ──────────────────────────────
@@ -40,6 +42,32 @@ die()  { printf '%s[✗]%s %s\n' "$RED" "$NC" "$*" >&2; exit 1; }
 command -v curl  >/dev/null 2>&1 || die "curl is required to download Roe."
 command -v unzip >/dev/null 2>&1 || die "unzip is required. Install it, then re-run."
 
+# On Windows, Roe runs under WSL2 — which is Linux, so everything here works.
+# But it has to be installed on the LINUX filesystem, not a mounted Windows
+# drive: /mnt/c can't hold Unix permissions, so the `chmod +x roe.sh` below
+# silently does nothing and the user is left with a script they can't run.
+# (File watching also stops seeing edits made from Windows, which breaks
+# content sync later — see require_linux_filesystem in roe.sh.)
+if [ -r /proc/version ] && grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+    case "$INSTALL_PARENT" in
+        /mnt/*)
+            die "Install Roe on the Linux side, not a Windows drive.
+
+  You're in: $INSTALL_PARENT
+
+  Windows drives (/mnt/...) can't store file permissions, so Roe's launcher
+  won't be executable and file changes won't be detected.
+
+  Run this instead:
+
+      cd ~ && curl -fsSL https://go-roe.com/install | bash
+
+  Your files stay reachable from Windows at:
+      \\\\wsl\$\\${WSL_DISTRO_NAME:-Ubuntu}\\home\\$USER\\"
+            ;;
+    esac
+fi
+
 say "${BOLD}Installing Roe${NC}"
 say ""
 
@@ -49,15 +77,19 @@ tag=""
 
 if [ -z "$zip_url" ]; then
   say "Finding the latest release…"
-  # Use the releases LIST (newest first), not /releases/latest — Gitea's
-  # "latest" endpoint 404s on this repo. Parse asset URLs directly: a
+  # Use the releases LIST (newest first), not /releases/latest. Parse asset
+  # URLs directly, which works the same on GitHub and Forgejo: both return
+  # browser_download_url, and both serve assets from
+  # .../releases/download/<tag>/<asset>, so the tag parse below holds too. A
   # stable installer asset is named roe-<numeric version>.zip (e.g.
   # roe-0.0.37.zip). Pre-release builds carry a suffix
   # (roe-0.0.38-nightly.zip) and are skipped by the numeric-only match,
   # so users only ever get stable releases. Since the list is newest
   # first, head -1 is the latest stable.
-  api_json="$(curl -fsSL "${API_BASE}/releases?limit=20" 2>/dev/null)" \
-    || die "Couldn't reach Codeberg to find the latest release. Check your connection, or set ROE_INSTALL_URL to a .zip URL."
+  # per_page is GitHub's spelling; Forgejo calls it limit. Both default to a
+  # page big enough, so the parameter is belt and braces either way.
+  api_json="$(curl -fsSL "${API_BASE}/releases?per_page=20" 2>/dev/null)" \
+    || die "Couldn't reach the release server to find the latest version. Check your connection, or set ROE_INSTALL_URL to a .zip URL."
 
   zip_url="$(printf '%s' "$api_json" \
         | grep -oE '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*roe-[0-9]+\.[0-9]+\.[0-9]+\.zip"' \
@@ -66,7 +98,7 @@ if [ -z "$zip_url" ]; then
 
   [ -n "$zip_url" ] || die "No stable installer .zip found on recent releases.
   Set ROE_INSTALL_URL to the zip's URL and re-run, e.g.:
-    ROE_INSTALL_URL='https://…/roe-X.Y.Z.zip' curl -fsSL https://roecms.com/install | bash"
+    ROE_INSTALL_URL='https://…/roe-X.Y.Z.zip' curl -fsSL https://go-roe.com/install | bash"
 
   # Derive the version tag from the asset URL (.../download/vX.Y.Z/roe-…).
   tag="$(printf '%s' "$zip_url" | sed -E 's#.*/download/(v[^/]+)/.*#\1#')"

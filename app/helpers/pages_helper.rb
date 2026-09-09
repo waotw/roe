@@ -1,6 +1,6 @@
 module PagesHelper
   def render_page_content(page, context: nil)
-    html = page.to_html(context: context, static: @static_generation)
+    html = page.to_html(context: context, preview: editor_preview?, static: @static_generation)
 
     # Replace token placeholders with actual tokens
     html = html.gsub("AUTHENTICITY_TOKEN_PLACEHOLDER", form_authenticity_token)
@@ -22,7 +22,7 @@ module PagesHelper
   private
 
   def should_truncate_content?(item)
-    return false unless item.metadata["audience"] == "paid"
+    return false unless item.audience == "paid"
     return false if current_member&.paid? && current_member&.active?
     return false if authenticated? # Admins can see everything
 

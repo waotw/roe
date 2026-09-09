@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Cards
+title: Cards
 status: published
 url_name: cards
 tags: roe-anji
@@ -20,7 +20,7 @@ type: aside
 text: This is an aside which is adding some helpful info about this paragraph.
 ``` 
 
-Cards use a similar syntax to [Collections](/documentation/roe/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside), [product link ↓](#product-link).
+Cards use a similar syntax to [Collections](/documentation/roe/collections) and allow you to embed styled elements directly in a Markdown file: [pullquote ↓](#pull-quote), [post link ↓](#post-link), [aside ↓](#aside), [product link ↓](#product-link), [player ↓](#player).
 
 To make things a bit easier, each card `type` has it's own defaults. The card defaults can be edited in [Admin/Settings](/admin/configs/cards/edit).
 
@@ -129,9 +129,25 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 Post links are a great way to link to other posts in your site with support for thumbnails. The syntax is easy and automatically imports the necessary info and image.
 
+````markdown
+```card
+type: post-link
+style: small
+post: collection-full
+```
+````
+
+↑ That code will produce this ↓ :
+
+```card
+type: post-link
+style: small
+post: collection-full
+```
+
 ### Options
 
-Most of these are not required. You can just use: `type:`, `post:`, these are here if you want to customize. As long as you add a `post:` option, it will pull all the info from the post. But you can override that if you like.
+<mark>Note:</mark> Most of these are not required. You can just use: `type:`, `post:`, these are here if you want to customize. As long as you add a `post:` option, it will pull all the info from the post. But you can override that if you like.
 
 | Option | Required | Description |
 |--------|----------|-------------|
@@ -219,15 +235,16 @@ Asides allow you to add notes "next to" the content of the text. The syntax is s
 
 ### Options
 
-You're only required to set: `type:` and then add image, text and links as needed. You can use: image, text, or both and add a link.
+Add an image, some text, or both, and point the whole card somewhere with `link_url:` if you'd like to.
+
+`text:` had full markdown support. It will grab everything between: `text:` and the next option such as `image:` or the closing backticks. See examples below.
 
 | Option | Required | Description |
 |--------|----------|-------------|
 | `type` | Yes | Must be `aside` |
-| `text` | No | Body text |
+| `text` | No | Body text, written in Markdown. Several paragraphs are fine |
 | `image` | No | Path to image — displays above text |
-| `link` | No | URL to link to |
-| `link_text` | No | Custom link text — if omitted, shows arrow appended to text |
+| `link_url` | No | Makes the whole aside a link, image included |
 
 ### Just Text (example)
 
@@ -238,7 +255,7 @@ You're only required to set: `type:` and then add image, text and links as neede
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
 ```
-You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
+You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future.
 ````
 
 ↑ This code looks like this ↓ :
@@ -249,7 +266,7 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
 ```
-You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
+You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future.
 
 ---
 
@@ -263,7 +280,7 @@ type: aside
 image: /media/images/old_plane.jpg
 ```
 
-You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
+You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o.
 ````
 
 ↑ This code looks like this ↓ :
@@ -275,7 +292,7 @@ type: aside
 image: /media/images/old_plane.jpg
 ```
 
-You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
+You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o.
 
 ---
 
@@ -307,27 +324,42 @@ You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful m
 
 ### Asides can use links (example)
 
-To add a link to an Aside, just do this ↓ :
+There are two ways to link from an aside, and they do different things.
+
+**Write the link in the text.** Because `text:` is Markdown, you choose the wording and where it sits:
 
 ````markdown
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-link: https://en.wikipedia.org/wiki/Back_to_the_Future
-link_text: Quoted from →
-``` 
+
+[Quoted from Back to the Future →](https://en.wikipedia.org/wiki/Back_to_the_Future)
+```
 ````
 
-↑ This code looks like this ↓ :
+**Or point the whole card somewhere** with `link_url:`. The entire aside becomes a link, image included — useful when the aside is a picture, or a short note that's all one destination:
+
+````markdown
+```card
+type: aside
+image: /media/images/old_plane.jpg
+text: A short note that all points one way.
+link_url: https://en.wikipedia.org/wiki/Back_to_the_Future
+```
+````
+
+You can't do both at once: a link inside a link isn't valid HTML. If your text already contains a link, `link_url` goes on the image instead, and with no image Roe tells you in the preview that it had nowhere to put it.
+
+↑ The first of those looks like this ↓ :
 
 ---
 
 ```card
 type: aside
 text: I'll never let him forget it. And if I did, what would that make me?
-link: https://en.wikipedia.org/wiki/Back_to_the_Future
-link_text: Quoted from →
-``` 
+
+[Quoted from Back to the Future →](https://en.wikipedia.org/wiki/Back_to_the_Future)
+```
 You wait and see, Mr. Caruthers, I will be mayor and I'll be the most powerful mayor in the history of Hill Valley, and I'm gonna clean up this town. There's that word again, heavy. Why are things so heavy in the future. Is there a problem with the Earth's gravitational pull? Your not gonna be picking a fight, Dad, dad dad daddy-o. You're coming to a rescue, right? Okay, let's go over the plan again. 8:55, where are you gonna be. Wow, ah Red, you look great. Everything looks great. 1:24, I still got time. Oh my god. No, no not again, c'mon, c'mon. Hey. Libyans. It works, ha ha ha ha, it works. I finally invent something that works.
 
 ## Product Link
@@ -361,3 +393,30 @@ style: medium
 ````
 
 ↑ That pulls the Blue T-shirt's title, price, image, and description into a medium card. Like Post Links, add any field above to override what's pulled in.
+
+## Player
+
+<mark>Music only:</mark> Player cards need the **Music** feature turned on. Until then `player` won't appear in the `CARD ▼` menu.
+
+A Player card puts a single audio player in the middle of your writing — a track you want someone to hear at that point, rather than a whole release.
+
+### Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `type` | Yes | Must be `player` |
+| `audio` | Yes | Path to the audio file |
+| `title` | No | Shown beside the player |
+| `image` | No | Artwork to show with it |
+| `show_artwork` | No | `false` hides the artwork |
+
+````markdown
+```card
+type: player
+audio: /media/audio/the-quiet-hours-03.mp3
+title: Three — The Quiet Hours
+image: /media/images/quiet-hours.jpg
+```
+````
+
+For a whole release, use the [`playlist` collection template](/documentation/roe/collections_templates#when-to-use-the-playlist-template) instead — it gives you one player and a track list rather than a player per track.

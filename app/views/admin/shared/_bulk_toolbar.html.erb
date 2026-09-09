@@ -1,0 +1,71 @@
+<%#
+  Bulk action bar + confirm modals for an index table. Render inside the
+  element carrying data-controller="bulk-select".
+  locals:
+    destroy_path — POST endpoint for bulk delete
+    publish_path — POST endpoint for bulk publish
+    label        — singular noun ("post" / "page" / "product")
+%>
+<div data-bulk-select-target="toolbar" class="hidden items-center gap-3 bg-gray-900 text-white px-4 py-2 mb-3 text-sm">
+  <span><strong data-bulk-select-target="count">0</strong> selected</span>
+  <div class="flex-1"></div>
+  <button type="button" data-action="bulk-select#openPublish" data-bulk-select-target="publishButton"
+          class="hidden uppercase text-xs px-3 py-1 border border-green-400 bg-green-100 text-green-800 hover:bg-green-200 font-mono rounded-xs cursor-pointer">
+    PUBLISH SELECTED
+  </button>
+  <button type="button" data-action="bulk-select#openDelete"
+          class="uppercase text-xs px-3 py-1 border border-red-400 bg-red-100 text-red-700 hover:bg-red-200 font-mono rounded-xs cursor-pointer">
+    DELETE SELECTED
+  </button>
+</div>
+
+<%# Delete confirm — type DELETE %>
+<div data-bulk-select-target="deleteModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Delete selected <%= label.pluralize %>?</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      This permanently deletes each selected <%= label %>'s file and record — draft or published. This action cannot be undone.
+    </p>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Type <strong>DELETE</strong> to confirm:</label>
+      <input type="text" data-bulk-select-target="deleteInput"
+             data-action="input->bulk-select#deleteInputChanged keydown->bulk-select#deleteInputKeydown"
+             class="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+             placeholder="DELETE" autocomplete="off">
+    </div>
+    <%= form_with url: destroy_path, method: :post, data: { turbo: false } do %>
+      <div data-bulk-select-target="deleteIds"></div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" data-action="bulk-select#closeModals"
+                class="px-4 py-2 border font-mono border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 rounded-xs">CANCEL</button>
+        <button type="submit" data-bulk-select-target="deleteSubmit" disabled
+                class="px-4 py-2 font-mono border border-transparent text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xs">
+          DELETE PERMANENTLY
+        </button>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Publish confirm — with a consequence summary %>
+<div data-bulk-select-target="publishModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Publish <strong data-bulk-select-target="publishCount">0</strong> <%= label.pluralize %>?</h3>
+    <p class="text-sm text-gray-600 mb-3">
+      Each selected draft goes live with its current settings. Already-published items are left as-is.
+    </p>
+    <ul class="text-sm text-gray-700 mb-4 space-y-1">
+      <li data-bulk-select-target="newsletterSummary" class="hidden font-medium text-amber-700"></li>
+      <li data-bulk-select-target="paidSummary" class="hidden text-gray-600"></li>
+    </ul>
+    <%= form_with url: publish_path, method: :post, data: { turbo: false } do %>
+      <div data-bulk-select-target="publishIds"></div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" data-action="bulk-select#closeModals"
+                class="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">CANCEL</button>
+        <button type="submit"
+                class="px-4 py-2 border border-transparent text-sm font-medium text-white bg-green-600 hover:bg-green-700">PUBLISH</button>
+      </div>
+    <% end %>
+  </div>
+</div>

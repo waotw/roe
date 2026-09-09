@@ -4,7 +4,12 @@
     subscribe section — the same partial the episode pages use. %>
 <% podcast_key    = @page.metadata["podcast"] %>
 <% podcast_config = (podcast_enabled? && podcast_key.present?) ? PodcastConfig.get(podcast_key) : nil %>
-<article class="page page-<%= @page.url_name %><%= ' member-page' if @page.member_page? %>">
+<%# page-<url_name> is derived from the page's name, so renaming a page renames
+    its class — a theme targeting .page-store stopped matching when the page was
+    retitled "Bookshop". page-type-<type> is declared rather than derived, so it
+    survives a rename. Both are emitted: the name-based one is what existing
+    themes already target. %>
+<article class="page page-<%= @page.url_name %><%= " page-type-#{@page.page_type}" if @page.page_type %><%= ' member-page' if @page.member_page? %>">
   <% if podcast_config.present? %>
     <%# Ordinary pages leave the title to the markdown; a podcast page
         makes an exception and leads with the show name as the H1,

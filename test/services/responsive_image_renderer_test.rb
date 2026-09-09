@@ -82,15 +82,15 @@ class ResponsiveImageRendererTest < ActiveSupport::TestCase
     refute_includes html, "photo-xl.png"
   end
 
-  test "falls back to the original <img> when no variants exist and no libvips" do
+  test "falls back to the original when no variants exist and no libvips" do
     write_png(File.join(DIR, "photo.png"), 2000)
     ImageVariantGenerator.stubs(:available?).returns(false)
 
     html = ResponsiveImageRenderer.render(WEB_PATH)
 
-    refute_includes html, "<picture>"
     assert_includes html, "<img"
-    assert_includes html, %(src="#{WEB_PATH}")
+    assert_includes html, %(src="#{WEB_PATH}"), "serves the original"
+    refute_includes html, "<source", "nothing to choose between yet"
   end
 
   test "queues generation and shows the original when variants missing but libvips present" do
@@ -100,8 +100,23 @@ class ResponsiveImageRendererTest < ActiveSupport::TestCase
 
     html = ResponsiveImageRenderer.render(WEB_PATH)
 
-    refute_includes html, "<picture>"
     assert_includes html, "<img"
+    refute_includes html, "<source", "no variants to offer yet"
+  end
+
+  # Themes size images with rules keyed on the wrapper (.post-header picture img,
+  # .grid-item-image picture:has(…), .gallery-item picture). If the fallback
+  # emitted a bare <img>, none of those matched and the image painted at its
+  # intrinsic size until variants finished — then visibly snapped smaller.
+  test "both paths wrap in <picture>, so CSS can't tell them apart" do
+    write_png(File.join(DIR, "photo.png"), 2000)
+
+    ImageVariantGenerator.stubs(:available?).returns(false)
+    fallback = ResponsiveImageRenderer.render(WEB_PATH)
+
+    assert_includes fallback, "<picture>", "the single-source fallback is wrapped too"
+    assert_includes fallback, "</picture>"
+    assert_includes fallback, 'decoding="async"', "matches the variant path"
   end
 
   test "serves a <picture> from just the baseline and queues the rest to enrich" do

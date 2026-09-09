@@ -26,7 +26,7 @@ Roe includes a complete membership system that allows you to:
 - Gate content behind a paywall with preview snippets
 - Manage members and their access levels from the admin
 - Accept donations from anyone visiting the site
-- See [Payment Models](/documentation/payments#payment-models)
+- See [Payment Models](/documentation/roe/payments#payment-models)
 
 The system is designed to be flexible: you can use it for free newsletters only, paid memberships only, or a combination of both. You can even use payments purely for donations/support without gating any content.
 
@@ -101,7 +101,15 @@ upgrade-button-text: Sign up and become a paid member
 
 The upgrade button only appears if payments are enabled in your config.
 
-**Just a link to sign-up?** For a call-to-action that sends readers to the sign-up page rather than embedding the form, use the Roe-anji [`subscribe` button](/documentation/forms-and-buttons#subscribe-button) — a `button` block with `for: subscribe`.
+**Just a link to sign-up?** For a call-to-action that sends readers to the sign-up page rather than embedding the form, use the Roe-anji [`subscribe` button](/documentation/roe/forms-and-buttons#subscribe-button) — a `button` block with `for: subscribe`.
+
+### Email is required
+
+Members sign in with a link sent to their address, so a site with Members turned on needs a way to send email. Set up [Postmark](/documentation/roe/postmark) — it appears in your settings as soon as Members is on.
+
+Newsletters are separate, and optional. Turn them on when you want to send posts to your list; leave them off and sign-in emails still work.
+
+If email isn't set up, Roe shows an orange dot beside your settings and tells anyone trying to sign in that the message couldn't be sent, rather than leaving them watching an inbox.
 
 ### Email Templates
 
@@ -127,14 +135,29 @@ Member emails are customizable Markdown files: [Admin → Emails](/admin/emails)
 - `@magic_link` and `@confirmation_link` are full URLs that members click to complete actions
 - Templates support full Markdown formatting including links, headings, and emphasis
 
+## Member tokens
+
+Each member has two tokens associtated with their membership.
+
+| Token | What it does |
+|-------|--------------|
+| **Access token** | Signs them in. It's what a magic-link email carries — treat it like a password. |
+| **Media token** | Gives them access to `paid` feeds, files and content. |
+
+A site owner can see them for any member here: [Admin → Members](/admin/members).
+
+A member's private feed addresses are listed on their account page: a paid feed from [feeds.yml](/documentation/roe/feeds-rss-atom), a podcast with paid episodes, or a music release with paid tracks. Each has a Copy button, and **Refresh your private links** issues a fresh set if one gets shared — the old links stop working straight away. The benefit of a media token is that they don't have to sign in to their account to access files. This is what allows them to subsribe in a podcast or RSS reader without being signed in.
+
+Cancelling an account will invalidate both tokens. A cancelled or downgraded member's media token stops opening files immediately.
+
 ## Static Site Generation
 
-If you're using static site generation, `SSG` + `MEMBERS` is an advanced feature still in development.
+Currently, the members system is not supported for SSG. You can only have public files in your static site but you can use the Store feature to sell tracks and other digital files: [Feature → Store](/documentation/roe/store)
 
 ## Next Steps
 
 1. **Customize your member pages** - Edit the copy in signup.md, upgrade.md, etc.
 2. **Enable newsletters** - To test emails ([Settings → Members](/admin/configs/members/edit))
-3. **Enable payments** - When you're ready to monetize, see [Payments](/documentation/payments)
+3. **Enable payments** - When you're ready to monetize, see [Payments](/documentation/roe/payments)
 
 The members system is designed to grow with you - start with free signups, add payments when you're ready, and customize everything to match your membership/publishing model.

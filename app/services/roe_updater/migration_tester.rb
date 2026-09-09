@@ -6,9 +6,22 @@ module RoeUpdater
 
     class << self
       def test_migrations(status_record)
+        # Only the last thing this step does is migrations. Before that it
+        # copies the whole site, bundles the staged tree and boots a second
+        # Rails — none of which is free, and none of which is worth doing for
+        # an update that ships no migrations. Most don't.
+        if (unapplied = unapplied_staged_versions)&.empty?
+          status_record.update!(
+            current_step: "Testing migrations...",
+            log: (status_record.log || "") + "→ No new migrations in this version, nothing to test\n"
+          )
+          return true
+        end
+
         status_record.update!(
           current_step: "Testing migrations...",
-          log: (status_record.log || "") + "→ Testing migrations on copy...\n"
+          log: (status_record.log || "") +
+            "→ Testing #{unapplied.size} new #{unapplied.size == 1 ? 'migration' : 'migrations'} on copy...\n"
         )
 
         copy_site_to_test
@@ -65,6 +78,34 @@ module RoeUpdater
       end
 
       private
+
+      # The migrations this update would actually run: ones shipped in the
+      # downloaded version that this database hasn't applied.
+      #
+      # Compared against the database rather than against the current
+      # checkout's files, so an install already sitting a migration behind
+      # still gets its dry run.
+      #
+      # nil when the answer can't be worked out — no staging directory yet, no
+      # migrations found where there should be sixty, or a database that won't
+      # answer. The caller tests in that case. Doing the work needlessly costs
+      # a minute; skipping a migration that turns out to be broken costs the
+      # update, and it's the reason this step exists.
+      def unapplied_staged_versions
+        directory = File.join(RoeSitePaths::ROE_ROOT, "staging", "db", "migrate")
+        return nil unless Dir.exist?(directory)
+
+        staged = Dir.children(directory).filter_map { |name| name[/\A(\d+)_.+\.rb\z/, 1] }
+        return nil if staged.empty?
+
+        applied = ActiveRecord::Base.connection
+                                    .select_values("SELECT version FROM schema_migrations")
+                                    .map(&:to_s)
+
+        staged - applied
+      rescue StandardError
+        nil
+      end
 
       def copy_site_to_test
         cleanup_test_site

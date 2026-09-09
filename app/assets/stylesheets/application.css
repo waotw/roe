@@ -67,3 +67,64 @@ body {
 .cb-input.cb-empty {
   color: #9ca3af;
 }
+
+/* Editor tab strip — table of contents / markdown check, sharing one row and
+   the panel space below it.
+
+   The active state is CSS rather than a class toggled in JS because two
+   separate Stimulus controllers open these panels (editor and markdown-doctor),
+   and each has several places where a panel closes. Reading the panel's own
+   visibility with :has() leaves one definition of "active" that cannot drift
+   out of step with what's actually open. */
+.editor-tabs {
+  /* The one knob for the strip's vertical spacing. Set it here rather than with
+     a py-* utility in the ERB: this file is unlayered and Tailwind's utilities
+     live in @layer utilities, so anything here wins regardless of specificity —
+     a py-2 on the row would be silently ignored. The tabs derive their bleed
+     from this value, so they stay joined to their panel whatever it's set to. */
+  --editor-tab-pad: 0.25rem;
+  padding-top: var(--editor-tab-pad);
+  padding-bottom: var(--editor-tab-pad);
+}
+
+/* A tab has to sit inside the strip's padding (so it looks evenly spaced when
+   closed) and simultaneously reach past it (so its background touches the panel
+   it opens). It does both by growing downward and then being pulled back up by
+   the same amount: padding-bottom covers the tab's own breathing room, the
+   strip's bottom padding and the panel's 1px top border, and margin-bottom
+   removes everything below the strip again. The margin box is therefore the
+   size it would have been without any of this, so the row's height and the
+   label's position don't move — only the background and border reach further. */
+.editor-tab {
+  /* Top padding is short by the 1px top border, which is part of the gap the
+     eye reads. That leaves the label an equal (--editor-tab-pad * 2) from the
+     top of the strip and from the panel below. */
+  padding: calc(var(--editor-tab-pad) - 1px) 0.5rem
+    calc(var(--editor-tab-pad) * 2 + 1px);
+  margin-bottom: calc(-1 * (var(--editor-tab-pad) + 1px));
+  border: 1px solid transparent; /* reserved so the tab doesn't shift when active */
+  border-bottom: 0;
+  position: relative; /* with z-index, paints the 1px overlap over the panel */
+  z-index: 1;
+}
+
+.editor-tabs:has(~ .editor-panel-toc:not(.hidden)) .editor-tab-toc,
+.editor-tabs:has(~ .editor-panel-markdown:not(.hidden)) .editor-tab-markdown {
+  background-color: #f9fafb; /* bg-gray-50 — the panel's background */
+  border-color: #d1d5db; /* gray-300 — the panel's border */
+}
+
+/* Metadata editor label column.
+
+   Sized to the longest label the current resource type actually has, set as
+   --metadata-label-width on #metadata-container. `ch` is the advance width of
+   one character, and these labels are font-mono, so N characters is exactly
+   Nch. The +1rem covers the label's own px-2.
+
+   A fixed width here meant the column was sized for image_in_header (a post
+   field) even on products and pages, where nothing is close to that long. The
+   fallback keeps JS-built rows sane if the property is ever missing. */
+.metadata-label {
+  width: calc(var(--metadata-label-width, 8rem) + 1rem);
+}
+

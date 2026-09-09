@@ -2,6 +2,7 @@
 title: Support this site
 url_name: donate
 status: published
+page_type: donate
 audience: everyone
 ---
 

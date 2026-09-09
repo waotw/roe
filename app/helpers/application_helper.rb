@@ -3,6 +3,22 @@ module ApplicationHelper
     SiteConfig.get("title").presence || "(set site title in Settings → site)"
   end
 
+  # True only while an admin preview action is re-rendering content from the
+  # editor. This is what lets Roe's amber block warnings appear in a preview in
+  # any environment while never appearing on a published URL.
+  #
+  # The test is which controller is rendering, because the preview actions
+  # render the very same views and helpers as the public site — @preview_mode
+  # alone can't tell them apart. It's also set by setup_theme_preview, which
+  # runs on the real published URL from a public controller, and a published URL
+  # showing diagnostics is the one thing this must never do.
+  #
+  # Both halves matter: @preview_mode is never true for an unauthenticated
+  # visitor, and an admin controller never serves a public page.
+  def editor_preview?
+    @preview_mode.present? && controller_path.start_with?("admin/")
+  end
+
   # The actual on-disk name of the Roe root folder. Usually "roe", but a user
   # may have it as "roe-v0.2.0" (versioned download) or renamed to their site
   # name. Use this — and roe_folder_path — anywhere a /roe path is shown so
@@ -128,9 +144,13 @@ module ApplicationHelper
   # Feature flag predicates — delegated to SiteFeature so models can use
   # the same checks without pulling in the helper context.
   def members_enabled?            = SiteFeature.members_enabled?
+  def always_show_member_icon?    = SiteFeature.always_show_member_icon?
   def payments_enabled?           = SiteFeature.payments_enabled?
   def memberships_enabled?        = SiteFeature.memberships_enabled?
+  def memberships_configured?     = SiteFeature.memberships_configured?
   def donations_enabled?          = SiteFeature.donations_enabled?
+  def email_enabled?              = SiteFeature.email_enabled?
+  def email_feature_enabled?      = SiteFeature.email_feature_enabled?
   def newsletters_enabled?        = SiteFeature.newsletters_enabled?
   def postmark_configured?        = SiteFeature.postmark_configured?
   def store_enabled?              = SiteFeature.store_enabled?
@@ -138,6 +158,8 @@ module ApplicationHelper
   def stripe_configured?          = SiteFeature.stripe_configured?
   def snipcart_configured?        = SiteFeature.snipcart_configured?
   def podcast_enabled?            = SiteFeature.podcast_enabled?
+  def custom_feeds_enabled?       = SiteFeature.custom_feeds_enabled?
+  def music_enabled?              = SiteFeature.music_enabled?
   def payments_feature_enabled?    = SiteFeature.payments_feature_enabled?
   def newsletters_feature_enabled? = SiteFeature.newsletters_feature_enabled?
   def any_integration_unconfigured? = SiteFeature.any_integration_unconfigured?

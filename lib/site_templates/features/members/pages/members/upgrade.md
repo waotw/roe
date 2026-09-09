@@ -2,6 +2,7 @@
 title: Upgrade
 url_name: upgrade
 status: published
+page_type: upgrade
 audience: everyone
 ---
 
@@ -24,6 +25,6 @@ member-button-text: Upgrade Now
 non-member-button-text: Sign up as paid member
 ```
 
-Secure payment powered by Stripe. You'll receive your login password after payment.
+Secure payment powered by Stripe.
 
 [^1]: As long as this site is around (and perhaps even longer).

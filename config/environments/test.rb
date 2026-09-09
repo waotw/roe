@@ -22,6 +22,13 @@ Rails.application.configure do
   config.consider_all_requests_local = true
   config.cache_store = :null_store
 
+  # Point the Solid Queue models at the queue database, as development and
+  # production already do. Jobs still run through the :test adapter and nothing
+  # is enqueued here — this is so tests that inspect the queue (DeployWatchdog
+  # asks whether a deploy job is still alive) read the tables that exist rather
+  # than looking for them in the primary database.
+  config.solid_queue.connects_to = { database: { writing: :queue, reading: :queue } }
+
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable
 

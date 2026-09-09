@@ -89,10 +89,10 @@
         in Admin → Settings → Custom Code. %>
     <%= CustomCodeRenderer.render_field("head_html", nonce: safe_csp_nonce) %>
   </head>
-  <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}" ].compact.join(" ") %>
+  <% body_classes = [ ("has-sidebar" if show_sidebar?), "sidebar-#{sidebar_position}", ("sidebar-mobile-#{sidebar_mobile}" if show_sidebar?), ("sidebar-mobile-style-#{sidebar_mobile_style}" if show_sidebar? && sidebar_mobile_style) ].compact.join(" ") %>
   <body class="<%= body_classes %>">
     <header class="site-nav <%= logo_classes %>">
-      <%= render_layout_file('navigation', current_page: @post || @page || @doc) %>
+      <%= render_layout_file('header', current_page: @post || @page || @doc) %>
     </header>
     <%# Live preview receiver: content editors set @preview_mode/@preview_id;
         the theme editor opens the site with ?preview_theme=<name> and drives
@@ -126,34 +126,73 @@
     <footer class="site-footer">
       <%= render_layout_file('footer') %>
     </footer>
-    <%# Checkout glue script — loads in both dynamic and static so
-        Snipcart can pick up cart events on static product pages. %>
-    <script src="/theme/checkout.js" nonce="<%= safe_csp_nonce %>"></script>
+    <%# Site-facing vanilla JS, served from /javascript — the site copies in
+        site/javascript/ win, falling back to the shipped app/site_js/. All
+        load in both dynamic and static (the importmap/Stimulus stack doesn't
+        export to a static host), and each is overridable per-site. %>
+    <%# Checkout glue so Snipcart picks up cart events on static product pages. %>
+    <script src="/javascript/checkout.js" nonce="<%= safe_csp_nonce %>"></script>
     <%# Gallery enhancements (carousel nav + zoom keyboard). Galleries work
-        without it — zoom is CSS :target, the carousel is CSS scroll-snap.
-        Loads in dynamic + static; overridable via site/theme/gallery.js. %>
-    <script src="/theme/gallery.js" nonce="<%= safe_csp_nonce %>" defer></script>
+        without it — zoom is CSS :target, the carousel is CSS scroll-snap. %>
+    <script src="/javascript/gallery.js" nonce="<%= safe_csp_nonce %>" defer></script>
+    <%# Public site search. %>
+    <script src="/javascript/search.js" nonce="<%= safe_csp_nonce %>" defer></script>
+    <%# Footnote backlinks return you to the mention you followed. Footnotes
+        work without it — a multiply-referenced note renders a return link per
+        mention, and single-reference notes need nothing. %>
+    <script src="/javascript/footnotes.js" nonce="<%= safe_csp_nonce %>" defer></script>
     <%# Cart icon shows in both dynamic and static — Snipcart is entirely
         client-side so it works on static product pages. Member icon only
-        appears in dynamic mode (current_member is forced to nil during
-        static rendering, so this short-circuits naturally). %>
+        appears in dynamic mode: signed in, current_member is forced to nil
+        during static rendering so it short-circuits naturally; signed out,
+        it's excluded explicitly, because a static export has no session and
+        the sign-in page it points at can't work there. %>
+    <%# Signed out, the icon is only worth showing if there's somewhere for it to
+        go — same rule the paywall's sign-in line follows. url_for is nil when
+        the site has no sign-in page, and a header icon onto a 404 is worse
+        than no icon. %>
+    <% member_signin_url = if current_member || Current.static_generation || !always_show_member_icon?
+                            nil
+                          else
+                            MemberPages.url_for("signin")
+                          end %>
+    <% show_member_icon = current_member.present? || member_signin_url.present? %>
     <%# site-wide search is always available, so .site-actions always renders;
         cart/member remain conditional within it. %>
     <div class="site-actions">
       <%= render "shared/site_search", search_scope: site_search_scope %>
-      <% if snipcart_connected? || current_member %>
+      <% if snipcart_connected? || show_member_icon %>
         <% if snipcart_connected? %>
           <%# `snipcart-checkout` is the class Snipcart v3 binds the
               open-cart click handler to — without it the icon is inert.
               `snipcart-link` is kept only as a CSS styling hook
               (themes target it); it carries no behaviour on its own. %>
-          <a href="#" class="site-action snipcart-link snipcart-checkout" title="Cart" aria-label="Cart">
+          <%# Deliberately NOT data-turbo="false". Turbo ignores popstate events
+              whose state it didn't write (History#onPopState checks
+              `event.state.turbo`), so Snipcart's own routing never provokes a
+              visit. Opting the link out instead hands `href="#"` back to the
+              browser, which adds a history entry Snipcart didn't make — and
+              closing the cart then pops into it and re-opens. %>
+          <%# Permanent, and it needs the id for that — Turbo matches permanent
+              elements by id alone. Snipcart writes the item count into the
+              <sup> after it mounts, but the server renders that element empty
+              on every page, so a navigation swapped the populated node for a
+              blank one: cart intact, count gone until the next cart change.
+              Preserving the link keeps Snipcart's own binding pointing at the
+              node the reader is looking at. Safe to freeze — this markup is
+              identical on every page. %>
+          <a href="#" id="snipcart-cart-link" data-turbo-permanent
+             class="site-action snipcart-link snipcart-checkout" title="Cart" aria-label="Cart">
             <%= inline_system_svg("cart-icon.svg") || "Cart" %>
             <sup class="snipcart-items-count"></sup>
           </a>
         <% end %>
+        <%# Same classes either way, so a theme styling .member-link doesn't have
+            to know whether anyone is signed in. %>
         <% if current_member %>
           <%= link_to inline_system_svg("member-icon.svg") || "Account", account_path, class: "site-action member-link", title: "My Account", aria_label: "My Account" %>
+        <% elsif member_signin_url %>
+          <%= link_to inline_system_svg("member-icon.svg") || "Sign In", member_signin_url, class: "site-action member-link", title: "Sign In", aria_label: "Sign In" %>
         <% end %>
       <% end %>
     </div>
@@ -165,13 +204,209 @@
       <% snipcart = SnipcartConfig.current %>
 
       <% if snipcart.current_snippet.present? %>
+        <%# Snipcart's own container, rendered here rather than left to its
+            loader to append.
+
+            Snipcart appends this div to <body> itself, and Turbo Drive replaces
+            <body> on every navigation — so the cart's container was destroyed
+            on the first click through the site. Snipcart notices and says so:
+            "The #snipcart div was removed from the document."
+
+            Its loader does `document.querySelector("#snipcart")` and only
+            creates one when absent, so it adopts this element rather than
+            appending a second one.
+
+            The attribute here is a starting value, not a guarantee — Snipcart
+            does not preserve it on mount. See the re-marking script below. %>
+        <div id="snipcart" hidden data-turbo-permanent></div>
+
         <%= snipcart.current_snippet_html %>
 
-        <script nonce="<%= safe_csp_nonce %>">
+        <%# data-turbo-eval="false" on this and the scripts below: Turbo
+            re-executes body scripts on every visit, and these register
+            listeners and observers. Without it each navigation added another
+            set — the diagnostics caught it, logging every line twice from two
+            script instances. The JS context survives visits, so running once
+            per full load is both sufficient and correct. Same reasoning that
+            marks Snipcart's own loader (see SnipcartConfig::TURBO_EVAL_OFF). %>
+        <script nonce="<%= safe_csp_nonce %>" data-turbo-eval="false">
           // Override currency after snippet loads but before Snipcart initializes
           if (window.SnipcartSettings) {
             window.SnipcartSettings.currency = '<%= snipcart.currency.downcase %>';
           }
+        </script>
+
+        <script nonce="<%= safe_csp_nonce %>" data-turbo-eval="false">
+          // Keep #snipcart marked permanent, whatever Snipcart does to it.
+          //
+          // Turbo only preserves an element across a body swap when it can find
+          // `#snipcart[data-turbo-permanent]` in BOTH documents — see
+          // getPermanentElementMapForSnapshot, which drops any element the
+          // incoming page can't match. Snipcart doesn't keep our attribute when
+          // it mounts, so the outgoing page offers no permanent element at all,
+          // the map comes back empty, and the mounted container is destroyed
+          // with the body: "The #snipcart div was removed from the document."
+          // The fresh div from the incoming page then looks correct in devtools
+          // while Snipcart still points at the destroyed one, so the cart stays
+          // dead until a full reload.
+          //
+          // Re-assert the attribute on whatever element is actually there.
+          //
+          // Two paths, because Snipcart could strip the attribute or swap the
+          // node and each is invisible to the other's watcher: childList sees a
+          // replacement, the attribute filter sees a strip. turbo:before-render
+          // then backstops both — it fires before Turbo reads permanentElements,
+          // so even a mutation neither observer caught is repaired in time.
+          //
+          // Re-marking can't loop: setAttribute only runs when the attribute is
+          // missing, and the resulting mutation finds it present.
+          (function () {
+            function markPermanent() {
+              var el = document.getElementById("snipcart");
+              if (el && !el.hasAttribute("data-turbo-permanent")) {
+                el.setAttribute("data-turbo-permanent", "");
+              }
+            }
+
+            markPermanent();
+            document.addEventListener("turbo:before-render", markPermanent);
+
+            new MutationObserver(markPermanent).observe(document.body, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              attributeFilter: ["data-turbo-permanent"]
+            });
+          })();
+        </script>
+
+        <%# ── TEMPORARY: Snipcart/Turbo diagnostics ──────────────────────
+            Delete this whole script block when the cart behaviour is settled.
+            It logs nothing until switched on:
+
+              localStorage.roeSnipcartDebug = "1"   (or add ?snipcart-debug)
+              delete localStorage.roeSnipcartDebug  to stop
+
+            What to read: whether #snipcart keeps the SAME node id across a
+            navigation (preserved) while .snipcart-items-count gets a NEW one
+            (swapped in empty with the body) — that pairing would explain a
+            working cart with a blank count. %>
+        <script nonce="<%= safe_csp_nonce %>" data-turbo-eval="false">
+          (function () {
+            var on = false;
+            try {
+              if (/[?&]snipcart-debug\b/.test(location.search)) {
+                localStorage.setItem("roeSnipcartDebug", "1");
+              }
+              on = localStorage.getItem("roeSnipcartDebug") === "1";
+            } catch (e) {}
+            if (!on) return;
+
+            // Stamp each node so a preserved element and a freshly rendered one
+            // are distinguishable — identical markup otherwise looks the same.
+            var seq = 0;
+            function tag(el) {
+              if (!el) return "MISSING";
+              if (!el.__roeSeq) el.__roeSeq = ++seq;
+              return "node#" + el.__roeSeq;
+            }
+
+            function cartCount() {
+              try { return Snipcart.store.getState().cart.items.count; }
+              catch (e) { return "unavailable"; }
+            }
+
+            function snap(label, extra) {
+              var container = document.getElementById("snipcart");
+              var counter = document.querySelector(".snipcart-items-count");
+              var row = {
+                container: tag(container),
+                permanent: container ? container.hasAttribute("data-turbo-permanent") : null,
+                counter: tag(counter),
+                counterText: counter ? JSON.stringify(counter.textContent) : null,
+                snipcart: typeof Snipcart,
+                cartCount: cartCount()
+              };
+              for (var k in (extra || {})) row[k] = extra[k];
+              console.log("[roe/snipcart] " + label, row);
+            }
+
+            snap("initial script run");
+
+            ["turbo:visit", "turbo:before-cache", "turbo:before-render",
+             "turbo:render", "turbo:load"].forEach(function (name) {
+              document.addEventListener(name, function (event) {
+                var extra = {};
+                var incoming = event.detail && event.detail.newBody;
+                if (incoming) {
+                  var el = incoming.querySelector("#snipcart");
+                  var c  = incoming.querySelector(".snipcart-items-count");
+                  extra.incomingContainer = el ? "present" : "MISSING";
+                  extra.incomingPermanent = el ? el.hasAttribute("data-turbo-permanent") : null;
+                  extra.incomingCounterText = c ? JSON.stringify(c.textContent) : "MISSING";
+                }
+                snap(name, extra);
+              });
+            });
+
+            document.addEventListener("snipcart.ready", function () { snap("snipcart.ready"); });
+
+            // Call roeSnipcartSnap("after closing cart") by hand at any moment
+            // the events above don't cover.
+            window.roeSnipcartSnap = snap;
+          })();
+        </script>
+        <%# ── end TEMPORARY diagnostics ─────────────────────────────────── %>
+
+        <script nonce="<%= safe_csp_nonce %>" data-turbo-eval="false">
+          // Let Snipcart own the browser history while its cart is open.
+          //
+          // Snipcart runs Vue Router on the History API. Opening the cart pushes
+          // an entry of its own; closing it calls history.back(), which pops onto
+          // the entry Turbo wrote for this page. Turbo sees its own state there
+          // (History#onPopState checks event.state.turbo) and answers with a
+          // restoration visit — restoring a snapshot taken before Snipcart
+          // mounted. The body is replaced, #snipcart goes with it ("The #snipcart
+          // div was removed from the document"), Snipcart re-initialises and the
+          // cart re-opens with its close button bound to detached nodes.
+          //
+          // Independent of the permanence problem above: even with the element
+          // preserved, a restoration visit re-renders the body around it.
+          //
+          // So detach Turbo's popstate listener for exactly as long as the cart
+          // is open. Everything else about Turbo stays on. The open state is read
+          // from the classes Snipcart puts on <html>, which the theme already
+          // uses to hide .site-actions behind the cart pane.
+          (function () {
+            var root = document.documentElement;
+            var OPEN = ["snipcart-cart--opened", "snipcart-sidecart--opened"];
+            var stopped = false;
+
+            function cartOpen() {
+              return OPEN.some(function (name) { return root.classList.contains(name); });
+            }
+
+            function sync() {
+              var history = window.Turbo && Turbo.session && Turbo.session.history;
+              // Turbo absent or restructured: leave history alone rather than throw.
+              if (!history || typeof history.stop !== "function") return;
+
+              if (cartOpen()) {
+                if (!stopped) { history.stop(); stopped = true; }
+              } else if (stopped) {
+                // On the next tick, so the popstate that closed the cart is done
+                // being handled before Turbo starts listening again. Re-attaching
+                // inside this callback would hand Turbo the very event we're
+                // shielding it from.
+                setTimeout(function () { history.start(); stopped = false; }, 0);
+              }
+            }
+
+            new MutationObserver(sync).observe(root, {
+              attributes: true,
+              attributeFilter: ["class"]
+            });
+          })();
         </script>
       <% end %>
     <% end %>

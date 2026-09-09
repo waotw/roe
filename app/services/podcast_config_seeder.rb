@@ -30,10 +30,14 @@ class PodcastConfigSeeder
     title.to_s.sub(/\s*\([^)]*\)\s*\z/, "").strip.parameterize
   end
 
-  def initialize(podcast_key, channel_data, mode: :create)
+  def initialize(podcast_key, channel_data, mode: :create, subscribe_links: {})
     @podcast_key = podcast_key.to_s
     @channel = (channel_data || {}).transform_keys(&:to_s)
     @mode = mode
+    # Extra subscribe-app URLs to fold into the entry (e.g. Apple + Overcast
+    # derived from an Apple Podcasts seed source). Kept out of build_entry's
+    # canonical set since they're not iTunes-spec feed fields.
+    @subscribe_links = (subscribe_links || {}).transform_keys(&:to_s)
   end
 
   def seed!
@@ -46,7 +50,11 @@ class PodcastConfigSeeder
 
     artwork_filename = download_artwork
 
-    config[@podcast_key] = build_entry(artwork_filename)
+    # Merge onto any existing entry so subscribe links and other non-canonical
+    # fields the user set aren't wiped on re-seed. Feed-derived canonical
+    # fields and any derived subscribe links take precedence.
+    existing = (config[@podcast_key] || {}).transform_keys(&:to_s)
+    config[@podcast_key] = existing.merge(build_entry(artwork_filename))
 
     write_config(config)
     SiteConfig.reload!("features/podcast") rescue nil  # safe no-op if cache hasn't been touched yet
@@ -102,9 +110,12 @@ class PodcastConfigSeeder
       "link"        => @channel["link"].to_s
     }
 
-    PodcastConfig::CANONICAL_FIELDS.each_with_object({}) do |field, entry|
-      entry[field] = extracted.fetch(field, PodcastConfig::FIELD_DEFAULTS.fetch(field, ""))
+    entry = PodcastConfig::CANONICAL_FIELDS.each_with_object({}) do |field, e|
+      e[field] = extracted.fetch(field, PodcastConfig::FIELD_DEFAULTS.fetch(field, ""))
     end
+    # Fold in any derived subscribe links (Apple / Overcast from an Apple source).
+    @subscribe_links.each { |k, v| entry[k] = v if v.present? }
+    entry
   end
 
   # Public entry points for callers that need the seeder's behaviour

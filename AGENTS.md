@@ -2,11 +2,11 @@
 
 ## Overview
 
-Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store. Content (posts, pages, documentation, products) is authored as Markdown files in `site/` and synced to SQLite via `ContentSync`. The app can also generate a fully static version of the public site. Ruby 3.2.2.
+Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store. Content (posts, pages, documentation, products) is authored as Markdown files in `site/` and synced to SQLite via `ContentSync`. The app can also generate a fully static version of the public site. Ruby 4.0.5.
 
 **Architecture**: Roe uses a **versioned directory structure** that supports seamless updates without touching user content. The Rails application lives in `current/`, while user content remains in `site/` at the root level.
 
-**Repository**: Primary development happens at [Codeberg](https://codeberg.org/waotw/roe) (migrated from Sourcehut).
+**Repository**: Primary development happens at [Codeberg](https://github.com/waotw/roe) (migrated from Sourcehut, then Codeberg — both bar AI-assisted projects).
 
 Primary integrations: **Stripe** (payments / paid memberships), **Postmark** (transactional + broadcast email, with a fallback to ActionMailer when unconfigured), and a multi-phase **Substack importer**.
 

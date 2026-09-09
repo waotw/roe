@@ -262,6 +262,81 @@ The system:
 
 **Supported fences:** `` ``` `` (3+) and `` ``` `` (4+ backticks)
 
+Two things about the restore step in `HasMarkdownExtensions#to_html` that look
+like fussiness and aren't:
+
+- **The wrapping paragraph is replaced along with the token.** Kramdown wraps a
+  bare placeholder in `<p>`, and `<pre>` can't legally sit inside `<p>` — so
+  replacing only the token yields `<p><pre>…</pre></p>`, which the next Nokogiri
+  pass rewrites to `<p></p><pre>…</pre>`. That left a stray empty paragraph
+  before every code block on the site. A second pass over the bare token still
+  runs afterwards, because Kramdown doesn't wrap every placement (a fence inside
+  a list item, for example) and those must still restore.
+- **`gsub` is used in its block form.** With a string replacement, Ruby reads
+  `\0`, `\1` and `\\` in the *replacement* as backreferences. The pattern has no
+  capture groups, so a code block containing `\1` had it silently deleted —
+  which bit regex examples, `sed` one-liners, and Windows paths.
+
+---
+
+## Footnotes
+
+Standard Kramdown footnotes (`[^name]` / `[^name]:`). The older `(*…*)` inline
+syntax is retired; `HasInlineFootnotes` is a no-op kept so existing `include`
+statements don't need changing. `(*caption*)` after an image is a separate
+feature — see [Gallery with Captions](#gallery-with-captions).
+
+Roe renders with `footnote_backlink: ""` and `footnote_backlinks_inline: true`,
+then `add_footnote_backlinks` prepends a numbered backlink to each note.
+
+### Known quirks
+
+**Numbers follow the first *reference*, not the definition order.** Definitions
+can sit anywhere in the file — Kramdown collects them and renders the list at
+the end regardless.
+
+**Kramdown puts the reference id on the `<sup>`, not the `<a>`:**
+
+```html
+<sup id="fnref:name"><a href="#fn:name" class="footnote">1</a></sup>
+```
+
+Anything walking from a reference back to its anchor has to read the parent.
+This is not obvious from the rendered page and has cost debugging time more than
+once — both `add_footnote_backlinks` and `site_js/footnotes.js` handle it, with
+the anchor as a fallback.
+
+**Backlink numbering counts only the footnote list's own items.** The selector is
+`.footnotes > ol > li`, not `.footnotes ol > li`. The latter also matches the
+items of an ordered list *inside* a footnote — those are direct children of *an*
+`ol` that descends from `.footnotes` — so a note containing a numbered list was
+counted as several notes and everything after it drifted. `<ul>` never triggered
+it, which is why an earlier partial fix looked complete.
+
+**A note referenced more than once gets a return link per mention.** The leading
+number can only point at one of them, so on its own it always returns you to the
+first. Kramdown ids repeat references `fnref:name`, `fnref:name:1`, … and each
+gets a `.footnote-return` link. These are plain anchors and work with no
+JavaScript. `site_js/footnotes.js` then enhances it: clicking a reference
+repoints that note's leading number at the mention you came from. Single-reference
+notes are untouched — no extra markup at all.
+
+**Notes ending in a block carry an empty `<p>`.** With
+`footnote_backlinks_inline`, Kramdown appends the backlink to the note's last
+paragraph; when the note ends in a quote, list, code block, table, or image it
+adds a paragraph to hold it, and since `footnote_backlink` is `""` that
+paragraph arrives empty.
+
+This is *not* the code-block placeholder issue above — different cause, same
+symptom. It's left alone deliberately: the themes hide it with
+`.content p:empty { display: none }`, and removing it would shift spacing on
+every block-ending footnote in every existing post. Return links fill the slot
+when a note has them, which is why `.footnote-returns` is inserted into that
+paragraph rather than appended to the `<li>`.
+
+`site/posts/footnote-test.md` exercises all of the above if you need a page to
+look at.
+
 ---
 
 ## Extension Order Matters

@@ -12,56 +12,67 @@
     end
   end
 
-  # Flatten nested structures for easier form handling
+  # Flatten nested structures so a field named "docs.roe" can look up its
+  # current value, matching the dotted names the schema uses.
+  #
+  # This used to name each nestable key explicitly — fonts, theme,
+  # grouped_products, snipcart, search — and anything absent from that list
+  # fell through to the else branch and stayed a Hash. So a new nested setting
+  # rendered with no value: the select fell back to its "Select..." placeholder
+  # every time, including straight after a successful save, which reads exactly
+  # like the save being ignored. `docs.roe` was the one that hit it.
+  #
+  # formToYaml() below already splits dotted names generically when writing, so
+  # the allowlist meant reading and writing disagreed about which settings could
+  # nest. Doing the same thing generically here keeps them in step and means the
+  # next nested setting needs no change at all.
+  #
+  # Two levels covers everything in use (fonts.heading.family is the deepest).
+  # The unflattened key is kept alongside so anything reading a whole hash is
+  # unaffected.
   flattened_config = {}
 
   config_hash.each do |key, value|
-    if key == 'fonts' && value.is_a?(Hash)
-      # Fonts are 2 levels: fonts.heading.family
-      value.each do |role, role_data|
-        next unless role_data.is_a?(Hash)
-        role_data.each do |variant, variant_value|
-          flattened_config["fonts.#{role}.#{variant}"] = variant_value
-        end
+    flattened_config[key] = value
+    next unless value.is_a?(Hash)
+
+    value.each do |sub_key, sub_value|
+      if sub_value.is_a?(Hash)
+        sub_value.each { |leaf, leaf_value| flattened_config["#{key}.#{sub_key}.#{leaf}"] = leaf_value }
+      else
+        flattened_config["#{key}.#{sub_key}"] = sub_value
       end
-    elsif key == 'theme' && value.is_a?(Hash)
-      # Theme is 1 level: theme.active
-      value.each do |field, field_value|
-        flattened_config["theme.#{field}"] = field_value
-      end
-    elsif key == 'grouped_products' && value.is_a?(Hash)
-      # Grouped products is 1 level: grouped_products.button_text
-      value.each do |field, field_value|
-        flattened_config["grouped_products.#{field}"] = field_value
-      end
-    elsif key == 'snipcart' && value.is_a?(Hash)
-      # Snipcart settings are 1 level: snipcart.load_strategy
-      value.each do |field, field_value|
-        flattened_config["snipcart.#{field}"] = field_value
-      end
-    elsif key == 'search' && value.is_a?(Hash)
-      # Search is 1 level: search.all_pages, search.roe_docs, ...
-      value.each do |field, field_value|
-        flattened_config["search.#{field}"] = field_value
-      end
-    else
-      flattened_config[key] = value
     end
   end
 %>
 
-<div id="config-container" class="mb-5 bg-white p-8 border border-gray-200" data-controller="config-focus">
+<div id="config-container" class="mb-5 bg-white p-8 border border-gray-200"
+     data-controller="config-focus<%= ' podcast-entries' if @config_type == 'podcast' %>"
+     <% if @config_type == 'podcast' %>data-podcast-entries-add-path-value="<%= add_podcast_admin_configs_path %>"<% end %>>
   <div class="flex items-center justify-between mb-6">
-    <!--<h2 class="text-lg font-semibold text-gray-900">Configuration</h2>-->
-    <h2 class="text-xl font-semibold text-gray-900">
-      <% if @config_type == 'members' %>
-        Payments, newsletter & paid content
-      <% elsif @config_type == 'podcast' %>
-        Podcasts
-      <% else %>
-        <%= @config_type.capitalize %>
+    <div class="flex items-center gap-3">
+      <!--<h2 class="text-lg font-semibold text-gray-900">Configuration</h2>-->
+      <h2 class="text-xl font-semibold text-gray-900">
+        <% if @config_type == 'members' %>
+          Payments, newsletter & paid content
+        <% elsif @config_type == 'podcast' %>
+          Podcasts
+        <% else %>
+          <%= @config_type.capitalize %>
+        <% end %>
+      </h2>
+      <%# Add a fresh blank podcast entry to podcast.yml (podcast config only). %>
+      <%# Client-side — appends a blank show to the form. Nothing is written
+          until Save, so adding one no longer discards unsaved edits. %>
+      <% if @config_type == 'podcast' %>
+        <button type="button"
+                data-action="podcast-entries#add"
+                class="uppercase text-xs px-1.5 py-0 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem] cursor-pointer">
+          ADD NEW
+        </button>
+        <span class="text-xs text-gray-500">Saved when you click Save.</span>
       <% end %>
-    </h2>
+    </div>
     <button type="button"
             onclick="toggleConfigView()"
             class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none pt-[0.1rem]"
@@ -197,6 +208,30 @@
                           class: "uppercase text-sm font-normal px-1.5 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs leading-none" %>
                   </div>
                 </div>
+
+              <% elsif @config_type == 'security' %>
+                <% [ :rate_limiting, :ai_crawlers, :limits ].each do |section| %>
+                  <div class="config-section mb-10">
+                    <h3 class="text-base font-semibold text-gray-900 mb-1"><%= config_schema[section][:label] %></h3>
+                    <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                      <%# A site with no security.yml yet is still rate limited —
+                          RateLimits falls back to its defaults. Show those, so
+                          the form reports what's running rather than blanks. %>
+                      <% config_schema[section][:fields].each do |field_name, field_config| %>
+                        <%= render 'shared/config_field',
+                                 field_name: field_name,
+                                 field_config: field_config,
+                                 value: security_field_value(flattened_config, field_name),
+                                 all_values: flattened_config %>
+                      <% end %>
+                      <% if section == :ai_crawlers %>
+                        <p class="text-xs text-gray-500">
+                          Preview it at <%= link_to "/robots.txt", "/robots.txt", target: "_blank", rel: "noopener", class: "underline" %>.
+                        </p>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
 
               <% elsif @config_type == 'content' %>
                 <!-- Content Section -->
@@ -557,13 +592,30 @@
                   <% end %>
 
                   <div class="space-y-6">
+                    <%# Podcast configs get a tabbed layout (one tab per show).
+                        The tabs controller remembers the last-opened tab in
+                        localStorage, and ?tab=<key> — set by "Add new" — opens
+                        that tab straight away. Podcast-only; every other config
+                        type renders the flat list exactly as before. %>
+                    <% if @config_type == 'podcast' %>
+                      <div data-controller="tabs" data-tabs-remember-value="true" data-tabs-storage-key-value="podcast-config">
+                        <nav class="flex flex-wrap gap-1 border-b border-gray-200 mb-6">
+                          <% nav_idx = 0 %>
+                          <% defaults.each do |nav_key, nav_value| %>
+                            <% next unless nav_value.is_a?(Hash) %>
+                            <% nav_idx += 1 %>
+                            <% nav_title = nav_value['title'].to_s.strip.presence || ("Podcast %02d" % nav_idx) %>
+                            <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="<%= nav_key %>"
+                                    class="py-2 px-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap cursor-pointer"><%= nav_title %></button>
+                          <% end %>
+                        </nav>
+                    <% end %>
                     <% podcast_index = 0 %>
                     <% defaults.each do |key, value| %>
                       <% if value.is_a?(Hash) %>
                         <% if @config_type == 'podcast' %>
                           <% podcast_index += 1 %>
-                          <% podcast_title = value['title'].to_s.strip.presence || ("Podcast %02d" % podcast_index) %>
-                          <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200"><%= podcast_title %></h3>
+                          <div data-tabs-target="panel" data-tabs-panel="<%= key %>" class="hidden">
                         <% end %>
                         <!-- Nested section (like post-link, aside, pullquote) -->
                         <div class="config-subsection pl-4 border-l-2 border-gray-300">
@@ -592,11 +644,19 @@
                           <% end %>
 
                           <div class="space-y-3">
+                            <% subscribe_heading_shown = false %>
                             <% value.each do |subkey, subvalue| %>
                               <%
                                 # Skip subcategory fields - they're dynamically managed
                                 next if subkey == 'subcategory' || subkey == 'subcategory_secondary'
                               %>
+
+                              <%# The subscribe fields are ordered last (display toggle
+                                  first) by edit_podcast; draw one heading over them. %>
+                              <% if @config_type == 'podcast' && !subscribe_heading_shown && defined?(PodcastConfig) && PodcastConfig::SUBSCRIBE_FIELDS.include?(subkey) %>
+                                <% subscribe_heading_shown = true %>
+                                <h4 class="text-sm font-semibold text-gray-800 mt-6 mb-3 pt-4 border-t border-gray-200">Subscribe Links</h4>
+                              <% end %>
 
                               <% nested_field_key = "#{key}.#{subkey}" %>
                               <% help_key = @field_help&.key?(nested_field_key) ? nested_field_key : (@field_help&.key?(subkey) ? subkey : nil) %>
@@ -618,7 +678,21 @@
                                 %>
 
                                 <% field_options_key = @field_options&.key?(nested_field_key) ? nested_field_key : subkey %>
-                                <% if @field_options&.key?(field_options_key) %>
+                                <%# An on/off setting that reads as on/off. Everything else here is a
+                                    two-option select, which is fine for a genuine choice (memberships
+                                    vs donations) but makes a plain yes/no look like a decision. A
+                                    checkbox writes true/false through formToYaml's existing checkbox
+                                    branch, so the YAML is identical either way. %>
+                                <% if @field_checkboxes&.include?(nested_field_key) %>
+                                  <%# No caption beside it — the field's own label is already
+                                      rendered above, the same as every other control here. %>
+                                  <input type="checkbox"
+                                         name="config_fields[<%= key %>][<%= subkey %>]"
+                                         value="true"
+                                         class="w-4 h-4"
+                                         data-config-field="<%= nested_field_key %>"
+                                         <%= 'checked' if subvalue.to_s == 'true' %>>
+                                <% elsif @field_options&.key?(field_options_key) %>
                                   <!-- Select dropdown (no extra wrapper/label) -->
                                   <select name="config_fields[<%= key %>][<%= subkey %>]"
                                           class="w-full font-mono text-sm p-2 border border-gray-300 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat"
@@ -681,12 +755,13 @@
                                 <% end %>
                                 <!-- Add hint text here ↓ -->
                                 <% if @field_hints&.key?(nested_field_key) %>
-                                  <p class="text-xs text-gray-500 mt-1"><%= @field_hints[nested_field_key] %></p>
+                                  <p class="text-xs text-gray-500 mt-1"><%= config_hint(@field_hints[nested_field_key]) %></p>
                                 <% end %>
                               </div>
                             <% end %>
                           </div>
                         </div>
+                        <% if @config_type == 'podcast' %></div><% end %>
 
                       <% else %>
                         <!-- Top-level field -->
@@ -727,31 +802,17 @@
                         </div>
                       <% end %>
                     <% end %>
+                    <% if @config_type == 'podcast' %></div><% end %>
                   </div>
                 </div>
               <% end %>
 
-              <!-- Templates Section -->
-              <% if templates.any? %>
-                <div>
-                  <h3 class="text-base font-semibold text-gray-800 mb-2 pb-2 border-b border-gray-200">Button Templates</h3>
-                  <p class="text-xs text-amber-600 mt-0 mb-2"><code class="font-mono bg-blue-200 text-gray-800 rounded-xs py-1 px-2">__PLACEHOLDER__</code> will be selected when you use the button in a Post/Page.</p>
-
-                  <div class="space-y-4">
-                    <% templates.each do |key, value| %>
-                      <div class="config-field-row">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                          <%= key.humanize %>
-                        </label>
-                        <textarea name="config_fields[<%= key %>]"
-                                  rows="<%= value.lines.count + 2 %>"
-                                  class="w-full font-mono text-sm p-2 border border-gray-300 bg-gray-50"
-                                  data-config-field="<%= key %>"><%= value %></textarea>
-                      </div>
-                    <% end %>
-                  </div>
-                </div>
-              <% end %>
+              <%# Retired settings (the old button templates) are excluded from
+                  `defaults` above so they don't render as editable fields. The
+                  notice explaining them is rendered by edit.html.erb, outside
+                  this form — its Cleanup button is a button_to, and a form
+                  nested inside another form is invalid HTML that the browser
+                  silently drops. %>
 
             </div>
           <% end %>

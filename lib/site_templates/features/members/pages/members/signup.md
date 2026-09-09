@@ -2,6 +2,7 @@
 title: Sign Up
 url_name: sign-up
 status: published
+page_type: signup
 audience: everyone
 ---
 

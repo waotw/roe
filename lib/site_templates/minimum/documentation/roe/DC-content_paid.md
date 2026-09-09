@@ -18,11 +18,11 @@ template: links
 
 In order to add Paid Content, you'll need to enable `MEMBERS` and turn on `Payments` in the Members settings. You can enable here: [Admin → Settings](/admin/configs), click `ENABLE MEMBERS`, then enable `Payments` for `Members`.
 
-You can also choose whether or not to show paid content to everyone or just paid members. 
+You can also choose whether or not to show paid content to everyone or just paid members. Public visitors and free members will see previews of the paid content.
 
 ## Creating Paid Content
 
-Once you enable `Payments`, a **Paywall** option appears in the `ACTION ▼` menu of [The Editor](/documentation/the-editor) — a quick way to drop in a paywall form.
+Once you enable `Payments`, a **Paywall** option appears in the `ACTION ▼` menu of [The Editor](/documentation/roe/the-editor) — a quick way to drop in a paywall form.
 
 To make a post or page premium/paid-only:
 
@@ -39,7 +39,7 @@ audience: paid
 
 ### 2. Add a Paywall (Optional)
 
-You can control where the paywall appears in your content using a `paid_content` form block:
+You can control where the paywall appears in your content using a `paid_content` form block. The editor helps you write these with the `ACTION ▼` → `P [The Editor](/documentation/roe/the-editor) — a quick way to drop in a paywall form.
 
 ````markdown
 This is the free preview that everyone can read. It gives them a taste of what's inside...
@@ -63,19 +63,59 @@ Everything below this point is only visible to paid members. This is where your 
 
 ### 3. Without a Paywall Form
 
-If you mark a post as `audience: paid` but don't add a paywall form, visitors who try to access it will be redirected to your `/upgrade` page.
+If you mark a post as `audience: paid` but don't add a paywall, visitors who try to access it will be redirected to your `/upgrade` page.
 
-## Smart Upgrade Buttons
+## Media files and paid content
+
+Adding `audience: paid` to a post or page's metadata will protect any media files in the content of that post or page. Direct links to those files are blocked as well.
+
+#### There are a few exceptions:
+
+- Roe allows you to give previews of paid content. Any media files in the content above the paywall will be public.
+- Posts and pages can have an `image` in their metadata. These images will always remain public.
+- <mark>A media file that is referenced in both paid and free content stays public.</mark>
+
+#### How to know if media is public or protected
+
+ The [Media browser](/documentation/roe/media#audiences) allows you to filter by `paid` and `free` media so you can verify if something is protected. Check both `paid` and `free` to find files that are in `paid` posts but are still public.
+
+![Roe - Media Browser with Paid and Free filters checked](/media/images/media_paid_free.png)
+
+### Podcasts and music
+
+Paid members are given private feeds for podcasts and music. If a user cancels their account, thier private links will no longer work. See [Podcast feeds](/documentation/roe/podcast-feed-tags#feed-urls).
+
+## Paid podcasts and releases
+
+In Roe, you can add `audience: paid` to the podcast or music release globally. This will set all episodes or tracks as paid. However, you can override this for individual episodes or tracks.
+
+An episode that sets `audience: everyone` overrides the global setting for that episode:
+
+```yaml
+---
+title: Episode 1 — Come In
+podcast: my-show
+audience: everyone
+---
+```
+
+### How people subscribe
+
+If a podcast contains at least one free episode, there will be a public feed which contains the free episodes and previews of the paid episodes. Previews appear in the public feed with their title and description but no audio file.
+
+Music releases work the same way — see [Settings → Music](/documentation/roe/settings-music#paid-music).
+
+## Upgrade Buttons
 
 ### Options
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `for` | Yes | Must be `checkout` |
+| `for` | Yes | `checkout` |
 | `member-button-text` | No | For logged-in members |
 | `non-member-button-text` | No | For non-members (shows sign-up link) |
 
-The upgrade page shows different buttons depending on who's viewing it:
+The upgrade form shows different buttons depending on who's viewing it:
 
 ````markdown
 ```form
@@ -90,5 +130,3 @@ non-member-button-text: Sign up as paid member
 - **Signed-in free members** see "Upgrade Now" → goes straight to Stripe
 - **Not signed in** see "Sign up as paid member" → goes to signup page
 - **Paid members** don't see the form (they're already paid)
-
-This creates a better experience - everyone sees the right call-to-action for their situation.

@@ -29,12 +29,27 @@
     <% end %>
   </div>
 
-  <% unless podcast_enabled? %>
+  <% if !podcast_enabled? || !custom_feeds_enabled? || !music_enabled? %>
     <div class="mt-4">
       <h3 class="mb-2 text-xl font-bold text-gray-900">Features</h3>
-      <%= link_to "Enable Podcasts",
-                  new_podcast_setup_admin_configs_path,
-                  class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+      <% feature_btn = "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-800 font-mono rounded-xs" %>
+      <div class="flex gap-2">
+        <% unless podcast_enabled? %>
+          <%= link_to "Enable Podcasts",
+                      new_podcast_setup_admin_configs_path,
+                      class: "#{feature_btn} bg-blue-200 hover:bg-blue-300" %>
+        <% end %>
+        <% unless custom_feeds_enabled? %>
+          <%= link_to "Enable Custom Feeds",
+                      new_feeds_setup_admin_configs_path,
+                      class: "#{feature_btn} bg-teal-200 hover:bg-teal-300" %>
+        <% end %>
+        <% unless music_enabled? %>
+          <%= link_to "Enable Music",
+                      new_music_setup_admin_configs_path,
+                      class: "#{feature_btn} bg-rose-200 hover:bg-rose-300" %>
+        <% end %>
+      </div>
     </div>
   <% end %>
 
@@ -57,17 +72,22 @@
           <tbody class="divide-y border border-gray-200 divide-gray-200 bg-white">
             <% section[:files].each do |file| %>
               <tr>
-                <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 font-mono">
-                  <%= link_to file[:name], file[:edit_path], class: "text-blue-600 hover:text-blue-900 block mb-0.5" %>
-                  <span class="text-xs text-gray-400"><%= file[:description] %></span>
+                <td class="py-2 pl-3 pr-1.5 text-sm font-medium text-gray-900 font-mono">
+                  <div class="flex gap-2 items-center">
+                    <%= link_to file[:name], file[:edit_path], class: "text-blue-600 hover:text-blue-900 block" %>
+                    <span class="text-xs text-gray-400">— <%= file[:description] %></span>
+                  </div>
                 </td>
-                <td class="py-4 pl-3 pr-4 text-right text-sm">
-                  <% if file[:unconfigured] %>
-                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500 mr-2">
-                      unconfigured
-                    </span>
-                  <% end %>
-                  <%= link_to "Edit", file[:edit_path], class: "text-blue-600 hover:text-blue-900" %>
+                <td class="py-2 pl-3 pr-4 text-sm">
+                  <div class="flex items-center justify-end gap-2">
+                    <% if file[:unconfigured] %>
+                      <span class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        unconfigured
+                      </span>
+                    <% end %>
+                    <%= link_to icon_svg("edit", class: "w-[1.3rem] h-[1.3rem]"), file[:edit_path],
+                          class: "inline-flex text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
+                  </div>
                 </td>
               </tr>
             <% end %>

@@ -1,17 +1,17 @@
 fonts:
   heading:
-    family: ""
-    regular: ""
+    family: ''
+    regular: ''
   body:
-    family: ""
-    regular: ""
-    italic: ""
-    bold: ""
-    bold_italic: ""
+    family: ''
+    regular: ''
+    italic: ''
+    bold: ''
+    bold_italic: ''
   mono:
-    family: ""
-    regular: ""
+    family: ''
+    regular: ''
   accent:
-    family: ""
-    regular: ""
+    family: ''
+    regular: ''
 themes: []

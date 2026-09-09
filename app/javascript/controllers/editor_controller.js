@@ -33,7 +33,6 @@ if (!window.EditorState || !window.EditorState.saveElement) {
         `editorState:${window.location.pathname}`,
         JSON.stringify(state),
       );
-
     },
 
     restore(textareaId) {
@@ -113,7 +112,6 @@ export default class extends Controller {
   };
 
   connect() {
-
     // Leave-guard modal state (see handleTurboBeforeVisit).
     this.confirmedLeave = false;
     this.pendingVisitUrl = null;
@@ -223,6 +221,16 @@ export default class extends Controller {
       this.mediaPickerInsertHandler,
     );
 
+    // The gallery builder asks for images; the editor owns the modal, so it
+    // does the opening. The selection comes back as media-picker:insert-gallery,
+    // which the gallery builder listens for itself.
+    this.galleryPickHandler = () =>
+      this.openMediaPickerFor("images", "gallery");
+    this.element.addEventListener(
+      "gallery-builder:pick-images",
+      this.galleryPickHandler,
+    );
+
     // Listen for media picker close events (e.g. Cancel button)
     this.mediaPickerCloseHandler = this.closeMediaPicker.bind(this);
     this.element.addEventListener(
@@ -259,11 +267,14 @@ export default class extends Controller {
       history.scrollRestoration = "manual";
     }
 
-    // Combined Enter key handler for footnotes and lists
+    // Combined Enter key handler for lists, blockquotes, and footnotes
     this.enterHandler = (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         // Try list handling first (more common)
         if (this.handleListEnter(e)) return;
+        // Then blockquotes (must run before footnote continuation so
+        // indented `> ` lines inside footnotes continue as blockquotes)
+        if (this.handleBlockquoteEnter(e)) return;
         // Then try footnote handling
         if (this.handleFootnoteEnter(e)) return;
       }
@@ -425,7 +436,6 @@ export default class extends Controller {
   }
 
   disconnect() {
-
     // Remove global keyboard handler
     document.removeEventListener("keydown", this.globalKeydownHandler);
     document.removeEventListener(
@@ -507,6 +517,13 @@ export default class extends Controller {
       this.element.removeEventListener(
         "media-picker:insert",
         this.mediaPickerInsertHandler,
+      );
+    }
+
+    if (this.galleryPickHandler) {
+      this.element.removeEventListener(
+        "gallery-builder:pick-images",
+        this.galleryPickHandler,
       );
     }
 
@@ -793,8 +810,7 @@ export default class extends Controller {
     const currentlyShowingPublish = publishButton !== null;
     if (currentlyShowingPublish === shouldShowPublish) return; // no change
 
-    const postId =
-      publishButton?.dataset.editorPostId || this.resourceIdValue;
+    const postId = publishButton?.dataset.editorPostId || this.resourceIdValue;
     if (!postId) return;
 
     // Type-generic base path: post -> /admin/posts, page -> /admin/pages, etc.
@@ -977,7 +993,20 @@ export default class extends Controller {
       // Kramdown expects 4 spaces for continuation, not visual alignment
       const indent = "    "; // Always 4 spaces for Kramdown compatibility
 
-      document.execCommand("insertText", false, "\n" + indent);
+      const currentLine = lines[currentLineNumber];
+      // Continue a blockquote inside the footnote. The blockquote handler
+      // catches regular `    > ` continuation lines; this covers the
+      // footnote definition line (`[^N]: > ...`) and acts as a fallback.
+      const isBlockquoteLine =
+        currentLine.match(/^(\s*)>(?:\s|$)/) ||
+        (currentLine === footnoteDefLine &&
+          footnoteDefLine.match(/^\[\^\d+\]:\s*(>)(?:\s|$)/));
+
+      if (isBlockquoteLine) {
+        document.execCommand("insertText", false, "\n" + indent + "> ");
+      } else {
+        document.execCommand("insertText", false, "\n" + indent);
+      }
       return true;
     }
 
@@ -993,8 +1022,8 @@ export default class extends Controller {
     doneButton.type = "button";
     doneButton.id = "footnote-done-button";
     doneButton.className =
-      "fixed bottom-8 right-12 z-50 uppercase text-base px-1.5 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs";
-    doneButton.innerHTML = "✓ Done with Footnote";
+      "fixed bottom-18 left-12 z-50 uppercase text-base px-1.5 py-1 border border-green-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs";
+    doneButton.innerHTML = "Close Footnote";
     doneButton.dataset.returnPosition = returnPosition;
 
     // Click handler to return to original position
@@ -1016,7 +1045,6 @@ export default class extends Controller {
   }
 
   returnFromFootnote(returnPosition) {
-
     let targetPosition = returnPosition;
     const pending = this.pendingFootnote;
 
@@ -1207,6 +1235,58 @@ export default class extends Controller {
     return false; // Not a list
   }
 
+  handleBlockquoteEnter(event) {
+    const cursorPos = this.textareaTarget.selectionStart;
+    const content = this.textareaTarget.value;
+    const beforeCursor = content.substring(0, cursorPos);
+    const afterCursor = content.substring(cursorPos);
+
+    // Get current line
+    const lines = beforeCursor.split("\n");
+    const currentLine = lines[lines.length - 1];
+
+    // Match a blockquote line: optional leading whitespace, >, optional space
+    const blockquoteMatch = currentLine.match(/^(\s*)>\s?(.*)$/);
+    if (!blockquoteMatch) return false;
+
+    // Only handle Enter at end of line
+    const nextChar = afterCursor[0];
+    const atEndOfLine = !nextChar || nextChar === "\n";
+    if (!atEndOfLine) return false;
+
+    const leadingSpace = blockquoteMatch[1];
+    const lineContent = blockquoteMatch[2];
+    const isEmpty = lineContent.trim() === "";
+
+    if (isEmpty) {
+      const previousLine = lines.length > 1 ? lines[lines.length - 2] : null;
+      const previousIsEmptyBlockquote =
+        previousLine && previousLine.match(/^(\s*)>\s*$/);
+
+      if (previousIsEmptyBlockquote) {
+        event.preventDefault();
+        // Exit the blockquote: remove the current empty `>` line AND the
+        // previous empty `>` separator line, then land on a new empty line
+        // preserving any leading indentation (so footnotes keep their indent).
+        const currentLineStart = beforeCursor.length - currentLine.length;
+        const previousLineStart = currentLineStart - previousLine.length - 1;
+        this.textareaTarget.value =
+          content.substring(0, previousLineStart) +
+          "\n" +
+          leadingSpace +
+          afterCursor;
+        this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
+          previousLineStart + 1 + leadingSpace.length;
+        return true;
+      }
+    }
+
+    // Continue the blockquote on a new line
+    event.preventDefault();
+    document.execCommand("insertText", false, "\n" + leadingSpace + "> ");
+    return true;
+  }
+
   outdentLine() {
     const cursorPos = this.textareaTarget.selectionStart;
     const content = this.textareaTarget.value;
@@ -1232,7 +1312,6 @@ export default class extends Controller {
       this.textareaTarget.value = newContent;
       this.textareaTarget.selectionStart = this.textareaTarget.selectionEnd =
         cursorPos - spacesToRemove;
-
     }
   }
 
@@ -1458,7 +1537,6 @@ export default class extends Controller {
   }
 
   insertProductTemplate(product) {
-
     // Get template and currency symbol
     const template = this.productTemplateValue || "";
     const currencySymbol = this.getCurrencySymbol();
@@ -1501,7 +1579,6 @@ export default class extends Controller {
     this.savedCursorBeforeModal = null;
 
     this.closeProductModal();
-
   }
 
   closeProductModal() {
@@ -1558,8 +1635,14 @@ export default class extends Controller {
 
   openMediaPicker(event) {
     event.preventDefault();
-    const mediaType = event.currentTarget.dataset.mediaType || "images";
+    this.openMediaPickerFor(event.currentTarget.dataset.mediaType || "images");
+  }
 
+  // Split out so the gallery builder can open the picker without duplicating
+  // the modal handling or the fetch. `openedFor` travels to the server, which
+  // decides what the toolbar's primary button says and does — one definition of
+  // that label rather than a client-side patch after load.
+  openMediaPickerFor(mediaType, openedFor = null) {
     // Close dropdown
     if (this.hasMediaMenuDropdownTarget) {
       this.mediaMenuDropdownTarget.classList.add("hidden");
@@ -1578,7 +1661,10 @@ export default class extends Controller {
     this.mediaPickerContentTarget.innerHTML =
       '<div class="flex items-center justify-center h-full text-gray-400 font-mono text-sm">Loading...</div>';
 
-    fetch(`/admin/medium/picker?media_type=${mediaType}`, {
+    const params = new URLSearchParams({ media_type: mediaType });
+    if (openedFor) params.set("for", openedFor);
+
+    fetch(`/admin/medium/picker?${params}`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
     })
       .then((r) => r.text())
@@ -1665,6 +1751,17 @@ export default class extends Controller {
 
       this.textareaTarget.focus({ preventScroll: true });
     }
+  }
+
+  // Closes the TOC without toggling it. The markdown check shares the tab strip
+  // and the panel space below it, so opening that one closes this one. Separate
+  // from toggleTOC because a toggle would re-open the TOC on a second click of
+  // the markdown tab, leaving both panels open — the thing the tabs prevent.
+  closeTOC() {
+    if (!this.hasTocPanelTarget) return;
+
+    this.tocPanelTarget.classList.add("hidden");
+    if (this.hasTocArrowTarget) this.tocArrowTarget.textContent = "▶";
   }
 
   updateTOC() {
@@ -1847,6 +1944,18 @@ export default class extends Controller {
     this.previewUpdateTimer = setTimeout(() => this.pushPreviewUpdate(), 800);
   }
 
+  // Push to the preview tab NOW, skipping the typing debounce. For a change the
+  // writer made in one click — Fix All, Undo Fix — there is no typing pause to
+  // wait at the end of, and 800ms of an unchanged preview reads as the click
+  // having done nothing. Clearing the timer first means the `input` event that
+  // accompanied the change doesn't fire a second, redundant render.
+  refreshPreview() {
+    if (!this.previewOpened) return;
+
+    clearTimeout(this.previewUpdateTimer);
+    this.pushPreviewUpdate();
+  }
+
   // Render the current (unsaved) content server-side and hand the resulting
   // <main> HTML to the preview tab over the BroadcastChannel. The receiver swaps
   // it in place, preserving scroll — no reload. Fire-and-forget; failures are
@@ -1885,7 +1994,6 @@ export default class extends Controller {
   // ========== FORM ACTIONS ==========
 
   save(event) {
-
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
 
@@ -1922,7 +2030,6 @@ export default class extends Controller {
     // The preview is kept current by the debounced live updates; the post-save
     // reload re-pushes the saved content (see the data-trigger="refresh" path
     // in connect). No pre-submit broadcast needed here.
-
   }
 
   restoreScrollPosition() {
@@ -2318,7 +2425,6 @@ export default class extends Controller {
   }
 
   wrapSelectionWithSavedPosition(prefix, suffix, placeholder = "") {
-
     // Check if textarea currently has focus and a selection
     const hasFocus = document.activeElement === this.textareaTarget;
     const hasSelection =
@@ -2484,7 +2590,6 @@ export default class extends Controller {
         return;
       }
     }
-
   }
 
   // ========== TEST EMAIL METHODS ==========
@@ -2630,79 +2735,6 @@ export default class extends Controller {
 
     if (this.hasTextareaTarget) {
       this.textareaTarget.focus({ preventScroll: true });
-    }
-  }
-
-  showResendModal(event) {
-    const button = event.currentTarget;
-    const postId = button.dataset.postId;
-    const modalUrl = `/admin/posts/${postId}/resend_modal`;
-
-    let modalContainer = document.getElementById("resend-modal-container");
-    if (!modalContainer) {
-      modalContainer = document.createElement("div");
-      modalContainer.id = "resend-modal-container";
-      document.body.appendChild(modalContainer);
-    }
-
-    fetch(modalUrl)
-      .then((response) => response.text())
-      .then((html) => {
-        modalContainer.innerHTML = html;
-      });
-  }
-
-  toggleAllMembers(event) {
-    const button = event.currentTarget;
-    const additionalMembers = document.getElementById("additional-members");
-
-    if (additionalMembers.classList.contains("hidden")) {
-      additionalMembers.classList.remove("hidden");
-      button.textContent = "Show fewer members";
-    } else {
-      additionalMembers.classList.add("hidden");
-      const memberCount = button.textContent.match(/\d+/)[0];
-      button.textContent = `Show all ${memberCount} members`;
-    }
-  }
-
-  closeResendModal(event) {
-    // Only close on successful submission
-    if (event.detail.success !== false) {
-      const modalContainer = document.getElementById("resend-modal-container");
-      if (modalContainer) {
-        modalContainer.innerHTML = "";
-      }
-
-      // Show "Sending..." state
-      const postId = this.resourceIdValue;
-      const statusDiv = document.getElementById(`newsletter-status-${postId}`);
-      if (statusDiv) {
-        statusDiv.innerHTML = `
-          <hr class="text-gray-300 my-2">
-          <div class="flex items-start gap-2">
-            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18.9844 13.3496" class="w-4 h-4 mt-0.5 flex-shrink-0">
-              <path d="M2.49023 13.3496L16.4062 13.3496C17.793 13.3496 18.623 12.5391 18.623 10.8984L18.623 2.46094C18.623 0.820312 17.7832 0.00976562 16.1328 0.00976562L2.2168 0.00976562C0.820312 0.00976562 0 0.820312 0 2.46094L0 10.8984C0 12.5391 0.830078 13.3496 2.49023 13.3496ZM2.43164 12.0215C1.73828 12.0215 1.33789 11.6406 1.33789 10.8984L1.33789 2.45117C1.73789 1.71875 1.73828 1.33789 2.43164 1.33789L16.1816 1.33789C16.8848 1.33789 17.2852 1.71875 17.2852 2.46094L17.2852 10.9082C17.2852 11.6406 16.8848 12.0215 16.1816 12.0215ZM13.5645 5.13672L15.5078 5.13672C15.8496 5.13672 16.1035 4.88281 16.1035 4.54102L16.1035 3.125C16.1035 2.7832 15.8496 2.5293 15.5078 2.5293L13.5645 2.5293C13.2227 2.5293 12.9688 2.7832 12.9688 3.125L12.9688 4.54102C12.9688 4.88281 13.2227 5.13672 13.5645 5.13672ZM6.36719 7.95898L12.2461 7.95898C12.5488 7.95898 12.7832 7.72461 12.7832 7.42188C12.7832 7.12891 12.5488 6.89453 12.2461 6.89453L6.36719 6.89453C6.07422 6.89453 5.83008 7.12891 5.83008 7.42188C5.83008 7.72461 6.07422 7.95898 6.36719 7.95898ZM6.36719 10.0293L10.791 10.0293C11.0938 10.0293 11.3281 9.78516 11.3281 9.49219C11.3281 9.19922 11.0938 8.95508 10.791 8.95508L6.36719 8.95508C6.07422 8.95508 5.83008 9.19922 5.83008 9.49219C5.83008 9.78516 6.07422 10.0293 6.36719 10.0293Z" fill="currentColor"/>
-            </svg>
-            <div class="flex-1">
-              <div>
-                <strong class="text-blue-600">Sending newsletter...</strong>
-                <span class="ml-2 inline-block">
-                  <svg class="animate-spin h-4 w-4 text-blue-600 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </span>
-              </div>
-            </div>
-          </div>
-        `;
-
-        // After 3 seconds, reload the page to show updated numbers
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      }
     }
   }
 

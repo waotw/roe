@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.9.9
-   Bundled with: Roe v0.2.0
+   Version: 0.1.0
+   Bundled with: Roe v0.3.0
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -336,6 +336,11 @@ p:has(.site-logo) {
 
 /* ================ SITE ACTIONS (cart, member icon) ================= */
 
+html.snipcart-cart--opened .site-actions,
+html.snipcart-sidecart--opened .site-actions {
+  display: none;
+}
+
 .site-actions {
   position: absolute;
   top: var(--space-4);
@@ -400,17 +405,18 @@ p:has(.site-logo) {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
-.collection-header h2 {
-  margin: var(--space-2) 0 var(--space-4) 0;
+.collection-grid .collection-header h2 {
+  margin: 0 0 0 0;
 }
 
 .site-search-trigger {
-  margin: var(--space-3) 0 0 0;
+  margin: 0 0 0 0;
   background: none;
   border: none;
-  padding: var(--space-1);
+  padding: var(--space-0);
   cursor: pointer;
   line-height: 0;
   opacity: 0.4;
@@ -661,7 +667,7 @@ body.sidebar-right {
 @media (min-width: 769px) {
   body.has-sidebar {
     display: grid;
-    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-columns: fit-content(var(--sidebar-width)) 1fr;
     grid-template-areas:
       "nav nav"
       "sidebar main"
@@ -672,7 +678,7 @@ body.sidebar-right {
   }
 
   body.sidebar-right {
-    grid-template-columns: 1fr var(--sidebar-width);
+    grid-template-columns: 1fr fit-content(var(--sidebar-width));
     grid-template-areas:
       "nav nav"
       "main sidebar"
@@ -735,6 +741,81 @@ body.sidebar-right {
 
   .site-sidebar a {
     color: var(--color-link);
+  }
+}
+
+/* Sidebar on narrow screens — frontmatter `mobile:` on the sidebar file.
+   Default (hidden) keeps the base `.site-sidebar { display: none }`. */
+@media (max-width: 768px) {
+  /* top: horizontal, scrollable strip under the header (for a nav sidebar). */
+  body.sidebar-mobile-top {
+    display: flex;
+    flex-direction: column;
+  }
+  body.sidebar-mobile-top .site-nav {
+    order: 1;
+  }
+  body.sidebar-mobile-top .site-sidebar {
+    order: 2;
+    display: block;
+  }
+  body.sidebar-mobile-top main {
+    order: 3;
+  }
+  body.sidebar-mobile-top .site-footer {
+    order: 4;
+  }
+
+  body.sidebar-mobile-top .site-sidebar {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  body.sidebar-mobile-top .site-sidebar .collection-menu {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: var(--space-4);
+    overflow-x: auto;
+    margin: 0;
+  }
+  body.sidebar-mobile-top .site-sidebar .collection-menu-item {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  /* bottom: full-width below the content. The DOM already orders the sidebar
+     after main, so we only need to reveal it. */
+  body.sidebar-mobile-bottom .site-sidebar {
+    display: block;
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-4);
+    margin-top: var(--space-8);
+  }
+
+  /* mobile_style: explicit override of a relocated menu's orientation. Placed
+     after the top rule so it wins at equal specificity — `top` defaults to
+     horizontal, `bottom` to vertical, and this forces either regardless. */
+  body.sidebar-mobile-style-horizontal .site-sidebar .collection-menu {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: var(--space-4);
+    overflow-x: auto;
+    margin: 0;
+  }
+  body.sidebar-mobile-style-horizontal .site-sidebar .collection-menu-item {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  body.sidebar-mobile-style-vertical .site-sidebar .collection-menu {
+    display: block;
+    overflow-x: visible;
+  }
+  body.sidebar-mobile-style-vertical .site-sidebar .collection-menu-item {
+    flex: none;
+    margin: 0 0 var(--space-1);
   }
 }
 
@@ -830,6 +911,7 @@ div.flash mark {
 .content li > ol {
   margin-top: var(--space-2);
   margin-bottom: var(--space-2);
+  padding-left: var(--space-4);
 }
 
 .content li {
@@ -860,7 +942,7 @@ div.flash mark {
   font-size: 0.9em;
   background-color: var(--color-code-bg);
   color: var(--color-code-text);
-  padding: var(--space-1) calc(var(--space-2) * 0.7);
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
   border: 1px solid var(--color-border);
 }
 
@@ -890,7 +972,7 @@ div.flash mark {
 
 .content figure img,
 .content figure picture {
-  /*margin-bottom: var(--space-1);*/
+  margin-bottom: var(--space-2);
 }
 
 .content hr {
@@ -936,18 +1018,60 @@ a.footnote {
 
 .content .footnotes ol,
 .footnotes ol {
-  padding-left: var(--space-0);
+  padding-left: 0;
   list-style: none;
 }
 
 .footnotes ol li {
   position: relative;
-  padding-left: 2em;
+  padding-left: 0rem;
   margin-bottom: var(--space-2);
+}
+
+.footnotes ol li > ul {
+  padding-left: var(--space-3);
+}
+
+.footnotes ol > li {
+  position: relative;
+  padding-left: var(--space-8);
+  line-height: var(--space-6);
 }
 
 .footnotes p {
   margin: 0 0 var(--space-1) 0;
+}
+
+.footnotes table {
+  margin-bottom: var(--space-2);
+}
+
+.footnotes pre {
+  margin-bottom: var(--space-3);
+}
+
+/* Return links for a footnote referenced more than once. The leading number
+   can only point at one mention, so each mention gets its own link here —
+   these work with no JavaScript. Single-reference footnotes render none. */
+.footnotes .footnote-returns {
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-left: var(--space-1);
+}
+
+.footnotes .footnote-return {
+  text-decoration: none;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.footnotes .footnote-return:hover,
+.footnotes .footnote-return:focus {
+  opacity: 1;
+}
+
+.footnotes .footnote-return sup {
+  margin-left: 0.1em;
 }
 
 .footnotes .gallery {
@@ -1221,13 +1345,13 @@ p.collection-more a:hover {
 }
 
 .collection.list .item-subtitle {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-style: italic;
   margin: 0;
 }
 
 .collection.list .item-meta {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   margin: 0;
 }
 
@@ -1421,6 +1545,81 @@ p.collection-more a:hover {
 
 .collection-menu-item {
   margin: 0;
+}
+
+/* ============ COLLECTION PLAYLIST (music / podcast) ============
+   The `playlist` collection renders the track/episode list. Rows carry the data
+   a `player` card reads to build its queue. TUI-flavored: mono, compact, symbol
+   markers. Override or replace freely. (`player` is an alias for `playlist`.) */
+.collection.playlist,
+.collection.player {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.player-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.player-track-meta {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0.15rem 0;
+  cursor: pointer;
+}
+.player-track-number {
+  min-width: 2ch;
+  text-align: right;
+  opacity: 0.5;
+}
+.player-track-title {
+  flex: 1;
+}
+.player-track-duration {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.player-track.is-playing .player-track-title {
+  font-weight: 700;
+}
+.player-track.is-playing .player-track-title::before {
+  margin-right: 0.4rem;
+  content: "\25B8 ";
+}
+.player-track-link {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.5;
+}
+.player-track-link::before {
+  content: "\2197";
+}
+.player-track-link:hover {
+  opacity: 1;
+}
+
+/* Paid tracks in a playlist, and the player's paywall notice.
+   A protected track's audio 403s, which on its own just looks like the player
+   is broken — the lock says why before you press play, and the notice says it
+   again if you do. */
+.player-track.is-paid .player-track-title {
+  opacity: 0.7;
+}
+
+.player-track .paid-lock-icon {
+  margin-left: 0.35em;
+  vertical-align: -0.2em;
+  width: var(--space-4);
+  height: var(--space-4);
+  opacity: 0.6;
+}
+
+.content p.player-paywall {
+  margin: var(--space-2) 0 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
 }
 
 /* Collection Glossary */
@@ -2268,6 +2467,7 @@ figcaption {
   display: none;
 }
 
+.card-aside .aside-image-link,
 .card-aside .aside-image {
   grid-column: 1;
   grid-row: 1;
@@ -2299,13 +2499,12 @@ a.aside-link-inline {
   color: var(--color-text);
 }
 
-.card-aside .aside-wrapper {
+.card-aside.aside-wrapper {
   text-decoration: none;
   color: inherit;
-  display: block;
 }
 
-.card-aside .aside-wrapper:hover {
+.card-aside.aside-wrapper:hover {
   opacity: 0.7;
 }
 
@@ -2326,6 +2525,7 @@ article .content,
   .card-aside {
     grid-template-columns: 1fr;
   }
+  .card-aside .aside-image-link,
   .card-aside .aside-image {
     grid-column: 1;
     grid-row: 1;
@@ -2400,6 +2600,140 @@ article .content,
   .card-aside .aside-text {
     margin: var(--aside-text-top-offset) 0 0 0;
   }
+}
+
+/* Player card (card type: player) — the transport, driven by the audio-player
+   controller. It reads a `playlist` collection on the same page (if any) to
+   build its queue. TUI-flavored: mono, compact, symbol-based transport. Play
+   state is [data-playing] on the button; progress width and handle position are
+   set inline by the controller, so here we only style appearance. */
+.card-player {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+  border: 1px solid var(--color-border);
+  margin-top: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  --player-progress: 0;
+}
+
+/* Artwork (show_artwork) sits left of the now/transport column; drop it and the
+   column reflows full-width. Its left edge lines up with the column's. */
+.player-body {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.player-main {
+  flex: 1;
+  min-width: 0;
+}
+.player-figure {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.player-cover {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+}
+
+.player-now {
+  margin-bottom: var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-now::before {
+  content: "\266A";
+  opacity: 0.6;
+  margin-right: 0.5ch;
+}
+.player-now-link {
+  margin-left: 0.5ch;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.6;
+}
+.player-now-link:hover {
+  opacity: 1;
+}
+
+.player-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.player-toggle {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.player-toggle::before {
+  content: "\25B6";
+}
+.player-toggle[data-playing="true"]::before {
+  content: "\23F8";
+}
+.player-speed {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.player-speed:hover {
+  opacity: 1;
+}
+.player-time {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-progress {
+  position: relative;
+  flex: 1;
+  height: 1em;
+  cursor: pointer;
+}
+.player-progress::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.3;
+  transform: translateY(-50%);
+}
+.player-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+  width: calc(var(--player-progress, 0) * 100%);
+  transform: translateY(-50%);
+}
+.player-progress-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.player-progress-handle::before {
+  content: "\25CF";
+  font-size: 0.8em;
+}
+.card-player .player-video {
+  width: 100%;
 }
 
 /* ============ MEDIA PLAYERS =============== */
@@ -3042,7 +3376,7 @@ p.podcast-audio-fallback {
 /* Subscribe block spacing — used on episode pages and on podcast-connected
    pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
 .podcast-subscribe {
-  margin-top: var(--space-6);
+  margin: var(--space-4) 0;
   font-size: 0.85rem;
 }
 
@@ -3179,7 +3513,7 @@ p.podcast-audio-fallback {
 
 .content.documentation table {
   font-size: var(--text-sm);
-  line-height: 2;
+  line-height: 1.75;
 }
 
 /* =============== UTILITIES ================ */
@@ -3255,6 +3589,7 @@ hr.clear-floats {
 .btn-primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-2);
   background: var(--color-heading);
   color: var(--color-bg);
   border: 1px solid var(--color-heading);
@@ -3487,11 +3822,69 @@ hr.clear-floats {
 
 .checkout-form-wrapper {
   margin-top: var(--space-6);
+  margin-bottom: var(--space-2);
 }
 
 .checkout-form-wrapper.is-guest .member-checkout,
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
+}
+
+/* Private podcast feeds on the member account page. The URL sits in a
+   readonly input so it can be selected and copied on a phone, where a
+   copy button alone isn't always reachable. */
+
+.private-feeds {
+  margin: var(--space-6) 0;
+}
+
+.private-feeds-note {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, currentColor);
+  opacity: 0.8;
+}
+
+.private-feeds-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0 0;
+}
+
+.private-feed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.private-feed-title {
+  flex: 0 0 100%;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.private-feed-url {
+  flex: 1 1 20rem;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+}
+
+.private-feeds-regenerate {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.private-feeds-regenerate-form {
+  display: inline;
 }
 
 /* Alerts */
@@ -3642,9 +4035,47 @@ hr.clear-floats {
   border-bottom: 1px solid var(--color-border);
 }
 
+.paid-content-gate p {
+  margin-bottom: var(--space-2);
+}
+
 .paid-content-gate a {
-  color: var(--color-link);
-  text-decoration: none;
+  /*text-decoration: none;*/
+}
+
+.paid-content-signin {
+  font-size: var(--text-xs);
+}
+
+/* Deleting an account — separated from the account actions, and behind a
+   disclosure, because it can't be undone. */
+
+.account-delete {
+  margin: var(--space-8) 0 var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.account-delete summary {
+  cursor: pointer;
+  color: var(--color-text-muted, currentColor);
+}
+
+.account-delete-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.account-delete-input {
+  font-family: var(--font-mono);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
 }
 
 /* ========== STORE — PRODUCT PAGE ========== */
@@ -3729,6 +4160,13 @@ hr.clear-floats {
 .product ul.product-variant-list .variant-price {
   color: var(--color-muted);
   justify-self: end;
+}
+
+/* Single product button with `show_price: true`. A variant list prints its own
+   prices; this is the one-product case, where the price sits beside the button. */
+.product-price {
+  color: var(--color-muted);
+  margin-right: var(--space-2);
 }
 
 /* The button (last cell) sits at the far right of its 1fr column. */

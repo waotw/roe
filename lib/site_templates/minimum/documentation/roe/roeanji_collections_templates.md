@@ -82,14 +82,16 @@ The `menu` template is a clean list of links — no subtitle, date, or author, j
 order: home, blog, shop, about, contact
 ```
 
+When a `menu` lives in a sidebar, `style` sets its orientation on a full-size screen. On a narrow screen the sidebar can move under the header or below your content, and the links change orientation to fit. See [the sidebar options](/documentation/roe/admin_layouts#the-sidebar-on-narrow-screens) for `mobile` and `mobile_style`.
+
 #### Why give the `collection` a name?
 
 Once a `menu` has a name, you can send content to it. Say you're editing a new Page and want it in your site's navigation:
 
-- add `collection: nav` to the `menu` Collection in your [navigation](/admin/layouts) layout
+- add `collection: nav` to the `menu` Collection in your [header](/admin/layouts) layout
 - add `collection: nav` to the new Page's metadata
 
-The Page now shows up in the navigation on its own. To place it at a specific spot, add its `url_name` to the menu's `order`, as shown above.
+The Page now shows up in the header on its own. To place it at a specific spot, add its `url_name` to the menu's `order`, as shown above.
 
 ### When to use the `grid` template
 
@@ -111,6 +113,26 @@ A `grid` Collection also has its own options:
 - `category` — show only products in this category
 - `groups` — set to `true` to show grouped products as a single card, such as one book sold as ePub, Paperback, and Hardback
 - `aspect_ratio` — the shape of the product images in the grid
+
+### When to use the `playlist` template
+
+<mark>Music only:</mark> the `playlist` template needs the **Music** feature turned on. Until then the option doesn't appear.
+
+A `playlist` lays out a set of tracks as a numbered list with a single player at the top. Clicking a track loads it into that player, so a visitor can work through a release without the page jumping about.
+
+It's built for [music posts](/documentation/roe/posts#music). A release is a collection filtered to it and ordered by track number:
+
+````markdown
+```collection
+source: posts
+post_type: music
+release: the-quiet-hours
+order: track_number
+template: playlist
+```
+````
+
+`order: track_number` is what puts them in running order. Without it you'll get them by date, which is rarely what a release wants.
 
 ### When to use the `glossary` template
 

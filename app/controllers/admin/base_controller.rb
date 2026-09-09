@@ -29,7 +29,8 @@ class Admin::BaseController < ApplicationController
       ConfigGenerator.new.generate_payments_config
     end
 
-    if SiteFeature.newsletters_feature_enabled? && !SiteFeature.newsletters_integration_file?
+    # Email, not newsletters — members can't sign in without it.
+    if SiteFeature.email_feature_enabled? && !SiteFeature.email_integration_file?
       ConfigGenerator.new.generate_newsletters_config
     end
 

@@ -128,16 +128,13 @@
           <div class="flex items-center gap-6">
             <div class="relative inline-flex items-center">
               <%= link_to "Site Sync", admin_site_sync_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900 text-nowrap" %>
-              <% if Rails.env.development? && SiteSync::Exchange.can_call_peer? %>
-                <%
-                  peer_state    = (SiteSync::Exchange.refresh_if_stale rescue nil)
-                  peer_reachable = SiteSync::Exchange.peer_reachable?
-                  local_fp      = (SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil)
-                  peer_fp       = peer_state&.dig(:fingerprint)
-                  sync_in_sync  = peer_fp.present? && local_fp.present? && local_fp == peer_fp
-                %>
-                <% unless sync_in_sync %>
-                  <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="<%= peer_reachable ? 'Local content differs from live' : 'Live site unreachable' %>"></span>
+              <% if Rails.env.development? %>
+                <%# Same conclusion the banner and the Site Sync page use, so the
+                    dot can't contradict them. Reuses the controller-computed one
+                    on the Site Sync page rather than walking the site twice. %>
+                <% conclusion = @sync_conclusion || SiteSync::Conclusion.current %>
+                <% if conclusion.configured && !conclusion.in_sync? && !conclusion.undecided? %>
+                  <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="<%= conclusion.peer_reachable ? 'Local content differs from live' : 'Live site unreachable' %>"></span>
                 <% end %>
               <% end %>
             </div>
@@ -206,6 +203,9 @@
                 <%# icon_svg('tools', class: 'w-4.5 h-4.5 text-gray-500 hover:text-gray-900') %>🛠️
               </button>
               <div data-dropdown-target="menu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
+                <%= link_to "Feed Imports", admin_feed_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+                <%= link_to "File Imports", admin_file_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+                <%= link_to "Media Imports", admin_media_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
                 <%= link_to "Substack Imports", admin_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
                 <%= link_to "Images", admin_dependencies_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
               </div>

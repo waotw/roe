@@ -8,7 +8,7 @@ class ActionBuilderSchemaTest < ActiveSupport::TestCase
   # render_form's per-`for` branches, ProductButtonRenderer). A typo produces a
   # dead option, so guard each kind's set.
   SUPPORTED_KEYS = {
-    "product"      => %w[sku text style quantity],
+    "product"      => %w[sku text style quantity show_price],
     "share"        => %w[label url title text style],
     "subscribe"    => %w[label url style],
     "signup"       => %w[button-text upgrade-button-text],
@@ -16,7 +16,7 @@ class ActionBuilderSchemaTest < ActiveSupport::TestCase
     "checkout"     => %w[member-button-text non-member-button-text],
     "donate"       => %w[button-text],
     "unsubscribe"  => %w[button-text],
-    "paid_content" => %w[text button-text]
+    "paid_content" => %w[text button-text signin-text]
   }.freeze
 
   test "button kinds are feature-gated; share is always available" do
@@ -61,6 +61,19 @@ class ActionBuilderSchemaTest < ActiveSupport::TestCase
     values = all_kinds.map { |k| k[:value] }
     assert_equal values.uniq, values, "kind values must be globally unique (groups are keyed by kind alone)"
     all_kinds.each { |k| assert k[:label].present?, "#{k[:value]} missing label" }
+  end
+
+  # The paywall's sign-in line is the one field whose default value contains
+  # markup the author is meant to edit, so it's worth naming here rather than
+  # leaving it to the generic well-formedness sweep above.
+  test "the paywall offers a sign-in line, and says what it defaults to" do
+    field = ActionBuilderSchema.fields_for("paid_content").find { |f| f[:key] == "signin-text" }
+
+    assert field, "a members site with a paywall needs a way in for members who already have an account"
+    assert_match "Already a member? [Sign in].", field[:hint],
+      "the default belongs in the hint — it's what the field does when left blank"
+    assert_match "[square brackets]", field[:hint],
+      "the bracket convention is the whole syntax of the field"
   end
 
   test "fields_for is empty for an unknown kind" do

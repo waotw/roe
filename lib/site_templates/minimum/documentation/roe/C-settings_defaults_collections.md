@@ -1,5 +1,5 @@
 ---
-title: Defaults → Collections
+title: Settings → Collections
 status: published
 url_name: settings-collections
 tags: settings
@@ -16,24 +16,31 @@ limit: all
 template: links
 ```
 
-# Collection: Default Settings & Template
+# Collections: Default Settings
 
-This allows you to customize the defaults used in Collections, as well as the Buttons which generate the code in the Editor.
-
-These defaults can always be overridden when using a Collection. Simply add the option you need.
+These settings decide what a collection does by default. If the collection itself specifies something, the collection will win. Set the defaults at [Settings → collections.yml](/admin/configs/collections/edit) and all collections will work that way unless you change a specific collection.
 
 ## Defaults
-- `default_source` - set your default `source` for Collections: `posts`, `pages`, `documentation`
-- `default_post_type` - set your default `post_type` for Collections: `article`, `podcast`, `video`, `all`
-- `default_order` - set your default `order` for Collections: `date`, `date-asc`, `title`, `filename` - using `filename` allows you to create a specific order, e.g. (01-first-post, 02-second-post) by editing the names of the files.
-- `default_limit` - set your default `limit` - any number or `all`
-- `default_template` - `list`, `links`, `compact`, `full`, 
-- `items_per_page` - this sets the number of items when `show_more: true` is in the Collection. These apply to items in pagination.
 
-## Button 
+- `default_source` — `posts`, `pages`, `documentation` or `products`.
+- `default_post_type` — which posts to include: `all`, `article`, `podcast`, `music`, `audio` or `video`. Only applies when the source is `posts`.
+- `default_order` — `date` (newest first), `date-asc` (oldest first), `title` or `filename`. Using `filename` lets you set an exact order by naming files `01-first-post`, `02-second-post` and so on.
+- `default_limit` — how many items to show. A number, or `all`.
+- `default_template` — the template determines how a collection is displayed: `list`, `compact`, `links`, `full`, `menu`,  `glossary` or `playlist`. When `source: products` it will default to `grid`.
 
-### The `COLLECTION` button in the editor
+## Pagination
 
-This button drops a `collection` template into your Markdown. This is where that template lives.
+These two apply to collections with `show_more: true`.
 
-See all available [options for Collections](/documentation/collections#options)
+- `items_per_page` — how many items each page holds.
+- `pagination_template` — the collection template used by the pagination pages.
+
+## How the collection builder uses default settings
+
+`COLLECTION` in [the editor](/documentation/roe/the-editor) opens the collection builder, and each field will default to the default settings you've set for all collections. Change what you want and click Insert.
+
+The builder inserts the collection with the default settings. You might notice that if you leave an option as the default, that option isn't written into the collection when you insert it. This is deliberate. This allows you to update all the collections from the global settings rather than having to update every collection one-by-one if you decide you want to change them.
+
+If you want a collection to always have specific options (such as a particular template), add that option to the collection itself and that will override the global settings.
+
+See all available [options for Collections](/documentation/roe/collections#options).

@@ -3,6 +3,7 @@ class Product < ApplicationRecord
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex
+  include IndexesMediaReferences
 
   # Validations
   validates :file_path, presence: true, uniqueness: true
@@ -103,21 +104,152 @@ class Product < ApplicationRecord
     metadata["tags"] || []
   end
 
+  # Products have no audience field yet. When they get one this can go and the
+  # concern's default takes over; until then a product never protects a file.
+  def media_audience = "free"
+
   # URL helpers
   def public_url
     "/store/#{url_name}"
   end
 
   # Snipcart data attributes
-  def snipcart_attributes
-    {
+  # A downloadable product rather than something posted. The toggle is what
+  # decides — `file_guid` is only asked for once it's on, so the two can't
+  # contradict each other.
+  def digital?
+    metadata["digital"] == true || metadata["digital"] == "true"
+  end
+
+  # Normalise weight before the file is written, so what's on disk is exactly
+  # what Snipcart receives.
+  #
+  # #weight rounds on read, which meant typing 499.6 stored 499.6 in the file
+  # and sent 500 in the HTML — the file and the shop disagreeing, with nothing
+  # in the editor to say which one counted. Rounding here means the field reads
+  # back as 500 after saving, so the answer is visible rather than needing to
+  # be explained.
+  #
+  # Anything that produces no attribute (blank, zero, negative, junk) is stored
+  # blank for the same reason: the file shouldn't claim a weight that isn't used.
+  def self.format_metadata_yaml(metadata)
+    metadata = metadata.dup
+    if metadata.key?("weight")
+      grams = metadata["weight"].to_s.strip.to_f.round
+      metadata["weight"] = grams.positive? ? grams : ""
+    end
+    super(metadata)
+  end
+
+  # Shipping weight in whole grams, as Snipcart requires: "The weight in grams
+  # of the product. Mandatory if you use any integrated shipping provider we
+  # support" — integers only, no decimals.
+  #
+  # Rounded rather than passed through, because a decimal is dropped silently
+  # by Snipcart and a shop owner would only find out from a wrong postage
+  # quote. Zero and negatives are treated as absent for the same reason: a
+  # weight of 0 quotes free shipping rather than refusing to quote.
+  def weight
+    raw = metadata["weight"].to_s.strip
+    return nil if raw.blank?
+
+    grams = raw.to_f.round
+    grams.positive? ? grams : nil
+  end
+
+  def file_guid
+    metadata["file_guid"].to_s.strip.presence
+  end
+
+  # Snipcart file GUIDs are UUIDs. Mirrored in digital_product_controller.js
+  # for the live check in the editor; a guard test keeps the two in step.
+  FILE_GUID_FORMAT = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+  # Whether this product can actually deliver what it sells.
+  #
+  # The two failures are not symmetrical, which is why this exists. A *wrong*
+  # GUID is caught by Snipcart, which refuses the order at checkout — loud, and
+  # nobody is charged. A *missing* one isn't: Roe drops the empty attribute, so
+  # Snipcart sees an ordinary non-shippable product, takes the payment and has
+  # nothing to send. Neither should reach a buyer, so no button renders for
+  # either.
+  def deliverable?
+    return true unless digital?
+    file_guid.present? && file_guid.match?(FILE_GUID_FORMAT)
+  end
+
+  # Why it isn't deliverable, for the admin-facing notice. nil when it is.
+  def delivery_problem
+    return nil if deliverable?
+    file_guid.blank? ? :missing_file_guid : :malformed_file_guid
+  end
+
+  # Every `data-item-*` Snipcart gets, from one place. It used to be built
+  # separately in three (here, ProductButtonRenderer, and the product grid in
+  # HasMarkdownExtensions), which had already drifted — a field added to two of
+  # them would validate on the product's own page and fail from a grid.
+  #
+  # url:      what Snipcart's crawler fetches to verify the order. Callers that
+  #           know the store domain pass an absolute one; public_url otherwise.
+  # quantity: only emitted when a caller sets a default.
+  def snipcart_attributes(url: nil, quantity: nil)
+    attrs = {
       "data-item-id" => sku,
       "data-item-name" => title,
       "data-item-price" => price,
-      "data-item-url" => public_url,
-      "data-item-description" => description,
+      "data-item-url" => url.presence || public_url,
+      "data-item-description" => snipcart_description,
       "data-item-image" => image
-    }.compact
+    }
+    attrs["data-item-quantity"] = quantity if quantity.present?
+
+    # Snipcart can't quote postage without this, and ignores it on anything
+    # non-shippable — so it's sent whenever it's set rather than being gated on
+    # the digital flag.
+    attrs["data-item-weight"] = weight if weight.present?
+
+    # A digital good isn't posted, so shipping comes out of the cart. Without
+    # this the buyer is asked for an address to deliver a download to.
+    if digital?
+      attrs["data-item-file-guid"] = file_guid
+      attrs["data-item-shippable"] = "false"
+    end
+
+    attrs.compact.reject { |_, v| v.to_s.strip.empty? }
+  end
+
+  # The line a shopper reads against this item in the cart.
+  #
+  # Two problems with sending `description` straight through. Every variant in
+  # a group shares a title, so a cart holding three sizes of the same tee shows
+  # three identical rows with nothing to tell them apart — the size lives in
+  # `variant` and never reached Snipcart. And variant files are usually written
+  # with an empty description (the group's copy sits on the primary), so the
+  # attribute was dropped by the reject above and only the primary carried one.
+  #
+  # So: lead with this product's own variant, and fall back to the group's
+  # description when the variant doesn't set its own.
+  def snipcart_description
+    detail = description.presence || group_primary_description
+    [ variant.presence, detail.presence ].compact.join(" — ").presence
+  end
+
+  # The group's shared copy, which lives on whichever member is flagged
+  # primary. Memoized because a variant list asks every button for it.
+  #
+  # `primary` is matched in Ruby rather than SQL: it's stored as a real boolean
+  # or the string "true" depending on how the file was written, and json_extract
+  # would have to match both.
+  def group_primary_description
+    return @group_primary_description if defined?(@group_primary_description)
+
+    @group_primary_description =
+      if group.blank? || primary?
+        nil
+      else
+        self.class.where("json_extract(metadata, \'$.group\') = ?", group)
+            .find(&:primary?)&.description
+      end
   end
 
   def self.create_or_update_from_file(file_path)
@@ -262,7 +394,12 @@ class Product < ApplicationRecord
   # the admin UI to surface mistakes without blocking save.
   def needs_attention?
     return false unless status == "published"
-    missing_required_fields.any? || missing_media_refs.any?
+    publish_warnings?
+  end
+
+  # Guardless version of needs_attention? — used to gate bulk publish on drafts.
+  def publish_warnings?
+    missing_required_fields.any? || missing_media_refs.any? || !deliverable?
   end
 
   # The ProductGroup this product belongs to (2+ products sharing a `group:`

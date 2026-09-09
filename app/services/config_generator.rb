@@ -32,6 +32,16 @@ class ConfigGenerator
   # customizations stick. Also safe to re-run later with a different
   # kit (e.g. blog_kit) without overwriting anything.
   def generate_all
+    # MUST run before the kit is installed, and it lives here rather than at the
+    # call site so every caller is covered. The loader skips a file only when
+    # that exact path exists — it doesn't know header.md and navigation.md are
+    # the same slot — so on a site still using navigation.md it installs the
+    # stock header.md, which then wins in LayoutFiles.path and silently hides
+    # the user's navigation. The boot initializer ordered these correctly, but
+    # bin/setup calls generate_all with the initializer disabled (no
+    # Rails::Server), so re-running setup shadowed the nav.
+    LayoutFiles.migrate_navigation_to_header!
+
     ensure_directories
 
     result = SiteTemplates::Loader.install(
@@ -44,6 +54,7 @@ class ConfigGenerator
     result[:installed].each { |path| puts "✓ Installed #{path}" }
 
     migrate_content_config!
+    migrate_security_config!
   end
 
   # One-time, idempotent migration for the site.yml → content.yml split.
@@ -59,6 +70,28 @@ class ConfigGenerator
     "results_when_opened" => %w[search results_when_opened],
     "soft_line_breaks"    => %w[soft_line_breaks]
   }.freeze
+
+  # ai_crawlers began in site.yml and belongs with the other controls on
+  # automated traffic. Same shape as the content migration below.
+  def migrate_security_config!
+    site_file     = SiteConfig::SITE_FILE
+    security_file = SiteConfig::SECURITY_FILE
+    return unless File.exist?(site_file)
+
+    site = YAML.load_file(site_file) || {}
+    return unless site.key?("ai_crawlers")
+
+    security = (File.exist?(security_file) ? YAML.load_file(security_file) : {}) || {}
+    security["ai_crawlers"] = site.delete("ai_crawlers")
+
+    write_config_yaml(security_file, security)
+    write_config_yaml(site_file, site)
+    SiteConfig.sync_from_file("security")
+    SiteConfig.sync_from_file("site")
+    puts "✓ Migrated ai_crawlers → security.yml"
+  rescue => e
+    Rails.logger.warn "[ConfigGenerator] security migration failed: #{e.class} #{e.message}"
+  end
 
   def migrate_content_config!
     site_file    = SiteConfig::SITE_FILE
@@ -189,7 +222,11 @@ class ConfigGenerator
   # Without this, deleting welcome.md would have it reappear on every
   # boot.
   def skip_paths_for_minimum
-    paths = []
+    # The sidebar is opt-in: its template lives with the other layout files
+    # (so it's the canonical default), but unlike header/footer it is never
+    # auto-installed. The admin creates it on request via LayoutsController,
+    # which renders this same template — see #generate_missing there.
+    paths = [ "layout/sidebar.md" ]
     posts_dir = File.join(RoeSitePaths::SITE_PATH, "posts")
     if Dir.exist?(posts_dir) && Dir.glob(File.join(posts_dir, "*.md")).any?
       paths << "posts/welcome.md"

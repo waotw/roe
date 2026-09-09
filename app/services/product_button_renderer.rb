@@ -130,7 +130,22 @@ class ProductButtonRenderer
     quantity = config["quantity"]&.to_i || 1
 
     # Generate Snipcart button
-    render_button(product, text, style, quantity)
+    button = render_button(product, text, style, quantity)
+
+    # A single product's price is otherwise invisible — it rides along as
+    # data-item-price for Snipcart, but nothing renders it. Shown by default
+    # (a shopper expects a price next to a buy button); `show_price: false`
+    # turns it off. Variant lists print their own, so this is the single case.
+    return button if falsy?(config["show_price"])
+
+    price = "#{get_currency_symbol}#{sprintf('%.2f', product.price)}"
+    "<span class=\"product-price\">#{ERB::Util.html_escape(price)}</span> #{button}"
+  end
+
+  # Block values arrive as real booleans from YAML or as strings from the
+  # builder, so accept both. Anything unset means "default", i.e. show.
+  def falsy?(value)
+    %w[false no 0].include?(value.to_s.strip.downcase)
   end
 
   def render_product_list(products)
@@ -170,6 +185,11 @@ class ProductButtonRenderer
   private
 
   def render_button(product, text, style, quantity)
+    # No button for a digital product that can't deliver — see
+    # Product#deliverable?. A missing GUID is the dangerous case: Snipcart
+    # accepts the order and has nothing to send.
+    return render_undeliverable(product) unless product.deliverable?
+
     # Get the domain for Snipcart validation
     domain = SiteConfig.feature("store", "default_domain")
 
@@ -181,17 +201,10 @@ class ProductButtonRenderer
       "/store/#{product.url_name}"
     end
 
-    attrs = {
-      "data-item-id" => product.sku,
-      "data-item-name" => product.title,
-      "data-item-price" => product.price,
-      "data-item-url" => validation_url,
-      "data-item-quantity" => quantity
-    }
-
-    # Add optional attributes
-    attrs["data-item-description"] = product.description if product.description.present?
-    attrs["data-item-image"] = product.image if product.image.present?
+    # Product#snipcart_attributes is the one place that decides what Snipcart
+    # gets, so a digital good's file GUID and shippable flag reach every button
+    # rather than only the ones someone remembered to update.
+    attrs = product.snipcart_attributes(url: validation_url, quantity: quantity)
 
     attr_string = attrs.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(" ")
 
@@ -201,6 +214,17 @@ class ProductButtonRenderer
               #{attr_string}>
         #{ERB::Util.html_escape(text)}
       </button>
+    HTML
+  end
+
+  def render_undeliverable(product)
+    reason = product.delivery_problem == :missing_file_guid ?
+      "has no Snipcart file GUID" : "has a malformed Snipcart file GUID"
+
+    <<~HTML.strip
+      <div class="product-button-error" style="padding: 1rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 0.25rem;">
+        <strong>Not available to buy.</strong> This digital product #{reason}, so it can't be sold yet.
+      </div>
     HTML
   end
 

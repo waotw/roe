@@ -18,7 +18,16 @@ template: links
 
 # Members, Newsletter & Paid Content Settings
 
-### Payments
+## Display
+
+`Always show member icon`
+
+- When `checked` the member/account icon is visible at all times
+  - if signed-out it links to the `/sign-in` page.
+  - if signed-in it links to their account page.
+- When `unchecked`, the member icon will only show up for signed-in members. 
+
+## Payments
 
 | Setting | Type | Description |
 |---------|------|-------------|
@@ -33,13 +42,13 @@ template: links
 - `donations` — One-time contributions, no account required  
 - `both` — Enable both memberships and donations
 
-### Newsletter
+## Newsletter
 
 | Setting | Type | Description |
 |---------|------|-------------|
 | `enabled` | Boolean | Enable newsletter broadcasts via Postmark |
 
-### Paid Content
+## Paid Content
 
 | Setting | Type | Description |
 |---------|------|-------------|

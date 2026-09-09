@@ -48,6 +48,22 @@ module RoeSecrets
       assert_equal "a" * 32, cfg.dig(:active_record_encryption, :primary_key), "AR keys preserved"
     end
 
+    # The upgrade incident this heal addresses: an install whose credentials
+    # predate AR encryption (secret_key_base present, AR keys absent) with an
+    # EXISTING master.key. The old bootstrap only seeded AR keys alongside a
+    # freshly generated master.key, so these installs never healed and the first
+    # `encrypts` save crashed with a missing-primary_key error. They self-heal now.
+    test "seeds AR encryption keys into a readable credentials file that lacks them" do
+      seed_credentials!("secret_key_base" => "s" * 128)
+
+      assert_equal :seeded, Bootstrap.run!(secrets_dir: @dir)
+      cfg = enc.config
+      assert_equal "s" * 128, cfg[:secret_key_base], "existing secret_key_base preserved"
+      assert cfg.dig(:active_record_encryption, :primary_key).present?,         "AR primary_key seeded"
+      assert cfg.dig(:active_record_encryption, :deterministic_key).present?,   "AR deterministic_key seeded"
+      assert cfg.dig(:active_record_encryption, :key_derivation_salt).present?, "AR salt seeded"
+    end
+
     # The incident: a restore left an empty master.key next to real credentials,
     # and the old inline bootstrap rewrote credentials — destroying the AR keys.
     test "REFUSES to overwrite credentials it cannot decrypt" do

@@ -82,6 +82,13 @@ module ContentTemplate
     metadata["date"] = Time.current.strftime("%Y-%m-%dT%H:%M") if REQUIRED.fetch(type.to_s, {}).key?("date")
 
     metadata.merge!(overrides.transform_keys(&:to_s))
-    [ metadata, parsed.content ]
+
+    # The body is scaffolded from the type: a podcast episode gets a player and
+    # an episode list, a product its image/title/buy button. ContentScaffold
+    # composes those around the template's own body (its `:content` slot), so
+    # editing the template still works. See ContentScaffold for the rules.
+    body = ContentScaffold.body_for(type, metadata: metadata, template_body: parsed.content)
+
+    [ metadata, body ]
   end
 end

@@ -46,7 +46,7 @@
     </div>
   </td>
   <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
-    $<%= sprintf('%.2f', product.price) %>
+    <%= store_currency_symbol %><%= sprintf('%.2f', product.price) %>
   </td>
   <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
     <%= product.sku.presence || '—' %>

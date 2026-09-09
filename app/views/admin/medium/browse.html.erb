@@ -1,4 +1,4 @@
-<div class="mb-5 pb-2 border-b border-gray-300">
+<div class="mb-1 pb-2 border-b border-gray-300">
   <div class="flex items-start justify-between">
       <h1 class="text-2xl font-bold">Media Browser</h1>
       <div class="flex flex-col items-end gap-1">
@@ -27,34 +27,34 @@
           data-action="click->media-filter#filterByType"
           data-type="all"
           data-media-filter-target="tab"
-          class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
           All
         </button>
 
         <!-- Show tabs for types that exist -->
         <% if @existing_types.include?('images') %>
-          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Images
           </button>
         <% end %>
 
         <% if @existing_types.include?('audio') %>
-          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Audio
           </button>
         <% end %>
 
         <% if @existing_types.include?('video') %>
-          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Video
           </button>
         <% end %>
         <% if @has_global_media && MediaUsageIndex.global_tab_enabled? %>
-          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Global
           </button>
         <% end %>
-          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
             Unused
           </button>
       </nav>
@@ -134,15 +134,38 @@
     </div>
   </div>
 
-  <!-- Results Counter -->
-  <p class="mb-4 text-xs text-gray-500 font-sans">
-    Showing <span data-media-filter-target="count"><%= @media.count %></span> of <%= @media.count %> files
-  </p>
+  <!-- Results Counter + audience toggles -->
+  <div class="mb-4 flex items-center justify-between gap-4">
+    <p class="text-xs text-gray-500 font-sans">
+      Showing <span data-media-filter-target="count"><%= @media.count %></span> of <%= @media.count %> files<span data-media-filter-target="audienceNote"></span>
+    </p>
+
+    <%# Two predicates rather than a union: either on its own narrows to that
+        set, both on narrows further to files that are somehow both — used by
+        paid content and by something public. Neither on shows everything.
+        The note beside the count spells that state out, because two filters
+        showing fewer results than one is otherwise surprising. %>
+    <div class="flex items-center gap-3 text-xs font-mono shrink-0">
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox"
+               data-media-filter-target="paidToggle"
+               data-action="change->media-filter#filterByAudience">
+        <span class="text-green-700">$ Paid</span>
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox"
+               data-media-filter-target="freeToggle"
+               data-action="change->media-filter#filterByAudience">
+        <span class="text-gray-600">Free</span>
+      </label>
+    </div>
+  </div>
 
   <!-- Media Grid -->
-  <div class="grid grid-cols-4 gap-4" data-media-filter-target="grid" data-media-upload-target="grid">
+  <div class="grid grid-cols-4 gap-2" data-media-filter-target="grid" data-media-upload-target="grid">
     <% @media.each do |media| %>
-      <%= render "media_card", media: media, usages: @media_usages[media.file_path] %>
+      <%= render "media_card", media: media, usages: @media_usages[media.file_path],
+                 mixed: @mixed_media_ids.include?(media.id) %>
     <% end %>
   </div>
   <% if @media.empty? %>

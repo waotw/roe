@@ -7,42 +7,96 @@
   </div>
 
   <!-- ─── CONTENT ─── -->
+  <%# One block per type rather than one flat list. The old table showed Total,
+      Published and Drafts for posts, which silently lost anything unlisted —
+      and Pages had no breakdown at all. Rows are Published / Unlisted /
+      Drafts / Total so the column adds up, plus a "No status" row that appears
+      only when something belongs to none of the scopes. %>
+  <div class="grid sm:grid-cols-2 gap-8 mb-8">
+    <% @content_blocks.each do |blk| %>
+      <% label, index_path, filter_path, stats = blk[:label], blk[:index_path], blk[:filter_path], blk[:stats] %>
+      <div class="relative border-2 border-gray-800">
+        <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
+          ── <%= label %> ──
+        </div>
+
+        <table class="w-full bg-[#fffdf9]">
+          <tbody class="pt-2">
+            <% [ [ "Published", :published, "published" ],
+                 [ "Unlisted",  :unlisted,  "unlisted"  ],
+                 [ "Drafts",    :drafts,    "draft"     ] ].each_with_index do |(row_label, key, status), i| %>
+              <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer"
+                  onclick="window.location='<%= filter_path.call(status) %>'">
+                <td class="px-4 <%= i.zero? ? 'pt-4' : 'pt-1.5' %> pb-1.5">
+                  <%= link_to row_label, filter_path.call(status), class: "text-blue-700 hover:underline" %>
+                </td>
+                <td class="px-4 <%= i.zero? ? 'pt-4' : 'pt-1.5' %> pb-1.5 text-right w-24"><%= stats[key] %></td>
+              </tr>
+            <% end %>
+
+            <%# Only when something has no status at all. Those pages 404 for
+                logged-out visitors, so this is a problem, not a category. %>
+            <% if stats[:unset].to_i > 0 %>
+              <tr class="border-b border-dashed border-gray-200 bg-amber-50/60">
+                <td class="px-4 py-1.5 text-amber-900">No status</td>
+                <td class="px-4 py-1.5 text-right text-amber-900"><%= stats[:unset] %></td>
+              </tr>
+            <% end %>
+
+            <tr class="hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= index_path %>'">
+              <td class="px-4 py-1.5 pb-3 font-bold border-t border-gray-400">
+                <%= link_to "Total", index_path, class: "text-blue-700 hover:underline" %>
+              </td>
+              <td class="px-4 py-1.5 pb-3 text-right font-bold border-t border-gray-400"><%= stats[:total] %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Pages Roe installed that lost their status. They're unreachable for
+      anyone not signed in — including the Stripe return pages — so this says
+      what's wrong and offers the repair rather than fixing files unasked. %>
+  <% if @pages_needing_status.to_i > 0 %>
+    <div class="border-2 border-amber-500 bg-amber-50 px-3 py-2 mb-8 text-xs flex items-center justify-between gap-3">
+      <span class="text-amber-900">
+        ⚠ <strong><%= pluralize(@pages_needing_status, "PAGE") %></strong> MISSING A STATUS —
+        NOT REACHABLE FOR ANYONE NOT SIGNED IN
+      </span>
+      <%= button_to "[ Repair ]",
+                    admin_repair_page_statuses_path,
+                    method: :post,
+                    form_class: "shrink-0",
+                    data: { turbo_confirm: "Add the default status to these pages. This only affects pages that Roe has created for you. Your pages are untouched." },
+                    class: "text-amber-900 underline whitespace-nowrap cursor-pointer" %>
+    </div>
+  <% end %>
+
+  <!-- ─── SYSTEM ─── -->
   <div class="relative border-2 border-gray-800 mb-8">
     <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
-      ── Content ──
+      ── System ──
     </div>
 
-    <table class="w-full  bg-[#fffdf9]">
-      <thead>
-        <tr class="border-b border-gray-300 text-xs uppercase tracking-wider text-gray-500">
-          <th class="px-4 pt-4 pb-2 text-left font-semibold">Type</th>
-          <th class="px-4 pt-4 pb-2 text-right font-semibold w-32">Count</th>
-        </tr>
-      </thead>
+    <table class="w-full bg-[#fffdf9]">
       <tbody>
-        <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
-          <td class="px-4 py-1.5">
-            <%= link_to "Total Posts", admin_posts_path, class: "text-blue-700 hover:underline" %>
-          </td>
-          <td class="px-4 py-1.5 text-right"><%= @posts_count %></td>
+        <tr class="border-b border-dashed border-gray-200">
+          <td class="px-4 pt-4 pb-1.5">Backups</td>
+          <td class="px-4 pt-4 pb-1.5 text-right w-32"><%= @backup_stats.count %></td>
         </tr>
-        <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_posts_path %>'">
-          <td class="px-4 py-1.5">
-            <%= link_to "Published Posts", admin_posts_path, class: "text-blue-700 hover:underline" %>
-          </td>
-          <td class="px-4 py-1.5 text-right"><%= @published_posts_count %></td>
+        <tr class="border-b border-dashed border-gray-200">
+          <%# Deduplicated by inode. Backups are hard-linked between runs, so
+              adding up file sizes reports several times the real figure —
+              which is exactly what Finder shows. %>
+          <td class="px-4 py-1.5">Backups size</td>
+          <td class="px-4 py-1.5 text-right"><%= @backup_stats.human_size %></td>
         </tr>
-        <tr class="border-b border-dashed border-gray-200 hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_posts_path(type: 'article', status: 'draft', sort: 'updated-desc') %>'">
-          <td class="px-4 py-1.5">
-            <%= link_to "Draft Posts", admin_posts_path(type: 'article', status: 'draft', sort: 'updated-desc'), class: "text-blue-700 hover:underline" %>
+        <tr>
+          <td class="px-4 py-1.5 pb-3">Database size</td>
+          <td class="px-4 py-1.5 pb-3 text-right">
+            <%= @database_size ? number_to_human_size(@database_size) : "—" %>
           </td>
-          <td class="px-4 py-1.5 text-right"><%= @draft_posts_count %></td>
-        </tr>
-        <tr class="hover:bg-amber-50/40 cursor-pointer" onclick="window.location='<%= admin_pages_path %>'">
-          <td class="px-4 py-1.5 pb-3">
-            <%= link_to "Pages", admin_pages_path, class: "text-blue-700 hover:underline" %>
-          </td>
-          <td class="px-4 py-1.5 pb-3 text-right"><%= @pages_count %></td>
         </tr>
       </tbody>
     </table>

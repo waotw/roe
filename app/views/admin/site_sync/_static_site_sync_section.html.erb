@@ -88,7 +88,15 @@
               Failed during <code class="text-xs bg-white px-1 rounded font-mono"><%= StaticSiteSyncPushJob::STEPS[sss[:step]] || sss[:step] %></code>
               <% if sss[:failed_at] %><%= time_ago_in_words(sss[:failed_at]) %> ago<% end %>.
             </p>
-            <p class="text-xs text-red-700 font-mono break-all"><%= sss[:error] %></p>
+            <% if sss[:cert_unverified] %>
+              <p class="text-sm text-red-800 mb-3">The host's TLS certificate couldn't be verified. The connection would still be encrypted — if you trust this host, connect without verification and push again.</p>
+              <%= button_to "CONNECT WITHOUT VERIFICATION",
+                            admin_skip_tls_verification_static_site_path,
+                            method: :post,
+                            class: "inline-flex items-center px-3 py-2 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono text-xs rounded-xs cursor-pointer" %>
+            <% else %>
+              <p class="text-xs text-red-700 font-mono break-all"><%= sss[:error] %></p>
+            <% end %>
           </div>
           <%= button_to "Dismiss",
                         admin_dismiss_static_site_transfer_status_path,
@@ -96,6 +104,25 @@
                         class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
         </div>
     <% end %>
+  <% end %>
+
+  <%# ─── TLS certificate prompt ──────────────────────────────────── %>
+  <%# Shown after Test Connection fails specifically on certificate
+      verification. Verification is automatic; this is the one-click
+      "I trust this host" escape hatch (drops verification, keeps the
+      channel encrypted). %>
+  <% if flash[:tls_cert_prompt] %>
+    <div class="bg-amber-50 border border-amber-300 rounded-xs p-6 mb-6">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">Certificate couldn't be verified</h3>
+      <p class="text-sm text-amber-800 mb-3">
+        <%= flash[:tls_cert_error] %>
+        The connection would still be encrypted — Roe just can't confirm the host's identity. If you trust this host, connect without verification.
+      </p>
+      <%= button_to "CONNECT WITHOUT VERIFICATION",
+                    admin_skip_tls_verification_static_site_path,
+                    method: :post,
+                    class: "inline-flex items-center px-3 py-2 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono text-xs rounded-xs cursor-pointer" %>
+    </div>
   <% end %>
 
   <%# ─── Configured: summary + push ─────────────────────────────── %>
@@ -115,8 +142,16 @@
           <% if @static_site_sync_config.last_verification_error.present? %>
             <p class="text-xs text-red-700 mt-1">Last connection test failed: <%= @static_site_sync_config.last_verification_error %></p>
           <% elsif @static_site_sync_config.last_verified_at %>
-            <p class="text-xs text-gray-500">Connection verified: <%= time_ago_in_words(@static_site_sync_config.last_verified_at) %> ago</p>
+            <p class="text-xs text-green-700">Connection verified: <%= time_ago_in_words(@static_site_sync_config.last_verified_at) %> ago</p>
           <% end %>
+          <%# Jump to the full Static Site page (generate / rebuild / clean /
+              browse the output). A link, not a button — it navigates rather
+              than acting on the connection, and applies to every protocol. %>
+
+          <%= link_to "STATIC SITE ACTIONS →",
+                      admin_static_site_path,
+                      class: "inline-flex items-center justify-center mt-4 mb-0 text-blue-500 hover:text-gray-800 underline font-mono text-xs cursor-pointer whitespace-nowrap" %>
+          <p class="text-xs text-gray-500 mt-0">Use Static Site Actions to rebuild your static site.</p>
         </div>
 
         <div class="flex flex-col gap-2 items-stretch shrink-0">
@@ -131,14 +166,23 @@
                 When there's no drift the job no-ops with "Already in
                 sync" — giving the user the button regardless beats
                 hiding it and making them wonder where it went. %>
-            <%= button_to (@static_site_sync_diff && !@static_site_sync_diff.empty? ? "Push now" : "Push (nothing to push)"),
+            <%= button_to (@static_site_sync_diff && !@static_site_sync_diff.empty? ? "PUSH NOW" : "PUSH (nothing to push)"),
                           admin_push_static_site_path,
                           method: :post,
                           class: "inline-flex items-center justify-center px-4 py-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono text-sm rounded-xs cursor-pointer whitespace-nowrap" %>
-            <%= button_to "Test connection",
+            <%= button_to "TEST CONNECTION",
                           admin_test_static_site_sync_connection_path,
                           method: :post,
-                          class: "inline-flex items-center justify-center px-3 py-1.5 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+                          class: "inline-flex items-center justify-center px-2 py-1 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+            <%# Full re-sync — re-uploads every file and prunes ones removed
+                locally, to recover when Roe's record and the host drift apart.
+                Deliberately low-key: the escape hatch, not the default. %>
+            <%= button_to "FULL RE-SYNC",
+                          admin_push_static_site_path,
+                          method: :post,
+                          params: { full: 1 },
+                          form: { data: { turbo_confirm: "Re-upload every file and remove any Roe-pushed file that's no longer local?" } },
+                          class: "inline-flex items-center justify-center px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
           <% end %>
         </div>
       </div>

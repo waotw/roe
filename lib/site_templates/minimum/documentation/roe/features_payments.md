@@ -20,11 +20,11 @@ template: links
 #### Global Payment Settings
 
 This document will explain global settings for Members & Payments:  
-[Settings → Features → Members](/documentation/settings-members)
+[Settings → Features → Members](/documentation/roe/settings-members)
 
 ## Setting up Stripe
 
-[Integrations → Stripe](/documentation/stripe)
+[Integrations → Stripe](/documentation/roe/stripe)
 
 ## Payment Models
 

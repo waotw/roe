@@ -37,6 +37,25 @@ class DocumentationController < ApplicationController
     candidates = scope.present? ? Documentation.in_directory(scope) : Documentation.root
     @doc = candidates.find { |d| d.url_name == params[:url_name] }
 
+    # Fall back to the copy bundled with the app.
+    #
+    # Roe's docs are installed into site/documentation/roe/ so they travel with
+    # the site and can be edited. But they're the user's files — they can be
+    # deleted, renamed, or never installed, and then every admin link into them
+    # 404s. Those links tend to appear exactly when something has gone wrong,
+    # which is the worst moment to hit a dead end.
+    #
+    # The installed copy still wins, so edits are what you see. This only
+    # catches the case where there's nothing to find.
+    # Signed-in only when Roe's docs aren't published on this site. A site set
+    # to "local" has decided these pages aren't part of it, and the fallback
+    # shouldn't quietly put them back at a public URL — but the admin's help
+    # links have to keep working, which is the whole reason it exists.
+    if @doc.nil? && (authenticated? || bundled_scope_published?(scope))
+      @doc = BundledDocumentation.find(scope, params[:url_name])
+    end
+    @bundled = @doc&.new_record?
+
     raise ActiveRecord::RecordNotFound unless @doc
 
     # Back-link target. Prefer the user's /documentation page when
@@ -49,6 +68,12 @@ class DocumentationController < ApplicationController
   end
 
   private
+
+  # Roe's own docs are the only bundled scope, and whether they're part of the
+  # public site is the site owner's call.
+  def bundled_scope_published?(scope)
+    scope.to_s == "roe" ? Documentation.roe_docs_published? : true
+  end
 
   def index_markdown
     File.read(Rails.root.join("app", "views", "documentation", "index.md"))

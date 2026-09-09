@@ -19,7 +19,8 @@ module CardBuilderSchema
     { value: "pullquote",    label: "Pull quote" },
     { value: "post-link",    label: "Post link" },
     { value: "aside",        label: "Aside" },
-    { value: "product-link", label: "Product link" }
+    { value: "product-link", label: "Product link" },
+    { value: "player",       label: "Player" }
   ].freeze
 
   FIELDS_BY_TYPE = {
@@ -38,10 +39,8 @@ module CardBuilderSchema
         hint: "Body text. Leave blank for an image-only aside." },
       { key: "image", type: :text, label: "Image",
         hint: "Image URL/path to show in the aside." },
-      { key: "link", type: :text, label: "Link",
-        hint: "URL the aside links to. Leave blank and no link will be added." },
-      { key: "link_text", type: :text, label: "Link text",
-        hint: "Custom label for the link. Defaults to →." }
+      { key: "link_url", type: :text, label: "Link URL",
+        hint: "Makes the whole aside a link — image and all. Put links inside the text instead if you only want part of it to be clickable." }
     ],
 
     "post-link" => [
@@ -92,6 +91,17 @@ module CardBuilderSchema
         hint: "Label for the link. Defaults to “View product →”." },
       { key: "image", type: :text, label: "Image",
         hint: "Override the product image. Use “none” to suppress it." }
+    ],
+
+    "player" => [
+      { key: "audio", type: :text, label: "Audio",
+        hint: "Audio file to play. Defaults to the post's own audio." },
+      { key: "title", type: :text, label: "Title",
+        hint: "Defaults to the post's title." },
+      { key: "image", type: :text, label: "Artwork",
+        hint: "Defaults to the post's image, then the release/podcast cover." },
+      { key: "show_artwork", type: :boolean, label: "Show artwork",
+        hint: "Show the artwork. On by default." }
     ]
   }.freeze
 
@@ -114,14 +124,37 @@ module CardBuilderSchema
     "product-link" => { all: %w[product] }
   }.freeze
 
-  # cards.yml key holding each type's button_template (the author-editable
-  # defaults). post-link's key uses an underscore.
-  TEMPLATE_KEYS = {
-    "pullquote"    => "pullquote_button_template",
-    "aside"        => "aside_button_template",
-    "post-link"    => "post_link_button_template",
-    "product-link" => "product_link_button_template"
+  # Booleans whose default depends on the card's style — off for small, on for
+  # medium and large (show_excerpt: large only). A site that wants one of them
+  # on everywhere can say so in cards.yml; absent, the style rule stands, which
+  # is what every install already has.
+  STYLE_DEFAULT_SETTINGS = {
+    "show_subtitle" => "default_show_subtitle",
+    "show_excerpt"  => "default_show_excerpt"
   }.freeze
+
+  # true/false when a site setting has fixed this default for every style, nil
+  # when the style rule still decides. A blank setting counts as unset — the
+  # config editor writes an empty string for a field nobody filled in.
+  def self.setting_default(type, key)
+    setting_key = STYLE_DEFAULT_SETTINGS[key.to_s] or return nil
+
+    value = SiteConfig.default("cards", type.to_s)&.[](setting_key)
+    return nil if value.nil? || value.to_s.strip.empty?
+
+    value.to_s.strip.casecmp("true").zero?
+  end
+
+  # What the builder's "—" option will actually do, so the menu says it rather
+  # than leaving the author to guess. Leaving it unset keeps the key out of the
+  # card, which is what lets the card follow the setting later.
+  def self.default_label(type, key)
+    fixed = setting_default(type, key)
+    return "default: #{fixed ? 'on' : 'off'}" unless fixed.nil?
+    return "default: by style" if STYLE_DEFAULT_SETTINGS.key?(key.to_s)
+
+    "default"
+  end
 
   def self.types
     TYPES
@@ -139,22 +172,26 @@ module CardBuilderSchema
     CORE[type] || []
   end
 
-  # A type's button_template (raw YAML-ish text from cards.yml) parsed into a
-  # { key => value } hash the builder uses to pre-fill fields. `type:` itself
-  # and the placeholder token are dropped, as are unknown keys. Returns {}.
-  def self.default_values(type, template_text = nil)
-    template_text ||= SiteConfig.default("cards", TEMPLATE_KEYS[type])
-    return {} if template_text.blank?
+  # What the builder shows for each field before the author touches it, read
+  # from the site's card defaults: field `style` takes its value from
+  # `default_style` under that card type in cards.yml.
+  #
+  # This used to be parsed out of a per-type `button_template` — a block of
+  # YAML-ish text that the editor once pasted straight into the document. The
+  # builders replaced that insert path, leaving the templates as a second,
+  # invisible copy of settings the config already had. cards.yml carried both
+  # `default_style: small` and a template saying `style: small`, and only one
+  # of them was on the settings form.
+  #
+  # A value equal to the default is left out of the card on insert (see the
+  # builder's insert()), so the card keeps following the setting if it changes.
+  def self.default_values(type)
+    settings = SiteConfig.default("cards", type.to_s)
+    return {} unless settings.is_a?(Hash)
 
-    keys = fields_for(type).map { |f| f[:key] }
-    template_text.to_s.each_line.each_with_object({}) do |line, acc|
-      next if line.strip.empty?
-
-      key, value = line.split(":", 2).map { |s| s.to_s.strip }
-      next if key.blank? || value.blank?
-
-      value = "" if value == "__PLACEHOLDER__"
-      acc[key] = value if keys.include?(key) && value.present?
+    fields_for(type).each_with_object({}) do |field, acc|
+      value = settings["default_#{field[:key]}"].to_s.strip
+      acc[field[:key]] = value if value.present?
     end
   end
 end

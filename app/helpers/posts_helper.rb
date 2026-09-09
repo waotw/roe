@@ -19,7 +19,7 @@ module PostsHelper
   end
 
   def render_post_content(post)
-    html = post.to_html(static: @static_generation)
+    html = post.to_html(preview: editor_preview?, static: @static_generation)
 
     # Replace token placeholders
     html = html.gsub("AUTHENTICITY_TOKEN_PLACEHOLDER", form_authenticity_token)
@@ -41,7 +41,7 @@ module PostsHelper
   private
 
   def should_truncate_content?(item)
-    return false unless item.metadata["audience"] == "paid"
+    return false unless item.audience == "paid"
     return false if current_member&.paid? && current_member&.active?
     return false if authenticated? # Admins can see everything
 

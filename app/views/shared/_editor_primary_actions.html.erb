@@ -19,6 +19,10 @@
     Preview
   </button>
 
+  <%# No Check Markdown button: the check runs on load and on every pause in
+      typing, so the dot in the tab strip already says what the button would
+      have. See markdown_doctor_controller. %>
+
   <% if publishable %>
     <div class="publish-button-container">
       <% unless resource.published? %>

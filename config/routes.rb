@@ -57,8 +57,17 @@ Rails.application.routes.draw do
     # OS-correct install command. Read-only; installs happen in a terminal.
     get "dependencies", to: "dependencies#index", as: "dependencies"
 
+    # Markdown diagnostics for the editor. Shared by posts/pages/products/emails
+    # — they all render shared/_editor. POST because the content being checked
+    # is in the body (it hasn't been saved yet).
+    post "markdown/check", to: "markdown#check", as: "check_markdown"
+    post "markdown/fix",   to: "markdown#fix",   as: "fix_markdown"
+
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
+    post "pages/repair_statuses", to: "pages#repair_statuses", as: "repair_page_statuses"
+    get "site_sync/history", to: "site_sync#history", as: "site_sync_history"
+    post "site_sync/history/restore", to: "site_sync#restore_from_history", as: "restore_from_site_sync_history"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
     patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
@@ -73,6 +82,7 @@ Rails.application.routes.draw do
     post "site_sync/push_to_live",     to: "site_sync#push_to_live",    as: "push_site_to_live"
     post "site_sync/pull_from_live",   to: "site_sync#pull_from_live",  as: "pull_site_from_live"
     post "site_sync/sync",             to: "site_sync#sync",            as: "sync_site"
+    post "site_sync/clone_to_live",    to: "site_sync#clone_to_live",   as: "clone_site_to_live"
     post "site_sync/resolve_conflicts", to: "site_sync#resolve_conflicts", as: "resolve_site_sync_conflicts"
     get  "site_sync/transfer_status",         to: "site_sync#transfer_status",        as: "site_transfer_status"
     post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"
@@ -84,6 +94,7 @@ Rails.application.routes.draw do
     patch "site_sync/static/config",           to: "static_site_sync#update_config",        as: "update_static_site_sync_config"
     post  "site_sync/static/test_connection",  to: "static_site_sync#test_connection",      as: "test_static_site_sync_connection"
     post  "site_sync/static/push",             to: "static_site_sync#push",                 as: "push_static_site"
+    post  "site_sync/static/skip_tls_verification", to: "static_site_sync#skip_tls_verification", as: "skip_tls_verification_static_site"
     get   "site_sync/static/download_zip",     to: "static_site_sync#download_zip",         as: "download_static_site_zip"
     get   "site_sync/static/transfer_status",  to: "static_site_sync#transfer_status",      as: "static_site_transfer_status"
     post  "site_sync/static/transfer_status/dismiss", to: "static_site_sync#dismiss_transfer_status", as: "dismiss_static_site_transfer_status"
@@ -94,8 +105,11 @@ Rails.application.routes.draw do
     patch "account/password",       to: "account#update_password",            as: "update_account_password"
     post  "account/recovery_codes", to: "account#regenerate_recovery_codes",  as: "regenerate_account_recovery_codes"
 
-    get "layout/navigation/edit", to: "layouts#edit_navigation"
-    patch "layout/navigation", to: "layouts#update_navigation"
+    get "layout/header/edit", to: "layouts#edit_header"
+    patch "layout/header", to: "layouts#update_header"
+    # Legacy aliases so old links/bookmarks keep working.
+    get "layout/navigation/edit", to: "layouts#edit_header"
+    patch "layout/navigation", to: "layouts#update_header"
     get "layout/footer/edit", to: "layouts#edit_footer"
     patch "layout/footer", to: "layouts#update_footer"
     get "layout/sidebar/edit", to: "layouts#edit_sidebar"
@@ -108,6 +122,9 @@ Rails.application.routes.draw do
       collection do
         get :drafts
         get :unlisted
+        get :check_unique
+        post :bulk_destroy
+        post :bulk_publish
       end
       member do
         post :publish_modal
@@ -115,17 +132,20 @@ Rails.application.routes.draw do
         post :preview
         get :preview
         patch :rename
+        patch :set_duration
         post :duplicate
         post :send_test_email
-        get :resend_modal
-        post :confirm_resend
-        post :resend_newsletter
         get :newsletter_status
       end
     end
 
 
     resources :pages, only: [ :index, :edit, :update, :new, :create, :destroy ] do
+      collection do
+        post :bulk_destroy
+        post :bulk_publish
+        post :restore_member_pages
+      end
       member do
         post :publish_modal
         patch :unpublish
@@ -159,9 +179,12 @@ Rails.application.routes.draw do
     resources :products do
       collection do
         get :check_sku
+        get :suggest_sku
         get :search
         get :next_sku_number
         get :duplicate_skus
+        post :bulk_destroy
+        post :bulk_publish
       end
       member do
         post :publish_modal
@@ -179,13 +202,17 @@ Rails.application.routes.draw do
         get  :new_podcast_setup
         post :preview_podcast_from_rss
         post :create_podcast
+        post :add_podcast
         delete :delete_podcast
+        delete :delete_podcast_entry
         get :new_members_setup
         post :create_members
         delete :delete_members
         get :new_store_setup
         post :create_store
         delete :delete_store
+        get :new_feeds_setup
+        get :new_music_setup
       end
     end
 
@@ -262,6 +289,26 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :feed_imports, only: [ :index, :create, :show, :destroy ] do
+      collection do
+        post :preview
+        post :add_show
+      end
+    end
+
+    resources :file_imports, only: [ :index, :create, :show, :destroy ] do
+      collection do
+        post :run
+      end
+    end
+
+    resources :media_imports, only: [ :index, :create ] do
+      collection do
+        get :status
+        delete :dismiss_status
+      end
+    end
+
     resources :emails, only: [ :index, :edit, :update ] do
       member do
         post :preview
@@ -279,6 +326,8 @@ Rails.application.routes.draw do
 
     # Separate config edit routes
     get "configs/site/edit", to: "configs#edit_site", as: "edit_site_config"
+    get "configs/security/edit", to: "configs#edit_security", as: "edit_security_config"
+    patch "configs/security", to: "configs#update_security", as: "update_security_config"
     patch "configs/site", to: "configs#update_site", as: "site_config"
 
     get "configs/content/edit", to: "configs#edit_content", as: "edit_content_config"
@@ -299,6 +348,19 @@ Rails.application.routes.draw do
 
     get "configs/collections/edit", to: "configs#edit_collections", as: "edit_collections_config"
     patch "configs/collections", to: "configs#update_collections", as: "collections_config"
+
+    get "configs/feeds/edit", to: "configs#edit_feeds", as: "edit_feeds_config"
+    patch "configs/feeds", to: "configs#update_feeds", as: "feeds_config"
+
+    get "configs/music/edit", to: "configs#edit_music", as: "edit_music_config"
+    patch "configs/music", to: "configs#update_music", as: "music_config"
+
+    # Drop settings a Roe update stopped reading, from the file they're in.
+    post "configs/cleanup", to: "configs#cleanup", as: "cleanup_config"
+
+    # Raw YAML fallback editor for a config whose structured form won't parse.
+    get "configs/raw/edit", to: "configs#edit_raw", as: "edit_raw_config"
+    patch "configs/raw", to: "configs#update_raw", as: "raw_config"
 
     get "configs/members/edit", to: "configs#edit_members", as: "edit_members_config"
     patch "configs/members", to: "configs#update_members", as: "members_config"
@@ -325,6 +387,10 @@ Rails.application.routes.draw do
   # Health check
   get "/health", to: "health#check"
 
+  # Served rather than a file in public/, so the AI-crawler setting takes effect
+  # the moment it's saved instead of on the next static build.
+  get "/robots.txt", to: "robots#show", defaults: { format: "text" }
+
   # Member authentication (public-facing)
   post "signin", to: "members/sessions#create"
   delete "signout", to: "members/sessions#destroy"
@@ -347,6 +413,10 @@ Rails.application.routes.draw do
   get "account/edit", to: "members/accounts#edit"
   patch "account", to: "members/accounts#update"
   get "account/confirm-email", to: "members/accounts#confirm_email", as: :confirm_email
+  # New private feed URLs, when the old ones have been shared or leaked.
+  post "account/feeds/regenerate", to: "members/accounts#regenerate_media_token",
+       as: :regenerate_media_token
+  delete "account", to: "members/accounts#destroy", as: :delete_account
   get "/unsubscribe/:token", to: "members/subscriptions#unsubscribe", as: :unsubscribe
   post "/unsubscribe/:token", to: "members/subscriptions#confirm_unsubscribe"
   post "webhooks/postmark/:token", to: "webhooks/postmark#create", as: :admin_postmark_webhook
@@ -398,7 +468,23 @@ Rails.application.routes.draw do
   get "feed", to: "feeds#rss", defaults: { format: "xml" }, as: :feed
   get "feed.xml", to: "feeds#rss", defaults: { format: "xml" }
   get "feed.atom", to: "feeds#atom", defaults: { format: "xml" }, as: :feed_atom
+  # Named feeds from feeds.yml — a collection query served as RSS/Atom.
+  # Members' copies, carrying full paid articles. Declared before the :name
+  # routes so /feed/private.xml isn't read as a feed named "private".
+  get "feed/private.xml",  to: "feeds#private_rss", defaults: { format: "xml" }, as: :private_feed
+  get "feed/private.atom", to: "feeds#private_rss", defaults: { format: "xml", atom: true }, as: :private_feed_atom
+  get "feed/:name/private.xml",  to: "feeds#private_named", defaults: { format: "xml" }, as: :private_named_feed
+  get "feed/:name/private.atom", to: "feeds#private_named", defaults: { format: "xml", atom: true }, as: :private_named_feed_atom
+
+  get "feed/:name.xml", to: "feeds#named", defaults: { format: "xml" }, as: :named_feed
+  get "feed/:name.atom", to: "feeds#named", defaults: { format: "xml", atom: true }, as: :named_feed_atom
   get "/podcast/:podcast_key.xml", to: "feeds#podcast", as: :podcast_feed
+  # A music release published as a podcast-format feed. Separate from the
+  # Podcast feature — a release never appears in podcast.yml.
+  get "/music/:release_key.xml", to: "feeds#music_release", as: :music_release_feed
+  # The paid member's copy: full audio for paid tracks, and the only feed a
+  # wholly-paid release has. Mirrors the private podcast feed.
+  get "/music/:release_key/private.xml", to: "feeds#private_music_release", as: :private_music_release_feed
   get "/podcast/:podcast_key/private.xml", to: "feeds#private_podcast", as: :private_podcast_feed
 
   # Theme CSS
@@ -406,6 +492,10 @@ Rails.application.routes.draw do
   get "theme/:filename.js", to: "system/themes#show", defaults: { format: "js" }
   # Theme assets (CSS and JS)
   # get 'theme/:filename', to: 'system/themes#show'
+
+  # Roe bundled site JavaScript (search.js, etc.) — served from /javascript
+  # so the same layout path works in dynamic and static builds.
+  get "javascript/:filename.js", to: "system/javascripts#show", defaults: { format: "js" }, constraints: { filename: /[^\/]+/ }
 
   # System assets
   get "system/fonts/:filename", to: "system/fonts#show", as: :system_font, constraints: { filename: /[^\/]+/ }

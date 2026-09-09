@@ -267,6 +267,37 @@ class ContentSyncTest < ActiveSupport::TestCase
     assert_equal "Test Doc", result.title
   end
 
+  # The old behaviour was to skip documentation/roe and delete any rows already
+  # there whenever the docs setting was off. The files stayed on disk but the
+  # records didn't, so every /documentation/roe/… URL 404'd — including the
+  # admin's help links, with nothing in the setting's name to suggest it.
+  #
+  # The database is a local index of what's on local disk now. Whether those
+  # files reach the live site is Site Sync's business (Ledger::ROE_DOCS_PATH),
+  # and whether they're findable is search's.
+  test "sync_documentation indexes documentation/roe whatever the docs setting" do
+    roe_raw  = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "roe", "zz-roe-sync-test.md")
+    root_raw = File.join(RoeSitePaths::SITE_DOCUMENTATION_PATH, "zz-root-sync-test.md")
+    [ roe_raw, root_raw ].each do |p|
+      FileUtils.mkdir_p(File.dirname(p))
+      File.write(p, "---\ntitle: #{File.basename(p, '.md')}\nstatus: published\n---\n\nbody")
+    end
+    roe  = RoeSitePaths.normalize(roe_raw)
+    root = RoeSitePaths.normalize(root_raw)
+
+    Documentation.stubs(:roe_docs_published?).returns(false)
+    Dir.stubs(:glob).returns([ root_raw, roe_raw ])
+
+    ContentSync.new.send(:sync_documentation)
+
+    assert Documentation.exists?(file_path: root), "a root doc syncs"
+    assert Documentation.exists?(file_path: roe),
+      "Roe's docs are indexed locally even when they aren't published — otherwise " \
+      "the pages 404 on the machine they're sitting on"
+  ensure
+    [ roe_raw, root_raw ].each { |p| File.delete(p) if p && File.exist?(p) }
+  end
+
   test "sync_file routes to correct model for posts" do
     content = <<~YAML
       ---

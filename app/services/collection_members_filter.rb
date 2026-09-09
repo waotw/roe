@@ -23,8 +23,48 @@ class CollectionMembersFilter
     # Return early if items is an array (empty collection or already filtered)
     return @items if @items.is_a?(Array)
 
-    # Hide paid posts
-    @items = @items.where("json_extract(metadata, '$.audience') IS NULL OR json_extract(metadata, '$.audience') != ?", "paid")
+    @items = hide_paid(@items)
+  end
+
+  # Hide paid posts — including ones that are paid only by inheritance.
+  #
+  # An episode on a paid show carries no audience of its own, so matching the
+  # column alone left it in the collection while its audio 403'd. The paid show
+  # and release keys are a short list from config, so they go into the query
+  # rather than forcing this into Ruby.
+  def hide_paid(scope)
+    own_free = <<~SQL.squish
+      json_extract(metadata, '$.audience') IS NULL
+        OR json_extract(metadata, '$.audience') != 'paid'
+    SQL
+
+    blank_audience = <<~SQL.squish
+      json_extract(metadata, '$.audience') IS NULL
+        OR TRIM(json_extract(metadata, '$.audience')) = ''
+    SQL
+
+    scope = scope.where(own_free)
+
+    paid_shows = PodcastConfig.paid_keys
+    paid_releases = ReleaseConfig.paid_keys
+    return scope if paid_shows.empty? && paid_releases.empty?
+
+    # Of the ones that look free, drop any that inherit paid from their
+    # container. NOT(blank AND in a paid container) keeps explicit opt-outs.
+    inherits_paid = []
+    binds = []
+    if paid_shows.any?
+      inherits_paid << "json_extract(metadata, '$.podcast') IN (?)"
+      binds << paid_shows
+    end
+    if paid_releases.any?
+      inherits_paid << "json_extract(metadata, '$.release') IN (?)"
+      binds << paid_releases
+    end
+
+    scope.where.not(
+      [ "(#{blank_audience}) AND (#{inherits_paid.join(' OR ')})", *binds ]
+    )
   end
 
   def should_show_paid?

@@ -8,13 +8,16 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
   # option, so guard each type's set.
   SUPPORTED_KEYS = {
     "pullquote"    => %w[text attribution position],
-    "aside"        => %w[text image link link_text],
+    # link/link_text still render for cards written before link_url existed, but
+    # the builder doesn't offer them — see CARD_EXTRA_KEYS.
+    "aside"        => %w[text image link_url link link_text],
     "post-link"    => %w[post style title subtitle show_subtitle excerpt show_excerpt url link_text author date image],
-    "product-link" => %w[product style title description show_description url link_text image]
+    "product-link" => %w[product style title description show_description url link_text image],
+    "player"       => %w[audio title image show_artwork]
   }.freeze
 
   test "types match the renderer's dispatch values" do
-    assert_equal %w[pullquote post-link aside product-link], CardBuilderSchema.types.map { |t| t[:value] }
+    assert_equal %w[pullquote post-link aside product-link player], CardBuilderSchema.types.map { |t| t[:value] }
   end
 
   test "every field is well-formed and a real option for its type" do
@@ -56,18 +59,40 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
     end
   end
 
-  test "default_values parses a type's button_template, dropping type/placeholder/unknowns" do
-    template = "type: pullquote\ntext: __PLACEHOLDER__\nposition: right\nbogus: nope"
-    defaults = CardBuilderSchema.default_values("pullquote", template)
+  # Pre-fill used to come from a per-type `button_template`, an invisible second
+  # copy of settings cards.yml already had — it carried both `default_style:
+  # small` and a template saying `style: small`, with only the first on the
+  # settings form. Field `style` now reads `default_style` under that type.
+  test "default_values reads that card type's defaults" do
+    SiteConfig.stubs(:default).returns(nil)
+    SiteConfig.stubs(:default).with("cards", "pullquote").returns({ "default_position" => "right" })
 
-    assert_equal "right", defaults["position"]
-    assert_nil defaults["text"], "placeholder token should not become a default"
-    assert_nil defaults["type"], "type is not a builder field"
-    assert_nil defaults["bogus"], "unknown keys should be ignored"
+    assert_equal "right", CardBuilderSchema.default_values("pullquote")["position"]
   end
 
-  test "default_values is empty for blank input" do
-    assert_empty CardBuilderSchema.default_values("aside", "")
-    assert_empty CardBuilderSchema.default_values("aside", nil)
+  test "each type reads only its own settings" do
+    SiteConfig.stubs(:default).returns(nil)
+    SiteConfig.stubs(:default).with("cards", "post-link").returns({ "default_style" => "large" })
+    SiteConfig.stubs(:default).with("cards", "pullquote").returns({ "default_position" => "left" })
+
+    assert_equal "large", CardBuilderSchema.default_values("post-link")["style"]
+    assert_nil CardBuilderSchema.default_values("pullquote")["style"]
+  end
+
+  test "a setting with no matching builder field is ignored" do
+    SiteConfig.stubs(:default).returns(nil)
+    SiteConfig.stubs(:default).with("cards", "aside").returns({ "default_bogus" => "nope" })
+
+    assert_empty CardBuilderSchema.default_values("aside")
+  end
+
+  # A blank setting is "not set" — it must not pre-fill the field with "",
+  # which would look configured and write an empty key into the card.
+  test "blank and missing settings produce no default" do
+    SiteConfig.stubs(:default).returns(nil)
+    assert_empty CardBuilderSchema.default_values("pullquote")
+
+    SiteConfig.stubs(:default).with("cards", "pullquote").returns({ "default_position" => "  " })
+    assert_empty CardBuilderSchema.default_values("pullquote")
   end
 end

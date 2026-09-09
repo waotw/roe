@@ -12,6 +12,8 @@
 # Usage:
 #   current/bin/build-installer                   # zip → current dir
 #   current/bin/build-installer -o ~/Downloads    # zip → specific dir
+#   current/bin/build-installer --version 0.3.0-nightly.4   # name/stamp the
+#                                                 # package without editing VERSION
 #   current/bin/build-installer --keep-stage      # leave the staging
 #                                                 # dir for inspection
 #   current/bin/build-installer --with-dev-docs   # include current/docs/
@@ -34,6 +36,7 @@ ROE_ROOT="$(cd "$RAILS_ROOT/.." && pwd)"
 OUTPUT_DIR="$(pwd)"
 KEEP_STAGE=0
 INCLUDE_DEV_DOCS=0
+VERSION_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,6 +46,8 @@ while [[ $# -gt 0 ]]; do
       KEEP_STAGE=1; shift ;;
     --with-dev-docs)
       INCLUDE_DEV_DOCS=1; shift ;;
+    --version)
+      VERSION_OVERRIDE="$2"; shift 2 ;;
     -h|--help)
       sed -n '/^# build-installer/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -74,6 +79,14 @@ if [[ -z "$VERSION" ]]; then
   echo "Could not parse a version: field from $ROE_ROOT/VERSION." >&2
   echo "Expected something like:  version: 0.1.1" >&2
   exit 1
+fi
+# --version builds a package at a version the working tree isn't set to — a
+# nightly for a tester, say — without editing VERSION and having to remember
+# to put it back. The staged copy is stamped to match further down, so the
+# zip's name and the version it reports agree. The source VERSION is never
+# touched; this script stays read-only against the working tree.
+if [[ -n "$VERSION_OVERRIDE" ]]; then
+  VERSION="$VERSION_OVERRIDE"
 fi
 # --with-dev-docs gets a -dev suffix so the two flavours can sit side
 # by side on disk without anyone having to remember which is which.
@@ -139,6 +152,16 @@ for f in "${ROOT_FILES[@]}"; do
     exit 1
   fi
 done
+
+# Stamp the STAGED VERSION when --version was given, so the package reports the
+# version its filename claims. Editing the copy, never the source.
+if [[ -n "$VERSION_OVERRIDE" ]]; then
+  awk -v v="$VERSION_OVERRIDE" '
+    /^version:/ { print "version: " v; next }
+    { print }
+  ' "$STAGE_ROOT/VERSION" > "$STAGE_ROOT/VERSION.tmp" && mv "$STAGE_ROOT/VERSION.tmp" "$STAGE_ROOT/VERSION"
+  echo "  Version:  $VERSION_OVERRIDE (override; working tree unchanged)"
+fi
 
 # Preserve exec bits on the two user-facing entry scripts (zip will
 # carry them through on Unix; Windows tools may strip, hence README's

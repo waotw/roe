@@ -2,6 +2,7 @@
 title: Unsubscribe from Newsletter
 url_name: unsubscribe
 status: published
+page_type: unsubscribe
 audience: everyone
 ---
 

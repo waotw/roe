@@ -143,6 +143,7 @@ class StaticGenerator
     generate_sitemap
     generate_robots
     generate_search_index
+    copy_site_javascript
 
     save_manifest
     @stats[:end_time] = Time.current
@@ -199,9 +200,10 @@ class StaticGenerator
         "defaults/collections" => SiteConfig.find_by("file_path LIKE ?", "%collections.yml")&.updated_at&.iso8601(6),
         "defaults/cards" => SiteConfig.find_by("file_path LIKE ?", "%cards.yml")&.updated_at&.iso8601(6),
         "features/podcast" => SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.updated_at&.iso8601(6),
-        "defaults/members" => SiteConfig.find_by("file_path LIKE ?", "%members.yml")&.updated_at&.iso8601(6)
+        "features/members" => SiteConfig.find_by("file_path LIKE ?", "%features/members.yml")&.updated_at&.iso8601(6)
       },
       layouts: layout_checksums,
+      layout_collections: layout_collection_fingerprint,
       assets: asset_checksums
     }
 
@@ -219,19 +221,34 @@ class StaticGenerator
     docs = changed_items(Documentation.not_draft, "documentation")
     products = changed_items(Product.published, "products")
 
-    podcast_posts = posts.select { |p| p.metadata["post_type"] == "podcast" }
-
     # Track which specific configs changed
     site_config_changed = config_file_changed?("site")
     collections_config_changed = config_file_changed?("defaults/collections")
     cards_config_changed = config_file_changed?("defaults/cards")
     podcast_config_changed = config_file_changed?("features/podcast")
-    members_config_changed = config_file_changed?("defaults/members")
+    members_config_changed = config_file_changed?("features/members")
 
-    global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed?
+    # A layout file edit (nav/footer/sidebar mtime) OR a change to what its
+    # embedded collections list — e.g. a page joining `collection: nav` — alters
+    # every page's chrome, so it forces a full rebuild.
+    layout_collections_changed = layout_collections_changed?
+    global_changed = site_config_changed || collections_config_changed || cards_config_changed || members_config_changed || layouts_changed? || layout_collections_changed
+
+    # Pull in host pages whose EMBEDDED collections changed membership/content —
+    # a new glossary definition, a retagged post, a deleted member — even though
+    # the host file's own updated_at is untouched. Skipped under global_changed,
+    # which already regenerates every page of each type.
+    unless global_changed
+      posts    |= collection_dependents(Post.not_draft, "posts", posts)
+      pages    |= collection_dependents(static_pages_scope, "pages", pages)
+      docs     |= collection_dependents(Documentation.not_draft, "documentation", docs)
+      products |= collection_dependents(Product.published, "products", products)
+    end
+
+    podcast_posts = posts.select { |p| p.metadata["post_type"] == "podcast" }
 
     {
-      home: home_changed? || site_config_changed || collections_config_changed || members_config_changed || layouts_changed?,
+      home: home_changed? || site_config_changed || collections_config_changed || members_config_changed || layouts_changed? || layout_collections_changed,
       posts: global_changed ? Post.not_draft.to_a : posts,
       pages: global_changed ? static_pages_scope.to_a : pages,
       documentation: global_changed ? Documentation.not_draft.to_a : docs,
@@ -264,6 +281,60 @@ class StaticGenerator
         !last_generated || item.updated_at > Time.parse(last_generated)
       end
     end
+  end
+
+  # Records in `scope` that embed a collection whose current membership
+  # fingerprint differs from the manifest — an aggregation page (glossary,
+  # index, "see also") that must regenerate because a member changed even
+  # though its own file didn't. `already` are records already flagged changed;
+  # those are skipped (they'll regenerate anyway). Legacy manifests have no
+  # stored fingerprint, so a page with a collection regenerates once.
+  def collection_dependents(scope, type, already)
+    already_ids = already.map(&:id).to_set
+    with_static_context do
+      scope.where("content LIKE ?", "%```collection%").select do |rec|
+        next false if already_ids.include?(rec.id)
+        rec.embedded_collection_fingerprint != @manifest.dig(type, rec.id.to_s, "collections_fp")
+      end
+    end
+  end
+
+  # Fingerprint of every collection embedded in the layout files (nav / footer /
+  # sidebar). These render into every page's chrome, so a membership change here
+  # (e.g. a page joining `collection: nav`) means a full rebuild. Keyed by
+  # filename; only files that actually embed a collection are included.
+  def layout_collection_fingerprint
+    layout_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "layout"))
+    return {} unless layout_dir.exist?
+
+    with_static_context do
+      Dir.glob(layout_dir.join("*.md")).sort.each_with_object({}) do |f, acc|
+        fp = LayoutMarkdown.new(File.read(f)).embedded_collection_fingerprint
+        acc[File.basename(f)] = fp if fp
+      end
+    end
+  end
+
+  def layout_collections_changed?
+    (@manifest["layout_collections"] || {}) != layout_collection_fingerprint
+  end
+
+  # Resolve collections the way the static build renders them — anonymous
+  # viewer, static_generation on — so fingerprints match the generated HTML
+  # regardless of who triggered the build (e.g. a logged-in admin on Rebuild).
+  # Safe to nest: it saves and restores whatever was set.
+  def with_static_context
+    prior_static = Current.static_generation
+    prior_member = Current.member
+    prior_user   = Current.user
+    Current.static_generation = true
+    Current.member = nil
+    Current.user   = nil
+    yield
+  ensure
+    Current.static_generation = prior_static
+    Current.member            = prior_member
+    Current.user              = prior_user
   end
 
   def home_changed?
@@ -340,12 +411,26 @@ class StaticGenerator
 
   def build_content_manifest(scope)
     klass_name = scope.respond_to?(:klass) ? scope.klass.name : scope.name
+
+    # Membership fingerprint for items that embed a collection, so change
+    # detection can regenerate an aggregation page when a member changed even
+    # though the page's own file didn't. Only items with a collection block are
+    # resolved; computed as the anonymous static viewer to match the output.
+    fingerprints = with_static_context do
+      scope.where("content LIKE ?", "%```collection%").each_with_object({}) do |rec, acc|
+        fp = rec.embedded_collection_fingerprint
+        acc[rec.id] = fp if fp
+      end
+    end
+
     items = scope.pluck(:id, :updated_at, Arel.sql("json_extract(metadata, '$.url_name')"))
     items.map do |id, updated_at, url_name|
-      [ id.to_s, {
+      entry = {
         updated_at: updated_at.iso8601(6),
         html_file: html_filename_for_type(klass_name, url_name)
-      } ]
+      }
+      entry[:collections_fp] = fingerprints[id] if fingerprints.key?(id)
+      [ id.to_s, entry ]
     end.to_h
   end
 
@@ -471,6 +556,9 @@ class StaticGenerator
     puts "📚 Generating #{docs.count} changed documentation pages..."
     docs.each do |doc|
       next if doc.content.blank?
+      # Skip Roe's bundled docs when they're excluded (search.roe_docs off) —
+      # excluded from search means not published to the static site.
+      next unless doc.publishable?
       generate_documentation_page(doc)
       @stats[:documentation] += 1
     rescue => e
@@ -492,7 +580,10 @@ class StaticGenerator
       template: "documentation/show",
       assigns: { doc: doc, back_path: documentation_back_path_for_static }
     )
-    write_file("documentation/#{doc.url_name}.html", html)
+    # Mirror the doc's directory under site/documentation (public_url does the
+    # same) so Roe's docs land under documentation/roe/ and a user's own docs
+    # keep their place — instead of everything being flattened into one folder.
+    write_file("#{doc.public_url.delete_prefix('/')}.html", html)
   end
 
   # Resolves the back-link target for docs in static mode. Mirrors the
@@ -502,8 +593,14 @@ class StaticGenerator
   # every doc in a single build.
   def documentation_back_path_for_static
     @documentation_back_path_for_static ||= begin
-      has_user_page = Page.public_pages.any? { |p| p.url_name == "documentation" }
-      has_user_page ? "/documentation" : "/roe/documentation"
+      if Page.public_pages.any? { |p| p.url_name == "documentation" }
+        "/documentation"
+      elsif Documentation.roe_docs_published?
+        "/roe/documentation"
+      else
+        # No docs landing is published (user authored none, Roe's are excluded).
+        "/"
+      end
     end
   end
 
@@ -516,6 +613,10 @@ class StaticGenerator
   # ```collection``` block inside renders the same theme-styled
   # docs list the dynamic route produces.
   def generate_documentation_index
+    # The /roe/documentation index lists Roe's bundled docs; skip it when they
+    # aren't published so it can't link to pages the build didn't produce.
+    return unless defined?(Documentation) && Documentation.roe_docs_published?
+
     puts "📚 Generating /roe/documentation/ index..."
     markdown_path = Rails.root.join("app", "views", "documentation", "index.md")
     markdown = if File.exist?(markdown_path)
@@ -727,20 +828,17 @@ class StaticGenerator
     collection
   end
 
+  # Delegates to CollectionQuery so the static site and the Rails site put a
+  # collection in the same order.
+  #
+  # This was a second implementation of the same four keywords — the others in
+  # SQL against the raw `$.date` string. That worked by accident for ISO dates
+  # (lexicographic order matches chronological for same-shaped strings) but
+  # had no tie-break for identical values, and couldn't see an explicit `time:`
+  # at all. So a static build could order a collection differently from the
+  # site it was generated from.
   def apply_collection_order(items, order_by)
-    case order_by
-    when "filename"
-      items.to_a.sort_by do |item|
-        filename = File.basename(item.file_path, ".md")
-        filename =~ /^(\d+)/ ? [ $1.to_i, filename ] : [ Float::INFINITY, filename ]
-      end
-    when "title"
-      items.order(Arel.sql("json_extract(metadata, '$.title') ASC"))
-    when "date-asc"
-      items.order(Arel.sql("json_extract(metadata, '$.date') ASC NULLS LAST"))
-    else
-      items.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
-    end
+    CollectionQuery.order_items(items, order_by)
   end
 
   def generate_title_from_config(config)
@@ -819,9 +917,34 @@ class StaticGenerator
     atom_xml = render_feed(format: :atom)
     write_file("feed.atom", atom_xml) if atom_xml.present?
 
+    generate_named_feeds
+
     puts "  ✓ Generated feeds"
   rescue => e
     log_error("feeds", nil, e)
+  end
+
+  # Named feeds from feeds.yml. Only free feeds are emitted statically — a paid
+  # feed is token-gated, so a static file would just leak its content.
+  def generate_named_feeds
+    FeedConfig.feed_names.each do |name|
+      next if FeedConfig.paid?(name)
+
+      posts = FeedContent.for(FeedConfig.get(name), include_paid: false)
+      write_file("feed/#{name}.xml", FeedGenerator.new(posts: posts, format: :rss, site_config: feed_site_config).generate)
+      write_file("feed/#{name}.atom", FeedGenerator.new(posts: posts, format: :atom, site_config: feed_site_config).generate)
+    rescue => e
+      log_error("named_feed", name, e)
+    end
+  end
+
+  def feed_site_config
+    {
+      title: SiteConfig.get("title") || "My Blog",
+      description: SiteConfig.get("description") || "Blog posts and updates",
+      url: "https://#{site_host}",
+      author: SiteConfig.get("author") || "Site Author"
+    }
   end
 
   def generate_podcast_feeds
@@ -890,12 +1013,32 @@ class StaticGenerator
     puts "  ✓ Assets synced"
   end
 
+  # Roe's own public JavaScript (search, …) — self-contained vanilla files
+  # served from /javascript, distinct from the theme's own scripts. Copied
+  # every build so the output always has them; sync_directory skips unchanged
+  # files and prunes orphans.
+  # Publish site JS to /javascript/. The shipped source is the base; the
+  # per-site copies in site/javascript/ overlay it so overrides win — the same
+  # site-first-then-source resolution the dynamic controller uses.
+  def copy_site_javascript
+    out = @output_dir.join("javascript")
+    sync_directory(SiteJavascript.source_dir, out) # shipped base
+
+    # Overlay the per-site copies (and any site-only additions) on top without
+    # removing the base — a site override wins, matching the dynamic resolver.
+    return unless File.directory?(SiteJavascript.site_dir)
+
+    Dir.glob(File.join(SiteJavascript.site_dir, "*")).each do |f|
+      FileUtils.cp(f, out.join(File.basename(f))) if File.file?(f)
+    end
+  end
+
   # If the active theme isn't installed under site/theme/, fall back to
   # the bundled copy in app/themes/. Without this, sites running the
   # out-of-box default theme would publish with no stylesheet.
   def copy_bundled_themes
     theme_name = SiteConfig.get("theme.active") || "default"
-    %W[#{theme_name}.css checkout.js gallery.js].each do |filename|
+    %W[#{theme_name}.css].each do |filename|
       dest = @output_dir.join("theme", filename)
       next if dest.exist? # site/theme/<file> already won the copy
 
@@ -1001,7 +1144,18 @@ class StaticGenerator
   # (signup, signin, donate, checkout flows) which depend on Rails
   # endpoints that don't exist in a static build.
   def static_pages_scope
-    Page.not_draft.where.not("file_path LIKE ?", "%/pages/members/%")
+    # Excluded by what the page IS, not only where it sits. A sign-in page moved
+    # out of pages/members/ still depends on Rails endpoints a static build
+    # hasn't got, so baking it produces a page whose form silently fails.
+    #
+    # Expressed in SQL rather than Page#member_page? because callers chain
+    # .pluck and .to_a onto this — rejecting in Ruby returns an Array and breaks
+    # them. COALESCE matters: a NULL page_type is not IN the list under SQL's
+    # three-valued logic, which would have excluded every ordinary page.
+    Page.not_draft
+        .where.not("file_path LIKE ?", "%/pages/members/%")
+        .where("COALESCE(json_extract(metadata, '$.page_type'), '') NOT IN (?)",
+               Page::MEMBER_PAGE_TYPES)
   end
 
   # ============================================================================
@@ -1045,10 +1199,9 @@ class StaticGenerator
 
   def generate_robots
     puts "🤖 Generating robots.txt..."
-    host = site_url_base
-    body = "User-agent: *\nAllow: /\n\nSitemap: #{host}/sitemap.xml\n"
+    body = AiCrawlers.robots_txt(sitemap_url: "#{site_url_base}/sitemap.xml")
     write_file("robots.txt", body)
-    puts "  ✓ robots.txt"
+    puts "  ✓ robots.txt (#{AiCrawlers.blocked.size} AI crawlers disallowed)"
   end
 
   # Bake the public search index so client-side site search works with no
@@ -1172,15 +1325,19 @@ class StaticGenerator
       href = link["href"]
       next if href.start_with?("/media/", "/system/", "/assets/")
 
-      clean_href = href[1..-1]
+      # Split off any ?query / #fragment first so the .html suffix lands on
+      # the path, not after the anchor: /docs/glossary#sec must become
+      # /docs/glossary.html#sec, never /docs/glossary#sec.html.
+      path, sep, tail = href.partition(/[?#]/)
+      suffix = "#{sep}#{tail}"
+
+      clean_href = path[1..-1]
 
       # Keep root path as-is (don't convert / to /index.html)
-      if clean_href.empty?
-        link["href"] = prefix.chomp("./") + "/"
-      elsif clean_href == "index"
-        link["href"] = prefix.chomp("./") + "/"
+      if clean_href.empty? || clean_href == "index"
+        link["href"] = prefix.chomp("./") + "/" + suffix
       elsif !clean_href.match?(/\.\w+$/)
-        link["href"] = "#{prefix}#{clean_href}.html"
+        link["href"] = "#{prefix}#{clean_href}.html#{suffix}"
       end
     end
   end

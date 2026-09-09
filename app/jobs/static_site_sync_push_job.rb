@@ -23,7 +23,7 @@ class StaticSiteSyncPushJob < ApplicationJob
     finishing:          "Finishing up…"
   }.freeze
 
-  def perform
+  def perform(full: false)
     @started_at = Time.current
     @config     = StaticSiteSyncConfig.current
     @manifest   = StaticSiteSync::PushManifest.new
@@ -32,7 +32,9 @@ class StaticSiteSyncPushJob < ApplicationJob
     raise "SFTP connection isn't configured." unless @config.configured?
 
     update_step(:computing_diff)
-    diff = @manifest.diff
+    # A full push re-uploads every file and prunes host files removed locally —
+    # recovers from a manifest that's drifted out of sync with the host.
+    diff = full ? @manifest.full_diff : @manifest.diff
     if diff.empty?
       write_completed(message: "Already in sync — nothing to push.")
       return
@@ -103,6 +105,9 @@ class StaticSiteSyncPushJob < ApplicationJob
       kind:     :push,
       step:     @last_step,
       error:    "#{error.class}: #{error.message}",
+      # Lets the failed panel offer "connect without verification" instead
+      # of a dead-end error when the host's cert couldn't be verified.
+      cert_unverified: error.is_a?(StaticSiteSync::Pusher::CertificateError),
       failed_at: Time.current
     )
   end

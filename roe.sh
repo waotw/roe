@@ -173,6 +173,56 @@ esac
 is_macos() { [ "$OS" = "macos" ]; }
 is_linux() { [ "$OS" = "linux" ]; }
 
+# Windows runs Roe through WSL2 — it IS Linux, so everything below works
+# unchanged. We detect it only to give Windows-specific advice: where to
+# install (see require_linux_filesystem) and how to open a browser.
+IS_WSL=0
+if [ -r /proc/version ] && grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+    IS_WSL=1
+fi
+is_wsl() { [ "$IS_WSL" = "1" ]; }
+
+# Roe must live on the Linux filesystem, not a mounted Windows drive.
+#
+# Three things break under /mnt/c, in descending order of how badly:
+#
+#   1. chmod is a no-op there — Windows doesn't have the Unix permission
+#      model. install.sh's `chmod +x roe.sh` silently fails, and so does
+#      anything Rails does to bin/. You get "Operation not permitted".
+#   2. inotify doesn't fire for edits made from the Windows side, so
+#      ContentWatcher misses file changes. Roe is file-backed; a watcher
+#      that doesn't see writes means edits never reach the site.
+#   3. Every read and write crosses the 9p bridge, which is slow enough
+#      to be obvious on a site with any real number of files.
+#
+# The files are still reachable from Windows — \\wsl$\<distro>\home\<you>\roe
+# in File Explorer, or `code .` from the WSL terminal with VS Code's WSL
+# extension. So there's no reason to keep them on the Windows side.
+require_linux_filesystem() {
+    is_wsl || return 0
+    case "$ROE_ROOT" in
+        /mnt/*) ;;
+        *) return 0 ;;
+    esac
+
+    log_error "Roe is installed on a Windows drive: $ROE_ROOT"
+    echo ""
+    echo "  Windows drives are mounted under /mnt/ and can't do what Roe needs:"
+    echo "  file permissions don't stick, and file-change detection doesn't fire"
+    echo "  for edits made from Windows — so your content silently stops syncing."
+    echo ""
+    echo "  Move Roe onto the Linux side, where it belongs:"
+    echo ""
+    echo "      mv \"$ROE_ROOT\" ~/roe && cd ~/roe && ./roe.sh check"
+    echo ""
+    echo "  You can still open the files from Windows:"
+    echo "      \\\\wsl\$\\$(_wsl_distro)\\home\\$USER\\roe"
+    echo ""
+    return 1
+}
+
+_wsl_distro() { printf '%s' "${WSL_DISTRO_NAME:-Ubuntu}"; }
+
 # Check if Homebrew is available (macOS only)
 check_brew() { command_exists brew; }
 
@@ -798,7 +848,7 @@ install_mise() {
 # Runs from APP_DIR so rbenv/.ruby-version is honoured.
 check_ruby() {
     local required
-    required=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
     local req_major req_minor req_patch
     IFS='.' read -r req_major req_minor req_patch <<< "$required"
 
@@ -866,7 +916,7 @@ usage() {
 # tooling) is handled in the friendlier setup flow once Ruby is present.
 print_requirements_summary() {
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
 
     log_step "Checking what's already installed"
 
@@ -900,7 +950,7 @@ cmd_check() {
 
     local all_good=true
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
 
     print_requirements_summary
 
@@ -1060,7 +1110,7 @@ cmd_setup() {
     log_step "Checking Requirements"
 
     local all_good=true
-    check_ruby    || { log_error "Ruby $(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")+ required"; all_good=false; }
+    check_ruby    || { log_error "Ruby $(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")+ required"; all_good=false; }
     check_git     || { log_error "Git required"; all_good=false; }
     check_bundler || { log_error "Bundler required"; all_good=false; }
 
@@ -1381,6 +1431,15 @@ cmd_start() {
                         open "$1"
                     elif command -v xdg-open >/dev/null 2>&1; then
                         xdg-open "$1"
+                    elif command -v wslview >/dev/null 2>&1; then
+                        # WSL: hands the URL to the Windows default browser.
+                        # A bare Ubuntu has no xdg-open, so without this the
+                        # server starts and nothing opens.
+                        wslview "$1"
+                    elif command -v explorer.exe >/dev/null 2>&1; then
+                        # Fallback when wslu isn't installed. explorer.exe
+                        # exits non-zero even when it works, hence the `|| true`.
+                        explorer.exe "$1" >/dev/null 2>&1 || true
                     fi
                 }
                 _open_url "${URL}/"
@@ -1456,7 +1515,7 @@ cmd_console() {
 
 cmd_status() {
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "3.2.2")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
 
     echo -e "${BOLD}Roe Status${NC}"
     echo "=============="
@@ -1501,6 +1560,16 @@ cmd_status() {
     check_bundler && log_success "Bundler"                                  || log_error "Bundler not found"
     check_sqlite  && log_success "SQLite3"                                  || log_error "SQLite3 not found"
     check_libvips && log_success "libvips (optional)" || log_warning "libvips not installed (optional)"
+
+    # Confirm the Windows setup is the supported one, so a user who followed
+    # the docs gets told it worked rather than nothing at all.
+    if is_wsl; then
+        log_success "WSL ($(_wsl_distro)) — Roe runs as Linux here"
+        case "$ROE_ROOT" in
+            /mnt/*) log_error "Installed on a Windows drive — move it to ~/roe (./roe.sh check explains)" ;;
+            *)      log_success "On the Linux filesystem" ;;
+        esac
+    fi
 }
 
 # ── Update command ────────────────────────────────────────────────────────────
@@ -1525,6 +1594,16 @@ cmd_update() {
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+# Under WSL, refuse to set up or run from a Windows drive — permissions and
+# file-change detection both fail there, in ways that look like Roe is broken
+# rather than like a misplaced folder. Read-only commands are left alone so
+# `status` and `help` still work while the user sorts it out.
+case "${1:-}" in
+    check|setup|setup-mise|setup-rbenv|start|restart)
+        require_linux_filesystem || exit 1
+        ;;
+esac
 
 case "${1:-}" in
     check)        cmd_check ;;

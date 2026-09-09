@@ -1,8 +1,8 @@
 ---
-title: Guide → Deploy your site
+title: Guide → Deploy the Roe app
 status: published
 url_name: guide-deploy
-tags: guide
+tags: guide, deploy
 related:
   - site-sync
 ---
@@ -96,7 +96,7 @@ If the name is taken, Fly will tell you and you can try another.
 
 ### Configure Roe for Fly
 
-Details here: [Settings → Global → Deployment](/documentation/settings-deployment#configure-roe-for-fly)
+Details here: [Settings → Deployment](/documentation/roe/settings-deployment#configure-roe-for-fly)
 
 ### Deploy
 
@@ -173,7 +173,7 @@ Don't use your account password — generate a dedicated token instead:
 
 ### Configure Roe for Kamal
 
-Details here: [Settings → Global → Deployment](/documentation/settings-deployment#configure-roe-for-kamal)
+Details here: [Settings → Deployment](/documentation/roe/settings-deployment#configure-roe-for-kamal)
 
 ### Install the Docker Desktop App
 

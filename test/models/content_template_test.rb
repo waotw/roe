@@ -52,7 +52,10 @@ class ContentTemplateTest < ActiveSupport::TestCase
             assert metadata.key?(name),
               "#{type}: frontmatter_for dropped required key #{name.inspect}"
           end
-          assert_equal "Just a body, no frontmatter.", body.strip
+          # The body is now scaffolded per type (ContentScaffold), so the
+          # template's own body is composed in rather than being the whole thing.
+          assert_includes body, "Just a body, no frontmatter.",
+            "#{type}: scaffolding dropped the template's own body"
         end
       end
     end

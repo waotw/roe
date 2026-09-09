@@ -7,7 +7,7 @@ class Admin::StaticSiteSyncController < Admin::BaseController
     config = StaticSiteSyncConfig.current
 
     attrs = params.require(:static_site_sync_config).permit(
-      :protocol, :host, :port, :username, :auth_mode, :password, :ssh_private_key, :remote_path
+      :protocol, :host, :port, :username, :auth_mode, :password, :ssh_private_key, :remote_path, :verify_tls, :ssh_key_passphrase
     )
 
     # Empty password / key in the form means "don't change" — let the
@@ -17,6 +17,26 @@ class Admin::StaticSiteSyncController < Admin::BaseController
     # recoverable by editing again.
     attrs.delete(:password) if attrs[:password].blank?
     attrs.delete(:ssh_private_key) if attrs[:ssh_private_key].blank?
+    attrs.delete(:ssh_key_passphrase) if attrs[:ssh_key_passphrase].blank?
+
+    # An explicit "Remove" (credential-field) clears a stored secret — a blank
+    # field on its own just keeps the current value.
+    attrs[:password]           = nil if params[:clear_password] == "1"
+    attrs[:ssh_private_key]    = nil if params[:clear_ssh_private_key] == "1"
+    attrs[:ssh_key_passphrase] = nil if params[:clear_ssh_key_passphrase] == "1"
+
+    # The form no longer offers an auth-method choice — the protocol decides:
+    # SFTP always uses the SSH key, FTPS always uses the password. Derive
+    # auth_mode so the pusher picks the right path regardless of what was
+    # previously stored.
+    attrs[:auth_mode] = "ssh_key"  if attrs[:protocol] == "sftp"
+    attrs[:auth_mode] = "password" if attrs[:protocol] == "ftps"
+
+    # A new host is a fresh trust decision — re-arm TLS verification so a
+    # previous "connect without verification" never silently carries over
+    # to a different server. (Verification is automatic; there's no manual
+    # toggle in the form.)
+    attrs[:verify_tls] = true if attrs[:host].present? && attrs[:host] != config.host
 
     config.assign_attributes(attrs)
     config.last_verification_error = nil
@@ -48,14 +68,18 @@ class Admin::StaticSiteSyncController < Admin::BaseController
       redirect_to admin_site_sync_path(tab: "static-sync") and return
     end
 
-    pusher = StaticSiteSync::Pusher.for(config: config)
-    pusher.test_connection
-    config.update!(last_verified_at: Time.current, last_verification_error: nil)
-    flash[:notice] = "Connection succeeded."
-  rescue StaticSiteSync::Pusher::ConnectionError => e
-    config.update!(last_verification_error: e.message)
-    flash[:alert] = "Connection failed: #{e.message}"
-  ensure
+    run_connection_test(config)
+    redirect_to admin_site_sync_path(tab: "static-sync")
+  end
+
+  # One-click follow-up to a certificate-verification failure: the user has
+  # chosen to trust this host, so drop verification (the channel stays
+  # encrypted) and immediately re-test to confirm it now connects. Pushes
+  # then pick up the stored verify_tls flag automatically.
+  def skip_tls_verification
+    config = StaticSiteSyncConfig.current
+    config.update!(verify_tls: false)
+    run_connection_test(config)
     redirect_to admin_site_sync_path(tab: "static-sync")
   end
 
@@ -76,9 +100,14 @@ class Admin::StaticSiteSyncController < Admin::BaseController
       redirect_to admin_site_sync_path(tab: "static-sync") and return
     end
 
+    full = params[:full].present?
     seed_running_status
-    StaticSiteSyncPushJob.perform_later
-    flash[:notice] = "Push started in the background. Refresh to check progress."
+    StaticSiteSyncPushJob.perform_later(full: full)
+    flash[:notice] = if full
+      "Full re-sync started — re-uploading everything and pruning files removed locally. Refresh to check progress."
+    else
+      "Push started in the background. Refresh to check progress."
+    end
     redirect_to admin_site_sync_path(tab: "static-sync")
   end
 
@@ -133,6 +162,29 @@ class Admin::StaticSiteSyncController < Admin::BaseController
   end
 
   private
+
+  # Shared path for the manual "Test connection" button and the
+  # "connect without verification" follow-up. Verification is automatic:
+  # a certificate that can't be verified surfaces a distinct prompt
+  # (flash[:tls_cert_prompt]) rather than a dead-end error, so the user
+  # can choose to proceed without it. CertificateError must be rescued
+  # before ConnectionError — it's a subclass.
+  def run_connection_test(config)
+    StaticSiteSync::Pusher.for(config: config).test_connection
+    config.update!(last_verified_at: Time.current, last_verification_error: nil)
+    flash[:notice] = if config.verify_tls
+      "Connection succeeded."
+    else
+      "Connection succeeded. TLS certificate verification is off for this host."
+    end
+  rescue StaticSiteSync::Pusher::CertificateError => e
+    config.update!(last_verification_error: e.message)
+    flash[:tls_cert_prompt] = true
+    flash[:tls_cert_error]  = e.message
+  rescue StaticSiteSync::Pusher::ConnectionError => e
+    config.update!(last_verification_error: e.message)
+    flash[:alert] = "Connection failed: #{e.message}"
+  end
 
   def transfer_in_progress?
     status = Rails.cache.read(StaticSiteSyncPushJob::STATUS_CACHE_KEY)

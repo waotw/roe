@@ -4,8 +4,22 @@ module Members
     before_action :redirect_if_signed_in, only: [ :new, :create, :create_and_checkout ]
     before_action :load_signup_page, only: [ :new, :create, :create_and_checkout ]
 
+    # Declared after load_signup_page so @page is there to re-render with.
+    # Keyed on the IP because the address is the attacker's to choose, and set
+    # high enough that a room full of people signing up at an event won't reach
+    # it. Signing up is the one thing that must never be refused wrongly.
+    include RateLimited
+    limit_requests :signup, only: :create, with: -> { too_many_signups }
+    limit_requests :checkout, only: :create_and_checkout, with: -> { too_many_signups }
+
     def new
       @member = Member.new
+    end
+
+    def too_many_signups
+      @member ||= Member.new
+      flash.now[:alert] = "Too many sign-ups from this connection just now. Wait a minute and try again."
+      render "pages/show", status: :too_many_requests
     end
 
     def create

@@ -48,10 +48,23 @@ export default class extends Controller {
     }
   }
 
+  // Anything inside the collapsible region marked
+  // `data-sticky-toolbar-keep-open` pins the region open while it's on screen.
+  // The auto-hide is right for a panel that's merely available (the TOC) and
+  // wrong for one the user deliberately opened — collapsing that on the next
+  // scroll hides the thing they just asked to see. Opting in per panel keeps
+  // the decision with the panel rather than in this controller.
+  get pinned() {
+    return Array.from(
+      this.collapsibleTarget.querySelectorAll("[data-sticky-toolbar-keep-open]"),
+    ).some((el) => el.getClientRects().length > 0);
+  }
+
   hide() {
     if (!this.hasCollapsibleTarget) return;
     const el = this.collapsibleTarget;
     if (el.style.maxHeight === "0px") return; // already collapsed
+    if (this.pinned) return;
 
     // Set explicit pixel max-height before collapsing so the
     // transition has a concrete "from" value — transitions from
@@ -80,5 +93,23 @@ export default class extends Controller {
     el.addEventListener("transitionend", () => {
       if (el.style.maxHeight !== "0px") el.style.maxHeight = "";
     }, { once: true });
+  }
+
+  // For a panel inside the region that has just opened itself. Expanding isn't
+  // enough on its own — the region can be expanded while the whole toolbar sits
+  // above or below the viewport, so the panel would open where nobody can see
+  // it. Wire with e.g.
+  //   data-action="markdown-doctor:opened->sticky-toolbar#reveal"
+  reveal() {
+    this.show();
+
+    // Scroll only when the toolbar isn't wholly in the viewport. While it's
+    // stuck at the top that's already true, so the common case doesn't move the
+    // page under the writer — it fires when they've scrolled past the toolbar's
+    // containing block, or when it still sits below the fold.
+    const rect = this.element.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      this.element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 }

@@ -1,4 +1,12 @@
 <%= link_to "← Back to Documentation", @back_path, class: "docs-back-link" %>
+<%# Shown only when this page came from the app rather than from /site — so
+    it's clear why an edit to the installed docs isn't appearing here. %>
+<% if @bundled %>
+  <p class="docs-bundled-note">
+    This is Roe's own copy of this page. Your site's documentation doesn't
+    include it, so it's being read from the app instead.
+  </p>
+<% end %>
 <article class="content documentation">
   <div class="content">
     <%= @doc.to_html(static: @static_generation) %>

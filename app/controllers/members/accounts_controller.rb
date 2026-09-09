@@ -7,6 +7,7 @@ module Members
 
     def show
       @member = current_member
+      @private_feeds = PrivateFeeds.for(@member)
     end
 
     def edit
@@ -38,6 +39,36 @@ module Members
           render :edit, status: :unprocessable_entity
         end
       end
+    end
+
+    # Issue a new media token, invalidating every private feed URL the member
+    # has handed out. The whole reason media_token is separate from the
+    # sign-in token is that these URLs travel — so being able to rotate one
+    # without touching the other is the point.
+    def regenerate_media_token
+      current_member.regenerate_media_token!
+
+      redirect_to account_path,
+        notice: "New feed links created. Your old links have stopped working — " \
+                "update your podcast app with the new ones below."
+    end
+
+    # Delete the account: erase the person, keep the record. See
+    # Member#anonymize! for what survives and why.
+    #
+    # Typing DELETE is the confirmation. A dialog is too easy to click past for
+    # something with no undo, and the word has to be produced deliberately.
+    def destroy
+      unless params[:confirm].to_s.strip.upcase == "DELETE"
+        redirect_to account_path, alert: "Type DELETE to confirm you want to delete your account."
+        return
+      end
+
+      current_member.anonymize!(by: :member)
+      reset_session
+
+      redirect_to root_path,
+        notice: "Your account has been deleted. Your name and email address have been removed."
     end
 
     def confirm_email

@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Forms & Buttons
+title: Forms & Buttons
 status: published
 url_name: forms-and-buttons
 tags: roe-anji
@@ -15,6 +15,10 @@ template: links
 
 # Forms & Buttons
 
+##### Before Forms
+
+You'll need to enable the Members feature, go to: [Admin → Settings](/admin/configs) and click `ENABLE MEMBERS`. You will see see `members.yml` in the `Features` section.
+
 Two Roe-anji blocks add interactive elements to your content: `form` (membership, payment, and newsletter flows) and `button` (store "add-to-cart" buttons, plus share and subscribe actions).
 
 ## The `for:` selector
@@ -29,9 +33,9 @@ This determines what the `form` or `button` is for…
 
 ---
 
-# Buttons
+## Buttons
 
-## Product buttons (default)
+### Product buttons (default)
 
 Add a product purchase button. On a product page the SKU is auto-detected; elsewhere, name it.
 
@@ -53,7 +57,7 @@ quantity: 1
 
 For more information about product buttons and how they work, see [Store](/documentation/roe/store) for the full picture.
 
-## Share button
+### Share button
 
 A share button for the current page. On touch devices it opens the native OS share sheet; on desktop it reveals a small **Copy link** + **Email** menu.
 
@@ -76,7 +80,7 @@ By default it shares the page's canonical URL and its [og:title](/documentation/
 
 **Styling:** the wrapper always carries a stable `.share` class (plus a `share-<token>` for each `style:` word), so a theme can align or restyle every share button at once. It's `inline-flex` by default, so to center them all: `.share { display: flex; justify-content: center }`.
 
-## Subscribe button
+### Subscribe button
 
 A "Subscribe" button that links to the member **sign-up** page. On a Roe site, subscribing means becoming a member (this includes newsletters). This button links to your [member sign-up](/documentation/roe/members#member-pages) page.
 
@@ -97,11 +101,11 @@ The subscribe button only works if Members is enabled for your site. With member
 
 ---
 
-# Forms
+## Forms
 
 Forms provide interactive elements for [memberships](/documentation/roe/members), [payments](/documentation/roe/payments), and the [newsletter](/documentation/roe/newsletters). Each is selected with `for:`.
 
-## Signup
+### Signup
 
 ````markdown
 ```form
@@ -117,7 +121,7 @@ upgrade-button-text: Upgrade now
 | `button-text` | No | default "Sign Up" |
 | `upgrade-button-text` | No | Optional second button for immediate upgrade |
 
-## Signin
+### Signin
 
 ````markdown
 ```form
@@ -131,7 +135,7 @@ button-text: Send Magic Link
 | `for` | Yes | `signin` |
 | `button-text` | No | Button text — default "Send Magic Link" |
 
-## Checkout
+### Checkout
 
 ````markdown
 ```form
@@ -147,7 +151,7 @@ non-member-button-text: Sign up to upgrade
 | `member-button-text` | No | For logged-in members |
 | `non-member-button-text` | No | For non-members (shows sign-up link) |
 
-## Donate
+### Donate
 
 ````markdown
 ```form
@@ -163,7 +167,7 @@ button-text: Donate
 
 Uses the donation amounts from your `members.yml` config.
 
-## Unsubscribe
+### Unsubscribe
 
 ````markdown
 ```form
@@ -177,13 +181,15 @@ button-text: Unsubscribe
 | `for` | Yes | `unsubscribe` |
 | `button-text` | No | Button text — default "Unsubscribe" |
 
-## Paid Content (paywall)
+### Paid Content (paywall)
+
+The paywall form will emit text, a button, and a link to sign in.
 
 ````markdown
 ```form
 for: paid_content
 text: This is premium content. Upgrade to continue reading.
-button-text: Become a paid member
+button_text: Become a paid member
 ```
 ````
 
@@ -191,4 +197,7 @@ button-text: Become a paid member
 |--------|----------|-------------|
 | `for` | Yes | `paid_content` |
 | `text` | No | Message shown above the upgrade button |
-| `button-text` | No | CTA text — default "Become a paid member" |
+| `button_text` | No | Add any text you like — default "Become a paid member" |
+| `signin_text` | No | Add any text you like — default "Already a member? [Sign in]" |
+
+When adding `signin_text`, the text between the `[]` will become a link to `/sign-in` automatically.

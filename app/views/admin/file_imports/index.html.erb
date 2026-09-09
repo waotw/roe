@@ -1,0 +1,22 @@
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold mb-2">File Imports</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Upload a ZIP of markdown and/or HTML — a blog export, a static site, a folder
+    of notes. Files come in as drafts: posts and pages sorted out by folder and
+    frontmatter, with a review step for anything unclear. Bundled images and
+    media are copied into your library and their links rewritten. Nothing is
+    published until you review it.
+  </p>
+
+  <div class="bg-white shadow p-6">
+    <%= form_with url: admin_file_imports_path, method: :post, multipart: true, data: { turbo: false } do %>
+      <label for="archive" class="uppercase text-xs px-3 py-1 border border-blue-700 bg-blue-200 text-blue-600 hover:bg-blue-700 hover:text-white font-mono rounded-xs cursor-pointer">ZIP FILE</label>
+      <div class="flex flex-wrap items-center gap-3">
+        <%= file_field_tag "file_import[archive]", accept: ".zip", id: "archive", class: "text-sm" %>
+        <%= submit_tag "Upload & review", class: "uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+
+  <%= render "admin/shared/import_history", imports: @imports, resource: "file_import" %>
+</div>

@@ -8,7 +8,11 @@ class SendNewsletterJob < ApplicationJob
     post = Post.find(post_id)
     members = Member.where(id: member_ids)
 
-    members_to_send = members.reject { |m| NewsletterSend.exists?(post: post, member: m) }
+    # Skip only members already delivered to. This used to skip anyone with a
+    # row at all, which after the failure-recording change would mean a failed
+    # send was never retried.
+    delivered = NewsletterSend.delivered_member_ids(post)
+    members_to_send = members.reject { |m| delivered.include?(m.id) }
 
     Rails.logger.info "Sending to #{members_to_send.size} members for post #{post_id}"
 
@@ -57,20 +61,28 @@ class SendNewsletterJob < ApplicationJob
           if msg_result["ErrorCode"] == 0
             message_id = msg_result["MessageID"]
 
-            # Use find_or_create_by to avoid duplicates
-            NewsletterSend.find_or_create_by!(post: post, member: member) do |ns|
-              ns.sent_at = Time.current
-              ns.message_id = message_id
-            end
+            NewsletterSend.record!(post: post, member: member, message_id: message_id)
 
             sent_count += 1
           else
             failed_count += 1
+            # Recorded, not just logged: the admin panel counts these rows, so
+            # a failure that isn't written down is a failure the site owner
+            # never learns about.
+            NewsletterSend.record!(post: post, member: member,
+                                   error: msg_result["Message"].presence || "Postmark rejected the message")
             Rails.logger.error "Failed to send to #{member.email}: #{msg_result['Message']}"
           end
         end
       else
         failed_count += batch_tuples.size
+        # The whole batch never reached Postmark, so every member in it failed.
+        # Without this the panel reports the batch as if it simply had fewer
+        # recipients.
+        batch_members.each do |member|
+          NewsletterSend.record!(post: post, member: member,
+                                 error: result[:error].to_s.presence || "Batch failed")
+        end
         Rails.logger.error "Bulk batch #{batch_index} failed: #{result[:error]}"
       end
 

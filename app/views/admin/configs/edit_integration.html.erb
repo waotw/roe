@@ -38,13 +38,18 @@
 
   title = case @config_type
     when 'payments'    then 'Payments (Stripe)'
-    when 'newsletters' then 'Newsletters (Postmark)'
+    when 'newsletters' then 'Email (Postmark)'
     when 'snipcart'    then 'Store (Snipcart)'
   end
 
   is_production = Rails.env.production?
   has_mode      = integration_record&.respond_to?(:mode)
   live_ready    = integration_record&.respond_to?(:live_mode_ready?) && integration_record.live_mode_ready?
+
+  # Snipcart has no secret keys and its live snippet runs locally + on the
+  # static build, so its mode is selectable in every environment. Stripe and
+  # Postmark keep live mode production-only (real secrets / real charges).
+  mode_selectable = has_mode && (is_production || @config_type == "snipcart")
 %>
 
 <div class="max-w-3xl mx-auto p-8 bg-white">
@@ -100,21 +105,32 @@
     </div>
   </div>
 
-  <%# Active mode (production only). Sits above the tabs because it's
-      a global state for the integration, not specific to test/live
-      input. Live radio is disabled until live keys are saved. %>
-  <% if is_production && has_mode %>
+  <%# Active mode. Sits above the tabs because it's a global state for the
+      integration, not specific to test/live input. Live radio is disabled
+      until live keys are saved. Production-only for Stripe/Postmark; always
+      available for Snipcart (public snippet, runs live locally + on static). %>
+  <% if mode_selectable %>
+    <%# What "live" costs differs per integration, so say the real thing.
+        "no real charges" on the Postmark page described Stripe's stakes on a
+        screen that never takes a payment. %>
+    <%
+      test_consequence, live_consequence = case @config_type
+        when 'newsletters' then [ "no email delivered", "real email sent!" ]
+        else                    [ "no real charges",    "real charges!"    ]
+      end
+    %>
     <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
       <h3 class="text-base font-semibold text-gray-900 mb-3">Active Mode</h3>
+      <p class="text-xs text-gray-500 mt-1">Here you change which mode you are in.<br>This allows you to use Test Mode on the live site before switching to Live Mode.</p>
       <%= form_with url: mode_update_path, method: :patch, class: "flex items-center gap-6" do |f| %>
         <label class="flex items-center gap-2">
           <%= f.radio_button :mode, "test", checked: integration_record.mode_test?, class: "form-radio" %>
-          <span class="text-sm">Test Mode (no real charges)</span>
+          <span class="text-sm">Test Mode (<%= test_consequence %>)</span>
         </label>
         <label class="flex items-center gap-2">
           <%= f.radio_button :mode, "live", checked: integration_record.mode_live?, disabled: !live_ready, class: "form-radio" %>
           <span class="text-sm <%= live_ready ? 'font-semibold text-red-600' : 'text-gray-400' %>">
-            Live Mode <%= live_ready ? '(real charges!)' : '(add live keys to enable)' %>
+            Live Mode <%= live_ready ? "(#{live_consequence})" : '(add live keys to enable)' %>
           </span>
         </label>
         <%= f.submit "Update Mode",
@@ -192,7 +208,13 @@
       Stimulus target lookups (this.panelTargets) actually find them.
       Without this wrapping, panelTargets is empty and clicking Live
       only restyles the buttons; the visible form never changes. %>
-  <div data-controller="tabs">
+  <% if @config_type == "snipcart" %>
+    <%= render "admin/configs/snipcart_tabs",
+               update_path: update_path,
+               live_update_path: live_update_path,
+               record: integration_record %>
+  <% else %>
+  <div data-controller="tabs" data-tabs-default-value="<%= integration_record&.mode %>">
     <div class="border-b border-gray-200 mb-6">
       <nav class="flex gap-4">
         <button type="button"
@@ -218,7 +240,7 @@
         wonder why the Live tab is greyed out. Skipped in production
         where the tab is interactive. %>
     <% unless is_production %>
-      <p class="text-sm pl-2 mb-2 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">DO NOT PUT LIVE KEYS IN TEXT MODE.</p>
+      <p class="text-sm pl-2 mb-2 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">DO NOT PUT LIVE KEYS IN TEST MODE.</p>
       <ul class="text-sm text-gray-500 italic mb-4 list-disc ml-4">
         <li>Test keys are stored as plain text in <code class="text-xs font-mono">site/system/integrations/<%= @config_type %>.yml</code>.</li>
         <li>Live keys are stored encrypted in the database.</li>
@@ -298,9 +320,21 @@
             </p>
             <div class="space-y-4 pl-4 border-l-2 border-gray-200">
               <% live_section[:fields].each do |field_name, field_config| %>
-                <% current_value = integration_record&.public_send("#{field_name}_live").to_s rescue '' %>
+                <%# `rescue ''` used to wrap this read, so a model with no
+                    `<field>_live` reader rendered an empty box — indistinguishable
+                    from "nothing saved yet". That's how a saved Postmark token
+                    looked like a failed save. Name the problem instead. %>
+                <% reader  = "#{field_name}_live" %>
+                <% wired   = integration_record.respond_to?(reader) %>
+                <% current_value = wired ? integration_record.public_send(reader).to_s : "" %>
                 <% masked = current_value.present? %>
                 <div>
+                <% unless wired %>
+                  <p class="text-xs text-red-700 mb-1">
+                    <strong><%= integration_record.class.name %> has no <code><%= reader %></code>.</strong>
+                    This field can't show or save a value until the model provides it.
+                  </p>
+                <% end %>
                   <label class="block text-sm font-medium text-gray-700 mb-1">
                     <%= field_config[:label] %>
                   </label>
@@ -343,6 +377,7 @@
     <% end %>
   </div>
   </div><%# /data-controller="tabs" %>
+  <% end %>
 
   <%# Danger zone — disconnect clears all keys for this integration
       across both modes. Postmark also exposes a webhook-token rotate

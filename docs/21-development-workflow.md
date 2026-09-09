@@ -3,7 +3,7 @@
 **Status:** Pre-1.0 (0.x)
 **Audience:** Roe maintainers & contributors — internal, not part of the public site docs.
 
-Roe develops in the open on Codeberg ([`waotw/roe`](https://codeberg.org/waotw/roe)). This document covers how versions are tagged, how the branch/release flow works, and how the in-app update system consumes it.
+Roe develops in the open on GitHub ([`waotw/roe`](https://github.com/waotw/roe)). This document covers how versions are tagged, how the branch/release flow works, and how the in-app update system consumes it.
 
 Push/PR access to `development` and `main` is invite-only (trusted contributors). If you don't have it, reach out first — outside contributions are handled case-by-case.
 
@@ -163,8 +163,40 @@ git checkout development && git merge main   # so the fix isn't lost on the next
 
 Roe ships an in-app updater:
 
-1. **Check** — polls Codeberg tags, compares them to the install's `VERSION`, and surfaces an available update in the admin UI (respecting the install's channel).
-2. **Apply** — downloads the target tag to `staging/`, runs migrations/tests, atomically swaps `current/` ↔ `staging/`, and restarts.
+1. **Check** — lists tags with `git ls-remote --tags`, compares them to the install's `VERSION`, and surfaces an available update in the admin UI (respecting the install's channel).
+2. **Apply** — clones the target tag to `staging/`, runs migrations/tests, atomically swaps `current/` ↔ `staging/`, and restarts.
+
+### Where it looks
+
+An install knows only what was compiled into it. One place to look means stranded the day that place goes away — and it can't be rescued by an update, because updating is the broken thing. So `RoeUpdater::Forge` holds an ordered list, and both the check and the download walk it until one answers:
+
+```
+https://go-roe.com/roe.git      redirects; can be repointed without a release
+https://github.com/waotw/roe    where Roe lives
+https://codeberg.org/waotw/roe  where installs from before the move still point
+```
+
+Order matters. go-roe.com is first because it's the one entry that can be moved without shipping anything — a future forge change is a redirect edit, not a release nobody can fetch. The entries behind it are **direct forges, never more redirects**: a redirect can't be its own fallback, since a client can't ask go-roe.com where to go when go-roe.com is down.
+
+Codeberg stays last rather than being removed. Dropping it is what would strand an install that predates the move.
+
+Two things follow from the list:
+
+- An install that is itself a mirror skips its own entry, so go-roe.com doesn't ask itself and wait on a request that can only tell it what it already knows.
+- Timeouts are short (5s per mirror for tags, 3s for release notes) because there's another mirror behind each one. Giving up quickly costs less than waiting.
+
+### Overriding it
+
+| Variable | Effect |
+| --- | --- |
+| `ROE_FORGE_URLS` | Comma-separated list, replacing the defaults outright |
+| `ROE_FORGE_HOST` / `ROE_FORGE_REPO` | Single host/repo, also replacing the list |
+
+Both **replace** rather than extend. Someone who pinned a host meant that host; falling through to ours would quietly update them from somewhere they didn't choose.
+
+Release notes are the only forge-specific call — GitHub answers on `api.github.com`, Forgejo and Gitea on the forge itself. A host with no known API shape simply yields no notes; the update still works.
+
+> **The installer is separate.** `install.sh` resolves a release through a forge API and has no mirror list, so a new install still depends on one host being up. That's tracked as its own work.
 
 Update visibility is gated by license:
 

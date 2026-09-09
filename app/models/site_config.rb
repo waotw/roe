@@ -11,6 +11,7 @@ class SiteConfig < ApplicationRecord
   DEVELOPMENT_FILE = File.join(SITE_PATH, "development.yml")
   DEPLOY_FILE = File.join(SITE_PATH, "deploy.yml")
   CONTENT_FILE = File.join(SITE_PATH, "content.yml")
+  SECURITY_FILE = File.join(SITE_PATH, "security.yml")
 
   # content.yml keys that used to live flat in site.yml. Lets `content`
   # read a pre-split install (before the boot migration moves them).
@@ -126,12 +127,14 @@ class SiteConfig < ApplicationRecord
     File.exist?(FEATURES_PATH.join("#{type}.yml"))
   end
 
-  # Get current config by type
+  # Get current config by type. Nil for a type this class doesn't manage —
+  # callers already reach through with &., so an unknown type reads as
+  # "no config" rather than as the site config.
   def self.current(type = "site")
-    cache_key = "#{CACHE_KEY_PREFIX}_#{type}"
+    file_path = file_path_for(type)
+    return unmanaged(type) if file_path.nil?
 
-    Rails.cache.fetch(cache_key) do
-      file_path = file_path_for(type)
+    Rails.cache.fetch("#{CACHE_KEY_PREFIX}_#{type}") do
       find_by(file_path: file_path.to_s) || create_from_file(type)
     end
   end
@@ -140,16 +143,10 @@ class SiteConfig < ApplicationRecord
     if type
       Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     else
-      # Clear all config caches
-      [
-        "site",
-        "fonts",
-        "defaults/collections",
-        "defaults/cards",
-        "features/members",
-        "features/podcast",
-        "features/store"
-      ].each do |config_type|
+      # Derived, not listed. The hardcoded list this replaced had gone stale —
+      # features/music was added and never added here, so reloading "all"
+      # quietly left the music config cached.
+      db_backed_types.each do |config_type|
         Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{config_type}")
       end
     end
@@ -157,6 +154,7 @@ class SiteConfig < ApplicationRecord
 
   def self.sync_from_file(type)
     file_path = file_path_for(type)
+    return unmanaged(type) if file_path.nil?
     return unless File.exist?(file_path)
 
     config_data = YAML.load_file(file_path)
@@ -165,29 +163,40 @@ class SiteConfig < ApplicationRecord
     site_config.save!
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
+
+    # A show or release audience cascades to its episodes' and tracks' files.
+    # Editing podcast.yml saves no post, so without this the media index keeps
+    # the old answer until something unrelated happens to be saved. Hooked here
+    # rather than on reload!, which fires on read paths too.
+    Medium.recompute_for_config(type)
+
     site_config
   rescue => e
     Rails.logger.error "Failed to sync #{type} config: #{e.message}"
     nil
   end
 
+  # Every config type this class serves from the database, discovered from
+  # what's actually on disk. Files are the source of truth; these rows are a
+  # projection of them, so anything that changes the files has to be able to
+  # rebuild the whole projection.
+  #
+  # `get`, `fonts`, `custom_code` and `development` read their files directly
+  # and so are never stale — they're deliberately absent here.
+  def self.db_backed_types
+    types = []
+    types << "site"     if File.exist?(SITE_FILE)
+    types << "content"  if File.exist?(CONTENT_FILE)
+    types << "fonts"    if File.exist?(FONTS_FILE)
+    types << "deploy"   if File.exist?(DEPLOY_FILE)
+    types << "security" if File.exist?(SECURITY_FILE)
+
+    types + Dir.glob(DEFAULTS_PATH.join("*.yml")).map { |f| "defaults/#{File.basename(f, '.yml')}" }.sort +
+            Dir.glob(FEATURES_PATH.join("*.yml")).map { |f| "features/#{File.basename(f, '.yml')}" }.sort
+  end
+
   def self.sync_all
-    # Sync site configs
-    sync_from_file("site") if File.exist?(SITE_FILE)
-    sync_from_file("fonts") if File.exist?(FONTS_FILE)
-    sync_from_file("deploy") if File.exist?(DEPLOY_FILE)
-
-    # Sync all defaults
-    Dir.glob(DEFAULTS_PATH.join("*.yml")).each do |file|
-      type = "defaults/#{File.basename(file, '.yml')}"
-      sync_from_file(type)
-    end
-
-    # Sync all features
-    Dir.glob(FEATURES_PATH.join("*.yml")).each do |file|
-      type = "features/#{File.basename(file, '.yml')}"
-      sync_from_file(type)
-    end
+    db_backed_types.each { |type| sync_from_file(type) }
   end
 
   def static_generation_enabled
@@ -196,6 +205,25 @@ class SiteConfig < ApplicationRecord
 
   private
 
+  # A type we don't manage. Logged rather than raised: file_path_for is shared
+  # with `current`, which runs on page renders, and ContentWatcher hands it the
+  # basename of whatever .yml appears in system/global/ — so a user dropping
+  # notes.yml in there would take out a page or the watcher thread. Nil is the
+  # honest answer and every caller already treats it as "no config".
+  def self.unmanaged(type)
+    Rails.logger.warn "[SiteConfig] No config file for type #{type.inspect} — ignoring"
+    nil
+  end
+
+  # nil for anything unrecognised.
+  #
+  # This used to fall through to SITE_FILE, which meant an unknown type was
+  # answered with the site config instead of an error. Two things were already
+  # living in that gap: every `integrations/*` call resolved to site.yml (so
+  # four callers that meant to sync an integration were re-syncing site.yml),
+  # and ContentWatcher reported "✓ Custom_code config reloaded" while reloading
+  # site.yml. Both were invisible precisely because the fallback looked like an
+  # answer.
   def self.file_path_for(type)
     case type
     when "site"
@@ -204,6 +232,8 @@ class SiteConfig < ApplicationRecord
       FONTS_FILE
     when "content"
       CONTENT_FILE
+    when "security"
+      SECURITY_FILE
     when "deploy"
       DEPLOY_FILE
     when /^features\//
@@ -212,8 +242,6 @@ class SiteConfig < ApplicationRecord
     when /^defaults\//
       filename = type.split("/").last
       DEFAULTS_PATH.join("#{filename}.yml")
-    else
-      SITE_FILE
     end
   end
 

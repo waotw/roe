@@ -34,23 +34,27 @@ class Admin::SiteSyncController < Admin::BaseController
     @deploy_target_label   = SiteSync.deploy_target_label
     @last_exchange_result  = SiteSync::Exchange.last_exchange_result
 
-    # Cross-side fingerprint comparison — the authoritative "are dev
-    # and live actually in sync" signal. Local-only drift (@status,
-    # @peer_drift) tells us each side's filesystem-vs-own-ledger
-    # state; this tells us whether the two filesystems agree.
-    local_fp        = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil
-    peer_fp         = @peer_state&.dig(:fingerprint)
-    @in_sync_with_peer = local_fp.present? && peer_fp.present? && local_fp == peer_fp
+    # The one shared answer — same object the banner, the nav dot and the
+    # imports publish panel use, so no two surfaces can disagree on the same
+    # render. It walks the site once, compares against the cached peer
+    # fingerprint, and falls back to PeerAgreement when they differ. Pass the
+    # peer state already read above rather than reading the cache twice.
+    @sync_conclusion   = SiteSync::Conclusion.current(peer_state: @peer_state)
+    @in_sync_with_peer = @sync_conclusion.in_sync?
+    @peer_agreement    = @sync_conclusion.agreement
+
+    # First sync: no shared baseline has ever been written (.sync-state.json
+    # absent), the peer is reachable, and the two sides aren't already
+    # identical. Without a common ancestor, a normal reconcile would flag every
+    # shared-path file as a conflict, so the UI offers a one-click mirror clone
+    # instead of that flood.
+    @site_sync_first_sync = @peer_call_configured && @peer_reachable &&
+                            !@in_sync_with_peer && SiteSync::Ledger.recorded.nil?
 
     # When the local ledger was last written = the last successful sync.
     # Persists across cache expiry (unlike the transient transfer status),
     # so the always-on status line can show "last synced …".
-    @last_synced_at = begin
-      version = SiteSync::Ledger.recorded&.dig("version")
-      version.present? ? Time.parse(version.to_s) : nil
-    rescue StandardError
-      nil
-    end
+    @last_synced_at = @sync_conclusion.last_synced_at
 
     # Live config for the form (token + peer_url). first_or_create!
     # auto-generates a token on first access, so the form always has
@@ -314,6 +318,35 @@ class Admin::SiteSyncController < Admin::BaseController
   # Bi-directional sync: reconcile with live and apply the safe changes
   # both ways in one pass. Conflicts stop it (nothing overwritten), so no
   # typed confirmation is needed — both sides are backed up first anyway.
+  # A read-only record of what past syncs moved. Its own page because the Site
+  # Sync screen is already dense, and because this is something you go looking
+  # for after the fact rather than something you watch.
+  def history
+    @events = SiteSync::History.recent
+  end
+
+  # Take specific files back out of the snapshot a sync took before it wrote.
+  # Local only — the snapshot is of this machine, so it can't speak to what a
+  # sync did on live.
+  def restore_from_history
+    result = SiteSync::HistoryRestore.call(
+      snapshot_name: params[:snapshot],
+      paths:         params[:paths]
+    )
+
+    flash[:notice] = "Restored #{result.restored.size} file#{'s' unless result.restored.size == 1} " \
+                     "from #{result.snapshot}."
+    if result.skipped.any?
+      flash[:alert] = "Couldn't restore #{result.skipped.size}: they're missing from that " \
+                      "restore point or not Site Sync's to write."
+    end
+
+    redirect_to admin_site_sync_history_path
+  rescue SiteSync::HistoryRestore::Error => e
+    flash[:alert] = e.message
+    redirect_to admin_site_sync_history_path
+  end
+
   def sync
     if transfer_in_progress?
       flash[:alert] = "A sync is already running. Wait for it to finish."
@@ -330,6 +363,36 @@ class Admin::SiteSyncController < Admin::BaseController
     seed_running_status(:sync)
     SiteSyncTransferJob.perform_later(:sync)
     flash[:notice] = "Syncing with live in the background. Refresh the page to check progress."
+    redirect_to admin_site_sync_path
+  end
+
+  # First-sync clone: mirror this side onto the peer, wholesale. There's no
+  # shared ancestor on a first sync, so instead of a per-file conflict flood we
+  # make the peer an exact copy of local — pushing everything and deleting the
+  # peer's starter/seed content. Destructive on the peer, so it takes the same
+  # typed "LIVE" confirmation as a push; the peer is snapshotted first.
+  def clone_to_live
+    if transfer_in_progress?
+      flash[:alert] = "Another sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless SiteSync::Exchange.can_call_peer?
+      flash[:alert] = "Clone requires a peer URL set on this side (dev only)."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    unless params[:confirm].to_s.strip == "LIVE"
+      flash[:alert] = "Clone aborted — the confirmation didn't match \"LIVE\"."
+      redirect_to admin_site_sync_path
+      return
+    end
+
+    seed_running_status(:clone)
+    SiteSyncTransferJob.perform_later(:clone)
+    flash[:notice] = "Cloning local to live in the background — live will become an exact copy of local. Refresh the page to check progress."
     redirect_to admin_site_sync_path
   end
 
@@ -409,7 +472,7 @@ class Admin::SiteSyncController < Admin::BaseController
     last = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
     kind = last && last[:kind]
 
-    unless [ :push, :pull, :sync ].include?(kind)
+    unless [ :push, :pull, :sync, :clone ].include?(kind)
       flash[:alert] = "Can't retry — no recent transfer status to retry from."
       redirect_to admin_site_sync_path
       return

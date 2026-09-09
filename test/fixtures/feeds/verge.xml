@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+	<channel>
+
+		
+<title>The Verge - Full RSS for subscribers | The Verge</title>
+<link>https://www.theverge.com</link>
+<description>The Verge is about technology and how it makes us feel. Founded in 2011, we offer our audience everything from breaking news to reviews to award-winning features and investigations, on our site, in video, and in podcasts.</description>
+<pubDate>Fri, 24 Jul 2026 12:04:32 +0000</pubDate>
+
+	<lastBuildDate>Fri, 24 Jul 2026 12:04:32 +0000</lastBuildDate>
+
+
+			<image>
+			<url>https://platform.theverge.com/wp-content/uploads/sites/2/2025/01/verge-rss-large_80b47e.png</url>
+							<link>https://www.theverge.com</link>
+										<title>The Verge - Full RSS for subscribers | The Verge</title>
+					</image>
+		
+		
+			<item>
+				
+	<title>Whack-a-drone</title>
+
+<link>https://www.theverge.com/report/969725/fcc-drone-ban-odyssey-robot-galiview-etak-randolph-howard-eason</link>
+<pubDate>Fri, 24 Jul 2026 08:00:00 -0400</pubDate>
+<guid isPermaLink="false">https://www.theverge.com/?p=969725</guid>
+
+			<dc:creator>Sean Hollister</dc:creator>
+	
+
+
+	<media:keywords>ban, drone, eason, etak, fcc, galiview, howard, odyssey, randolph, report, robot</media:keywords>
+	
+	
+<description>
+	The US tried to ban Chinese drones. Brendan Carr can't keep them grounded.</description>
+
+
+				<content:encoded>
+
+																		<![CDATA[
+
+							
+<figure>
+
+<img alt="" data-caption="" data-portal-copyright="Image: Alex Parkin / The Verge, FCC, DJI, Skyrover" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/FCC_Drone_Ban.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+
+							<p class="has-drop-cap wp-block-paragraph">In Pasadena, California, there’s a cute red brick courtyard where one storefront isn’t like the rest. The glass doors open onto a sparse industrial hallway, which leads to a sunlit foyer with a large spiral staircase. Go up, and you’ll see a typical coworking space: open tables, healthy snacks, a collection of meeting rooms with glass walls. Follow one hallway most of the way back, and you’ll find Office 18.</p>
+
+<p class="wp-block-paragraph">There are no signs of life in this tiny private office that’s supposed to be the headquarters of Odyssey Robot, an upstart US drone company. We saw three small desks and chairs, but no power strips, no monitors, no keyboards or chargers or decorations. Two of the desks were covered with sealed cardboard packages.</p>
+
+<p class="wp-block-paragraph">This room is the latest proof: The FCC’s ban on foreign-made drones is a bad joke.&nbsp;</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/odyssey-robot-office-18-john-higgins-the-verge.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;This is where Odyssey Robot claimed to be manufacturing drones.&lt;/em&gt;" data-portal-copyright="" />
+<p class="wp-block-paragraph">On December 22nd, 2025, the US government claimed — without a shred of public evidence — that foreign consumer drones posed an unacceptable threat to national security. With the help of other agencies, FCC Chairman Brendan Carr <a href="https://www.theverge.com/news/849460/fcc-foreign-drone-ban-dji-congress-deadline">banned all future foreign drones</a> from entering the country without a special new waiver. </p>
+
+<p class="wp-block-paragraph">Like with Carr’s make-it-make-sense <a href="https://www.theverge.com/tech/899906/fcc-router-ban-march-2026-explainer">consumer internet router ban</a>, that waiver has nothing to do with the security of these products. The application includes zero questions about restricting or improving the technology itself. </p>
+
+<p class="wp-block-paragraph">Instead, it gives Carr and President Donald Trump the power to decide losers and winners while beating the “America First” drum. Foreign companies have to submit a detailed plan to build their products in the US, including how much they intend to invest in US manufacturing — <a href="https://www.theverge.com/tech/911888/netgear-router-ban-conditional-approval">yet US-based Netgear got a waiver</a> from the router ban even though it made no commitment to produce devices outside Asia.</p>
+
+<p class="wp-block-paragraph">Consumer drones are effectively all made in China, and as of April, it appeared that no one planned to change that as a result of the FCC’s foreign drone ban. Though some US dronemakers exist, they’re pursuing a different and more lucrative opportunity: <a href="https://www.theverge.com/news/906306/fcc-drone-ban-who-will-replace-dji-in-us-antigravity-hoverair-skydio">drones that spy and kill</a>.</p>
+
+<p class="wp-block-paragraph">But Office 18 shows another gaping hole in the FCC’s plan. Instead of creating new US consumer drone companies, it’s incentivizing <em>fake</em> ones instead.&nbsp;</p>
+
+<p class="wp-block-paragraph">How easy is it to fool the FCC? Just lie on the paperwork, it seems.&nbsp;</p>
+
+<p class="wp-block-paragraph">Just whip up a new company that <em>pretends</em> to build brand-new drones in the USA and count on no one noticing — even if your drones clearly use proprietary DJI wireless tech.&nbsp;</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/Drones.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;The DJI Mini 4 Pro next to the Skyrover X1. &lt;a href=&quot;https://www.theverge.com/report/714103/dji-skyrover-x1-evade-ban-amazon&quot;&gt;It’s not just a clone&lt;/a&gt;.&lt;/em&gt;" data-portal-copyright="" />
+<p class="has-drop-cap wp-block-paragraph">DJI, the world’s biggest drone company, didn’t dominate drones just because of <a href="https://en.wikipedia.org/wiki/First-mover_advantage">first-mover advantage</a>. It was technology. DJI’s OcuSync and older Lightbridge real-time video transmission systems were and are the most reliable long-range, low-latency ways to remotely control a consumer-grade drone. Almost every time <em>The Verge</em> has tested another brand, the signal hasn’t been as reliable. It’s a competitive advantage that DJI wouldn’t easily share.&nbsp;</p>
+
+<p class="wp-block-paragraph">But OcuSync has a telltale fingerprint. It uses specific pairs of radio frequencies, pairs that appear in the FCC’s databases.&nbsp;</p>
+
+<p class="wp-block-paragraph">When software developer and journalist Konrad Iturbe began watching FCC databases for those frequencies, he realized that DJI was preparing to play a grand game of <em>Whac-A-Mole</em> in the United States. Well ahead of the December 2025 drone ban, a host of new companies had suddenly appeared selling barely disguised versions of DJI technology. He dubbed them “<a href="https://github.com/KonradIT/dji-front-companies">DJI front companies</a>.”&nbsp;</p>
+
+<figure class="wp-block-embed is-type-rich is-provider-tiktok wp-block-embed-tiktok"><div class="wp-block-embed__wrapper">
+<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@verge/video/7559053065475689741" data-video-id="7559053065475689741" data-embed-from="oembed" style="max-width:605px;min-width:325px"> <section> <a target="_blank" title="@verge" href="https://www.tiktok.com/@verge?refer=embed">@verge</a> <p>Did DJI just dodge Trump&#8217;s tariffs by knocking off its own excellent camera? The DJI Osmo Pocket 3 costs a pricey $800 these days, but the Xtra Muse seems to be the same exact thing for $500-600, minus DJI Mic support. Watch to see how this isn&#8217;t your typical cheap clone! <a title="dji" target="_blank" href="https://www.tiktok.com/tag/dji?refer=embed">#dji</a> <a title="camera" target="_blank" href="https://www.tiktok.com/tag/camera?refer=embed">#camera</a> <a title="osmopocket3" target="_blank" href="https://www.tiktok.com/tag/osmopocket3?refer=embed">#osmopocket3</a> <a title="techtok" target="_blank" href="https://www.tiktok.com/tag/techtok?refer=embed">#techtok</a> <a title="todayimtoyingwith" target="_blank" href="https://www.tiktok.com/tag/todayimtoyingwith?refer=embed">#todayimtoyingwith</a> </p> <a target="_blank" title="♬ original sound - The Verge - The Verge" href="https://www.tiktok.com/music/original-sound-The-Verge-7559053195687758605?refer=embed">♬ original sound &#8211; The Verge &#8211; The Verge</a> </section> </blockquote> 
+</div></figure>
+
+<p class="wp-block-paragraph">One of the most prominent DJI clones to enter the US was Skyrover, which released a budget drone that was a dead ringer for the DJI Mini 4 Pro. Last July, DJI would not confirm or deny to <em>The Verge</em> that “Skyrover” was <a href="https://www.theverge.com/report/714103/dji-skyrover-x1-evade-ban-amazon">a disguised version of its own drone</a>, even though security researchers confirmed its app included DJI code.</p>
+
+<p class="wp-block-paragraph">Then, in October, <a href="https://www.theverge.com/report/795016/xtra-muse-dji-osmo-pocket-3-us-customs-tariffs">Iturbe helped us introduce you to Xtra</a>, the company that lets DJI sneak its popular cameras into the US. When we tested an Xtra camera versus a DJI camera, we found them so identical, it removed any doubt. Again, DJI would not confirm or deny.&nbsp;</p>
+
+<p class="wp-block-paragraph">As a result, US citizens were still able to purchase DJI tech — only now, they were dealing with fly-by-night businesses, with no real guarantee of support in the future.</p>
+
+<p class="wp-block-paragraph">This June, Iturbe discovered the most brazen attempt yet. The DJI fingerprint led him to the FCC filings for a company named Odyssey Robot, which does business as Galiview Tech. In March, it became the first DJI-equipped drone brand to get FCC approval since the drone ban began. DJI did not reply to requests for comment for this story.</p>
+
+<p class="wp-block-paragraph">If Galiview was trying to hide the DJI connection, it didn’t try very hard: The company’s website even listed DJI’s trademarked OcuSync tech as a Galiview feature.&nbsp;</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/galiview-ocusync.png?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;Galiview’s website claimed that its drone would have OcuSync, among other DJI trademarks and marketing phrases.&lt;/em&gt;" data-portal-copyright="" />
+<p class="wp-block-paragraph">Wasn’t stopping clandestine Chinese hardware the whole point of the ban? <em>How</em> could the FCC approve this drone?</p>
+
+<p class="wp-block-paragraph">Simple: On February 6th, a “Randolph Howard Eason” declared on an FCC form that Odyssey Robot&#8217;s drone and controller were made in the United States, and nobody ever questioned that before rubber-stamping its application.&nbsp;</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/odyssey-robot-us-attestation.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;p&gt;&lt;em&gt;This is Odyssey Robot’s declaration that its drone was made in the USA.&lt;/em&gt;&lt;/p&gt;" data-portal-copyright="" />
+<p class="wp-block-paragraph">The FCC could have spotted the OcuSync frequencies, or that this supposedly US-manufactured gadget was tested by a Chinese lab, or that it used a Chinese-made antenna also used by another Chinese drone.</p>
+
+<p class="wp-block-paragraph">But it’s easier than that. Odyssey Robot declared that its drone was designed, developed, and manufactured<em> </em>at 21 Miller Alley Suite 210 in Pasadena, California. Even <a href="https://www.google.com/search?q=21+Miller+Alley%2C+Suite+210">a basic Google search can show you</a> that’s not the address of a factory — it’s a coworking space called Industrious that <a href="https://www.industriousoffice.com/access-agreement#:~:text=manufacturing%2C%20or%20for%20any%20other%20use%20prohibited%20by%20the%20Member%20handbook%20is%20not%20permitted">explicitly prohibits members</a> from manufacturing anything onsite.&nbsp;</p>
+
+<p class="wp-block-paragraph">Odyssey Robot also declared that its drones are assembled at eTak Worldwide Corporation in Grand Prairie, Texas. With 80,000 square feet of warehouse space and 15 loading docks, you could theoretically build drones there. But again, a basic Google search would show you that <a href="https://www.etakworldwide.com/">eTak isn’t an assembler</a>; it’s a <em>recycling</em> company that collects e-waste, <a href="https://greentx.wistron.com/en-global/News/press_release/Content?param1=293">including old batteries</a>, then sorts and dismantles them.&nbsp;</p>
+
+<p class="wp-block-paragraph">Still, we wanted to be sure. We called up the receptionist at the coworking space in Pasadena; they confirmed that Odyssey Robot was actively renting a two-person private office. Official California business records claimed the company was operating out of Office 18. You know the rest: We found a lonely room with three unused desks topped with cardboard packages.</p>
+
+<p class="wp-block-paragraph">If the FCC had ever seen the website for these drones, it could have found even more eyebrow-raising contradictions. The website claimed that “Galiview Inc.” was founded in 2022 and headquartered in San Francisco, even as it provided a Las Vegas phone number and a Pasadena address.&nbsp;</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/galiview-website.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;Galiview’s website falsely claimed it was a corporation headquartered in San Francisco and founded in 2022.&lt;/em&gt;" data-portal-copyright="" />
+<p class="wp-block-paragraph">“Based in the heart of San Francisco’s technology innovation hub, we’ve been pushing the boundaries of what’s possible in consumer drone technology,” it claimed.</p>
+
+<p class="wp-block-paragraph">In reality, public records show that Galiview is not a corporation. It’s a trademark of Odyssey Robot, LLC, which was formed in Delaware in January 2025 and registered in California last December, after what seems like an aborted attempt to call the brand “Flyon” instead. Other trademark filings from February 2026 show it planning at least three products: a Galiview Titan, Galiview Venus, and Galiview Nova.</p>
+
+<p class="wp-block-paragraph">The company never replied to my emails to contact@flyondrone.com, the one and only email address it has provided publicly. We found its only phone number disconnected: “The subscriber you have dialed is not in service.” </p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/SCR-20260702-ksri.jpeg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;eTak’s website.&lt;/em&gt;" data-portal-copyright="" />
+<p class="has-drop-cap wp-block-paragraph">eTak Worldwide, the recycler, also wasn’t answering emails or picking up the phone. “Sorry, but the user’s mailbox can’t accept any more messages,” I heard time and again. We had no better luck with “iNet Expert,” an earlier company from eTak’s founder that claimed to offer wholesale computer parts. Every time I tried the company’s phone tree, the answer was always a robotic “No one is available.”&nbsp;</p>
+
+<p class="wp-block-paragraph">But when I realized iNet Expert was just 30 minutes from my house, I decided to pay it a visit.&nbsp;</p>
+
+<p class="wp-block-paragraph">The building was locked, but through the window I saw something strange. The primary decoration was a nearly floor-to-ceiling marketing image for a smartphone screen protector from 2014, from a company called Rudaor. It appears that iNet tried to become a US distributor, judging by the <a href="https://www.youtube.com/@inetparts/videos">roughly 300 views on YouTube</a>. On the windows of iNet’s office, there were also signs <a href="https://web.archive.org/web/20180825053417/http://www.hirutech.com/we-represent">for Hirutech USA</a>, the defunct US arm of a Taiwanese electronics business development firm that once occupied the same address.&nbsp;</p>
+
+<div class="image-slider">
+	<div class="image-slider">
+		
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/20260701_160734.jpg?quality=90&amp;strip=all&amp;crop=0,5.5555555555556,100,88.888888888889" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;The iNet Expert sign seemed quite old.&lt;/em&gt;" data-portal-copyright="" />
+
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/20260701_160900.jpg?quality=90&amp;strip=all&amp;crop=0,5.5555555555556,100,88.888888888889" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;The front office at iNet Expert.&lt;/em&gt;" data-portal-copyright="" />
+
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/20260701_161452.jpg?quality=90&amp;strip=all&amp;crop=0,5.5555555555556,100,88.888888888889" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;Another sign for Hirutech USA.&lt;/em&gt;" data-portal-copyright="" />
+	</div>
+</div>
+
+<p class="wp-block-paragraph">The whole building was a time capsule — and yet, it’s still getting a few shipments from overseas, including on July 15th, <a href="https://www.importyeti.com/company/inet-expert">according to import records</a> collected by ImportYeti. </p>
+
+<p class="wp-block-paragraph"><em>eTak’s founder has a history of lending out his business address</em>, I thought.&nbsp;</p>
+
+<p class="wp-block-paragraph">But when I finally stumble across a cell phone number for Richard Lee, founder of eTak and iNet Expert, he says he’d never heard of Odyssey Robot until a week or so earlier.</p>
+
+<p class="wp-block-paragraph">“I’m happy you called me, because we totally have no idea what’s going on,” Lee told me on July 13th. “Why are people using our company name to do this kind of thing? It’s kind of ridiculous.”&nbsp;</p>
+
+<p class="wp-block-paragraph">When I show him Odyssey Robot’s sworn attestation that eTak assembles its drones, he says it must have picked his address out of a search engine.&nbsp;&nbsp;</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/etak-worldwide-google-maps.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;eTak Worldwide, as seen in Google Street View.&lt;/em&gt;" data-portal-copyright="" />
+<p class="wp-block-paragraph">“No, we don’t assemble anything, we only refurbish,” he says when I ask, adding that eTak doesn’t have the manpower. He says he’s recycled batteries for Taiwanese computer maker Wistron (which builds laptops for giants like HP and Dell), UV ink cartridges for Anker, and vacuums for Ecovacs, but he’s never had a relationship with dronemaker DJI.&nbsp;</p>
+
+<p class="wp-block-paragraph">“They are a huge company, they will not choose us,” he says. “If they use our company name, it’s not fair for us, it’s not right.”</p>
+
+<p class="wp-block-paragraph">But whoever’s behind Odyssey Robot is likely to get away with the lies.</p>
+
+<hr class="wp-block-separator has-alpha-channel-opacity" />
+
+<p class="has-drop-cap wp-block-paragraph">Since 2023, every foreign company selling wireless gadgets in the United States has theoretically needed an extra human in the loop, based in the United States. <a href="https://www.fcc.gov/laboratory-division/equipment-authorization-approval-guide/equipment-authorization-system#:~:text=beginning%20February%206%2C%202023">That February</a> is when the FCC added the requirement for a “US agent” who it can legally serve papers to, and communicate with, so the FCC can enforce against a company that might be unreachable under international law.</p>
+
+<p class="wp-block-paragraph">But there’s nothing in <a href="https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-2/subpart-J#p-2.911(d)(7)">the rules</a> that requires anyone to verify the US agent is a known, reputable person with a working telephone number and email address, working out of an actual permanent office. And though the FCC might have <em>guidelines</em> suggesting those things, Keller &amp; Heckman partner Greg Kunkle tells <em>The Verge</em> that it’s unlikely anyone’s bothering to check.</p>
+
+<p class="wp-block-paragraph">“To my knowledge, there’s no real vetting of the US agent,” he tells <em>The Verge</em>. “If you’re making a misstatement, that’s a rule violation, but I don’t think the FCC or TCB is checking those actively. I’m not sure anybody is.”&nbsp;</p>
+
+<p class="wp-block-paragraph">Kunkle says that for the past decade or so, FCC authorizations haven’t actually been handled by the FCC at all — the agency outsourced that role to <a href="https://www.fcc.gov/sites/default/files/34-TCB-Market-Surveillance-TCB_Apr_2026.pdf">roughly 40</a> private companies called TCBs, short for Telecommunications Certification Bodies. “Once the TCB finishes its process, you’re good to go,” says Kunkle, adding that those authorizations go straight into the FCC database with no more FCC input at all.</p>
+
+<p class="wp-block-paragraph">A TCB could theoretically get in trouble for letting banned companies through, even lose its status — and the FCC <em>does</em> ask TCBs not to take the “US agent” at their word. The agency added <a href="https://apps.fcc.gov/kdb/GetAttachment.html?id=XwvSuxlozSVEhSKc15aQPw%3D%3D&amp;desc=986446%20D01%20Covered%20Equipment%20Guidance%20v04&amp;tracking_number=325672">specific guidelines this past December</a> about that, including the requirement for “a valid physical US mailing address,” not just a virtual mailbox or a vacant lot:</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/chrome_oBma5NDpx7.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="“TCBs should perform due diligence to validate the information provided,” the guidelines begin." title="“TCBs should perform due diligence to validate the information provided,” the guidelines begin." data-has-syndication-rights="1" data-caption="&lt;em&gt;The FCC would like TCBs to check if companies are physically located at the address they provide — but it may just be a guideline.&lt;/em&gt;" data-portal-copyright="" />
+<p class="wp-block-paragraph">“TCBs should not rely solely on the applicant’s certification,” the FCC writes. If a TCB has any reason to believe that a gadget <em>may</em> be banned, the FCC says it shouldn’t process the application at all. And if a TCB decides it did the wrong thing, it should “immediately submit a KDB inquiry explaining the issue to the FCC,” the agency adds.</p>
+
+<p class="wp-block-paragraph">But does that happen? We reached out to TÜV Rheinland, the TCB that approved Odyssey Robot’s FCC authorization, to let it know we were writing a story about Odyssey Robot making potentially fraudulent attestations, and the company <em>still</em> couldn’t find anything wrong.</p>
+
+<p class="wp-block-paragraph">“As of today, we do not have any concrete evidence for questioning our certifications to Odyssey Robot. If there is a reasonable basis for questioning a certification, we will follow the procedures established by the FCC for such cases,” TÜV Rheinland communications manager Maximilian Grün told <em>The Verge</em> on July 15th.</p>
+
+<p class="wp-block-paragraph">TÜV Rheinland said it hadn’t received any communication from the FCC regarding Odyssey Robot, but also that Odyssey Robot did not forge the TÜV Rheinland test reports attached to its FCC filing. Those were genuine.&nbsp;</p>
+
+<hr class="wp-block-separator has-alpha-channel-opacity" />
+
+<p class="has-drop-cap wp-block-paragraph">If the TCBs do their jobs, it’s possible they would catch some fake brands. <a href="https://apps.fcc.gov/kdb/GetAttachment.html?id=dQfN6tcMcj%2FrEmjHGZ%2B3dw%3D%3D&amp;desc=610077%20D01%20TCB%20Post%20Market%20Surveillance%20v06r02&amp;tracking_number=20540">The TCBs are supposed to audit 5 percent of all devices</a> they certify in a calendar year and report back to the FCC with their findings — including whether a company fails to provide a sample of a product for testing. Perhaps Odyssey Robot would have been the 1 in 20 and get caught that way.</p>
+
+<p class="wp-block-paragraph">But so far, the only “DJI front companies” we’ve seen targeted by the FCC are the ones that journalists brought to the agency’s attention.</p>
+
+<p class="wp-block-paragraph">On July 10th, <a href="https://www.theverge.com/policy/964342/fcc-crack-down-dji-front-companies-xtra-skyrover-sgs-lab">the FCC proposed $25,000 fines</a> against eight of the “DJI front companies,” noting that they were alerted to the brands through research from Konrad Iturbe and my own coverage on <em>The Verge</em>. It justified the fines, and possibly further action, because those companies’ US agents didn’t even bother replying to the agency’s letters. <em>&nbsp;</em></p>
+
+<p class="wp-block-paragraph">In 2024, the FCC similarly proposed <a href="https://www.theverge.com/2024/11/21/24302544/eken-video-doorbell-fcc-fine-fishbot-cutepanda">over $700,000 in fines against Eken</a>, a Hong Kong-based video doorbell manufacturer that also failed to provide working contact information for a US agent. That time, it was journalists <a href="https://www.consumerreports.org/home-garden/home-security-cameras/video-doorbells-sold-by-major-retailers-have-security-flaws-a2579288796/">at <em>Consumer Reports</em></a> who prompted the FCC to act.&nbsp;</p>
+
+<p class="wp-block-paragraph">But even if the FCC can issue a fine, it probably won’t be able to collect.</p>
+
+<p class="wp-block-paragraph">Earlier this year, the agency <a href="https://docs.fcc.gov/public/attachments/DOC-420714A1.pdf">cited the Eken case as evidence</a> that “foreign actors in our equipment authorization have been able to evade US law when products they are responsible for have harmed American consumers.” Even if a company pretends to be based in the US, the FCC can’t reach them if they’re actually in China instead.</p>
+
+<p class="wp-block-paragraph">There might still be real financial consequences for some DJI front companies. On July 17th, the FCC took things up a notch by threatening to <a href="https://www.theverge.com/news/968310/fcc-dji-drone-camera-ban-skyrover-xtra">retroactively ban the DJI fronts’ already-approved products</a> from import, sale, marketing, and distribution, which could be the end for successful brands like Xtra and Skyrover that snuck in before the ban.</p>
+
+<p class="wp-block-paragraph">But it seems like that might be where the FCC’s direct powers of enforcement end. Former FCC enforcement chief Peter Hyun tells <em>The Verge</em> that the agency will want to send a message to other companies not to do this thing, but the tools it has in its tool belt are forfeitures, cease and desist letters, and “show-cause” orders where a company has to explain why its license shouldn’t be revoked. The FCC could also theoretically help the Department of Justice bring a smuggling charge, he says.</p>
+
+<p class="wp-block-paragraph">Lying smugglers hiding behind disconnected phone numbers won’t be stepping forward to provide their real identities, of course.</p>
+
+<p class="wp-block-paragraph">On July 21st, a month and a half after Iturbe and <em>The Verge </em>asked the FCC about Odyssey Robot for this story, the agency revealed <a href="https://docs.fcc.gov/public/attachments/DA-26-746A1.pdf">it had sent a “show-cause” order to the company</a> a few days after we tipped them off. The FCC’s investigation was limited to sending letters to Odyssey and eTak and noting whether the two entities responded. Odyssey didn’t respond. eTak denied any relationship with Odyssey.&nbsp;</p>
+
+<p class="wp-block-paragraph">eTak replied to the FCC on July 13th, the same day I spoke to its founder on the phone.&nbsp;</p>
+<div class="documentcloud-embed"><a href="https://embed.documentcloud.org/documents/28508188-da-26-746a12/?embed=1" target="_blank" rel="noopener noreferrer">View Link</a></div>
+<p class="has-drop-cap wp-block-paragraph">The question now isn’t what happens to the empty husk of Odyssey Robot, but how many other smugglers might sneak through when the agency <em>isn’t</em> tipped off. If the only reason the FCC caught Odyssey is a guy named Konrad — well, that’s not how government agencies are supposed to work.&nbsp;</p>
+
+<p class="wp-block-paragraph">The FCC’s consumer gadget bans are broken if they don’t require anyone to do a basic Google search before legally approving banned gadgets for import and sale. They’re broken if the FCC can’t track down and make a meaningful example of a bad actor even after they’re caught, because the same lies that made them invisible also shield them from consequences.&nbsp;</p>
+
+<p class="wp-block-paragraph">Since Odyssey hadn’t yet begun selling drones in the US, revoking its FCC authorization likely wouldn’t matter to its mystery owners. It wouldn’t be surprising if their takeaway is to lie more carefully, rather than not lying at all.&nbsp;</p>
+
+<p class="wp-block-paragraph">But it does seem that the FCC is attempting to close some loopholes.</p>
+
+<p class="wp-block-paragraph">At first, it seemed that the FCC was following the America First formula of punishing Chinese entities based on their affiliation rather than their actions — it took action <a href="https://docs.fcc.gov/public/attachments/DOC-414369A1.pdf">against eight so-called “bad labs”</a> that test radios in China simply because Chinese state-sponsored entities had more than 10 percent equity. When it moved against <a href="https://docs.fcc.gov/public/attachments/DA-26-744A1.pdf">SGS-CSTC Shenzhen</a>, a lab used by at least one DJI front, it didn’t mention that front in its justification for the move.&nbsp;</p>
+
+<p class="wp-block-paragraph">But on July 21st, the FCC <a href="https://docs.fcc.gov/public/attachments/DA-26-745A1.pdf">moved against test lab Shenzhen STS</a> because it “willfully provided false test results” for a variety of Bluetooth headsets, phones, and tablets, which the lab blamed on negligent staff. Perhaps the FCC will act against TCBs and test labs that aren’t carefully checking banned gadgets, too.</p>
+
+<p class="wp-block-paragraph">The agency is also now proposing to make online retailers like Amazon display the FCC IDs of each device on their product pages so that consumers can check for themselves whether the names line up, at least. Amazon already collects those FCC IDs from sellers, but spokesperson Juliana Karber confirms the company’s never required them to actually display the IDs publicly.</p>
+
+<p class="wp-block-paragraph">The FCC did not respond to any of our repeated requests for comment over the past two months.</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/tuv-rheinland-tcb-2.jpg?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;TÜV Rheinland is the TCB that processed Odyssey Robot’s paperwork. &lt;/em&gt;" data-portal-copyright="" />
+<p class="has-drop-cap wp-block-paragraph">So far, we’ve been unable to track down “Randolph Howard Eason,” the “compliance director” who submitted Odyssey Robot’s paperwork. No one we’ve found by that name or similar seems likely to be a fit, and those who might have been paid by Odyssey — like the coworking space and TÜV Rheinland — declined to tell <em>The Verge</em> anything more about their clients.&nbsp;</p>
+
+<p class="wp-block-paragraph">Not that we’d necessarily get very far, because Odyssey Robot used middlemen to cover its tracks. For example, Sean Hartlieb, an attorney in Hawaii who processed the “Galiview” trademark, tells <em>The Verge</em> that he never interacted with the company at all. He says he processes trademark filings for all sorts of Chinese companies as a side gig, getting his assignments from a Chinese firm that charges a flat fee for US trademarks.&nbsp;</p>
+
+<p class="wp-block-paragraph">By paying small standardized fees, it might not be that expensive for a big company to build lots of shell companies and see which ones escape notice. “$20,000, maybe something like that?” Kunkle suggests each might cost. “Trademarks, TCBs, test labs, it’s probably somewhere in that range. It’s not much more than that.”</p>
+
+<p class="wp-block-paragraph">So what keeps a big foreign brand from sneaking through?</p>
+
+<p class="wp-block-paragraph">“I hate to say it, but it would be pretty easy,” says Kunkle. “I think just the volume of devices coming into the United States — if you&#8217;re the type of person that&#8217;s willing to fudge this paperwork and you reside in some place where you think you&#8217;re unreachable by the US government, I don&#8217;t think this would be hard to fake at all.”</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/whack-a-drone_5c290e.webp?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="" data-portal-copyright="Image: Alex Parkin / The Verge, FCC, Skyrover" />
+<p class="has-drop-cap wp-block-paragraph">If anyone were to make a definitive link between Odyssey Robot and DJI, I thought it would be one of the firms that registered its LLC in the United States. Odyssey Robot is currently registered through Delaware Business Incorporators and California Registered Agent.&nbsp;But Delaware is a state that lets companies set up LLCs anonymously.</p>
+
+<p class="wp-block-paragraph">“Unfortunately, it opens up the door to fraud and there’s not much recourse,” says the receptionist at Delaware Business Incorporators.</p>
+
+<p class="wp-block-paragraph">If I want to reach Odyssey Robot, the receptionist at California Registered Agent tells me, I can try mailing the message to her office in Sacramento instead.</p>
+
+<p class="wp-block-paragraph">“We&#8217;re real!” she says. “Sometimes our clients are not, unfortunately.”</p>
+
+<p class="wp-block-paragraph"><em>Additional reporting by John Higgins.&nbsp;</em></p>
+							]]>
+											
+				</content:encoded>
+			</item>
+
+		
+			<item>
+				
+	<title>TikTok’s protection of minors should not be opt-in, warns EU</title>
+
+<link>https://www.theverge.com/tech/970519/tiktok-eu-dsa-child-safety-age-account-privacy</link>
+<pubDate>Fri, 24 Jul 2026 07:40:03 -0400</pubDate>
+<guid isPermaLink="false">https://www.theverge.com/?p=970519</guid>
+
+			<dc:creator>Jess Weatherbed</dc:creator>
+	
+
+
+	<media:keywords>account, age, child, dsa, eu, privacy, safety, tech, tiktok</media:keywords>
+	
+	
+<description>
+	﻿‘A high level of protection should not be an opt-in; it should be the default.’</description>
+
+
+				<content:encoded>
+
+																		<![CDATA[
+
+							
+<figure>
+
+<img alt="An illustration of the TikTok logo" data-caption="" data-portal-copyright="Illustration by Nick Barclay / The Verge" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2025/03/STK051_VRG_Illo_N_Barclay_2_tiktok.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+
+							<p class="wp-block-paragraph">TikTok has attracted the ire of the European Union over its protection of children who use the video sharing platform. The <a href="https://ec.europa.eu/commission/presscorner/detail/en/ip_26_1679">European Commission announced</a> preliminary findings today under the Digital Services Act (DSA) that offer specific issues to address.</p>
+
+<p class="wp-block-paragraph">The Commission suggests that TikTok should adjust the default settings of minors&#8217; “public” accounts so the content they post is only visible to TikTok users the teen has chosen to share it with, and that such content shouldn’t be recommended to other users in the For You feed. Even accounts set to private can be easily discovered through the “following” lists of other users, and their profile photos can be seen by anyone. If TikTok fails to address the concerns, it could face a DSA non-compliance decision that imposes fines of up to 6 percent of the company’s global annual revenue.</p>
+
+<p class="wp-block-paragraph">“Minors deserve a safe experience from the moment they go online. The Digital Services Act requires platforms to build protections for minors into the design of their services, and holds them to account when they fail to do so,” EU tech chief Henna Virkkunen said in the announcement. “A high level of protection should not be an opt-in; it should be the default. This is our responsibility for current and future generations of European children.”</p>
+
+<p class="wp-block-paragraph">The preliminary findings follow UK communications regulator Ofcom launching a <a href="https://www.theverge.com/tech/966419/the-uk-is-scrutinizing-tiktok-over-child-safety">similar child safety investigation</a> into TikTok last week, with updates expected in October. The EU says its separate probe to evaluate the addictive “<a href="https://www.theverge.com/policy/874746/tiktok-addictive-eu-regulators-infinite-scroll-notifications-autoplay">rabbit hole effect</a>” of TikTok&#8217;s recommender systems is still ongoing.</p>
+							]]>
+											
+				</content:encoded>
+			</item>
+
+		
+			<item>
+				
+	<title>Facebook considers giving up and becoming TikTok</title>
+
+<link>https://www.theverge.com/tech/970504/facebook-video-experience-testing-tiktok-updates</link>
+<pubDate>Fri, 24 Jul 2026 07:00:00 -0400</pubDate>
+<guid isPermaLink="false">https://www.theverge.com/?p=970504</guid>
+
+			<dc:creator>Jess Weatherbed</dc:creator>
+	
+
+
+	<media:keywords>experience, facebook, tech, testing, tiktok, updates, video</media:keywords>
+	
+	
+<description>
+	It’s also imitating Reddit. And Craigslist.</description>
+
+
+				<content:encoded>
+
+																		<![CDATA[
+
+							
+<figure>
+
+<img alt="An illustration showing the Facebook logo on a blue background" data-caption="" data-portal-copyright="Illustration by Nick Barclay / The Verge" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2025/03/STK040_VRG_Illo_N_Barclay_6_facebook.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+
+							<p class="wp-block-paragraph">Facebook is planning some big changes to try and keep its users from jumping to rival social platforms like TikTok — changes that sound dubiously similar to becoming a TikTok clone. Facebook head Tom Alison <a href="https://about.fb.com/news/2026/07/connecting-real-people-on-facebook/" data-type="link" data-id="https://about.fb.com/news/2026/07/connecting-real-people-on-facebook/">announced today</a> that the platform will begin testing a “reimagined experience” later this year that will put a subset of users into a “full-screen video the moment they open the app.”</p>
+
+<p class="wp-block-paragraph">Meta didn’t share examples of what its experimental new interface will look like, only that it will initially roll out to countries with a noted preference for video content, with a potential expansion planned for the US next year. These tests are driven by Facebook observing that “video is where conversations are happening, communities are forming, and even commerce is starting to take place” — placing Meta’s original social media platform at risk of falling behind. While Meta doesn’t break out specific user figures for its individual platforms, it collectively <a href="https://www.theverge.com/tech/921089/meta-earnings-q1-2026-user-decline-ai-investments">lost 20 million users</a> in the first quarter of 2026, according to the company’s own data.&nbsp;</p>
+
+<p class="wp-block-paragraph">Facebook is reportedly still the most <a href="https://en.wikipedia.org/wiki/List_of_most_popular_social_platforms">popular social platform</a> globally, but YouTube is a close second, and TikTok isn’t far behind — it passed the <a href="https://www.theverge.com/2021/9/27/22696281/tiktok-1-billion-users">1 billion monthly users milestone</a> just three years after launch, significantly <a href="https://www.theverge.com/2012/10/4/3453350/facebook-one-billion-monthly-users-announcement">faster than Facebook</a>. Meta launched Reels for Instagram in 2020 to better compete with TikTok, and now it&#8217;s trying to do something similar with Facebook. This is after <a href="https://www.theverge.com/23328278/facebook-tom-alison-interview-instagram-meta-zuckerberg-news-feed-discovery-engine-tiktok">Alison told <em>The Verge</em></a> in 2022 that he sees “TikTok chasing Facebook,” rather than the other way around.</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/01_Introducing-Seller-an-App-for-Facebook-Marketplace-Sellers_Carousel_01.jpg.webp?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;Meta’s new dedicated Seller app.&lt;/em&gt; | Image: Meta" data-portal-copyright="Image: Meta" />
+<p class="wp-block-paragraph">Facebook has grown into a hodgepodge of social and commerce services over the years, and now it’s also emulating similar rival platforms to improve its own user experiences. Today it’s launching Seller, a dedicated Craigslist-like app for Marketplace sellers to track performance, manage listings, and message buyers. Facebook also launched its <a href="https://www.theverge.com/tech/935868/meta-facebook-app-forum-groups">Forum app</a> earlier this year that provides a dedicated space for people to interact with Facebook Groups — similar to subreddit communities on Reddit.</p>
+<img src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/02_Introducing-Facebook-Verified.jpg.webp?quality=90&amp;strip=all&amp;crop=0,0,100,100" alt="" title="" data-has-syndication-rights="1" data-caption="&lt;em&gt;A verified user.&lt;/em&gt; | Image: Meta" data-portal-copyright="Image: Meta" />
+<p class="wp-block-paragraph">Changes are also being made to Facebook’s user verification badges, which require a <a href="https://www.theverge.com/2023/3/17/23644849/meta-verified-facebook-instagram-paid-verification-us">paid subscription to Meta Verified</a> that starts at $11.99 per month. Now, Facebook says it&#8217;s offering a free verified badge that can be obtained by completing a “simple selfie verification” process, with the aim of helping users know that a profile is linked to a real person.</p>
+							]]>
+											
+				</content:encoded>
+			</item>
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+			
+
+		
+	</channel>
+</rss>

@@ -7,17 +7,6 @@
     </p>
   </div>
 
-  <% if flash[:notice] %>
-    <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-xs">
-      <p class="text-sm text-green-800"><%= flash[:notice] %></p>
-    </div>
-  <% end %>
-  <% if flash[:alert] %>
-    <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xs">
-      <p class="text-sm text-red-800"><%= flash[:alert] %></p>
-    </div>
-  <% end %>
-
   <%# ─── One-time recovery codes display ──────────────────────────── %>
   <%# Rendered right after a regenerate — flash[:plaintext_codes]
       carries the plaintext for a single page render and is then

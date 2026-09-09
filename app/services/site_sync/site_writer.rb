@@ -40,7 +40,12 @@ module SiteSync
         Array(paths).each_with_object([]) do |rel, removed|
           rel = rel.to_s
           next if rel.include?("..") || rel.start_with?("/")
-          next if Ledger.excluded?(rel)
+          # The guard stops a peer deleting anything we don't track — backups,
+          # .git, secrets. Roe's own docs are the exception: a site set to
+          # `local` excludes them from its manifest, so without this carve-out
+          # it would refuse the very deletion that setting is asking for, and
+          # stale copies would sit on live forever with nothing reporting them.
+          next if Ledger.excluded?(rel) && !Ledger.roe_docs_path?(rel)
 
           full = File.expand_path(File.join(root, rel))
           next unless full.start_with?("#{site_root}/")

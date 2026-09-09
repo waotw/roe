@@ -1,13 +1,22 @@
 class FeedGenerator
+  # Where PodcastConfigSeeder writes downloaded artwork, and what
+  # /system/images/:filename serves.
+  SYSTEM_IMAGE_DIR = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images").freeze
+
   attr_reader :posts, :format, :site_config, :podcast_config, :include_paid, :show_paid_teasers
 
-  def initialize(posts:, format: :rss, site_config: {}, podcast_config: nil, include_paid: false, show_paid_teasers: false)
+  # media_token: a member's read credential, appended to enclosure URLs in a
+  # private feed. Podcast apps fetch enclosures with no cookies, so a protected
+  # file is only reachable if the URL carries its own proof. Nil for public
+  # feeds, which never point at protected files anyway.
+  def initialize(posts:, format: :rss, site_config: {}, podcast_config: nil, include_paid: false, show_paid_teasers: false, media_token: nil)
     @posts = posts
     @format = format.to_sym
     @site_config = default_site_config.merge(site_config)
     @podcast_config = podcast_config
     @include_paid = include_paid
     @show_paid_teasers = show_paid_teasers
+    @media_token = media_token
   end
 
   def generate
@@ -33,7 +42,7 @@ class FeedGenerator
       maker.channel.updated = posts.first&.date&.to_time || Time.now
       maker.channel.managingEditor = site_config[:author] if site_config[:author].present?
 
-      posts.each do |post|
+      visible_posts.each do |post|
         maker.items.new_item do |item|
           item.title = post.title
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
@@ -43,6 +52,10 @@ class FeedGenerator
           else
             feed_description(post)
           end
+
+          # The article itself. A reader shows this rather than the summary,
+          # which is what makes a paid feed worth subscribing to.
+          item.content_encoded = feed_item_content(post)
 
           item.pubDate = post.date.to_time if post.date
           item.author = post.author if post.author
@@ -66,7 +79,7 @@ class FeedGenerator
       maker.channel.author = site_config[:author]
       maker.channel.id = site_config[:url]
 
-      posts.each do |post|
+      visible_posts.each do |post|
         maker.items.new_item do |item|
           item.title = post.title
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
@@ -76,6 +89,10 @@ class FeedGenerator
           else
             feed_description(post)
           end
+
+          # Atom's equivalent of content:encoded.
+          item.content.content = feed_item_content(post)
+          item.content.type = "html"
 
           item.updated = post.date.to_time if post.date
           item.author = post.author if post.author
@@ -105,10 +122,19 @@ class FeedGenerator
   def generate_podcast_rss
     require "nokogiri"
 
+    # A music release adds the Podcasting 2.0 namespace so apps that read it
+    # can treat the feed as music rather than as a show. Only declared when
+    # it's used — a podcast feed's XML is unchanged.
+    music = podcast_config["medium"].to_s == "music"
+    namespaces = {
+      "version" => "2.0",
+      "xmlns:itunes" => "http://www.itunes.com/dtds/podcast-1.0.dtd",
+      "xmlns:content" => "http://purl.org/rss/1.0/modules/content/"
+    }
+    namespaces["xmlns:podcast"] = "https://podcastindex.org/namespace/1.0" if music
+
     builder = Nokogiri::XML::Builder.new(encoding: "UTF-8") do |xml|
-      xml.rss("version" => "2.0",
-              "xmlns:itunes" => "http://www.itunes.com/dtds/podcast-1.0.dtd",
-              "xmlns:content" => "http://purl.org/rss/1.0/modules/content/") do
+      xml.rss(namespaces) do
         xml.channel do
           # Standard RSS elements
           xml.title podcast_config["title"]
@@ -124,18 +150,35 @@ class FeedGenerator
           xml["itunes"].explicit(podcast_config["explicit"] ? "true" : "false")
           xml["itunes"].type(podcast_config["type"] || "episodic")
 
+          # Music-only extras. Both are additive and in territory Apple and
+          # Spotify ignore: <podcast:medium> is a foreign namespace, and plain
+          # <category> is stock RSS 2.0 that podcast platforms don't read —
+          # they use <itunes:category>, which is still "Music" above. The
+          # genre would be rejected there, since Apple only accepts values
+          # from its own fixed list.
+          if music
+            xml["podcast"].medium "music"
+            xml.category podcast_config["genre"] if podcast_config["genre"].present?
+          end
+
           # iTunes owner
           xml["itunes"].owner do
             xml["itunes"].name podcast_config["owner_name"] || podcast_config["author"]
             xml["itunes"].email podcast_config["email"]
           end
 
-          # iTunes artwork — channel-level cover. The /system/images/* path
-          # podcast.yml uses falls outside the variant pipeline so this
-          # tends to fall through to the original; episode-level art below
-          # gets the xl-variant treatment.
+          # iTunes artwork — channel-level cover, always the original file.
+          #
+          # No variant. Apple wants a square JPEG or PNG between 1400 and 3000
+          # pixels, and whoever set this artwork chose a file that meets that;
+          # substituting a derived copy second-guesses them. Worse, variants
+          # live under media/images/variants/, which Site Sync excludes and
+          # ContentSync prunes — so a feed could advertise a URL that exists
+          # when the feed renders and 404s when Apple fetches it days later.
+          # Directories get their cover art from a URL they cache and re-check
+          # rarely; a miss at the wrong moment is a show with no artwork.
           if podcast_config["artwork"].present?
-            artwork_url = image_full_url(podcast_config["artwork"], variant: :xl)
+            artwork_url = image_full_url(podcast_config["artwork"])
             xml["itunes"].image(href: artwork_url)
             xml.image do
               xml.url artwork_url
@@ -171,13 +214,10 @@ class FeedGenerator
 
               # Audio enclosure — omit for paid episodes in public feed
               if post.metadata["audio"].present? && (!is_paid || include_paid)
-                audio_url = audio_full_url(post.metadata["audio"])
-                audio_path = audio_file_path(post.metadata["audio"])
-
                 xml.enclosure(
-                  url: audio_url,
-                  length: audio_file_size(audio_path),
-                  type: audio_mime_type(audio_path)
+                  url:    with_media_token(audio_full_url(post.metadata["audio"])),
+                  length: audio_byte_length(post),
+                  type:   audio_content_type(post)
                 )
               end
 
@@ -190,14 +230,19 @@ class FeedGenerator
 
               xml["itunes"].duration post.metadata["duration"] if post.metadata["duration"].present?
               xml["itunes"].explicit(post.metadata["explicit"] == true ? "true" : "false")
-              xml["itunes"].episode post.metadata["episode_number"] if post.metadata["episode_number"].present?
+              # Music has no episode_number — a track's place in the running
+              # order is its track_number, which is the same idea. A podcast
+              # episode never carries one, so the fallback can't misfire.
+              episode_number = post.metadata["episode_number"].presence || post.metadata["track_number"].presence
+              xml["itunes"].episode episode_number if episode_number.present?
               xml["itunes"].season post.metadata["season"] if post.metadata["season"].present?
               xml["itunes"].episodeType post.metadata["episode_type"] || "full"
 
-              # Episode artwork (optional override). xl variant — Apple
-              # wants podcast art at >=1400px square; xl is 1800px max.
+              # Episode artwork (optional override). The original, same as the
+              # channel art above — Apple applies the same size rules per
+              # episode, and the same variant fragility applies.
               if post.metadata["image"].present?
-                xml["itunes"].image(href: image_full_url(post.metadata["image"], variant: :xl))
+                xml["itunes"].image(href: image_full_url(post.metadata["image"]))
               end
             end
           end
@@ -217,6 +262,49 @@ class FeedGenerator
       url: SiteConfig.site_url.presence || "https://example.com",
       author: SiteConfig.get("author_name").presence || SiteConfig.get("author_email").presence || "Site Author"
     }
+  end
+
+  # Full rendered HTML for a feed item, cut at the paywall where one applies.
+  #
+  # Three cases:
+  #   free post                    → everything
+  #   paid post, token-gated feed  → everything (they've paid)
+  #   paid post shown as a preview → up to the paywall gate, then a line saying
+  #                                  where the rest is
+  #
+  # Without this, every RSS item carried a 200-character summary and nothing
+  # else, so a paid feed gave subscribers the same list of links a free one did.
+  def feed_item_content(post)
+    html = post.to_html(feed: true).to_s
+    return gate_free_content(html) unless post.audience == "paid"
+    return gate_free_content(html) if include_paid
+
+    preview_before_gate(html)
+  end
+
+  # A free post can still carry a paywall block — the author may have written
+  # one and then published to everyone. Drop the gate itself; keep the content.
+  def gate_free_content(html)
+    html.gsub(/<!-- PAID_CONTENT_GATE -->.*?<\/div>/m, "")
+  end
+
+  # Everything above the gate, plus a line pointing at the rest. When the post
+  # has no gate there's nothing free to show, so the summary stands alone —
+  # never the article.
+  def preview_before_gate(html)
+    free_part = html.include?("<!-- PAID_CONTENT_GATE -->") ? html.split("<!-- PAID_CONTENT_GATE -->").first : ""
+
+    "#{free_part}<p><em>The rest of this is for paying members.</em></p>"
+  end
+
+  # Paid posts a public feed may advertise. Follows the same
+  # `everyone.show_paid_content` setting collections use, so a site that would
+  # rather not market to non-members turns it off in one place and every
+  # surface agrees.
+  def visible_posts
+    return posts if include_paid || show_paid_teasers
+
+    posts.reject { |post| post.respond_to?(:audience) && post.audience == "paid" }
   end
 
   def feed_description(post)
@@ -299,31 +387,80 @@ class FeedGenerator
     feed_description(post)
   end
 
+  attr_reader :media_token
+
+  # Appends the member's read token to a local /media/ URL. Remote URLs are
+  # left alone — they aren't ours to authorize.
+  def with_media_token(url)
+    return url if media_token.blank?
+    return url if url.to_s.match?(%r{\Ahttps?://}) && !url.to_s.include?("/media/")
+
+    separator = url.include?("?") ? "&" : "?"
+    "#{url}#{separator}token=#{CGI.escape(media_token)}"
+  end
+
   def audio_full_url(audio_path)
-    # Remove leading slash if present
+    # An already-absolute URL (a referenced remote file, e.g. an episode
+    # imported with remote audio) is the enclosure URL as-is. Prepending the
+    # site URL would produce a broken https://mysite/https://host/… link — so
+    # only local /media paths get the site URL prepended.
+    return audio_path if audio_path.to_s.match?(%r{\Ahttps?://})
+
     clean_path = audio_path.start_with?("/") ? audio_path[1..-1] : audio_path
     "#{site_config[:url]}/#{clean_path}"
   end
 
-  # Build an absolute URL for an image. Pass `variant:` to point at a
-  # generated variant (xl is right for podcast feed art — Apple wants
-  # square cover at >=1400px and our xl is 1800px). When the variant
-  # doesn't exist (e.g. /system/images/* podcast cover art that lives
-  # outside the variant pipeline) we fall back to the original path.
-  def image_full_url(image_path, variant: nil)
-    resolved = variant ? resolve_variant_web_path(image_path, variant) : image_path
+  # Enclosure byte length. Prefer a stored `audio_bytes` (importers set this
+  # from the source feed for remote audio Roe can't stat locally); otherwise
+  # stat the local /media file; 0 when neither is available.
+  def audio_byte_length(post)
+    stored = post.metadata["audio_bytes"]
+    return stored.to_i if stored.present?
+
+    path = audio_file_path(post.metadata["audio"])
+    File.exist?(path) ? File.size(path) : 0
+  end
+
+  # Enclosure MIME type. Prefer a stored `audio_type`; otherwise derive it from
+  # the file extension.
+  def audio_content_type(post)
+    post.metadata["audio_type"].presence || audio_mime_type(post.metadata["audio"].to_s)
+  end
+
+  # An absolute URL for an image, always the original file.
+  #
+  # This used to take a `variant:` and point podcast art at the xl rendition.
+  # The parameter is gone rather than merely unused: artwork has a spec the
+  # site owner met deliberately, and variants live under
+  # media/images/variants/ — excluded from Site Sync, pruned by ContentSync —
+  # so a feed could advertise a URL that resolved at render time and 404'd when
+  # Apple fetched it days later. Removing the capability is what stops it
+  # coming back.
+  def image_full_url(image_path)
+    resolved = system_asset_web_path(image_path) || image_path
     clean_path = resolved.start_with?("/") ? resolved[1..-1] : resolved
     "#{site_config[:url]}/#{clean_path}"
   end
 
-  def resolve_variant_web_path(image_path, variant_name)
-    return image_path unless ImageVariantGenerator.available?
-    return image_path unless ImageVariantGenerator::VARIANTS.key?(variant_name.to_sym)
+  # A bare filename means a system asset, not a file at the site root.
+  #
+  # PodcastConfigSeeder downloads channel artwork into system/assets/images/
+  # and stores just the filename in podcast.yml — that's the contract. This
+  # joined it straight onto the site URL, producing
+  # https://site/the-briefcase-podcast-artwork.jpg, which 404s. Apple and
+  # Overcast both fall back to no artwork without complaining, so a podcast
+  # simply showed up blank.
+  #
+  # Anything containing a slash is already a path (music covers are written as
+  # /media/images/…) and is left alone. A filename with no matching asset falls
+  # through too, so a stale entry keeps its old behaviour rather than gaining a
+  # confidently wrong URL.
+  def system_asset_web_path(image_path)
+    name = image_path.to_s.strip
+    return nil if name.empty? || name.include?("/")
+    return nil unless File.file?(File.join(SYSTEM_IMAGE_DIR, name))
 
-    filesystem_path = ImageVariantGenerator.variant_path_for(image_path, variant_name)
-    return image_path unless File.exist?(filesystem_path)
-
-    filesystem_path.sub(RoeSitePaths::SITE_PATH.to_s, "")
+    "/system/images/#{name}"
   end
 
   def audio_file_path(audio_path)

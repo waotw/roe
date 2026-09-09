@@ -1,9 +1,111 @@
-Roe
-Copyright © 2026 We Are On The Web LLC
+# License
 
-Roe is open-source software with commercial-use restrictions.
-During the beta period (versions < 1.0), commercial use is not licensed unless permission is given in writing from licensor.
+COPYRIGHT © 2026 WE ARE ON THE WEB LLC
 
-Full license terms: [License](https://go-roe.com/license)
+The current version of this agreement is at [go-roe.com/license](https://go-roe.com/license). This license is the version that shipped with this release.
 
-For licensing questions: roe@weareontheweb.com
+## Before 1.0 - Beta
+
+<mark>Roe is currently in beta. If you download Roe before version 1.0 is released, you are eligible for a free commercial license when 1.0 is released. This must be requested in the first year after 1.0 is released and will give you 2 years of updates and priority support.</mark>
+
+This is a thank you for giving Roe a try in the early days.
+
+## About this Agreement
+
+While Roe's source code is open-source, Roe is not free to use on commercial websites (sites that make money or help you make money). To use Roe on a commercial site, you need to purchase a license. They will be available when 1.0 is released.
+
+This License Agreement (the "Agreement") will be updated and detailed with the release of 1.0.
+
+Installation or use of Roe denotes that you understand:
+
+- You cannot use Roe for commercial purposes while it's version is < 1.0
+- You cannot repackage or sell Roe or Roe specific code.
+
+## Definitions
+
+- When we refer to "You", we mean the person that has licensed Roe, the licensee. When it comes to local, dev and personal sites, the licensee is the person or company that downloaded/installed Roe. When it comes to public Commercial Sites, the licensee is the person or company that bought a Commercial License from us, or was gifted one by us.
+- When we say "We"/"Us"/"Our", we mean the licensor, Benjamin Welch, Co-founder, We Are On The Web LLC.
+- "Personal Site" and "Personal Use" refer to a website and/or licensee using Roe inline with the Personal Use definition below.
+- "Commercial Site" and "Commercial Use" refer to a website and/or licensee using Roe inline with the Commercial Use definition below.
+- "Website" is a single Roe project and it's associated domain if that site is public (live on the web)
+
+### Personal vs. Commercial Use
+
+**Personal Use:**
+
+- A site owned and operated by an individual
+- Does not accept payments or process transactions
+- Does not function primarily as a sales channel, lead generator, or marketing site for a business
+- Casual affiliate links or a "Buy me a coffee" / Patreon link on an otherwise personal site does NOT make it commercial
+- Free newsletters and personal podcasts are personal use
+
+**Commercial Use** is anything else, including:
+
+- Sites that accept payments (Snipcart, Stripe, etc.)
+- Paid newsletters or paid memberships
+- Sites operating as a primary client/lead acquisition channel for a business
+- Sites that sell digital or physical products
+
+## License scope
+
+- **Personal license** (free): unlimited installs for personal use sites and sites in development.
+- **Commercial license** ($129): one commercial license per domain/site. You are a company, under 10 members. You are an individual or company, with a yearly net revenue under $1,000,000 US dollars.
+- **Business license** ($500): 1 commercial sites under one business, plus unlimited personal installs
+
+### Hosting for Clients
+
+If you install Roe on behalf of a client (as a designer, developer, or agency), the client is the licensee and is responsible for the appropriate license tier for their use. If they are hiring you to build thier site, they need a commercial license
+
+You may:
+
+- install and configure Roe for your client at no additional license cost.
+- charge for ongoing maintenance, hosting, as arranged with your client.
+- purchase a license on behalf of your client
+
+You may not:
+
+- charge a higher licensing price on top of Roe's license cost.
+
+## After the Update + Support Period of Commercial License
+
+Your installation continues to work indefinitely under the license tier you purchased. After the 2-year update + priority support window ends, you may continue using the version you have under the same terms. To receive new releases and continued priority support, purchase a renewal at the then-current pricing.
+
+## Prohibited High-Risk Uses
+
+Roe is not designed, intended, tested, or licensed for use in any environment where the failure, error, or downtime of the software could foreseeably lead to death, personal injury, environmental damage, or significant property loss. This includes but is not limited to:
+
+- Medical devices, electronic health records, or any system involved in patient care, diagnosis, or treatment decisions
+- Emergency services dispatch, life-safety systems, or critical infrastructure (water, power, transportation, telecommunications)
+- Nuclear facilities, aviation control, or military command-and-control
+- Financial systems where downtime or data loss could cause material harm
+- Any other application where Roe's failure could reasonably foreseeably cause death, injury, regulatory violation, or critical service disruption
+
+You agree not to deploy Roe for any of the above purposes. If you do so anyway, your license (Personal or Commercial) is void, you assume all riskand waive any claim against We Are On The Web LLC for resulting damages.
+
+## No Warranty
+
+Roe is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or noninfringement. We do not warrant that Roe will be error-free, secure, or run uninterrupted. **This applies with particular force during the beta period — back up your work and don't bet mission-critical infrastructure on a beta release.**
+
+## Limitation of Liability
+
+To the maximum extent permitted by law, We Are On The Web LLC shall not be liable for any damages arising from the use of, or inability to use, Roe — including direct, indirect, incidental, consequential, or punitive damages, loss of data, loss of revenue, or business interruption — even if advised of the possibility of such damages.
+
+## Contributions
+
+By submitting code, documentation, or other contributions to Roe, you grant We Are On The Web LLC a perpetual, worldwide, royalty-free license to use, modify, and redistribute your contribution as part of Roe under the terms of this Agreement. You retain copyright of your contribution.
+
+## Termination
+
+This Agreement terminates automatically if you violate its terms. Upon termination, you must cease using Roe.
+
+## Governing Law
+
+This Agreement is governed by the laws of the State, Territory, Country in which you reside and/or are using Roe.
+
+## Severability
+
+If any provision of this Agreement is unenforceable, the remaining provisions continue in full force.
+
+## Questions
+
+For licensing questions, beta-amnesty requests, or anything not covered here: [roe@weareontheweb.com](mailto:roe@weareontheweb.com)

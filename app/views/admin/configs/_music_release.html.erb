@@ -1,0 +1,102 @@
+<%# One release block in the Music settings form. Rendered both for each saved
+    release and once inside a <template>, where index is "__INDEX__" and the
+    music-releases controller swaps in a real number as it clones. Keeping one
+    partial means an added release has exactly the fields a saved one has.
+
+    Locals:
+      index       — the releases[] array index, or "__INDEX__" in the template
+      key         — the release key ("" for a new one)
+      release     — its current values (blank_release for a new one)
+      image_paths — media library images, for the cover typeahead
+      removable   — draw the Remove button (false for the default release)
+%>
+<%
+  index       = local_assigns[:index]
+  key         = local_assigns[:key].to_s
+  release     = local_assigns[:release] || MusicConfigSchema.blank_release
+  image_paths = local_assigns[:image_paths] || []
+  removable   = local_assigns.fetch(:removable, true)
+%>
+<%# The id is the anchor the release-link controller jumps to from a track's
+    metadata editor (#release-<key>), and where + New Release scrolls to. %>
+<div <%= tag.attributes(id: "release-#{key}") if key.present? %>
+     class="config-subsection pl-4 border-l-2 border-gray-300"
+     data-music-releases-target="release">
+  <input type="hidden" name="releases[<%= index %>][original_key]" value="<%= key %>">
+
+  <div class="config-field-row mb-4">
+    <label class="block text-sm font-medium text-gray-700 mb-1">
+      Release key<span class="text-red-600 ml-0.5">*</span>
+      <%= render "shared/help_tooltip",
+                 title: "Release key",
+                 text: ("This is the name or <span class='font-bold'>key</span> that collections and tracks use to connect to this release. Renaming it here will mean any tracks/collections that are using this release will break.").html_safe %>
+    </label>
+    <input type="text"
+           name="releases[<%= index %>][key]"
+           value="<%= key %>"
+           class="w-full font-mono text-sm p-2 border border-gray-300"
+           data-music-releases-target="keyInput"
+           placeholder="summer-release">
+    <p class="text-xs text-gray-500 mt-0.5">
+      <% if key.present? %>
+        Collect it with <code>release: <%= key %></code>.
+      <% else %>
+        Short and stable; collections use this key to find tracks for this release. Blank uses the title.
+      <% end %>
+    </p>
+  </div>
+
+  <div class="space-y-3">
+    <% MusicConfigSchema.release_fields.each do |field| %>
+      <%= render "admin/configs/music_field",
+                 field: field,
+                 name: "releases[#{index}][#{field[:key]}]",
+                 value: release[field[:key]],
+                 image_paths: image_paths %>
+    <% end %>
+  </div>
+
+  <%# Feed status for a saved release. Ticking the box isn't enough on its own
+      — Apple validates title, description and artwork — so say which is
+      missing rather than publishing a feed that gets rejected on submission. %>
+  <% if key.present? && ReleaseConfig.truthy?(release["feed"]) %>
+    <% blockers = MusicConfigSchema.feed_blockers(release) %>
+    <div class="mt-3 p-3 text-xs border <%= blockers.any? ? "bg-amber-50 border-amber-300 text-amber-900" : "bg-green-50 border-green-300 text-green-900" %>">
+      <% if blockers.any? %>
+        <p>
+          The feed is off until this release has
+          <strong><%= blockers.to_sentence %></strong>.
+          Apple checks all three when you submit.
+        </p>
+      <% else %>
+        <p>
+          Feed: <code><%= music_release_feed_path(release_key: key) %></code>
+          — submit that URL to Apple Podcasts, Spotify or any podcatcher.
+        </p>
+        <% if SiteConfig.get("author_email").blank? %>
+          <p class="mt-1">
+            Add an author email in
+            <%= link_to "Settings → site", admin_edit_site_config_path, class: "underline" %>
+            before submitting. Apple emails it to verify you own the feed.
+          </p>
+        <% end %>
+        <% if ReleaseConfig.audience_for(key) == "paid" %>
+          <p class="mt-1">This release is paid, so the feed isn't public.</p>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if removable %>
+    <div class="mt-4">
+      <%# Removal is a DOM change — update_music rebuilds the release list from
+          whatever rows are posted, so a removed row is gone on save and a
+          mis-click is undone by not saving. %>
+      <button type="button"
+              data-action="music-releases#removeRelease"
+              class="uppercase text-xs px-2 py-1 border border-red-500 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs cursor-pointer">
+        Remove release
+      </button>
+    </div>
+  <% end %>
+</div>

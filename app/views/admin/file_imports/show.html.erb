@@ -1,0 +1,61 @@
+<div class="max-w-3xl mx-auto">
+  <div class="flex items-baseline justify-between mb-4">
+    <h1 class="text-2xl font-bold">Import #<%= @import.id %></h1>
+    <%= link_to "← All imports", admin_file_imports_path, class: "text-sm text-gray-500 hover:text-gray-700" %>
+  </div>
+
+  <div class="bg-white shadow p-6 mb-6">
+    <dl class="grid grid-cols-2 gap-y-2 text-sm">
+      <dt class="text-gray-400">Imported</dt>
+      <dd><%= @import.created_at.strftime("%b %-d, %Y · %-l:%M %p") %></dd>
+      <dt class="text-gray-400">Source</dt>
+      <dd><%= @import.configuration["source"].presence || "ZIP upload" %></dd>
+      <dt class="text-gray-400">Posts</dt>
+      <dd><%= @import.stats["posts"].to_i %></dd>
+      <dt class="text-gray-400">Pages</dt>
+      <dd><%= @import.stats["pages"].to_i %></dd>
+      <dt class="text-gray-400">Media copied</dt>
+      <dd><%= @import.stats["assets"].to_i %></dd>
+      <% if @import.stats["skipped"].to_i.positive? %>
+        <dt class="text-gray-400">Skipped (already imported)</dt>
+        <dd><%= @import.stats["skipped"].to_i %></dd>
+      <% end %>
+      <dt class="text-gray-400">Still drafts</dt>
+      <dd><%= @import.ref_draft_count %></dd>
+      <dt class="text-gray-400">Now published</dt>
+      <dd><%= @import.ref_published_count %></dd>
+    </dl>
+
+    <% if @import.stats["warnings"].present? %>
+      <div class="mt-4 border-t border-gray-100 pt-3">
+        <p class="text-xs uppercase text-gray-400 mb-1">Warnings</p>
+        <ul class="text-xs text-gray-600 list-disc ml-4 space-y-0.5">
+          <% Array(@import.stats["warnings"]).first(50).each do |w| %><li><%= w %></li><% end %>
+        </ul>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="bg-white shadow p-6">
+    <h2 class="text-sm font-semibold text-red-900 mb-2">Delete this import</h2>
+    <p class="text-xs text-gray-600 mb-3">
+      Removes this import's <strong>draft</strong> posts and pages (file and record).
+      Published items are kept — remove those manually. You can always re-import.
+    </p>
+    <button type="button"
+            data-action="delete"
+            data-resource-id="<%= @import.id %>"
+            data-resource-title="Import #<%= @import.id %>"
+            data-resource-type="import"
+            data-delete-url="<%= admin_file_import_path(@import) %>"
+            class="uppercase text-xs px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-700 font-mono rounded-xs cursor-pointer">
+      Delete import &amp; drafts
+    </button>
+  </div>
+
+  <%= render "shared/delete_file_modal",
+             resource_type: "import",
+             resource: @import,
+             delete_path: admin_file_import_path(@import),
+             delete_message: "This deletes the DRAFT posts and pages from this import (file and record). Published posts and pages are kept — remove those manually from Posts/Pages. You can always re-import.".html_safe %>
+</div>

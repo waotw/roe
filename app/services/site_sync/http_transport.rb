@@ -27,6 +27,14 @@ module SiteSync
   class HttpTransport
     class HttpTransportError < StandardError; end
 
+    # Cap each upload batch so a single request can't blow the transfer
+    # timeout or balloon memory. A large first sync fans out into several
+    # bounded requests; a small sync stays one batch (the fast path). A file
+    # bigger than the byte cap still gets its own batch rather than being
+    # split — the wire primitive is whole files.
+    PUSH_BATCH_MAX_BYTES = 25 * 1024 * 1024
+    PUSH_BATCH_MAX_FILES = 500
+
     class << self
       # ─── Push (local → live) ──────────────────────────────────────
 
@@ -37,16 +45,54 @@ module SiteSync
         deleted = Array(diff[:deleted])
         return if changed.empty? && deleted.empty?
 
-        on_progress&.call(completed: 0, total: changed.size)
+        # Roe's docs when the setting says local-only. Not part of the diff —
+        # both sides exclude them from their manifests, so neither can see what
+        # live still has, and it's sent every push because it can't be detected.
+        #
+        # Added AFTER the early return on purpose: this rides along with a sync
+        # that's already happening rather than causing one, or an install set to
+        # `local` would push on every check forever with nothing to do.
+        #
+        # Deliberately quiet — the docs ship with Roe, so this can't lose
+        # anything, and the setting is the instruction.
+        purge = Ledger.roe_docs_to_purge
+        deleted += purge
 
-        # Per-file size+mtime so the peer can restore mtimes after unpack.
-        manifest = Ledger.current.slice(*changed)
-        archive  = TarArchive.pack(root: RoeSitePaths::SITE_PATH, paths: changed)
+        total = changed.size
+        on_progress&.call(completed: 0, total: total)
 
-        result = Exchange.upload_files(archive_bytes: archive, manifest: manifest, deleted: deleted)
-        raise HttpTransportError, "upload to peer failed" if result.nil?
+        # Chunk into bounded batches. Deletions ride the LAST batch so the peer
+        # only removes files after every new file has landed — a mid-push
+        # failure leaves EXTRA files, never missing ones. Each batch retries
+        # independently (transient network blips), peer writes are atomic, and
+        # a fresh push recomputes its diff against the peer's current state — so
+        # a re-run skips what already landed and converges without corruption.
+        batches = batch_paths(changed)
+        batches << [] if batches.empty? # deletions-only push still needs a call
+        last = batches.length - 1
+        done = 0
 
-        on_progress&.call(completed: changed.size, total: changed.size)
+        batches.each_with_index do |paths, i|
+          # Per-file size+mtime so the peer can restore mtimes after unpack.
+          manifest = Ledger.current.slice(*paths)
+          archive  = TarArchive.pack(root: RoeSitePaths::SITE_PATH, paths: paths)
+          del      = (i == last) ? deleted : []
+
+          Exchange.with_retries(label: "upload batch #{i + 1}/#{batches.length}") do
+            result = Exchange.upload_files(archive_bytes: archive, manifest: manifest, deleted: del)
+            raise HttpTransportError, "upload to peer failed" if result.nil?
+
+            # The peer reports what it actually removed, which is how a purge
+            # stays silent when there was nothing left to remove.
+            if i == last && purge.any? && (removed = result["deleted"].to_i) > 0
+              Rails.logger.info "[SiteSync::HttpTransport] removed #{removed} Roe documentation " \
+                                "file(s) from live (docs.roe: local)"
+            end
+          end
+
+          done += paths.size
+          on_progress&.call(completed: done, total: total)
+        end
 
         # Match the rsync flow's post-push bookkeeping: rewrite the peer's
         # ledger (so its drift detection doesn't scream after the upload
@@ -68,22 +114,34 @@ module SiteSync
         if changed.any?
           on_progress&.call(completed: 0, total: changed.size)
 
-          # Fetch peer mtimes up front so we can stamp them after unpack.
+          # Fetch peer mtimes up front so we can stamp them after unpack, and
+          # size the download batches (the local copy may not exist yet).
           states = Exchange.fetch_peer_file_states(changed)
 
-          bytes = Exchange.download_files(changed)
-          raise HttpTransportError, "download from peer failed" if bytes.nil?
+          done = 0
+          batches = batch_by_size(changed) { |rel| states.dig(rel, "size") }
+          batches.each_with_index do |batch, i|
+            bytes = nil
+            Exchange.with_retries(label: "download batch #{i + 1}/#{batches.size}") do
+              bytes = Exchange.download_files(batch)
+              raise HttpTransportError, "download from peer failed" if bytes.nil?
+            end
 
-          written = TarArchive.unpack(bytes, dest: RoeSitePaths::SITE_PATH)
-          SiteWriter.restore_mtimes(root: RoeSitePaths::SITE_PATH, manifest: states)
+            written = TarArchive.unpack(bytes, dest: RoeSitePaths::SITE_PATH)
+            SiteWriter.restore_mtimes(root: RoeSitePaths::SITE_PATH, manifest: states.slice(*written))
 
-          on_progress&.call(completed: written.size, total: changed.size)
+            done += written.size
+            on_progress&.call(completed: done, total: changed.size)
+          end
         end
 
         SiteWriter.delete_paths(root: RoeSitePaths::SITE_PATH, paths: deleted) if deleted.any?
 
-        # We changed our own /site — rewrite our ledger so drift clears.
-        Ledger.write_current!
+        # We changed our own /site — rewrite our ledger so drift clears. Only
+        # what the peer also has: a pull leaves local-only files untouched on
+        # disk, and recording them here would make them look deleted on the peer
+        # next time round.
+        Ledger.write_confirmed!(Exchange.fetch_peer_manifest&.dig("files"), context: "pull")
         true
       end
 
@@ -127,12 +185,21 @@ module SiteSync
         end
 
         if to_download.any?
-          bytes = Exchange.download_files(to_download)
-          raise HttpTransportError, "backup download from peer failed" if bytes.nil?
+          downloaded = 0
+          batches = batch_by_size(to_download) { |rel| peer_files.dig(rel, "size") }
+          batches.each_with_index do |batch, i|
+            bytes = nil
+            Exchange.with_retries(label: "backup download batch #{i + 1}/#{batches.size}") do
+              bytes = Exchange.download_files(batch)
+              raise HttpTransportError, "backup download from peer failed" if bytes.nil?
+            end
 
-          written = TarArchive.unpack(bytes, dest: backup_dir)
-          SiteWriter.restore_mtimes(root: backup_dir, manifest: peer_files.slice(*written))
-          on_progress&.call(completed: linked + written.size, total: wanted.size)
+            written = TarArchive.unpack(bytes, dest: backup_dir)
+            SiteWriter.restore_mtimes(root: backup_dir, manifest: peer_files.slice(*written))
+
+            downloaded += written.size
+            on_progress&.call(completed: linked + downloaded, total: wanted.size)
+          end
         else
           on_progress&.call(completed: linked, total: wanted.size)
         end
@@ -147,6 +214,36 @@ module SiteSync
       # bytes actually move (deletes are handled separately).
       def changed_files(diff)
         (Array(diff[:added]) + Array(diff[:modified])).uniq.sort
+      end
+
+      # Split paths into batches bounded by cumulative bytes and file count.
+      # Preserves order; a single oversized file lands in its own batch rather
+      # than being dropped or split.
+      # Chunk paths into bounded batches by file count and total bytes. The
+      # block yields each path's size — local file size for a push, the peer's
+      # reported size for a download (the local copy may not exist yet).
+      def batch_by_size(paths)
+        batches = []
+        current = []
+        bytes   = 0
+
+        paths.each do |rel|
+          size = yield(rel).to_i
+          if current.any? && (current.size >= PUSH_BATCH_MAX_FILES || bytes + size > PUSH_BATCH_MAX_BYTES)
+            batches << current
+            current = []
+            bytes   = 0
+          end
+          current << rel
+          bytes += size
+        end
+
+        batches << current if current.any?
+        batches
+      end
+
+      def batch_paths(paths)
+        batch_by_size(paths) { |rel| File.size?(File.join(RoeSitePaths::SITE_PATH, rel)) }
       end
 
       # Full push with no precomputed diff: diff local against the peer's

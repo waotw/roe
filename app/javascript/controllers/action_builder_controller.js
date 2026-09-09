@@ -78,8 +78,10 @@ export default class extends Controller {
       sel.disabled = !match;
     });
     if (this.hasTitleTarget) {
+      // "form" is the block name in the markup; the label says what it's for,
+      // since every kind behind it is a member form.
       this.titleTarget.textContent =
-        this.block === "form" ? "Insert form" : "Insert button";
+        this.block === "form" ? "Insert member form" : "Insert button";
     }
 
     // Honour a preset kind when its option exists in the active select.
@@ -153,6 +155,21 @@ export default class extends Controller {
     }
   }
 
+  // The builder must never hand back a block that doesn't parse. Most values
+  // are ordinary words and read better unquoted, but YAML takes a leading [ or
+  // { as a collection, a leading # as a comment, and a newline as the end of
+  // the scalar — so `signin-text: [Sign in] if you're a member` comes back as a
+  // sequence followed by stray text, and the author sees a YAML error for
+  // something they typed literally. Quote only those cases.
+  yamlScalar(value) {
+    const needsQuoting = /^[\[\{>|*&!%@`'"#]/.test(value) ||
+                         /^-\s/.test(value) ||
+                         /:\s|\s#|\n/.test(value);
+    if (!needsQuoting) return value;
+
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
+  }
+
   insert(event) {
     event?.preventDefault();
     const group = this.activeGroup();
@@ -169,7 +186,7 @@ export default class extends Controller {
     group.querySelectorAll("[data-cb-field]").forEach((el) => {
       const value = el.value.trim();
       if (value === "") return; // only fields with a value get written
-      lines.push(`${el.dataset.cbField}: ${value}`);
+      lines.push(`${el.dataset.cbField}: ${this.yamlScalar(value)}`);
     });
 
     const block = "```" + fence + "\n" + lines.join("\n") + "\n```";

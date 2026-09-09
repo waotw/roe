@@ -1,5 +1,5 @@
 ---
-title: Roe-anji → Images & Image Galleries
+title: Images & Image Galleries
 status: published
 url_name: galleries
 tags: roe-anji
@@ -89,9 +89,19 @@ By wrapping the images in a `gallery` block, you can:
 ```
 ````
 
-Rather than typing the block out by hand, click the `GALLERY` button in The Editor. It opens a little menu where you can switch on a carousel, choose an aspect ratio, and add a gallery caption — then it drops the finished block in at your cursor with a placeholder ready for your images.
+Rather than typing the block out by hand, click the `GALLERY` button in The Editor. It opens a little menu where you can switch on a carousel, choose an aspect ratio, add a gallery caption — and choose the images themselves.
 
-Use the `MEDIA ▼` button in The Editor to add your images where `__PLACEHOLDER__` is.
+![The gallery button in the editor](/media/images/gallery-builder.png)
+
+Click `ADD IMAGES` and the media picker opens. Tick the ones you want, click `ADD TO GALLERY`, and they come back into the menu as a list. `ADD MORE` fetches more; `CLEAR` empties the list. Click `INSERT` and the finished block lands at your cursor.
+
+You can start from the other end too. Open `MEDIA ▼ → Images`, select two or more, and a `GALLERY` button appears alongside `INSERT SELECTED` — it hands them to the gallery menu so you can set the options before inserting.
+
+![The gallery button in the editor](/media/images/image-gallery-button.png)
+
+And if you've already written some image lines, select them and click `GALLERY`. Roe reads them into the list, captions included, so you can add more before wrapping them up.
+
+If you insert without choosing any images, you get a block with `__PLACEHOLDER__` in it, ready to type over or fill with `MEDIA ▼`.
 
 This allows you to do some fancy things such as…
 
@@ -108,6 +118,7 @@ If you want an image to be full-width, just put it on it's own line like so ↓
 ![house on ilkley moore](/media/images/old_plane.jpg)
 ```
 ````
+
 ↑ That will look like this ↓
 
 ```gallery

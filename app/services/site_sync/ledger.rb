@@ -31,6 +31,10 @@ module SiteSync
     #                       same reason.
     EXCLUDED_PATHS = %w[system/secrets media/images/variants].freeze
 
+    # Roe's bundled documentation — 85 files a site may not want to carry.
+    # Kept off the wire unless the site publishes them.
+    ROE_DOCS_PATH = "documentation/roe/"
+
     # Filenames excluded wherever they appear in the tree:
     #   - .DS_Store       macOS noise that appears in every browsed dir
     #   - .sync-state.json the ledger itself; otherwise the ledger's mtime
@@ -55,10 +59,70 @@ module SiteSync
         new.write_manifest!(manifest)
       end
 
+      # The only baseline write that's safe to make after a transfer.
+      #
+      # A deletion is inferred, never observed: "in the baseline, absent on the
+      # peer" is a guess that the peer deleted it. So a file the peer has never
+      # had must not enter the baseline — next sync its absence reads as a
+      # deletion, and the file is destroyed on the only side that had it. That
+      # is how 9 episodes and 23 audio files were lost on 2026-08-26, and it is
+      # why every caller comes through here rather than write_current!.
+      #
+      # Absence isn't always deletion for another reason too: a side configured
+      # not to track documentation/roe/ omits it from its manifest entirely.
+      # Intersecting is what stops that scope difference being recorded as
+      # agreement and then read as a delete.
+      #
+      # No peer manifest means no confirmation is possible, so the baseline is
+      # left alone. Stale drift is visible and recoverable; a wrong baseline is
+      # neither.
+      def write_confirmed!(peer_manifest, context: "sync")
+        if peer_manifest.blank?
+          Rails.logger.warn "[SiteSync::Ledger] #{context}: no peer manifest — baseline left as-is " \
+                            "rather than recording files the peer may not have"
+          return nil
+        end
+
+        # fetch_peer_manifest returns {"files" => …, "fingerprint" => …}; this
+        # wants the files map. Passing the envelope by mistake matches nothing
+        # and would quietly record an empty baseline, so refuse it outright.
+        if peer_manifest.key?("files") || peer_manifest.key?(:files)
+          Rails.logger.error "[SiteSync::Ledger] #{context}: got the manifest envelope, not its files — " \
+                             "baseline left as-is"
+          return nil
+        end
+
+        local     = new.current_manifest
+        confirmed = local.select { |path, _| peer_manifest.key?(path) }
+        dropped   = local.size - confirmed.size
+
+        if dropped.positive?
+          Rails.logger.info "[SiteSync::Ledger] #{context}: #{dropped} local file(s) not on the peer — " \
+                            "left out of the baseline so they stay a push, not a deletion"
+        end
+
+        write_manifest!(confirmed)
+      end
+
       # Compare two file-hashes, returning the file-level diff. Sorted
       # lists so the UI is stable across reloads.
       def diff(current_files, recorded_files)
         recorded_files ||= {}
+
+        # A baseline written while Roe's docs were published still lists them
+        # after the setting changes to local. current_manifest stops walking
+        # them at the same moment, so the plain key subtraction below reads
+        # every one as a deletion — 113 of them, on the drift banner, with no
+        # reconciler involved.
+        #
+        # Dropped from both sides instead: out of scope is not deleted. Done
+        # here rather than at each caller because diff is the shared primitive
+        # — Checker's banner, and anything else asking what changed.
+        if roe_docs_excluded?
+          current_files  = current_files.reject  { |path, _| roe_docs_path?(path) }
+          recorded_files = recorded_files.reject { |path, _| roe_docs_path?(path) }
+        end
+
         added = current_files.keys - recorded_files.keys
         deleted = recorded_files.keys - current_files.keys
         common = current_files.keys & recorded_files.keys
@@ -105,8 +169,58 @@ module SiteSync
         parts = relative_path.split("/")
         return true if EXCLUDED_DIRS.include?(parts.first)
         return true if EXCLUDED_FILES.include?(parts.last)
+        return true if roe_docs_excluded? && relative_path.start_with?(ROE_DOCS_PATH)
 
         EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
+      end
+
+      # Read once and held for the walk rather than per file — excluded? is
+      # called for every file under /site, and a config lookup each time would
+      # be the slowest thing in building a manifest. current_manifest clears it
+      # first, so a changed setting applies to the next sync, not the next boot.
+      def roe_docs_excluded?
+        return @roe_docs_excluded unless @roe_docs_excluded.nil?
+
+        @roe_docs_excluded = !Documentation.roe_docs_published?
+      rescue StandardError
+        @roe_docs_excluded = false # a config read must never stop a sync
+      end
+
+      def reset_roe_docs_cache!
+        @roe_docs_excluded = nil
+      end
+
+      # Is this path Roe's own bundled documentation?
+      #
+      # Separated from excluded? because the two exclusions mean different
+      # things. Everything else excluded/ is protected — a peer must never be
+      # able to delete backups or .git. Roe's docs are content that ships with
+      # Roe: they are always on this computer, so removing them from live costs
+      # nothing and can be undone by changing one setting back.
+      def roe_docs_path?(relative_path)
+        relative_path.to_s.start_with?(ROE_DOCS_PATH)
+      end
+
+      # Roe's docs to remove from live, when the setting says they belong here
+      # only. Empty when they're published, so this is a no-op for anyone who
+      # hasn't asked for it.
+      #
+      # Listed from our own copy rather than the peer's manifest, because a peer
+      # set to `local` excludes them from its manifest and so can't report what
+      # it still has. Sending the full list every push is cheap and idempotent:
+      # the peer deletes what exists and reports the count, which is nothing
+      # after the first time.
+      def roe_docs_to_purge
+        reset_roe_docs_cache!
+        return [] unless roe_docs_excluded?
+
+        root = File.join(RoeSitePaths::SITE_PATH, ROE_DOCS_PATH)
+        return [] unless Dir.exist?(root)
+
+        Dir.glob(File.join(root, "**", "*"))
+           .select { |path| File.file?(path) }
+           .map    { |path| path.sub("#{RoeSitePaths::SITE_PATH}/", "") }
+           .sort
       end
     end
 
@@ -120,6 +234,8 @@ module SiteSync
 
     def current_manifest
       return {} unless Dir.exist?(@site_path)
+
+      self.class.reset_roe_docs_cache!
 
       manifest = {}
       prefix = @site_path.end_with?("/") ? @site_path : "#{@site_path}/"

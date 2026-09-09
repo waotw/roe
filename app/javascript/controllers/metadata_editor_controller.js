@@ -246,19 +246,41 @@ export default class extends Controller {
   // toggleMenu=false skips closing the add-field dropdown (it isn't open)
   _addKnownFieldByName(fieldName, initialValue = null, toggleMenu = false) {
     const config = this.knownFieldsValue[fieldName];
+    // A checkbox centres against its label, and the label drops the top
+    // padding that exists to line up with text — matching the ERB. Hardcoding
+    // items-start and pt-1.5 is why a checkbox added from the menu sat off
+    // until a save re-rendered it server-side.
+    const isCheckbox = config.type === "checkbox";
     const container = this.fieldsContainerTarget;
 
+    // Adding a field back undoes an earlier removal. Without this, formToYaml
+    // deletes it again at the end (removedFields wins), so a field removed and
+    // then re-added in the same session silently never saved.
+    this.removedFields.delete(fieldName);
+
     const row = document.createElement("div");
-    row.className = "metadata-field-row flex items-start gap-2";
+    row.className = `metadata-field-row flex ${isCheckbox ? "items-center" : "items-start"} gap-2`;
     row.dataset.fieldName = fieldName;
 
-    // Use default author if adding author field
+    // What a field starts as when added from the menu.
+    //
+    // A field carrying its own `default` wins — show_sidebar sets one per
+    // resource type, because adding it only ever means "do the opposite of
+    // what the scope already does".
+    //
+    // Otherwise a checkbox starts ticked: adding `image_in_header` and leaving
+    // it unticked writes what not adding it would have written, so the click
+    // would accomplish nothing. Reaching for a field is a statement of intent.
     const defaultValue =
       initialValue !== null
         ? initialValue
         : fieldName === "author" && config.default_from_config
           ? this.defaultAuthorValue
-          : "";
+          : config.default !== undefined && config.default !== null
+            ? config.default
+            : config.type === "checkbox"
+              ? "true"
+              : "";
 
     const inputHtml = this.buildInputHtml(fieldName, config, defaultValue);
 
@@ -271,11 +293,25 @@ export default class extends Controller {
           ×
         </button>`;
 
+    // Field and note share one column, mirroring the ERB partial — the note
+    // then lines up with the field without anything having to reproduce the
+    // label's width. A row built here used to be flat, so a field added from
+    // the menu rendered without its note while the same field rendered on page
+    // load had one.
+    const noteHtml = config.note
+      ? `<p class="text-xs text-gray-500 mt-1 mb-0.5">${config.note}</p>`
+      : "";
+
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}:
       </label>
-      ${inputHtml}
+      <div class="flex-1 min-w-0">
+        <div class="flex ${isCheckbox ? "items-center" : "items-start"} gap-2">
+          ${inputHtml}
+        </div>
+        ${noteHtml}
+      </div>
       ${deleteButton}
     `;
 
@@ -339,7 +375,7 @@ export default class extends Controller {
       <input type="text"
              value=""
              placeholder="field_name"
-             class="font-mono text-xs px-2 py-1 border border-gray-300 w-32"
+             class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
              data-custom-key>
       <input type="text"
              value=""
@@ -625,6 +661,20 @@ export default class extends Controller {
                           class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                           data-metadata-field="${fieldName}">${value}</textarea>`;
 
+      // Mirrors the ERB partial's checkbox branch. Its absence is why adding
+      // explicit / image_in_header / primary / show_sidebar from the menu
+      // produced a label and a delete button with nothing between them: they
+      // used to be selects, and `digital` — the only checkbox before — is
+      // always rendered by the server, so it never came through here.
+      case "checkbox":
+        return `<label class="flex-1 flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox"
+                         id="metadata-field-${fieldName}"
+                         data-metadata-field="${fieldName}"
+                         ${String(value) === "true" ? "checked" : ""}>
+                  ${config.hint ? `<span class="text-xs text-gray-500">${config.hint}</span>` : ""}
+                </label>`;
+
       default:
         return "";
     }
@@ -733,7 +783,14 @@ export default class extends Controller {
       }
 
       const fieldName = input.dataset.metadataField;
-      let value = input.value.trim();
+      // An unchecked box still has a .value ("on"), so reading that would
+      // write true for every one of them.
+      let value =
+        input.type === "checkbox"
+          ? input.checked
+            ? "true"
+            : "false"
+          : input.value.trim();
       fields[fieldName] = value;
     });
 
@@ -856,10 +913,15 @@ export default class extends Controller {
 
   addKnownFieldToForm(fieldName, value) {
     const config = this.knownFieldsValue[fieldName];
+    // A checkbox centres against its label, and the label drops the top
+    // padding that exists to line up with text — matching the ERB. Hardcoding
+    // items-start and pt-1.5 is why a checkbox added from the menu sat off
+    // until a save re-rendered it server-side.
+    const isCheckbox = config.type === "checkbox";
     const container = this.fieldsContainerTarget;
 
     const row = document.createElement("div");
-    row.className = "metadata-field-row flex items-start gap-2";
+    row.className = `metadata-field-row flex ${isCheckbox ? "items-center" : "items-start"} gap-2`;
     row.dataset.fieldName = fieldName;
 
     // Build input HTML
@@ -882,10 +944,15 @@ export default class extends Controller {
 
     // Now use all the variables
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}${asterisk}:
       </label>
-      ${inputHtml}
+      <div class="flex-1 min-w-0">
+        <div class="flex ${isCheckbox ? "items-center" : "items-start"} gap-2">
+          ${inputHtml}
+        </div>
+        ${config.note ? `<p class="text-xs text-gray-500 mt-1 mb-0.5">${config.note}</p>` : ""}
+      </div>
       ${deleteButton}
     `;
 
@@ -914,7 +981,7 @@ export default class extends Controller {
       <input type="text"
              value="${key}"
              placeholder="field_name"
-             class="font-mono text-xs px-2 py-1 border border-gray-300 w-32"
+             class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
              data-custom-key>
       <input type="text"
              value="${value}"
@@ -1475,7 +1542,7 @@ export default class extends Controller {
     row.dataset.fieldName = "duration";
 
     row.innerHTML = `
-        <label class="font-mono text-xs px-2 py-1 text-gray-700 w-32 flex-shrink-0 pt-1.5">
+        <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label flex-shrink-0 pt-1.5">
           duration:
         </label>
         <input type="text"

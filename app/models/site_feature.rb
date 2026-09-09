@@ -29,16 +29,47 @@ module SiteFeature
     File.exist?(File.join(FEATURES_PATH, "podcast.yml"))
   end
 
+  def custom_feeds_enabled?
+    File.exist?(File.join(FEATURES_PATH, "feeds.yml"))
+  end
+
+  def music_enabled?
+    File.exist?(File.join(FEATURES_PATH, "music.yml"))
+  end
+
   # Payments enabled = members enabled AND payments.enabled in members.yml
   def payments_feature_enabled?
     return false unless members_enabled?
     SiteConfig.feature("members", "payments.enabled") == true
   end
 
-  # Newsletters enabled = members enabled AND newsletter.enabled in members.yml
+  # Email is required by members, not optional alongside them: a magic link IS
+  # the sign-in mechanism, so a members site with no way to send one has no way
+  # to let anyone in. Enabled with members, never separately.
+  #
+  # This used to hang off newsletter.enabled, which meant a site running free
+  # members with newsletters off never had postmark.yml generated and never saw
+  # the setting in Settings — so every sign-in email fell through to a fallback
+  # mailer that reports success and delivers nothing.
+  def email_feature_enabled?
+    members_enabled?
+  end
+
+  # Newsletters enabled = members enabled AND newsletter.enabled in members.yml.
+  # Sending posts as broadcasts, and nothing else — it no longer decides whether
+  # email works at all.
   def newsletters_feature_enabled?
     return false unless members_enabled?
     SiteConfig.feature("members", "newsletter.enabled") == true
+  end
+
+  # The account icon in the site header. Off by default, which shows it only to
+  # someone already signed in — a site with a handful of members doesn't want a
+  # permanent sign-in affordance in the header. On, it's there for everyone and
+  # points at the sign-in page until they are.
+  def always_show_member_icon?
+    return false unless members_enabled?
+    SiteConfig.feature("members", "display.always_show_member_icon") == true
   end
 
   # ── Integration files present ───────────────────────────────────────────
@@ -47,9 +78,10 @@ module SiteFeature
     File.exist?(File.join(INTEGRATIONS_PATH, "stripe.yml"))
   end
 
-  def newsletters_integration_file?
+  def email_integration_file?
     File.exist?(File.join(INTEGRATIONS_PATH, "postmark.yml"))
   end
+  alias_method :newsletters_integration_file?, :email_integration_file?
 
   def snipcart_integration_file?
     File.exist?(File.join(INTEGRATIONS_PATH, "snipcart.yml"))
@@ -61,6 +93,12 @@ module SiteFeature
     payments_feature_enabled? && StripeConfig.current.keys_present?
   end
 
+  # Can we actually send anything: the feature is on and Postmark has keys.
+  def email_enabled?
+    email_feature_enabled? && PostmarkConfig.current.keys_present?
+  end
+
+  # Can we send a newsletter: email works AND broadcasts are turned on.
   def newsletters_enabled?
     newsletters_feature_enabled? && PostmarkConfig.current.keys_present?
   end
@@ -83,16 +121,19 @@ module SiteFeature
   # Returns true if ANY enabled integration needs attention for current mode.
 
   def any_integration_unconfigured?
-    payments_unconfigured? || newsletters_unconfigured? || snipcart_unconfigured?
+    payments_unconfigured? || email_unconfigured? || snipcart_unconfigured?
   end
 
   def payments_unconfigured?
     payments_feature_enabled? && !stripe_configured?
   end
 
-  def newsletters_unconfigured?
-    newsletters_feature_enabled? && !postmark_configured?
+  # The orange dot follows members, not newsletters. A members site without
+  # working email is broken whether or not it ever sends a broadcast.
+  def email_unconfigured?
+    email_feature_enabled? && !postmark_configured?
   end
+  alias_method :newsletters_unconfigured?, :email_unconfigured?
 
   def snipcart_unconfigured?
     store_enabled? && !snipcart_configured?
@@ -105,10 +146,32 @@ module SiteFeature
     SiteConfig.feature("members", "payments.mode").presence || "memberships"
   end
 
+  # Whether the site is SET UP for paid memberships — members.yml says so and
+  # the payments mode includes them. Deliberately does not require Stripe keys.
+  #
+  # It used to. That meant a site with memberships turned on but Stripe not yet
+  # connected got no `audience` field on posts, pages, podcasts or releases —
+  # so you couldn't mark anything paid until after you'd wired up billing, which
+  # is backwards from how people actually set a site up. Roe is file-first: the
+  # config says what the site is, and Stripe is a separate question about
+  # whether it can charge yet.
+  #
+  # Use memberships_configured? for "can actually take money" — see
+  # admin_helper#member_links, which has always ANDed the Stripe check itself.
   def memberships_enabled?
-    payments_enabled? && payments_mode.in?(%w[memberships both])
+    payments_feature_enabled? && payments_mode.in?(%w[memberships both])
   end
 
+  # Memberships are set up AND Stripe is connected, i.e. someone could pay
+  # today. Gate anything that offers a real transaction on this.
+  def memberships_configured?
+    memberships_enabled? && StripeConfig.current.keys_present?
+  end
+
+  # Same split as memberships: configured vs chargeable. Donations differ in
+  # that a donate button with no Stripe behind it is a dead end rather than a
+  # setting, so donations_enabled? keeps requiring keys — the call sites that
+  # render buttons depend on it.
   def donations_enabled?
     payments_enabled? && payments_mode.in?(%w[donations both])
   end

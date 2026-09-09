@@ -2,25 +2,13 @@
   <div class="sm:flex sm:items-center">
     <div class="sm:flex-auto font-sans">
       <h1 class="text-3xl font-bold text-gray-900">Pages</h1>
-      <p class="mt-2 text-sm text-gray-700">Standalone pages on your site.</p>
+      <!--<p class="mt-2 text-sm text-gray-700">Standalone pages on your site.</p>-->
     </div>
     <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
       <%= link_to "Edit Template", admin_settings_template_path(type: "page"), class: "inline-flex items-center uppercase text-xs px-1.5 py-1 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
       <%= link_to "New Page", new_admin_page_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
     </div>
   </div>
-
-  <% if flash[:notice] %>
-    <div class="mt-4 px-4 py-2 bg-green-50 border border-green-200 text-green-800 text-sm">
-      <%= flash[:notice] %>
-    </div>
-  <% end %>
-
-  <% if flash[:error] %>
-    <div class="mt-4 px-4 py-2 bg-red-50 border border-red-200 text-red-800 text-sm">
-      <%= flash[:error] %>
-    </div>
-  <% end %>
 
   <!-- Content Pages Section -->
   <div class="mt-8">
@@ -30,6 +18,10 @@
 
     <%= render 'pages_table', pages: @content_pages %>
   </div>
+
+  <%# Shown above the Member Pages section, and shown even when that section is
+      hidden — a site with no member pages at all is exactly when this matters. %>
+  <%= render "missing_member_pages", missing: @missing_member_pages, guessed: @guessed_member_pages %>
 
   <!-- Member Pages Section (if members enabled) -->
   <% if members_enabled? && @member_pages.any? %>

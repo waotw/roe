@@ -14,6 +14,10 @@ class MemberMailer
         site_name: site_name
       })
 
+      # Printed in development so the link is usable from the terminal when
+      # there's no browser to open — a remote box, or a preview turned off.
+      Rails.logger.info "🔑 Magic link for #{member.email}: #{signin_url}" if Rails.env.development?
+
       send_email(
         to: member.email,
         to_name: member.name || member.email,
@@ -181,13 +185,49 @@ class MemberMailer
           Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
         end
 
+        # Postmark took it, but a sandbox server records without delivering and
+        # a live one delivers somewhere you aren't. letter_opener is already the
+        # development delivery method — it just never fired here, because it
+        # sits on the fallback path a configured Postmark skips. Hand it a copy
+        # so the mail opens locally with a working link, while the real request
+        # still goes to Postmark and shows up in Activity.
+        preview_locally(to: to, subject: subject, html_content: html_content)
+
         result
       else
-        # Postmark not configured — fall back to Rails ActionMailer (letter_opener in dev)
+        # Postmark not configured — fall back to Rails ActionMailer.
         Rails.logger.info "📬 Postmark not configured, falling back to ActionMailer"
-        FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
-        { success: true, fallback: true }
+        deliver_via_fallback(to: to, subject: subject, html_content: html_content)
       end
+    end
+
+    # ActionMailer is a real delivery path in development, where letter_opener
+    # catches the mail and the sign-in link is right there. In production it's
+    # SMTP against settings nobody filled in — localhost:25, which isn't there —
+    # and Rails raises delivery errors by default. That exception had nothing
+    # catching it, so a members site with no Postmark token answered sign-in
+    # with a 500.
+    #
+    # Now it degrades instead: the page still works, the log says what's wrong,
+    # and the result says the mail didn't go rather than claiming it did.
+    def deliver_via_fallback(to:, subject:, html_content:)
+      FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
+      { success: true, fallback: true }
+    rescue StandardError => e
+      Rails.logger.error "❌ No email delivery configured — '#{subject}' to #{to} was not sent " \
+                         "(#{e.class}: #{e.message}). Add a Postmark token in Settings → Email."
+      { success: false, fallback: true, error: "Email delivery isn't configured" }
+    end
+
+    # Development only, and never allowed to affect the send. ROE_EMAIL_PREVIEW=0
+    # turns it off for anyone who'd rather not have a browser tab per email.
+    def preview_locally(to:, subject:, html_content:)
+      return unless Rails.env.development?
+      return if ENV["ROE_EMAIL_PREVIEW"] == "0"
+
+      FallbackMailer.generic(to: to, subject: subject, html_content: html_content).deliver_now
+    rescue StandardError => e
+      Rails.logger.debug "[MemberMailer] local preview skipped: #{e.class} #{e.message}"
     end
 
     def site_url

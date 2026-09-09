@@ -92,8 +92,23 @@ class Documentation < ApplicationRecord
   # /rails/site/... and would never match the stored paths → empty
   # collection on every query. Memoized so we don't realpath() per
   # query; the path doesn't change during the process's lifetime.
+  # Only remembered once the directory is really there.
+  #
+  # RoeSitePaths.normalize falls back to the un-resolved path when realpath
+  # can't find it. Caching that is unrecoverable: on Fly the prefix would stay
+  # /rails/site/documentation for the life of the process while ContentSync
+  # writes /data/site/documentation, so every LIKE matches nothing and the
+  # collection is empty until a restart happens to catch a better moment.
+  #
+  # site/documentation is missing more often than you'd think — before a first
+  # Site Sync brings it across, and in the window around an update.
   def self.normalized_documentation_path
-    @normalized_documentation_path ||= RoeSitePaths.normalize(RoeSitePaths::SITE_DOCUMENTATION_PATH)
+    return @normalized_documentation_path if @normalized_documentation_path
+
+    path = RoeSitePaths::SITE_DOCUMENTATION_PATH
+    resolved = RoeSitePaths.normalize(path)
+    @normalized_documentation_path = resolved if Dir.exist?(path)
+    resolved
   end
 
   # Return all unique tags across documentation records, optionally scoped
@@ -126,5 +141,62 @@ class Documentation < ApplicationRecord
     rel  = file_path.to_s.sub(/\A#{Regexp.escape(root)}\/?/, "")
     segments = rel.split("/")
     segments.length > 1 ? segments.first.presence : nil
+  end
+
+  # What happens to Roe's own documentation (documentation/roe) on a user's
+  # site. Roe ships 85 files most sites don't want to publish, so the default
+  # is to keep them out of the way.
+  #
+  # One dial rather than separate switches, because the three outcomes are
+  # nested and independent controls could be set to states that can't exist:
+  #
+  #   :local      not synced to live, not built, not searchable
+  #   :published  synced and built, but not in search
+  #   :searchable synced, built, and findable
+  #
+  # Search on live requires the files to be on live, so "searchable but not
+  # synced" is not a thing anyone can have. Naming that in the type stops it
+  # being a support question.
+  #
+  # None of this affects the admin: help links read Roe's docs from the copy
+  # inside the app (see BundledDocumentation), so they work at every setting.
+  ROE_DOCS_MODES = %w[local published searchable].freeze
+
+  def self.roe_docs_mode
+    value = SiteConfig.content("docs.roe").to_s.strip.downcase
+    return value if ROE_DOCS_MODES.include?(value)
+
+    # Legacy `search.roe_docs: true` meant "search and static build", which is
+    # this dial's top setting. Anything else — false, absent, unreadable —
+    # meant the default.
+    legacy = SiteConfig.content("search.roe_docs")
+    (legacy == true || legacy == "true") ? "searchable" : "local"
+  end
+
+  # Does documentation/roe travel to the live site, and get built into a
+  # static one? Site Sync and StaticGenerator both ask this.
+  def self.roe_docs_published? = roe_docs_mode != "local"
+
+  # …and is it findable once there?
+  def self.roe_docs_searchable? = roe_docs_mode == "searchable"
+
+  # Published docs that should be exposed to search.
+  def self.publishable
+    return published if roe_docs_searchable?
+    published.where("file_path NOT LIKE ?", "%/documentation/roe/%")
+  end
+
+  # Should this doc go into the static build? Follows the sync setting rather
+  # than the search one: a file that isn't on the live site can't be built
+  # into it, so "published" and "built" are the same question.
+  def publishable?
+    return true unless url_scope == "roe"
+    self.class.roe_docs_published?
+  end
+
+  # Should this doc be indexed for search?
+  def searchable?
+    return true unless url_scope == "roe"
+    self.class.roe_docs_searchable?
   end
 end

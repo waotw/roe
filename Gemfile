@@ -43,6 +43,11 @@ gem "listen", "~> 3.8"
 gem "kramdown", "~> 2.4"
 gem "front_matter_parser", "~> 1.0"
 
+# Formerly default gems, now "bundled" gems on Ruby 3.4+/4.0 — must be declared
+# explicitly under Bundler. csv: Substack import; ostruct: required in post.rb.
+gem "csv"
+gem "ostruct"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri ], require: "debug/prelude"
@@ -103,6 +108,11 @@ gem "postmark-rails", "~> 0.22.1"
 
 gem "net-sftp", "~> 4.0"
 gem "net-ftp", ">= 0.2"
+# SSH key decryption for SFTP key auth: bcrypt_pbkdf reads modern
+# (bcrypt-KDF) OpenSSH keys, ed25519 supports Ed25519 keys. Declared
+# directly so key auth doesn't silently depend on kamal pulling them in.
+gem "bcrypt_pbkdf"
+gem "ed25519"
 
 # Terminal UI for the install-time admin setup (bin/bootstrap) — select
 # menus, masked password input, validated prompts, framed panels. Pure

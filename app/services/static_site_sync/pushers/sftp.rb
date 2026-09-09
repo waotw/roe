@@ -23,15 +23,24 @@ module StaticSiteSync
       private
 
       def with_session
+        # Net::SFTP.start's return value with a block isn't the block's
+        # result — capture it explicitly so push! returns the transfer
+        # summary (and test_connection returns true) instead of nil.
+        result = nil
         Net::SFTP.start(@config.host, @config.username, **ssh_options) do |sftp|
-          yield sftp
+          result = yield sftp
         end
+        result
       rescue Net::SSH::AuthenticationFailed => e
         raise Pusher::ConnectionError, "Authentication failed: #{e.message}"
-      rescue SocketError, Errno::ECONNREFUSED, Errno::ETIMEDOUT, Net::SSH::ConnectionTimeout => e
+      rescue SocketError
+        raise Pusher::ConnectionError, unresolved_host_message
+      rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT, Net::SSH::ConnectionTimeout => e
         raise Pusher::ConnectionError, "Could not connect to #{@config.host}: #{e.message}"
       rescue Net::SSH::HostKeyMismatch => e
         raise Pusher::ConnectionError, "Host key mismatch — host fingerprint changed. #{e.message}"
+      rescue ArgumentError, OpenSSL::PKey::PKeyError => e
+        raise Pusher::ConnectionError, "Couldn't read the SSH private key — make sure it's a complete, unencrypted private key. (#{e.message})"
       rescue Net::SSH::Exception => e
         raise Pusher::ConnectionError, "SSH error: #{e.message}"
       end
@@ -39,13 +48,23 @@ module StaticSiteSync
       def ssh_options
         opts = { port: @config.port || 22, non_interactive: true, timeout: 30 }
         if @config.auth_mode_ssh_key?
-          opts[:key_data]   = [ @config.ssh_private_key ]
+          opts[:key_data]   = [ normalized_private_key ]
           opts[:keys_only]  = true
+          opts[:passphrase] = @config.ssh_key_passphrase if @config.ssh_key_passphrase.present?
         else
           opts[:password]     = @config.password
           opts[:auth_methods] = [ "password" ]
         end
         opts
+      end
+
+      # Browsers submit <textarea> content with CRLF line endings, but
+      # net-ssh's OpenSSH key parser checks the header with a strict
+      # start_with? and rejects the key when CRLF (or a missing trailing
+      # newline) is present. Normalize to LF and guarantee a final newline.
+      def normalized_private_key
+        key = @config.ssh_private_key.to_s.gsub(/\r\n?/, "\n")
+        key.end_with?("\n") ? key : key + "\n"
       end
 
       def upload_file(sftp, rel)

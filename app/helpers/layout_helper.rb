@@ -1,19 +1,20 @@
 module LayoutHelper
   def render_layout_file(filename, current_page: nil)
-    file_path = File.join(RoeSitePaths::SITE_PATH, "layout", "#{filename}.md")
+    file_path = LayoutFiles.path(filename)
 
     return "" unless File.exist?(file_path)
 
     content = File.read(file_path)
 
     # Run through the full roe-anji pipeline (Collections, Cards, Galleries,
-    # etc.), not raw Kramdown — that's how a collection in navigation.md or
+    # etc.), not raw Kramdown — that's how a collection in header.md or
     # footer.md renders. to_html handles inline-pipe escaping itself.
     html = LayoutMarkdown.render(content, static: @static_generation)
 
-    # Add active class to navigation links if this is the navigation file.
-    # Runs on the final HTML, so collection-generated nav links get it too.
-    if filename == "navigation"
+    # Add the active class to header/nav links (header supersedes the legacy
+    # navigation file). Runs on the final HTML, so collection-generated nav
+    # links get it too.
+    if %w[header navigation].include?(filename.to_s)
       html = add_active_nav_class(html, current_page)
     end
 
@@ -23,35 +24,39 @@ module LayoutHelper
     ""
   end
 
-  # Check if sidebar should be shown for current content
+  # Whether the sidebar shows for what's being rendered now.
+  #
+  # The file always wins. Without a setting, Sidebar's scope decides — so the
+  # field only ever exists to say the opposite of what the scope already does:
+  # `false` on a page the scope covers, `true` on a post it doesn't.
+  #
+  # `true` used to do nothing. Only `false` was handled, so the editor offered
+  # a choice with no effect, and a sidebar scoped to pages couldn't be turned
+  # on for one post.
   def show_sidebar?
-    return false unless File.exist?(sidebar_file_path)
+    return false unless Sidebar.exists?
 
-    # Check post/page metadata for override
-    content = @post || @page || @doc
+    content = @post || @page || @doc || @product
     if content.respond_to?(:metadata)
-      # If show_sidebar is explicitly false, hide it
-      return false if content.metadata["show_sidebar"] == false
+      # The metadata editor writes strings ("false"), so comparing to a boolean
+      # missed every setting made through the admin.
+      case content.metadata["show_sidebar"].to_s
+      when "true"  then return true
+      when "false" then return false
+      end
     end
 
-    # Check sidebar scope from frontmatter
-    scope = sidebar_scope
-    return true if scope.include?("all")
+    Sidebar.covers?(current_content_type)
+  end
 
-    # Determine current content type
-    current_type = if @post
-      "posts"
-    elsif @page
-      "pages"
-    elsif @doc
-      "documentation"
-    elsif @product
-      "products"
-    else
-      "unknown"
-    end
+  # Which of Sidebar::TYPES is being rendered.
+  def current_content_type
+    return "posts" if @post
+    return "pages" if @page
+    return "documentation" if @doc
+    return "products" if @product
 
-    scope.include?(current_type)
+    "unknown"
   end
 
   # Get sidebar position from frontmatter (default: left)
@@ -61,24 +66,33 @@ module LayoutHelper
     @sidebar_position = parse_sidebar_frontmatter["position"] || "left"
   end
 
+  # How the sidebar behaves on narrow screens (frontmatter `mobile:`):
+  #   hidden (default) — hidden below the breakpoint
+  #   top             — horizontal strip under the header, always visible
+  #   bottom          — full-width below the content, always visible
+  def sidebar_mobile
+    return @sidebar_mobile if defined?(@sidebar_mobile)
+
+    value = parse_sidebar_frontmatter["mobile"].to_s.strip.downcase
+    @sidebar_mobile = %w[top bottom hidden].include?(value) ? value : "hidden"
+  end
+
+  # Optional override for a relocated sidebar menu's orientation on narrow
+  # screens (frontmatter `mobile_style:`). Unset (nil) keeps the sensible
+  # default: `mobile: top` flips the menu horizontal, `bottom` stays vertical.
+  # Set `horizontal` or `vertical` to force it either way.
+  def sidebar_mobile_style
+    return @sidebar_mobile_style if defined?(@sidebar_mobile_style)
+
+    value = parse_sidebar_frontmatter["mobile_style"].to_s.strip.downcase
+    @sidebar_mobile_style = %w[horizontal vertical].include?(value) ? value : nil
+  end
+
   # Get sidebar scope from frontmatter (default: ['all'])
   # Supports: 'all', 'pages', 'posts', 'products', 'documentation'
   # Can be a single value or array: 'pages, posts' or ['pages', 'posts']
   def sidebar_scope
-    return @sidebar_scope if defined?(@sidebar_scope)
-
-    scope_value = parse_sidebar_frontmatter["scope"] || "all"
-
-    # Handle both string and array inputs
-    @sidebar_scope = case scope_value
-    when String
-      # Split by comma and clean up whitespace
-      scope_value.split(",").map(&:strip)
-    when Array
-      scope_value
-    else
-      [ "all" ]
-    end
+    @sidebar_scope ||= Sidebar.scope
   end
 
   # Render sidebar with proper positioning class
@@ -93,6 +107,11 @@ module LayoutHelper
 
     # Full roe-anji pipeline so Collections/Cards/Galleries work in the sidebar
     html = LayoutMarkdown.render(body_content, static: @static_generation)
+
+    # Highlight the current page — a `menu` collection in the sidebar is
+    # navigation just like the header, so it gets the same active-link pass.
+    html = add_active_nav_class(html, @post || @page || @doc)
+
     html.html_safe
   rescue => e
     Rails.logger.error "Error rendering sidebar: #{e.message}"

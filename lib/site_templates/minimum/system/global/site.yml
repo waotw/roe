@@ -1,17 +1,17 @@
-title: ""
-url: ""
-description: ""
-author: ""
-author_email: ""
-logo: ""
-logo_style: ""
-favicon: ""
-social_image: ""
+title: ''
+url: ''
+description: ''
+author: ''
+author_email: ''
+logo: ''
+logo_style: ''
+favicon: ''
+social_image: ''
 social_image_override: false
-social_image_alt: ""
-twitter_handle: ""
+social_image_alt: ''
+twitter_handle: ''
 theme:
-  active: "default"
+  active: default
 update_channel: stable
 sync_transport: http
 static_generation_enabled: false

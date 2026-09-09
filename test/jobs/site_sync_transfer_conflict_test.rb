@@ -130,4 +130,29 @@ class SiteSyncTransferConflictTest < ActiveSupport::TestCase
     SiteSyncTransferJob.perform_now(:sync)
     assert_equal :conflicts, status[:state]
   end
+
+  # A clone mirrors local → peer. It should back up only the peer content it
+  # will OVERWRITE (modified) or DELETE (peer-only), not the whole tree — added
+  # files are new to the peer and unchanged files come from local.
+  test "clone backs up only the peer files it overwrites or deletes" do
+    SiteSync::Ledger.stubs(:current).returns(
+      "added.md" => e(1, 100),  # local-only → added to peer (nothing to back up)
+      "mod.md"   => e(2, 200)   # differs from peer → overwritten
+    )
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => {
+      "mod.md" => e(2, 999),    # same size, different mtime → modified
+      "del.md" => e(3, 300)     # peer-only → deleted
+    })
+
+    backed_up = nil
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!).with { |files:, on_progress:| backed_up = files; true }
+    transport.stubs(:push_local_to_live!)
+    SiteSync.stubs(:transport).returns(transport)
+
+    SiteSyncTransferJob.perform_now(:clone)
+
+    assert_equal %w[del.md mod.md], backed_up.sort, "only overwritten + deleted peer files"
+    refute_includes backed_up, "added.md"
+  end
 end

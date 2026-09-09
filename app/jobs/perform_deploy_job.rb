@@ -20,9 +20,42 @@ class PerformDeployJob < ApplicationJob
 
   STATUS_CACHE_KEY = "deploy:status".freeze
   STATUS_TTL       = 24.hours
+
+  # A deploy that goes quiet for this long is treated as hung and stopped.
+  #
+  # Deliberately generous. DeployWatchdog declines to guess "stuck" from log
+  # silence for good reason — a quiet `docker build` layer can run for minutes
+  # — and killing a working deploy is far worse than letting a dead one sit.
+  # This isn't that guess: nothing here infers a stall mid-deploy and reports
+  # it, it only stops a command that has produced nothing at all for ten
+  # minutes, which no real build stage does.
+  STALL_TIMEOUT = 10.minutes
+
+  # How often to look up from the read while it's quiet.
+  STALL_POLL = 1
+
+  # How long a stalled command gets to exit on TERM before it's KILLed. A wedged
+  # CLI often ignores TERM; a healthy one uses this to clean up after itself.
+  TERM_GRACE = 2
+
+  # Written into both the log and the error so DeployDiagnostics can recognise
+  # a stall. It has to be a marker we plant: every other signature matches text
+  # the failing command printed, and a stall is defined by printing nothing.
+  STALL_MARKER = "roe: deploy stalled".freeze
   LAST_DEPLOY_FILE = File.join(RoeSitePaths::SITE_PATH, "system", "global", ".last_deploy.yml")
 
   def perform(target:, version_tag:, admin_user_id: nil, reset_cache: false)
+    # Refuse to run a deploy nobody is waiting for.
+    #
+    # Solid Queue puts an in-flight job back on the queue when a worker shuts
+    # down cleanly (Process::Executor#release_all_claimed_executions), so
+    # quitting Roe mid-deploy can hand this job straight back for the next boot
+    # to pick up. A deploy is not safe to resume unattended hours later: it
+    # auto-commits the working tree, pushes secrets and builds an image, all
+    # with nobody watching. Dropping it is the right default — the button is
+    # still there.
+    return unless claim_deploy!(version_tag)
+
     # Stage VERSION FIRST. Kamal builds from the git tree, not the raw
     # working directory — anything not committed is silently absent
     # from the build context. If we auto-commit BEFORE staging VERSION
@@ -71,11 +104,10 @@ class PerformDeployJob < ApplicationJob
       # deploy just works instead of failing at the last step.
       ensure_kamal_secrets!
 
-      # Cache reset before bootstrap + build. Runs over the same SSH
-      # connection Kamal already uses, so no new auth/setup. Failures
-      # are logged but don't abort — a flaky prune shouldn't block a
-      # deploy attempt the user explicitly asked to retry.
-      clear_remote_build_cache if reset_cache
+      # Cache reset before bootstrap + build. Prunes locally, because that's
+      # where builds run. Failures are logged but don't abort — a flaky prune
+      # shouldn't block a deploy the user explicitly asked to retry.
+      clear_build_cache if reset_cache
 
       # Kamal analog: rewrite the ROE_BOOTSTRAP line in .kamal/secrets
       # with current admin + sync_token before kamal builds the image.
@@ -83,6 +115,27 @@ class PerformDeployJob < ApplicationJob
       # when there's no admin to package (the prod initializer no-ops on
       # an empty payload).
       sync_kamal_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
+    end
+
+    # Fail before the build, not four minutes into it.
+    #
+    # Kamal reports a missing local Docker as whatever it failed to reach next,
+    # which reads as a problem with the server rather than this computer. Fly
+    # is worse: with an expired session `fly deploy` produces no output and
+    # never returns, so the page sits with an empty log and no way back. Both
+    # are cheaper to catch here than to diagnose from a stuck screen.
+    if (blockers = DeployPreflight.new.blockers(target)).any?
+      Rails.logger.warn "[PerformDeployJob] Preflight failed: #{blockers.map(&:title).join('; ')}"
+      write_status(
+        state:        :failed,
+        target:       target,
+        version_tag:  version_tag,
+        finished_at:  Time.current,
+        log:          blockers.map { |b| "[preflight] #{b.title}" }.join("\n"),
+        error:        blockers.map(&:title).join(". ") + ".",
+        preflight:    blockers.map { |b| { title: b.title, explanation: b.explanation, steps: b.steps } }
+      )
+      return
     end
 
     cmd = build_command(target, version_tag, reset_cache: reset_cache)
@@ -102,6 +155,37 @@ class PerformDeployJob < ApplicationJob
   end
 
   private
+
+  # True when this job is the deploy the page is currently showing, and hasn't
+  # already had a go.
+  #
+  # Three ways it can be false, all meaning "don't deploy":
+  #
+  #   no status      — dismissed, or the TTL passed. Nobody is watching.
+  #   another tag    — a newer deploy superseded this one.
+  #   already begun  — this job ran before and was re-queued by a restart.
+  #
+  # The last is the one that matters, and it's why this records the attempt
+  # rather than just reading. Solid Queue doesn't count a released execution as
+  # a retry, so `executions` stays 1 and can't tell a resumed job from a fresh
+  # one. A marker in the status can.
+  def claim_deploy!(version_tag)
+    status = Rails.cache.read(STATUS_CACHE_KEY)
+
+    reason =
+      if status.nil?                                        then "no deploy status — it was dismissed or expired"
+      elsif status[:version_tag].to_s != version_tag.to_s   then "superseded by a newer deploy"
+      elsif status[:job_started_at].present?                then "already started once — Roe restarted while it was running"
+      end
+
+    if reason
+      Rails.logger.warn "[PerformDeployJob] Skipping deploy #{version_tag}: #{reason}"
+      return false
+    end
+
+    write_status(job_started_at: Time.current)
+    true
+  end
 
   # Commits any staged or unstaged changes so Kamal's build context is current.
   # Uses inline git config so it works even when git user isn't globally
@@ -288,8 +372,8 @@ class PerformDeployJob < ApplicationJob
     when "kamal"
       # --version bypasses git SHA versioning so the deploy always uses
       # the files on disk, no commit required. Cache reset for Kamal
-      # happens out-of-band via clear_remote_build_cache (SSH prune
-      # before kamal runs); the command itself stays unchanged.
+      # happens out-of-band via clear_build_cache (a local prune before
+      # kamal runs); the command itself stays unchanged.
       "bundle exec kamal deploy --version=#{version_tag}"
     when "fly"
       # Fly's builder cache lives on their infrastructure, not on a
@@ -302,74 +386,106 @@ class PerformDeployJob < ApplicationJob
     end
   end
 
-  # SSH into the Kamal deploy server and clear BuildKit + builder cache.
-  # Same SSH connection Kamal already uses for deploys, so it inherits
-  # whatever auth (keys, ssh-agent) is already configured — no new setup
-  # required for users.
+  # Clear BuildKit + builder cache on the machine that does the building —
+  # this one.
   #
-  # Best-effort: failures here are logged but never raise, because the
-  # whole point is to recover from a stuck state and the user is going
-  # to retry the deploy regardless. A failed prune just means the next
-  # build might still hit the cache issue; we don't want to fail the
-  # retry on top of that.
-  def clear_remote_build_cache
-    config  = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
-    servers = Array(config.dig("kamal", "servers")).map(&:to_s).reject(&:blank?)
-    server  = servers.first
-
-    unless server.present?
-      Rails.logger.warn "[PerformDeployJob] No Kamal server configured — can't clear remote build cache"
-      return
-    end
-
-    Rails.logger.info "[PerformDeployJob] Clearing remote build cache on #{server}"
+  # This used to SSH into the deploy server and prune there, back when
+  # deploy.yml configured a remote builder. That builder is gone (it pointed
+  # at the same small droplet that serves the site), so the cache this needs
+  # to clear is local. Pruning the server cleared a cache nothing was using
+  # while leaving the real one untouched — the button did nothing.
+  #
+  # Best-effort: failures are logged but never raise. The whole point is to
+  # recover from a stuck state and the user is retrying regardless, so a
+  # failed prune shouldn't fail the retry on top of it.
+  def clear_build_cache
+    Rails.logger.info "[PerformDeployJob] Clearing local build cache"
 
     Bundler.with_original_env do
-      # StrictHostKeyChecking=accept-new auto-accepts a host key on
-      # first connect (so the job doesn't hang at an interactive
-      # prompt) but refuses if the key changes from a known value
-      # (defends against MITM).
       output, status = Open3.capture2e(
-        "ssh",
-        "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "BatchMode=yes",
-        "root@#{server}",
-        "docker buildx prune --force --all && docker builder prune --force --all"
+        "docker", "buildx", "prune", "--force", "--all"
       )
 
       if status.success?
-        Rails.logger.info "[PerformDeployJob] Remote build cache cleared on #{server}"
+        Rails.logger.info "[PerformDeployJob] Local build cache cleared"
       else
-        Rails.logger.warn "[PerformDeployJob] Cache clear failed on #{server}: #{output.lines.first&.strip}"
+        Rails.logger.warn "[PerformDeployJob] Cache clear failed: #{output.lines.first&.strip}"
       end
     end
+  rescue StandardError => e
+    Rails.logger.warn "[PerformDeployJob] Cache clear failed: #{e.message}"
+  end
+
+  # Overridable so a test doesn't have to wait ten minutes to prove the timeout.
+  def stall_timeout = STALL_TIMEOUT
+  def term_grace    = TERM_GRACE
+
+  # TERM the whole group, not just the child. `kamal deploy` and `fly deploy`
+  # are front ends — the thing actually hung is usually a docker or ssh
+  # grandchild, and killing the parent alone orphans it still holding the
+  # resource. pgroup: true on spawn is what makes the negative pid work.
+  def terminate_process_group(pid)
+    Process.kill("TERM", -pid)
+    sleep term_grace
+    Process.kill("KILL", -pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    # Already gone, or not ours to signal — either way there's nothing to stop.
   end
 
   def run_with_streaming(cmd, target:, version_tag:, env: {})
     log         = ""
     last_write  = Time.current
     success     = false
+    stalled     = false
 
     begin
       Bundler.with_original_env do
         # Pass the explicit env hash as Open3's first arg so it merges
         # over the inherited ENV without us having to hand-roll the
         # subprocess setup. Empty hash is a no-op.
-        Open3.popen2e(env, cmd, chdir: Rails.root.to_s) do |stdin, stdout_err, wait_thr|
+        # pgroup: true so the deploy and everything it spawns share a group we
+        # can stop as one. Without it a stall timeout can only kill the front
+        # end and leaves the wedged child running.
+        Open3.popen2e(env, cmd, chdir: Rails.root.to_s, pgroup: true) do |stdin, stdout_err, wait_thr|
           stdin.close
 
-          stdout_err.each_line do |line|
-            log += line
+          last_output = Time.current
+          buffer      = +""
 
-            # Throttle cache writes — once per second is plenty for the
-            # polling interval (2 s) and avoids hammering the cache store.
-            if Time.current - last_write >= 1.0
-              write_status(state: :running, target: target, version_tag: version_tag, log: log)
-              last_write = Time.current
+          # Read with a deadline rather than each_line, which blocks forever on
+          # a command that never writes and never exits — the whole bug.
+          loop do
+            if stdout_err.wait_readable(STALL_POLL)
+              begin
+                buffer << stdout_err.readpartial(4096)
+              rescue EOFError
+                break
+              end
+              last_output = Time.current
+
+              # readpartial lands on chunk boundaries, not line ones. Emit whole
+              # lines and hold the remainder for the next read.
+              while (newline = buffer.index("\n"))
+                log += buffer.slice!(0..newline)
+              end
+
+              # Throttle cache writes — once per second is plenty for the
+              # polling interval (2 s) and avoids hammering the cache store.
+              if Time.current - last_write >= 1.0
+                write_status(state: :running, target: target, version_tag: version_tag, log: log)
+                last_write = Time.current
+              end
+            elsif Time.current - last_output >= stall_timeout
+              stalled = true
+              terminate_process_group(wait_thr.pid)
+              break
             end
           end
 
-          success = wait_thr.value.success?
+          log += buffer # whatever it printed without a trailing newline
+          # Short-circuit: after a kill there's no exit status worth reading,
+          # and a stalled deploy failed whatever the process eventually says.
+          success = !stalled && wait_thr.value.success?
         end
       end
     rescue => e
@@ -403,20 +519,50 @@ class PerformDeployJob < ApplicationJob
       File.write(LAST_DEPLOY_FILE, yaml)
       Rails.logger.info "[PerformDeployJob] #{target} deploy completed successfully"
     else
+      minutes = (stall_timeout / 60).round
+
+      # The log is kept exactly as collected. On a stall it's the only evidence
+      # there is, and it's usually where the deploy got to before going quiet.
+      log += "\n[#{STALL_MARKER}] no output for #{minutes} minutes — Roe stopped the deploy.\n" if stalled
+
       write_status(
         state:        :failed,
         target:       target,
         version_tag:  version_tag,
         log:          log,
         completed_at: Time.current,
-        error:        "Deploy command exited with a non-zero status. See log for details."
+        error:        if stalled
+          [ "The deploy stopped responding — no output for #{minutes} minutes, " \
+            "so Roe stopped it (#{STALL_MARKER}).",
+            # Stopping mid-deploy leaves the same residue as Roe quitting
+            # mid-deploy, so it gets the same warning.
+            DeployWatchdog.cleanup_hint(target) ].compact.join(" ")
+                      else
+          "Deploy command exited with a non-zero status. See log for details."
+                      end
       )
-      Rails.logger.error "[PerformDeployJob] #{target} deploy failed"
+      Rails.logger.error "[PerformDeployJob] #{target} deploy #{stalled ? 'stalled and was stopped' : 'failed'}"
     end
   end
 
+  # Tracks how many times in a row a deploy has failed, which is what tells
+  # the failure panel whether a cold build is worth offering. One failure is
+  # usually something you go and fix; a second means the cheap retry isn't
+  # working.
+  #
+  # Counted here rather than compared by content because every non-zero exit
+  # writes the same error string — comparing those would call every failure a
+  # repeat. The count carries through the :running state on a retry (merge
+  # keeps it) and resets on success or dismissal.
   def write_status(attrs)
     current = Rails.cache.read(STATUS_CACHE_KEY) || {}
+
+    attrs = case attrs[:state]
+    when :failed    then attrs.merge(consecutive_failures: current[:consecutive_failures].to_i + 1)
+    when :completed then attrs.merge(consecutive_failures: 0)
+    else attrs
+    end
+
     Rails.cache.write(STATUS_CACHE_KEY, current.merge(attrs), expires_in: STATUS_TTL)
   end
 end

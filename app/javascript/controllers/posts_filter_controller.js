@@ -10,6 +10,7 @@ export default class extends Controller {
     "sortFilter",
     "tbody",
     "tabContainer",
+    "paidToggle",
   ];
   static values = { total: Number };
 
@@ -102,6 +103,10 @@ export default class extends Controller {
     this.applyFilters();
   }
 
+  filterByPaid() {
+    this.applyFilters();
+  }
+
   filterBySearch(event) {
     this.updateURL();
     this.applyFilters();
@@ -133,6 +138,16 @@ export default class extends Controller {
 
       // Filter by search query
       if (query && !row.dataset.searchable.includes(query)) {
+        matches = false;
+      }
+
+      // Paid only. One toggle, because a post is paid or it isn't — unlike a
+      // media file, which can be reached from both paid and free content.
+      if (
+        this.hasPaidToggleTarget &&
+        this.paidToggleTarget.checked &&
+        row.dataset.paid !== "true"
+      ) {
         matches = false;
       }
 

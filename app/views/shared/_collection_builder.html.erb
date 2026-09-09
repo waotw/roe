@@ -1,9 +1,9 @@
 <%# Collection builder modal. Lives inside the editor root so its
     `collection-builder:insert` event bubbles to the editor controller (same
     seam the media picker uses). All options come from CollectionBuilderSchema
-    — the single source of truth — and pre-fill from the site's button_template
-    so commonly-used options are the defaults. Fields dim until they hold a
-    value; only non-empty fields get written into the block. %>
+    — the single source of truth — and pre-fill from the site's collection
+    defaults. Fields dim until they hold a value. A field still showing the
+    default is left out of the block, so it keeps following that setting. %>
 <%# The `collection-builder` controller lives on the editor root (alongside
     `editor`), so this modal, the toolbar trigger, and the textarea all sit in
     its scope. %>
@@ -23,7 +23,7 @@
       <div>
       <h2 class="font-mono text-sm font-semibold text-gray-900">Insert collection</h2>
       <p class="text-xs text-gray-500">There are a lot of options here but none are required for a working Collection</a><br>
-        Check out some <a href="/documentation/roe/collections#collection-examples" target="_blank" class="underline">Collection examples</a><br>You can edit the <a href="/admin/configs/collections/edit" class="underline" target="_blank">button template</a> which controls the defaults for this form.</p>
+        Check out some <a href="/documentation/roe/collections#collection-examples" target="_blank" class="underline">Collection examples</a><br>These fields start from your <a href="/admin/configs/collections/edit" class="underline" target="_blank">collection defaults</a>. Anything you leave at its default is left out of the block, so it follows that setting.</p>
       </div>
       <button type="button" data-action="click->collection-builder#close"
               class="w-7 h-7 flex items-center justify-center border border-gray-400 bg-white hover:bg-gray-100 text-gray-600 text-sm font-mono rounded-xs">×</button>
@@ -41,18 +41,18 @@
 
           <% case field[:type] %>
           <% when :select %>
-            <select data-cb-field="<%= key %>"
+            <select data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                     data-action="change->collection-builder#fieldChanged"
                     class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
               <option value="">—</option>
-              <% field[:options].each do |opt| %>
+              <% CollectionBuilderSchema.options_for(field).each do |opt| %>
                 <option value="<%= opt %>"<%= ' selected' if value == opt %>><%= opt %></option>
               <% end %>
             </select>
 
           <% when :boolean %>
             <%# Tri-state: blank = use engine default; true/false force it. %>
-            <select data-cb-field="<%= key %>"
+            <select data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                     data-cb-boolean="true"
                     data-action="change->collection-builder#fieldChanged"
                     class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= select_chevron %> <%= 'cb-empty' if value.blank? %>">
@@ -62,7 +62,7 @@
             </select>
 
           <% else %>
-            <input type="text" data-cb-field="<%= key %>"
+            <input type="text" data-cb-field="<%= key %>" data-cb-default="<%= value %>"
                    value="<%= value %>"
                    data-action="input->collection-builder#fieldChanged"
                    class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">

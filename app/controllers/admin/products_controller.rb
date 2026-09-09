@@ -1,4 +1,10 @@
 class Admin::ProductsController < Admin::BaseController
+  include BulkContentActions
+  include CreatesContent
+
+  def bulk_model = Product
+  def bulk_index_path = admin_products_path
+  def bulk_label = "product"
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   before_action :set_product, only: [ :edit, :update, :show, :destroy ]
@@ -16,7 +22,20 @@ class Admin::ProductsController < Admin::BaseController
   end
 
   def create
+    title_param = params[:title].to_s.strip
     filename = sanitize_filename(params[:filename])
+
+    # The two derive from each other: a filename gives a title, a title gives a
+    # filename. Without this a title-only submission wrote "products/.md", which
+    # File.extname reads as having no extension — the front matter parser then
+    # can't pick a syntax and dies on nil.to_sym.
+    filename = sanitize_filename(title_param.parameterize) if filename.blank?
+
+    if filename.blank?
+      flash.now[:error] = "Give the product a filename or a title"
+      render :new, status: :unprocessable_entity
+      return
+    end
 
     # Ensure products directory exists
     products_dir = Pathname.new(File.join(RoeSitePaths::SITE_PATH, "products"))
@@ -32,13 +51,16 @@ class Admin::ProductsController < Admin::BaseController
       return
     end
 
-    title = filename_to_title(filename)
-    metadata, body = ContentTemplate.frontmatter_for("product", "title" => title, "url_name" => filename)
+    title = title_param.presence || filename_to_title(filename)
+    overrides = { "title" => title, "url_name" => filename }.merge(create_field_overrides("product"))
+    overrides["sku"] = suggested_sku(overrides) if overrides["sku"].blank?
+
+    metadata, body = ContentTemplate.frontmatter_for("product", overrides)
 
     yaml_content = metadata.to_yaml.sub(/\A---\n/, "")
     content = "---\n#{yaml_content}\n---\n#{body}"
 
-    File.write(file_path, content)
+    SiteFile.write(file_path, content)
     ContentSync.sync_file(file_path)
 
     relative_path = file_path.to_s.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
@@ -97,7 +119,7 @@ class Admin::ProductsController < Admin::BaseController
     rescue => e
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
-      File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
+      SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
       redirect_to edit_admin_product_path(@product)
       return
     end
@@ -106,7 +128,7 @@ class Admin::ProductsController < Admin::BaseController
     was_published = @product.status == "published"
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
-    File.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
+    SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
 
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     @product.reload
@@ -186,7 +208,7 @@ class Admin::ProductsController < Admin::BaseController
     new_rel = File.join(rel_dir, "#{base_name}-#{n}.md")
 
     metadata["title"] = base_title.present? ? "#{base_title} #{n}" : "Untitled #{n}"
-    File.write(File.join(RoeSitePaths::SITE_PATH, new_rel),
+    SiteFile.write(File.join(RoeSitePaths::SITE_PATH, new_rel),
                "---\n#{Product.format_metadata_yaml(metadata)}\n---\n#{parsed.content}")
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, new_rel))
 
@@ -337,6 +359,13 @@ class Admin::ProductsController < Admin::BaseController
     render json: { exists: exists }
   end
 
+  # The same suggestion the editor's generator makes, but for a product that
+  # doesn't exist yet — so the NEW PRODUCT form can offer one before creating.
+  # (sku_generator is a member route and needs a persisted product.)
+  def suggest_sku
+    render json: { sku: sku_suggestion_for(params) }
+  end
+
   def duplicate_skus
     @duplicates = Product.duplicate_skus
   end
@@ -353,7 +382,7 @@ class Admin::ProductsController < Admin::BaseController
         cats = ProductCategory.all rescue []
         cats.any? ? "e.g., #{cats.first(3).join(', ')}" : "e.g., book, ebook, poster"
       end,
-      "price"    => "Price in dollars (e.g., 29.99)",
+      "price"    => "Price in #{helpers.store_currency_symbol} (e.g., 29.99)",
       "sku"      => "Stock Keeping Unit (e.g., BOOK-001-TITLE)",
       "image"    => "Path to product image: /media/images/file.jpg"
     }
@@ -396,7 +425,7 @@ class Admin::ProductsController < Admin::BaseController
   def save_product_to_file(product)
     yaml_content = product.metadata.to_yaml.sub(/\A---\n/, "")
     full_content = "---\n#{yaml_content}\n---\n#{product.content}"
-    File.write(File.join(RoeSitePaths::SITE_PATH, product.file_path), full_content)
+    SiteFile.write(File.join(RoeSitePaths::SITE_PATH, product.file_path), full_content)
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, product.file_path))
   end
 
@@ -404,11 +433,34 @@ class Admin::ProductsController < Admin::BaseController
     @product = Product.find(params[:id])
   end
 
+  # Snipcart keys a cart item on the SKU (data-item-id), so a product without
+  # one has a buy button that can't work. Rather than make the writer invent an
+  # identifier at create, suggest the same one the editor's generator would —
+  # they can change it there, or press Generate on the form first.
+  def suggested_sku(overrides)
+    sku_suggestion_for(overrides)
+  end
+
+  # Shared by the form's Generate button and the fallback at create time, so the
+  # SKU you're shown is the SKU you get.
+  def sku_suggestion_for(source)
+    Product.new(metadata: {
+      "title"    => source["title"] || source[:title],
+      "category" => source["category"] || source[:category],
+      "variant"  => source["variant"] || source[:variant]
+    }.compact).generate_sku_suggestion
+  rescue => e
+    Rails.logger.warn "[products] SKU suggestion failed: #{e.class} #{e.message}"
+    nil
+  end
+
+  # nil-safe: the form's filename is optional now (it follows the title), so a
+  # submission can arrive without one at all.
   def sanitize_filename(filename)
-    filename.parameterize
+    filename.to_s.parameterize
   end
 
   def filename_to_title(filename)
-    filename.gsub("-", " ").titleize
+    filename.to_s.gsub("-", " ").titleize
   end
 end

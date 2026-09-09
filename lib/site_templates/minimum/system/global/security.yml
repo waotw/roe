@@ -1,0 +1,15 @@
+ai_crawlers: block_all
+enabled: true
+limits:
+  magic_link:
+    to: 5
+    within: 15
+  signup:
+    to: 20
+    within: 60
+  checkout:
+    to: 20
+    within: 60
+  token:
+    to: 30
+    within: 60

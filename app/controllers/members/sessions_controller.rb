@@ -1,7 +1,26 @@
 module Members
   class SessionsController < BaseController
+    include RateLimited
+
     skip_before_action :set_current_member, only: [ :new, :create, :signin_with_token ]
     before_action :redirect_if_signed_in, only: [ :new, :create ]
+
+    # Counted per address, not per IP. Flooding one person's inbox is abuse of
+    # that address; an IP limit here would punish everyone behind a shared
+    # connection — an office, a campus, a whole mobile network — for something
+    # one of them did.
+    #
+    # And hitting it doesn't refuse the sign-in. It stops sending another email
+    # and says one is already on its way, which is true and is what someone
+    # clicking twice needed to hear. Nobody is turned away.
+    limit_requests :magic_link, only: :create, with: -> { link_already_sent }
+
+    # Token guessing. Nothing narrower than the IP to key on here, and a guess
+    # is cheap, so the allowance is high enough that a person following links
+    # from their own inbox will never see it.
+    limit_requests :token, only: :signin_with_token, with: -> {
+      redirect_to root_path, alert: "Too many sign-in attempts. Try again shortly."
+    }
 
     def new
       # Render sign in form
@@ -14,14 +33,19 @@ module Members
         member.regenerate_token!
 
         # Send magic link email immediately (no .deliver_now needed)
-        MemberMailer.magic_link(member)
+        result = MemberMailer.magic_link(member)
 
-        # Redirect to confirmation page instead of home
-        check_email_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "check-email")
-        if check_email_page
-          redirect_to "/#{check_email_page.url_name}"
+        # Nothing was sent — almost always a site with members turned on and no
+        # email configured. Say so rather than sending someone to watch an inbox
+        # for a link that was never going to arrive. Deliberately vague: what's
+        # broken is the site owner's to fix, and the visitor can't act on it.
+        if result.is_a?(Hash) && result[:success] == false
+          # Redirect rather than render: the sign-in form is a Page, and a site
+          # that hasn't got one would blow up on the template instead of showing
+          # the message.
+          redirect_to "/sign-in", alert: "We couldn't send the sign-in email. Please try again shortly."
         else
-          redirect_to root_path, notice: "Check your email for a sign-in link!"
+          redirect_to_check_email
         end
       else
         flash.now[:alert] = "No account found with that email"
@@ -33,6 +57,21 @@ module Members
     def destroy
       session.delete(:member_id)
       redirect_to root_path, notice: "Signed out successfully"
+    end
+
+    # Same destination as a successful send — from the reader's side nothing has
+    # gone wrong, and a link really is waiting for them.
+    def link_already_sent
+      redirect_to_check_email(notice: "We've already sent a sign-in link — check your email, including spam.")
+    end
+
+    def redirect_to_check_email(notice: nil)
+      page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "check-email")
+      if page
+        redirect_to "/#{page.url_name}", notice: notice
+      else
+        redirect_to root_path, notice: notice || "Check your email for a sign-in link!"
+      end
     end
 
     def signin_with_token

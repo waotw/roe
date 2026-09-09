@@ -3,6 +3,26 @@ class Admin::ConfigsController < Admin::BaseController
   # so any non-GET config action busts the media-usage backlink cache.
   after_action :invalidate_media_usage_index
 
+  # Structured editors that fall back to the raw YAML editor when their file
+  # can't be parsed. Maps the edit action → the SiteConfig type (also the
+  # file_path_for key). The matching path helper is always
+  # admin_<action>_config_path, so we derive it rather than list it twice.
+  RAW_EDITABLE_CONFIGS = {
+    "edit_site"        => "site",
+    "edit_content"     => "content",
+    "edit_fonts"       => "fonts",
+    "edit_podcast"     => "features/podcast",
+    "edit_cards"       => "defaults/cards",
+    "edit_collections" => "defaults/collections",
+    "edit_members"     => "features/members",
+    "edit_store"       => "features/store"
+  }.freeze
+
+  # When a structured editor above hits malformed YAML, don't 500 — send the
+  # admin to the raw editor for that file so they can fix it by hand. Any other
+  # source of a syntax error re-raises as before.
+  rescue_from Psych::SyntaxError, with: :handle_unparseable_config
+
   # Site Config Schema Definition
   SITE_CONFIG_SCHEMA = {
     site_info: {
@@ -108,6 +128,12 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Transport",
           options: [ "http", "rsync" ],
           hint: "Protocol that Site Sync uses to sync files to/from a live site. HTTP (recommended) works over HTTPS with a shared token. rsync requires SSH to host."
+        },
+        "sync_confirm_deletions_over" => {
+          type: :text,
+          label: "Confirm deletions over",
+          placeholder: "0",
+          hint: "Site Sync deletes files. If a file is deleted on your Live site and you sync the site, it will be deleted locally and vice-versa. This is a threshold for when you will be warned about file deletions. 0 means you'll be warned everytime. '5' means you'll be warned if 6 or more files will be deleted. Set to 'never' to turn off warnings."
         }
       }
     },
@@ -134,6 +160,71 @@ class Admin::ConfigsController < Admin::BaseController
           hint: "Automatically generate static files when content changes"
         }
       }
+    }
+  }.freeze
+
+  # security.yml — rate limits for the public endpoints. Field keys are dotted
+  # so the editor buries them into nested YAML (limits.magic_link.to →
+  # limits: { magic_link: { to: … } }), the same way theme.active does.
+  #
+  # Labels say what the limit protects rather than naming the endpoint, because
+  # the person setting it is deciding how much room to give a reader.
+  SECURITY_LIMIT_LABELS = {
+    "magic_link" => [ "Sign-in emails", "per email address" ],
+    "signup"     => [ "Sign-ups", "per connection" ],
+    "checkout"   => [ "Sign-up with checkout", "per connection" ],
+    "token"      => [ "Link and token attempts", "per connection" ]
+  }.freeze
+
+  SECURITY_CONFIG_SCHEMA = {
+    rate_limiting: {
+      label: "Rate Limiting",
+      fields: {
+        "enabled" => {
+          type: :checkbox,
+          label: "Limit repeated requests",
+          hint: "Slows down abuse of the endpoints that send email, create accounts or accept tokens. " \
+                "It is not protection against a denial-of-service attack — a flood is stopped at your host " \
+                "or CDN, before it ever reaches Roe."
+        }
+      }
+    },
+
+    ai_crawlers: {
+      label: "AI Crawlers",
+      fields: {
+        "ai_crawlers" => {
+          type: :select,
+          label: "AI crawlers",
+          options: [
+            [ "Block training and AI answers", "block_all" ],
+            [ "Block training only", "block_training" ],
+            [ "Allow everything", "allow" ]
+          ],
+          hint: "Written into robots.txt. Blocking training keeps your writing out of model training sets; " \
+                "blocking AI answers as well takes the site out of AI search results, which is a real cost. " \
+                "Ordinary search engines are never blocked either way. robots.txt is a request — the large " \
+                "operators honour it, anything spoofing its user agent does not, so anything that must not be " \
+                "read by a machine belongs behind an audience setting instead."
+        }
+      }
+    },
+
+    limits: {
+      label: "Limits",
+      fields: RateLimits::DEFAULTS.each_with_object({}) do |(name, default), fields|
+        label, scope = SECURITY_LIMIT_LABELS.fetch(name, [ name.humanize, "per connection" ])
+        fields["limits.#{name}.to"] = {
+          type: :text,
+          label: "#{label} allowed",
+          hint: "How many, #{scope}. Default #{default['to']}."
+        }
+        fields["limits.#{name}.within"] = {
+          type: :text,
+          label: "#{label} — minutes",
+          hint: "The window those are counted in. Default #{default['within']}."
+        }
+      end.freeze
     }
   }.freeze
 
@@ -166,15 +257,23 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Include all pages in search",
           hint: "By default only pages linked in the navigation or footer are searchable. Turn on to index every published page."
         },
-        "search.roe_docs" => {
-          type: :checkbox,
-          label: "Include bundled Roe documentation in search",
-          hint: "Roe's own documentation (documentation/roe) is excluded from search by default. Turn on to include it."
-        },
         "search.results_when_opened" => {
           type: :checkbox,
           label: "Show results before typing",
           hint: "By default, search doesn't show results until you type but if you want results to show up before typing, enable this option."
+        },
+        "docs.roe" => {
+          type: :select,
+          label: "Roe's documentation",
+          options: [ "local", "published", "searchable" ],
+          # Matches Documentation.roe_docs_mode's fallback. Without it an unset
+          # setting shows the empty "Select..." option, which reads as "off"
+          # rather than as the default it actually is.
+          default: "local",
+          hint: "What happens to Roe's bundled documentation (documentation/roe) on your site.<br>" \
+                "**local (default)** — kept on this computer, not sent to your live site.<br>" \
+                "<strong>published</strong> — sent to your live site but left out of your search results.<br>" \
+                "<strong>searchable</strong> — sent to your live site and in search."
         }
       }
     }
@@ -258,17 +357,15 @@ class Admin::ConfigsController < Admin::BaseController
 
   SNIPCART_CONFIG_SCHEMA = {
     test_keys: {
-      label: "Snipcart Test Mode",
+      label: "Test & Local",
       fields: {
-        "snippet" => { type: :textarea, label: "Snippet (Test)", hint: "Paste the full Snipcart snippet from your Test mode dashboard" },
-        "secret_key" => { type: :password, label: "Secret API Key (Test)", hint: "Create a Secret Key in Test Mode and paste it here" }
+        "snippet" => { type: :textarea, label: "Snippet (Test)", hint: "Paste the full Snipcart snippet from your Test mode dashboard. Test mode uses fake payments and works locally." }
       }
     },
     live_keys: {
-      label: "Snipcart Live Mode",
+      label: "Live & Static Site",
       fields: {
-        "snippet" => { type: :textarea, label: "Snippet (Live)", hint: "Paste the full Snipcart snippet from your Live mode dashboard" },
-        "secret_key" => { type: :password, label: "Secret API Key (Live)", hint: "Create a Secret Key in Live Mode and paste it here" }
+        "snippet" => { type: :textarea, label: "Snippet (Live)", hint: "Paste the full Snipcart snippet from your Live mode dashboard. Set this once — the same snippet runs your local store and the static-site build." }
       }
     }
   }.freeze
@@ -332,7 +429,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "custom_code.yml",
         path: "global/custom_code.yml",
         type: "custom_code",
-        description: "Add analytics, fonts, widgets, or any HTML/JS/CSS into your site's <head> or footer",
+        description: "Add any HTML/JS/CSS into your site's <head> or footer",
         edit_path: admin_edit_custom_code_config_path
       },
       {
@@ -343,6 +440,14 @@ class Admin::ConfigsController < Admin::BaseController
         edit_path: admin_edit_fonts_config_path
       }
     ]
+
+    global_files << {
+      name: "security.yml",
+      path: "global/security.yml",
+      type: "security",
+      description: "rate limits for sign-in, sign-up and tokens",
+      edit_path: admin_edit_security_config_path
+    }
 
     # Always show deploy.yml (ships with Roe)
     if File.exist?(SiteConfig::DEPLOY_FILE)
@@ -374,6 +479,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "members.yml",
         path: "features/members.yml",
         type: "features/members",
+        description: "Member payments and newsletter settings",
         edit_path: admin_edit_members_config_path
       }
     end
@@ -383,6 +489,7 @@ class Admin::ConfigsController < Admin::BaseController
         name: "podcast.yml",
         path: "features/podcast.yml",
         type: "features/podcast",
+        description: "Add, edit, remove podcasts",
         edit_path: admin_edit_podcast_config_path
       }
     end
@@ -392,7 +499,28 @@ class Admin::ConfigsController < Admin::BaseController
         name: "store.yml",
         path: "features/store.yml",
         type: "features/store",
+        description: "Currency, domain, categories, product groups",
         edit_path: admin_edit_store_config_path
+      }
+    end
+
+    if File.exist?(SiteConfig::FEATURES_PATH.join("feeds.yml"))
+      features_files << {
+        name: "feeds.yml",
+        path: "features/feeds.yml",
+        type: "features/feeds",
+        description: "Custom RSS/Atom feeds.",
+        edit_path: admin_edit_feeds_config_path
+      }
+    end
+
+    if File.exist?(SiteConfig::FEATURES_PATH.join("music.yml"))
+      features_files << {
+        name: "music.yml",
+        path: "features/music.yml",
+        type: "features/music",
+        description: "Music releases.",
+        edit_path: admin_edit_music_config_path
       }
     end
 
@@ -402,12 +530,14 @@ class Admin::ConfigsController < Admin::BaseController
         name: "cards.yml",
         path: "defaults/cards.yml",
         type: "defaults/cards",
+        description: "post-link, aside, pullquote, templates",
         edit_path: admin_edit_cards_config_path
       },
       {
         name: "collections.yml",
         path: "defaults/collections.yml",
         type: "defaults/collections",
+        description: "source, post-type, order, limit, template",
         edit_path: admin_edit_collections_config_path
       }
     ]
@@ -437,13 +567,16 @@ class Admin::ConfigsController < Admin::BaseController
       }
     end
 
-    if SiteFeature.newsletters_feature_enabled?
+    # Shown whenever members are on. Sign-in emails go through this whether or
+    # not the site ever sends a newsletter, so gating it on newsletters left the
+    # one setting a members-only site needs hidden from it.
+    if SiteFeature.email_feature_enabled?
       integration_files << {
         name: "postmark.yml",
         path: "integrations/postmark.yml",
-        description: "Postmark test token",
+        description: "Email delivery — sign-in links, confirmations, newsletters",
         edit_path: admin_edit_newsletters_config_path,
-        unconfigured: SiteFeature.newsletters_unconfigured?
+        unconfigured: SiteFeature.email_unconfigured?
       }
     end
 
@@ -515,6 +648,22 @@ class Admin::ConfigsController < Admin::BaseController
     update_config("site", SiteConfig::SITE_FILE)
   end
 
+  # GET — security.yml. Rate limits for the public endpoints, one section per
+  # limit. The file is written on first save; until then the form shows the
+  # defaults that are already in force, so what's on screen is what's running.
+  def edit_security
+    @config_type = "security"
+    @config_content = File.exist?(SiteConfig::SECURITY_FILE) ? File.read(SiteConfig::SECURITY_FILE) : ""
+    @config_hash = (YAML.safe_load(@config_content) if @config_content.present?) || {}
+    @config_schema = SECURITY_CONFIG_SCHEMA
+    @available_themes = []
+    render :edit
+  end
+
+  def update_security
+    update_config("security", SiteConfig::SECURITY_FILE)
+  end
+
   # GET — dedicated edit page for content.yml (rendering + search), split
   # out of site.yml. Reuses the schema-driven config editor.
   def edit_content
@@ -560,12 +709,151 @@ class Admin::ConfigsController < Admin::BaseController
     }
 
     FileUtils.mkdir_p(File.dirname(SiteConfig::CUSTOM_CODE_FILE))
-    File.write(SiteConfig::CUSTOM_CODE_FILE, config.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(SiteConfig::CUSTOM_CODE_FILE, config.to_yaml.sub(/\A---\s*\n/, ""))
     SiteConfig.sync_from_file("custom_code")
     Rails.cache.clear
 
     flash[:notice] = "Custom code saved."
     redirect_to admin_edit_custom_code_config_path
+  end
+
+  # Enable custom feeds by creating features/feeds.yml, seeded with one example
+  # feed so the format is clear. Idempotent — if the file already exists, just
+  # open the editor.
+  def new_feeds_setup
+    unless File.exist?(FeedConfig::FILE)
+      FileUtils.mkdir_p(File.dirname(FeedConfig::FILE))
+      SiteFile.write(FeedConfig::FILE, <<~YAML)
+        articles:
+          title: Articles
+          source: posts
+          post_type: article
+          order: date
+          limit: 20
+          audience: free
+      YAML
+      SiteConfig.sync_from_file("features/feeds")
+      flash[:notice] = "Custom feeds enabled. Edit feeds.yml below to define your feeds."
+    end
+    redirect_to admin_edit_feeds_config_path
+  end
+
+  def edit_feeds
+    unless File.exist?(FeedConfig::FILE)
+      redirect_to admin_configs_path, alert: "Custom feeds aren't enabled yet." and return
+    end
+    @config_content = File.read(FeedConfig::FILE)
+    render :edit_feeds
+  end
+
+  # Raw-YAML save. Validate the document is a mapping (feed name → settings)
+  # before writing — a broken file would take down every named feed — and
+  # re-render with the user's input intact on any parse error.
+  def update_feeds
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+
+    parsed = YAML.safe_load(content)
+    unless parsed.nil? || parsed.is_a?(Hash)
+      @config_content = content
+      flash.now[:alert] = "feeds.yml must be a mapping of feed name to settings."
+      return render(:edit_feeds, status: :unprocessable_entity)
+    end
+
+    SiteFile.write(FeedConfig::FILE, content)
+    SiteConfig.sync_from_file("features/feeds")
+    flash[:notice] = "Feeds saved."
+    redirect_to admin_configs_path
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    flash.now[:alert] = "YAML error: #{e.message}"
+    render(:edit_feeds, status: :unprocessable_entity)
+  end
+
+  # Enable music by installing lib/site_templates/features/music/, which seeds
+  # features/music.yml with an example release — the same path members, store
+  # and podcast take, so the template is the one place the starting file is
+  # defined. The loader skips files that already exist, and the guard keeps the
+  # "enabled" flash for the run that actually creates it.
+  def new_music_setup
+    unless File.exist?(ReleaseConfig::FILE)
+      SiteTemplates::Loader.install(folder: "features/music")
+      SiteConfig.sync_from_file("features/music")
+      flash[:notice] = "Music enabled. Edit music.yml below to define your releases."
+    end
+    redirect_to admin_edit_music_config_path
+  end
+
+  def edit_music
+    unless File.exist?(ReleaseConfig::FILE)
+      redirect_to admin_configs_path, alert: "Music isn't enabled yet." and return
+    end
+    load_music_config
+    render :edit_music
+  end
+
+  # Save from the structured form. `content` is only present when the admin
+  # used the YAML toggle, and takes precedence — that's the escape hatch for
+  # anything the form can't express.
+  def update_music
+    return update_music_from_yaml if params[:content].present?
+
+    globals = params.fetch(:music_globals, {}).permit!.to_h
+    posted  = params.fetch(:releases, {}).permit!.to_h.values
+
+    config = globals.filter_map { |k, v| [ k, v.to_s.strip ] if v.to_s.strip.present? }.to_h
+    releases = {}
+    posted.each do |row|
+      key = release_key_for(row)
+      next if key.blank?
+      fields = MusicConfigSchema::RELEASE_KEYS.filter_map do |f|
+        value = row[f].to_s.strip
+        # The feed checkbox posts "true"/"false". Store it as a real boolean,
+        # and leave a false one out entirely so the file only carries what's
+        # actually switched on.
+        next [ f, true ] if f == "feed" && ReleaseConfig.truthy?(value)
+        next nil if f == "feed"
+        [ f, value ] if value.present?
+      end.to_h
+      # A row with nothing but a key is a release the admin added and left
+      # empty; keep it rather than silently dropping their click.
+      releases[key] = fields
+    end
+    config["releases"] = releases
+
+    write_music_config(config)
+    flash[:notice] = "Music saved."
+    redirect_to admin_edit_music_config_path
+  end
+
+  # Raw YAML editor — the escape hatch a structured editor redirects to when its
+  # file won't parse. Shows the file as-is so the admin can fix it by hand.
+  def edit_raw
+    @raw_type = params[:type].to_s
+    return redirect_to(admin_configs_path, alert: "Unknown config file.") unless RAW_EDITABLE_CONFIGS.value?(@raw_type)
+
+    path = SiteConfig.file_path_for(@raw_type)
+    @config_content = File.exist?(path) ? File.read(path) : ""
+    @structured_path = structured_edit_path(@raw_type)
+    render :edit_raw
+  end
+
+  def update_raw
+    @raw_type = params[:type].to_s
+    return redirect_to(admin_configs_path, alert: "Unknown config file.") unless RAW_EDITABLE_CONFIGS.value?(@raw_type)
+
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+    YAML.load(content) # raises Psych::SyntaxError if it still won't parse
+
+    path = SiteConfig.file_path_for(@raw_type)
+    FileUtils.mkdir_p(File.dirname(path))
+    SiteFile.write(path, content)
+    SiteConfig.sync_from_file(@raw_type)
+    redirect_to structured_edit_path(@raw_type), notice: "Saved. The settings form should open now."
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    @structured_path = structured_edit_path(@raw_type)
+    flash.now[:alert] = "Still invalid YAML: #{e.message}"
+    render(:edit_raw, status: :unprocessable_entity)
   end
 
   def edit_fonts
@@ -639,11 +927,26 @@ class Admin::ConfigsController < Admin::BaseController
       podcast["subscribe_display"] = "links" unless podcast.key?("subscribe_display")
     end
 
+    # Order each podcast's fields so the subscribe group renders last, with the
+    # display toggle first — the editor draws a single "Subscribe Links"
+    # heading over them (see _config_editor).
+    subscribe_order = [ "subscribe_display" ] + PodcastConfig::SUBSCRIBE_APPS.keys
+    @config_hash.each_key do |key|
+      podcast = @config_hash[key]
+      next unless podcast.is_a?(Hash)
+      reordered = podcast.reject { |k, _| PodcastConfig::SUBSCRIBE_FIELDS.include?(k) }
+      subscribe_order.each { |k| reordered[k] = podcast[k] if podcast.key?(k) }
+      @config_hash[key] = reordered
+    end
+
     @field_options = build_field_options_for_podcast
     @field_help = build_field_help_for_podcast
     # Source of truth for which podcast fields are required (used by the
     # admin form to render the red asterisk next to the label).
     @field_required = PodcastConfig::REQUIRED_FIELDS
+    # Per-show draft episode counts, so the Danger Zone can offer to delete a
+    # show's drafts on removal. Published episodes are never touched here.
+    @draft_episode_counts = draft_episode_counts_by_podcast
     render :edit
   end
 
@@ -671,11 +974,15 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     key = PodcastConfigSeeder.derive_key(title)
-    seeder = PodcastConfigSeeder.new(key, channel.transform_keys(&:to_s), mode: :overwrite)
+    # If the source was an Apple Podcasts link, fill the Apple + Overcast
+    # subscribe fields from its iTunes ID too.
+    subscribe = fetch.data[:apple_id] ? PodcastAppleLink.subscribe_links(fetch.data[:apple_id]) : {}
+    seeder = PodcastConfigSeeder.new(key, channel.transform_keys(&:to_s), mode: :overwrite, subscribe_links: subscribe)
     result = seeder.seed!
 
+    extra = subscribe.any? ? " Apple & Overcast links added." : ""
     redirect_to admin_edit_podcast_config_path,
-                notice: "Podcast '#{title}' seeded as '#{key}' (#{result})."
+                notice: "Podcast '#{title}' seeded as '#{key}' (#{result}).#{extra}"
   end
 
   def update_podcast
@@ -687,6 +994,19 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content = File.read(SiteConfig::DEFAULTS_PATH.join("cards.yml"))
     @config_hash = YAML.load(@config_content) || {}
     @field_options = build_field_options_for_cards
+    @field_help = build_field_help_for_cards
+
+    # Settings added after an install was created aren't in its cards.yml.
+    # Show them empty so they can be set, without writing to /site/ — the value
+    # lands in the file only when the user saves. Same intent as
+    # @extra_field_defaults in edit_collections, done here because these sit in
+    # a nested section, which that mechanism doesn't reach.
+    section = (@config_hash["post-link"] ||= {})
+    %w[default_show_subtitle default_show_excerpt].each do |key|
+      section[key] = "" unless section.key?(key)
+    end
+
+    @retired_settings = RetiredConfigSettings.in_config(@config_hash)
     render :edit
   end
 
@@ -706,11 +1026,37 @@ class Admin::ConfigsController < Admin::BaseController
     # key isn't already in @config_hash. The default lands in the YAML
     # only when the user clicks save.
     @extra_field_defaults = { "pagination_template" => "list" }
+    @retired_settings = RetiredConfigSettings.in_config(@config_hash)
     render :edit
   end
 
   def update_collections
     update_config("defaults/collections", SiteConfig::DEFAULTS_PATH.join("collections.yml"))
+  end
+
+  # Drop settings a Roe update stopped reading. Only ever runs on a click —
+  # Roe doesn't rewrite files under site/ by itself, and nothing depends on
+  # this having happened.
+  CLEANUP_FILES = {
+    "cards"       => "cards.yml",
+    "collections" => "collections.yml"
+  }.freeze
+
+  def cleanup
+    type = params[:type].to_s
+    filename = CLEANUP_FILES[type]
+    return redirect_to(admin_configs_path, alert: "Nothing to clean up there.") unless filename
+
+    removed = RetiredConfigSettings.strip!(SiteConfig::DEFAULTS_PATH.join(filename))
+
+    if removed.any?
+      SiteConfig.sync_from_file("defaults/#{type}")
+      flash[:notice] = "Removed #{removed.to_sentence} from #{filename}. Your defaults are unchanged."
+    else
+      flash[:notice] = "Nothing to remove — #{filename} is already up to date."
+    end
+
+    redirect_to type == "cards" ? admin_edit_cards_config_path : admin_edit_collections_config_path
   end
 
   def field_options_for(config_type, field_name)
@@ -836,9 +1182,82 @@ class Admin::ConfigsController < Admin::BaseController
     File.delete(file_path) if File.exist?(file_path)
     SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
     SiteConfig.reload!("features/podcast")
+    # The config is gone, so there's nothing to sync from — release the
+    # files its shows were protecting.
+    Medium.recompute_for_config("features/podcast")
 
     flash[:notice] = "Podcast configuration deleted successfully"
     redirect_to admin_configs_path
+  end
+
+  # Delete a single podcast's entry from podcast.yml, leaving the others (and
+  # the feature) in place. The show's posts are untouched. If it was the last
+  # podcast, remove the whole config and disable the feature.
+  def delete_podcast_entry
+    key = params[:key].to_s
+    file_path = SiteConfig::FEATURES_PATH.join("podcast.yml")
+
+    unless File.exist?(file_path)
+      redirect_to admin_configs_path, alert: "Podcast configuration doesn't exist." and return
+    end
+
+    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    unless config.is_a?(Hash) && config.key?(key)
+      redirect_to admin_edit_podcast_config_path, alert: "Podcast '#{key}' not found." and return
+    end
+
+    title = config[key].is_a?(Hash) ? config[key]["title"].to_s.strip.presence : nil
+
+    # Opt-in: also delete this show's DRAFT episodes (published ones are never
+    # touched here — those are removed by hand). Done before the config write
+    # so a failure leaves the show in place.
+    deleted_drafts = params[:delete_drafts].present? ? delete_draft_episodes(key) : 0
+    drafts_note = deleted_drafts.positive? ? " and #{helpers.pluralize(deleted_drafts, 'draft episode')}" : ""
+
+    config.delete(key)
+
+    if config.empty?
+      File.delete(file_path)
+      SiteConfig.find_by("file_path LIKE ?", "%podcast.yml")&.destroy
+      SiteConfig.reload!("features/podcast")
+      # The config is gone, so there's nothing to sync from — release the
+      # files its shows were protecting.
+      Medium.recompute_for_config("features/podcast")
+      redirect_to admin_configs_path,
+                  notice: "Removed “#{title || key}”#{drafts_note}. That was the last podcast, so podcasts are now disabled."
+    else
+      SiteFile.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
+      # sync, not just reload: removing a show drops the audience its episodes
+      # were inheriting, so their files have to be re-resolved.
+      SiteConfig.sync_from_file("features/podcast")
+      redirect_to admin_edit_podcast_config_path, notice: "Removed podcast “#{title || key}”#{drafts_note}."
+    end
+  end
+
+  # Append a fresh blank podcast entry to podcast.yml (canonical defaults) so
+  # the admin can fill it in — the manual counterpart to "Seed from feed".
+  def add_podcast
+    file_path = SiteConfig::FEATURES_PATH.join("podcast.yml")
+    unless File.exist?(file_path)
+      redirect_to admin_configs_path, alert: "Enable podcasts before adding a show." and return
+    end
+
+    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    config = {} unless config.is_a?(Hash)
+
+    base = "new-podcast"
+    key = base
+    n = 1
+    while config.key?(key)
+      n += 1
+      key = "#{base}-#{n}"
+    end
+    config[key] = PodcastConfig.default_entry
+
+    SiteFile.write(file_path, config.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteConfig.sync_from_file("features/podcast")
+    redirect_to admin_edit_podcast_config_path(tab: key),
+                notice: "Added a new podcast (“#{key}”). Rename its key and fill in the details below."
   end
 
   def edit_members
@@ -851,9 +1270,10 @@ class Admin::ConfigsController < Admin::BaseController
 
     @config_type = "members"
     @config_content = File.read(members_config_path)
-    @config_hash = YAML.load(@config_content) || {}
+    @config_hash = with_members_display_defaults(YAML.load(@config_content) || {})
     @field_options = build_field_options_for_members
-    @field_hints = build_field_hints_for_members  # ← Add this
+    @field_hints = build_field_hints_for_members
+    @field_checkboxes = MEMBERS_CHECKBOX_FIELDS
 
     render :edit
   end
@@ -973,6 +1393,10 @@ class Admin::ConfigsController < Admin::BaseController
     @deploy_secrets      = DeploySecrets.current
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
+    # Only asked when the CLI exists and Fly is the target: it's a network round
+    # trip to Fly's API, and asking without a `fly` binary would report "not
+    # signed in", sending someone to log in to a tool they haven't installed.
+    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     # Local SSH keys for the kamal.ssh picker. Kamal supports an array
@@ -1061,6 +1485,10 @@ class Admin::ConfigsController < Admin::BaseController
     @deploy_secrets      = DeploySecrets.current
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
+    # Only asked when the CLI exists and Fly is the target: it's a network round
+    # trip to Fly's API, and asking without a `fly` binary would report "not
+    # signed in", sending someone to log in to a tool they haven't installed.
+    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     render :edit_deploy, status: :unprocessable_entity
@@ -1100,7 +1528,7 @@ class Admin::ConfigsController < Admin::BaseController
       existing["dev_host"] = dev_host
     end
 
-    File.write(SiteConfig::DEVELOPMENT_FILE, existing.to_yaml)
+    SiteFile.write(SiteConfig::DEVELOPMENT_FILE, existing.to_yaml)
     SiteConfig.sync_from_file("development")
 
     flash[:notice] = "Development configuration updated successfully"
@@ -1138,7 +1566,7 @@ class Admin::ConfigsController < Admin::BaseController
       # purposes). Commented out by default; most setups don't need
       # it because the allowed_hosts fallback works.
       FileUtils.mkdir_p(SiteConfig::DEVELOPMENT_FILE.dirname)
-      File.write(SiteConfig::DEVELOPMENT_FILE, <<~YAML)
+      SiteFile.write(SiteConfig::DEVELOPMENT_FILE, <<~YAML)
         allowed_hosts:
           - your-site.ngrok-free.app
 
@@ -1199,7 +1627,7 @@ class Admin::ConfigsController < Admin::BaseController
     stripe.verify!
 
     flash[:notice] = "Stripe configuration saved"
-    redirect_to admin_edit_payments_config_path
+    redirect_to admin_edit_payments_config_path(tab: "test")
   end
 
   def verify_payments
@@ -1227,12 +1655,14 @@ class Admin::ConfigsController < Admin::BaseController
     else
       flash[:error] = "Failed to save Stripe live keys"
     end
-    redirect_to admin_edit_payments_config_path
+    redirect_to admin_edit_payments_config_path(tab: "live")
   end
 
   def update_payments_mode
     update_integration_mode(StripeConfig.current, "Payments")
-    redirect_to admin_edit_payments_config_path
+    # Reopen the tab matching the now-active mode (the tabs controller reads
+    # ?tab= on load). Falls back to the current mode if the switch was rejected.
+    redirect_to admin_edit_payments_config_path(tab: StripeConfig.current.mode)
   end
 
   def disconnect_payments
@@ -1250,6 +1680,9 @@ class Admin::ConfigsController < Admin::BaseController
     @config_content   = File.read(path)
     @config_hash      = (YAML.load(@config_content) || {})["test"] || {}
     @postmark_config  = PostmarkConfig.current
+    # Older installs have a row from before generate_webhook_token existed, and
+    # without a token the Webhook URL section doesn't render at all.
+    @postmark_config.ensure_webhook_token!
     @postmark_config.verify! if @postmark_config.keys_present? && @postmark_config.verified_at.nil?
     @schema           = NEWSLETTERS_CONFIG_SCHEMA
     render :edit_integration
@@ -1270,7 +1703,7 @@ class Admin::ConfigsController < Admin::BaseController
     PostmarkConfig.current.verify!
 
     flash[:notice] = "Postmark configuration saved"
-    redirect_to admin_edit_newsletters_config_path
+    redirect_to admin_edit_newsletters_config_path(tab: "test")
   end
 
   def verify_newsletters
@@ -1298,12 +1731,12 @@ class Admin::ConfigsController < Admin::BaseController
     else
       flash[:error] = "Failed to save Postmark live token"
     end
-    redirect_to admin_edit_newsletters_config_path
+    redirect_to admin_edit_newsletters_config_path(tab: "live")
   end
 
   def update_newsletters_mode
-    update_integration_mode(PostmarkConfig.current, "Newsletters")
-    redirect_to admin_edit_newsletters_config_path
+    update_integration_mode(PostmarkConfig.current, "Email")
+    redirect_to admin_edit_newsletters_config_path(tab: PostmarkConfig.current.mode)
   end
 
   def disconnect_newsletters
@@ -1338,7 +1771,9 @@ class Admin::ConfigsController < Admin::BaseController
 
     existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
     existing["test"] ||= {}
-    test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
+    # The snippet is public and shown in full (never masked), so save it
+    # verbatim — a blank submission means "clear it," not "leave unchanged."
+    existing["test"]["snippet"] = test_data["snippet"].to_s
 
     write_yaml(path, existing)
     SiteConfig.sync_from_file("integrations/snipcart")
@@ -1347,36 +1782,29 @@ class Admin::ConfigsController < Admin::BaseController
     SnipcartConfig.current.verify!
 
     flash[:notice] = "Store (Snipcart) Test configuration saved"
-    redirect_to admin_edit_snipcart_integration_config_path
+    redirect_to admin_edit_snipcart_integration_config_path(tab: "test")
   end
 
   def update_snipcart_live
-    unless Rails.env.production?
-      flash[:notice] = "Live keys are only saved in production."
-      redirect_to admin_edit_snipcart_integration_config_path and return
-    end
+    # The live snippet carries only a PUBLIC key, so — unlike Stripe/Postmark
+    # live keys — it's saved locally too: the same snippet runs the local
+    # store AND the static-site build (no production server needed). There's
+    # no secret key; webhooks (a future production concern) use Snipcart's
+    # per-request token, not a stored secret.
+    # Save the snippet verbatim — including blank, so clearing the field
+    # removes it (it's public and shown in full, never masked).
+    SnipcartConfig.save_live_snippet(params[:live][:snippet].to_s) if params[:live]
 
-    # Save live snippet to YAML
-    if params[:live] && params[:live][:snippet].present? && params[:live][:snippet] != "•" * 16
-      SnipcartConfig.save_live_snippet(params[:live][:snippet])
-    end
-
-    # Save live secret key to database (encrypted)
-    snipcart = SnipcartConfig.current
-    apply_live_keys(snipcart, params[:live] || {}, %w[secret_key])
-
-    if snipcart.save
-      snipcart.verify!
-      flash[:notice] = "Snipcart Live configuration saved"
-    else
-      flash[:error] = "Failed to save Snipcart Live configuration"
-    end
-    redirect_to admin_edit_snipcart_integration_config_path
+    SnipcartConfig.current.verify!
+    flash[:notice] = "Snipcart Live & Static Site configuration saved"
+    # Pin the Live/Static Site tab so the page reopens where the user was
+    # (the tabs Stimulus controller reads ?tab= on load).
+    redirect_to admin_edit_snipcart_integration_config_path(tab: "live")
   end
 
   def update_snipcart_mode
     update_integration_mode(SnipcartConfig.current, "Store")
-    redirect_to admin_edit_snipcart_integration_config_path
+    redirect_to admin_edit_snipcart_integration_config_path(tab: SnipcartConfig.current.mode)
   end
 
   def disconnect_snipcart
@@ -1391,18 +1819,35 @@ class Admin::ConfigsController < Admin::BaseController
     render json: {
       verified:    success,
       verified_at: success ? snipcart.verified_at.iso8601 : nil,
-      error:       success ? nil : "Could not connect to Snipcart. Check your Secret API key."
+      error:       success ? nil : "No Snipcart snippet found. Paste your snippet and save."
     }
   end
 
   private
+
+  # rescue_from handler: a structured editor couldn't parse its file. Route the
+  # admin to the raw editor for that config; re-raise for anything unmapped.
+  def handle_unparseable_config(error)
+    type = RAW_EDITABLE_CONFIGS[action_name]
+    raise error unless type
+
+    redirect_to admin_edit_raw_config_path(type: type),
+      alert: "This config file has a YAML error, so its settings form can't open. Fix the raw YAML below and save. (#{error.message})"
+  end
+
+  # The structured edit path for a raw-editable config type. Every one follows
+  # admin_<action>_config_path, so derive it from the action in the map.
+  def structured_edit_path(type)
+    action = RAW_EDITABLE_CONFIGS.key(type)
+    send("admin_#{action}_config_path")
+  end
 
   # Write a Ruby hash to YAML at `path` without the leading `---`
   # document separator. Hand-authored Roe config files don't use it,
   # so generated ones shouldn't either — purely stylistic, but keeps
   # diffs clean across the codebase.
   def write_yaml(path, data)
-    File.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(path, data.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   # Extract just the canonical podcast fields from form params,
@@ -1434,7 +1879,34 @@ class Admin::ConfigsController < Admin::BaseController
       lines << format_yaml_field(field, value, indent: 1)
     end
 
-    File.write(path, lines.join("\n") + "\n")
+    SiteFile.write(path, lines.join("\n") + "\n")
+  end
+
+  # Draft podcast episodes belonging to a given show (never published ones).
+  def draft_episodes_for(key)
+    Post.where("json_extract(metadata, '$.post_type') = ?", "podcast")
+        .where("json_extract(metadata, '$.podcast') = ?", key.to_s)
+        .where("json_extract(metadata, '$.status') = ?", "draft")
+  end
+
+  # Delete a show's draft episodes — both the markdown file and the DB record,
+  # mirroring the posts controller's destroy. Returns how many were removed.
+  def delete_draft_episodes(key)
+    count = 0
+    draft_episodes_for(key).find_each do |post|
+      File.delete(post.file_path) if post.file_path.present? && File.exist?(post.file_path)
+      post.destroy
+      count += 1
+    end
+    count
+  end
+
+  # { podcast_key => draft_episode_count } across all shows, in one query.
+  def draft_episode_counts_by_podcast
+    Post.where("json_extract(metadata, '$.post_type') = ?", "podcast")
+        .where("json_extract(metadata, '$.status') = ?", "draft")
+        .group("json_extract(metadata, '$.podcast')")
+        .count
   end
 
   # Format a single YAML field at the given indentation level.
@@ -1492,11 +1964,22 @@ class Admin::ConfigsController < Admin::BaseController
   # the bare field (e.g. "publishable_key"); the model attribute gets
   # "_live" appended. Skip masked placeholders so the user can save
   # the form without re-entering already-stored secrets.
+  # Writes `<field>_live` for integrations that keep test and live keys in
+  # paired columns (Stripe). An integration stored some other way doesn't
+  # belong here — say so plainly rather than raising NoMethodError from inside
+  # a redirect, where it reads as "the form didn't save".
   def apply_live_keys(record, params_hash, fields)
     fields.each do |field|
+      writer = "#{field}_live="
+      unless record.respond_to?(writer)
+        raise ArgumentError,
+          "#{record.class.name} has no #{writer} — it doesn't store live keys in " \
+          "paired columns, so it needs its own save path rather than apply_live_keys."
+      end
+
       value = params_hash[field]
       next if value.blank? || value == "•" * 16
-      record.public_send("#{field}_live=", value)
+      record.public_send(writer, value)
     end
   end
 
@@ -1573,7 +2056,7 @@ class Admin::ConfigsController < Admin::BaseController
       # present (auto-surfaced above when payments are enabled).
       "audience" => [ "everyone", "paid" ],
       # How the subscribe section renders on the episode page.
-      "subscribe_display" => [ "links", "menu" ]
+      "subscribe_display" => [ "links", "button + menu" ]
     }
 
     # Build prefixed versions separately
@@ -1605,8 +2088,39 @@ class Admin::ConfigsController < Admin::BaseController
   def build_field_options_for_cards
     {
       "post-link.default_style" => [ "small", "medium", "large" ],
+      "post-link.default_show_subtitle" => [ "", "true", "false" ],
+      "post-link.default_show_excerpt" => [ "", "true", "false" ],
       "pullquote.default_position" => [ "center", "left", "right" ]
     }
+  end
+
+  def build_field_help_for_cards
+    {
+      "post-link.default_show_subtitle" => {
+        title: "Show subtitle",
+        text: ("Leave blank and the card's style decides — off for small, on for medium and large. " \
+               "Set it to have every post-link show or hide the subtitle whatever its style.<br><br>" \
+               "A card can still override this with <code>show_subtitle:</code>.").html_safe
+      },
+      "post-link.default_show_excerpt" => {
+        title: "Show excerpt",
+        text: ("Leave blank and the card's style decides — on for large only. " \
+               "Set it to have every post-link show or hide the excerpt whatever its style.<br><br>" \
+               "A card can still override this with <code>show_excerpt:</code>.").html_safe
+      }
+    }
+  end
+
+  # Settings that read as on/off rather than as a choice between two things.
+  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon" ].freeze
+
+  # Display defaults for a members.yml written before this section existed.
+  # Merged ahead of the file's own keys so the section renders first, and only
+  # for keys the file doesn't already set — saving the form writes it back, so
+  # this seeds the setting once rather than on every load.
+  def with_members_display_defaults(config)
+    display = { "always_show_member_icon" => false }.merge(config["display"] || {})
+    { "display" => display }.merge(config)
   end
 
   def build_field_options_for_members
@@ -1632,13 +2146,21 @@ class Admin::ConfigsController < Admin::BaseController
       "subscribe_display" => {
         title: "Subscribe display",
         text: ("<strong>links</strong> — show every subscribe link (Apple, Spotify, RSS…) inline on the episode page.<br><br>" \
-               "<strong>menu</strong> — collapse them behind a single <em>Subscribe</em> button that opens on click.").html_safe
+               "<strong>button + menu</strong> — collapse them behind a single <em>Subscribe</em> button that opens on click.").html_safe
       },
       "apple_podcasts" => {
         title: "Subscribe links",
         text: ("Paste your show's page URL on each platform. Leave any blank to hide it. The public RSS feed (and the private paid feed, if applicable) are added automatically.").html_safe
       }
     }
+  end
+
+  # The saved target, so the Fly session check only runs on a Fly site.
+  def fly_target?
+    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    (config["target"].presence || "kamal").to_s == "fly"
+  rescue StandardError
+    false
   end
 
   def build_field_hints_for_members
@@ -1651,8 +2173,9 @@ class Admin::ConfigsController < Admin::BaseController
       "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.",
       "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       "payments.donation_amounts" => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
-      "newsletter.enabled" => "Enable newsletter & email sending via Postmark (requires Postmark account & configuration)",
-      "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it."
+      "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Postmark account & configuration)",
+      "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.",
+      "display.always_show_member_icon" => "Keep the account icon in the site header for everyone, not just signed-in members. Signed out, it links to your sign-in page. Leave this off and the icon appears only once someone signs in."
     }
   end
 
@@ -1680,7 +2203,7 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     # Write to file
-    File.write(file_path, content)
+    SiteFile.write(file_path, content)
 
     # Sync to database and clear cache
     SiteConfig.sync_from_file(type)
@@ -1728,5 +2251,61 @@ class Admin::ConfigsController < Admin::BaseController
     @config_type = type.split("/").last
     @config_content = content
     render :edit
+  end
+
+  def music_config_hash
+    parsed = YAML.safe_load(File.read(ReleaseConfig::FILE), permitted_classes: [ Date, Time ])
+    parsed.is_a?(Hash) ? parsed : {}
+  rescue Psych::SyntaxError
+    {}
+  end
+
+  def write_music_config(config)
+    SiteFile.write(ReleaseConfig::FILE, config.to_yaml.sub(/\A---\n/, ""))
+    SiteConfig.sync_from_file("features/music")
+  end
+
+  # The key input lets an admin rename a release. Blank means "keep the one it
+  # already had"; a brand-new row with no key falls back to its title.
+  def release_key_for(row)
+    typed = row["key"].to_s.strip.parameterize
+    return typed if typed.present?
+    row["original_key"].to_s.strip.presence || row["title"].to_s.strip.parameterize.presence
+  end
+
+  def load_music_config
+    @config_content = File.read(ReleaseConfig::FILE)
+    @config_hash    = music_config_hash
+    raw             = @config_hash["releases"]
+    @releases       = raw.is_a?(Hash) ? raw : {}
+    # Every schema field present so the form draws an input for each, blank or
+    # not — a missing key would render nothing and look like the field doesn't
+    # exist. Same reason edit_podcast backfills its own.
+    @releases = @releases.transform_values do |r|
+      MusicConfigSchema.blank_release.merge(r.is_a?(Hash) ? r.transform_values(&:to_s) : {})
+    end
+    @image_paths = Medium.originals_only.where(media_type: "images").pluck(:file_path).sort
+  end
+
+  def update_music_from_yaml
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+
+    parsed = YAML.safe_load(content, permitted_classes: [ Date, Time ])
+    unless parsed.nil? || parsed.is_a?(Hash)
+      load_music_config
+      @config_content = content
+      flash.now[:alert] = "music.yml must be a mapping with a releases: block."
+      return render(:edit_music, status: :unprocessable_entity)
+    end
+
+    SiteFile.write(ReleaseConfig::FILE, content)
+    SiteConfig.sync_from_file("features/music")
+    flash[:notice] = "Music saved."
+    redirect_to admin_configs_path
+  rescue Psych::SyntaxError => e
+    load_music_config
+    @config_content = content
+    flash.now[:alert] = "YAML error: #{e.message}"
+    render(:edit_music, status: :unprocessable_entity)
   end
 end

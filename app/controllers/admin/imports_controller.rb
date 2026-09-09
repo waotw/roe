@@ -2,7 +2,8 @@ class Admin::ImportsController < Admin::BaseController
   before_action :set_import, only: [ :show, :phase_2, :phase_2_run, :phase_3, :phase_3_run, :phase_4, :phase_4_run, :rollback, :rollback_members, :rollback_deliveries, :destroy, :resolve_missing_media, :attempt_download, :resolve_manually, :skip_missing_media, :reconnect_media, :retry_live_fetch, :publish_to_live, :dismiss_publish_status, :refresh_peer_exchange, :members ]
 
   def index
-    @imports = Import.order(created_at: :desc)
+    # Substack imports only — File Imports live under their own tool.
+    @imports = Import.where(source_type: "substack").order(created_at: :desc)
   end
 
   def show
@@ -811,7 +812,7 @@ class Admin::ImportsController < Admin::BaseController
 
   def phase_3_params
     params.require(:import).permit(
-      options: [ :auto_gift_lifetime, :auto_gift_paid ]
+      options: [ :auto_gift_lifetime, :auto_gift_annual, :auto_gift_paid ]
     ).tap do |whitelisted|
       whitelisted[:options] ||= {}
     end

@@ -32,6 +32,30 @@ class PostmarkConfig < ApplicationRecord
     safe_encrypted_read(:server_token)
   end
 
+  # The admin's live-key UI addresses every field as `<schema key>_live` — the
+  # form input, the masking, and apply_live_keys all build that name. Postmark's
+  # column is `server_token`, which is Postmark's own term and worth keeping, so
+  # the model speaks the shared convention instead of the column being renamed
+  # or Postmark being special-cased in three separate places.
+  #
+  # Without these, the page saved nothing, showed an empty field where a saved
+  # token should read as bullets, and left Live Mode greyed out forever — all
+  # from the same missing name, and all silently.
+  def server_token_live
+    live_server_token
+  end
+
+  def server_token_live=(value)
+    self.server_token = value
+  end
+
+  # Whether Live Mode can be selected. StripeConfig has had this all along;
+  # PostmarkConfig never did, and the view's `respond_to?(:live_mode_ready?) &&`
+  # guard turned that into a permanently disabled radio button.
+  def live_mode_ready?
+    live_server_token.present?
+  end
+
   # Active token based on mode — live wins in production when live token present
   def server_token
     if mode_live? && live_server_token.present?
@@ -91,6 +115,25 @@ class PostmarkConfig < ApplicationRecord
     update!(webhook_token: SecureRandom.hex(32))
   end
 
+  # Backfill the token on a record that never got one.
+  #
+  # generate_webhook_token is a before_create, so it only ever ran for records
+  # made after it was added. An install whose PostmarkConfig row predates it —
+  # PostmarkConfig.current is first_or_create!, so the row is made once and kept
+  # forever — has no token, and nothing regenerates it.
+  #
+  # The admin hides the whole Webhook URL section when the token is blank
+  # (the path is nil, so even the explanatory box is skipped), which reads as
+  # "this install doesn't do webhooks" rather than "something is missing". So
+  # repair it on the way in rather than waiting to be asked.
+  def ensure_webhook_token!
+    return webhook_token if safe_encrypted_read(:webhook_token).present?
+
+    regenerate_webhook_token!
+    Rails.logger.info "[PostmarkConfig] Backfilled a missing webhook token"
+    webhook_token
+  end
+
   # ── Test config file ─────────────────────────────────────────────────────
 
   def self.test_config
@@ -103,7 +146,7 @@ class PostmarkConfig < ApplicationRecord
 
   def self.save_test_config(config_data)
     FileUtils.mkdir_p(File.dirname(TEST_CONFIG_PATH))
-    File.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml.sub(/\A---\s*\n/, ""))
+    SiteFile.write(TEST_CONFIG_PATH, { "test" => config_data }.to_yaml.sub(/\A---\s*\n/, ""))
   end
 
   def self.clear_test_config

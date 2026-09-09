@@ -1,0 +1,123 @@
+<%# What past syncs actually moved, newest first.
+    Grouped by event and split by direction, because "which way did this go?"
+    is the first thing you need to know when a file isn't where you left it. %>
+<div class="px-4 sm:px-0 font-mono">
+  <div class="sm:flex sm:items-center sm:justify-between">
+    <div class="font-sans">
+      <h1 class="text-3xl font-semibold text-gray-900">Sync History</h1>
+      <p class="mt-2 text-sm text-gray-700">
+        Every change Site Sync has made, newest first. Read-only.
+      </p>
+    </div>
+    <div class="mt-4 sm:mt-0">
+      <%= link_to "← Back to Site Sync", admin_site_sync_path,
+            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
+    </div>
+  </div>
+
+  <% if @events.empty? %>
+    <p class="mt-8 text-sm text-gray-500 font-sans">
+      No syncs recorded yet. This fills in as you sync.
+    </p>
+  <% else %>
+    <div class="mt-8 space-y-4">
+      <% @events.each do |event| %>
+        <div class="bg-white border border-gray-300 rounded-xs overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <span class="text-sm font-semibold text-gray-900">
+                <%= event.at ? event.at.in_time_zone.strftime("%B %-d, %Y at %-I:%M %p") : "Unknown time" %>
+              </span>
+              <span class="ml-2 text-xs uppercase text-gray-500"><%= event.kind %></span>
+            </div>
+
+            <%# A resolve is the answer to a pause, so it reads as an outcome
+                rather than as a plain count — the pause above it in the list
+                says "nothing moved", and this says what came of it. %>
+            <% if event.outcome == "blocked" %>
+              <span class="inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                Paused — nothing moved
+              </span>
+            <% elsif event.kind == "resolve" && event.any_changes? %>
+              <span class="text-xs text-gray-500">
+                <%= event.total %> file<%= "s" if event.total != 1 %>
+                <span class="ml-1 inline-flex bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                  Resolved
+                </span>
+              </span>
+            <% elsif !event.any_changes? %>
+              <span class="inline-flex bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                Already in sync
+              </span>
+            <% else %>
+              <span class="text-xs text-gray-500">
+                <%= event.total %> file<%= "s" if event.total != 1 %>
+              </span>
+            <% end %>
+          </div>
+
+          <% if event.error.present? %>
+            <p class="px-4 py-2 text-xs text-amber-800 font-sans bg-amber-50"><%= event.error %></p>
+          <% end %>
+
+          <%# The snapshot is taken before the sync writes anything locally, so
+              it still holds whatever this event changed or removed here. When
+              it's still on disk, the Live → Local column becomes selectable
+              and anything in it can be taken back. %>
+          <% restorable = event.restorable? %>
+          <% states = restorable ? SiteSync::HistoryRestore.states(
+                        snapshot_name: event.snapshot_name,
+                        paths: event.to_local.changed + event.to_local.deleted) : {} %>
+          <% outstanding = states.count { |_, v| v == :restorable } %>
+
+          <% if event.any_changes? %>
+            <%= form_with url: admin_restore_from_site_sync_history_path, method: :post, data: { turbo: false } do %>
+              <%= hidden_field_tag :snapshot, event.snapshot_name %>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
+                <%= render "direction", title: "Local → Live", direction: event.to_live, restorable: false, states: {} %>
+                <%= render "direction", title: "Live → Local", direction: event.to_local, restorable: restorable, states: states %>
+              </div>
+
+              <% if restorable %>
+                <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center gap-3">
+                  <%# Nothing left to take means the button says so rather than
+                      offering a no-op that looks like work. %>
+                  <% if outstanding.zero? %>
+                    <span class="inline-flex items-center px-3 py-1.5 border border-slate-400 bg-slate-200 text-slate-600 font-mono text-xs rounded-xs">
+                      ALL CHANGES RESTORED
+                    </span>
+                    <p class="text-xs text-gray-600 font-sans">
+                      Every file changed by this sync has been restored to it's pre-sync state.
+                    </p>
+                  <% else %>
+                    <button type="submit"
+                            class="inline-flex items-center px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 font-mono text-xs rounded-xs cursor-pointer"
+                            data-confirm="Restore the selected files from <%= event.snapshot_name %>? This overwrites the current version of each one. A backup of the current state is taken first.">
+                      RESTORE SELECTED
+                    </button>
+                    <p class="text-xs text-gray-600 font-sans">
+                      <%= outstanding %> file<%= "s" if outstanding != 1 %> still
+                      <%= outstanding == 1 ? "differs" : "differ" %> from the version before this
+                      sync. Only <strong>Live → Local</strong> can be restored — the snapshot is
+                      of this machine.
+                    </p>
+                  <% end %>
+                </div>
+              <% elsif event.to_local.any? %>
+                <p class="px-4 py-2 text-xs text-gray-500 font-sans bg-gray-50 border-t border-gray-200">
+                  <% if event.snapshot_name %>
+                    The restore point for this sync (<%= event.snapshot_name %>) has since been
+                    removed, so these can't be put back from here.
+                  <% else %>
+                    No restore point was taken for this sync, so these can't be put back from here.
+                  <% end %>
+                </p>
+              <% end %>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

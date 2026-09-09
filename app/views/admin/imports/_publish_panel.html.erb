@@ -14,11 +14,11 @@
   # cache entry below is just transient progress display.
   published    = import.stats && import.stats["published_to_live"]
   status        = Rails.cache.read(ImportPublishJob.status_cache_key(import.id))
-  peer_set_up   = SiteSync::Exchange.can_call_peer?
-  local_fp      = peer_set_up ? SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) : nil
-  peer_state    = peer_set_up ? SiteSync::Exchange.peer_state : nil
-  peer_fp       = peer_state&.dig(:fingerprint)
-  site_in_sync  = local_fp.present? && peer_fp.present? && local_fp == peer_fp
+  # Shared with the banner, the nav dot and the Site Sync page. refresh:
+  # false because this panel is not the place to trigger a peer ping.
+  conclusion    = SiteSync::Conclusion.current(refresh: false)
+  peer_set_up   = conclusion.configured
+  site_in_sync  = conclusion.in_sync?
 %>
 
 <div class="mb-6 bg-white shadow p-6">

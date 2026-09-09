@@ -4,33 +4,31 @@
   be nagged about sync state on every page render. The Site Sync page
   on prod still surfaces the same info for anyone who wants to check.
 
-  Authority: cross-side fingerprint comparison. We don't trust local-
-  ledger drift as a sync signal because the ledger can get rewritten
-  by paths that didn't actually transfer content (historical bug).
+  Authority: SiteSync::Conclusion, the one answer shared with the nav
+  dot, the imports publish panel and the Site Sync page. We don't trust
+  local-ledger drift as a sync signal because the ledger can get
+  rewritten by paths that didn't actually transfer content.
 
-  Three states:
-    - in sync         → hidden
-    - out of sync     → "local differs from live, sync to align"
+  States:
+    - in sync          → hidden
+    - out of sync      → "local differs from live, sync to align"
+    - unknown          → hidden unless the peer is unreachable; the peer
+                         answer is older than our last sync, so a refresh
+                         is already enqueued and any warning here would
+                         be about content we've since sent. The Site Sync
+                         page says so out loud instead.
     - peer unreachable → "live unreachable, content can't be verified"
 %>
 <% if Rails.env.development? %>
-  <%
-    # refresh_if_stale enqueues an async ping when the cache is older
-    # than 60s; the current request still uses whatever's in cache.
-    peer_state = (SiteSync::Exchange.refresh_if_stale rescue nil)
-    peer_reachable = SiteSync::Exchange.peer_reachable?
-    local_fp = SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH) rescue nil
-    peer_fp  = peer_state&.dig(:fingerprint)
-    in_sync  = peer_fp.present? && local_fp.present? && local_fp == peer_fp
-  %>
+  <% conclusion = local_assigns[:conclusion] || @sync_conclusion || SiteSync::Conclusion.current %>
 
-  <% if !SiteSync::Exchange.can_call_peer? %>
+  <% if !conclusion.configured %>
     <%# No peer URL or token configured — nothing to compare to. Silent. %>
 
-  <% elsif in_sync %>
+  <% elsif conclusion.in_sync? %>
     <%# Happy path — nothing to surface. %>
 
-  <% elsif !peer_reachable %>
+  <% elsif !conclusion.peer_reachable %>
     <div class="admin-warning-bar bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 font-mono text-xs">
       <p>
         🔌 Live site is unreachable. Local content can't be verified as in sync —
@@ -40,6 +38,10 @@
         <% end %>
       </p>
     </div>
+
+  <% elsif conclusion.undecided? %>
+    <%# Peer answered before our last sync — a background refresh is on its
+        way, and claiming drift here is the bug this replaced. %>
 
   <% else %>
     <div class="admin-warning-bar bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 font-mono text-xs">

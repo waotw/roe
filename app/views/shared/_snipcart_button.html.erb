@@ -5,10 +5,17 @@
   # Only show button if Snipcart is configured
   if snipcart_config&.connected?
 %>
+<%# A digital product with a missing or malformed file GUID gets no button at
+    all. Snipcart refuses a wrong GUID at checkout, but a missing one it
+    accepts happily — sells the download and delivers nothing. %>
+<% if !product.deliverable? %>
+  <%= render "shared/undeliverable_product", product: product %>
+<% else %>
   <button class="snipcart-add-item product-button"
           <%= product.snipcart_attributes.map { |k, v| "#{k}=\"#{ERB::Util.html_escape(v)}\"" }.join(' ').html_safe %>>
     Add to Cart
   </button>
+<% end %>
 <% else %>
   <!-- Fallback if Snipcart not configured -->
   <div class="product-notice warning">

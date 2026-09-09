@@ -1,21 +1,6 @@
 post-link:
-  default_image: ""
+  default_image: ''
   default_style: small
-  default_link_text: "Read full story →"
-aside:
-  default_link_text: "→"
+  default_link_text: Read full story →
 pullquote:
-  default_position: "center"
-aside_button_template: |-
-  type: aside
-  text: __PLACEHOLDER__
-  link:
-  link_text:
-  image:
-post_link_button_template: |-
-  type: post-link
-  style: small
-  post:
-pullquote_button_template: |-
-  type: pullquote
-  text: __PLACEHOLDER__
+  default_position: center

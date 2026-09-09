@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<rss version="2.0">
+<channel>
+<title>monome</title>
+<link>https://monome.org</link>
+<description>sound machines for the exploration of time and space</description>
+<item>
+<title>monome</title>
+<link>https://monome.org</link>
+<guid>https://monome.org/news/260715.html</guid>
+<description><![CDATA[
+<p>07/15/26</p>
+<p><a href="https://www.youtube.com/watch?v=fhHJykM1GWk"><img src="/image/mlrws.jpg" alt="" /></a></p>
+<p><a href="https://www.youtube.com/watch?v=fhHJykM1GWk">mlrws</a> is a mlr adaptation for the Music Thing Workshop Computer created by <a href="https://github.com/dessertplanet">dessertplanet</a>. it is astonishingly well featured for such a tiny computer.</p>
+<p>norns is sold out and we don't yet have a timeline for their return. however we did find some extra parts while cleaning up and managed to build a couple units, including one with original middle grey metal. (edit: now gone as well.)</p>
+<p>also available again are <a href="https://monome.org/bstock.html">b-stock</a> grid and arc. for a limited time we're offering these at 20% off (compared to the normal 10% off).</p>
+]]></description>
+<pubDate>Wed, 15 Jul 2026 11:11:11 EST</pubDate>
+</item>
+<item>
+<title>monome</title>
+<link>https://monome.org</link>
+<guid>https://monome.org/news/260523.html</guid>
+<description><![CDATA[
+<p>05/23/26 - monome is twenty. we put together a photo collection. part how it happened, part work-art-life entanglement, part disbelief.</p>
+<p><a href="/twenty">monome.org/twenty</a></p>
+<p>deep thanks to so many of you here who supported and participated in this journey towards other ways of being.</p>
+<p><img src="/image/20/0410-wiring.jpg" alt="" /></p>
+]]></description>
+<pubDate>Sat, 23 May 2026 11:11:11 EST</pubDate>
+</item>
+<item>
+<title>monome</title>
+<link>https://monome.org</link>
+<guid>https://monome.org/news/260423.html</guid>
+<description><![CDATA[
+<p>04/23/26</p>
+<iframe allow="fullscreen" loading="lazy" src="https://hyper8.monome.org/mp-ws/embed/" style="aspect-ratio: 1.7777778; border: none; width: 100%;"> </iframe>
+<p>here's more <a href="https://monome.org/docs/iii">iii</a>, where <a href="https://monome.org/docs/iii/library/mp">meadowphysics</a> runs on the grid itself, sending MIDI notes by connecting directly to a <a href="https://www.musicthing.co.uk/workshopsystem/">workshop system</a>. recall meadowphysics is a discontinued <a href="https://monome.org/docs/meadowphysics">module</a> and also a mode on the discontinued <a href="https://monome.org/docs/ansible/">ansible</a>. iii is a way to connect your grid/arc to a modular system using any midi-to-cv capable modules.</p>
+]]></description>
+<pubDate>Thu, 23 Apr 2026 11:11:11 EST</pubDate>
+</item>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</channel>
+</rss>

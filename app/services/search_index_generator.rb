@@ -61,19 +61,12 @@ class SearchIndexGenerator
     value == true || value == "true"
   end
 
-  # Roe ships its own documentation under documentation/roe. On a user's site
-  # that's noise, so exclude it by default; the Roe project's own site sets
-  # `search_roe_docs: true` to include it (and can then scope a collection to
-  # documentation/roe).
+  # Roe's bundled docs (documentation/roe) are excluded by default. Search is
+  # the narrowest of the three settings: a site can publish Roe's docs without
+  # putting them in its own search results, which is the middle position on
+  # the dial. Documentation.publishable already asks the search question.
   def searchable_documentation
-    return Documentation.published if search_roe_docs?
-
-    Documentation.published.where("file_path NOT LIKE ?", "%/documentation/roe/%")
-  end
-
-  def search_roe_docs?
-    value = SiteConfig.content("search.roe_docs")
-    value == true || value == "true"
+    Documentation.publishable
   end
 
   # Grouped products (2+ sharing a `group:`) are variants of one item, so index
@@ -87,11 +80,10 @@ class SearchIndexGenerator
     end
   end
 
-  # Set of root-relative paths linked from navigation.md / footer.md.
+  # Set of root-relative paths linked from header.md / footer.md.
   def nav_footer_paths
     paths = Set.new
-    %w[navigation.md footer.md].each do |name|
-      file = File.join(RoeSitePaths::SITE_LAYOUT_PATH, name)
+    [ LayoutFiles.path("header"), File.join(RoeSitePaths::SITE_LAYOUT_PATH, "footer.md") ].each do |file|
       next unless File.file?(file)
 
       text = File.read(file)

@@ -1,13 +1,15 @@
 <%# ACTION builder modal. Mounted via the `action-builder` controller on the
     editor root (alongside `editor`), so the ACTION dropdown, this modal, and
-    the textarea share its scope. Opened in Button or Form mode from the ACTION ▼
+    the textarea share its scope. Opened in Button or member-form mode from the ACTION ▼
     menu; the type selector swaps the visible field group. Options come from
     ActionBuilderSchema, feature-gated the same way the menu is. Only non-empty
     fields of the active kind get written. %>
 <%# Down-chevron styling used by selects across Roe's forms. %>
 <% select_chevron = "appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat" %>
 <% button_kinds = ActionBuilderSchema.button_kinds(store: store_enabled?, members: members_enabled?) %>
-<% form_kinds   = ActionBuilderSchema.form_kinds(members: members_enabled?, payments: payments_enabled?) %>
+<% form_kinds   = ActionBuilderSchema.form_kinds(members: members_enabled?,
+                                                payments: payments_enabled?,
+                                                payments_configured: payments_feature_enabled?) %>
 <div data-action-builder-target="modal"
      data-action="keydown->action-builder#onKeydown"
      class="fixed inset-0 z-50 items-center justify-center"

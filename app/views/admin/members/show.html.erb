@@ -5,7 +5,9 @@
       <p class="mt-2 text-sm text-gray-700"><%= @member.email %></p>
     </div>
     <div class="mt-4 sm:mt-0 flex gap-2">
-      <%= link_to "Edit", edit_admin_member_path(@member), class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
+      <% unless @member.anonymized? %>
+        <%= link_to "Edit", edit_admin_member_path(@member), class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
+      <% end %>
       <%= link_to "← Back to Members", admin_members_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
     </div>
   </div>
@@ -31,6 +33,11 @@
           <dd class="mt-1 text-sm text-gray-900">
             <% if @member.active? %>
               <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Active</span>
+            <% elsif @member.anonymized? %>
+              <span class="inline-flex bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700">Deleted</span>
+              <% if @member.cancelled_at %>
+                <span class="mt-1 text-xs text-gray-500"><%= @member.cancelled_at.strftime("%b %d, %Y") %></span>
+              <% end %>
             <% else %>
               <span class="inline-flex bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">Cancelled</span>
             <% end %>
@@ -63,13 +70,33 @@
           </div>
         <% end %>
 
+        <%# Both tokens are regenerated when an account is deleted, so what's
+            stored belongs to nobody and can't sign anyone in. Showing it just
+            invites the question of whose it is. %>
+        <% unless @member.anonymized? %>
         <div class="sm:col-span-2">
           <dt class="text-sm font-medium text-gray-500 uppercase">Access Token</dt>
           <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border border-gray-200 rounded-xs break-all">
             <%= @member.access_token %>
           </dd>
-          <p class="mt-1 text-xs text-gray-500 font-sans">Used to verify member access to premium content</p>
+          <p class="mt-1 text-xs text-gray-500 font-sans">
+            <mark>Signs this member in.</mark> It's the magic-link token — treat it like a password
+            and keep it out of anything shareable.
+          </p>
         </div>
+
+        <div class="sm:col-span-2">
+          <dt class="text-sm font-medium text-gray-500 uppercase">Media Token</dt>
+          <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 border border-gray-200 rounded-xs break-all">
+            <%= @member.media_token %>
+          </dd>
+          <p class="mt-1 text-xs text-gray-500 font-sans">
+            Read-only. Unlocks this member's private feeds and the files behind paid content —
+            it can't sign anyone in. Appears in their feed URLs as
+            <code>?token=…</code>
+          </p>
+        </div>
+        <% end %>
       </dl>
     </div>
   </div>
@@ -80,6 +107,10 @@
       <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Member Actions</h3>
       <div class="mt-5 space-y-4">
         <!-- Upgrade/Downgrade -->
+        <%# The tier above stays as a matter of record — it says what they were
+            when they left. Changing it is what stops making sense: there's no
+            one to grant access to or bill. %>
+        <% unless @member.anonymized? %>
         <div class="flex items-center justify-between">
           <% if @member.free? %>
 
@@ -105,6 +136,7 @@
 
           <% end %>
         </div>
+        <% end %>
 
         <!-- Cancel/Reactivate -->
         <div class="flex items-center justify-between border-t border-gray-200 pt-4">
@@ -118,6 +150,29 @@
                 method: :patch,
                 class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs",
                 form: { data: { turbo_confirm: "Cancel this membership?" } } %>
+
+          <% elsif @member.anonymized? %>
+
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Account Deleted</h4>
+              <%# Who did it matters: "this person deleted their own account" is
+                  plainly wrong when the site owner deleted it from here. Most
+                  deletions will be member-initiated, but not all.
+
+                  Accounts deleted before this was recorded have no answer, so
+                  they get neutral wording rather than a guess. %>
+              <p class="text-sm text-gray-500 font-sans">
+                <% if @member.deleted_by == :admin %>
+                  Member deleted by site admin.
+                <% elsif @member.deleted_by == :member %>
+                  This person deleted their own account.
+                <% else %>
+                  This account was deleted.
+                <% end %>
+                Their name and email address are gone; the payment and delivery
+                records below are kept. It can't be reactivated.
+              </p>
+            </div>
 
           <% else %>
 
@@ -133,17 +188,154 @@
         </div>
 
         <!-- Delete -->
-        <div class="flex items-center justify-between border-t border-gray-200 pt-4">
-          <div>
-            <h4 class="text-sm font-medium text-gray-900">Delete Member</h4>
-            <p class="text-sm text-gray-500 font-sans">Permanently remove this member and all data</p>
+        <%# What this button does depends on the member, so it has to say which.
+            Someone with payments or newsletters behind them is anonymised —
+            removing the row would take the site's own records with it. %>
+        <% unless @member.anonymized? %>
+          <div class="flex items-center justify-between border-t border-gray-200 pt-4">
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Delete Member</h4>
+              <p class="text-sm text-gray-500 font-sans w-[80%]">
+                <% if @member.erasable? %>
+
+                  Remove this member account entirely. There are no payments or newsletters on this
+                  account, this account will be entirely removed.
+
+                <% else %>
+
+                  Delete this account. All user indentifiable information will be removed. Their payment and newsletter
+                  records are kept without their email and name.
+
+                <% end %>
+              </p>
+
+              <%# Which of the two happens is decided by what's behind this
+                  member, so name it. "Cancelled" reads like there's nothing
+                  left, when there may be a payment from last year underneath. %>
+              <% unless @member.erasable? %>
+                <p class="mt-1 text-sm text-gray-500 font-sans w-[80%]">
+                  Kept: <%= @member.retained_records.to_sentence %>.
+                </p>
+              <% end %>
+            </div>
+            <%# The same type-DELETE modal the content editors and index tables
+                use. This was a browser confirm, so deleting a member — which
+                can't be undone and may be keeping payment records — asked less
+                of you than deleting a draft post. %>
+            <button type="button"
+                    data-action="delete"
+                    data-resource-id="<%= @member.id %>"
+                    data-resource-title="<%= @member.name.presence || @member.email %>"
+                    data-resource-type="member"
+                    class="inline-flex items-center uppercase text-sm text-red-800 px-3 py-2 border border-red-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs text-nowrap cursor-pointer">
+              Delete Member
+            </button>
           </div>
-          <%= button_to "Delete Member", admin_member_path(@member),
-              method: :delete,
-              class: "inline-flex items-center uppercase text-sm text-red-800 px-3 py-2 border border-red-800 bg-red-200 hover:bg-red-300 font-mono rounded-xs",
-              form: { data: { turbo_confirm: "This cannot be undone. Delete this member?" } } %>
-        </div>
+
+          <%# Rendered beside the button that opens it. delete_path is passed
+              because the partial only resolves post/page/product on its own.
+
+              No figures in the message on purpose. The amounts are on the page
+              behind this dialog, and quoting a single payment forced prose that
+              read wrong for one record ("A $25.00 payment ... without their
+              name on them"). The sentence names the kinds this member actually
+              has — payments, deliveries, or both — and nothing else. %>
+          <%= render "shared/delete_file_modal",
+                resource: @member,
+                resource_type: "member",
+                delete_path: admin_member_path(@member),
+                confirm_label: @member.erasable? ? "DELETE PERMANENTLY" : "DELETE MEMBER",
+                delete_message: (@member.erasable? ?
+                  "There are no payments or newsletters on this account, so it will be removed entirely." :
+                  "All user identifiable information will be removed. #{@member.retained_records_summary}") %>
+        <% end %>
       </div>
+    </div>
+  </div>
+
+  <!-- Payment History -->
+  <%# The money is what survives a deletion, and it's the reason a deleted
+      member keeps a row at all — so it has to be readable here. Membership
+      payments and donations are merged into one list; they read the same way
+      to whoever is reconciling them. %>
+  <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Payment History</h3>
+
+      <% payments = MemberPayments.for(@member) %>
+
+      <% if payments.any? %>
+        <p class="mt-2 text-sm text-gray-600 font-sans">
+          <%= payments.count %> payment<%= payments.count == 1 ? '' : 's' %> from this member
+        </p>
+
+        <div class="mt-5 border border-gray-200 rounded-xs overflow-hidden">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Type
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Amount
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stripe Reference
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% payments.each do |payment| %>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900"><%= payment.kind %></div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <div class="text-sm text-gray-900"><%= payment.date&.strftime("%b %d, %Y") || "—" %></div>
+                    <div class="text-xs text-gray-500"><%= payment.date&.strftime("%I:%M %p") %></div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <div class="text-sm text-gray-900"><%= payment.amount || "—" %></div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <% if payment.refunded? %>
+                      <span class="inline-flex bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
+                        Refunded<%= " #{payment.refund}" if payment.refund %>
+                      </span>
+                      <% if payment.refunded_at %>
+                        <div class="mt-1 text-xs text-gray-500"><%= payment.refunded_at.strftime("%b %d, %Y") %></div>
+                      <% end %>
+                    <% else %>
+                      <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Paid</span>
+                    <% end %>
+                  </td>
+                  <%# Kept through deletion on purpose: it names a transaction,
+                      not a person, so a refund can still be matched in Stripe
+                      after the account is gone. %>
+                  <td class="px-4 py-3">
+                    <div class="text-xs text-gray-500 font-mono break-all"><%= payment.reference || "—" %></div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mt-3 text-xs text-gray-500 font-sans">
+          Refunds are issued in Stripe. Find the payment by its reference above —
+          it stays on the record even if the account is deleted.
+        </p>
+      <% else %>
+        <p class="mt-4 text-sm text-gray-500 font-sans">
+          This member has not made any payments.
+        </p>
+      <% end %>
     </div>
   </div>
 
@@ -152,11 +344,16 @@
     <div class="px-4 py-5 sm:p-6">
       <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Newsletter Delivery History</h3>
 
+      <%# Counted by status. A failed send is a row too now, and calling those
+          "delivered" is the same miscount the post panel had. %>
       <% newsletter_sends = @member.newsletter_sends.includes(:post).recent %>
+      <% delivered_count = newsletter_sends.count(&:sent?) %>
+      <% failed_count = newsletter_sends.count(&:failed?) %>
 
       <% if newsletter_sends.any? %>
         <p class="mt-2 text-sm text-gray-600 font-sans">
-          <%= newsletter_sends.count %> newsletter<%= newsletter_sends.count == 1 ? '' : 's' %> delivered to this member
+          <%= pluralize(delivered_count, "newsletter") %> delivered to this member<%
+            %><% if failed_count.positive? %>, <span class="text-red-700"><%= failed_count %> failed</span><% end %>
         </p>
 
         <div class="mt-5 border border-gray-200 rounded-xs overflow-hidden">
@@ -189,12 +386,20 @@
                     </div>
                   </td>
                   <td class="px-4 py-3 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">
-                      <%= send.sent_at.strftime("%b %d, %Y") %>
-                    </div>
-                    <div class="text-xs text-gray-500">
-                      <%= send.sent_at.strftime("%I:%M %p") %>
-                    </div>
+                    <% if send.failed? %>
+                      <div class="text-sm text-red-700">Failed</div>
+                      <div class="text-xs text-red-600"><%= send.error.presence || "no reason recorded" %></div>
+                      <% if send.attempted_at %>
+                        <div class="text-xs text-gray-500"><%= send.attempted_at.strftime("%b %d, %Y") %></div>
+                      <% end %>
+                    <% else %>
+                      <div class="text-sm text-gray-900">
+                        <%= send.sent_at.strftime("%b %d, %Y") %>
+                      </div>
+                      <div class="text-xs text-gray-500">
+                        <%= send.sent_at.strftime("%I:%M %p") %>
+                      </div>
+                    <% end %>
                   </td>
                   <td class="px-4 py-3 whitespace-nowrap">
                     <% if send.import_id.present? %>

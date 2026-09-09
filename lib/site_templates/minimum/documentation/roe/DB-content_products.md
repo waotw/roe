@@ -49,6 +49,22 @@ The Admin shows product metadata as a simple form.
 | `group` | No | Groups variants together — see [Product Variants](#product-variants-groups) |
 | `variant` | No | Label for this variant (e.g., "Paperback") |
 | `primary` | No | `true` to show this variant first in a grouped collection |
+| `digital` | No | Tick to sell a downloadable file — see [Digital goods](#digital-goods) |
+| `file_guid` | Yes, if `digital` is toggled on | The file's GUID from your Snipcart dashboard |
+
+## Digital goods
+
+A Product can be a file Snipcart delivers after payment — an album, a PDF, a sample pack — instead of something you post.
+
+Tick `digital` in the Product's metadata and the `file_guid` field appears below it. Paste in the `GUID` that Snipcart gave you when you uploaded the file, and Roe handles the rest: the file is delivered from Snipcart, and the checkout won't ask the buyer for a shipping address.
+
+The two fields travel together. Untick `digital` and the GUID field goes away, so a Product can't end up carrying a GUID it doesn't use.
+
+Roe warns you in the editor if the GUID is missing or malformed. If `digital` is checked and the `file_guid` has issues, the `ADD TO CART` button won't render. This is to prevent a user from paying for something that won't be delivered.
+
+We recommend using a `zip` file if you want to deliver multiple files for one purchase (e.g. ePub and PDF or MP3 and WAV).
+
+For uploading the file, finding its GUID, and setting how long the download link lasts, see Snipcart's documentation → [Digital goods](/documentation/roe/snipcart#digital-goods).
 
 ## Product Variants (groups)
 

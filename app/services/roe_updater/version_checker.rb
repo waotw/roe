@@ -1,6 +1,8 @@
 module RoeUpdater
   class VersionChecker
-    CODEBERG_REPO = "waotw/roe"
+    # Kept as an alias so anything still referencing it resolves to the
+    # configured forge rather than a second, drifting copy of the answer.
+    CODEBERG_REPO = RoeUpdater::Forge::DEFAULT_REPO
     CACHE_KEY = "roe_latest_version"
     CACHE_TTL = 1.hour
     # Persistent flag — no TTL. Set by CheckForUpdatesJob when an update
@@ -132,6 +134,9 @@ module RoeUpdater
         nil
       end
 
+      MIRROR_TIMEOUT = 5
+      RELEASE_NOTES_TIMEOUT = 3
+
       def fetch_via_git_tags
         return nil unless git_available?
 
@@ -145,24 +150,29 @@ module RoeUpdater
           "HOME" => ENV["HOME"]
         }.compact
 
-        # Try HTTPS first (works for public repos without auth)
-        https_url = "https://codeberg.org/#{CODEBERG_REPO}"
-
-        begin
-          stdout, stderr, status = nil, nil, nil
-          Timeout.timeout(10) do
-            stdout, stderr, status = Open3.capture3(env, "git", "ls-remote", "--tags", https_url)
+        # Try every mirror over HTTPS, in order (works for public repos without
+        # auth). An unreachable host fails in seconds, so walking the list costs
+        # nothing on the happy path and is the whole point on the sad one.
+        RoeUpdater::Forge.mirrors.each do |https_url|
+          stdout, status = nil, nil
+          # Shorter than a single-host check would justify: there's another
+          # mirror behind this one, so abandoning a slow one costs less than
+          # waiting on it. Three mirrors at 10s each was a 30s worst case.
+          Timeout.timeout(MIRROR_TIMEOUT) do
+            stdout, _stderr, status = Open3.capture3(env, "git", "ls-remote", "--tags", https_url)
           end
 
-          if status.success? && stdout.present?
+          if status&.success? && stdout.present?
             return parse_git_tags_output(stdout)
           end
+
+          Rails.logger.debug "[VersionChecker] No tags from #{https_url}, trying the next mirror"
         rescue Timeout::Error
-          Rails.logger.debug "[VersionChecker] HTTPS fetch timed out"
+          Rails.logger.debug "[VersionChecker] #{https_url} timed out, trying the next mirror"
         end
 
         # HTTPS failed (private repo or timeout), try SSH
-        ssh_url = "git@codeberg.org:#{CODEBERG_REPO}.git"
+        ssh_url = RoeUpdater::Forge.ssh_url
 
         begin
           output, status = nil, nil
@@ -253,7 +263,7 @@ module RoeUpdater
         release = fetch_release_metadata(original) || {}
         {
           version:      version,
-          url:          release[:html_url] || "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/#{original}",
+          url:          release[:html_url] || RoeUpdater::Forge.release_page_url(original),
           notes:        build_summary(release[:name], release[:body]),
           published_at: release[:published_at] || Time.now.iso8601
         }
@@ -275,10 +285,22 @@ module RoeUpdater
         require "net/http"
         require "json"
 
-        url = URI("https://codeberg.org/api/v1/repos/#{CODEBERG_REPO}/releases/tags/#{tag}")
+        # Try each mirror that has a known API shape. Release notes are
+        # best-effort — every path here already returns nil on failure — so a
+        # mirror that doesn't answer just means trying the next one.
+        RoeUpdater::Forge.api_release_urls(tag).each do |api_url|
+          notes = fetch_release_metadata_from(URI(api_url))
+          return notes if notes
+        end
 
+        nil
+      end
+
+      def fetch_release_metadata_from(url)
         response = nil
-        Timeout.timeout(5) do
+        # Release notes are cosmetic — the update works without them — so this
+        # gets the smallest budget of anything in the check.
+        Timeout.timeout(RELEASE_NOTES_TIMEOUT) do
           http = Net::HTTP.new(url.host, url.port)
           http.use_ssl = true
           http.open_timeout = 3
@@ -406,7 +428,7 @@ module RoeUpdater
       def mock_release
         {
           version: "0.2.0",
-          url: "https://codeberg.org/#{CODEBERG_REPO}/releases/tag/v0.2.0",
+          url: RoeUpdater::Forge.release_page_url("v0.2.0"),
           notes: "## What's New\n\n- Feature A\n- Feature B\n- Bug fixes\n\nView full changelog on Codeberg.",
           published_at: Time.now.iso8601
         }

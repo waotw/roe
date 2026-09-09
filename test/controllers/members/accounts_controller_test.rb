@@ -407,8 +407,11 @@ class Members::AccountsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    # Should either accept or fail gracefully
-    assert response.status == 302 || response.status == 422
+    # Should either accept or fail gracefully. Any redirect counts — the exact
+    # code isn't the point, and a non-GET redirect is 303 now (see
+    # ApplicationController#redirect_to).
+    assert response.redirect? || response.status == 422,
+      "expected a redirect or 422, got #{response.status}"
   end
 
   test "handles special characters in name" do

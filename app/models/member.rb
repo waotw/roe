@@ -1,11 +1,16 @@
 class Member < ApplicationRecord
   # Enums (integer-backed for SQLite performance)
   enum :tier, { free: 0, paid: 1 }, prefix: true
-  enum :status, { active: 0, cancelled: 1 }, prefix: true
+  # `deleted` is the member asking to be forgotten. The row stays so delivery
+  # records and payments keep a valid owner; everything identifying them is
+  # cleared. See #anonymize!.
+  enum :status, { active: 0, cancelled: 1, deleted: 2 }, prefix: true
   enum :newsletter_status, { subscribed: 0, unsubscribed: 1, bounced: 2 }, prefix: true
 
   belongs_to :import, optional: true
 
+  # No dependent: — a donation is a payment record and outlives the account.
+  has_many :donations
   has_many :newsletter_sends, dependent: :destroy
   has_many :newsletters_received, through: :newsletter_sends, source: :post
 
@@ -58,9 +63,179 @@ class Member < ApplicationRecord
   # Callbacks
   before_create :set_subscribed_at
   before_create :generate_memorable_token
+  before_create :ensure_media_token
 
   def regenerate_token!
     update!(access_token: self.class.generate_password)
+  end
+
+  # Placeholder identity for a deleted account. `.invalid` is reserved by
+  # RFC 2606 precisely so it can never resolve — no mail can escape to it —
+  # and the id keeps it unique, since a constant would collide on the second
+  # deletion against the unique index on email.
+  ANONYMIZED_DOMAIN = "deleted.invalid"
+  ANONYMIZED_NAME   = "Deleted account"
+
+  def self.anonymized_email_for(id) = "deleted-#{id}@#{ANONYMIZED_DOMAIN}"
+
+  def anonymized? = status_deleted?
+
+  # :member, :admin, or nil for accounts deleted before this was recorded —
+  # the admin panel falls back to neutral wording rather than guessing.
+  def deleted_by
+    return nil unless anonymized?
+
+    metadata["deleted_by"].presence&.to_sym
+  end
+
+  def deleted_by_admin? = deleted_by == :admin
+
+  # What this member has behind them that the site needs to keep — in the
+  # owner's words, for the admin to show before they delete anyone.
+  #
+  # Deleting a member does one of two things depending on this list, and "it
+  # depends" is no use to someone holding the button. A cancelled membership
+  # reads like there's nothing left, when there may well be a payment from
+  # last year underneath it.
+  # A membership payment, by any of the three marks one leaves behind. Asked
+  # the same way by #retained_records and #retained_record_kinds so they can't
+  # disagree about whether there was one.
+  def membership_payment?
+    paid_at? || paid_amount_cents.to_i.positive? || stripe_payment_intent_id.present?
+  end
+
+  def retained_records
+    records = []
+
+    if membership_payment?
+      records << [ "a", format_money(paid_amount_cents, paid_currency), "payment",
+                   paid_at && "from #{paid_at.strftime('%B %Y')}" ].compact.join(" ")
+    end
+
+    donations.count.then { |n| records << "#{n} #{'donation'.pluralize(n)}" if n.positive? }
+    newsletter_sends.count.then { |n| records << "#{n} #{'newsletter'.pluralize(n)}" if n.positive? }
+
+    records
+  end
+
+  # The same question as #retained_records, answered in kinds rather than
+  # figures: :payments, :deliveries, or both.
+  #
+  # The confirmation dialog wants "Payment and delivery history will be kept",
+  # not "a $25.00 payment from December 2025 ... them" — the amounts are on the
+  # page behind the dialog, and quoting one payment forces prose that reads
+  # wrong for a single record. Derived from the same checks so the two can't
+  # end up disagreeing about what's there.
+  def retained_record_kinds
+    kinds = []
+    kinds << :payments   if membership_payment? || donations.any?
+    kinds << :deliveries if newsletter_sends.any?
+    kinds
+  end
+
+  # A sentence naming what survives, or nil when nothing does — that's the
+  # erasable case, which reads entirely differently and is the caller's to
+  # handle.
+  def retained_records_summary
+    kinds = retained_record_kinds
+    return nil if kinds.empty?
+
+    subject = case kinds
+    when [ :payments, :deliveries ] then "Payment and delivery history"
+    when [ :payments ]              then "Payment history"
+    else                                 "Delivery history"
+    end
+
+    "#{subject} will be kept without any user identifiable information."
+  end
+
+  # Whether this member can be removed outright rather than anonymised.
+  #
+  # A spam signup or a typo'd address has nothing behind it, and leaving a
+  # permanent "Deleted account" row for one is just litter in the members
+  # list. Anything with money or mail behind it is a different case: those
+  # records are the site's own accounts, and they have to survive the person.
+  #
+  # Derived from the list rather than repeating its conditions — the two would
+  # drift, and the page would then explain one outcome while doing the other.
+  def erasable? = retained_records.empty?
+
+  # Erase the person, keep the record.
+  #
+  # Not a destroy: newsletter_sends is `dependent: :destroy`, so deleting the
+  # row would take every delivery record with it, and donations point here
+  # with no such rule and would be left dangling. Anonymising in place keeps
+  # both valid and keeps the money countable.
+  #
+  # Tokens are regenerated rather than nulled — access_token is NOT NULL and
+  # both are unique-indexed — which also has the effect of killing their magic
+  # links and private feed URLs at once.
+  #
+  # Kept on purpose: paid_at, paid_amount_cents, refunded_*, subscribed_at,
+  # tier and stripe_payment_intent_id. The last is how a later refund still
+  # finds this row (see WebhooksController#handle_charge_refunded); it names a
+  # transaction, not a person. stripe_customer_id names the person, so it goes.
+  #
+  # Stripe and Postmark keep their own copies of the address. Roe doesn't
+  # reach into either: deleting a Stripe customer is irreversible and would
+  # damage the payment history this is trying to preserve.
+  # `by` records who asked: :member (they deleted their own account) or
+  # :admin (the site owner deleted it from the admin). The admin panel says
+  # which, and "this person deleted their own account" is plainly wrong when
+  # it was the owner who did it.
+  #
+  # Kept in metadata rather than a new column: metadata is cleared here anyway
+  # to drop anything stashed in it, and who performed the deletion isn't
+  # personal data. No migration, and it survives with the record.
+  def anonymize!(by: :member)
+    transaction do
+      donations.find_each do |donation|
+        donation.update_columns(email: self.class.anonymized_email_for(id))
+      end
+
+      update!(
+        email: self.class.anonymized_email_for(id),
+        name: ANONYMIZED_NAME,
+        pending_email: nil,
+        password_digest: nil,
+        email_confirmation_token: nil,
+        email_confirmation_sent_at: nil,
+        stripe_customer_id: nil,
+        metadata: { "deleted_by" => by.to_s },
+        access_token: self.class.generate_password,
+        media_token: self.class.generate_media_token,
+        newsletter_status: :unsubscribed,
+        status: :deleted,
+        cancelled_at: cancelled_at || Time.current
+      )
+    end
+  end
+
+  # A read-only credential for protected media and private feeds.
+  #
+  # Deliberately NOT access_token: that one signs a member in
+  # (Members::SessionsController#signin_with_token), so putting it in a URL
+  # would mean every protected image on a page carries a working credential for
+  # the account — and those URLs leak through history, Referer headers, shared
+  # links and podcast-app logs. This grants reading files and nothing else.
+  #
+  # Verified against the database on every request rather than being a signed
+  # token, so cancelling or downgrading revokes on the next request.
+  def regenerate_media_token!
+    update!(media_token: self.class.generate_media_token)
+  end
+
+  def self.generate_media_token
+    SecureRandom.uuid
+  end
+
+  # Whether this member may read protected files right now.
+  def may_read_protected_media?
+    active? && paid?
+  end
+
+  def ensure_media_token
+    self.media_token ||= self.class.generate_media_token
   end
 
   def generate_unsubscribe_token
@@ -138,8 +313,8 @@ class Member < ApplicationRecord
       sakura samurai sapphire sensei shore shuriken silver
       slate sonnet spirit spring star stream summer sumimasen
       sumo sunset sushi taiko takoyaki tanuki tatami
-      tempura teru-teru-bozu thunder tiger time tofu topaz
-      torii train true trueromance tsunami ukiyo-e umami
+      tempura thunder tiger time tofu topaz
+      torii train true trueromance tsunami umami
       velvet voyage wabisabi wakaresaseya wasabi wind winter
       wolf yakuza yukata zen
     ]
@@ -231,6 +406,8 @@ class Member < ApplicationRecord
   end
 
   private
+
+  def format_money(cents, currency) = MemberPayments.money(cents, currency)
 
   def generate_memorable_token
     self.access_token ||= self.class.generate_password

@@ -27,6 +27,16 @@ module Api
         render json: { error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # Permitted loosely on purpose: a manifest is an arbitrary map of relative
+      # path => {size, mtime}, so there are no field names to whitelist. Only
+      # the keys are used, and only to intersect with our own paths.
+      def peer_manifest_param
+        raw = params[:manifest]
+        return nil unless raw.respond_to?(:to_unsafe_h) || raw.is_a?(Hash)
+
+        (raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw).to_h
+      end
+
       # POST /api/site_sync/refresh_ledger
       #
       # Called by the peer right after it pushes content to us, so
@@ -36,12 +46,16 @@ module Api
       # rsync updated mtimes on every transferred file but our
       # ledger still has the old mtimes).
       #
-      # No body needed — we just walk our own /site and write the
-      # ledger to whatever's on disk now. Returns the resulting
-      # fingerprint so the caller can sanity-check.
+      # The caller sends its own manifest, which is what makes the write safe:
+      # recording our full local state would put every file the caller doesn't
+      # have into our baseline, and next sync their absence over there reads as
+      # a deletion over here. A caller too old to send one gets no baseline
+      # write — stale drift is visible and recoverable, a wrong baseline isn't.
+      #
+      # Returns the resulting fingerprint so the caller can sanity-check.
       def refresh_ledger
         Rails.logger.info "[Api::SiteSync::ExchangeController] refresh_ledger called from peer"
-        ::SiteSync::Ledger.write_current!
+        ::SiteSync::Ledger.write_confirmed!(peer_manifest_param, context: "refresh_ledger")
         ::SiteSync::Checker.clear_cache
         Rails.cache.delete("site_sync:current_fingerprint")
         fp = ::SiteSync::Ledger.fingerprint_for(::RoeSitePaths::SITE_PATH)

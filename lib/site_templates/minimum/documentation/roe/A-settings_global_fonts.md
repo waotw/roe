@@ -1,12 +1,12 @@
 ---
-title: "Global → Custom Fonts"
+title: "Settings → Custom Fonts"
 status: published
 tags: settings
 ---
 
 # Global Custom Fonts 
 
-In the [Settings → Global → fonts.yml](/admin/configs/fonts/edit) 
+In the [Settings → fonts.yml](/admin/configs/fonts/edit) 
 
 ## Themes
 

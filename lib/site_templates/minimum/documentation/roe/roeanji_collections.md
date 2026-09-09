@@ -17,7 +17,7 @@ template: links
 
 # Collections
 
-A Collection is a list of your content — posts, pages, products, or documentation — that you drop anywhere with a short block. One Collection can power an entire blog; another can add three "Featured Posts" to your home page. They can even build your site's navigation, footer, or sidebar (see [Build a menu, footer, or sidebar](#build-a-menu-footer-or-sidebar)).
+A Collection is a list of your content — posts, pages, products, or documentation — that you drop anywhere with a short block. One Collection can power an entire blog; another can add three "Featured Posts" to your home page. They can even build your site's menus — the header, footer, or sidebar (see [Build a menu, footer, or sidebar](#build-a-menu-footer-or-sidebar)).
 
 You don't have to write the block by hand. In [The Editor](/documentation/roe/the-editor), click the `COLLECTION` button: it opens a form with every option below, shows each field only when it applies (the product options appear once you set the source to `products`), and writes just the fields you fill in. It then drops the finished `collection` block at your cursor. Set your Collection defaults in [Admin/Settings](/admin/configs/collections/edit).
 
@@ -31,7 +31,7 @@ You won't need most of these. Start with a bare block and add options only as yo
 |--------|----------|-------------|
 | `source` | No | `posts` (default), `pages`, `documentation`, or `products` |
 | `tags` | No | Comma-separated, use `-tag` to exclude |
-| [`areas`](#build-a-menu-footer-or-sidebar) | No | Comma-separated (`nav`, `footer`, `sidebar`) |
+| [`collection`](#build-a-menu-footer-or-sidebar) | No | Comma-separated names; gathers content tagged with a matching `collection:` field |
 | `category` | No | Filter products by category |
 | `podcast` | No | Filter posts by podcast key/name |
 | `post_type` | No | Filter posts by type: `article`, `audio`, `video`, `podcast` or `all`|
@@ -56,14 +56,14 @@ order: blog, about, store
 
 Items you don't name fall to the end, alphabetically — so nothing disappears if you forget one. The whole order lives in the block, so each collection can arrange things its own way, and you never edit the individual pages.
 
-The [`nav`](#build-a-menu-footer-or-sidebar) template is the one exception: there the list *is* the menu, so anything you don't name is left out rather than appended.
+The [`menu`](#build-a-menu-footer-or-sidebar) template is the one exception: there the list *is* the menu, so anything you don't name is left out rather than appended.
 
 ### Display
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, `nav`, `full` or `glossary` |
-| `style` | No | For the `nav` template only: `vertical` (default) or `horizontal` |
+| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, `menu`, `full`, or `glossary` |
+| `style` | No | For the `menu` template only: `vertical` (default) or `horizontal` |
 | `limit` | No | Number or `all` — defaults to [collection config](/admin/configs/collections/edit) or 10 |
 | `offset` | No | Skip first `N` items, e.g., `offset: 10` |
 | `heading` | No | Section heading above collection |
@@ -144,9 +144,9 @@ post_type: article
 
 ## Build a menu, footer, or sidebar
 
-A Collection isn't only for the body of a page — it works in your **layout files** too: `navigation`, `footer`, and `sidebar` (edit these in [Admin → Layouts](/admin/layouts)). Instead of hand-writing links, you build the menu from your own content.
+A Collection isn't only for the body of a page — it works in your **layout files** too: `header`, `footer`, and `sidebar` (edit these in [Admin → Layouts](/admin/layouts)). Instead of hand-writing links, you build the menu from your own content.
 
-The simplest way is to list the pages you want, in the order you want them. In your `navigation` layout file:
+The simplest way is to list the pages you want, in the order you want them. In your `header` layout file:
 
 ````
 ```collection
@@ -163,18 +163,18 @@ A few things worth knowing:
 - The source defaults to `pages` (the usual case). Set `source: posts` or `products` to build the menu from those instead.
 - `style: horizontal` lays the links out in a row; the default, `vertical`, stacks them.
 - A `url_name` the list can't find is skipped (and logged in development, so a typo is easy to catch).
-- A nav shows every link you give it — it isn't capped at ten like other templates.
-- In the `navigation` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
+- A menu shows every link you give it — it isn't capped at ten like the other templates.
+- In the `header` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
 
-### Or let the menu fill itself with `areas`
+### Or let the menu fill itself
 
-Prefer a menu that updates on its own — every page meant for the footer shows up there, with no list to maintain? Tag the content instead. Add an `areas:` field to any page, post, or product:
+Prefer a menu that keeps itself current — every page meant for the footer shows up there, with no list to maintain? Tag the pages instead. Give each one a `collection:` field naming the menu it belongs to:
 
 ```yaml
-collection: nav, footer
+collection: footer
 ```
 
-`areas` accepts `nav` (or `navigation`), `footer`, and `sidebar`. Then point a `nav` collection at it, leaving `order:` off:
+The name is yours to choose — `footer`, `resources`, `main-menu`, whatever fits. Then point a `menu` Collection at that name and leave `order:` off:
 
 ````
 ```collection
@@ -183,9 +183,9 @@ collection: footer
 ```
 ````
 
-Every item tagged `collection: footer` now appears, alphabetically — tag a page and it joins the menu, no layout edit needed. `areas` is to placement what [tags](#source--filtering) are to topics: it groups content by *where it should appear* instead of by subject.
+Every page tagged `collection: footer` now appears, alphabetically — tag a page and it joins the menu, no layout edit needed. A page can belong to more than one: `collection: footer, main-menu` puts it in both. Think of `collection:` as placement the way [tags](#source--filtering) are subject — it gathers content by the menu it belongs to instead of by topic.
 
-Use whichever fits — or **both**. Give a `nav` collection an `order:` list *and* an `areas` value, and the menu is the two combined: listed pages come first, in your order; anything tagged but not listed follows, alphabetically. Like `related`, it works from either side — name a page in the list here, or tag the page itself — so nothing you meant to include gets dropped.
+Use whichever fits — or **both**. Give a `menu` Collection an `order:` list *and* a `collection:` name, and the menu is the two combined: listed pages come first, in your order; anything tagged but not listed follows, alphabetically. Like `related`, it works from either side — name a page in the list here, or tag the page itself — so nothing you meant to include gets dropped.
 
 ## Show `related` content
 

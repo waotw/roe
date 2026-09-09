@@ -19,6 +19,21 @@
           Started <%= time_ago_in_words(@deploy_status[:started_at]) %> ago
         </span>
       <% end %>
+      <%# The way out.
+          
+          DeployWatchdog turns an abandoned deploy into a failed one, which has
+          its own buttons, so this is the backstop for the case the watchdog
+          can't see: the queue is unreadable, or a deploy really is running and
+          the user wants to stop watching it. Without this the running state is
+          a dead end by construction — no dismiss here, and Start Deploy
+          refuses while one is in progress. That's how a user sat on this panel
+          for a day. %>
+      <%= button_to "Dismiss",
+                    admin_dismiss_deploy_path,
+                    method: :post,
+                    form_class: @deploy_status[:started_at] ? "" : "ml-auto",
+                    data: { turbo_confirm: "This clears the deploy from this page. It doesn't stop a deploy that's genuinely still running — check your terminal if you're unsure. Continue?" },
+                    class: "uppercase text-xs font-mono px-2 py-1 border border-amber-400 bg-white hover:bg-amber-100 text-amber-800 rounded-xs" %>
     </div>
     <p class="text-xs text-amber-800 mb-3">Please don't close this window. The page updates automatically.</p>
     <div class="bg-white border border-amber-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-56 overflow-y-auto"
@@ -32,16 +47,30 @@
     <div class="flex items-center justify-between mb-2">
       <h3 class="text-sm font-semibold text-red-900">Deploy failed</h3>
       <div class="flex gap-2">
-        <%# Single retry button — clears the remote build cache, then
-            re-runs the deploy. For Kamal it SSHes into the deploy server
-            and runs docker buildx prune; for Fly it appends --no-cache.
-            Cache contamination is the most common recoverable failure,
-            so making it the default retry path is the right tradeoff. %>
-        <%= button_to "Clear deploy cache + retry",
-                      admin_reset_and_retry_deploy_path,
+        <%# A plain retry is always here — most failures are fixed outside Roe
+            and then simply re-run, and those want a warm cache.
+
+            The cold build only appears once there's a reason: the log names
+            something cache-shaped, or the deploy has failed twice running, so
+            the cheap retry has been tried and didn't work. Then it leads, and
+            the plain retry steps back. Offering it every time charged everyone
+            several minutes for a case most people never hit. %>
+        <% cold_build = DeployDiagnostics.cache_suspect?(@deploy_status) %>
+        <% primary   = "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
+        <% secondary = "uppercase text-xs font-mono px-3 py-1.5 border border-gray-400 bg-white hover:bg-gray-100 text-gray-700 rounded-xs" %>
+
+        <%= button_to "Retry deploy",
+                      admin_start_deploy_path,
                       method: :post,
-                      data: { turbo_confirm: "This will clear the remote build cache and re-deploy. The first build will take a few extra minutes (no cache hits). Continue?" },
-                      class: "uppercase text-xs font-mono px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 rounded-xs" %>
+                      class: cold_build ? secondary : primary %>
+
+        <% if cold_build %>
+          <%= button_to "Retry without cache",
+                        admin_reset_and_retry_deploy_path,
+                        method: :post,
+                        data: { turbo_confirm: "This clears the build cache first, so the build runs from scratch and takes several extra minutes. Continue?" },
+                        class: primary %>
+        <% end %>
         <%= button_to "Dismiss",
                       admin_dismiss_deploy_path,
                       method: :post,
@@ -51,6 +80,45 @@
     <% if @deploy_status[:error].present? %>
       <p class="text-xs text-red-700 mb-3"><%= @deploy_status[:error] %></p>
     <% end %>
+    <%# Kamal and Docker report failures in their own vocabulary — "docker
+        system dial-stdio has exited with exit status 255" names the mechanism
+        that failed, not the thing to go and fix. Where the log matches a
+        failure we recognise, say what it means and what to do; anything else
+        falls through to the raw log as before. %>
+    <% if (preflight = @deploy_status[:preflight]).present? %>
+      <% preflight.each do |issue| %>
+        <div class="bg-white border border-red-300 rounded-xs p-3 mb-3">
+          <h4 class="text-xs font-semibold text-red-900 uppercase font-mono mb-1">
+            <%= issue[:title] %>
+          </h4>
+          <p class="text-xs text-gray-700 font-sans mb-2"><%= sanitize issue[:explanation] %></p>
+          <ol class="text-xs text-gray-700 font-sans list-decimal list-inside space-y-1">
+            <% issue[:steps].each do |step| %>
+              <%# `a` is allowed because these steps are developer-authored constants in
+                  DeployPreflight and DeployDiagnostics, never user input — and a step
+                  that says "see the troubleshooting page" is no use without the link. %>
+              <li><%= sanitize step, tags: %w[code pre strong em a], attributes: %w[href target rel] %></li>
+            <% end %>
+          </ol>
+        </div>
+      <% end %>
+    <% elsif (diagnosis = DeployDiagnostics.for_status(@deploy_status)) %>
+      <div class="bg-white border border-red-300 rounded-xs p-3 mb-3">
+        <h4 class="text-xs font-semibold text-red-900 uppercase font-mono mb-1">
+          <%= diagnosis.title %>
+        </h4>
+        <p class="text-xs text-gray-700 font-sans mb-2"><%= sanitize diagnosis.explanation %></p>
+        <ol class="text-xs text-gray-700 font-sans list-decimal list-inside space-y-1">
+          <% diagnosis.steps.each do |step| %>
+            <%# `a` is allowed because these steps are developer-authored constants in
+                  DeployPreflight and DeployDiagnostics, never user input — and a step
+                  that says "see the troubleshooting page" is no use without the link. %>
+              <li><%= sanitize step, tags: %w[code pre strong em a], attributes: %w[href target rel] %></li>
+          <% end %>
+        </ol>
+      </div>
+    <% end %>
+
     <% if @deploy_status[:log].present? %>
       <div class="bg-white border border-red-200 rounded-xs p-3 font-mono text-xs text-gray-700 h-48 overflow-y-auto">
         <%= simple_format(@deploy_status[:log]) %>

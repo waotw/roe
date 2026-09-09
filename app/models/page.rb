@@ -1,9 +1,11 @@
 class Page < ApplicationRecord
+  include ResolvesMediaAudience
   include HasAudience
   include HasMetadata
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex
+  include IndexesMediaReferences
 
   # Public URL for the page on the live site. The `home` page renders
   # at the root path (per config/routes.rb → root to: "pages#show",
@@ -81,7 +83,27 @@ class Page < ApplicationRecord
   # True for pages stored under site/pages/members/ — used by the public
   # page view to add a `member-page` CSS class so theme styles can target
   # signup / signin / upgrade / donate / etc. distinctly from regular pages.
+  # What this page is FOR, as distinct from what it's called.
+  #
+  # Roe needs to find certain pages — the one members sign in on, the one the
+  # store lives at — and it used to infer them from the filename, the url_name
+  # or the directory. Every one of those is something Roe's own documentation
+  # tells people they can change: rename store.md to bookshop.md and the theme's
+  # `.page-store` selector stops matching; move signin.md and the sign-in link
+  # disappears.
+  #
+  # Optional by design. Nothing requires it, the fallbacks below still work, and
+  # an existing site keeps behaving exactly as it did. It's what a page can say
+  # when it wants to be found reliably.
+  def page_type = metadata["page_type"].to_s.strip.presence
+
+  # A page belongs to the members feature. Declared type first; the old path
+  # check stays for every page written before page_type existed.
+  MEMBER_PAGE_TYPES = %w[signin signup upgrade donate unsubscribe account].freeze
+
   def member_page?
+    return true if page_type.in?(MEMBER_PAGE_TYPES)
+
     file_path.to_s.include?("/site/pages/members/")
   end
 
@@ -91,10 +113,11 @@ class Page < ApplicationRecord
   # Returns names of site-gated metadata fields that are blank but should
   # be set on a published page. Pages support paid audience but never
   # newsletter delivery, so we only check audience here.
-  def missing_site_gated_fields
-    return [] unless SiteFeature.memberships_enabled?
-    metadata["audience"].to_s.strip.blank? ? [ "audience" ] : []
-  end
+  # Nothing. A blank audience already means public — site_controller gates only
+  # on `audience == "paid"` — so flagging it warned about a page that was
+  # working exactly as intended. Kept as a method because callers ask for it and
+  # a page may gain genuinely required fields later.
+  def missing_site_gated_fields = []
 
   def media_refs
     MEDIA_FIELDS.filter_map do |field|
@@ -119,6 +142,11 @@ class Page < ApplicationRecord
   # that doesn't exist on disk.
   def needs_attention?
     return false unless published?
+    publish_warnings?
+  end
+
+  # Guardless version of needs_attention? — used to gate bulk publish on drafts.
+  def publish_warnings?
     missing_site_gated_fields.any? || missing_media_refs.any?
   end
 

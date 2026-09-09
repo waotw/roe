@@ -9,6 +9,8 @@
      data-media-type="<%= media.media_type %>"
      data-has-references="<%= usages.any? %>"
      data-usage-global="<%= usages.any? { |u| u[:global] } %>"
+     data-audience="<%= media.audience %>"
+     data-mixed="<%= local_assigns[:mixed] ? true : false %>"
      data-filename="<%= File.basename(media.file_path).downcase %>"
      data-uploaded-at="<%= media.created_at.to_i %>"
      data-file-size="<%= File.size?(File.join(RoeSitePaths::SITE_PATH, media.file_path.delete_prefix('/'))) || 0 %>"
@@ -71,6 +73,10 @@
         <div class="flex items-baseline gap-1 min-w-0 max-w-full">
           <span class="shrink-0">Used in:</span>
           <span class="text-gray-400 uppercase tracking-wide text-[10px] shrink-0"><%= usages.first[:type] %></span>
+          <%# $ marks a reference that protects this file. %>
+          <% if usages.first[:paid] %>
+            <span class="text-green-700 font-semibold shrink-0" title="Paid — this reference protects the file">$</span>
+          <% end %>
           <%= link_to usages.first[:label],
                                usages.first[:url],
                                class: "text-blue-600 hover:text-blue-800 hover:underline truncate min-w-[3rem]",
@@ -88,6 +94,9 @@
               <% usages[1..-1].each do |usage| %>
                 <div class="flex items-baseline gap-1 py-1 px-1 -mx-1 rounded hover:bg-blue-50">
                   <span class="text-gray-400 uppercase tracking-wide text-[10px] shrink-0"><%= usage[:type] %></span>
+                  <% if usage[:paid] %>
+                    <span class="text-green-700 font-semibold shrink-0" title="Paid — this reference protects the file">$</span>
+                  <% end %>
                   <%= link_to usage[:label],
                               usage[:url],
                               class: "block text-xs text-blue-600 hover:text-blue-800",

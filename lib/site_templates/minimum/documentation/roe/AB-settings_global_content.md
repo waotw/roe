@@ -1,12 +1,12 @@
 ---
-title: "Global → Content"
+title: "Settings → Content"
 status: published
 tags: settings
 ---
 
 # Edit your Global Content Settings
 
-Your Global Content Settings has options for content and search. Edit them in the Admin at [Settings → Global → Content](/admin/configs/content/edit). Click `SAVE` when you're done.
+Your Global Content Settings has options for content and search. Edit them in the Admin at [Settings → Content](/admin/configs/content/edit). Click `SAVE` when you're done.
 
 ## Global
 
@@ -15,6 +15,6 @@ Your Global Content Settings has options for content and search. Edit them in th
 
 ## Search
 
-- `Include all pages in search` — by default, only pages linked in your navigation or footer are searchable. Turn this on to index every published page.
-- `Include bundled Roe documentation in search` — Roe's own documentation is left out of search by default. Turn this on to include it.
+- `Include all pages in search` — by default, only pages linked in your header or footer are searchable. Turn this on to index every published page.
+- `Roe's documentation` — Roe's own documentation is left out of your live site and search by default. Add them back if you need them.
 - `Show results before typing` — by default, search waits until you type. Turn this on to show results as soon as the search opens.

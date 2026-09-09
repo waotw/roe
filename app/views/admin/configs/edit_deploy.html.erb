@@ -38,6 +38,31 @@
       Both banners share the same show/hide toggle as their
       respective settings section so they track the target radio. %>
 
+  <%# Signed out of Fly. Shown at setup rather than only at deploy time,
+      because `fly deploy` without a session produces no output and never
+      returns — the deploy page just sits there. Telling someone here costs
+      them nothing; finding out from a stuck screen costs them the deploy. %>
+  <% if @fly_cli_available && !@fly_signed_in %>
+    <div id="fly-auth-warning"
+         class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (@config_hash['target'].presence || 'kamal') != 'fly' %>">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">You're not signed in to Fly</h3>
+      <p class="text-sm text-amber-800 mb-3">
+        Your Fly session has expired, or you haven't signed in on this computer yet.
+        Deploying without one hangs with no output rather than failing, so sign in first.
+      </p>
+      <ol class="text-sm text-amber-800 mb-3 list-decimal list-inside space-y-1">
+        <li>Open a terminal — any folder will do.</li>
+        <li>Run the command below. It opens your browser.</li>
+        <li>Sign in to Fly. You'll see &ldquo;Your CLI is connected now. Feel free to close this tab.&rdquo;</li>
+        <li>Back in the terminal you'll see <code class="font-mono text-xs bg-amber-100 px-0.5">successfully logged in as &lt;your email&gt;</code></li>
+        <li>Reload this page.</li>
+      </ol>
+      <div class="font-mono text-xs bg-white border border-amber-200 p-3">
+        <p class="select-all">fly auth login</p>
+      </div>
+    </div>
+  <% end %>
+
   <% unless @fly_cli_available %>
     <div id="fly-cli-warning"
          class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (target = @config_hash['target'].presence || 'kamal') != 'fly' %>">

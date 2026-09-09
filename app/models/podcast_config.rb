@@ -54,22 +54,41 @@ class PodcastConfig
   # All subscribe-related fields (the app URLs + the display toggle).
   SUBSCRIBE_FIELDS = (SUBSCRIBE_APPS.keys + %w[subscribe_display]).freeze
 
-  # Ordered [{ label:, url: }] for every app/service field a podcast has
-  # filled in (blank ones dropped). Feed links are added by the template.
+  # Where each app link is worth showing, or nil for "everywhere".
+  #
+  #   Overcast  — its web page can't subscribe a visitor to anything, so on a
+  #               desktop the link is a dead end. iOS only.
+  #   Apple     — no Android app; podcasts.apple.com there is a browser page
+  #               offering nothing useful. Desktop and iOS.
+  #
+  # Spotify, YouTube, Pocket Casts and Amazon all open their native app on both
+  # phones and work in a desktop browser, so they're unmarked.
+  LINK_PLATFORMS = {
+    "overcast"       => "ios",
+    "apple_podcasts" => "desktop ios"
+  }.freeze
+
+  def self.link_platforms(field) = LINK_PLATFORMS[field.to_s]
+
+  # Ordered [{ label:, url:, field: }] for every app/service field a podcast
+  # has filled in (blank ones dropped). Feed links are added by the template.
   def self.subscribe_links(config)
     return [] unless config
 
     SUBSCRIBE_APPS.filter_map do |field, label|
       url = config[field].to_s.strip
-      { label: label, url: url } if url.present?
+      { label: label, url: url, field: field } if url.present?
     end
   end
 
   # How the subscribe section renders: "links" (show all inline, the
-  # default) or "menu" (collapse behind a single Subscribe button).
+  # default) or "button + menu" (collapse behind a single Subscribe
+  # button). Legacy configs may store the older "menu" value — treat it
+  # as the button + menu mode.
   def self.subscribe_display(config)
     value = config&.dig("subscribe_display").to_s.strip
-    %w[links menu].include?(value) ? value : "links"
+    return "button + menu" if value == "button + menu" || value == "menu"
+    "links"
   end
 
   def self.default_entry
@@ -102,6 +121,41 @@ class PodcastConfig
   end
 
   # Clear cache
+  # Whether this show serves a public feed.
+  #
+  # Not "is the show flagged paid" — a paid show with free openers has a public
+  # feed carrying those, which is how someone samples it and then subscribes.
+  # No public feed only when there's nothing public in it.
+  #
+  # Teasers count: a title and description with no audio is a legitimate thing
+  # to advertise.
+  #
+  # Lives here because FeedsController#podcast and the two views that link to
+  # the feed all need the same answer, and they had drifted — the controller
+  # started serving a feed the views still hid.
+  def self.public_feed?(key)
+    return false if key.to_s.strip.blank?
+    return true if SiteConfig.feature("members", "everyone.show_paid_content")
+
+    published_episodes(key).any? { |episode| episode.audience != "paid" }
+  end
+
+  def self.published_episodes(key)
+    Post
+      .published
+      .where("json_extract(metadata, '$.post_type') = ?", "podcast")
+      .where("json_extract(metadata, '$.podcast') = ?", key.to_s)
+  end
+
+  # Shows whose audience is paid. Their episodes inherit it unless they say
+  # otherwise, so this is what "which posts are paid by inheritance" resolves
+  # against — in Ruby and in the SQL that filters collections.
+  def self.paid_keys
+    all_podcasts.filter_map { |key, show| key if show.is_a?(Hash) && show["audience"].to_s.strip == "paid" }
+  rescue StandardError
+    []
+  end
+
   def self.reload!
     SiteConfig.reload!("features/podcast")
   end

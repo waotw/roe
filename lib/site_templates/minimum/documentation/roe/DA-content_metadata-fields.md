@@ -1,5 +1,5 @@
 ---
-title: Metadata Fields
+title: Metadata Properties
 status: published
 tags: content
 related:
@@ -18,9 +18,9 @@ limit: all
 template: links
 ```
 
-# Metadata Fields
+# Metadata Properties
 
-Every content file in Roe — posts, pages, products, documentation — opens with a block of [YAML](/documentation/glossary#yaml) called frontmatter. This is the metadata for that piece of content.
+Every content file in Roe — posts, pages, products, documentation — opens with a section of [YAML](/documentation/roe/glossary#yaml) called frontmatter. These properties are the `metadata` for that content.
 
 Frontmatter sits between two `---` lines at the top of the file:
 
@@ -38,15 +38,15 @@ When editing in the admin, the Metadata panel reads and writes this YAML for you
 
 ![Metadata in Admin](/media/images/metadata-editor.png)(*The metadata editor writes directly to the YAML frontmatter in your markdown file*)
 
-Fields show up in the editor automatically based on `post_type`, whether members or newsletters are enabled, and other context. The `+ Add Field` button lets you add any field manually.
+Properties show up in the editor automatically based on `post_type`, whether members or newsletters are enabled, and other context. The `+ Add Property` button lets you add any field manually.
 
 ---
 
-## Shared Fields
+## Shared Properties
 
-These fields work across posts, pages, and products.
+These properties work across posts, pages, and products.
 
-| Field | Values | Description |
+| Property | Values | Description |
 |-------|--------|-------------|
 | `title` | Any text | The title of the content. Required. |
 | `subtitle` | Any text | A secondary heading or short description. |
@@ -68,23 +68,23 @@ These fields work across posts, pages, and products.
 
 ## Posts
 
-Posts are dated content — blog articles, podcast episodes, audio, and video. In addition to the shared fields above, posts have:
+Posts are dated content — blog articles, podcast episodes, audio, and video. In addition to the shared properties above, posts have:
 
-| Field | Values | Description |
+| Property | Values | Description |
 |-------|--------|-------------|
 | `date` | `YYYY-MM-DD` | Publish date. Controls sort order in collections and feeds. Required for published posts. |
-| `post_type` | `article` `podcast` `audio` `video` | Controls the post layout and which extra fields appear. Defaults to `article`. |
+| `post_type` | `article` `podcast` `music` `audio` `video` | Controls the post layout and which extra properties appear. Defaults to `article`. |
 | `author` | Any text | Post author. Defaults to the site-wide author if not set. |
 
 ### Audience (when Members is enabled)
 
-| Field | Values | Description |
+| Property | Values | Description |
 |-------|--------|-------------|
-| `audience` | `everyone` `paid` | Who can read this post. `everyone` is the default. `paid` restricts to paid members only. |
+| `audience` | `everyone` `paid` | `paid` restricts it to paid members and protects its files. |
 
 ### Distribution (when Newsletters is enabled)
 
-| Field | Values | Description |
+| Property | Values | Description |
 |-------|--------|-------------|
 | `published_to` | `site` `newsletter` `both` | Where to publish. `site` is the default. Use `both` to publish to the site and send as a newsletter. |
 
@@ -92,17 +92,17 @@ Posts are dated content — blog articles, podcast episodes, audio, and video. I
 
 ## Post Types
 
-The `post_type` field unlocks additional metadata fields in the editor. These are the available types:
+The `post_type` field unlocks additional metadata properties in the editor. These are the available types:
 
 ### `article` (default)
 
-A standard blog post. No additional fields beyond the shared and post fields above.
+A standard blog post. No additional properties beyond the shared and post properties above.
 
 ### `audio`
 
 An article with a featured audio player. Adds:
 
-| Field | Required | Description |
+| Property | Required | Description |
 |-------|----------|-------------|
 | `audio` | Yes | Path to the audio file (e.g., `/media/audio/my-song.mp3`). |
 | `duration` | No | Duration string (e.g., `12:34`). |
@@ -111,7 +111,7 @@ An article with a featured audio player. Adds:
 
 An article with a featured video player. Adds:
 
-| Field | Required | Description |
+| Property | Required | Description |
 |-------|----------|-------------|
 | `video` | Yes | Path to the video file (e.g., `/media/video/my-talk.mp4`). |
 | `duration` | No | Duration string (e.g., `45:00`). |
@@ -120,7 +120,7 @@ An article with a featured video player. Adds:
 
 A podcast episode with RSS feed support. Adds:
 
-| Field | Required | Description |
+| Property | Required | Description |
 |-------|----------|-------------|
 | `audio` | Yes* | Path to the audio file. *Required for RSS feed; optional if `video` is set. |
 | `video` | No | Path to a video version of the episode. |
@@ -137,13 +137,32 @@ A podcast episode with RSS feed support. Adds:
 
 <mark>Note:</mark> The `guid` field is managed by Roe automatically when a podcast episode is published. It is intentionally locked to prevent it from changing, since podcast apps use it to track which episodes a listener has already downloaded.
 
+### `music`
+
+A track, grouped into a release. Needs the Music feature on — see [Settings → Music](/documentation/roe/settings-music). Adds:
+
+| Property | Required | Description |
+|-------|----------|-------------|
+| `audio` | Yes | Path to the audio file. |
+| `release` | No | Which release this track belongs to. Chosen from the releases in your music config. Defaults to `singles`. |
+| `track_number` | No | Its place in the release's running order. Also becomes the episode number if you create a podcast feed out of the release. |
+| `duration` | No | Duration string (e.g., `3:45`). Extracted from the audio file. |
+| `explicit` | No | `true` or `false`. One explicit track marks its release's whole feed as explicit. |
+| `isrc` | No | The recording's code (e.g., `QMZ123456789`). Stored with the track; not shown anywhere yet. |
+| `songwriters` | No | Legal names, comma-separated. Stored with the track; not shown anywhere yet. |
+| `lyrics` | No | The full text. Stored with the track; not shown anywhere yet. |
+| `image` | No | Track artwork. Falls back to the release's cover. |
+| `guid` | — | Unique track identifier. **Set automatically — do not edit.** |
+
+<mark>Note:</mark> Published tracks get a locked `guid` for the same reason podcast episodes do. A release can be published as a podcast feed, since podcast apps use it to track which episodes a listener has already downloaded.
+
 ---
 
 ## Pages
 
-Pages use the shared fields. The only page-specific behavior is:
+Pages use the shared properties. The only page-specific behavior is:
 
-| Field | Values | Description |
+| Property | Values | Description |
 |-------|--------|-------------|
 | `url_name` | `home` `404` or any slug | `home` makes the page your homepage. `404` makes it your not-found page. |
 | `audience` | `everyone` `paid` | When Members is enabled, restricts the page to paid members. |
@@ -153,9 +172,9 @@ Pages use the shared fields. The only page-specific behavior is:
 
 ## Products
 
-Products require a few additional fields for the store to work:
+Products require a few additional properties for the store to work:
 
-| Field | Required | Description |
+| Property | Required | Description |
 |-------|----------|-------------|
 | `sku` | Yes | Unique product identifier. Used by Snipcart for checkout. **Never change after purchase.** |
 | `price` | Yes | Price as a number (e.g., `19.99`). |
@@ -165,16 +184,18 @@ Products require a few additional fields for the store to work:
 | `group` | No | Groups variants together (e.g., same book in different formats). Use the same value on all variants. |
 | `variant` | No | Label for this variant (e.g., `Paperback`, `Digital`). |
 | `primary` | `true` `false` | When grouping variants, marks which one shows first in collections. |
+| `digital` | `true` `false` | A downloadable file rather than something you ship. Reveals `file_guid` and drops shipping from the cart. |
+| `file_guid` | When `digital` | The file's GUID from your Snipcart dashboard. See [Digital goods](/documentation/roe/snipcart#digital-goods). |
 
-See [Products](/documentation/products) for a full guide to creating and grouping products.
+See [Products](/documentation/roe/products) for a full guide to creating and grouping products.
 
 ---
 
 ## Documentation
 
-Documentation files (like this one) use the shared fields plus:
+Documentation files (like this one) use the shared properties plus:
 
-| Field | Values | Description |
+| Property | Values | Description |
 |-------|--------|-------------|
 | `tags` | `[tag-one, tag-two]` | Tags for filtering documentation collections. |
 | `related` | `[url-name, url-name]` | List of related doc `url_name` values. Used by the `related: true` collection filter to show bidirectional links. |

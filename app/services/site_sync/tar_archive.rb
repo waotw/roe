@@ -1,6 +1,7 @@
 require "rubygems/package"
 require "zlib"
 require "stringio"
+require "securerandom"
 
 module SiteSync
   # The transfer primitive shared by the HTTP transport's push (upload) and
@@ -59,7 +60,20 @@ module SiteSync
 
               target = File.join(dest_root, rel)
               FileUtils.mkdir_p(File.dirname(target))
-              File.open(target, "wb") { |f| IO.copy_stream(entry, f) }
+              # Write to a temp file in the same directory, then atomically
+              # rename into place. A crash or truncated stream mid-write can't
+              # leave a half-written file at the real path (rename is atomic on
+              # one filesystem) — worst case the file is simply re-sent next run.
+              # gzip's trailing CRC/length catches a corrupt upload and raises
+              # here, so a bad batch fails cleanly and only complete files land.
+              tmp = "#{target}.sync-tmp-#{SecureRandom.hex(6)}"
+              begin
+                File.open(tmp, "wb") { |f| IO.copy_stream(entry, f) }
+                File.rename(tmp, target)
+              rescue
+                FileUtils.rm_f(tmp)
+                raise
+              end
               written << rel
             end
           end

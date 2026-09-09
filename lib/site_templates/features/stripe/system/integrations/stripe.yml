@@ -1,4 +1,4 @@
 test:
-  publishable_key: ""
-  secret_key: ""
-  webhook_signing_secret: ""
+  publishable_key: ''
+  secret_key: ''
+  webhook_signing_secret: ''

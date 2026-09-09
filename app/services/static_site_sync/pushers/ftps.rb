@@ -36,33 +36,56 @@ module StaticSiteSync
       private
 
       def with_session
-        ftp = Net::FTP.new
+        # TLS has to be configured at construction — Net::FTP has no ssl=
+        # setter. A nil host defers the actual connect to the call below,
+        # so our own timeout and error handling still wraps it.
+        ftp = Net::FTP.new(nil, ssl: ssl_context_options)
         ftp.passive  = true
-        ftp.ssl      = ssl_context_options
         ftp.open_timeout = 30
         ftp.read_timeout = 60
 
         ftp.connect(@config.host, @config.port || 21)
         ftp.login(@config.username, @config.password)
         yield ftp
-      rescue SocketError, Errno::ECONNREFUSED, Errno::ETIMEDOUT => e
+      rescue SocketError
+        raise Pusher::ConnectionError, unresolved_host_message
+      rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT => e
         raise Pusher::ConnectionError, "Could not connect to #{@config.host}: #{e.message}"
       rescue Net::FTPPermError => e
         raise Pusher::ConnectionError, "Authentication failed: #{e.message}"
       rescue OpenSSL::SSL::SSLError => e
-        raise Pusher::ConnectionError, "TLS handshake failed: #{e.message}"
+        raise tls_certificate_failure?(e) ?
+          Pusher::CertificateError.new(tls_certificate_message) :
+          Pusher::ConnectionError.new("TLS handshake failed: #{e.message}")
       rescue Net::FTPError => e
         raise Pusher::ConnectionError, "FTP error: #{e.message}"
       ensure
         ftp&.close rescue nil
       end
 
-      # Hash form turns on Net::FTP's TLS path. `verify_mode` left at
-      # default (verify peer); the user can lower it later if their
-      # host uses a self-signed cert — not surfacing that knob yet to
-      # avoid encouraging insecure setups by default.
+      # Hash form turns on Net::FTP's TLS path. Verify the peer certificate
+      # by default. FTPS on shared / cPanel hosts often uses a self-signed
+      # or hostname-mismatched cert; when the user turns verification off we
+      # keep the channel encrypted but accept any certificate. VERIFY_NONE
+      # also makes Net::FTP skip its post-connection hostname check.
       def ssl_context_options
-        { verify_mode: OpenSSL::SSL::VERIFY_PEER }
+        mode = @config.verify_tls ? OpenSSL::SSL::VERIFY_PEER : OpenSSL::SSL::VERIFY_NONE
+        { verify_mode: mode }
+      end
+
+      # A verification failure — untrusted / self-signed / expired cert, or a
+      # hostname that doesn't match — is distinct from a genuine handshake
+      # problem: the channel would still encrypt, we just can't confirm the
+      # host's identity. Only possible while we're actually verifying, so a
+      # host we've already chosen to trust (verify_tls off) never lands here.
+      def tls_certificate_failure?(error)
+        @config.verify_tls &&
+          error.message.match?(/certificate verify failed|does not match|hostname/i)
+      end
+
+      def tls_certificate_message
+        "#{@config.host} presented a TLS certificate Roe couldn't verify. " \
+          "Shared and cPanel hosts often use self-signed or mismatched certificates."
       end
 
       def upload_file(ftp, rel)

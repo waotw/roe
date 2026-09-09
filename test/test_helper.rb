@@ -4,6 +4,7 @@ require "rails/test_help"
 require "mocha/minitest"
 require_relative "test_helpers/session_test_helper"
 require_relative "test_helpers/markdown_fixture"
+require_relative "test_helpers/block_warning_helper"
 require "factory_bot"
 
 FactoryBot.find_definitions
@@ -61,6 +62,7 @@ module ActiveSupport
     parallelize(workers: 0)
     fixtures :all
     include FactoryBot::Syntax::Methods
+    include BlockWarningHelper
 
     setup do
       # Clear cache first to remove any cached SiteConfig

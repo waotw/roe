@@ -1,10 +1,25 @@
 module HasMetadata
   extend ActiveSupport::Concern
 
+  # At module level, not inside `included do` — that block runs once per
+  # including class, so defining the constant there redefined it for every
+  # model and warned "already initialized constant" on boot.
+  #
+  # A missing status counts as a draft, matching #status below. The reader has
+  # always defaulted to "draft" while the scopes matched the raw JSON, so an
+  # item with no status belonged to no scope at all: missing from every total,
+  # and called a draft by one half of the code and nothing by the other.
+  #
+  # Draft is the safe direction — an item nobody gave a status to shouldn't be
+  # public, which is already how it behaves when served
+  # (SiteController#check_draft_access! refuses anything not published or
+  # unlisted).
+  DRAFT_SQL = "COALESCE(NULLIF(json_extract(metadata, '$.status'), ''), 'draft')".freeze
+
   included do
     before_save :ensure_url_name_in_metadata
 
-    # Status scopes
+    # Status scopes — see DRAFT_SQL above for why a missing status is a draft.
     scope :published, -> {
       where("json_extract(metadata, '$.status') = ?", "published")
     }
@@ -14,11 +29,11 @@ module HasMetadata
     }
 
     scope :drafts, -> {
-      where("json_extract(metadata, '$.status') = ?", "draft")
+      where("#{HasMetadata::DRAFT_SQL} = ?", "draft")
     }
 
     scope :not_draft, -> {
-      where("json_extract(metadata, '$.status') != ?", "draft")
+      where("#{HasMetadata::DRAFT_SQL} != ?", "draft")
     }
 
     scope :public_items, -> {
