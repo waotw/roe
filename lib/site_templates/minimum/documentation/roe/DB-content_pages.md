@@ -79,11 +79,13 @@ Create a page with `url_name: 404` to customize your not-found page.
 
 ### Member Pages
 
-When you enable [Members](/documentation/roe/members), Roe generates pages for sign up, sign in, upgrade, and more. These live in `/site/pages/members/` and are regular Markdown files you can edit.
+When you enable [Members](/documentation/roe/members), Roe generates pages for sign up, sign in, upgrade, and more. These live in `/site/pages/members/` and are regular Markdown files you can edit. Roe uses `page_type:` as a way to explicitly say what these pages are for. Example: `page_type: signin` will let Roe know this is the page used for signing in.
+
+This way, you can change the `title` or `url_name` to whatever you like and Roe will still know how to find the page.
 
 ### Podcast Pages
 
-Add `podcast: <podcast-key>` to a page's frontmatter to connect it to a podcast show (the key comes from your [podcast config](/documentation/roe/podcasts)). The page then leads with the show's name as its heading and shows the show's [subscribe section](/documentation/roe/podcasts#subscribe-section) beneath it — a ready-made "podcast home" page. Requires the Podcasts feature.
+Add `podcast: <podcast-key>` to a page's metadata to connect it to a podcast show (the key comes from your [podcast config](/documentation/roe/podcasts)). Roe will then add the show's name as its heading and shows the show's [subscribe section](/documentation/roe/podcasts#subscribe-section) beneath it — a ready-made "podcast home" page.
 
 ## Pages vs Posts
 
@@ -97,14 +99,8 @@ Add `podcast: <podcast-key>` to a page's frontmatter to connect it to a podcast 
 
 ## Editing Pages
 
-Use [The Editor](/documentation/roe/the-editor) to write and format page content. Pages support all Roe-anji features: [cards](/documentation/roe/cards), [collections](/documentation/roe/collections), [galleries](/documentation/roe/galleries), and more.
+Use [The Editor](/documentation/roe/the-editor) to write and format page content.
 
 ## Navigation
 
-Add pages to your site's header in [Admin → Layouts](/admin/layouts):
-
-1. Go to **Layouts**
-2. Under **Navigation**, add links to your pages
-3. Save
-
-Pages appear in the order you specify.
+Add pages to your site's header in [Admin → Layouts](/admin/layouts). More info here: [Layouts](/documentation/roe/layouts#layouts)
