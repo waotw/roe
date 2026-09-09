@@ -1723,7 +1723,7 @@
       "cwe_id": [
         77
       ],
-      "note": "Argv form \u2014 no shell, so nothing here is interpolated into a command line. version comes from a tag Roe published and git_url from Forge.mirrors, a compiled-in list. Brakeman flags Open3 with any interpolated argument regardless of the array form."
+      "note": "Argv form — no shell, so nothing here is interpolated into a command line. version comes from a tag Roe published and git_url from Forge.mirrors, a compiled-in list. Brakeman flags Open3 with any interpolated argument regardless of the array form."
     },
     {
       "warning_type": "Command Injection",
@@ -2179,7 +2179,329 @@
         22
       ],
       "note": ""
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "0d485009d7335ce90f2948e59848225bfc1b0a511a258de6c593bf935751402d",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/system/javascripts_controller.rb",
+      "line": 27,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(SiteJavascript.path(\"#{File.basename(params[:filename].to_s)}.#{(\"css\" or \"js\")}\"), :type => ((\"application/javascript\" or \"text/css\")), :disposition => \"inline\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "System::JavascriptsController",
+        "method": "show"
+      },
+      "user_input": "params[:filename].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "File.basename in the controller and again in SiteJavascript.path, with the extension fixed to js/css. A traversal collapses to a bare name inside site/javascript or app/site_js, and a name that isn't there 404s."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "19aaa52f7336703676f65410b0427015bcfbb29daa4612bbba51ee49eccb93fd",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/post.rb",
+      "line": 199,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "regular_posts.where(\"CAST(json_extract(metadata, '$.#{field.to_s}') AS TEXT) = ?\", value.to_s.strip)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Post",
+        "method": "Post.conflicting_post"
+      },
+      "user_input": "field",
+      "confidence": "Weak",
+      "cwe_id": [
+        89
+      ],
+      "note": "field is interpolated only after UNIQUE_FIELDS[field] returns non-nil, so only whitelisted names reach the query; scope names come from that same table, and every value is a bound parameter."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "33a917304d5d898a12b61139275d4c1331f097d1e8d743df25e41cb3fac428d5",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 1245,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "YAML.load_file(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"), :permitted_classes => ([Date, Time]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "add_podcast"
+      },
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "610df42229f0e211c5aa61c8786fcd8447568b2c5eba3945514bdf1f215d2191",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/media_controller.rb",
+      "line": 90,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.open(resolve_media_path(params[:path].to_s), \"rb\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "MediaController",
+        "method": "send_data_stream"
+      },
+      "user_input": "params[:path].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "resolve_media_path expands the candidate and requires within?(root, candidate), which compares on a separator boundary. Traversal attempts return nil and 404."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "64cd07cd23c028e1de7dc1879e48fb7a0694490dc4af32562e22463031b7be4a",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/file_imports_controller.rb",
+      "line": 81,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.rm_rf(safe_dir(params[:token]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::FileImportsController",
+        "method": "run"
+      },
+      "user_input": "params[:token]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "safe_dir returns nil unless the token matches /\\A[a-f0-9]{16}\\z/ and the directory already exists under IMPORTS_ROOT."
+    },
+    {
+      "warning_type": "Remote Code Execution",
+      "warning_code": 25,
+      "fingerprint": "9da99a59c2ca03c606e746974bb7ca041acf8f74ffc0814e049f7d3bea0a9723",
+      "check_name": "Deserialize",
+      "message": "`YAML.load` called with parameter value",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 845,
+      "link": "https://brakemanscanner.org/docs/warning_types/unsafe_deserialization",
+      "code": "YAML.load(params[:content].to_s.gsub(/\\r\\n/, \"\\n\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_raw"
+      },
+      "user_input": "params[:content].to_s.gsub(/\\r\\n/, \"\\n\")",
+      "confidence": "High",
+      "cwe_id": [
+        502
+      ],
+      "note": "Psych 5 YAML.load is safe_load — no arbitrary classes, no aliases (checked against Psych 5.4.0). The parse is only a syntax check before the file is written."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "a9f2d22499e1cd7b2d3e70aebce2b882b44263ed915e4ba95999981df1770cb8",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 848,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.mkdir_p(File.dirname(SiteConfig.file_path_for(params[:type].to_s)))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_raw"
+      },
+      "user_input": "SiteConfig.file_path_for(params[:type].to_s)",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "b5a313ce3443e90002ff44e5a52f009d049119fc40db53e79988fcafbc6191a2",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 1220,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "delete_podcast_entry"
+      },
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "b85a58b0512301a3e0cb8e8c939efcb4a9391410e39d23c9fa7203f110f050da",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/post.rb",
+      "line": 206,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "regular_posts.where(\"CAST(json_extract(metadata, '$.#{field.to_s}') AS TEXT) = ?\", value.to_s.strip).where(\"IFNULL(CAST(json_extract(metadata, '$.#{scope_field}') AS TEXT), '') = ?\", (scopes or {}).transform_keys(&:to_s)[scope_field].to_s.strip)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Post",
+        "method": "Post.conflicting_post"
+      },
+      "user_input": "scope_field",
+      "confidence": "Weak",
+      "cwe_id": [
+        89
+      ],
+      "note": "field is interpolated only after UNIQUE_FIELDS[field] returns non-nil, so only whitelisted names reach the query; scope names come from that same table, and every value is a bound parameter."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "da528eedaef5ddc832c0b535b432f8732f7bc4f2147591fda3e51c3a760a80da",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/media_controller.rb",
+      "line": 70,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(resolve_media_path(params[:path].to_s), :disposition => \"inline\", :type => ((Mime::Type.lookup_by_extension(File.extname(resolve_media_path(params[:path].to_s)).delete_prefix(\".\")).to_s or \"application/octet-stream\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "MediaController",
+        "method": "serve_whole_file"
+      },
+      "user_input": "params[:path].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "resolve_media_path expands the candidate and requires within?(root, candidate), which compares on a separator boundary. Traversal attempts return nil and 404."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "e09542e6bdf6bdab3f982b4f178b0149191fc7a8c850801b258b2717590bef69",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 835,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(SiteConfig.file_path_for(params[:type].to_s))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "edit_raw"
+      },
+      "user_input": "SiteConfig.file_path_for(params[:type].to_s)",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "e6c006422ee8f956281844364e75c8888ee888f4b8aae21d793136dd05dcb500",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 1204,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "YAML.load_file(SiteConfig::FEATURES_PATH.join(\"podcast.yml\"), :permitted_classes => ([Date, Time]))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "delete_podcast_entry"
+      },
+      "user_input": "SiteConfig::FEATURES_PATH.join(\"podcast.yml\")",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "params[:type] must be a value in RAW_EDITABLE_CONFIGS before file_path_for is reached; the podcast.yml paths are constants with no request data in them."
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 70,
+      "fingerprint": "fe6708ef5ddddfde2416695bf06c0621b7c30eade3ea92569822ca9328fe6f21",
+      "check_name": "MassAssignment",
+      "message": "Specify exact keys allowed for mass assignment instead of using `permit!` which allows any keys",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 801,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.fetch(:releases, {}).permit!",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_music"
+      },
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [
+        915
+      ],
+      "note": "No model involved: the permitted hash is filtered to stripped strings and written to the music YAML config. Admin-only, and the same file has a raw YAML editor anyway."
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 70,
+      "fingerprint": "ffb3230c19d82eac3e2e3fc748b8cc63c6c3bab93b8301d40949bcd130ae6485",
+      "check_name": "MassAssignment",
+      "message": "Specify exact keys allowed for mass assignment instead of using `permit!` which allows any keys",
+      "file": "app/controllers/admin/configs_controller.rb",
+      "line": 800,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.fetch(:music_globals, {}).permit!",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ConfigsController",
+        "method": "update_music"
+      },
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [
+        915
+      ],
+      "note": "No model involved: the permitted hash is filtered to stripped strings and written to the music YAML config. Admin-only, and the same file has a raw YAML editor anyway."
     }
   ],
-  "brakeman_version": "8.0.5"
+  "brakeman_version": "8.0.6"
 }

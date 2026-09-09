@@ -29,8 +29,8 @@ class StaticSiteSync::PushManifestTest < ActiveSupport::TestCase
       write_manifest(root, "a.html" => { "sha256" => "stale" }, "gone.html" => { "sha256" => "x" })
 
       full = manifest.full_diff
-      assert_equal ["a.html", "sub/b.html"], full.upload_paths.sort
-      assert_equal ["gone.html"], full.deleted
+      assert_equal [ "a.html", "sub/b.html" ], full.upload_paths.sort
+      assert_equal [ "gone.html" ], full.deleted
     end
   end
 
@@ -42,7 +42,7 @@ class StaticSiteSync::PushManifestTest < ActiveSupport::TestCase
       write_manifest(root, "a.html" => { "sha256" => Digest::SHA256.hexdigest("A") })
 
       assert manifest.diff.empty?, "unchanged file should be absent from the incremental diff"
-      assert_equal ["a.html"], manifest.full_diff.upload_paths
+      assert_equal [ "a.html" ], manifest.full_diff.upload_paths
     end
   end
 end

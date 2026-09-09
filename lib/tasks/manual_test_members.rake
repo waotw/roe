@@ -49,7 +49,6 @@ module ManualTestMembers
 end
 
 namespace :members do
-
   desc "Create throwaway members for testing account deletion (development, or ROE_ALLOW_TEST_MEMBERS=1)"
   task seed_manual_test: :environment do
     abort ManualTestMembers.refusal unless ManualTestMembers.allowed?

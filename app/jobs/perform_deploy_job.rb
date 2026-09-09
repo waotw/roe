@@ -537,9 +537,9 @@ class PerformDeployJob < ApplicationJob
             # Stopping mid-deploy leaves the same residue as Roe quitting
             # mid-deploy, so it gets the same warning.
             DeployWatchdog.cleanup_hint(target) ].compact.join(" ")
-        else
+                      else
           "Deploy command exited with a non-zero status. See log for details."
-        end
+                      end
       )
       Rails.logger.error "[PerformDeployJob] #{target} deploy #{stalled ? 'stalled and was stopped' : 'failed'}"
     end

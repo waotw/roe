@@ -91,19 +91,19 @@ module ContentMetadataSchema
     # because they later deleted their sidebar.
     unless Sidebar.exists?
       return {
-        'show_sidebar' => {
-          type: :checkbox, label: 'show_sidebar', available: false,
-          hint: 'This site has no sidebar (site/layout/sidebar.md), so this setting does nothing.'
+        "show_sidebar" => {
+          type: :checkbox, label: "show_sidebar", available: false,
+          hint: "This site has no sidebar (site/layout/sidebar.md), so this setting does nothing."
         }
       }
     end
 
     covered = Sidebar.covers?(resource_type)
     {
-      'show_sidebar' => {
+      "show_sidebar" => {
         type: :checkbox,
-        label: 'show_sidebar',
-        default: covered ? 'false' : 'true',
+        label: "show_sidebar",
+        default: covered ? "false" : "true",
         # hint, not note: the ERB renders a checkbox's hint beside the box,
         # inside the label, which reads better than a line underneath — the
         # same treatment image_in_header and explicit already get. `note` is
@@ -124,161 +124,161 @@ module ContentMetadataSchema
 
     {
       # Core fields
-      'title' => { type: :text, label: 'title', required: true },
-      'subtitle' => { type: :text, label: 'subtitle' },
-      'date' => { type: :datetime, label: 'date', required: true },
-      'post_type' => { type: :select, label: 'post_type', options: Post.post_type_options },
-      'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
-      'author' => { type: :text, label: 'author', default_from_config: true },
-      'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
-      'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. nav, footer)' },
-      'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
-      'image' => { type: :text, label: 'image', hint: 'Post image, episode artwork, etc: /media/images/image-file.png', required: required_for_type.call('image') },
-      'excerpt' => { type: :textarea, label: 'excerpt' },
-      'audience' => {
+      "title" => { type: :text, label: "title", required: true },
+      "subtitle" => { type: :text, label: "subtitle" },
+      "date" => { type: :datetime, label: "date", required: true },
+      "post_type" => { type: :select, label: "post_type", options: Post.post_type_options },
+      "status" => { type: :select, label: "status", options: [ "draft", "published", "unlisted" ], required: true },
+      "author" => { type: :text, label: "author", default_from_config: true },
+      "tags" => { type: :text, label: "tags", hint: "arts, culture, …" },
+      "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. nav, footer)" },
+      "url_name" => { type: :text, label: "url_name", hint: "auto-generated from title if blank" },
+      "image" => { type: :text, label: "image", hint: "Post image, episode artwork, etc: /media/images/image-file.png", required: required_for_type.call("image") },
+      "excerpt" => { type: :textarea, label: "excerpt" },
+      "audience" => {
         type: :select,
-        label: 'audience',
-        options: ['everyone', 'paid'],
-        hint: 'Who should see/receive this post?',
+        label: "audience",
+        options: [ "everyone", "paid" ],
+        hint: "Who should see/receive this post?",
         required: SiteFeature.memberships_enabled?
       },
-      'published_to' => {
+      "published_to" => {
         type: :select,
-        label: 'published_to',
-        options: ['site', 'newsletter', 'both'],
-        hint: 'Where should this be published?',
+        label: "published_to",
+        options: [ "site", "newsletter", "both" ],
+        hint: "Where should this be published?",
         required: SiteFeature.newsletters_enabled?
       },
 
       # Media fields — required flag comes from Post::POST_TYPES for the current type
-      'audio' => { type: :text, label: 'audio', hint: "Example: /media/audio/audio-file.mp3", required: required_for_type.call('audio') },
-      'video' => { type: :text, label: 'video', hint: "Example: /media/video/video-file.mp4", required: required_for_type.call('video') },
-      'duration' => {
+      "audio" => { type: :text, label: "audio", hint: "Example: /media/audio/audio-file.mp3", required: required_for_type.call("audio") },
+      "video" => { type: :text, label: "video", hint: "Example: /media/video/video-file.mp4", required: required_for_type.call("video") },
+      "duration" => {
         type: :text,
-        label: 'duration',
-        hint: 'Auto-calculated from media file',
+        label: "duration",
+        hint: "Auto-calculated from media file",
         readonly: true,
-        required: required_for_type.call('duration')
+        required: required_for_type.call("duration")
       },
-      'captions' => { type: :text, label: 'captions', hint: 'Path to captions file' },
+      "captions" => { type: :text, label: "captions", hint: "Path to captions file" },
 
       # Podcast-specific fields
-      'podcast' => {
+      "podcast" => {
         type: :select,
-        label: 'podcast',
+        label: "podcast",
         options: PodcastConfig.podcast_keys,
-        required: required_for_type.call('podcast'),
-        hint: 'Which podcast feed?'
+        required: required_for_type.call("podcast"),
+        hint: "Which podcast feed?"
       },
-      'guid' => {
+      "guid" => {
         type: :text,
-        label: 'guid',
+        label: "guid",
         # GUID is always read-only here. Either it was auto-generated by
         # Roe (and locked once published — podcast clients depend on
         # stability) or it came in from an importer (e.g. Substack) where
         # the original feed's GUID has to be preserved exactly to avoid
         # subscribers seeing every episode as new on the day of migration.
         readonly: true,
-        hint: metadata_hash['substack_post_id'].present? ?
-                'Imported from Substack feed — read-only to preserve subscriber dedup' :
-                'Auto-generated UUID. Locked once the post is published.'
+        hint: metadata_hash["substack_post_id"].present? ?
+                "Imported from Substack feed — read-only to preserve subscriber dedup" :
+                "Auto-generated UUID. Locked once the post is published."
       },
-      'explicit' => { type: :checkbox, label: 'explicit', hint: 'Explicit content?' },
-      'episode_number' => { type: :text, label: 'episode_number', hint: 'Episode number' },
-      'season' => { type: :text, label: 'season', hint: 'Season number' },
-      'episode_type' => { type: :select, label: 'episode_type', options: ['full', 'trailer', 'bonus'], hint: 'Episode type' },
+      "explicit" => { type: :checkbox, label: "explicit", hint: "Explicit content?" },
+      "episode_number" => { type: :text, label: "episode_number", hint: "Episode number" },
+      "season" => { type: :text, label: "season", hint: "Season number" },
+      "episode_type" => { type: :select, label: "episode_type", options: [ "full", "trailer", "bonus" ], hint: "Episode type" },
 
       # Music-specific fields. The release list comes from music.yml; the
       # release-link controller adds a link to that release's settings beside
       # this select, so the config is one click away from the track.
-      'release' => {
+      "release" => {
         type: :select,
-        label: 'release',
-        required: required_for_type.call('release'),
-        options: release_options(metadata_hash['release'])
+        label: "release",
+        required: required_for_type.call("release"),
+        options: release_options(metadata_hash["release"])
       },
-      'track_number' => {
+      "track_number" => {
         type: :text,
-        label: 'track_number',
-        required: required_for_type.call('track_number'),
-        hint: 'Track number within the release'
+        label: "track_number",
+        required: required_for_type.call("track_number"),
+        hint: "Track number within the release"
       },
       # Credits and codes live with the track, not in music.yml — they describe
       # this recording, and nothing else shares them.
-      'isrc' => {
+      "isrc" => {
         type: :text,
-        label: 'isrc',
-        hint: 'e.g. QMZ123456789 — the code for this recording'
+        label: "isrc",
+        hint: "e.g. QMZ123456789 — the code for this recording"
       },
-      'songwriters' => {
+      "songwriters" => {
         type: :text,
-        label: 'songwriters',
-        hint: 'Legal names, comma-separated — not stage names'
+        label: "songwriters",
+        hint: "Legal names, comma-separated — not stage names"
       },
-      'lyrics' => { type: :textarea, label: 'lyrics' },
+      "lyrics" => { type: :textarea, label: "lyrics" },
 
-      'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
-      'image_in_header' => { type: :checkbox, label: 'image_in_header', hint: 'Show post image in the header?' },
-      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
+      "show_sidebar" => { type: :checkbox, label: "show_sidebar" },
+      "image_in_header" => { type: :checkbox, label: "image_in_header", hint: "Show post image in the header?" },
+      "related" => { type: :text, label: "related", hint: "Related item url_names, comma-separated (bi-directional)" }
     }
   end
 
   def self.product_fields
     {
       # Core product fields
-      'title' => { type: :text, label: 'title', required: true },
-      'category' => {
+      "title" => { type: :text, label: "title", required: true },
+      "category" => {
         type: :text,
-        label: 'category',
+        label: "category",
         required: true,
         hint: begin
           categories = ProductCategory.all rescue []
           if categories.any?
-            examples = categories.first(3).join(', ')
+            examples = categories.first(3).join(", ")
             "Add one: e.g., #{examples}"
           else
-            'Add one: e.g., book, ebook, poster'
+            "Add one: e.g., book, ebook, poster"
           end
         end
       },
-      'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
-      'status' => { type: :select, label: 'status', options: ['draft', 'published'], required: true },
-      'price' => { type: :text, label: 'price', required: true, hint: 'Price in dollars (e.g., 29.99)' },
-      'sku' => { type: :text, label: 'sku', required: true, hint: 'Product SKU (required for publishing)' },
-      'image' => { type: :text, label: 'image', required: true, hint: 'Product image: /media/images/product.jpg' },
-      'description' => { type: :textarea, label: 'description', hint: 'Short description for Snipcart' },
+      "url_name" => { type: :text, label: "url_name", hint: "auto-generated from title if blank" },
+      "status" => { type: :select, label: "status", options: [ "draft", "published" ], required: true },
+      "price" => { type: :text, label: "price", required: true, hint: "Price in dollars (e.g., 29.99)" },
+      "sku" => { type: :text, label: "sku", required: true, hint: "Product SKU (required for publishing)" },
+      "image" => { type: :text, label: "image", required: true, hint: "Product image: /media/images/product.jpg" },
+      "description" => { type: :textarea, label: "description", hint: "Short description for Snipcart" },
       # A downloadable product. Turning this on reveals `file_guid` and drops
       # shipping from the cart. Snipcart has no API for digital goods — the
       # GUID is a copy-paste from their dashboard, so the editor links there.
-      'digital' => {
+      "digital" => {
         type: :checkbox,
-        label: 'digital',
-        hint: 'A digital file (e.g. mp3, ePub, PDF, etc.'
+        label: "digital",
+        hint: "A digital file (e.g. mp3, ePub, PDF, etc."
       },
-      'file_guid' => {
+      "file_guid" => {
         type: :text,
-        label: 'file_guid',
-        hint: 'The file GUID from your Snipcart dashboard'
+        label: "file_guid",
+        hint: "The file GUID from your Snipcart dashboard"
       },
       # Snipcart requires weight in grams, as a whole number, and won't quote
       # postage without it. The unit sits after the input rather than in the
       # label: label width sets the whole column (longest label + 1 in the
       # metadata editor), so "weight (grams)" would have widened every row on
       # every product form to carry one field's unit.
-      'weight' => {
+      "weight" => {
         type: :text,
-        label: 'weight',
-        suffix: 'grams',
-        hint: '500',
-        note: 'Whole grams. Needed for Snipcart shipping rates — leave blank for digital products.'
+        label: "weight",
+        suffix: "grams",
+        hint: "500",
+        note: "Whole grams. Needed for Snipcart shipping rates — leave blank for digital products."
       },
-      'tags' => { type: :text, label: 'tags', hint: 'featured, sale, …' },
-      'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. featured)' },
-      'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
-      'group' => { type: :text, label: 'group', hint: 'Group ID for product variants (e.g., narnia-book-1)' },
-      'variant' => { type: :text, label: 'variant', hint: 'Format: Paperback, Hardback, Ebook, etc.' },
-      'primary' => { type: :checkbox, label: 'primary', hint: 'Only one product in a group should be checked as primary.' },
-      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' }
+      "tags" => { type: :text, label: "tags", hint: "featured, sale, …" },
+      "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. featured)" },
+      "show_sidebar" => { type: :checkbox, label: "show_sidebar" },
+      "group" => { type: :text, label: "group", hint: "Group ID for product variants (e.g., narnia-book-1)" },
+      "variant" => { type: :text, label: "variant", hint: "Format: Paperback, Hardback, Ebook, etc." },
+      "primary" => { type: :checkbox, label: "primary", hint: "Only one product in a group should be checked as primary." },
+      "related" => { type: :text, label: "related", hint: "Related item url_names, comma-separated (bi-directional)" }
     }
   end
 
@@ -288,29 +288,29 @@ module ContentMetadataSchema
 
   def self.pages_fields
     {
-      'title' => { type: :text, label: 'title', required: true },
-      'subtitle' => { type: :text, label: 'subtitle' },
-      'status' => { type: :select, label: 'status', options: ['draft', 'published', 'unlisted'], required: true },
-      'tags' => { type: :text, label: 'tags', hint: 'arts, culture, …' },
-      'collection' => { type: :text, label: 'collection', hint: 'Collection name(s), comma-separated (e.g. nav, footer)' },
-      'url_name' => { type: :text, label: 'url_name', hint: 'auto-generated from title if blank' },
+      "title" => { type: :text, label: "title", required: true },
+      "subtitle" => { type: :text, label: "subtitle" },
+      "status" => { type: :select, label: "status", options: [ "draft", "published", "unlisted" ], required: true },
+      "tags" => { type: :text, label: "tags", hint: "arts, culture, …" },
+      "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. nav, footer)" },
+      "url_name" => { type: :text, label: "url_name", hint: "auto-generated from title if blank" },
       # A page is public unless someone says otherwise, so this is optional and
       # defaults to everyone. Requiring it put a red asterisk on every page and
       # a "missing required field" warning on every published one, for a choice
       # almost nobody needs to make. Posts keep it required: on a paid site
       # "free or paid?" is worth forcing, because getting it wrong silently is
       # expensive in both directions.
-      'audience' => {
+      "audience" => {
         type: :select,
-        label: 'audience',
-        options: [ 'everyone', 'paid' ],
-        default: 'everyone',
-        hint: 'Who should see this page? Public unless set to paid.'
+        label: "audience",
+        options: [ "everyone", "paid" ],
+        default: "everyone",
+        hint: "Who should see this page? Public unless set to paid."
       },
-      'image' => { type: :text, label: 'image', hint: 'Page image: /media/images/image-file.png' },
-      'excerpt' => { type: :textarea, label: 'excerpt' },
-      'show_sidebar' => { type: :checkbox, label: 'show_sidebar' },
-      'related' => { type: :text, label: 'related', hint: 'Related item url_names, comma-separated (bi-directional)' },
+      "image" => { type: :text, label: "image", hint: "Page image: /media/images/image-file.png" },
+      "excerpt" => { type: :textarea, label: "excerpt" },
+      "show_sidebar" => { type: :checkbox, label: "show_sidebar" },
+      "related" => { type: :text, label: "related", hint: "Related item url_names, comma-separated (bi-directional)" },
       # What the page is FOR, as distinct from what it's called. Roe finds
       # certain pages by purpose — the one members sign in on, the one the
       # store lives at — and without this it guesses from the filename or the
@@ -319,11 +319,11 @@ module ContentMetadataSchema
       # Offered in the Add Field menu rather than rendered on every page: most
       # pages have no job beyond being themselves. Feature templates ship it
       # already set.
-      'page_type' => {
+      "page_type" => {
         type: :select,
-        label: 'page_type',
-        options: [ '' ] + PAGE_TYPES,
-        hint: 'Only for pages Roe has to find — sign-in, the store. Survives renaming the page.'
+        label: "page_type",
+        options: [ "" ] + PAGE_TYPES,
+        hint: "Only for pages Roe has to find — sign-in, the store. Survives renaming the page."
       }
     }
   end

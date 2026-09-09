@@ -63,5 +63,4 @@ class DeployPreflightTest < ActiveSupport::TestCase
     assert_equal 1, preflight.blockers.size
     assert_match(/Docker isn't running/, preflight.blockers.first.title)
   end
-
 end
