@@ -6,7 +6,7 @@ Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, p
 
 **Architecture**: Roe uses a **versioned directory structure** that supports seamless updates without touching user content. The Rails application lives in `current/`, while user content remains in `site/` at the root level.
 
-**Repository**: Primary development happens at [Codeberg](https://github.com/waotw/roe) (migrated from Sourcehut, then Codeberg — both bar AI-assisted projects).
+**Repository**: [GitHub](https://github.com/waotw/roe), with Codeberg and sourcehut as push mirrors — the `roe` remote has three push URLs, so one `git push roe main --tags` fans out to all three. `RoeUpdater::Forge` holds the mirror list the updater reads, first answer wins, so a tag pushed to only one mirror is invisible to the others.
 
 Primary integrations: **Stripe** (payments / paid memberships), **Postmark** (transactional + broadcast email, with a fallback to ActionMailer when unconfigured), and a multi-phase **Substack importer**.
 
@@ -207,11 +207,11 @@ Two distinct workflows that target different audiences.
 
 **1. In-App Update System (DEVELOPMENT installs only)**
 
-Updates the developer's local Roe install to a new tagged release from Codeberg. Hidden in production: `Admin::UpdatesController#block_in_production` redirects every action and the nav link is conditionally rendered. Migrations always target the development SQLite — production DBs are migrated by the deploy flow (Kamal/Fly release_command), not by this system. `RAILS_ENV` is hardcoded to `development` for the migration subprocess to close the footgun where booting dev with `RAILS_ENV=production` would otherwise route migrations at the wrong DB.
+Updates the developer's local Roe install to a new tagged release from the forge (see `RoeUpdater::Forge` for the mirror list). Hidden in production: `Admin::UpdatesController#block_in_production` redirects every action and the nav link is conditionally rendered. Migrations always target the development SQLite — production DBs are migrated by the deploy flow (Kamal/Fly release_command), not by this system. `RAILS_ENV` is hardcoded to `development` for the migration subprocess to close the footgun where booting dev with `RAILS_ENV=production` would otherwise route migrations at the wrong DB.
 
 Orchestrated by `RoeUpdater::UpdateOrchestrator`, run inside `PerformUpdateJob`. Components:
 
-- **VersionChecker**: Reads root `/VERSION` for the installed version; queries Codeberg (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.1.0`); bare-numbered tags are ignored. Suffixed tags (`-nightly.N`, `-rc.N`) are pre-releases — shown only to dev installs / the `nightly` channel, and ordered via `Gem::Version`. Tag & release scheme: `docs/21-development-workflow.md`.
+- **VersionChecker**: Reads root `/VERSION` for the installed version; queries the forge mirrors via `git ls-remote --tags` (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.1.0`); bare-numbered tags are ignored. Suffixed tags (`-nightly.N`, `-rc.N`) are pre-releases — shown only to dev installs / the `nightly` channel, and ordered via `Gem::Version`. Tag & release scheme: `docs/21-development-workflow.md`.
 - **BackupManager**: Snapshots dev + prod SQLite to `site_backups/` with a timestamp stamped onto the `UpdateStatus` so rollback restores the right one.
 - **Downloader**: `git clone --branch <tag>` into `staging/`.
 - **MigrationTester**: Rsyncs migrations from `staging/` into a throwaway copy of `current/` and dry-runs them against a cloned dev DB.
@@ -252,6 +252,8 @@ Deploys the current codebase from local to a live server via Kamal or Fly.io.
 ### Content sync
 Markdown files in `site/` are the source of truth. `ContentSync` parses front-matter and body and upserts `Post`, `Page`, `Documentation`, `Medium`, `Product`, and `*Config` rows. `ContentWatcher` (dev) re-syncs on file changes. JSON metadata is stored as a text column and queried via SQLite `json_extract`.
 
+**One answer for sync state**: `SiteSync::Conclusion` — `in_sync` / `out_of_sync` / `unknown`, carrying `as_of`. Every surface (banner, nav dot, imports panel, Site Sync page) reads it, so they can't contradict each other. `unknown` matters: peer data is cached and may predate the last local change, and reporting that as drift produced a warning no amount of syncing cleared.
+
 ### Site configuration & settings
 Global config files live in `site/system/global/`; each has a dedicated `SiteConfig` accessor that reads its file directly (no cross-file lookup):
 - `SiteConfig.get(k)` → `site.yml` (identity, branding, theme, sync, updates, SSG)
@@ -259,6 +261,8 @@ Global config files live in `site/system/global/`; each has a dedicated `SiteCon
 - `.fonts` / `.custom_code` / `.development` → their files; `.feature(type, k)` / `.default(type, k)` → `features/*.yml` / `defaults/*.yml`
 
 **Moving keys between config files**: `ConfigGenerator#migrate_content_config!` is the pattern — an idempotent boot migration (runs inside `generate_all`) that relocates keys while preserving user values, paired with a legacy fallback in the accessor so un-migrated installs keep reading the old location. Safe to run on every boot.
+
+**Never read a config file with `YAML.load_file`** — use `SiteFile.read_yaml(path)`, or `SiteConfig.get` which goes through it. Bootsnap caches `load_file` on `(mtime, size)`, and mtime is whole-second on some filesystems, so two writes of the same byte length inside one second return the **first** parse. This silently broke `sync_from_file` (the DB record disagreed with the file on disk) and is worse in the read-modify-write savers, where a stale parse gets merged and written back, discarding the save before it. Only the bare `load_file(path)` form is affected — passing `permitted_classes:` bypasses bootsnap's fast path.
 
 **Admin settings are schema-driven**: `Admin::ConfigsController` defines `SITE_CONFIG_SCHEMA` / `CONTENT_CONFIG_SCHEMA` (sections → fields with type/label/hint). The shared `shared/_config_editor` partial has a **hardcoded section block per `config_type`**; on save it serializes `[data-config-field]` inputs into the YAML `content` param, splitting field names on `.` so dotted keys (`search.all_pages`, `theme.active`) nest. Config YAML carries **no comments** — put help text in the schema `hint:`, not the file.
 
@@ -270,7 +274,9 @@ Payment and email integrations support dual-storage for test/live environments:
 **Access**: Admin → Settings → Integrations
 **Services**: StripeConfig, PostmarkConfig, SnipcartConfig
 
-This separation allows testing integrations in development with test keys while keeping live keys secure and environment-specific.
+**Live keys are never stored locally, and this is deliberate — don't "fix" it.** Roe pushes the local install's `master.key` and `active_record_encryption` keys to production (`FlySecretsSync`, `DeployConfigGenerator`), so production decrypts with local's keys and syncing credentials across would technically work. The point is that the laptop already holds the key: storing live keys there too would put the lock and the valuables in the same bag, and a stolen laptop would hand over both. Keep them only on production and a stolen laptop yields a key with nothing local to open.
+
+So live keys are entered in the production admin — `update_newsletters_live` and the shared `apply_live_keys` refuse outside production.
 
 ### Members + audiences
 `Member` records back a magic-link / token-based auth flow under `app/controllers/members/`. The `HasAudience` concern controls who can see what (public / paid / draft). Paid access is gated by Stripe subscriptions managed via `StripeProductManager` and the `checkout_controller`.
@@ -294,10 +300,14 @@ Products are Markdown files in `site/products/` with front-matter defining price
 `PodcastConfig` (sourced from `site/system/features/podcast.yml`) supports multiple podcast series. `FeedGenerator` produces RSS/Atom for the main blog and per-podcast feeds, with `include_paid` / `show_paid_teasers` flags. Public feeds may show paid episodes as teasers (no enclosure); a separate `/podcast/:podcast_key/private.xml` route serves full audio to authenticated members via per-member tokens.
 
 ### Email
+`SiteSender` owns the From address — `author_email` from `site.yml`, with **no fallback**. Postmark rejects any From it hasn't verified, so a stand-in like `noreply@example.com` can't rescue a send; it only swaps a clear error for a confusing one. A missing address means the send is refused with a reason, and the Members + Postmark settings pages warn before anyone tries.
+
 `MemberMailer` is implemented as plain class methods (not Rails ActionMailer subclassing). It checks for a connected `PostmarkConfig` and delivers via `PostmarkService`; otherwise it falls back to `FallbackMailer` (a regular `ApplicationMailer`) and `letter_opener` in development. Newsletter broadcasts are batched via `QueueNewsletterBatchesJob` + `SendNewsletterJob` with delivery tracked in `NewsletterSend`. Postmark webhooks land in `webhooks/postmark_controller` and are processed asynchronously.
 
 ### Substack import
-`Admin::ImportsController` drives a three-phase import (`ImportPostsJob`, `ImportMembersJob`, `ImportDeliveriesJob`). Logic lives in `app/services/substack_importer/` (converter, frontmatter, html_loader, csv_parser, media_handler, live_fetcher, etc.). Audience mapping (free/paid) and media migration are handled per-post.
+`Admin::ImportsController` drives a four-phase import — upload/configure, posts + media (`ImportPostsJob`), members (`ImportMembersJob`), deliveries (`ImportDeliveriesJob`) — then an optional publish-to-live step (`ImportPublishJob`). Logic lives in `app/services/substack_importer/` (converter, frontmatter, html_loader, csv_parser, media_handler, live_fetcher, etc.). Audience mapping (free/paid) and media migration are handled per-post.
+
+**Publishing to live** sends members and newsletter sends over the Site Sync channel to `/api/site_sync/*`. `SiteSync::MemberPublish` decides what may be applied: an import can add but never take away — tier is never lowered (a lapsed subscription is reported, not applied), consent is never restored, and members with their own history on live are left alone and reported per reason. A member who deleted their account and is still in the CSV **is** re-imported; recognising them would mean keeping a fingerprint of the address Roe promised to destroy, and would also block them from ever signing up again.
 
 ### Static site generation
 `StaticGenerator` builds a static HTML mirror of the public site using a manifest for incremental rebuilds. It coordinates with `ImageVariantGenerator` / `ResponsiveImageRenderer` for responsive image output. Outputs to `static_site/` at root level (outside versioned directory). Triggered via `bin/rails static_site:build` or the admin static-site controller.

@@ -124,6 +124,14 @@ module SiteFeature
     payments_unconfigured? || email_unconfigured? || snipcart_unconfigured?
   end
 
+  # What the admin nav dot asks. Broader than the integrations: a site with no
+  # author_email can't send anything, and that setting lives in site.yml rather
+  # than in any integration — so folding it into any_integration_unconfigured?
+  # would make that name mean something it doesn't.
+  def settings_need_attention?
+    any_integration_unconfigured? || sender_unconfigured?
+  end
+
   def payments_unconfigured?
     payments_feature_enabled? && !stripe_configured?
   end
@@ -134,6 +142,17 @@ module SiteFeature
     email_feature_enabled? && !postmark_configured?
   end
   alias_method :newsletters_unconfigured?, :email_unconfigured?
+
+  # No address to send FROM, which is a different problem from Postmark not
+  # being set up — and they can be true separately. A connected Postmark with
+  # no author_email is still broken, and badging that "unconfigured" would
+  # send someone off to configure something already configured.
+  #
+  # See SiteSender: there's no stand-in address, because Postmark rejects any
+  # From it hasn't verified.
+  def sender_unconfigured?
+    members_enabled? && !SiteSender.configured?
+  end
 
   def snipcart_unconfigured?
     store_enabled? && !snipcart_configured?

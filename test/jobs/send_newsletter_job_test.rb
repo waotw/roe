@@ -262,23 +262,18 @@ class SendNewsletterJobTest < ActiveJob::TestCase
     assert_equal 1, result[:sent]
   end
 
-  test "uses default from when SiteConfig not set" do
-    # Destroy existing config and clear cache to test defaults
-    SiteConfig.where("file_path LIKE ?", "%site/system/global/site.yml").destroy_all
-    SiteConfig.reload!("site")
+  test "refuses to send when no author email is set" do
+    # There's no stand-in address any more: Postmark rejects a From it hasn't
+    # verified, so sending from one only swaps a clear error for a confusing
+    # one. A newsletter with nobody to send it from doesn't go out.
+    with_site_config({})
 
-    # Create new config with empty values
-    SiteConfig.create!(
-      file_path: SiteConfig::SITE_FILE.to_s,
-      config: {}
-    )
+    PostmarkService.expects(:send_newsletter_batch).never
 
-    PostmarkService.expects(:send_newsletter_batch).with do |args|
-      message = args[:messages].first
-      message[:From] == "Newsletter <noreply@example.com>"
-    end.returns({ success: true, results: [ { "ErrorCode" => 0, "MessageID" => "msg-1" } ] })
+    result = SendNewsletterJob.perform_now(@post.id, [ @member.id ])
 
-    SendNewsletterJob.perform_now(@post.id, [ @member.id ])
+    assert_equal 0, result[:sent]
+    assert_equal SiteSender::MISSING, result[:error]
   end
 
   test "broadcasts status update" do

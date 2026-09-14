@@ -43,7 +43,7 @@ module Members
           # Redirect rather than render: the sign-in form is a Page, and a site
           # that hasn't got one would blow up on the template instead of showing
           # the message.
-          redirect_to "/sign-in", alert: "We couldn't send the sign-in email. Please try again shortly."
+          redirect_to "/sign-in", alert: "We couldn't send the sign-in email. Please contact the site owner and let them know."
         else
           redirect_to_check_email
         end

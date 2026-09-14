@@ -22,7 +22,12 @@ class PostmarkService
       response = http.request(request)
 
       if response.code == "200"
-        { success: true, message: "Connection successful" }
+        # The body identifies the server, including DeliveryType ("Live" or
+        # "Sandbox"). A sandbox server records a message without delivering it,
+        # which changes what we can honestly tell someone after a test send —
+        # so keep the data rather than throwing it away.
+        data = JSON.parse(response.body) rescue {}
+        { success: true, message: "Connection successful", server: data }
       else
         error_data = JSON.parse(response.body) rescue {}
         { success: false, error: error_data["Message"] || response.body }
@@ -34,11 +39,14 @@ class PostmarkService
     def send_transactional_email(to_email:, to_name:, subject:, html_content:, tag: nil)
       return { success: false, error: "Postmark not configured" } unless configured?
 
-      config = PostmarkConfig.current
-      from_email = SiteConfig.current("site")&.config&.dig("author_email") || "noreply@example.com"
-      from_name = SiteConfig.current("site")&.config&.dig("author") || "Newsletter"
+      # No stand-in address: Postmark rejects an unverified From, so sending
+      # from a made-up one fails anyway, with a worse error. See SiteSender.
+      return { success: false, error: SiteSender::MISSING } unless SiteSender.configured?
 
-      Rails.logger.info "📤 Sending from: #{from_email} (#{from_name})"
+      config = PostmarkConfig.current
+      from = SiteSender.from_header
+
+      Rails.logger.info "📤 Sending from: #{from}"
 
       uri = URI("#{API_BASE}/email")
       http = Net::HTTP.new(uri.host, uri.port)
@@ -50,7 +58,7 @@ class PostmarkService
       request["X-Postmark-Server-Token"] = config.server_token
 
       body = {
-        From: "#{from_name} <#{from_email}>",
+        From: from,
         To: "#{to_name} <#{to_email}>",
         Subject: subject,
         HtmlBody: html_content,
@@ -72,7 +80,9 @@ class PostmarkService
         { success: true, message_id: data["MessageID"] }
       else
         error_data = JSON.parse(response.body) rescue {}
-        { success: false, error: error_data["Message"] || response.body }
+        { success: false,
+          error: error_data["Message"] || response.body,
+          error_code: error_data["ErrorCode"] }
       end
     rescue => e
       Rails.logger.error "Postmark transactional send failed: #{e.message}"

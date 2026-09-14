@@ -124,7 +124,7 @@ class SnipcartConfig < ApplicationRecord
 
   def self.full_config
     return {} unless File.exist?(TEST_CONFIG_PATH)
-    YAML.load_file(TEST_CONFIG_PATH) || {}
+    SiteFile.read_yaml(TEST_CONFIG_PATH) || {}
   rescue => e
     Rails.logger.error "Failed to load Snipcart config: #{e.message}"
     {}

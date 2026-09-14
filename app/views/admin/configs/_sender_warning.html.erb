@@ -1,0 +1,46 @@
+<%#
+  Shown wherever email is being set up, when the site has no address to send
+  from. Roe has none of its own to fall back on — Postmark rejects any From it
+  hasn't verified — so without this every send fails, and the only trace is a
+  line in the log the member who tried can't read.
+
+  Same reasoning as the Fly sign-in banner on the deploy page: saying so at
+  setup costs nothing, finding out from a failed sign-in costs someone else.
+
+  One partial for both pages so the two warnings can't drift apart.
+%>
+<% if !SiteSender.configured? %>
+  <div class="mb-4 border border-amber-300 bg-amber-50 p-4" data-sender-warning>
+    <h3 class="text-sm font-semibold text-amber-900 mb-1">Roe needs an email address</h3>
+    <p class="text-sm text-amber-800 mb-3">
+      Roe sends emails to members (sign-in links, newsletters, etc.) These emails come from
+      the author email in Roe's settings. Until you add one, no emails can be sent from Roe.
+    </p>
+    <p class="text-sm text-amber-800">
+      <%= link_to "Add an Author Email in Site settings →", admin_edit_site_config_path,
+                  class: "underline font-medium" %>
+    </p>
+  </div>
+
+<%# Address set, but Postmark refused it. A different problem with a different
+    fix, and it can only be discovered by attempting a send — listing Sender
+    Signatures needs an Account API token and Roe holds only a Server token. So
+    this appears once a send has actually been refused, either by the Send test
+    email button or by a real one failing. %>
+<% elsif PostmarkConfig.current&.sender_rejected? %>
+  <div class="mb-4 border border-amber-300 bg-amber-50 p-4" data-sender-warning data-sender-rejected>
+    <h3 class="text-sm font-semibold text-amber-900 mb-1">Postmark won't send from your address</h3>
+    <p class="text-sm text-amber-800 mb-3">
+      Your author email is set to <code class="font-mono text-xs"><%= SiteSender.address %></code>,
+      but Postmark hasn't confirmed it. Add and confirm it as a Sender Signature in Postmark,
+      then send a test email to check.
+    </p>
+    <p class="text-sm text-amber-800 mb-3">
+      Postmark said: <em><%= PostmarkConfig.current.sender_error %></em>
+    </p>
+    <p class="text-sm text-amber-800">
+      <%= link_to "Open Postmark settings →", admin_edit_newsletters_config_path,
+                  class: "underline font-medium" %>
+    </p>
+  </div>
+<% end %>

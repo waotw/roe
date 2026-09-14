@@ -71,6 +71,10 @@
       The page no longer 500s in this state, but the integration is
       effectively disconnected until the operator re-saves the
       affected fields, so we make that explicit. %>
+  <% if @config_type == 'newsletters' %>
+    <%= render "admin/configs/sender_warning" %>
+  <% end %>
+
   <% if integration_record&.respond_to?(:decryption_failed?) && integration_record.decryption_failed? %>
     <div class="p-4 mb-4 border border-amber-300 bg-amber-50">
       <h3 class="text-sm font-semibold text-amber-900 mb-1">
@@ -243,7 +247,7 @@
       <p class="text-sm pl-2 mb-2 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">DO NOT PUT LIVE KEYS IN TEST MODE.</p>
       <ul class="text-sm text-gray-500 italic mb-4 list-disc ml-4">
         <li>Test keys are stored as plain text in <code class="text-xs font-mono">site/system/integrations/<%= @config_type %>.yml</code>.</li>
-        <li>Live keys are stored encrypted in the database.</li>
+        <li>Live keys are encrypted and stored in the database.</li>
         <% if @config_type == 'payments' %>
           <li>If you're testing Stripe payments locally or on the live site, you can find test credit card numbers here: <a href="https://docs.stripe.com/testing?testing-method=card-numbers#visa" class="underline text-blue-500">Stripe: Test Card Numbers</a>
         <% end %>
@@ -301,6 +305,7 @@
       <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
         <input type="submit" value="Save Test Keys"
                class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+        <%= render "admin/configs/send_test_email_button", integration_record: integration_record %>
       </div>
     <% end %>
   </div>
@@ -316,7 +321,7 @@
           <div class="config-section">
             <h3 class="text-base font-semibold text-gray-900 mb-1"><%= live_section[:label] %></h3>
             <p class="text-xs text-gray-600 mb-3">
-              Live keys are stored encrypted in the database. Fields are masked when already set.
+              Live keys aree ncrypted and stored in the database.
             </p>
             <div class="space-y-4 pl-4 border-l-2 border-gray-200">
               <% live_section[:fields].each do |field_name, field_config| %>
@@ -356,6 +361,7 @@
         <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
           <input type="submit" value="Save Live Keys"
                  class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+          <%= render "admin/configs/send_test_email_button", integration_record: integration_record %>
         </div>
         <% if @config_type == 'payments' %>
           <ul class="text-sm text-gray-500 italic mt-4 list-disc ml-4">

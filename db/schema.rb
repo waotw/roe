@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_14_000000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -171,6 +171,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
+    t.text "sender_error"
+    t.string "sender_verified_address"
     t.text "server_token"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"

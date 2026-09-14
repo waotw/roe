@@ -229,6 +229,7 @@ Rails.application.routes.draw do
     patch  "configs/newsletters/live",                      to: "configs#update_newsletters_live",           as: "live_newsletters_config"
     patch  "configs/newsletters/mode",                      to: "configs#update_newsletters_mode",           as: "mode_newsletters_config"
     post   "configs/newsletters/verify",                    to: "configs#verify_newsletters",                as: "verify_newsletters_config"
+    post   "configs/newsletters/send_test_email",           to: "configs#send_test_email_newsletters",        as: "send_test_email_newsletters_config"
     delete "configs/newsletters/disconnect",                to: "configs#disconnect_newsletters",            as: "disconnect_newsletters_config"
     post   "configs/newsletters/regenerate_webhook_token",  to: "configs#regenerate_postmark_webhook_token", as: "regenerate_webhook_token_newsletters_config"
 

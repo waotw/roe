@@ -98,6 +98,60 @@ class PostmarkConfig < ApplicationRecord
     end
   end
 
+  # ── Sender verification ──────────────────────────────────────────────────
+  #
+  # verify! answers "does the token work". This answers "will Postmark accept
+  # the address we send FROM", which is a different question with a different
+  # failure: ErrorCode 400, "The 'From' address you supplied is not a Sender
+  # Signature on your account."
+  #
+  # There's no way to ask without sending. Listing Sender Signatures needs an
+  # Account API token and Roe only holds a Server token, so the check is a real
+  # send — which means a successful one delivers a real email.
+  #
+  # The ADDRESS is stored rather than a status. "Verified" is then just "the
+  # address that worked is the address we'd use now", so changing author_email
+  # makes it unverified by itself — no reset hook to wire up or keep in step.
+
+  # Postmark's code for an unconfirmed or unknown Sender Signature.
+  SENDER_NOT_VERIFIED = 400
+
+  def sender_verified?
+    SiteSender.configured? && sender_verified_address == SiteSender.address
+  end
+
+  # A send was attempted and refused because of the From address. Only
+  # meaningful for the address currently configured — once that changes, the
+  # old failure says nothing about the new address.
+  def sender_rejected? = sender_error.present? && !sender_verified?
+
+  # Send a real message to prove the From address is accepted. Returns the
+  # PostmarkService result so the caller can report what happened.
+  def verify_sender!(to:)
+    return { success: false, error: SiteSender::MISSING } unless SiteSender.configured?
+
+    result = PostmarkService.send_transactional_email(
+      to_email: to, to_name: to, tag: "sender-verification",
+      subject: "Test email from #{SiteConfig.get('title').presence || 'your Roe site'}",
+      html_content: "<p>This is a test. If you're reading it, Roe can send email " \
+                    "from #{ERB::Util.html_escape(SiteSender.address)}.</p>"
+    )
+
+    if result[:success]
+      update_columns(sender_verified_address: SiteSender.address, sender_error: nil)
+    else
+      update_columns(sender_verified_address: nil, sender_error: result[:error].to_s.presence)
+    end
+
+    result
+  end
+
+  # Called after a real send fails, so a rejection discovered in the wild
+  # surfaces the same way a button press would.
+  def record_sender_rejection!(error)
+    update_columns(sender_verified_address: nil, sender_error: error.to_s.presence)
+  end
+
   # ── Disconnect ───────────────────────────────────────────────────────────
 
   def disconnect!
@@ -138,7 +192,7 @@ class PostmarkConfig < ApplicationRecord
 
   def self.test_config
     return {} unless File.exist?(TEST_CONFIG_PATH)
-    YAML.load_file(TEST_CONFIG_PATH)["test"] || {}
+    SiteFile.read_yaml(TEST_CONFIG_PATH)["test"] || {}
   rescue => e
     Rails.logger.error "Failed to load Postmark test config: #{e.message}"
     {}

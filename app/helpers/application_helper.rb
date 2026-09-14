@@ -163,6 +163,7 @@ module ApplicationHelper
   def payments_feature_enabled?    = SiteFeature.payments_feature_enabled?
   def newsletters_feature_enabled? = SiteFeature.newsletters_feature_enabled?
   def any_integration_unconfigured? = SiteFeature.any_integration_unconfigured?
+  def settings_need_attention?    = SiteFeature.settings_need_attention?
   def payments_unconfigured?       = SiteFeature.payments_unconfigured?
   def newsletters_unconfigured?    = SiteFeature.newsletters_unconfigured?
   def snipcart_unconfigured?       = SiteFeature.snipcart_unconfigured?

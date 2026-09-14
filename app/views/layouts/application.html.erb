@@ -157,12 +157,12 @@
                 Settings
                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
               </button>
-              <% if any_integration_unconfigured? %>
-                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
+              <% if settings_need_attention? %>
+                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some settings need attention"></span>
               <% end %>
               <div data-dropdown-target="menu" class="hidden absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
-                <% if any_integration_unconfigured? %>
-                  <%= link_to admin_configs_path, class: "flex items-center justify-between px-4 py-2 text-sm text-amber-700 hover:bg-gray-100", title: "Some integrations need configuration" do %>
+                <% if settings_need_attention? %>
+                  <%= link_to admin_configs_path, class: "flex items-center justify-between px-4 py-2 text-sm text-amber-700 hover:bg-gray-100", title: "Some settings need attention" do %>
                     Roe
                     <span class="w-1.5 h-1.5 bg-amber-500 rounded-full" aria-hidden="true"></span>
                   <% end %>

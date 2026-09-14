@@ -54,7 +54,9 @@ end
 # through Rails controllers (instead of the StaticSiteMiddleware).
 File.write(
   SiteConfig::SITE_FILE,
-  { "static_generation_enabled" => false }.to_yaml.sub(/\A---\s*\n/, "")
+  { "static_generation_enabled" => false,
+    "author" => "Test Author",
+    "author_email" => "author@example.com" }.to_yaml.sub(/\A---\s*\n/, "")
 )
 
 module ActiveSupport
@@ -89,7 +91,9 @@ module ActiveSupport
       # would pollute every subsequent test in random order.
       File.write(
         SiteConfig::SITE_FILE,
-        { "static_generation_enabled" => false }.to_yaml.sub(/\A---\s*\n/, "")
+        { "static_generation_enabled" => false,
+    "author" => "Test Author",
+    "author_email" => "author@example.com" }.to_yaml.sub(/\A---\s*\n/, "")
       )
 
       # content.yml (search + content-rendering settings, split out of
@@ -102,6 +106,23 @@ module ActiveSupport
       # Sync the seeded site.yml into a SiteConfig record. Uses the same
       # path production does (find_by(file_path:) → create_from_file)
       # rather than constructing a record by hand.
+      SiteConfig.sync_from_file("site")
+      SiteConfig.reload!("site")
+    end
+
+    # Set site-level config for one test.
+    #
+    # Writes site.yml and syncs the record from it, because SiteConfig.get —
+    # the single read path — reads the file. Setting only the record (
+    # SiteConfig.current("site").update!) leaves the file unchanged, so the
+    # code under test never sees it and the fixture silently does nothing.
+    def with_site_config(values)
+      # Merged over the seeded default rather than replacing it, so a test
+      # setting one key can't silently drop static_generation_enabled and
+      # start routing its requests through StaticSiteMiddleware instead.
+      merged = { "static_generation_enabled" => false }.merge(values.transform_keys(&:to_s))
+
+      File.write(SiteConfig::SITE_FILE, merged.to_yaml.sub(/\A---\s*\n/, ""))
       SiteConfig.sync_from_file("site")
       SiteConfig.reload!("site")
     end

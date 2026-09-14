@@ -183,6 +183,14 @@ class MemberMailer
           Rails.logger.info "✉️  Sent '#{subject}' to #{to} (Message ID: #{result[:message_id]})"
         else
           Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
+
+          # A rejected From address isn't a transient failure — every send will
+          # fail the same way until the address is verified with Postmark. Record
+          # it so the settings pages can say so, rather than leaving the only
+          # trace in a log the person who tried can't read.
+          if result[:error_code].to_i == PostmarkConfig::SENDER_NOT_VERIFIED
+            postmark_config.record_sender_rejection!(result[:error])
+          end
         end
 
         # Postmark took it, but a sandbox server records without delivering and

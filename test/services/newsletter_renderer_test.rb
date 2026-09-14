@@ -109,9 +109,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   end
 
   test "converts relative URLs to absolute" do
-    SiteConfig.stubs(:current).returns(
-      OpenStruct.new(config: { "url" => "https://example.com" })
-    )
+    with_site_config("url" => "https://example.com")
 
     post_with_links = create(:post,
       metadata: {
@@ -130,7 +128,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   end
 
   test "uses localhost fallback when site URL not configured" do
-    SiteConfig.stubs(:current).returns(nil)
+    with_site_config({})
 
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render

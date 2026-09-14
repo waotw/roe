@@ -62,7 +62,7 @@ class NewsletterRenderer
   def convert_relative_urls(html)
     return html if html.blank?
 
-    site_url = SiteConfig.current("site")&.config&.dig("url")
+    site_url = SiteConfig.get("url")
 
     # Fallback to localhost for dev if not set
     site_url ||= "http://localhost:3000"

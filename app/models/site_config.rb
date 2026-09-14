@@ -24,23 +24,74 @@ class SiteConfig < ApplicationRecord
 
   CACHE_KEY_PREFIX = "site_config"
 
-  # Get site-level config
+  # A site-level setting, read from site.yml. Supports dotted keys
+  # ("theme.active").
+  #
+  # The one way site config is read. Deliberately NOT through `current` /
+  # Rails.cache: the cache store is Solid Cache, which is database-backed, so
+  # that path needs a database before it even reaches find_by. Config has to
+  # stay readable when the database isn't there — recovery boots, rake tasks,
+  # a half-migrated install.
+  #
+  # Reading the file can't be stale, either. sync_from_file is the only thing
+  # that writes a SiteConfig record's config, and it copies from the file, so
+  # the file is always at least as fresh as the record.
   def self.get(key)
-    return nil unless File.exist?(SITE_FILE)
-    config_data = YAML.load_file(SITE_FILE)
+    file_config&.dig(*key.to_s.split("."))
+  end
 
-    # Handle nested keys like 'theme.active'
-    keys = key.to_s.split(".")
-    config_data&.dig(*keys)
+  # site.yml, parsed once and re-read only when the file actually changes.
+  #
+  # It used to parse on every call, which is fine for a page render and not
+  # fine for ApplicationMailer: its `default from:` is a lambda ActionMailer
+  # evaluates per message, so sending a newsletter re-parsed site.yml once per
+  # recipient to fetch a value that changes about once a year.
+  #
+  # Keyed on mtime AND size rather than mtime alone — a filesystem with
+  # one-second mtime granularity can't distinguish two writes in the same
+  # second, and reload! clears this outright for the cases that matter.
+  def self.file_config
+    return nil unless File.exist?(SITE_FILE)
+
+    stat  = File.stat(SITE_FILE)
+    stamp = [ stat.mtime, stat.size ]
+    return @file_config if @file_config_stamp == stamp
+
+    parsed = parse_yaml(SITE_FILE)
+    # Stamped only after a successful parse, so a broken file is retried
+    # rather than remembered as nil.
+    @file_config       = parsed
+    @file_config_stamp = stamp
+    parsed
   rescue => e
     Rails.logger.error "SiteConfig.get error: #{e.message}"
     nil
   end
 
+  # Parse a config file.
+  #
+  # Deliberately not YAML.load_file: bootsnap caches that on (mtime, size),
+  # and mtime is whole-second on at least some filesystems — so two writes of
+  # the same byte length inside one second hand back the FIRST parse. That
+  # isn't hypothetical. Saving a config twice in quick succession (a one-
+  # character fix, an editor autosave) left the database record holding the
+  # previous contents while the file on disk held the new ones, and it stayed
+  # that way until the next save landed in a different second.
+  #
+  # Same parsing defaults as load_file, so nothing else changes.
+  def self.parse_yaml(path)
+    SiteFile.read_yaml(path)
+  end
+
+  def self.reset_file_cache!
+    @file_config = nil
+    @file_config_stamp = nil
+  end
+
   # Get fonts config
   def self.fonts(key = nil)
     return nil unless File.exist?(FONTS_FILE)
-    config_data = YAML.load_file(FONTS_FILE)
+    config_data = parse_yaml(FONTS_FILE)
 
     return config_data unless key
 
@@ -57,7 +108,7 @@ class SiteConfig < ApplicationRecord
   # never error on the missing file.
   def self.custom_code(key = nil)
     return nil unless File.exist?(CUSTOM_CODE_FILE)
-    config_data = YAML.load_file(CUSTOM_CODE_FILE)
+    config_data = parse_yaml(CUSTOM_CODE_FILE)
 
     return config_data unless key
 
@@ -71,7 +122,7 @@ class SiteConfig < ApplicationRecord
   # Get development config (advanced settings, hidden by default)
   def self.development(key = nil)
     return nil unless File.exist?(DEVELOPMENT_FILE)
-    config_data = YAML.load_file(DEVELOPMENT_FILE)
+    config_data = parse_yaml(DEVELOPMENT_FILE)
 
     return config_data unless key
 
@@ -86,7 +137,7 @@ class SiteConfig < ApplicationRecord
   # content.yml; if the key isn't there yet, falls back to the pre-split flat
   # key in site.yml so an un-migrated install keeps working.
   def self.content(key = nil)
-    config_data = File.exist?(CONTENT_FILE) ? (YAML.load_file(CONTENT_FILE) || {}) : {}
+    config_data = File.exist?(CONTENT_FILE) ? (parse_yaml(CONTENT_FILE) || {}) : {}
     return config_data unless key
 
     value = config_data.dig(*key.to_s.split("."))
@@ -140,6 +191,8 @@ class SiteConfig < ApplicationRecord
   end
 
   def self.reload!(type = nil)
+    reset_file_cache! if type.nil? || type.to_s == "site"
+
     if type
       Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
     else
@@ -157,12 +210,13 @@ class SiteConfig < ApplicationRecord
     return unmanaged(type) if file_path.nil?
     return unless File.exist?(file_path)
 
-    config_data = YAML.load_file(file_path)
+    config_data = parse_yaml(file_path)
     site_config = find_or_initialize_by(file_path: file_path.to_s)
     site_config.config = config_data
     site_config.save!
 
     Rails.cache.delete("#{CACHE_KEY_PREFIX}_#{type}")
+    reset_file_cache! if type.to_s == "site"
 
     # A show or release audience cascades to its episodes' and tracks' files.
     # Editing podcast.yml saves no post, so without this the media index keeps
@@ -249,7 +303,7 @@ class SiteConfig < ApplicationRecord
     file_path = file_path_for(type)
     return nil unless File.exist?(file_path)
 
-    config_data = YAML.load_file(file_path)
+    config_data = parse_yaml(file_path)
     create!(
       file_path: file_path.to_s,
       config: config_data

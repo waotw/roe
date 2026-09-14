@@ -416,7 +416,8 @@ class Admin::ConfigsController < Admin::BaseController
         path: "global/site.yml",
         type: "site",
         description: "Site title, URL, author info, and branding",
-        edit_path: admin_edit_site_config_path
+        edit_path: admin_edit_site_config_path,
+        no_sender: SiteFeature.sender_unconfigured?
       },
       {
         name: "content.yml",
@@ -574,7 +575,7 @@ class Admin::ConfigsController < Admin::BaseController
       integration_files << {
         name: "postmark.yml",
         path: "integrations/postmark.yml",
-        description: "Email delivery — sign-in links, confirmations, newsletters",
+        description: "(email) test keys",
         edit_path: admin_edit_newsletters_config_path,
         unconfigured: SiteFeature.email_unconfigured?
       }
@@ -1201,7 +1202,7 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path, alert: "Podcast configuration doesn't exist." and return
     end
 
-    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    config = SiteFile.read_yaml(file_path, permitted_classes: [ Date, Time ]) || {}
     unless config.is_a?(Hash) && config.key?(key)
       redirect_to admin_edit_podcast_config_path, alert: "Podcast '#{key}' not found." and return
     end
@@ -1242,7 +1243,7 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path, alert: "Enable podcasts before adding a show." and return
     end
 
-    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    config = SiteFile.read_yaml(file_path, permitted_classes: [ Date, Time ]) || {}
     config = {} unless config.is_a?(Hash)
 
     base = "new-podcast"
@@ -1389,7 +1390,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_deploy
-    @config_hash         = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    @config_hash         = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     @deploy_secrets      = DeploySecrets.current
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
@@ -1613,7 +1614,7 @@ class Admin::ConfigsController < Admin::BaseController
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml")
     test_data = params[:test] || {}
 
-    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing = SiteFile.read_yaml(path) || {}
     existing["test"] ||= {}
     # Skip masked placeholder values — user didn't change those fields
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
@@ -1692,7 +1693,7 @@ class Admin::ConfigsController < Admin::BaseController
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
     test_data = params[:test] || {}
 
-    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing = SiteFile.read_yaml(path) || {}
     existing["test"] ||= {}
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
@@ -1714,6 +1715,46 @@ class Admin::ConfigsController < Admin::BaseController
       verified_at: success ? postmark.verified_at.iso8601 : nil,
       error:       success ? nil : "Could not connect to Postmark. Check your server token."
     }
+  end
+
+  # Proves the From address is one Postmark will accept, by sending a real
+  # message to the signed-in admin. verify_newsletters only checks the token;
+  # a working token with an unverified Sender Signature still fails every send.
+  #
+  # A success genuinely delivers an email — there's no way to ask Postmark
+  # without sending — so this is a button rather than something that fires on
+  # every token save.
+  def send_test_email_newsletters
+    to = Current.user&.email_address
+
+    if to.blank?
+      flash[:alert] = "Your account has no email address, so there's nowhere to send a test."
+      redirect_to admin_edit_newsletters_config_path and return
+    end
+
+    result = PostmarkConfig.current.verify_sender!(to: to)
+
+    # Whether anything was actually delivered is a property of the Postmark
+    # server, not of the environment — a sandbox server accepts a message and
+    # records it in Activity without sending it. Asked here rather than stored,
+    # because it's one call on a button press and nothing else needs it.
+    sandbox = PostmarkService.test_connection(PostmarkConfig.current.server_token)
+                             .dig(:server, "DeliveryType").to_s.casecmp("sandbox").zero? rescue false
+
+    if result[:success] && sandbox
+      # Nothing was delivered, and saying "sent" here is what sends someone
+      # hunting through an inbox that will never receive it.
+      flash[:notice] = "Postmark received the email from #{SiteSender.address} and recorded it " \
+                       "in Activity. This server is in sandbox mode, no emails are sent. " \
+                       "Your email address is confirmed by Postmark."
+    elsif result[:success]
+      flash[:notice] = "Test email sent to #{to} from #{SiteSender.address}. " \
+                       "If an email arrives, Postmark is working and your email is verified."
+    else
+      flash[:alert] = result[:error].to_s.presence || "Postmark refused the message."
+    end
+
+    redirect_to admin_edit_newsletters_config_path(tab: PostmarkConfig.current.mode)
   end
 
   def update_newsletters_live
@@ -1769,7 +1810,7 @@ class Admin::ConfigsController < Admin::BaseController
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     test_data = params[:test] || {}
 
-    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing = SiteFile.read_yaml(path) || {}
     existing["test"] ||= {}
     # The snippet is public and shown in full (never masked), so save it
     # verbatim — a blank submission means "clear it," not "leave unchanged."
@@ -2157,7 +2198,7 @@ class Admin::ConfigsController < Admin::BaseController
 
   # The saved target, so the Fly session check only runs on a Fly site.
   def fly_target?
-    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    config = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     (config["target"].presence || "kamal").to_s == "fly"
   rescue StandardError
     false
@@ -2185,7 +2226,7 @@ class Admin::ConfigsController < Admin::BaseController
     # Load old config to compare (only for site config)
     old_config = nil
     if type == "site" && File.exist?(file_path)
-      old_config = YAML.load_file(file_path) rescue {}
+      old_config = SiteFile.read_yaml(file_path) || {} rescue {}
     end
 
     # Validate YAML syntax. safe_load (not load) so pasted config can't

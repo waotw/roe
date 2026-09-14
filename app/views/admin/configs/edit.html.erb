@@ -73,6 +73,7 @@
                  config_type: "collections", retired: @retired_settings %>
     <% end %>
   <% elsif @config_type == 'members' %>
+    <%= render "admin/configs/sender_warning" %>
     <%= render 'shared/config_editor',
                form_url: admin_members_config_path,
                config_content: @config_content,

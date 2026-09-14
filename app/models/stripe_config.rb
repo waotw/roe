@@ -148,7 +148,7 @@ class StripeConfig < ApplicationRecord
 
   def self.test_config
     return {} unless File.exist?(TEST_CONFIG_PATH)
-    YAML.load_file(TEST_CONFIG_PATH)["test"] || {}
+    SiteFile.read_yaml(TEST_CONFIG_PATH)["test"] || {}
   rescue => e
     Rails.logger.error "Failed to load Stripe test config: #{e.message}"
     {}
