@@ -56,6 +56,8 @@ New to Roe? Start here:
 | [18 - Troubleshooting](./18-troubleshooting.md) | Common issues and solutions |
 | [19 - Testing](./19-testing.md) | Test conventions and best practices |
 | [20 - Deployment](./20-deployment.md) | Production deployment guide |
+| [21 - Development Workflow](./21-development-workflow.md) | Branching, tags, release scheme |
+| [Agent Notes](./agents/00-index.md) | Working agreements, authoring map, decisions, parked designs |
 
 ## Architecture Overview
 

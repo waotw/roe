@@ -1,5 +1,37 @@
 # AGENTS.md
 
+## Working Agreements — read first
+
+Standing rules. Each came from a correction, usually after something was lost.
+The shape of most of them is the same: **prepare the change, never run the step
+that mutates state.**
+
+1. **Never run a git command that changes state** — no `add`, `commit`, `push`,
+   `branch`, `checkout`, `merge`, `reset`, `rebase`, or `remote` changes. Read-only
+   git (`status`, `diff`, `log`, `show`) is always fine. When asked to commit,
+   output the message text and stop. No `Co-Authored-By` trailer, ever.
+2. **Never edit anything under `site/` without explicit permission** — it is not
+   in git, so any write or delete is unrecoverable. Reading is fine. Read a file
+   in full before overwriting it. Standing exceptions for requested work:
+   `site/theme/*.css` and `site/documentation/`.
+3. **Never run a migration without asking** — not even in dev. Write the file,
+   then stop and let Ben run it.
+4. **Never read or search the Obsidian vault** (`~/Dropbox/-OBSIDIAN/`). Ask him
+   to look instead.
+5. **Be conservative with the admin editor JavaScript** — don't modify existing
+   Stimulus controllers on the editor pages; prefer a new isolated controller.
+6. **No `#` comments in YAML config files** — put help text in the admin config
+   schema `hint` instead. A `#` inside a `|` block scalar is content, not a
+   comment; leave those.
+7. **Write in plain language** — no process jargon like "spike". Keep code
+   identifiers and paths exact.
+8. **Theme CSS goes inside its matching `/* ==== SECTION ==== */` block**, never
+   appended to the end of the file.
+
+Full reasoning, plus project decisions and parked designs, is in
+[`docs/agents/`](docs/agents/00-index.md) (`current/docs/agents/` from the project
+root). Start with `working-agreements.md`.
+
 ## Overview
 
 Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store. Content (posts, pages, documentation, products) is authored as Markdown files in `site/` and synced to SQLite via `ContentSync`. The app can also generate a fully static version of the public site. Ruby 4.0.5.
