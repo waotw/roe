@@ -1138,7 +1138,7 @@ cmd_setup() {
         echo ""
         echo -e "  ${BOLD}You're ready.${NC} Start Roe with:"
         echo -e "     ${CYAN}./roe.sh start${NC}"
-        echo -e "  Then open ${CYAN}http://localhost:3000${NC}"
+        echo -e "  Then open ${CYAN}http://localhost:${PORT:-3000}${NC}"
         mark_install_ok
     else
         log_error "Setup ran, but the app failed to boot."
@@ -1222,13 +1222,34 @@ cmd_setup_mise() {
 # ── Start command ─────────────────────────────────────────────────────────────
 
 # Kill any orphaned Tailwind watcher processes from previous runs
+# Kill orphaned Tailwind watchers belonging to THIS install only.
+#
+# The pattern "tailwindcss:watch" matches every Roe install on the
+# machine, so an unfiltered pgrep+kill here would stop the watchers of
+# sibling installs on every start. We therefore check each candidate's
+# full command line for $APP_DIR before killing it.
+#
+# `case` (not grep) does the matching so a path containing spaces, &, or
+# regex metacharacters is compared literally. If a watcher's command line
+# doesn't mention $APP_DIR we leave it alone — an orphan we didn't reap is
+# a far better failure than killing another site's watcher.
 kill_tailwind_watchers() {
-    local pids
+    local pids pid cmd killed=0
     pids=$(pgrep -f "tailwindcss:watch" 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-        log_info "Killing orphaned Tailwind watcher(s)..."
-        echo "$pids" | xargs kill 2>/dev/null || true
-    fi
+    [ -z "$pids" ] && return 0
+
+    for pid in $pids; do
+        cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+        case "$cmd" in
+            *"$APP_DIR"*)
+                kill "$pid" 2>/dev/null || true
+                killed=$((killed + 1))
+                ;;
+        esac
+    done
+
+    [ "$killed" -gt 0 ] && log_info "Killing orphaned Tailwind watcher(s) for this install..."
+    return 0
 }
 
 # ── Port collision handling ──────────────────────────────────────────
@@ -1239,14 +1260,20 @@ kill_tailwind_watchers() {
 # trace they can't interpret. The helpers below let us recover
 # gracefully:
 #
-#   1. If the thing on the port responds as Roe (HTTP probe → "Roe"
-#      in the /admin page title), we kill it. Two Roes on one port is
-#      impossible and starting a new one is what the user asked for.
+#   1. If the listener belongs to THIS install (its command line
+#      contains $APP_DIR), we kill it. Restarting our own server is
+#      exactly what the user asked for, and two Roes on one port is
+#      impossible.
 #
-#   2. If the thing on the port is something else, we pick an
-#      alternate port (next free above the requested one). Killing an
-#      unknown process is too dangerous — could be the user's other
-#      dev work.
+#   2. Anything else — including a DIFFERENT Roe install — is left
+#      running, and we pick an alternate port (next free above the
+#      requested one). Killing a process we don't own is too dangerous:
+#      it could be the user's other dev work, or another live site.
+#
+#      This is deliberately narrower than "any Roe on the port is
+#      disposable". Several installs can run side by side, so a Roe on
+#      the port is not necessarily a stale copy of OUR Roe — it may be a
+#      site someone is using.
 #
 # Requires lsof (for port checks and finding the PID — ships on macOS,
 # universally available on Linux). curl is used for the Roe HTTP probe.
@@ -1271,6 +1298,33 @@ is_roe_on_port() {
     local body
     body=$(curl -sf --max-time 2 "http://localhost:$port/admin" 2>/dev/null || true)
     [ -n "$body" ] && echo "$body" | grep -q "Roe"
+}
+
+# Returns 0 if the process listening on the given port belongs to THIS
+# install — i.e. its command line mentions $APP_DIR. This is what lets us
+# restart our own server while leaving a sibling install's alone. `case`
+# matches literally, so spaces and metacharacters in the path are safe.
+port_owned_by_this_install() {
+    local port="$1" pid cmd
+    command -v lsof >/dev/null 2>&1 || return 1
+    pid=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    [ -z "$pid" ] && return 1
+    cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+    case "$cmd" in
+        *"$APP_DIR"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Echo the first TCP port the given PID is listening on. Used so the
+# "already running" notice can print the real URL instead of assuming
+# 3000 — which is wrong as soon as more than one install exists.
+listening_port_for_pid() {
+    local pid="$1"
+    command -v lsof >/dev/null 2>&1 || return 1
+    lsof -nP -iTCP -sTCP:LISTEN -p "$pid" 2>/dev/null \
+        | awk 'NR > 1 { print $9; exit }' \
+        | sed 's/.*://'
 }
 
 # Soft-kill (SIGTERM) the process bound to a port. Waits a moment for
@@ -1312,14 +1366,16 @@ find_free_port() {
 resolve_port_collision() {
     port_in_use "$PORT" || return 0    # Port is free, nothing to do.
 
-    if is_roe_on_port "$PORT"; then
-        log_warning "Roe is already running on port $PORT. Stopping it before starting fresh…"
+    if port_owned_by_this_install "$PORT"; then
+        log_warning "This install is already serving port $PORT. Restarting it…"
         kill_pid_on_port "$PORT"
         if ! port_in_use "$PORT"; then
             log_info "Port $PORT is now free."
             return 0
         fi
-        log_warning "Port $PORT didn't free up after stopping the other Roe. Looking for an alternate."
+        log_warning "Port $PORT didn't free up. Looking for an alternate."
+    elif is_roe_on_port "$PORT"; then
+        log_warning "A different Roe install is serving port $PORT — leaving it running. Looking for an alternate port."
     else
         log_warning "Port $PORT is in use by another app (not Roe). Looking for an alternate port."
     fi
@@ -1328,7 +1384,11 @@ resolve_port_collision() {
     local new_port
     new_port=$(find_free_port "$((original_port + 1))")
     if [ -n "$new_port" ]; then
-        PORT="$new_port"
+        # MUST be exported: Puma reads ENV["PORT"] (config/puma.rb). A bare
+        # assignment stays script-local, so the banner would advertise the
+        # new port while Puma still bound the old one and died with
+        # EADDRINUSE.
+        export PORT="$new_port"
         log_info "Using port $PORT instead of $original_port."
     else
         log_error "Couldn't find a free port near $original_port. Free up a port, or set PORT=<n> ./roe.sh start to choose one yourself."
@@ -1342,8 +1402,14 @@ cmd_start() {
     if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
         PID=$(cat "$APP_DIR/tmp/pids/server.pid")
         if ps -p "$PID" > /dev/null 2>&1; then
+            local running_port
+            running_port=$(listening_port_for_pid "$PID")
             log_warning "Server is already running (PID: $PID)"
-            log_info "View: http://localhost:3000/welcome in your browser to use Roe."
+            if [ -n "$running_port" ]; then
+                log_info "View: http://localhost:${running_port}/welcome in your browser to use Roe."
+            else
+                log_info "Run './roe.sh status' for details, or './roe.sh restart' to restart it."
+            fi
             return 0
         else
             rm -f "$APP_DIR/tmp/pids/server.pid"
@@ -1352,9 +1418,12 @@ cmd_start() {
 
     cd "$APP_DIR"
     export SOLID_QUEUE_IN_PUMA=1
-    RAILS_ENV="${RAILS_ENV:-development}"
+    export RAILS_ENV="${RAILS_ENV:-development}"
 
-    PORT="${PORT:-3000}"
+    # Exported so the child `bin/rails server` → Puma actually sees it; see
+    # the note in resolve_port_collision. Set PORT=<n> to run several
+    # installs side by side.
+    export PORT="${PORT:-3000}"
 
     # Recover gracefully if something is already on PORT — either kill
     # it (if it identifies as another Roe install via HTTP probe) or
@@ -1530,7 +1599,12 @@ cmd_status() {
     if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
         PID=$(cat "$APP_DIR/tmp/pids/server.pid")
         if ps -p "$PID" > /dev/null 2>&1; then
-            log_success "Rails server running (PID: $PID)"
+            STATUS_PORT=$(listening_port_for_pid "$PID")
+            if [ -n "$STATUS_PORT" ]; then
+                log_success "Rails server running (PID: $PID) on http://localhost:${STATUS_PORT}"
+            else
+                log_success "Rails server running (PID: $PID)"
+            fi
         else
             log_error "PID file exists but server not running (stale)"
         fi
