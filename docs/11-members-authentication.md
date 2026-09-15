@@ -32,6 +32,32 @@ Member Request
 
 **Graph Note:** The `Member` model is a bridge node connecting Member Management to Payment & Email Integration communities (25 edges in architecture graph).
 
+## Session cookies: never set a `domain:` option
+
+Both of Roe's auth cookies are deliberately **host-only** — neither passes a
+`domain:` or `path:` option:
+
+| Cookie | Set by | Holds |
+|---|---|---|
+| `session_id` | `concerns/authentication.rb` (admin) | signed id of a `Session` row |
+| `_roe_session` | Rails' default cookie store (members) | `session[:member_id]` |
+
+Host-only is what keeps two Roe installs on one machine from evicting each
+other's logins. Cookies are **not** isolated by port (RFC 6265), so two installs
+on `localhost:3000` and `localhost:3001` share a cookie jar: same cookie names,
+different `secret_key_base` values, so logging into one overwrites the other's
+cookie and the first install then reads a signature it cannot verify. The fix is
+a distinct hostname per install, and that only works while the cookies stay
+host-only.
+
+Adding a `domain:` option — scoping these to a shared parent domain so they are
+sent to every subdomain — would undo that isolation and reintroduce the
+mutual-logout bug. Don't.
+
+Related: `SiteConfig.local_host?` keeps local hostnames on `http://`, and
+development's `default_url_options` reads its host from `site.yml` so magic-link
+emails point at the install that sent them.
+
 ## Member Model
 
 File: `app/models/member.rb`

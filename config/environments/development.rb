@@ -52,7 +52,33 @@ Rails.application.configure do
   # Set localhost to be used by links generated in mailer templates.
   config.action_mailer.delivery_method = :letter_opener
   config.action_mailer.perform_deliveries = true
-  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
+  # Mailer links must point at THIS install. Member sign-in is magic-link
+  # based, so a wrong host or port sends someone to a different site's login
+  # once more than one install runs locally — a real breakage, not cosmetic.
+  #
+  # Read site.yml directly rather than through SiteConfig: this runs during
+  # boot, before the database is connected and before autoloading app code
+  # is safe. Host comes from site.yml; port prefers the port the server
+  # actually bound (roe.sh exports PORT) and falls back to site.yml's.
+  config.action_mailer.default_url_options = begin
+    site_yml = File.join(RoeSitePaths::SITE_SYSTEM_PATH, "global", "site.yml")
+    raw      = File.exist?(site_yml) ? YAML.safe_load_file(site_yml, aliases: true) : nil
+    bare     = (raw.is_a?(Hash) ? raw["url"].to_s : "").sub(%r{\Ahttps?://}, "").sub(%r{/.*\z}, "")
+    host, _, configured_port = bare.partition(":")
+
+    port = if ENV["PORT"].to_i.positive?
+      ENV["PORT"].to_i
+    elsif configured_port.present?
+      configured_port.to_i
+    else
+      3000
+    end
+
+    { host: host.presence || "localhost", port: port }
+  rescue StandardError => e
+    warn "[Roe] couldn't read site.yml for mailer URLs (#{e.class}: #{e.message}); using localhost"
+    { host: "localhost", port: 3000 }
+  end
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log

@@ -313,6 +313,39 @@ class SiteConfig < ApplicationRecord
     nil
   end
 
+  # Host suffixes that are always local, and so must be served over http.
+  # .test and .localhost are reserved for exactly this by RFC 6761, .local
+  # by RFC 6762.
+  LOCAL_HOST_SUFFIXES = %w[.localhost .test .local].freeze
+
+  # True when the configured domain can only be a local address, so
+  # site_url must not upgrade it to https.
+  #
+  # This matters for running several installs side by side: each one is
+  # reached at its own hostname (site-a.test and so on) so the browser keeps
+  # their session cookies apart. Without this check such a host would be
+  # handed an https:// URL nothing is listening on, and every generated
+  # link, mailer URL, and feed entry would point at a dead scheme.
+  #
+  # Escape hatch: put an explicit scheme in site.yml's url and it is used
+  # verbatim, bypassing this guess entirely.
+  def self.local_host?(domain)
+    host = domain.to_s.downcase.sub(%r{\Ahttps?://}, "").split("/").first.to_s
+    host = if host.start_with?("[")
+      host[/\A\[([^\]]+)\]/, 1].to_s
+    else
+      host.split(":").first.to_s
+    end
+
+    return true if [ "localhost", "0.0.0.0", "::1" ].include?(host)
+    return true if host.match?(/\A127\.\d{1,3}\.\d{1,3}\.\d{1,3}\z/)
+    return true if host.match?(/\A10\.\d{1,3}\.\d{1,3}\.\d{1,3}\z/)
+    return true if host.match?(/\A192\.168\.\d{1,3}\.\d{1,3}\z/)
+    return true if host.match?(/\A172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\z/)
+
+    LOCAL_HOST_SUFFIXES.any? { |suffix| host.end_with?(suffix) }
+  end
+
   def self.site_url
     domain = current("site")&.config&.dig("url") || "localhost:3000"
 
@@ -323,7 +356,7 @@ class SiteConfig < ApplicationRecord
     return domain if domain.match?(/^https?:\/\//)
 
     # Otherwise, add the appropriate protocol
-    if domain.include?("localhost") || domain.match?(/^127\.0\.0\.1/)
+    if local_host?(domain)
       "http://#{domain}"
     else
       "https://#{domain}"
