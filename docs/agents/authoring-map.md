@@ -8,49 +8,41 @@ records which copy wins, plus the traps that have each cost an afternoon.
 
 | Thing | Edit this | Never edit this | Why |
 |---|---|---|---|
-| Theme CSS | `site/theme/*.css` | `current/app/themes/*.css` | Ben hand-edits `site/theme/`, then rsyncs it into `app/themes/`. The shipped copy is downstream. |
+| Theme CSS | `site/theme/*.css` | `current/app/themes/*.css` | `site/theme/` is hand-edited, then rsynced into `app/themes/` by `bin/sync-from-site`. The shipped copy is downstream. |
 | Roe documentation | `site/documentation/roe/*.md` | `current/lib/site_templates/minimum/documentation/roe/*.md` | Same pattern: authored in `site/`, rsynced to the shipped copy. |
 | Doc version stamps | nothing | `site/documentation/roe/_versions.yml` | System-generated on version bump. Hand edits get overwritten. |
-| Code for the `/egg` install | `/roe` then commit and push | `/egg/current/**` | See below. |
+| `roe.sh`, `README.md`, `LICENSE` | the copies in `current/` | the copies at the project root | `bin/sync-from-site` mirrors these up to the root, and the in-app updater does the same on user installs (`UpdateOrchestrator::ROOT_SYNC_FILES`). Edit the root copy and you lose it on the next sync. |
+
+If you run a second install alongside this one, move code between them with git —
+commit and push in one, pull in the other — rather than copying files across.
+Second installs also tend to leave traces here: `app/themes/egg.css` is one such
+theme and is gitignored on purpose.
 
 ### Theme CSS
 
 The CSS actually served comes from `site/theme/`, not from `current/app/themes/`.
 The active theme is set by `theme.active` in `site/system/global/site.yml`.
 
-**In this install the active theme is `bare`**, so the live file is
-`site/theme/bare.css`. Also present: `default.css` (the shipped standard theme)
-and `default-ben.css` (a personal variant). Check `site.yml` to confirm which is
-live, then read that file for the rules actually in effect.
+Roe ships `bare.css` and `default.css`, and an install may hold personal variants
+alongside them. **Always check `theme.active` in `site.yml` before editing**, then
+read that file for the rules actually in effect — don't assume a default.
 
-CSS edits belong in the active `bare.css`, plus `default.css` when the change
-belongs in the shipped standard theme. Ben has confirmed twice that editing
-`app/themes/` as well is redundant and will be overwritten.
+CSS edits belong in the active theme, plus `default.css` when the change belongs
+in the shipped standard theme. Editing `app/themes/` as well is redundant and
+will be overwritten.
 
-See [working-agreements.md](working-agreements.md) for the rule about which
-section of the file a new rule goes in.
+See [conventions.md](conventions.md) for the rule about which section of the file
+a new rule goes in.
 
 ### Documentation
 
-Edit only `site/documentation/`. If the two trees diverge, `site/` wins. Ben has
-standing permission-in-advance for documentation edits under
-`site/documentation/` when he has asked for doc work.
+Edit only `site/documentation/`. If the two trees diverge, `site/` wins.
+Documentation work is a standing exception to the "ask before touching `site/`"
+rule, but only when doc work has actually been requested.
 
 One removal worth remembering: `site/documentation/roe/markdown-extensions.md`
 was deleted as a stale duplicate of `roeanji.md`. Do not recreate it. The live
 reference is `roeanji.md` plus the per-topic `roeanji_*.md` deep dives.
-
-### The `/egg` install
-
-Ben maintains two sibling installs: `/Volumes/S&M 2019/Code/roe` (primary) and
-`/Volumes/S&M 2019/Code/egg` (an author and test site on Fly). Code moves from
-roe to egg by committing and pushing in roe, then pulling in egg.
-
-So do not propose copying individual files into egg, and do not edit anything
-under `/egg/current/`. Draft a commit message (without running the commit — rule
-1) and the change will flow through the normal push and pull.
-
-Note that `app/themes/egg.css` belongs to that other site and is gitignored here.
 
 ---
 

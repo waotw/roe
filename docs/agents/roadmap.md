@@ -24,16 +24,13 @@ single vendor.
 
 ### Do not build a paradigm around one host
 
-The Railway one-click-template idea was explored twice and shelved both times.
-Reshaping Roe around one proprietary host's template, volume, and variable system
-is vendor lock-in, which contradicts the whole point of the project. **Do not
-re-pitch Railway as a special path.** A Railway template could exist someday like
-any other Docker host, but never by bending Roe to fit it.
+Building Roe's install story around one host's template, volume, and variable
+system was evaluated and rejected. It is vendor lock-in, and it contradicts the
+whole point of the project. A template for any given host can exist the same way
+it would for any Docker host — but not by reshaping Roe to fit one.
 
-It is also unvalidated that hosting friction is even a bottleneck — there are too
-few users yet to know — so this is not a place to over-build. The cheap
-alternative that was agreed: offer Fly free trials at the maintainer's expense,
-with no change to the paradigm and a toggle to turn it off.
+It also hasn't been shown that hosting friction is the limiting factor, so this is
+not a place to over-build.
 
 Roe stays local-first and host-agnostic.
 
@@ -163,12 +160,12 @@ answer was a `./roe.sh uninstall` that removes the folder and offers
 
 ## Open-source the Substack importer
 
-Ben wants to release the Substack importer as its own project eventually. Not a
-near-term task. It works end to end and is reusable beyond Roe.
+The importer works end to end and is reusable beyond Roe, so it may eventually be
+extracted as a standalone project. Not a near-term task, but it is the reason to
+keep the decomposition clean: Substack should be just another source adapter on a
+generic pipeline, which is what makes it cleanly extractable.
 
-This is the motivating reason to keep the importer decomposition clean: Substack
-becomes just another source adapter on a generic pipeline, which is what makes it
-cleanly extractable. Favour separating Substack-specific logic — CSV and ZIP
-parsing, HTML cleanup filters, paywall handling — from generic ingest machinery.
+So favour separating Substack-specific logic — CSV and ZIP parsing, HTML cleanup
+filters, paywall handling — from the generic ingest machinery.
 
 See [specs-parked.md](specs-parked.md) for the pipeline design.

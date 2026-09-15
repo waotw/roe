@@ -123,6 +123,11 @@ echo "→ Root launcher/docs (current/ is canonical → mirror to package root):
 # too). The root copies are what users actually invoke/read, so keep them
 # in step here rather than only on in-app update. rsync -c so identical
 # files are a no-op.
+#
+# AGENTS.md and CLAUDE.md are deliberately NOT synced. The root copies are
+# the operator's own notes for this install (personal paths, preferences)
+# and point at current/docs/agents/ for Roe's shared conventions. Copying
+# current/AGENTS.md over them would destroy that.
 for f in roe.sh README.md LICENSE; do
   echo "    current/$f  →  $f"
   rsync -vc $DRY_RUN "current/$f" "$f"

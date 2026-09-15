@@ -25,9 +25,11 @@ module RoeUpdater
     # copied out after every successful switch so updates pick up new
     # versions of the launcher / docs without manual intervention.
     # current/ is canonical; these are the files mirrored up to ROE_ROOT/.
-    # Matches bin/sync-from-site's root-file step. AGENTS.md is intentionally
-    # NOT here — it's developer material that rides along in current/ for
-    # anyone cloning the repo, and doesn't need to sit at the package root.
+    # Matches bin/sync-from-site's root-file step. AGENTS.md and CLAUDE.md are
+    # intentionally NOT here — the copies in current/ are Roe's own conventions
+    # (they ride along for anyone cloning the repo), while a root copy belongs
+    # to whoever runs the install and may hold their personal notes. Syncing
+    # either direction would clobber one with the other.
     ROOT_SYNC_FILES = %w[roe.sh README.md LICENSE].freeze
 
     # Files that live INSIDE current/ but are per-install (gitignored,

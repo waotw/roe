@@ -2,14 +2,13 @@
 
 Working memory for anyone — person or agent — picking up work on Roe.
 
-These notes began as per-session memories held by one coding agent. They were
-converted into project files so they travel with the repository and any agent can
-read them. The binding rules are summarised in the root `AGENTS.md`; the detail
-and the reasoning live here.
+Decisions, conventions, and hard-won detail that a newcomer to the codebase — or
+an agent — would otherwise have to rediscover. The conventions are summarised in
+[`AGENTS.md`](../../AGENTS.md); the reasoning behind them lives here.
 
 | File | What's in it |
 |---|---|
-| [working-agreements.md](working-agreements.md) | What never to do without asking. **Read this first.** |
+| [conventions.md](conventions.md) | What not to do without asking, and why. **Read this first.** |
 | [authoring-map.md](authoring-map.md) | Which copy of a file is the source of truth, plus traps that have each cost an afternoon. |
 | [backups-secrets-and-data.md](backups-secrets-and-data.md) | Backup and restore architecture, encryption keys, where secrets live, member data. |
 | [roadmap.md](roadmap.md) | Status and direction for the larger pieces of work. |
@@ -17,15 +16,16 @@ and the reasoning live here.
 
 ## How to use these
 
-- `working-agreements.md` is binding. Each rule is a standing instruction.
+- `conventions.md` is binding. Each item is a standing instruction.
 - Everything else is context. When a note and the code disagree, the code wins —
   then fix the note.
-- When a decision gets made that a future agent would need and could not infer
+- When a decision gets made that someone later would need and could not infer
   from the code, add it here.
 
 These notes sit under `current/docs/` rather than in `site/` or a dotfile
 directory on purpose: most agent search tools skip ignored and hidden paths, so
-notes kept there would never be found.
+notes kept there would never be found. Note that `docs/` is excluded from the
+normal installer zip — it ships only with `bin/build-installer --with-dev-docs`.
 
 ## Staleness
 
@@ -43,4 +43,4 @@ while converting these notes:
 - **Snipcart no longer stores a secret key.** Its store runs on a public snippet,
   so `SnipcartConfig` has no encrypted attributes.
 
-Nothing in `working-agreements.md` has expired. Those rules stand.
+Nothing in `conventions.md` has expired. Those still stand.

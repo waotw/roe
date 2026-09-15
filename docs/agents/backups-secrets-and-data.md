@@ -219,14 +219,14 @@ email with `deterministic: true` would preserve the index and equality lookups
 but would couple the database to the keys in `system/secrets/`, which are
 deliberately not synced. A database pulled to a laptop would become unreadable
 without the matching key, which trades directly against the disaster-recovery
-convenience Ben wants — host destroyed, but members still recoverable from a
+property Roe wants to keep — host destroyed, but members still recoverable from a
 portable copy.
 
-Plaintext is portable but exposed. Encrypted is safe at rest but key-bound. Ben
-chose portable.
+Plaintext is portable but exposed. Encrypted is safe at rest but key-bound. The
+project chose portable.
 
-**Do not add member PII encryption without reopening this trade-off with him.** If
-it is revisited, it needs `encrypts :email/:name/:pending_email, deterministic: true`,
+**Do not add member PII encryption without reopening this trade-off explicitly.**
+If it is revisited, it needs `encrypts :email/:name/:pending_email, deterministic: true`,
 a data migration for existing rows, and a foolproof way to keep the key with the
 backup. Until then the mitigation is operational: encrypted disks, do not leave
 pulled database copies lying around, restrict who can pull.

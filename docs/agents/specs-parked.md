@@ -118,8 +118,8 @@ repoint browse at the table and add pagination.
 
 An optional stopgap: invalidate `MediaUsageIndex` at the end of ContentSync and in
 the Site Sync apply path. That plugs the specific hole without the rearchitecture.
-Ben declined the broader invalidation-patching approach in favour of fixing it
-structurally, so treat this as a fallback only.
+The broader invalidation-patching approach was declined in favour of fixing this
+structurally, so treat the stopgap as a fallback only.
 
 ---
 

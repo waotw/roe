@@ -1,40 +1,37 @@
-# Working agreements
+# Conventions
 
-Standing rules for anyone working on Roe. Each one came from Ben correcting an
-agent, usually after something was lost or broken. Treat them as binding
-instructions, not preferences.
+Conventions for working on Roe. Most of these came out of a real incident, so the
+reasoning is included — that is usually the part which stops someone breaking it
+again.
 
-The shape of most of these is the same: **prepare the change, but never run the
-step that mutates state.** Write the migration, draft the commit message, stage
-the edit — then stop and hand it over.
+Most share the same shape: **prepare the change, but don't run the step that
+mutates state.** Write the migration, draft the commit message, stage the edit —
+then hand it over.
 
 ---
 
-## 1. Never run a git command that changes state
+## 1. Don't run git commands that change state
 
-Do not run `git add`, `git commit`, `git push`, `git branch`, `git checkout`,
-`git switch`, `git merge`, `git reset`, `git rebase`, or `git remote add/rename/set-url`.
+Unless asked for that specific action, don't run `git add`, `git commit`,
+`git push`, `git branch`, `git checkout`, `git switch`, `git merge`, `git reset`,
+`git rebase`, or `git remote add/rename/set-url`.
 
 Read-only git is always fine and encouraged: `status`, `diff`, `log`, `show`,
 `ls-remote`, `branch --list`.
 
-**Why:** Ben controls his own commits. He has asked for this repeatedly, and once
-emphatically: "Don't ever commit for me, ever."
+**Why:** Commits are a human decision. Roe's history is small and readable, and
+it stays that way by having a person choose what lands and when.
 
 **How to apply:** When asked to "commit," write the commit message as text, ready
-to paste, and let him run git. A one-off authorisation ("you can commit this
-time") applies only to that request and expires immediately after.
-
-**No attribution trailer.** Leave `Co-Authored-By: Claude ...` off every commit
-message, including every message in a multi-commit set. This has had to be asked
-for more than once.
+to paste, and let a person run git. A one-off authorisation applies only to that
+request and expires immediately after.
 
 Commit messages follow the conventional-commits format — see
-`docs/conventional-commits.md`.
+[conventional-commits.md](../conventional-commits.md).
 
 ---
 
-## 2. Never edit anything under `site/` without explicit permission
+## 2. Never edit anything under `site/` without being asked
 
 `site/` and everything beneath it — `posts/`, `pages/`, `media/`, `theme/`,
 `system/`, `documentation/` — is deliberately not tracked in git.
@@ -43,18 +40,18 @@ Commit messages follow the conventional-commits format — see
 there is gone permanently.
 
 **How to apply:** Reading is fine. Before any write or delete on a path
-containing `site/`, either wait for Ben to ask for that specific change or ask
-and get confirmation. Ask even when the request seems to imply it.
+containing `site/`, either wait to be asked for that specific change, or ask and
+get confirmation. Ask even when the request seems to imply it.
 
 **Two hard-won corollaries:**
 
 - **Read the whole file before overwriting it.** Frontmatter alone is not enough
   to confirm identity. Without git, the only way to undo an overwrite is from a
-  copy made by reading. This came up on `site/documentation/payments.md`, where
-  only the first five lines had been read and the body was unrecoverable.
-- **Never run a destructive operation against `site/` as a test.** A Snipcart
-  smoke test once called `clear_test_config`, which deleted
-  `site/system/integrations/snipcart.yml`.
+  copy made by reading. This came up on a documentation page where only the
+  frontmatter had been read; the body was unrecoverable afterwards.
+- **Never run a destructive operation against `site/` as a test.** A smoke test
+  for an integration once called `clear_test_config`, which deleted a live
+  config file under `site/system/integrations/`.
 
 **Two standing exceptions**, both for requested work only:
 
@@ -70,39 +67,24 @@ Everything else under `site/` still needs a question first.
 Do not run `db:migrate`, `db:rollback`, `db:test:prepare`, or apply or revert any
 schema change — not even in development.
 
-**Why:** Ben was angry about this: "Don't fucking apply migrations without
-checking with me first, ever!" Running one under his live dev server also left it
-in a half-stale state that produced a confusing bug where saves appeared not to
-persist. His development database holds real data.
+**Why:** A development database usually holds real content. Running a migration
+under a live dev server also leaves it in a half-stale state, which produced a
+confusing bug where saves appeared not to persist — the kind of symptom that
+costs an hour to trace back to its cause.
 
-**How to apply:** Writing the migration file is fine. Stop before running it.
-Tell him it is ready and let him run it and restart his server.
-
----
-
-## 4. Never touch the Obsidian vault
-
-Do not read, search, or modify `~/Dropbox/-OBSIDIAN/`. This includes sweeping it
-with grep or find while hunting for a note.
-
-**Why:** It is Ben's personal thinking space, not project material. An agent once
-searched it uninvited while looking for a lost plan. He had mentioned Obsidian
-only as a place *he* had already looked, which is not an invitation.
-
-**How to apply:** If a note might live there, say so and ask him to look.
-Basecamp and the repository are fair game; the vault is not.
+**How to apply:** Writing the migration file is fine. Stop before running it. Say
+it is ready and let a person run it and restart the server.
 
 ---
 
-## 5. Be conservative with the admin editor JavaScript
+## 4. Be conservative with the admin editor JavaScript
 
 Do not modify existing Stimulus controllers on the admin editor pages —
 especially `editor_controller.js`, `metadata_editor_controller.js`,
 `audio_player_controller.js`, and `media_field_controller.js` — unless there is
 no alternative.
 
-**Why:** Ben's words: "Be careful not to mess up any existing JS, there's a lot
-going on with this page." These pages carry many interlocking behaviours (the
+**Why:** These pages carry many interlocking behaviours (the
 publish modal, status-change triggers, the guard that stops Enter submitting the
 form, media validation, audio duration extraction), and small changes cascade.
 
@@ -115,7 +97,7 @@ the unsaved-changes guard fires on navigation. Do not remove that meta tag.
 
 ---
 
-## 6. No comments in YAML config files
+## 5. No comments in YAML config files
 
 No `#` comment lines in the kit templates under `current/lib/site_templates/**`
 or in the generated configs under `site/system/**`.
@@ -132,13 +114,13 @@ alone.
 
 ---
 
-## 7. Write in plain language
+## 6. Write in plain language
 
-No industry jargon in explanations, cards, or task titles. Ben asked what a
-"spike" was; say "test it first" instead.
+No industry jargon in explanations, documentation, or task titles. Say "test it
+first" rather than "spike it".
 
-**Why:** He reads and acts on this text directly. A term he has to look up costs
-him time and adds nothing.
+**Why:** People read and act on this text directly. A term the reader has to look
+up costs time and adds nothing.
 
 **How to apply:** Name the action rather than the practice. Keep code identifiers,
 file paths, and error strings exact — precision about code is wanted. This is
@@ -149,7 +131,7 @@ work.
 
 ---
 
-## 8. Put theme CSS in the section it belongs to
+## 7. Put theme CSS in the section it belongs to
 
 Both `bare.css` and `default.css` are organised into feature sections marked with
 banner comments like `/* ======== MEMBERS ======== */`. New rules go inside the
@@ -165,4 +147,6 @@ unordered pile as features are added.
 new section only if nothing fits, following the existing banner format. The two
 files stay structurally parallel.
 
-Ben has twice had to move appended blocks into the right section by hand.
+Appended blocks have had to be moved into the right section by hand more than
+once. Which file is live is set by `theme.active` in `site/system/global/site.yml`
+— see [authoring-map.md](authoring-map.md).

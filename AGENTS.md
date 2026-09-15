@@ -1,36 +1,35 @@
 # AGENTS.md
 
-## Working Agreements — read first
+## Conventions — read first
 
-Standing rules. Each came from a correction, usually after something was lost.
-The shape of most of them is the same: **prepare the change, never run the step
-that mutates state.**
+Project conventions for anyone working on Roe, person or agent. Most share the
+same shape: **prepare the change, but don't run the step that mutates state.**
+Write the migration, draft the commit message — then hand it over.
 
-1. **Never run a git command that changes state** — no `add`, `commit`, `push`,
-   `branch`, `checkout`, `merge`, `reset`, `rebase`, or `remote` changes. Read-only
-   git (`status`, `diff`, `log`, `show`) is always fine. When asked to commit,
-   output the message text and stop. No `Co-Authored-By` trailer, ever.
-2. **Never edit anything under `site/` without explicit permission** — it is not
-   in git, so any write or delete is unrecoverable. Reading is fine. Read a file
-   in full before overwriting it. Standing exceptions for requested work:
+1. **Never edit anything under `site/` without being asked.** `site/` is
+   deliberately not tracked in git, so any write or delete there is
+   unrecoverable. Reading is fine. If you must overwrite a file, read it in full
+   first — that copy is the only undo. Standing exceptions for requested work:
    `site/theme/*.css` and `site/documentation/`.
-3. **Never run a migration without asking** — not even in dev. Write the file,
-   then stop and let Ben run it.
-4. **Never read or search the Obsidian vault** (`~/Dropbox/-OBSIDIAN/`). Ask him
-   to look instead.
-5. **Be conservative with the admin editor JavaScript** — don't modify existing
+2. **Never run a migration without asking** — not even in development. Write the
+   file, then stop.
+3. **Don't run git commands that change state** unless asked for that specific
+   action. Read-only git (`status`, `diff`, `log`, `show`) is always fine. When
+   asked to commit, output the message text and let a person run it.
+4. **Be conservative with the admin editor JavaScript.** Don't modify existing
    Stimulus controllers on the editor pages; prefer a new isolated controller.
-6. **No `#` comments in YAML config files** — put help text in the admin config
+   Those pages carry many interlocking behaviours and small changes cascade.
+5. **No `#` comments in YAML config files** — put help text in the admin config
    schema `hint` instead. A `#` inside a `|` block scalar is content, not a
    comment; leave those.
-7. **Write in plain language** — no process jargon like "spike". Keep code
-   identifiers and paths exact.
-8. **Theme CSS goes inside its matching `/* ==== SECTION ==== */` block**, never
-   appended to the end of the file.
+6. **Theme CSS goes inside its matching `/* ==== SECTION ==== */` block**, never
+   appended to the end of the file. Edit `site/theme/`, not
+   `current/app/themes/` — see the authoring map below.
+7. **Write in plain language.** No process jargon. Keep code identifiers and
+   paths exact.
 
-Full reasoning, plus project decisions and parked designs, is in
-[`docs/agents/`](docs/agents/00-index.md) (`current/docs/agents/` from the project
-root). Start with `working-agreements.md`.
+Reasoning, architecture decisions, known traps, and parked designs are in
+[`docs/agents/`](docs/agents/00-index.md).
 
 ## Overview
 
@@ -259,7 +258,7 @@ Step pipeline (matches `UpdateOrchestrator::STEPS`):
 5. `migrating` — apply migrations to the real dev DB
 6. `switching` — rename current → current.backup, staging → current
 7. `preserving_secrets` — copy `config/master.key` + `tmp/development_secret.txt` from `current.backup/` (gitignored, absent from the clone — without this the user gets signed out)
-8. `syncing_root_files` — copy `roe.sh`, `README.md`, `LICENSE` (`UpdateOrchestrator::ROOT_SYNC_FILES`) from `current/` to root. `AGENTS.md` is intentionally not synced — it's dev material that stays in `current/`. `bin/sync-from-site` mirrors the same set for release prep.
+8. `syncing_root_files` — copy `roe.sh`, `README.md`, `LICENSE` (`UpdateOrchestrator::ROOT_SYNC_FILES`) from `current/` to root. `AGENTS.md` and `CLAUDE.md` are intentionally not synced by either this step or `bin/sync-from-site`: the copies in `current/` hold Roe's own conventions, while a root copy belongs to whoever runs the install and may hold their personal notes.
 9. `writing_version` — rewrite both root `/VERSION` and `current/VERSION` with the new tag's full YAML
 10. `building_assets` — `assets:precompile` against the new code
 11. `restarting` — schedule a 5-second exit so the supervisor (`roe.sh`) relaunches Puma on the new code
