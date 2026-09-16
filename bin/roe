@@ -1,0 +1,265 @@
+#!/bin/bash
+# roe — run several Roe sites side by side.
+#
+# This is the global command. It lives at ~/.roe/bin/roe (copied there by
+# `./roe.sh register`) and knows about every registered install through
+# ~/.roe/installs/<name>.conf. It never runs a site itself: every start,
+# stop and status is handed to that install's own roe.sh, so each site
+# keeps booting with the logic it shipped with.
+#
+#   roe list                 every registered site, running or not
+#   roe start <name>         start a site in the background
+#   roe stop <name>          stop it
+#   roe restart <name>
+#   roe status <name>
+#   roe open <name>          open the site in your browser
+#   roe start --all          start every registered site
+#   roe stop --all
+#
+# Names are the slugified folder name — "The Briefcase" is the-briefcase.
+# Register a site by running ./roe.sh register inside it.
+
+ROE_HOME="${ROE_HOME:-$HOME/.roe}"
+ROE_REGISTRY_DIR="$ROE_HOME/installs"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+log_error()   { echo -e "${RED}[✗]${NC} $1" >&2; }
+log_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
+
+# Read one KEY from a .conf — first match, everything after the first "=".
+_conf_get() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
+
+usage() {
+    echo -e "${BOLD}roe — run several Roe sites side by side${NC}"
+    echo ""
+    echo "Usage: roe <command> [name | --all]"
+    echo ""
+    echo "  list              Show every registered site and whether it's running"
+    echo "  start <name>      Start a site in the background"
+    echo "  stop <name>       Stop a site"
+    echo "  restart <name>    Stop, then start"
+    echo "  status <name>     Full status from the site's own roe.sh"
+    echo "  open <name>       Open the site in your browser"
+    echo ""
+    echo "  start --all / stop --all   Apply to every registered site"
+    echo ""
+    echo "To register a site, run ./roe.sh register inside its folder."
+    echo "Registry: $ROE_REGISTRY_DIR"
+}
+
+# ── Registry ──────────────────────────────────────────────────────────────────
+
+all_names() {
+    local f
+    for f in "$ROE_REGISTRY_DIR"/*.conf; do
+        [ -f "$f" ] || continue
+        basename "$f" .conf
+    done
+}
+
+conf_for() {
+    local f="$ROE_REGISTRY_DIR/$1.conf"
+    [ -f "$f" ] && echo "$f"
+}
+
+# Resolve a name to its .conf, or explain what went wrong. Accepts the
+# exact name; if that misses, a unique prefix ("brief" → the-briefcase)
+# is good enough.
+resolve() {
+    local name="$1" f matches
+    f="$(conf_for "$name")" && { echo "$f"; return 0; }
+
+    matches="$(all_names | grep -i -- "$name" || true)"
+    case "$(printf '%s\n' "$matches" | grep -c .)" in
+        1) conf_for "$matches"; return 0 ;;
+        0) log_error "No registered site called '$name'."; echo "  Run 'roe list' to see what's registered." >&2 ;;
+        *) log_error "'$name' matches more than one site:"; printf '%s\n' "$matches" | sed 's/^/    /' >&2 ;;
+    esac
+    return 1
+}
+
+# The root folder must still exist and still hold a roe.sh — a moved or
+# deleted install leaves a stale .conf behind. current/roe.sh is the one
+# the app ships; the root copy is a mirror of it that the updater keeps
+# in step, so prefer the original.
+roe_sh_for() {
+    local f="$1" root
+    root="$(_conf_get "$f" ROOT)"
+    if [ -x "$root/current/roe.sh" ]; then
+        echo "$root/current/roe.sh"
+    elif [ -x "$root/roe.sh" ]; then
+        echo "$root/roe.sh"
+    else
+        log_error "$(basename "$f" .conf): folder is missing or has no roe.sh:"
+        echo "    $root" >&2
+        echo "  If it moved, run ./roe.sh unregister in the old spot (or delete" >&2
+        echo "  $f) and ./roe.sh register in the new one." >&2
+        return 1
+    fi
+}
+
+# ── Process state ─────────────────────────────────────────────────────────────
+
+# PID of the site's Puma if it's running, else nothing. Reads the same
+# tmp/pids/server.pid the install's roe.sh writes and checks.
+server_pid_for() {
+    local root="$1" pidfile pid
+    for pidfile in "$root/current/tmp/pids/server.pid" "$root/tmp/pids/server.pid"; do
+        [ -f "$pidfile" ] || continue
+        pid="$(cat "$pidfile" 2>/dev/null)"
+        [ -n "$pid" ] && ps -p "$pid" >/dev/null 2>&1 && { echo "$pid"; return 0; }
+    done
+    return 1
+}
+
+# The port a PID is actually listening on. Falls back to the registry
+# port when lsof isn't available. -a ANDs the filters; without it lsof
+# ORs them and hands back some other app's port.
+port_for_pid() {
+    command -v lsof >/dev/null 2>&1 || return 1
+    lsof -a -nP -iTCP -sTCP:LISTEN -p "$1" 2>/dev/null \
+        | awk 'NR > 1 { print $9; exit }' \
+        | sed 's/.*://'
+}
+
+url_for() {
+    local f="$1" host port pid live_port
+    host="$(_conf_get "$f" HOST)"
+    port="$(_conf_get "$f" PORT)"
+    if pid="$(server_pid_for "$(_conf_get "$f" ROOT)")"; then
+        live_port="$(port_for_pid "$pid")"
+        [ -n "$live_port" ] && port="$live_port"
+    fi
+    echo "http://${host}:${port}"
+}
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+
+cmd_list() {
+    local names name f root pid url
+    names="$(all_names)"
+    if [ -z "$names" ]; then
+        echo "No sites registered yet."
+        echo "  Run ./roe.sh register inside a Roe folder to add one."
+        return 0
+    fi
+
+    printf "${BOLD}%-22s %-10s %-36s %s${NC}\n" "NAME" "STATE" "URL" "FOLDER"
+    for name in $names; do
+        f="$(conf_for "$name")"
+        root="$(_conf_get "$f" ROOT)"
+        url="$(url_for "$f")"
+        if pid="$(server_pid_for "$root")"; then
+            printf "%-22s ${GREEN}%-10s${NC} %-36s ${DIM}%s${NC}\n" "$name" "running" "$url" "$root"
+        elif [ ! -d "$root" ]; then
+            printf "%-22s ${RED}%-10s${NC} %-36s ${DIM}%s${NC}\n" "$name" "missing" "$url" "$root"
+        else
+            printf "%-22s ${DIM}%-10s${NC} %-36s ${DIM}%s${NC}\n" "$name" "stopped" "$url" "$root"
+        fi
+    done
+}
+
+# Run one subcommand of an install's roe.sh, from its own folder, with
+# nothing inherited from this shell that could steer it (PORT above all:
+# a stray PORT in the environment would override the registry's).
+run_in() {
+    local f="$1"; shift
+    local script root
+    script="$(roe_sh_for "$f")" || return 1
+    root="$(_conf_get "$f" ROOT)"
+    ( cd "$root" && env -u PORT -u ROE_HOST "$script" "$@" )
+}
+
+cmd_start() {
+    local f="$1" name
+    name="$(basename "$f" .conf)"
+    if server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$name is already running at $(url_for "$f")"
+        return 0
+    fi
+    echo -e "${BOLD}Starting $name${NC}"
+    run_in "$f" start --daemon
+}
+
+cmd_stop() {
+    local f="$1" name
+    name="$(basename "$f" .conf)"
+    if ! server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$name isn't running"
+        return 0
+    fi
+    echo -e "${BOLD}Stopping $name${NC}"
+    run_in "$f" stop
+}
+
+cmd_restart() {
+    cmd_stop "$1"
+    sleep 1
+    cmd_start "$1"
+}
+
+cmd_status() { run_in "$1" status; }
+
+cmd_open() {
+    local f="$1" url
+    url="$(url_for "$f")"
+    if ! server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$(basename "$f" .conf) isn't running — start it first: roe start $(basename "$f" .conf)"
+        return 1
+    fi
+    if command -v open >/dev/null 2>&1; then open "$url"
+    elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"
+    elif command -v wslview >/dev/null 2>&1; then wslview "$url"
+    elif command -v explorer.exe >/dev/null 2>&1; then explorer.exe "$url" >/dev/null 2>&1 || true
+    else echo "$url"
+    fi
+}
+
+# Apply a per-site command to one named site or, with --all, to each.
+for_target() {
+    local fn="$1" target="$2" f name rc=0
+    case "$target" in
+        --all|-a)
+            for name in $(all_names); do
+                "$fn" "$(conf_for "$name")" || rc=1
+                echo ""
+            done
+            return $rc
+            ;;
+        "")
+            log_error "Which site? Give a name, or --all."
+            echo "" >&2
+            cmd_list >&2
+            return 1
+            ;;
+        *)
+            f="$(resolve "$target")" || return 1
+            "$fn" "$f"
+            ;;
+    esac
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+    list|ls|"")      cmd_list ;;
+    start)           for_target cmd_start   "${2:-}" ;;
+    stop)            for_target cmd_stop    "${2:-}" ;;
+    restart)         for_target cmd_restart "${2:-}" ;;
+    status)          for_target cmd_status  "${2:-}" ;;
+    open)            for_target cmd_open    "${2:-}" ;;
+    help|--help|-h)  usage ;;
+    *)
+        log_error "Unknown command: $1"
+        echo ""
+        usage
+        exit 1
+        ;;
+esac

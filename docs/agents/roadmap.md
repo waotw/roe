@@ -9,6 +9,7 @@ Where the larger pieces of work stand. Statuses checked against the code on
 | Bi-directional Site Sync over HTTP | **Shipped** |
 | Update as redeploy for container hosts | Goal, host-agnostic |
 | First-boot bootstrap | Partly shipped (`RoeSecrets::Bootstrap`) |
+| Several installs side by side | **Shipped** (Phase 1: registry + `roe` command); admin switcher not built |
 | Multi-tenant Roe | Future, not started |
 | Open-source the Substack importer | Eventual intent |
 | Importer pipeline decomposition | Designed, not built — [specs-parked.md](specs-parked.md) |
@@ -132,6 +133,55 @@ One diagnostic worth knowing: if the "Generated fresh master.key" warning appear
 on *every* boot, the persistent volume is not mounted where `SITE_PATH` resolves.
 Each restart is starting with an empty `site/` and regenerating, which means
 anything encrypted by a previous boot is no longer decryptable. Fix the mount.
+
+---
+
+## Several installs side by side — shipped (Phase 1)
+
+Several Roe folders run at once, each its own install, tied together by a
+registry rather than by one install serving many sites. This was chosen over
+multi-tenancy (below) because it gets most of the benefit for a fraction of the
+risk and does not rule multi-tenancy out later.
+
+**Where it lives.** `roe.sh register` / `unregister`, `roe.sh start --daemon`,
+and `bin/roe` (the global command, copied to `~/.roe/bin/roe`). Registry is
+`~/.roe/installs/<name>.conf`, plain `KEY=value` (`NAME`, `ROOT`, `HOST`,
+`PORT`), read with `sed`, never sourced. It lives outside every install because
+the updater replaces `current/` wholesale.
+
+**Decisions that are easy to undo by accident:**
+
+- The name is the slugified folder basename (`The Briefcase` → `the-briefcase`),
+  matching what the Site Sync handshake already uses as an install's identity.
+  It is stored at registration, not recomputed, so changing the slug rules later
+  cannot silently move a site.
+- Each install gets its own hostname, `<name>.roe.test`, via one `/etc/hosts`
+  line. This exists to fix a real bug, not for looks: cookies are per host, not
+  per port, so two installs on `localhost` share a jar and sign each other out.
+  It only works because neither session cookie sets `domain:` — see
+  `docs/11-members-authentication.md`. `config.hosts` in development allows the
+  whole `*.roe.test` suffix.
+- `roe.sh` exports `ROE_HOST` when registered; `development.rb` prefers it for
+  mailer URLs. Magic-link sign-in makes a wrong mailer host a login to the wrong
+  site.
+- Ports are fixed per install at registration (first free from 3000 across the
+  registry), so URLs are stable. If an unrelated app holds the port at start
+  time, `resolve_port_collision` still shifts for that run only.
+- The global `roe` never boots a site itself. It shells out to that install's
+  own `roe.sh`, so an old install keeps booting with the logic it shipped with.
+- `roe` reads the registry and PID files directly. It deliberately does not use
+  `SiteSync::Exchange`, which is single-peer and whose token grants full
+  `/download` and `/database` access.
+
+**Known limits.** Memory is the ceiling — one Puma per site. Switching is
+separate logins per install (each has its own `User` table), not single
+sign-on. On WSL the browser reads Windows' hosts file, so the user adds the
+line there by hand; `register` prints it.
+
+**Not built.** Phase 2 (read-only site switcher in the admin) and Phase 3
+(start/stop siblings from the admin, deferred on security grounds). A reverse
+proxy on :80 routing by `Host` would remove ports from URLs entirely and is
+worth revisiting.
 
 ---
 

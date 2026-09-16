@@ -25,6 +25,11 @@ Rails.application.configure do
     config.hosts |= allowed_hosts unless allowed_hosts.empty?
   end
 
+  # Registered installs are reached at <name>.roe.test (see roe.sh
+  # register). Allow the whole suffix so every registered site passes Host
+  # Authorization without each one editing development.yml.
+  config.hosts |= [ /\A[a-z0-9-]+\.roe\.test\z/ ]
+
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.
   if Rails.root.join("tmp/caching-dev.txt").exist?
@@ -58,13 +63,15 @@ Rails.application.configure do
   #
   # Read site.yml directly rather than through SiteConfig: this runs during
   # boot, before the database is connected and before autoloading app code
-  # is safe. Host comes from site.yml; port prefers the port the server
-  # actually bound (roe.sh exports PORT) and falls back to site.yml's.
+  # is safe. Host prefers ROE_HOST (set by roe.sh for a registered install,
+  # its <name>.roe.test hostname), then site.yml; port prefers the port the
+  # server actually bound (roe.sh exports PORT) and falls back to site.yml's.
   config.action_mailer.default_url_options = begin
     site_yml = File.join(RoeSitePaths::SITE_SYSTEM_PATH, "global", "site.yml")
     raw      = File.exist?(site_yml) ? YAML.safe_load_file(site_yml, aliases: true) : nil
     bare     = (raw.is_a?(Hash) ? raw["url"].to_s : "").sub(%r{\Ahttps?://}, "").sub(%r{/.*\z}, "")
     host, _, configured_port = bare.partition(":")
+    host = ENV["ROE_HOST"] if ENV["ROE_HOST"].present?
 
     port = if ENV["PORT"].to_i.positive?
       ENV["PORT"].to_i

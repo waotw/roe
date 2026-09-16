@@ -117,6 +117,34 @@ Install these to turn on extra features. Roe runs fine without them.
 - **Updates**: Use Admin → Updates to check for and install updates
 - **Backups**: Automatic backups stored in `backups/` when using Site Sync and Deploy from Admin
 
+## Running Several Sites
+
+Each Roe folder is one site. To run more than one at a time, register each
+one — from inside its folder:
+
+```bash
+./roe.sh register
+```
+
+That gives the site a name from its folder (`The Briefcase` becomes
+`the-briefcase`), its own address (`http://the-briefcase.roe.test:3001`),
+and installs a global `roe` command. Registration asks for your password
+once, to add the address to `/etc/hosts`.
+
+```bash
+roe list                    # every registered site, running or stopped
+roe start the-briefcase     # runs in the background
+roe stop the-briefcase
+roe open the-briefcase      # opens it in your browser
+roe start --all
+```
+
+Each site has its own address so you can be signed in to all of them at
+once. `./roe.sh start` inside a folder still works exactly as before.
+
+The registry lives in `~/.roe/installs/`. Run `./roe.sh unregister` in a
+folder to remove that site from it.
+
 ## Documentation & Support
 
 - **Documentation:** [go-roe.com/documentation](https://go-roe.com/documentation)
