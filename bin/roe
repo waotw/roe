@@ -89,7 +89,7 @@ usage() {
     echo "  start    Start a site in the background"
     echo "  stop     Stop a site"
     echo "  restart  Stop, then start"
-    echo "  status   Full status from the site's own roe.sh"
+    echo "  status   Status for each Roe site"
     echo "  open     Open the site in your browser"
     echo ""
     echo -e "${ROE_RED}${BOLD}FLAGS${NC}"
