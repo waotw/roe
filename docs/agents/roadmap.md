@@ -155,12 +155,12 @@ the updater replaces `current/` wholesale.
   matching what the Site Sync handshake already uses as an install's identity.
   It is stored at registration, not recomputed, so changing the slug rules later
   cannot silently move a site.
-- Each install gets its own hostname, `<name>.roe.test`, via one `/etc/hosts`
+- Each install gets its own hostname, `<name>.roe`, via one `/etc/hosts`
   line. This exists to fix a real bug, not for looks: cookies are per host, not
   per port, so two installs on `localhost` share a jar and sign each other out.
   It only works because neither session cookie sets `domain:` — see
   `docs/11-members-authentication.md`. `config.hosts` in development allows the
-  whole `*.roe.test` suffix.
+  whole `*.roe` suffix.
 - `roe.sh` exports `ROE_HOST` when registered; `development.rb` prefers it for
   mailer URLs. Magic-link sign-in makes a wrong mailer host a login to the wrong
   site.

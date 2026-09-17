@@ -16,9 +16,10 @@ else
   false
 end
 
-puts "🔧 Content management initializer: #{should_run ? 'ENABLED' : 'DISABLED'}"
-puts "   Console: #{is_console}, Runner: #{is_runner}, Rake: #{is_rake}"
-puts "   PROGRAM_NAME: #{$PROGRAM_NAME}"
+Rails.logger.debug do
+  "Content management initializer: #{should_run ? 'enabled' : 'disabled'} " \
+    "(console: #{is_console}, runner: #{is_runner}, rake: #{is_rake}, program: #{$PROGRAM_NAME})"
+end
 
 if should_run
   Rails.application.config.after_initialize do

@@ -10,6 +10,15 @@ def system!(*args)
   system(*args, exception: true)
 end
 
+# ── Brand colours ───────────────────────────────────────────────────────
+# Roe red #c64320 and orange #e47e5d, matching roe.sh and bin/roe. Raw
+# escapes, because the gem-free BootstrapProgress below runs before the
+# bundle exists. 24-bit where the terminal says it can; else the closest
+# of the 256 standard colours.
+TRUECOLOR  = %w[truecolor 24bit].include?(ENV["COLORTERM"].to_s)
+ROE_RED    = TRUECOLOR ? "\e[38;2;198;67;32m"  : "\e[38;5;166m"
+ROE_ORANGE = TRUECOLOR ? "\e[38;2;228;126;93m" : "\e[38;5;173m"
+
 # ── Setup TUI ───────────────────────────────────────────────────────────
 # One updating line per step: [progress bar] pct  Label  ·  live activity.
 # Finalizes to a ✓/✗ checklist entry. Full output streams to a log the
@@ -88,7 +97,7 @@ class SetupTUI
 
   def bar(fraction)
     filled = (BAR_WIDTH * fraction).round
-    @pastel.cyan("█" * filled) + @pastel.dim("░" * (BAR_WIDTH - filled))
+    "#{ROE_RED}#{'█' * filled}\e[0m" + @pastel.dim("░" * (BAR_WIDTH - filled))
   end
 
   def render(activity)
@@ -131,13 +140,13 @@ end
 # ── Bundle-step progress (no gems) ────────────────────────────────────────
 # The full TUI gems (pastel, tty-box) live in the bundle, so they can't be
 # loaded until AFTER `bundle install` runs. This tiny renderer gives that
-# one step the same look anyway — a cyan progress bar + live activity line
+# one step the same look anyway — a red progress bar + live activity line
 # finalizing to a ✓ — using nothing but raw ANSI (no gem dependencies). It
 # drives the bar off the gem count in Gemfile.lock, advancing as Bundler
 # fetches/installs each gem, then snaps to 100% on success.
 class BootstrapProgress
   BAR_WIDTH = 20
-  C = "\e[36m"  # cyan
+  C = ROE_RED   # bar fill
   D = "\e[2m"   # dim
   G = "\e[32m"  # green
   R = "\e[31m"  # red
@@ -281,15 +290,19 @@ FileUtils.chdir APP_ROOT do
   pastel   = Pastel.new
   log_path = File.join(Dir.tmpdir, "roe-setup-#{Process.pid}.log")
 
-  puts
-  puts TTY::Box.frame(
-    pastel.bold("Setting up Roe"),
-    padding: [0, 3],
-    align: :center,
-    border: :thick,
-    style: { border: { fg: :cyan } }
-  )
-  puts
+  # roe.sh setup prints its own "Setting up Roe" heading before calling
+  # us; only draw one here when run directly (bin/setup by hand).
+  unless ENV["ROE_SH_SETUP"]
+    puts
+    puts TTY::Box.frame(
+      pastel.bold("Setting up Roe"),
+      padding: [0, 3],
+      align: :center,
+      border: :thick,
+      style: { border: { fg: :red } }
+    )
+    puts
+  end
 
   # 8 progress-tracked steps (the interactive admin setup runs separately
   # after, with its own UI).
@@ -479,6 +492,11 @@ FileUtils.chdir APP_ROOT do
     File.chmod(0o755, start_command)
     puts pastel.dim("Created start.command (double-click to start the server)")
   end
+
+  # When roe.sh setup called us it verifies the boot, offers to register
+  # the site, and starts it — so hand control back rather than starting
+  # here, or those steps would only run after the user stopped the server.
+  exit 0 if ENV["ROE_SH_SETUP"]
 
   puts
   puts TTY::Box.frame(

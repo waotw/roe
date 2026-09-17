@@ -10,6 +10,20 @@ require "securerandom"
 
 pastel = Pastel.new
 
+# Roe red #c64320 and orange #e47e5d, matching roe.sh, bin/roe and
+# bin/setup. 24-bit where the terminal says it can; else the closest of
+# the 256 standard colours. tty-box only takes named colours for its
+# border, so the heading box is drawn by hand.
+truecolor  = %w[truecolor 24bit].include?(ENV["COLORTERM"].to_s)
+roe_red    = truecolor ? "\e[38;2;198;67;32m"  : "\e[38;5;166m"
+roe_orange = truecolor ? "\e[38;2;228;126;93m" : "\e[38;5;173m"
+brand_box = lambda do |title|
+  rule = "═" * (title.length + 6)
+  puts "#{roe_red}╔#{rule}╗\e[0m"
+  puts "#{roe_red}║\e[0m   #{roe_orange}\e[1m#{title}\e[0m   #{roe_red}║\e[0m"
+  puts "#{roe_red}╚#{rule}╝\e[0m"
+end
+
 # Read from the real controlling terminal, NOT the inherited $stdin.
 # bin/setup invokes this script via `system(ruby, bootstrap, in: $stdin)`,
 # and that redirected stdin doesn't give tty-prompt's reader the raw-mode
@@ -57,16 +71,10 @@ yes_no = lambda do |message, default: true|
 end
 
 puts
-# Note: no emoji INSIDE tty-box frames — they're rendered 2 columns wide
-# by terminals but counted as 1 by tty-box's width math, which drifts
-# the right border. Emoji are fine on plain (non-boxed) lines below.
-puts TTY::Box.frame(
-  pastel.bold("Admin User Setup"),
-  padding: [0, 3],
-  align: :center,
-  border: :thick,
-  style: { border: { fg: :cyan } }
-)
+# Note: no emoji INSIDE box frames — they're rendered 2 columns wide
+# by terminals but counted as 1 by the width math, which drifts the
+# right border. Emoji are fine on plain (non-boxed) lines below.
+brand_box.call("Admin User Setup")
 puts
 
 existing_user = User.first
@@ -174,7 +182,7 @@ if user.save
     puts pastel.bold("🔒  Recovery codes")
     puts pastel.dim("Save these somewhere safe. Each works once to reset your password if you lose access.")
     puts
-    recovery_codes.each { |code| puts "   #{pastel.cyan(code)}" }
+    recovery_codes.each { |code| puts "   #{roe_red}#{code}\e[0m" }
     puts
     puts pastel.dim("Use one at /recovery/new (the link is on the sign-in page).")
   elsif existing_user
@@ -184,7 +192,7 @@ if user.save
   end
 
   puts
-  puts "Sign in at #{pastel.cyan('http://localhost:3000/admin')}"
+  puts "Sign in at #{roe_red}http://localhost:3000/admin\e[0m"
   puts
 
   # Hold the screen so credentials/codes aren't scrolled away by the

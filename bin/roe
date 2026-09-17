@@ -15,6 +15,10 @@
 #   roe open <name>          open the site in your browser
 #   roe start --all          start every registered site
 #   roe stop --all
+#   roe -h                   help (so does a bare `roe`)
+#
+# The name can be left off when there is only one registered site, or —
+# for stop, restart, status and open — when only one site is running.
 #
 # Names are the slugified folder name — "The Briefcase" is the-briefcase.
 # Register a site by running ./roe.sh register inside it.
@@ -30,28 +34,81 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# Roe's brand red, #c64320, and the lighter orange #e47e5d it pairs with.
+# Need a 24-bit-colour terminal; otherwise the closest of the 256
+# standard colours.
+case "${COLORTERM:-}" in
+    truecolor|24bit)
+        ROE_RED='\033[38;2;198;67;32m'
+        ROE_ORANGE='\033[38;2;228;126;93m'
+        ;;
+    *)
+        ROE_RED='\033[38;5;166m'
+        ROE_ORANGE='\033[38;5;173m'
+        ;;
+esac
+
 log_error()   { echo -e "${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
 
 # Read one KEY from a .conf — first match, everything after the first "=".
 _conf_get() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
 
+# The wordmark: solid blocks in red, shading in orange. Each line is
+# coloured as it goes, so the art below can be edited as plain text.
+banner() {
+    local line
+    while IFS= read -r line; do
+        line="${line//█/${ROE_RED}█}"
+        line="${line//░/${ROE_ORANGE}░}"
+        echo -e "${line}${NC}"
+    done <<'EOF'
+
+███████████
+░░███░░░░░███
+ ░███    ░███   ██████   ██████
+ ░██████████   ███░░███ ███░░███
+ ░███░░░░░███ ░███ ░███░███████
+ ░███    ░███ ░███ ░███░███░░░
+ █████   █████░░██████ ░░██████
+░░░░░   ░░░░░  ░░░░░░   ░░░░░░
+EOF
+}
+
 usage() {
-    echo -e "${BOLD}roe — run several Roe sites side by side${NC}"
+    banner
+    echo "____________________________________"
+    echo -e "${BOLD} Run all Roe sites at once${NC}"
+    echo "------------------------------------------"
     echo ""
-    echo "Usage: roe <command> [name | --all]"
+    echo -e "${ROE_RED}${BOLD}USAGE${NC}"
+    echo "  roe <command> [name | --all]"
     echo ""
-    echo "  list              Show every registered site and whether it's running"
-    echo "  start <name>      Start a site in the background"
-    echo "  stop <name>       Stop a site"
-    echo "  restart <name>    Stop, then start"
-    echo "  status <name>     Full status from the site's own roe.sh"
-    echo "  open <name>       Open the site in your browser"
+    echo -e "${ROE_RED}${BOLD}COMMANDS${NC}"
+    echo "  list     Show every registered site and whether it's running"
+    echo "  start    Start a site in the background"
+    echo "  stop     Stop a site"
+    echo "  restart  Stop, then start"
+    echo "  status   Full status from the site's own roe.sh"
+    echo "  open     Open the site in your browser"
     echo ""
-    echo "  start --all / stop --all   Apply to every registered site"
+    echo -e "${ROE_RED}${BOLD}FLAGS${NC}"
+    echo "  --all    Apply start, stop or restart to every registered site"
+    echo "  -h       Show this help"
     echo ""
-    echo "To register a site, run ./roe.sh register inside its folder."
-    echo "Registry: $ROE_REGISTRY_DIR"
+    echo -e "${ROE_RED}${BOLD}EXAMPLES${NC}"
+    echo "  $ roe list"
+    echo "  $ roe start roe-site-name"
+    echo "  $ roe open"
+    echo "  $ roe stop --all"
+    echo ""
+    echo -e "${ROE_RED}${BOLD}NOTES${NC}"
+    echo "  • If you only have one Roe site, just use 'roe start/stop',"
+    echo "    you don't need to add a site name."
+    echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
+    echo "  • To register a site, run './roe.sh register' inside the Roe folder."
+    echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
+    echo "  • Registry: $ROE_REGISTRY_DIR"
 }
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -107,8 +164,12 @@ roe_sh_for() {
 
 # ── Process state ─────────────────────────────────────────────────────────────
 
-# PID of the site's Puma if it's running, else nothing. Reads the same
-# tmp/pids/server.pid the install's roe.sh writes and checks.
+# PID of the site's Puma if it's running, else nothing. Reads the
+# tmp/pids/server.pid the install's roe.sh writes, and if that's missing
+# or stale, scans process titles for a Puma tagged with the install's
+# app directory (config/puma.rb sets the tag). The pidfile is a single
+# slot that a second start overwrites and Puma deletes on exit, so on its
+# own it loses track of servers.
 server_pid_for() {
     local root="$1" pidfile pid
     for pidfile in "$root/current/tmp/pids/server.pid" "$root/tmp/pids/server.pid"; do
@@ -116,6 +177,10 @@ server_pid_for() {
         pid="$(cat "$pidfile" 2>/dev/null)"
         [ -n "$pid" ] && ps -p "$pid" >/dev/null 2>&1 && { echo "$pid"; return 0; }
     done
+    local app_dir="$root/current"
+    [ -d "$app_dir" ] || app_dir="$root"
+    pid="$(ps -axo pid=,command= 2>/dev/null | awk -v dir="[$app_dir]" 'index($0, "puma") && index($0, dir) { print $1; exit }')"
+    [ -n "$pid" ] && { echo "$pid"; return 0; }
     return 1
 }
 
@@ -169,12 +234,14 @@ cmd_list() {
 # Run one subcommand of an install's roe.sh, from its own folder, with
 # nothing inherited from this shell that could steer it (PORT above all:
 # a stray PORT in the environment would override the registry's).
+# ROE_CLI=1 tells roe.sh it was reached through this command, so its
+# hints say "roe stop" rather than "./roe.sh stop".
 run_in() {
     local f="$1"; shift
     local script root
     script="$(roe_sh_for "$f")" || return 1
     root="$(_conf_get "$f" ROOT)"
-    ( cd "$root" && env -u PORT -u ROE_HOST "$script" "$@" )
+    ( cd "$root" && env -u PORT -u ROE_HOST ROE_CLI=1 "$script" "$@" )
 }
 
 cmd_start() {
@@ -222,6 +289,38 @@ cmd_open() {
     fi
 }
 
+# Names of every registered site whose server is up right now.
+running_names() {
+    local name f
+    for name in $(all_names); do
+        f="$(conf_for "$name")"
+        server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null && echo "$name"
+    done
+}
+
+# When no name is given, pick the only sensible one. With a single
+# registered site there is nothing to choose. With several, stop /
+# restart / status / open can still go ahead when exactly one is running —
+# that is the one being asked about. Prints the name, or nothing.
+default_name() {
+    local fn="$1" names running
+    names="$(all_names)"
+    if [ "$(printf '%s\n' "$names" | grep -c .)" -eq 1 ]; then
+        echo "$names"
+        return 0
+    fi
+    case "$fn" in
+        cmd_stop|cmd_restart|cmd_status|cmd_open)
+            running="$(running_names)"
+            if [ "$(printf '%s\n' "$running" | grep -c .)" -eq 1 ]; then
+                echo "$running"
+                return 0
+            fi
+            ;;
+    esac
+    return 1
+}
+
 # Apply a per-site command to one named site or, with --all, to each.
 for_target() {
     local fn="$1" target="$2" f name rc=0
@@ -234,6 +333,15 @@ for_target() {
             return $rc
             ;;
         "")
+            if [ -z "$(all_names)" ]; then
+                log_error "No sites registered yet."
+                echo "  Run ./roe.sh register inside a Roe folder to add one." >&2
+                return 1
+            fi
+            if name="$(default_name "$fn")"; then
+                "$fn" "$(conf_for "$name")"
+                return $?
+            fi
             log_error "Which site? Give a name, or --all."
             echo "" >&2
             cmd_list >&2
@@ -249,7 +357,8 @@ for_target() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
-    list|ls|"")      cmd_list ;;
+    "")              usage ;;
+    list|ls)         cmd_list ;;
     start)           for_target cmd_start   "${2:-}" ;;
     stop)            for_target cmd_stop    "${2:-}" ;;
     restart)         for_target cmd_restart "${2:-}" ;;

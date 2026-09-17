@@ -315,14 +315,15 @@ class SiteConfig < ApplicationRecord
 
   # Host suffixes that are always local, and so must be served over http.
   # .test and .localhost are reserved for exactly this by RFC 6761, .local
-  # by RFC 6762.
-  LOCAL_HOST_SUFFIXES = %w[.localhost .test .local].freeze
+  # by RFC 6762. .roe is ours: roe.sh register maps <name>.roe in /etc/hosts
+  # for each install, and it is not a delegated top-level domain.
+  LOCAL_HOST_SUFFIXES = %w[.localhost .test .local .roe].freeze
 
   # True when the configured domain can only be a local address, so
   # site_url must not upgrade it to https.
   #
   # This matters for running several installs side by side: each one is
-  # reached at its own hostname (site-a.test and so on) so the browser keeps
+  # reached at its own hostname (the-briefcase.roe and so on) so the browser keeps
   # their session cookies apart. Without this check such a host would be
   # handed an https:// URL nothing is listening on, and every generated
   # link, mailer URL, and feed entry would point at a dead scheme.
