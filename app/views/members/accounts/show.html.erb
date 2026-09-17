@@ -35,6 +35,30 @@
     </div>
   </div>
 
+  <%# The newsletter switch. Until this existed the only way off the list
+      was the link in an email, which a member may never have had — an
+      imported subscriber, or one who deleted the emails. Same shape as the
+      private-feeds block: a heading, a note, one button. %>
+  <div class="account-newsletter">
+    <h2>Newsletter</h2>
+    <% if @member.newsletter_status_subscribed? %>
+      <p class="account-newsletter-note">You're subscribed. New posts arrive by email.</p>
+      <%= button_to "Unsubscribe", account_newsletter_path,
+            method: :patch, params: { newsletter: "unsubscribe" },
+            class: "btn-secondary", form_class: "account-newsletter-form" %>
+    <% elsif @member.newsletter_status_bounced? %>
+      <p class="account-newsletter-note">
+        Email to <%= @member.email %> has bounced, so the newsletter is paused.
+        Change your email address to start receiving it again.
+      </p>
+    <% else %>
+      <p class="account-newsletter-note">You're not subscribed. New posts won't be emailed to you.</p>
+      <%= button_to "Subscribe", account_newsletter_path,
+            method: :patch, params: { newsletter: "subscribe" },
+            class: "btn-secondary", form_class: "account-newsletter-form" %>
+    <% end %>
+  </div>
+
   <%# Deleting is last, separated, and asks for a typed word — it can't be
       undone and shouldn't sit next to Edit Account where a mis-click lands.
       The copy names what survives, including the copies Stripe and Postmark

@@ -53,6 +53,29 @@ module Members
                 "update your podcast app with the new ones below."
     end
 
+    # Newsletter on or off. The token route in SubscriptionsController serves
+    # the email links; this is the same switch for someone already signed
+    # in. A bounced address can't be resubscribed from here — the problem
+    # is delivery, not consent — so the form only offers the two real moves.
+    def update_newsletter
+      member = current_member
+
+      case params[:newsletter]
+      when "unsubscribe"
+        member.unsubscribe_from_newsletter!
+        redirect_to account_path, notice: "You've been unsubscribed from the newsletter."
+      when "subscribe"
+        if member.newsletter_status_bounced?
+          redirect_to account_path, alert: "Email to this address has bounced, so the newsletter can't be turned back on. Change your email address first."
+        else
+          member.resubscribe_to_newsletter!
+          redirect_to account_path, notice: "You're subscribed to the newsletter."
+        end
+      else
+        redirect_to account_path, alert: "Nothing changed."
+      end
+    end
+
     # Delete the account: erase the person, keep the record. See
     # Member#anonymize! for what survives and why.
     #

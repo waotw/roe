@@ -417,6 +417,10 @@ Rails.application.routes.draw do
   # New private feed URLs, when the old ones have been shared or leaked.
   post "account/feeds/regenerate", to: "members/accounts#regenerate_media_token",
        as: :regenerate_media_token
+  # Newsletter on/off from the account page, so a member isn't dependent on
+  # finding the unsubscribe link in an email — or on having ever received one.
+  patch "account/newsletter", to: "members/accounts#update_newsletter",
+        as: :account_newsletter
   delete "account", to: "members/accounts#destroy", as: :delete_account
   get "/unsubscribe/:token", to: "members/subscriptions#unsubscribe", as: :unsubscribe
   post "/unsubscribe/:token", to: "members/subscriptions#confirm_unsubscribe"
