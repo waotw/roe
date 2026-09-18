@@ -81,7 +81,13 @@ module SiteSync
             deploy_target: SiteSync.deploy_target&.to_s,
             # Rails-app dir relative to the Roe folder ("current" for the
             # versioned layout; nil when the app IS the Roe folder).
-            rails_subdir:  (RoeSitePaths::RAILS_APP_ROOT == RoeSitePaths::ROE_ROOT ? nil : File.basename(RoeSitePaths::RAILS_APP_ROOT))
+            rails_subdir:  (RoeSitePaths::RAILS_APP_ROOT == RoeSitePaths::ROE_ROOT ? nil : File.basename(RoeSitePaths::RAILS_APP_ROOT)),
+            # Whether this side encrypts and ships its database each sync.
+            # The fact only, so the other side's Site Backups page can show
+            # the real state of the live site instead of its own (empty)
+            # passphrase. See SyncConfig#peer_backup_encryption for why
+            # this is a string.
+            backup_encryption: (SyncConfig.current.backup_passphrase_set? ? "on" : "off")
           }
         }
 

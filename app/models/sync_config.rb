@@ -53,7 +53,7 @@ class SyncConfig < ApplicationRecord
   # render even when AR encryption is broken. On production, "peer" = the
   # local machine, so peer_folder_name is the folder to `cd` into locally.
 
-  ALLOWED_PEER_ENV_KEYS = %w[folder_name deploy_target rails_subdir].freeze
+  ALLOWED_PEER_ENV_KEYS = %w[folder_name deploy_target rails_subdir backup_encryption].freeze
 
   def peer_env_hash
     return {} if self[:peer_env].blank?
@@ -77,6 +77,19 @@ class SyncConfig < ApplicationRecord
   # restart command must run from.
   def peer_rails_subdir
     peer_env_hash["rails_subdir"].presence
+  end
+
+  # Whether the peer (the live site) has a backup passphrase set, i.e.
+  # whether it encrypts and ships its database on each sync. Only the
+  # fact travels — never the passphrase. Sent as "on"/"off" rather than
+  # a boolean because merge_peer_env! drops blank values, and false is
+  # blank: a cleared passphrase has to be able to overwrite an earlier
+  # "on". nil until the first exchange, so the UI can say "unknown".
+  def peer_backup_encryption
+    case peer_env_hash["backup_encryption"]
+    when "on"  then true
+    when "off" then false
+    end
   end
 
   # Merge a peer-supplied env hash (string keys) into the stored plaintext.
