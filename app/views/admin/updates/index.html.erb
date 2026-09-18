@@ -189,6 +189,45 @@
         — restart it to load the new code.
       </p>
 
+      <% if @restart_command %>
+        <%# Registered install: one command from any terminal. %>
+        <div class="bg-white border border-blue-200 rounded-xs p-5 mb-3">
+          <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart Roe</h4>
+
+          <ol class="space-y-5 text-sm text-gray-800">
+            <li>
+              <p class="font-medium mb-1">1. Open any terminal window.</p>
+              <p class="text-xs text-gray-600 leading-relaxed">
+                On macOS: search for <strong>Terminal</strong> in Spotlight with
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">⌘</kbd>
+                +
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">Space</kbd>.
+                It doesn't matter which folder it's in.
+              </p>
+            </li>
+
+            <li>
+              <p class="font-medium mb-2">2. Paste this command and press Enter:</p>
+              <div class="flex items-center gap-2">
+                <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all"><%= @restart_command %></code>
+                <button type="button"
+                        data-action="click->updates#copyCommand"
+                        data-command="<%= @restart_command %>"
+                        class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
+                  Copy
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-gray-600 leading-relaxed">
+                Once it says Roe is running, refresh this page (
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">⌘</kbd>
+                +
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">R</kbd>)
+                to confirm Roe updated successfully.
+              </p>
+            </li>
+          </ol>
+        </div>
+      <% else %>
       <div class="bg-white border border-blue-200 rounded-xs p-5 mb-3">
         <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart your Roe server</h4>
 
@@ -285,6 +324,7 @@
           </p>
         </div>
       </details>
+      <% end %>
     </div>
   <% elsif @restart_complete %>
     <%# Update is done AND the server has restarted — VersionChecker

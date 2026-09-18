@@ -64,6 +64,9 @@ class Admin::UpdatesController < Admin::BaseController
       @restart_pending  = boot_time && @last_update.completed_at >= boot_time
       @restart_complete = boot_time && @last_update.completed_at <  boot_time
     end
+    # A registered install restarts with one command from any terminal;
+    # an unregistered one still needs the foreground ./roe.sh dance.
+    @restart_command = RoeRegistry.restart_command
 
     # Deploy section
     @deploy_status       = DeployWatchdog.status
