@@ -25,7 +25,7 @@ The [Docs](/documentation) page has a list of introductory tutorials that flow o
 
 ## Diving deeper
 
-When you've created a few pages, posts and collections, visit the full [documentation](/documentation-all) to dive deeper. 
+When you've created a few pages, posts and collections, visit the full [documentation](/documentation-all) to learn more. 
 
 ## Let's contribute to a better internet
 

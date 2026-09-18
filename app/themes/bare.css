@@ -3572,6 +3572,23 @@ hr.clear-floats {
   display: inline;
 }
 
+/* Newsletter on/off on the account page. Same shape as the private feeds
+   block above: a heading, a note, one button. */
+.account-newsletter {
+  margin: var(--space-6) 0;
+}
+
+.account-newsletter-note {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, currentColor);
+  opacity: 0.8;
+}
+
+.account-newsletter-form {
+  display: inline;
+}
+
 /* Alerts */
 
 .member-page .alert {

@@ -353,10 +353,10 @@ require_linux_filesystem() {
     echo ""
     echo "  Move Roe onto the Linux side, where it belongs:"
     echo ""
-    echo "      mv \"$ROE_ROOT\" ~/roe && cd ~/roe && ./roe.sh check"
+    echo "  mv \"$ROE_ROOT\" ~/roe && cd ~/roe && ./roe.sh check"
     echo ""
     echo "  You can still open the files from Windows:"
-    echo "      \\\\wsl\$\\$(_wsl_distro)\\home\\$USER\\roe"
+    echo "  \\\\wsl\$\\$(_wsl_distro)\\home\\$USER\\roe"
     echo ""
     return 1
 }
@@ -498,7 +498,7 @@ ensure_linux_build_tools() {
 
     if [ -n "$cmd" ]; then
         echo -e "  1. Copy this command:"
-        echo -e "     ${CYAN}${cmd}${NC}"
+        echo -e "  ${CYAN}${cmd}${NC}"
         echo -e "  2. Run it in another terminal (it'll ask for your password — ${BOLD}sudo${NC})"
         echo -e "  3. Come back here and press [c] to continue"
     else
@@ -555,13 +555,13 @@ source_profile() {
             # shellcheck disable=SC1091
             [ -f "$HOME/.zprofile" ] && source "$HOME/.zprofile" 2>/dev/null || true
             # shellcheck disable=SC1091
-            [ -f "$HOME/.zshrc" ]    && source "$HOME/.zshrc"    2>/dev/null || true
+            [ -f "$HOME/.zshrc" ]    && source "$HOME/.zshrc"  2>/dev/null || true
             ;;
         bash)
             # shellcheck disable=SC1091
             [ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" 2>/dev/null || true
             # shellcheck disable=SC1091
-            [ -f "$HOME/.bashrc" ]       && source "$HOME/.bashrc"       2>/dev/null || true
+            [ -f "$HOME/.bashrc" ]       && source "$HOME/.bashrc"  2>/dev/null || true
             ;;
         *)
             # shellcheck disable=SC1091
@@ -604,7 +604,7 @@ install_prompt() {
     [ -n "$note" ] && echo -e "  ${YELLOW}Note:${NC} ${note}"
     echo ""
     echo -e "  1. Copy this command:"
-    echo -e "     ${CYAN}${cmd}${NC}"
+    echo -e "  ${CYAN}${cmd}${NC}"
     echo ""
     echo -e "  2. Open a new terminal window - cmd-t"
     echo -e "  3. Paste and press Enter — wait for it to finish"
@@ -647,14 +647,14 @@ ensure_installed() {
         echo ""
         log_warning "${description} not detected on PATH yet"
         echo "  Common causes:"
-        echo "    • The install in the other terminal hasn't finished"
-        echo "    • PATH changes from the install haven't reached this terminal"
-        echo "    • Newly compiled rbenv shims need a rehash"
+        echo "  • The install in the other terminal hasn't finished"
+        echo "  • PATH changes from the install haven't reached this terminal"
+        echo "  • Newly compiled rbenv shims need a rehash"
         echo ""
         echo "  Choose:"
-        echo "    [r] re-source shell + check again  (default — try this first)"
-        echo "    [i] show the install command again"
-        echo "    [q] quit setup — re-run ./roe.sh check later"
+        echo "  [r] re-source shell + check again  (default — try this first)"
+        echo "  [i] show the install command again"
+        echo "  [q] quit setup — re-run ./roe.sh check later"
         echo ""
         breathing_room
         read -rp "  Choice [R/i/q]: " REPLY
@@ -822,7 +822,7 @@ _warn_other_ruby_managers() {
     if command_exists rvm  || [ -d "$HOME/.rvm" ];  then found="$found rvm";  fi
     if command_exists asdf || [ -d "$HOME/.asdf" ]; then found="$found asdf"; fi
     if [ -d "$HOME/.rubies" ] || [ -f /usr/local/share/chruby/chruby.sh ]; then found="$found chruby"; fi
-    found="$(echo "$found" | xargs)"   # trim whitespace
+    found="$(echo "$found" | xargs)"  # trim whitespace
     [ -z "$found" ] && return 0
 
     echo ""
@@ -847,8 +847,8 @@ handle_ruby_manager_conflicts() {
         echo -e "  the lines are prefixed with a note, never deleted."
         echo ""
         echo "  How would you like to proceed?"
-        echo "    [1] Let Roe handle it      (recommended)"
-        echo "    [2] I'll handle it myself  (quit install for now)"
+        echo "  [1] Let Roe handle it      (recommended)"
+        echo "  [2] I'll handle it myself  (quit install for now)"
         echo ""
         breathing_room
         read -rp "  Choose [1/2]: " REPLY
@@ -1034,7 +1034,7 @@ usage() {
     echo ""
     echo -e "${BOLD}Running several sites:${NC}"
     echo "  register    Give this install a name, hostname and port, and install the"
-    echo "              global 'roe' command (roe list | start <name> | stop <name>)"
+    echo "     global 'roe' command (roe list | start <name> | stop <name>)"
     echo "  unregister  Remove this install from the registry"
     echo ""
     echo -e "${BOLD}Maintenance:${NC}"
@@ -1083,10 +1083,11 @@ cmd_check() {
     use_brand_colors
     echo ""
     banner
-    brand_box "Requirements Check"
     echo ""
-    echo "I'll check your system for required dependencies."
-    echo "If anything is missing, I'll guide you through installing it."
+    brand_box "Requirements Check"
+    log_step "Checking your system for required dependencies."
+    echo ""
+    echo "If anything is missing, this program will help you install it."
     echo ""
     echo -e "  OS detected: ${BOLD}${OS}${NC}"
     echo ""
@@ -1112,7 +1113,7 @@ cmd_check() {
     # ── Ruby ──────────────────────────────────────────────────────────────────
     if ! check_ruby; then
         log_step "Installing Ruby ${required_ruby} (Required)"
-        log_error "Ruby ${required_ruby}+ is not installedu"
+        log_error "Ruby ${required_ruby}+ is not installed"
         all_good=false
 
         # Two install paths. mise is the default for fresh installs:
@@ -1153,7 +1154,7 @@ cmd_check() {
                 if ! install_mise; then
                     log_error "Couldn't install mise automatically."
                     echo "  Install it manually, then re-run ./roe.sh check:"
-                    echo "    ${CYAN}curl https://mise.run | sh${NC}"
+                    echo "  ${CYAN}curl https://mise.run | sh${NC}"
                     exit 1
                 fi
                 log_success "mise installed"
@@ -1221,15 +1222,18 @@ cmd_check() {
     # flow, not here.
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    echo ""
     echo -e "${BOLD}═══════════════════════════════════════════${NC}"
     echo ""
 
     if $all_good; then
-        log_success "Ready — Ruby and Git are in place."
+        log_success "Ready — Ruby and Git are installed."
         echo ""
-        echo -e "${BOLD}Next step:${NC} Run the Roe setup"
-        echo -e "   ${CYAN}./roe.sh setup${NC}"
+        brand_box "Roe Setup"
+        log_step "Run the Roe setup"
+        echo -e ""
+        echo -e "This will create a site, database, everything you need for a Roe site."
+        echo -e ""
+        echo -e "  You can do this at any time with this command: ${CYAN}./roe.sh setup${NC}"
         echo ""
         breathing_room
         read -rp "Run setup now? [y/n]: " REPLY
@@ -1311,44 +1315,54 @@ verify_and_finish() {
     fi
 }
 
-# The last step of setup: offer to register the site so it gets its own
-# address and the global `roe` command, and if so start it that way.
-# Declining leaves everything as it was — plain ./roe.sh start.
+# The last step of setup: register the site and install the global `roe`
+# command, then offer to start it. Not optional on a fresh install — the
+# point is that every new install has `roe`, so the docs can rely on it.
+# Existing installs are asked once by offer_registration_once instead,
+# and `./roe.sh register` by hand still does the interactive version.
 offer_registration_after_setup() {
     local name
     name="$(install_slug)"
 
     echo ""
-    log_step "Register this site and use the global roe command"
+    brand_box "Roe Global Command"
     echo ""
-    echo -e "  Registering gives this site its own address, ${CYAN}http://${name}.${ROE_HOST_SUFFIX}${NC},"
-    echo -e "  and a global ${CYAN}roe${NC} command you can run from any folder:"
-    echo -e "     ${CYAN}• roe start${NC}"
-    echo -e "     ${CYAN}• roe stop${NC}"
-    echo -e "     ${CYAN}• roe open${NC}"
-    echo "  You can do this anytime with ./roe.sh register"
+    log_step "Installing the global ${CYAN}roe${NC} command"
+    echo ""
+    echo "This allows you to start and stop your Roe sites from any"
+    echo "terminal window. This does two small things:"
+    echo -e "  • adds ${CYAN}http://${name}.${ROE_HOST_SUFFIX}${NC} to your ${CYAN}/etc/hosts${NC}"
+    echo -e "  ${DIM}(your computer will ask for your password)${NC}"
+    echo -e "  • adds the ${CYAN}roe${NC} to your terminal's startup file"
+    echo ""
+
+    cmd_register quiet || return 1
+
+    # So the rest of this script (and anything it spawns) can find `roe`
+    # now, even though the user's own terminal needs a new window.
+    case ":$PATH:" in *":$ROE_BIN_DIR:"*) ;; *) export PATH="$ROE_BIN_DIR:$PATH" ;; esac
+
+    load_registry_entry || return 1
+    echo ""
+    echo -e "  ${BOLD}Site${NC}"
+    echo -e "    Name:     ${CYAN}${ROE_NAME}${NC}"
+    echo -e "    Address:  ${CYAN}http://${ROE_HOST}:${ROE_PORT}${NC}"
+    echo ""
+    if [ -n "${ROE_PATH_ADDED:-}" ]; then
+        echo -e "  ${DIM}Open a new Terminal window first."
+    fi
+    echo -e "  ${BOLD}Run these from any folder${NC}"
+    echo -e "    ${CYAN}roe start${NC}"
+    echo -e "    ${CYAN}roe stop${NC}"
+    echo -e "    ${CYAN}roe open${NC}"
+    echo -e "    ${CYAN}roe${NC} for help"
     echo ""
     breathing_room
-    read -rp "  Register this site? [Y/n]: " REPLY
+    read -rp "Start Roe and open your site in the browser? [Y/n]: " REPLY
     echo ""
     case "${REPLY:-y}" in
         [Nn]*)
-            echo -e "  ${BOLD}You're ready.${NC} Start Roe with:"
-            echo -e "     ${CYAN}./roe.sh start${NC}"
-            echo -e "  Then open ${CYAN}http://localhost:${PORT:-3000}${NC}"
-            return 0
-            ;;
-    esac
-
-    cmd_register || return 1
-
-    echo ""
-    breathing_room
-    read -rp "  Start it now? [Y/n]: " REPLY
-    echo ""
-    case "${REPLY:-y}" in
-        [Nn]*)
-            echo -e "  ${BOLD}You're ready.${NC} Start it with ${CYAN}roe start${NC} from anywhere in the terminal."
+            echo -e "  ${BOLD}You're ready.${NC} Start it with ${CYAN}roe start${NC} whenever you like."
             return 0
             ;;
     esac
@@ -1358,7 +1372,7 @@ offer_registration_after_setup() {
     # returns once the port answers, so there is no need to wait again
     # before opening the browser.
     ROE_CLI=1 cmd_start --daemon || return 1
-    load_registry_entry && _open_url "http://${ROE_HOST}:${PORT}" 2>/dev/null
+    _open_url "http://${ROE_HOST}:${PORT:-$ROE_PORT}" 2>/dev/null
 }
 
 # ── setup-rbenv command ───────────────────────────────────────────────────────
@@ -1450,7 +1464,7 @@ hosts_has_entry() { grep -qE "^[^#]*[[:space:]]$1([[:space:]]|\$)" /etc/hosts 2>
 # and reads Windows' own hosts file, which we can't write from here, so
 # we print the line for the user to add instead.
 add_hosts_entry() {
-    local host="$1" name="$2"
+    local host="$1" name="$2" quiet="${3:-}"
     hosts_has_entry "$host" && { log_info "$host is already in /etc/hosts"; return 0; }
 
     if is_wsl; then
@@ -1458,21 +1472,24 @@ add_hosts_entry() {
         log_warning "On Windows the browser reads Windows' hosts file, not WSL's."
         echo "  Add this line to C:\\Windows\\System32\\drivers\\etc\\hosts (as Administrator):"
         echo ""
-        echo -e "      ${CYAN}127.0.0.1  ${host}${NC}"
+        echo -e "  ${CYAN}127.0.0.1  ${host}${NC}"
         echo ""
         echo "  Until then, use http://localhost:<port> from ./roe.sh status."
         return 0
     fi
 
-    echo ""
-    echo -e "  Mapping ${CYAN}${host}${NC} to this computer needs one line in /etc/hosts."
-    echo -e "  ${DIM}(macOS/Linux will ask for your password — that's sudo, for this one edit.)${NC}"
-    echo ""
+    # The install flow has already explained the password prompt.
+    if [ -z "$quiet" ]; then
+        echo ""
+        echo -e "  Mapping ${CYAN}${host}${NC} to this computer needs one line in /etc/hosts."
+        echo -e "  ${DIM}(macOS/Linux will ask for your password — that's sudo, for this one edit.)${NC}"
+        echo ""
+    fi
     if printf '%s\n' "$(_hosts_line "$host" "$name")" | sudo tee -a /etc/hosts >/dev/null; then
         log_success "Added $host to /etc/hosts"
     else
         log_warning "Couldn't write /etc/hosts. Add this line yourself:"
-        echo -e "      ${CYAN}$(_hosts_line "$host" "$name")${NC}"
+        echo -e "  ${CYAN}$(_hosts_line "$host" "$name")${NC}"
     fi
 }
 
@@ -1517,12 +1534,17 @@ install_global_cli() {
     mkdir -p "$ROE_BIN_DIR"
     cp "$src" "$ROE_BIN_DIR/roe" && chmod +x "$ROE_BIN_DIR/roe"
     log_success "Installed the global 'roe' command at $ROE_BIN_DIR/roe"
-    ensure_roe_bin_on_path
+    ensure_roe_bin_on_path "$@"
 }
 
 # Offer to put ~/.roe/bin on PATH in the user's shell rc. Same shape as
-# ensure_mise_in_shell: marker line, idempotent, asks first.
+# ensure_mise_in_shell: marker line, idempotent, asks first — unless
+# called with "yes", when the answer was already given (the install
+# flow). Sets ROE_PATH_ADDED=1 when it wrote the line, so the caller
+# knows the current terminal can't see `roe` yet.
 ensure_roe_bin_on_path() {
+    local assume_yes="${1:-}"
+    ROE_PATH_ADDED=""
     case ":$PATH:" in *":$ROE_BIN_DIR:"*) return 0 ;; esac
 
     local rc_file marker='# Added by Roe — global `roe` command'
@@ -1532,34 +1554,46 @@ ensure_roe_bin_on_path() {
     }
     grep -qF "$marker" "$rc_file" 2>/dev/null && return 0
 
-    echo ""
-    echo -e "  To run ${CYAN}roe${NC} from any folder, ${CYAN}$ROE_BIN_DIR${NC} needs to be on your PATH."
-    breathing_room
-    read -rp "  Add it to $rc_file? [Y/n]: " REPLY
-    case "${REPLY:-y}" in
-        [Nn]*)
-            echo -e "  Skipped. Add this line yourself when you like:"
-            echo -e "      ${CYAN}export PATH=\"\$HOME/.roe/bin:\$PATH\"${NC}"
-            ;;
-        *)
-            {
-                echo ''
-                echo "$marker"
-                echo 'export PATH="$HOME/.roe/bin:$PATH"'
-            } >> "$rc_file"
-            log_success "Added $ROE_BIN_DIR to PATH in $rc_file (open a new terminal to pick it up)"
-            ;;
-    esac
+    if [ "$assume_yes" != "yes" ]; then
+        echo ""
+        echo -e "  To run ${CYAN}roe${NC} from any folder, ${CYAN}$ROE_BIN_DIR${NC} needs to be on your PATH."
+        breathing_room
+        read -rp "  Add it to $rc_file? [Y/n]: " REPLY
+        case "${REPLY:-y}" in
+            [Nn]*)
+                echo -e "  Skipped. Add this line yourself when you like:"
+                echo -e "  ${CYAN}export PATH=\"\$HOME/.roe/bin:\$PATH\"${NC}"
+                return 0
+                ;;
+        esac
+    fi
+
+    {
+        echo ''
+        echo "$marker"
+        echo 'export PATH="$HOME/.roe/bin:$PATH"'
+    } >> "$rc_file"
+    ROE_PATH_ADDED=1
+    if [ "$assume_yes" = "yes" ]; then
+        log_success "Added $ROE_BIN_DIR to PATH in $rc_file"
+    else
+        log_success "Added $ROE_BIN_DIR to PATH in $rc_file (open a new terminal to pick it up)"
+    fi
 }
 
 cmd_register() {
+    # "quiet": called from the install flow, which explains the steps
+    # itself, adds the PATH line without asking, and prints its own
+    # summary — so skip the per-step preamble and the closing hint.
+    local quiet="" path_answer=""
+    [ "${1:-}" = "quiet" ] && { quiet=1; path_answer="yes"; }
     local name host port f existing_root
 
     if load_registry_entry; then
         log_info "This install is already registered as '$ROE_NAME' (http://$ROE_HOST:$ROE_PORT)."
         # Re-running is the way to repair a missing hosts line or CLI copy.
-        add_hosts_entry "$ROE_HOST" "$ROE_NAME"
-        install_global_cli
+        add_hosts_entry "$ROE_HOST" "$ROE_NAME" "$quiet"
+        install_global_cli "$path_answer"
         return 0
     fi
 
@@ -1574,7 +1608,7 @@ cmd_register() {
     if [ -f "$f" ]; then
         existing_root="$(_conf_get "$f" ROOT)"
         log_error "The name '$name' is already taken by another install:"
-        echo "      $existing_root"
+        echo "  $existing_root"
         echo ""
         echo "  Names come from the folder name, so rename this folder to something"
         echo "  distinct (or unregister the other install) and try again."
@@ -1586,11 +1620,12 @@ cmd_register() {
 
     printf 'NAME=%s\nROOT=%s\nHOST=%s\nPORT=%s\n' "$name" "$ROE_ROOT" "$host" "$port" > "$f"
     log_success "Registered '$name' → $ROE_ROOT"
-    echo -e "  URL: ${CYAN}http://${host}:${port}${NC}"
+    [ -z "$quiet" ] && echo -e "  URL: ${CYAN}http://${host}:${port}${NC}"
 
-    add_hosts_entry "$host" "$name"
-    install_global_cli
+    add_hosts_entry "$host" "$name" "$quiet"
+    install_global_cli "$path_answer"
 
+    [ -n "$quiet" ] && return 0
     echo ""
     echo -e "  Start it with ${CYAN}roe start ${name}${NC} from anywhere, or ${CYAN}./roe.sh start${NC} here."
 }
@@ -1945,9 +1980,9 @@ cmd_start() {
         echo -e "  Admin:  ${CYAN}${URL}/admin${NC}"
         echo ""
         echo "  Choose:"
-        echo "    [y] Start server and open in browser  (default)"
-        echo "    [s] Start server only — don't open browser"
-        echo "    [q] Quit without starting"
+        echo "  [y] Start server and open in browser  (default)"
+        echo "  [s] Start server only — don't open browser"
+        echo "  [q] Quit without starting"
         echo ""
         breathing_room
         read -rp "  Choice [y/s/q]: " REPLY
@@ -2204,9 +2239,9 @@ cmd_status() {
     else
         log_error "Ruby ${required_ruby}+ not found"
     fi
-    check_git     && log_success "Git $(git --version | cut -d' ' -f3)"   || log_error "Git not found"
-    check_bundler && log_success "Bundler"                                  || log_error "Bundler not found"
-    check_sqlite  && log_success "SQLite3"                                  || log_error "SQLite3 not found"
+    check_git     && log_success "Git $(git --version | cut -d' ' -f3)"  || log_error "Git not found"
+    check_bundler && log_success "Bundler"                         || log_error "Bundler not found"
+    check_sqlite  && log_success "SQLite3"                         || log_error "SQLite3 not found"
     check_libvips && log_success "libvips (optional)" || log_warning "libvips not installed (optional)"
 
     # Confirm the Windows setup is the supported one, so a user who followed

@@ -63,7 +63,7 @@ Roe is built with [Ruby](/documentation/roe/glossary#ruby), so most of what it i
 | **[Git](/documentation/roe/glossary#git)** | Roe's built-in updater uses Git to fetch new releases. | `xcode-select --install` or `brew install git` (macOS); your package manager (Linux) |
 | **[A C compiler and build tools](/documentation/roe/glossary#build-tools-c-compiler)** | Needed to build Ruby's libraries and any Ruby add-ons written in C. | Xcode Command Line Tools (macOS); `build-essential` or your distribution's equivalent (Linux) |
 
-The install script, `./roe.sh check`, checks for each of these, installs whatever is missing, and configures it.
+The install script, `./roe.sh install`, checks for each of these, installs whatever is missing, and configures it.
 
 ### How Ruby is installed
 

@@ -18,7 +18,13 @@ template: links
 
 # Manage your Members
 
-Members are able to edit their accounts by signing in and going to `/account`. Users can upgrade, cancel their membership and delete their accounts.
+Members are able to edit their accounts by signing in and going to `/account`. Users can:
+
+- edit their name and email
+- upgrade
+- cancel their membership
+- delete their accounts (this cannot be undone and requires confirmation)
+- unsubscribe or resubscribe to the newsletter
 
 ## [Admin → Members](/admin/members)
 
