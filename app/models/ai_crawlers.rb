@@ -108,7 +108,7 @@ module AiCrawlers
   # search results, and every crawler that honours robots.txt then leaves it
   # alone. Readers are unaffected: robots.txt governs crawlers, not the fetch
   # the search UI makes from the browser.
-  DISALLOWED_PATHS = %w[/search-index.json].freeze
+  DISALLOWED_PATHS = %w[/search-index.json /members/search-index.json].freeze
 
   # What the site.yml setting can be set to, strictest first. `block_all` is the
   # default for a new install: opting in later is a decision someone makes on

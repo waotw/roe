@@ -156,6 +156,78 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     refute_includes e[:text].to_s, "secret paid body"
   end
 
+  # --- paywall split ---------------------------------------------------------
+
+  PAYWALLED = "Free intro everyone may read.\n\n```form for: paid_content\nUpgrade now!\n```\n\nSecret paid body below the wall."
+  PAYWALLED_MULTILINE = "Free intro everyone may read.\n\n```form\nfor: paid_content\nbutton: Upgrade\n```\n\nSecret paid body below the wall."
+
+  test "public index carries a paid post's text above the paywall but nothing below" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "Walled", audience: "paid", body: PAYWALLED)
+
+    e = entry_titled("Walled")
+    assert_includes e[:text], "Free intro everyone may read"
+    refute_includes e[:text], "Secret paid body"
+    refute_includes e[:text], "Upgrade now"
+  end
+
+  test "paywall with for: paid_content on its own line splits the same way" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "Walled Two", audience: "paid", body: PAYWALLED_MULTILINE)
+
+    e = entry_titled("Walled Two")
+    assert_includes e[:text], "Free intro everyone may read"
+    refute_includes e[:text], "Secret paid body"
+  end
+
+  test "a paid post with no paywall is fully gated, so only its excerpt is public" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "No Wall", audience: "paid", body: "Every word here is paid.")
+
+    refute_includes entry_titled("No Wall")[:text], "Every word here is paid"
+  end
+
+  # --- paid audience (members' index) ---------------------------------------
+
+  def paid_entries
+    SearchIndexGenerator.build(audience: :paid)[:entries]
+  end
+
+  test "paid index carries a paid post's full text, including below the paywall" do
+    SiteConfig.stubs(:feature).returns(nil)
+    make_post(title: "Walled", audience: "paid", body: PAYWALLED)
+
+    e = paid_entries.find { |x| x[:title] == "Walled" }
+    assert e, "paid post should be in the paid index"
+    assert_includes e[:text], "Secret paid body below the wall"
+    assert_equal true, e[:paid]
+  end
+
+  test "paid index includes paid posts even when show_paid_content is off" do
+    SiteConfig.stubs(:feature).returns(nil)
+    make_post(title: "Hidden Teaser", audience: "paid", body: "secret paid body")
+
+    assert_nil entry_titled("Hidden Teaser"), "public index excludes it"
+    assert paid_entries.find { |x| x[:title] == "Hidden Teaser" }, "paid index includes it"
+  end
+
+  test "paid index still excludes drafts and only_paid" do
+    SiteConfig.stubs(:feature).returns(nil)
+    make_post(title: "Draft Paid", audience: "paid", status: "draft")
+    make_post(title: "Only Paid", audience: "only_paid")
+
+    titles = paid_entries.map { |x| x[:title] }
+    refute_includes titles, "Draft Paid"
+    refute_includes titles, "Only Paid"
+  end
+
+  test "rejects an unknown audience" do
+    assert_raises(ArgumentError) { SearchIndexGenerator.build(audience: :admin) }
+  end
+
   test "indexes products (which lack HasAudience) as public" do
     Product.create!(
       file_path: File.join(RoeSitePaths::SITE_PATH, "products", "widget.md"),

@@ -1,9 +1,19 @@
 # frozen_string_literal: true
 
-# Builds the public search index consumed by the client-side site search.
-# It's served both dynamically (/search-index.json) and baked into the
-# static build, so search works whether a Roe site runs on Rails or is
-# deployed as static HTML.
+# Builds the search index consumed by the client-side site search.
+#
+# Two audiences, one generator, so they can't drift:
+#
+#   :public — served at /search-index.json to everyone and baked into the
+#             static build. Paid posts appear as a teaser: title, excerpt,
+#             and whatever the author put ABOVE the paywall (the
+#             `for: paid_content` form block), which is public on the page
+#             anyway. Never the text below it. Only when members
+#             `everyone.show_paid_content` is on; otherwise paid posts are
+#             absent entirely.
+#   :paid   — served at /members/search-index.json to signed-in paid
+#             members only. Paid posts carry their full text like any
+#             other. Never baked into a static build.
 #
 # Each entry: { title, url, type, post_type, tags, paid, text, excerpt }.
 # `type` mirrors a collection `source` (posts/pages/documentation/products)
@@ -13,16 +23,28 @@
 # Visibility (matches public listings):
 #   - published only — drafts and unlisted are excluded
 #   - audience "everyone"/blank — indexed with full body text
-#   - audience "paid" — indexed as a teaser (title + excerpt, no body) ONLY
-#     when members `everyone.show_paid_content` is on; otherwise excluded
+#   - audience "paid" — see above
 #   - anything else (e.g. only_paid) — excluded
 class SearchIndexGenerator
   # Cap body text per entry so the index stays small; enough for useful
   # matching without shipping whole articles.
   TEXT_LIMIT = 2000
 
-  def self.build
-    new.build
+  AUDIENCES = %i[public paid].freeze
+
+  # The paywall is a ```form block with `for: paid_content` — either on the
+  # fence line (```form for: paid_content) or inside the block. Everything
+  # above it is public on the page. Matches the whole fenced block so the
+  # split point is the start of the fence.
+  PAYWALL_BLOCK = /^```form\b(?:[^\n]*for:\s*paid_content[^\n]*\n|[^\n]*\n(?:(?!```)[^\n]*\n)*?[^\n]*for:\s*paid_content[^\n]*\n).*?^```[ \t]*$/m
+
+  def self.build(audience: :public)
+    new(audience: audience).build
+  end
+
+  def initialize(audience: :public)
+    raise ArgumentError, "audience must be one of #{AUDIENCES.inspect}" unless AUDIENCES.include?(audience)
+    @audience = audience
   end
 
   def build
@@ -30,6 +52,8 @@ class SearchIndexGenerator
   end
 
   private
+
+  def paid_audience? = @audience == :paid
 
   def entries
     out = []
@@ -103,12 +127,17 @@ class SearchIndexGenerator
     # anything without audience predicates as publicly accessible.
     paid = record.respond_to?(:premium?) && record.premium?
     if paid
-      return nil unless show_paid_teasers?
+      return nil unless paid_audience? || show_paid_teasers?
     elsif record.respond_to?(:publicly_accessible?) && !record.publicly_accessible?
       return nil # only_paid / non-public audiences never enter the index
     end
 
-    text = paid ? excerpt_for(record) : full_text(record)
+    text =
+      if !paid || paid_audience?
+        full_text(record)
+      else
+        teaser_text(record)
+      end
 
     {
       title: record.title.to_s,
@@ -148,16 +177,35 @@ class SearchIndexGenerator
     record.respond_to?(:excerpt) ? record.excerpt.to_s : ""
   end
 
+  # What a non-member may search in a paid post: the excerpt plus whatever
+  # sits above the paywall. A paid post with no paywall block is fully
+  # gated on the page (SiteController redirects to upgrade), so nothing of
+  # its body is public and only the excerpt goes in.
+  def teaser_text(record)
+    above = text_above_paywall(record.content.to_s)
+    return excerpt_for(record) if above.nil?
+
+    [ record.title, excerpt_for(record), plain_text(above) ].join(" ").strip[0, TEXT_LIMIT]
+  end
+
+  # The markdown before the paywall block, or nil when there is no paywall.
+  def text_above_paywall(content)
+    m = PAYWALL_BLOCK.match(content)
+    m && content[0...m.begin(0)]
+  end
+
   # Plain-ish text for matching: title + a stripped, truncated body. We keep
   # this cheap (no full markdown render) — strip fenced blocks and the
   # heaviest markup, collapse whitespace, and cap the length.
   def full_text(record)
-    body = record.content.to_s
-                 .gsub(/```.*?```/m, " ")        # fenced blocks (code/cards/etc.)
-                 .gsub(/!\[[^\]]*\]\([^)]*\)/, " ") # images
-                 .gsub(/[#>*_`~\-|]/, " ")        # common markdown punctuation
-                 .gsub(/\s+/, " ")
-                 .strip
-    [ record.title, body ].join(" ").strip[0, TEXT_LIMIT]
+    [ record.title, plain_text(record.content.to_s) ].join(" ").strip[0, TEXT_LIMIT]
+  end
+
+  def plain_text(markdown)
+    markdown.gsub(/```.*?```/m, " ")        # fenced blocks (code/cards/etc.)
+            .gsub(/!\[[^\]]*\]\([^)]*\)/, " ") # images
+            .gsub(/[#>*_`~\-|]/, " ")        # common markdown punctuation
+            .gsub(/\s+/, " ")
+            .strip
   end
 end

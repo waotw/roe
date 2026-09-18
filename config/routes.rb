@@ -468,6 +468,9 @@ Rails.application.routes.draw do
   # Public search index (client-side site search). Static builds bake the
   # same JSON to /search-index.json so search works with no backend.
   get "search-index.json", to: "search#index", as: :search_index, defaults: { format: "json" }
+  # The same index with paid posts' full text, for signed-in paid members.
+  # Dynamic sites only; never baked into a static build.
+  get "members/search-index.json", to: "search#members", as: :members_search_index, defaults: { format: "json" }
 
   # Feeds
   get "feed", to: "feeds#rss", defaults: { format: "xml" }, as: :feed
