@@ -26,9 +26,29 @@
 #   - audience "paid" — see above
 #   - anything else (e.g. only_paid) — excluded
 class SearchIndexGenerator
-  # Cap body text per entry so the index stays small; enough for useful
-  # matching without shipping whole articles.
-  TEXT_LIMIT = 2000
+  # The first PROSE_LIMIT characters of each entry are running text (phrases
+  # match there); the rest is a vocabulary. TEXT_LIMIT caps the whole thing
+  # so one enormous post can't bloat the file every visitor downloads.
+  PROSE_LIMIT = 2000
+  TEXT_LIMIT  = 12_000
+
+  # Words too common to help find anything. English only; a site in another
+  # language just gets a larger vocabulary, nothing is lost.
+  STOPWORDS = %w[
+    the and for are but not you all any can had her was one our out has his
+    how its may new now old see two way who did get let put say she too use
+    with this that from they have been were what when your will would there
+    their which them then than these those some more most such into over
+    only also very just like about after before being other because through
+    where while both each does each few here many much must same should
+    still under until upon well went does dont don't cant can't its it's
+    i'm i've i'd i'll we're we've we'll they're they've you're you've you'll
+    isn't aren't wasn't weren't hasn't haven't hadn't doesn't didn't won't
+    wouldn't couldn't shouldn't again against between down during off once
+    own why yes yet who whom whose ever every however therefore whether
+    might could shall something anything nothing everything someone anyone
+    everyone them themselves himself herself itself myself yourself ourselves
+  ].to_set.freeze
 
   AUDIENCES = %i[public paid].freeze
 
@@ -132,11 +152,11 @@ class SearchIndexGenerator
       return nil # only_paid / non-public audiences never enter the index
     end
 
-    text =
+    text, headings =
       if !paid || paid_audience?
-        full_text(record)
+        [ full_text(record), headings_in(record.content.to_s) ]
       else
-        teaser_text(record)
+        [ teaser_text(record), teaser_headings(record) ]
       end
 
     {
@@ -147,6 +167,7 @@ class SearchIndexGenerator
       tags: tags_for(record),
       paid: paid,
       excerpt: excerpt_for(record),
+      headings: headings.presence,
       text: text
     }.compact
   end
@@ -185,7 +206,12 @@ class SearchIndexGenerator
     above = text_above_paywall(record.content.to_s)
     return excerpt_for(record) if above.nil?
 
-    [ record.title, excerpt_for(record), plain_text(above) ].join(" ").strip[0, TEXT_LIMIT]
+    searchable_text(record.title, excerpt_for(record), above)
+  end
+
+  def teaser_headings(record)
+    above = text_above_paywall(record.content.to_s)
+    above.nil? ? "" : headings_in(above)
   end
 
   # The markdown before the paywall block, or nil when there is no paywall.
@@ -194,11 +220,49 @@ class SearchIndexGenerator
     m && content[0...m.begin(0)]
   end
 
-  # Plain-ish text for matching: title + a stripped, truncated body. We keep
-  # this cheap (no full markdown render) — strip fenced blocks and the
-  # heaviest markup, collapse whitespace, and cap the length.
   def full_text(record)
-    [ record.title, plain_text(record.content.to_s) ].join(" ").strip[0, TEXT_LIMIT]
+    searchable_text(record.title, "", record.content.to_s)
+  end
+
+  # What the client matches against. The first PROSE_LIMIT characters are
+  # kept as running text, so a phrase typed from memory still matches there
+  # exactly as it always has. Everything after that point is folded into a
+  # vocabulary — each distinct word once, common words dropped — so the
+  # whole post is searchable without shipping the whole post. A 49,000-
+  # character essay is ~1,200 distinct words, about the size of a 2,000-
+  # character prefix; past the prefix a multi-word query matches when
+  # every word is present, not when they're adjacent.
+  def searchable_text(title, lead, markdown)
+    body   = plain_text(markdown)
+    prose  = [ title, lead, body ].reject(&:blank?).join(" ").strip[0, PROSE_LIMIT]
+    rest   = body[PROSE_LIMIT..]
+    return prose if rest.blank?
+
+    # Terms already in the prose are findable there, so don't repeat them.
+    seen  = terms_in(prose)
+    extra = terms_in(rest).reject { |t| seen.include?(t) }
+    [ prose, extra.join(" ") ].join(" ").strip[0, TEXT_LIMIT]
+  end
+
+  # Distinct lowercased words worth indexing, in first-seen order. Anything
+  # under three letters or on the stopword list carries no signal. Digits
+  # stay — a year or a version number is exactly what someone searches for.
+  def terms_in(text)
+    text.downcase.scan(/[[:alnum:]][[:alnum:]'’-]*[[:alnum:]]|[[:alnum:]]/)
+        .reject { |w| w.length < 3 || STOPWORDS.include?(w) }
+        .uniq
+  end
+
+  # Markdown headings, as prose. These are the phrases people remember from
+  # a post, so they are kept whole rather than folded into the vocabulary.
+  # Fenced blocks are stripped first so a `#` inside code isn't a heading.
+  def headings_in(markdown)
+    markdown.gsub(/```.*?```/m, " ")
+            .scan(/^\#{1,6}[ \t]+(.+?)[ \t#]*$/)
+            .flatten
+            .map { |h| h.gsub(/[*_`~]/, "").strip }
+            .reject(&:blank?)
+            .join(" · ")
   end
 
   def plain_text(markdown)

@@ -36,6 +36,6 @@ class SearchController < ApplicationController
     paid = SiteConfig.feature("members", "everyone.show_paid_content")
     # Bump the version whenever the index's shape/contents logic changes
     # (content timestamps alone won't invalidate a code-only change).
-    [ "search_index", "v3", audience, stamp, paid ]
+    [ "search_index", "v4", audience, stamp, paid ]
   end
 end

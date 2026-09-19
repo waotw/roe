@@ -26,6 +26,11 @@
 #      markdown body, so we strip the `---\n…\n---\n` block from the
 #      destination after copy.
 #
+#   4. Site JavaScript — the other direction. current/app/site_js/ →
+#      site/javascript/roe/, an exact mirror. That folder is Roe's (the
+#      app rewrites it on boot too); a site overrides a file by putting
+#      its own copy in site/javascript/, which this never touches.
+#
 # Usage (from anywhere):
 #
 #   bin/sync-from-site            # do it
@@ -115,6 +120,17 @@ if [[ -z "$DRY_RUN" ]]; then
   ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
   echo "    (stripped YAML frontmatter from destination)"
 fi
+echo ""
+
+echo "→ Site JavaScript (current/ is canonical → Roe's folder in site/):"
+# app/site_js/ is Roe's own front-end code (the search overlay and so on).
+# On boot it's written into site/javascript/roe/, which Roe owns outright —
+# a site overrides a file by putting its own copy one level up. So this is
+# a plain mirror into roe/; site/javascript/ itself is never touched.
+echo "    current/app/site_js/  →  site/javascript/roe/"
+rsync -avc $DRY_RUN --delete \
+  current/app/site_js/ \
+  site/javascript/roe/
 echo ""
 
 echo "→ Root launcher/docs (current/ is canonical → mirror to package root):"

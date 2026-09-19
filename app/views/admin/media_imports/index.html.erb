@@ -3,9 +3,9 @@
 <div class="max-w-3xl mx-auto">
   <h1 class="text-2xl font-bold mb-2">Media Imports</h1>
   <p class="text-sm text-gray-500 mb-6">
-    Finds external images, audio, and video linked across your posts, pages, and
-    products, downloads them into your local media library, and rewrites the
-    links. Downloads run in the background — big audio and video are fine.
+    Downloads external images, audio, and video linked in your posts, pages, and
+    products into your local media library, and rewrites the
+    links. Downloads run in the background — supports large audio and video files as well.
   </p>
 
   <%# Live panel only while running — polling. Terminal states render a static
@@ -46,7 +46,7 @@
   <% total = @summary.values.sum { |v| v[:urls] } %>
   <% if total.zero? %>
     <div class="bg-white shadow p-6 text-sm text-gray-600">
-      No external media found — everything referenced is already local.
+      No external media found — all references to media in your site are in your <code class="text-xs bg-gray-100 px-0.5 border border-gray-300 rounded-xs">site/</code> folder.
     </div>
   <% else %>
     <div class="bg-white shadow p-6">
