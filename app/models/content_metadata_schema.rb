@@ -134,6 +134,9 @@ module ContentMetadataSchema
       "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. nav, footer)" },
       "url_name" => { type: :text, label: "url_name", hint: "auto-generated from title if blank" },
       "image" => { type: :text, label: "image", hint: "Post image, episode artwork, etc: /media/images/image-file.png", required: required_for_type.call("image") },
+      # Right under image, where it belongs: the editor adds it as soon as an
+      # image is set, and the order here is the order rows appear in.
+      "image_in_header" => { type: :checkbox, label: "image_in_header", hint: "Show post image in the header?" },
       "excerpt" => { type: :textarea, label: "excerpt" },
       "audience" => {
         type: :select,
@@ -218,7 +221,6 @@ module ContentMetadataSchema
       "lyrics" => { type: :textarea, label: "lyrics" },
 
       "show_sidebar" => { type: :checkbox, label: "show_sidebar" },
-      "image_in_header" => { type: :checkbox, label: "image_in_header", hint: "Show post image in the header?" },
       "related" => { type: :text, label: "related", hint: "Related item url_names, comma-separated (bi-directional)" }
     }
   end

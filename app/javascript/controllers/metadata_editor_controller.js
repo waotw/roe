@@ -356,6 +356,13 @@ export default class extends Controller {
       this.setupGroupListener();
     }
 
+    // The listener from connect() bound to the image input that existed at
+    // load; an image field added from the menu needs its own, or picking
+    // an image never surfaces image_in_header until a save re-renders.
+    if (fieldName === "image") {
+      this.setupImageInHeaderListener();
+    }
+
     this._notifyMetadataChange();
 
     // Focus the input only when triggered by user action
@@ -428,6 +435,14 @@ export default class extends Controller {
     }
 
     row.remove();
+
+    // image_in_header only means something with an image. Removing the
+    // image takes it with it (unless it was saved that way, which
+    // updateImageInHeaderVisibility already respects).
+    if (fieldName === "image") {
+      this.updateImageInHeaderVisibility("");
+    }
+
     this._notifyMetadataChange();
   }
 
