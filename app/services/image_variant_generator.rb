@@ -361,6 +361,80 @@ class ImageVariantGenerator
       IMAGE_EXTENSIONS.include?(File.extname(path).downcase)
     end
 
+    # An animated GIF — more than one frame. Variants of it would be stills
+    # (libvips resizes the first frame only), so the renderer serves the
+    # original instead and generation skips everything but the admin thumb.
+    #
+    # Frame count via libvips when it's there; otherwise a byte scan for a
+    # second image descriptor (0x2C after the first frame's data), which is
+    # what a GIF decoder itself looks for. Anything unreadable is treated as
+    # not animated — the worst case is then a still, which is today's
+    # behaviour, rather than a broken image.
+    def animated?(path)
+      path = path.to_s
+      # An absolute path that exists is taken as-is; anything else (a web
+      # path like /media/images/x.gif) is resolved under site/ like every
+      # other entry point here.
+      path = normalize_path(path) unless path.start_with?("/") && File.file?(path)
+      return false unless File.extname(path).downcase == ".gif"
+      return false unless File.exist?(path)
+
+      if available?
+        Vips::Image.new_from_file(path, n: -1).get("n-pages").to_i > 1
+      else
+        gif_frame_count_at_least_two?(path)
+      end
+    rescue => e
+      Rails.logger.info "[ImageVariants] Couldn't read frame count for #{File.basename(path)}: #{e.message}"
+      false
+    end
+
+    # True when the file holds at least two image descriptors. Reads the
+    # whole file, which is fine: a GIF too big to read is a GIF too big to
+    # serve. Extension blocks (0x21) are skipped by length so their bytes
+    # can't be mistaken for a descriptor.
+    def gif_frame_count_at_least_two?(path)
+      data = File.binread(path)
+      return false unless data.start_with?("GIF8")
+
+      # Header (6) + logical screen descriptor (7), then the global colour
+      # table if the packed byte says there is one.
+      packed = data.getbyte(10).to_i
+      pos = 13
+      pos += 3 * (2 << (packed & 0x07)) if packed & 0x80 != 0
+
+      frames = 0
+      while pos < data.bytesize
+        case data.getbyte(pos)
+        when 0x2C # image descriptor
+          frames += 1
+          return true if frames >= 2
+          pos += 10 # descriptor
+          lpacked = data.getbyte(pos - 1).to_i
+          pos += 3 * (2 << (lpacked & 0x07)) if lpacked & 0x80 != 0
+          pos += 1 # LZW minimum code size
+          pos = skip_sub_blocks(data, pos)
+        when 0x21 # extension: label byte, then sub-blocks
+          pos = skip_sub_blocks(data, pos + 2)
+        when 0x3B # trailer
+          break
+        else
+          break
+        end
+      end
+      false
+    end
+
+    def skip_sub_blocks(data, pos)
+      while pos < data.bytesize
+        size = data.getbyte(pos).to_i
+        pos += 1
+        return pos if size.zero?
+        pos += size
+      end
+      pos
+    end
+
     # Detect any path inside a "variants" directory — file path or web
     # path, absolute or relative. Used by generate_variants and queue! to
     # refuse recursion. The check is segment-based so it doesn't false-
@@ -377,6 +451,11 @@ class ImageVariantGenerator
     # under-generate. Shared by generate_variants and variants_exist? so
     # the two always agree on the expected set.
     def variant_names_for(source_path)
+      # An animated GIF is served as the original; only the admin grid
+      # wants a still of it. Also what variants_exist? checks against, so
+      # "complete" for these means "the thumb is there".
+      return [ :thumb ] if animated?(source_path)
+
       width = image_width(source_path)
       width ? needed_variant_names(width) : VARIANTS.keys
     end

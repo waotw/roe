@@ -363,6 +363,17 @@ export default class extends Controller {
       this.setupImageInHeaderListener();
     }
 
+    // digital_product_controller adds file_guid when the digital box is
+    // ticked, but it listens for input/change — and a field added from the
+    // menu arrives ticked without either firing, so the GUID row didn't
+    // show until the next click anywhere in the editor. Fire the event it's
+    // waiting for so both rows land together, with the link and warning.
+    if (fieldName === "digital") {
+      row
+        .querySelector('[data-metadata-field="digital"]')
+        ?.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
     this._notifyMetadataChange();
 
     // Focus the input only when triggered by user action
