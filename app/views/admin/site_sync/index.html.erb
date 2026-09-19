@@ -1010,7 +1010,7 @@
                    class="flex-1 px-3 py-2 border border-gray-300 rounded-xs font-mono text-xs text-gray-800 bg-gray-50"
                    onclick="this.select();">
             <button type="button"
-                    onclick="const f=document.getElementById('sync-token-field');f.select();navigator.clipboard.writeText(f.value);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000);"
+                    onclick="const f=document.getElementById('sync-token-field');f.select();window.copyToClipboard(f.value);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000);"
                     class="uppercase inline-flex items-center px-3 py-2 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs cursor-pointer">
               Copy
             </button>

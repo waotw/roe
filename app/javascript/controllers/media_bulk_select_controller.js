@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 export default class extends Controller {
   static targets = [
@@ -49,8 +50,7 @@ export default class extends Controller {
     const url = selected.map((cb) => cb.dataset.filePath).join("\n");
     const btn = event.currentTarget;
 
-    navigator.clipboard
-      .writeText(url)
+    copyToClipboard(url)
       .then(() => this.flashCopied(btn, "Copied!"))
       .catch(() => this.flashCopied(btn, "Press ⌘/Ctrl-C"));
   }

@@ -1,6 +1,7 @@
 # Pin npm packages by running ./bin/importmap
 
 pin "application"
+pin "clipboard", to: "clipboard.js", preload: true
 pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "delete_modal", to: "delete_modal.js", preload: true
 pin "theme_reset_modal", to: "theme_reset_modal.js", preload: true

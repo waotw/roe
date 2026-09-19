@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 // Copy a value to the clipboard and flash a quick "Copied" label on
 // the triggering button. Two ways to supply the value:
@@ -29,10 +30,11 @@ export default class extends Controller {
     if (!text) return;
 
     try {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       this.flashSuccess(button);
     } catch (e) {
       console.warn("[clipboard] copy failed:", e);
+      this.flashSuccess(button, "Press ⌘/Ctrl-C");
     }
   }
 
@@ -43,9 +45,9 @@ export default class extends Controller {
     return "value" in source ? source.value : source.textContent;
   }
 
-  flashSuccess(button) {
+  flashSuccess(button, label = this.successLabelValue) {
     const original = button.textContent;
-    button.textContent = this.successLabelValue;
+    button.textContent = label;
     button.disabled = true;
     setTimeout(() => {
       button.textContent = original;

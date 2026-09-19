@@ -222,32 +222,28 @@
 
   function copyMarkdown(event, path, filename) {
     const markdown = `![${filename}](${path})`;
-    navigator.clipboard.writeText(markdown).then(() => {
-      const btn = event.target;
-      const originalText = btn.textContent;
-      btn.textContent = 'Copied!';
-      btn.classList.add('bg-green-200');
-      setTimeout(() => {
-        btn.textContent = originalText;
-        btn.classList.remove('bg-green-200');
-      }, 1500);
-    }).catch(err => {
-      alert('Failed to copy: ' + err);
-    });
+    flashCopy(event.target, window.copyToClipboard(markdown));
   }
 
   function copyUrl(event, path) {
-    navigator.clipboard.writeText(path).then(() => {
-      const btn = event.target;
-      const originalText = btn.textContent;
+    flashCopy(event.target, window.copyToClipboard(path));
+  }
+
+  // window.copyToClipboard (app/javascript/clipboard.js) falls back to
+  // execCommand where navigator.clipboard is missing — which it is on
+  // http://<name>.roe, the address every registered install runs at.
+  function flashCopy(btn, promise) {
+    const originalText = btn.textContent;
+    promise.then(() => {
       btn.textContent = 'Copied!';
       btn.classList.add('bg-green-200');
+    }).catch(() => {
+      btn.textContent = 'Press ⌘/Ctrl-C';
+    }).finally(() => {
       setTimeout(() => {
         btn.textContent = originalText;
         btn.classList.remove('bg-green-200');
       }, 1500);
-    }).catch(err => {
-      alert('Failed to copy: ' + err);
     });
   }
 </script>

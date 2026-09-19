@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 // Handles live polling for two independent long-running operations on
 // the Updates & Deploy page:
@@ -328,7 +329,7 @@ export default class extends Controller {
     if (!command) return;
 
     try {
-      await navigator.clipboard.writeText(command);
+      await copyToClipboard(command);
       const originalText = btn.textContent;
       btn.textContent = "Copied!";
       btn.classList.add("bg-green-100", "border-green-500", "text-green-800");
@@ -341,9 +342,8 @@ export default class extends Controller {
         );
       }, 1500);
     } catch (e) {
-      // navigator.clipboard requires a secure context (HTTPS or localhost)
-      // and a user gesture. localhost in dev should always satisfy both,
-      // but fall back gracefully just in case.
+      // copyToClipboard already tried the execCommand fallback, so this
+      // is a browser that truly can't copy from script.
       console.warn("[updates] clipboard write failed:", e.message);
       btn.textContent = "Select & copy manually";
     }

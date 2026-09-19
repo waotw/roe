@@ -156,7 +156,7 @@
       const original = copyBtn.textContent;
       copyBtn.addEventListener('click', async () => {
         try {
-          await navigator.clipboard.writeText(copyBtn.dataset.codes || "");
+          await window.copyToClipboard(copyBtn.dataset.codes || "");
           copyBtn.textContent = 'Copied!';
         } catch (e) {
           copyBtn.textContent = 'Copy failed';

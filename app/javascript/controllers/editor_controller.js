@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 // Import EditorState directly
 if (!window.EditorState || !window.EditorState.saveElement) {
@@ -1855,7 +1856,7 @@ export default class extends Controller {
     const postId = this.resourceIdValue;
     const fullUrl = `${window.location.origin}/p/${postId}#${slug}`;
 
-    navigator.clipboard.writeText(fullUrl).then(() => {
+    copyToClipboard(fullUrl).then(() => {
       // Save original classes
       const originalClasses = button.className;
       const originalText = button.textContent;

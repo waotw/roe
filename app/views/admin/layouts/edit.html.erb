@@ -90,7 +90,7 @@
         const feedback = document.getElementById('copy-feedback');
 
         try {
-          await navigator.clipboard.writeText(url);
+          await window.copyToClipboard(url);
           feedback.textContent = `\u2713 Copied: ${label} (${url})`;
           feedback.className = 'mt-2 text-xs text-green-600';
 
