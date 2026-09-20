@@ -1,15 +1,21 @@
 # Site-facing vanilla JS (search.js, gallery.js, checkout.js, footnotes.js).
 #
-# The shipped source is app/site_js/. On boot it's written into
-# site/javascript/roe/ — Roe's folder, rewritten every boot, so a fix that
-# ships with an update reaches every site the moment it starts. The same
-# split as documentation/roe/: the roe/ subfolder is Roe's, everything
-# beside it is the site's.
+# The shipped source is app/site_js/. On first boot each file is copied
+# into site/javascript/ — once, if missing — and from then on the site
+# owns it. Roe never rewrites, moves or renames anything in site/javascript/
+# on boot: site/ travels between installs by Site Sync, and a change made
+# by new code lands on a live site still running the old code
+# (conventions.md, rule 8).
 #
-# To customise a file, copy it up one level: site/javascript/search.js wins
-# over site/javascript/roe/search.js, and Roe never touches it. Resolution
-# is site → roe → shipped source, for the dynamic controller and the static
-# generator alike, so an override wins in either mode.
+# Updates reach a site the same way theme updates do. Each shipped file
+# carries a header with its version and a fingerprint of its body;
+# ShippedFileInspector compares the site's copy to the shipped one, and the
+# Updates page offers the newer version — in one click when the copy is
+# untouched, with a diff and a download of the site's copy when it has been
+# edited. Nothing changes until someone chooses.
+#
+# Resolution is site copy first, shipped source second, for the dynamic
+# controller and the static generator alike.
 module SiteJavascript
   module_function
 
@@ -21,69 +27,85 @@ module SiteJavascript
     File.join(RoeSitePaths::SITE_PATH, "javascript")
   end
 
-  # Roe's own copies, refreshed on every boot.
-  def roe_dir
-    File.join(site_dir, "roe")
-  end
-
-  # Names of the files Roe ships — the set that roe/ owns.
+  # Names of the files Roe ships.
   def shipped_names
-    Dir.glob(File.join(source_dir, "*.js")).map { |f| File.basename(f) }
+    Dir.glob(File.join(source_dir, "*.js")).map { |f| File.basename(f) }.sort
   end
 
-  # Absolute path for a filename: the site's override if present, else Roe's
-  # copy in roe/, else the shipped source. Basename-only, so a request can't
-  # escape the directory.
+  # Absolute path for a filename — the site copy if present, else the
+  # shipped source. Basename-only, so a request can't escape the directory.
   def path(filename)
     name = File.basename(filename.to_s)
-    [ File.join(site_dir, name), File.join(roe_dir, name), File.join(source_dir, name) ]
-      .find { |p| File.exist?(p) } || File.join(source_dir, name)
+    site = File.join(site_dir, name)
+    File.exist?(site) ? site : File.join(source_dir, name)
   end
 
   def exist?(filename)
     File.exist?(path(filename))
   end
 
-  # True when the site has its own copy shadowing Roe's.
-  def overridden?(filename)
-    File.exist?(File.join(site_dir, File.basename(filename.to_s)))
-  end
-
-  # Write Roe's copies into site/javascript/roe/, overwriting whatever is
-  # there — that folder is Roe's. Never touches files beside it.
-  #
-  # Also the one-time move for sites from before roe/ existed: the seeder
-  # used to put these same files directly in site/javascript/, where they
-  # now read as overrides and would pin the site to the old code forever.
-  # An untouched seed is renamed out of the way rather than deleted, so a
-  # copy someone did edit is still there to put back. Only Roe's own
-  # filenames are considered, and only on the boot that creates roe/ —
-  # after that a Roe filename in site/javascript/ is an override and stays.
+  # Copy any shipped JS not already in site/javascript so the site carries
+  # its own copies. Never touches a file already there.
   def seed!
-    # Only before roe/ exists — that's the one boot where a Roe filename in
-    # site/javascript/ is the old seed rather than a deliberate override.
-    retire_pre_roe_copies! unless File.directory?(roe_dir)
-
-    FileUtils.mkdir_p(roe_dir)
+    undo_roe_subfolder!
+    FileUtils.mkdir_p(site_dir)
     Dir.glob(File.join(source_dir, "*.js")).each do |src|
-      dest = File.join(roe_dir, File.basename(src))
-      FileUtils.cp(src, dest) unless File.exist?(dest) && FileUtils.identical?(src, dest)
+      dest = File.join(site_dir, File.basename(src))
+      FileUtils.cp(src, dest) unless File.exist?(dest)
     end
   rescue => e
     Rails.logger.warn "[SiteJavascript] seed skipped: #{e.class} #{e.message}"
   end
 
-  RETIRED_SUFFIX_DATE = "2026-09-19".freeze
+  # One update report per shipped file, for the Updates page.
+  def reports
+    shipped_names.map do |name|
+      [ name, ShippedFileInspector.report(
+        bundled_path:   File.join(source_dir, name),
+        installed_path: File.join(site_dir, name)
+      ) ]
+    end.to_h
+  end
 
-  def retire_pre_roe_copies!
+  # Replace the site's copy with the shipped one. The single write path for
+  # an update, and it only ever runs because someone clicked.
+  def update!(filename)
+    name = File.basename(filename.to_s)
+    src  = File.join(source_dir, name)
+    raise ArgumentError, "Roe doesn't ship #{name}" unless File.exist?(src)
+
+    FileUtils.mkdir_p(site_dir)
+    FileUtils.cp(src, File.join(site_dir, name))
+  end
+
+  # ── nightly.4 undo ─────────────────────────────────────────────────────
+  #
+  # One nightly moved these files into site/javascript/roe/ and renamed the
+  # originals with a date suffix. That broke the rule above and a live
+  # site with it. This puts things back on the first boot that finds the
+  # layout, and only then: remove roe/ (Roe made it, Roe removes it) and
+  # restore each renamed file when nothing sits where it came from. Sites
+  # that never ran that nightly have no roe/ folder and nothing happens.
+  RETIRED_SUFFIX = ".2026-09-19".freeze
+
+  def undo_roe_subfolder!
+    roe_dir = File.join(site_dir, "roe")
+    return unless File.directory?(roe_dir)
+
     shipped_names.each do |name|
-      old = File.join(site_dir, name)
-      next unless File.file?(old)
+      original = File.join(site_dir, name)
+      retired  = "#{original}#{RETIRED_SUFFIX}"
+      next unless File.file?(retired)
 
-      retired = "#{old}.#{RETIRED_SUFFIX_DATE}"
-      retired = "#{old}.#{RETIRED_SUFFIX_DATE}.#{Time.now.to_i}" if File.exist?(retired)
-      FileUtils.mv(old, retired)
-      Rails.logger.info "[SiteJavascript] moved #{name} aside as #{File.basename(retired)} — Roe's copy now lives in javascript/roe/; copy it back up to override"
+      if File.exist?(original)
+        Rails.logger.info "[SiteJavascript] #{name} already present; leaving #{File.basename(retired)} for you to delete"
+      else
+        FileUtils.mv(retired, original)
+        Rails.logger.info "[SiteJavascript] restored #{name} from #{File.basename(retired)}"
+      end
     end
+
+    FileUtils.rm_rf(roe_dir)
+    Rails.logger.info "[SiteJavascript] removed site/javascript/roe/ — updates now go through Admin → Updates"
   end
 end

@@ -4,9 +4,8 @@ class System::JavascriptsController < ApplicationController
 
   def show
     # Serve the site-facing vanilla JS (search.js, gallery.js, checkout.js).
-    # SiteJavascript resolves site/javascript/<name> (an override), then
-    # site/javascript/roe/<name> (Roe's copy), then the shipped app/site_js/;
-    # the basename guard blocks traversal.
+    # SiteJavascript prefers the per-site copy in site/javascript/ and falls
+    # back to the shipped app/site_js/; the basename guard blocks traversal.
     filename = File.basename(params[:filename].to_s)
     format = params[:format] == "css" ? "css" : "js"
     full_filename = "#{filename}.#{format}"

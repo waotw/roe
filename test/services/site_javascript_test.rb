@@ -1,14 +1,13 @@
 require "test_helper"
 
-# Roe's front-end JS lives in site/javascript/roe/ (Roe's folder, rewritten
-# on boot) and a site overrides a file by putting its own copy one level up.
-# Resolution: site → roe → shipped source.
+# Roe's front-end JS is seeded into site/javascript/ once and then belongs
+# to the site. Roe never rewrites or renames it on boot; updates are offered
+# on the Updates page through ShippedFileInspector. Resolution: site copy
+# first, shipped source second.
 class SiteJavascriptTest < ActiveSupport::TestCase
   SITE = SiteJavascript.site_dir
-  ROE  = SiteJavascript.roe_dir
 
   setup do
-    # Snapshot the site javascript tree so the test can mutate it freely.
     @backup = {}
     Dir.glob(File.join(SITE, "**", "*")).each { |f| @backup[f] = File.read(f) if File.file?(f) } if File.directory?(SITE)
     FileUtils.rm_rf(SITE)
@@ -22,76 +21,91 @@ class SiteJavascriptTest < ActiveSupport::TestCase
     end
   end
 
-  test "path resolves site override, then roe copy, then shipped source" do
+  test "path prefers the site copy, falls back to the shipped source" do
     assert_equal File.join(SiteJavascript.source_dir, "search.js"), SiteJavascript.path("search.js")
 
-    FileUtils.mkdir_p(ROE)
-    roe_copy = File.join(ROE, "search.js")
-    File.write(roe_copy, "// roe")
-    assert_equal roe_copy, SiteJavascript.path("search.js"), "roe copy beats shipped source"
-
+    FileUtils.mkdir_p(SITE)
     site_copy = File.join(SITE, "search.js")
-    File.write(site_copy, "// override")
-    assert_equal site_copy, SiteJavascript.path("search.js"), "site override beats roe copy"
-    assert SiteJavascript.overridden?("search.js")
+    File.write(site_copy, "// mine")
+    assert_equal site_copy, SiteJavascript.path("search.js")
   end
 
   test "path is basename-only (blocks traversal)" do
     assert_equal "search.js", File.basename(SiteJavascript.path("../../secret/search.js"))
   end
 
-  test "seed writes shipped files into roe/ and rewrites them on every boot" do
+  test "seed copies shipped files once and never touches an existing copy" do
     SiteJavascript.seed!
-    %w[search.js gallery.js checkout.js].each do |f|
-      assert File.exist?(File.join(ROE, f)), "#{f} seeded into site/javascript/roe"
-      assert_not File.exist?(File.join(SITE, f)), "#{f} not placed directly in site/javascript"
+    %w[search.js gallery.js checkout.js footnotes.js].each do |f|
+      assert File.exist?(File.join(SITE, f)), "#{f} seeded"
     end
 
-    File.write(File.join(ROE, "search.js"), "// stale")
+    File.write(File.join(SITE, "search.js"), "// mine")
     SiteJavascript.seed!
-    assert_equal File.read(File.join(SiteJavascript.source_dir, "search.js")),
-                 File.read(File.join(ROE, "search.js")), "roe/ is Roe's — a re-seed brings it back in step"
+    assert_equal "// mine", File.read(File.join(SITE, "search.js")), "re-seed leaves the site's copy alone"
   end
 
-  test "seed never touches a site override" do
-    FileUtils.mkdir_p(SITE)
-    File.write(File.join(SITE, "mine.js"), "// site-only file")
+  test "a freshly seeded copy is current and untouched" do
     SiteJavascript.seed!
-    File.write(File.join(SITE, "search.js"), "// override")
-    SiteJavascript.seed!
-
-    assert_equal "// override", File.read(File.join(SITE, "search.js"))
-    assert_equal "// site-only file", File.read(File.join(SITE, "mine.js"))
+    r = SiteJavascript.reports["search.js"]
+    assert_equal :tracked_current, r.status
+    assert_equal false, r.edited
   end
 
-  # A site from before roe/ existed has Roe's files directly in
-  # site/javascript/, where they'd now read as overrides and pin the site to
-  # old code. First boot moves them aside — renamed, never deleted.
-  test "seed retires pre-roe copies by renaming them with a date" do
-    FileUtils.mkdir_p(SITE)
-    File.write(File.join(SITE, "search.js"), "// old seeded copy")
-    File.write(File.join(SITE, "custom.js"), "// the site's own file")
-
+  test "reports see an edit and an older version" do
     SiteJavascript.seed!
+    path = File.join(SITE, "search.js")
+    File.write(path, File.read(path).sub(/Version: [\d.]+/, "Version: 0.0.1") + "\n// my tweak\n")
 
-    assert_not File.exist?(File.join(SITE, "search.js")), "old copy moved out of the override slot"
-    retired = File.join(SITE, "search.js.#{SiteJavascript::RETIRED_SUFFIX_DATE}")
-    assert File.exist?(retired), "renamed, not deleted"
-    assert_equal "// old seeded copy", File.read(retired)
-    assert File.exist?(File.join(SITE, "custom.js")), "a file Roe doesn't ship is left alone"
-    assert_equal File.join(ROE, "search.js"), SiteJavascript.path("search.js"), "roe copy now serves"
+    r = SiteJavascript.reports["search.js"]
+    assert_equal :tracked_outdated, r.status
+    assert_equal true, r.edited
+    assert_not r.safe_to_update?
   end
 
-  test "retiring happens once: an override written after roe/ exists stays put" do
+  test "update! replaces the site copy with the shipped one, and refuses unknown files" do
     FileUtils.mkdir_p(SITE)
-    File.write(File.join(SITE, "search.js"), "// old seeded copy")
-    SiteJavascript.seed!
-    assert_equal 1, Dir.glob(File.join(SITE, "search.js.*")).size
+    File.write(File.join(SITE, "search.js"), "// old")
+    SiteJavascript.update!("search.js")
+    assert_equal File.read(File.join(SiteJavascript.source_dir, "search.js")), File.read(File.join(SITE, "search.js"))
 
-    File.write(File.join(SITE, "search.js"), "// my override")
+    assert_raises(ArgumentError) { SiteJavascript.update!("evil.js") }
+  end
+
+  # ── nightly.4 undo ───────────────────────────────────────────────────
+
+  test "a nightly.4 layout is put back: renamed files restored, roe/ removed" do
+    roe = File.join(SITE, "roe")
+    FileUtils.mkdir_p(roe)
+    File.write(File.join(roe, "search.js"), "// roe copy")
+    File.write(File.join(SITE, "search.js.2026-09-19"), "// the site's original")
+    File.write(File.join(SITE, "custom.js"), "// untouched site file")
+
     SiteJavascript.seed!
 
-    assert_equal "// my override", File.read(File.join(SITE, "search.js")), "override left alone on later boots"
-    assert_equal 1, Dir.glob(File.join(SITE, "search.js.*")).size, "nothing else retired"
+    assert_not File.directory?(roe), "roe/ removed"
+    assert_equal "// the site's original", File.read(File.join(SITE, "search.js")), "renamed file restored"
+    assert_not File.exist?(File.join(SITE, "search.js.2026-09-19"))
+    assert_equal "// untouched site file", File.read(File.join(SITE, "custom.js"))
+    assert File.exist?(File.join(SITE, "gallery.js")), "files with no renamed original are seeded fresh"
+  end
+
+  test "a renamed file is left in place when its original already exists" do
+    roe = File.join(SITE, "roe")
+    FileUtils.mkdir_p(roe)
+    File.write(File.join(SITE, "search.js"), "// new override")
+    File.write(File.join(SITE, "search.js.2026-09-19"), "// old")
+
+    SiteJavascript.seed!
+
+    assert_equal "// new override", File.read(File.join(SITE, "search.js"))
+    assert File.exist?(File.join(SITE, "search.js.2026-09-19")), "not clobbered, left for the user"
+  end
+
+  test "sites that never had roe/ are untouched by the undo" do
+    FileUtils.mkdir_p(SITE)
+    File.write(File.join(SITE, "search.js.2026-09-19"), "// unrelated file with the same suffix")
+    SiteJavascript.seed!
+    assert File.exist?(File.join(SITE, "search.js.2026-09-19")), "no roe/ folder, so nothing is renamed back"
   end
 end

@@ -1,17 +1,25 @@
-// Roe public site search — self-contained, buildless, works dynamic + static.
+/* ============== ROE SCRIPT ================
+   Roe Script: search
+   Version: 1.1.0
+   Fingerprint: e2a03253
+   Bundled with: Roe v0.4.0
+
+   This file was installed from Roe. Leave this comment in place
+   and Admin → Updates will tell you when a newer version ships.
+   Edit anything below it freely — Roe can tell, and will never
+   overwrite your changes without asking.
+   ========================================== */
+
+// Site search
 //
-// The admin is a Rails app served with an importmap + Stimulus. The public
-// site, though, exports to a dumb static host that can't serve importmap
-// modules — so public features ship as plain <script> files, exactly like the
-// theme's gallery.js / checkout.js. This is the vanilla-JS counterpart to the
-// old site-search Stimulus controller.
-//
-// It lazily fetches the prebuilt /search-index.json on first open, then filters
-// in-browser as you type. Scope is a set of facets — content sources (posts /
-// pages / documentation / products), post types, and tag include/exclude. Each
-// result's type is a clickable "+" pill that adds that facet; active facets
-// show as removable pills above the input. Markup + classes come from the
+// This script enables site search in Roe. It lazily fetches the prebuilt
+// index (search-index.json) on first open, then filters in-browser as
+// you type. Scope is a set of filters — content sources (posts, pages,
+// documentation, products), post types, and tag include/exclude. Each
+// result's type is a clickable "+" pill that adds that filter; active filters
+// show as removable pills above the search box. Markup + classes come from the
 // shared _site_search partial.
+
 (function () {
   "use strict";
 
@@ -27,12 +35,16 @@
 
   function createWidget(root) {
     var indexUrl =
-      root.getAttribute("data-site-search-index-url-value") || "/search-index.json";
+      root.getAttribute("data-site-search-index-url-value") ||
+      "/search-index.json";
     var resultsWhenOpened =
-      root.getAttribute("data-site-search-results-when-opened-value") === "true";
+      root.getAttribute("data-site-search-results-when-opened-value") ===
+      "true";
     var pageScope;
     try {
-      pageScope = JSON.parse(root.getAttribute("data-site-search-scope-value") || "{}");
+      pageScope = JSON.parse(
+        root.getAttribute("data-site-search-scope-value") || "{}",
+      );
     } catch (e) {
       pageScope = {};
     }
@@ -170,7 +182,11 @@
 
     function filter() {
       if (!entries) return;
-      var tokens = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      var tokens = input.value
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
 
       // Before anything is typed, show nothing (and no "no results" message)
       // unless the site opts into results-on-open.
@@ -219,8 +235,13 @@
 
     function inScope(entry) {
       var tags = entry.tags || [];
-      if (facets.sources.length && facets.sources.indexOf(entry.type) === -1) return false;
-      if (facets.postTypes.length && facets.postTypes.indexOf(entry.post_type) === -1) return false;
+      if (facets.sources.length && facets.sources.indexOf(entry.type) === -1)
+        return false;
+      if (
+        facets.postTypes.length &&
+        facets.postTypes.indexOf(entry.post_type) === -1
+      )
+        return false;
       if (
         facets.tagsInclude.length &&
         !facets.tagsInclude.some(function (t) {
@@ -267,10 +288,26 @@
     function renderContext() {
       if (!context) return;
       var list = []
-        .concat(facets.sources.map(function (v) { return { kind: "sources", value: v, label: v }; }))
-        .concat(facets.postTypes.map(function (v) { return { kind: "postTypes", value: v, label: v }; }))
-        .concat(facets.tagsInclude.map(function (v) { return { kind: "tagsInclude", value: v, label: "#" + v }; }))
-        .concat(facets.tagsExclude.map(function (v) { return { kind: "tagsExclude", value: v, label: "−#" + v }; }));
+        .concat(
+          facets.sources.map(function (v) {
+            return { kind: "sources", value: v, label: v };
+          }),
+        )
+        .concat(
+          facets.postTypes.map(function (v) {
+            return { kind: "postTypes", value: v, label: v };
+          }),
+        )
+        .concat(
+          facets.tagsInclude.map(function (v) {
+            return { kind: "tagsInclude", value: v, label: "#" + v };
+          }),
+        )
+        .concat(
+          facets.tagsExclude.map(function (v) {
+            return { kind: "tagsExclude", value: v, label: "−#" + v };
+          }),
+        );
       context.innerHTML = "";
       context.hidden = list.length === 0;
       list.forEach(function (f) {
@@ -347,7 +384,10 @@
 
     // Local listeners — bound to fresh elements on every (Turbo) render.
     if (toggle) toggle.addEventListener("click", open);
-    if (closeBtn) closeBtn.addEventListener("click", function () { close(); });
+    if (closeBtn)
+      closeBtn.addEventListener("click", function () {
+        close();
+      });
     input.addEventListener("input", filter);
     input.addEventListener("keydown", onKeydown);
 
@@ -371,7 +411,8 @@
       document.querySelector('.site-search[data-controller~="site-search"]') ||
       document.querySelector(".site-search");
     var prev = window.__roeSiteSearch;
-    if (prev && prev.root !== root && prev.widget && prev.widget.destroy) prev.widget.destroy();
+    if (prev && prev.root !== root && prev.widget && prev.widget.destroy)
+      prev.widget.destroy();
     if (!root) {
       window.__roeSiteSearch = null;
       return;
@@ -393,10 +434,12 @@
     // pre-scoped by dispatching this event.
     window.addEventListener("site-search:open", function (e) {
       var cur = window.__roeSiteSearch;
-      if (cur && cur.widget) cur.widget.openWithScope(e.detail && e.detail.scope);
+      if (cur && cur.widget)
+        cur.widget.openWithScope(e.detail && e.detail.scope);
     });
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", init);
   else init();
 })();

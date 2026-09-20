@@ -1017,20 +1017,17 @@ class StaticGenerator
   # served from /javascript, distinct from the theme's own scripts. Copied
   # every build so the output always has them; sync_directory skips unchanged
   # files and prunes orphans.
-  # Publish site JS to /javascript/. Layered the same way the dynamic
-  # resolver reads: shipped source, then Roe's site/javascript/roe/ copies,
-  # then the site's own files on top — so an override wins in the static
-  # build too, and a site-only addition ships as well.
+  # Publish site JS to /javascript/. The shipped source is the base; the
+  # per-site copies in site/javascript/ overlay it so the site's own files
+  # win — the same site-first resolution the dynamic controller uses.
   def copy_site_javascript
     out = @output_dir.join("javascript")
     sync_directory(SiteJavascript.source_dir, out) # shipped base
 
-    [ SiteJavascript.roe_dir, SiteJavascript.site_dir ].each do |dir|
-      next unless File.directory?(dir)
+    return unless File.directory?(SiteJavascript.site_dir)
 
-      Dir.glob(File.join(dir, "*")).each do |f|
-        FileUtils.cp(f, out.join(File.basename(f))) if File.file?(f)
-      end
+    Dir.glob(File.join(SiteJavascript.site_dir, "*")).each do |f|
+      FileUtils.cp(f, out.join(File.basename(f))) if File.file?(f)
     end
   end
 

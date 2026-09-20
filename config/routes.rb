@@ -247,6 +247,12 @@ Rails.application.routes.draw do
         post :activate
         post :reset
       end
+      # The site scripts Roe ships live on the Themes page too — same
+      # shipped-file story, no editor. :id is the script's basename.
+      collection do
+        post "scripts/:id/update", to: "themes#update_script", as: :update_script
+        get  "scripts/:id/download", to: "themes#download_script", as: :download_script
+      end
     end
 
     resources :system_assets, only: [ :index, :create ] do

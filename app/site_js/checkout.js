@@ -1,3 +1,15 @@
+/* ============== ROE SCRIPT ================
+   Roe Script: checkout
+   Version: 1.0.0
+   Fingerprint: e10b8558
+   Bundled with: Roe v0.4.0
+
+   This file was installed from Roe. Leave this comment in place
+   and Admin → Updates will tell you when a newer version ships.
+   Edit anything below it freely — Roe can tell, and will never
+   overwrite your changes without asking.
+   ========================================== */
+
 // Remove any existing overlays when page is shown (handles back button)
 window.addEventListener("pageshow", function (event) {
   const existingOverlay = document.querySelector(".checkout-loading-overlay");

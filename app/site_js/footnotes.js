@@ -1,17 +1,26 @@
-// Footnote backlinks that return you where you came from.
+/* ============== ROE SCRIPT ================
+   Roe Script: footnotes
+   Version: 1.0.0
+   Fingerprint: 5853db65
+   Bundled with: Roe v0.4.0
+
+   This file was installed from Roe. Leave this comment in place
+   and Admin → Updates will tell you when a newer version ships.
+   Edit anything below it freely — Roe can tell, and will never
+   overwrite your changes without asking.
+   ========================================== */
+
+// Support for multiple backlinks in footnotes
 //
-// A footnote referenced more than once can only point its leading number at one
-// of those mentions, so without help it always sends you back to the first.
-// The rendered HTML already handles that on its own: a multiply-referenced note
-// carries a return link per mention (see add_footnote_backlinks). This is the
-// enhancement on top — click a reference, and that note's number is repointed
-// at the mention you actually came from.
+// HTML supports one backlink which returns you to the place the footnote
+// is mentioned in the text. This adds support for multiple backlinks so a
+// footnote can return to all mentions, not just the first.
 //
 // See docs/04-markdown-extensions.md#known-quirks for the Kramdown details.
 //
-// Progressive: with no JavaScript the numbered return links still work, and
-// nothing here is required to read a footnote. Single-reference footnotes are
-// unaffected either way.
+// Progressive: with no JavaScript the HTML return link still works, and
+// nothing here is required to read a footnote.
+
 (function () {
   "use strict";
 

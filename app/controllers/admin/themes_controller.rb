@@ -22,7 +22,67 @@ class Admin::ThemesController < Admin::BaseController
       theme[:installed_version] = installed_header&.version
       theme[:bundled_version]   = bundled_header&.version
       theme[:status]            = bundled_path ? ThemeInspector.status(bundled_path: bundled_path, installed_path: installed_path) : :custom
+      # Whether the installed copy's body still matches the fingerprint it
+      # was installed with. nil when there's nothing to compare against.
+      theme[:edited]            = (theme[:installed] && bundled_path && theme[:status] != :custom) ? ThemeInspector.edited?(installed_path) : nil
     end
+
+    # The site scripts Roe ships (search, gallery, checkout, footnotes):
+    # same shipped-file story as the themes, without an editor. Each row
+    # carries the report so the view can say current / update / custom,
+    # and whether an update would overwrite the site's own edits.
+    @site_scripts = SiteJavascript.reports.map do |name, report|
+      {
+        name:              name,
+        display_name:      report.installed&.name || report.bundled&.name || name.delete_suffix(".js"),
+        installed_version: report.installed&.version,
+        bundled_version:   report.bundled&.version,
+        status:            report.status,
+        edited:            report.edited,
+        path:              "site/javascript/#{name}"
+      }
+    end
+  end
+
+  # Replace the site's copy of a shipped script with the current one. The
+  # button is only shown for an outdated tracked file; the confirm in the
+  # view is where an edited copy gets its warning. `keep_copy` saves the
+  # current file beside it first, so nothing is lost either way.
+  def update_script
+    name = File.basename(params[:id].to_s)
+    name = "#{name}.js" unless name.end_with?(".js")
+    site_path = File.join(SiteJavascript.site_dir, name)
+    keep_as = nil
+
+    if params[:keep_copy].present? && File.exist?(site_path)
+      report = SiteJavascript.reports[name]
+      suffix = report&.installed&.version ? "v#{report.installed.version}" : Time.current.strftime("%Y-%m-%d")
+      keep_as = File.join(SiteJavascript.site_dir, "#{name.delete_suffix('.js')}-#{suffix}.js")
+      FileUtils.cp(site_path, keep_as)
+    end
+
+    SiteJavascript.update!(name)
+    flash[:notice] = "#{name} updated to the latest version." + (keep_as ? " Your previous copy is at site/javascript/#{File.basename(keep_as)}." : "")
+  rescue ArgumentError => e
+    flash[:error] = e.message
+  rescue => e
+    flash[:error] = "Couldn't update #{name}: #{e.message}"
+  ensure
+    redirect_to admin_themes_path
+  end
+
+  # The site's copy, as a download — for someone who wants it before
+  # updating, or who edited it and wants it somewhere safe.
+  def download_script
+    name = File.basename(params[:id].to_s)
+    name = "#{name}.js" unless name.end_with?(".js")
+    path = File.join(SiteJavascript.site_dir, name)
+    return head(:not_found) unless SiteJavascript.shipped_names.include?(name) && File.exist?(path)
+
+    # Served as a generic download, not as JavaScript: Rails refuses a JS
+    # content type on a plain GET as a cross-origin-script precaution, and
+    # this is a file for someone to keep, not to run.
+    send_file path, type: "application/octet-stream", disposition: "attachment", filename: name
   end
 
   def edit

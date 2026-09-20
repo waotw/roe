@@ -10,12 +10,22 @@
 #      --delete is on; anything you delete from /site disappears from the
 #      app on the next sync. New files added in /site are propagated.
 #
+#   1b. Shipped site files — before the copies below. Themes and site JS
+#      carry a header with a Version (yours) and a Fingerprint (this
+#      script's, a hash of the body). Fails if a body changed since the
+#      last commit without a Version bump; otherwise stamps the
+#      Fingerprint in site/ so it and the copy in current/ agree.
+#
 #   2. Themes — update-only. site/theme/ → current/app/themes/.
 #      --existing flag means files that exist in BOTH places are updated
 #      from /site; files only in /site are ignored (you wanted to add a
 #      new bundled theme file, move it manually). Files only in the app
 #      are left alone (preserves bundled defaults like other starter
 #      themes you haven't installed locally).
+#
+#   2b. Site JavaScript — same rule. site/javascript/ → current/app/site_js/,
+#      update-only. You develop these where they're live, then bring
+#      them back for release.
 #
 #   3. Docs index page — single file copy + YAML frontmatter strip.
 #      site/pages/documentation.md → current/app/views/documentation/index.md.
@@ -25,11 +35,6 @@
 #      frontmatter (it's a Page); the bundled view only needs the
 #      markdown body, so we strip the `---\n…\n---\n` block from the
 #      destination after copy.
-#
-#   4. Site JavaScript — the other direction. current/app/site_js/ →
-#      site/javascript/roe/, an exact mirror. That folder is Roe's (the
-#      app rewrites it on boot too); a site overrides a file by putting
-#      its own copy in site/javascript/, which this never touches.
 #
 # Usage (from anywhere):
 #
@@ -66,11 +71,44 @@ rsync -avc $DRY_RUN --delete \
   current/lib/site_templates/minimum/documentation/roe/
 echo ""
 
+echo "→ Shipped site files (version check + fingerprint, in site/, before the copy):"
+# Themes and site JS are developed in site/ and copied into current/ by
+# the two steps that follow. Before that copy: refuse if a body changed
+# since the last commit but its Version didn't (the bump is what tells a
+# site an update exists, and it's the one thing that's easy to forget),
+# then stamp the header's Fingerprint from the body — in site/, so the
+# dev site and the shipped file agree and the Themes page here doesn't
+# call your own work "edited". Version is yours to set; Fingerprint is
+# this script's. Writing into site/ is fine here: it's the developer's
+# own install and they ran the command (rule 8 is about boot).
+echo "    site/theme/*.css, site/javascript/*.js"
+if [[ -z "$DRY_RUN" ]]; then
+  (cd current && bin/rails runner 'exit(ShippedFileInspector.check_release!(site_root: RoeSitePaths::SITE_PATH) ? 0 : 1)' 2>/dev/null) || {
+    echo ""
+    echo "  ✗ A shipped file's body changed without a version bump — see above."
+    echo "    Bump Version: in its header in site/ and run again."
+    exit 1
+  }
+else
+  echo "    (skipped in dry run)"
+fi
+echo ""
+
 echo "→ Themes (update existing files only, --existing on, --delete off):"
 echo "    site/theme/  →  current/app/themes/"
 rsync -avc $DRY_RUN --existing \
   site/theme/ \
   current/app/themes/
+echo ""
+
+echo "→ Site JavaScript (update existing files only, --existing on, --delete off):"
+# Same rule as themes: you develop the public-site JS in site/javascript/
+# where it's live, then bring it back here for release. Only files Roe
+# already ships are updated; a site-only file stays where it is.
+echo "    site/javascript/  →  current/app/site_js/"
+rsync -avc $DRY_RUN --existing \
+  site/javascript/ \
+  current/app/site_js/
 echo ""
 
 echo "→ Docs index page (single file copy + frontmatter strip):"
@@ -120,17 +158,6 @@ if [[ -z "$DRY_RUN" ]]; then
   ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
   echo "    (stripped YAML frontmatter from destination)"
 fi
-echo ""
-
-echo "→ Site JavaScript (current/ is canonical → Roe's folder in site/):"
-# app/site_js/ is Roe's own front-end code (the search overlay and so on).
-# On boot it's written into site/javascript/roe/, which Roe owns outright —
-# a site overrides a file by putting its own copy one level up. So this is
-# a plain mirror into roe/; site/javascript/ itself is never touched.
-echo "    current/app/site_js/  →  site/javascript/roe/"
-rsync -avc $DRY_RUN --delete \
-  current/app/site_js/ \
-  site/javascript/roe/
 echo ""
 
 echo "→ Root launcher/docs (current/ is canonical → mirror to package root):"

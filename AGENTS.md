@@ -27,6 +27,10 @@ Write the migration, draft the commit message — then hand it over.
    `current/app/themes/` — see the authoring map below.
 7. **Write in plain language.** No process jargon. Keep code identifiers and
    paths exact.
+8. **Never rename or move a file or config key that Roe put in `site/`.** Site
+   Sync carries `site/` to a live site that may still run the previous release,
+   and a rename becomes a missing file there. Add a new location; leave the old
+   one until the release after next.
 
 Reasoning, architecture decisions, known traps, and parked designs are in
 [`docs/agents/`](docs/agents/00-index.md).

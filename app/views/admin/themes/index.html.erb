@@ -31,6 +31,9 @@
   <!-- Available Themes -->
   <div class="mt-8">
     <h2 class="text-sm font-semibold text-gray-900 mb-4 uppercase">Available Themes</h2>
+    <p class="text-xs text-gray-500 mb-4">
+      To create your own theme, install and edit any theme and
+    </p>
 
     <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
       <table class="min-w-full divide-y divide-gray-300">
@@ -87,6 +90,10 @@
                       <span class="inline-flex bg-amber-100 px-2 text-xs font-semibold leading-5 text-amber-800" title="Bundled v<%= theme[:bundled_version] %> available">
                         Update to v<%= theme[:bundled_version] %>
                       </span>
+                      <% if theme[:edited] %>
+                        <%# COPY placeholder %>
+                        <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800" title="Theme updated since it was installed — choose Preserve when updating to keep your version">Edited</span>
+                      <% end %>
                     <% when :tracked_ahead %>
                       <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-600" title="Installed version is ahead of bundled — usually means Roe was downgraded">
                         Newer than bundled
@@ -140,6 +147,95 @@
                             class="uppercase text-xs px-2 py-1 border border-gray-800 bg-red-100 hover:bg-red-200 text-red-800 font-mono rounded-xs">
                       Uninstall
                     </button>
+                  <% end %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ── Site scripts ──────────────────────────────────────────────────────
+      The JS Roe ships for the public site, seeded into site/javascript/ and
+      then the site's own. Same shipped-file story as the themes above,
+      without an editor: a newer version is offered here, never pushed.
+      An untouched copy updates in one click; an edited copy gets a warning
+      and a "keep a copy" option first.
+
+      COPY: all user-facing strings in this section are placeholders. %>
+  <div class="mt-8">
+    <h2 class="text-sm font-semibold text-gray-900 mb-1 uppercase">Site Scripts</h2>
+    <p class="text-xs text-gray-500 mb-4">
+      Roe copies these JavaScript files to your <code class="bg-gray-200 rounded-xs px-0.5">site/</code> folder — search, galleries, checkout, footnotes.
+      These live in <code class="bg-gray-100 px-1">site/javascript/</code> and are yours to edit.
+      When a new version is shippped, you'll see it here.
+    </p>
+
+    <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Name</th>
+            <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+            <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @site_scripts.each do |s| %>
+            <tr class="hover:bg-gray-50">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
+                <%= s[:display_name] %>
+                <span class="ml-1 text-xs font-normal text-gray-400">(<%= s[:name] %>)</span>
+                <% if s[:installed_version] || s[:bundled_version] %>
+                  <span class="ml-1 text-xs font-normal text-gray-400">v<%= s[:installed_version] || s[:bundled_version] %></span>
+                <% end %>
+              </td>
+              <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                <div class="flex gap-1 flex-wrap">
+                  <% case s[:status] %>
+                  <% when :not_installed %>
+                    <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-500" title="Roe's copy is served until the site has its own">Not installed</span>
+                  <% when :tracked_current %>
+                    <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Up to date</span>
+                    <% if s[:edited] %>
+                      <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800" title="Changed since it was installed">Edited</span>
+                    <% end %>
+                  <% when :tracked_outdated %>
+                    <span class="inline-flex bg-amber-100 px-2 text-xs font-semibold leading-5 text-amber-800">Update to v<%= s[:bundled_version] %></span>
+                    <% if s[:edited] %>
+                      <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800" title="Changed since it was installed — updating replaces your changes">Edited</span>
+                    <% end %>
+                  <% when :tracked_ahead %>
+                    <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-600" title="Installed version is ahead of bundled — usually means Roe was downgraded">Newer than bundled</span>
+                  <% when :custom %>
+                    <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800" title="Header missing or name changed — Roe leaves this file alone">Custom</span>
+                  <% end %>
+                </div>
+              </td>
+              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                <div class="flex gap-2 justify-end">
+                  <% if s[:status] == :tracked_outdated %>
+                    <% if s[:edited] %>
+                      <%= button_to "Update & keep my copy",
+                            update_script_admin_themes_path(s[:name].delete_suffix(".js")),
+                            method: :post, params: { keep_copy: "1" },
+                            form: { data: { turbo_confirm: "You've changed #{s[:name]} since it was installed. Roe will save your version beside the new one as #{s[:name].delete_suffix('.js')}-v#{s[:installed_version]}.js, then install v#{s[:bundled_version]}. Continue?" } },
+                            class: "uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs" %>
+                      <%= link_to "Download mine",
+                            download_script_admin_themes_path(s[:name].delete_suffix(".js")),
+                            class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+                    <% else %>
+                      <%= button_to "Update to v#{s[:bundled_version]}",
+                            update_script_admin_themes_path(s[:name].delete_suffix(".js")),
+                            method: :post,
+                            class: "uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs" %>
+                    <% end %>
+                  <% elsif s[:status] == :custom %>
+                    <%= link_to "Download",
+                          download_script_admin_themes_path(s[:name].delete_suffix(".js")),
+                          class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
                   <% end %>
                 </div>
               </td>

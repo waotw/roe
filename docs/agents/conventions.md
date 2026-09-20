@@ -150,3 +150,34 @@ files stay structurally parallel.
 Appended blocks have had to be moved into the right section by hand more than
 once. Which file is live is set by `theme.active` in `site/system/global/site.yml`
 — see [authoring-map.md](authoring-map.md).
+
+---
+
+## 8. Never rename or move a file or config key that Roe put in `site/`
+
+`site/` travels between installs by Site Sync, and the two sides may be on
+different versions. A rename made by new code is pushed to live as a delete
+plus an add, and the old code on live no longer finds the file it expects.
+
+**Why:** Site Sync ships content, not code. The live site runs the previous
+release until you deploy, and it has to keep working on whatever `site/` the
+new release writes. This broke a live site when `search.js` moved into
+`javascript/roe/`: local booted on the new code, renamed the old copy in
+place, and the next sync carried that rename to a live site still looking for
+`javascript/search.js`.
+
+**How to apply:** add, don't move. A new location for something Roe owns is a
+*new* file; the old one stays where it is until the release after next. A
+config key that has to move is read from both places and still written to the
+old one. A one-time migration that renames things under `site/` is not
+acceptable, however tidy it looks — there is no way to teach the old code on
+live about it.
+
+The Roe-owned folders (`documentation/roe/`, `javascript/roe/`) exist so that
+adding to them never collides with the user's files. Use them, and never rename
+what is already inside.
+
+This is a beta rule, not the finished design. Before 1.0 the answer is a
+pattern like the theme update system's — Roe notices a shipped file has
+changed, tells the user, and lets them choose — rather than moving things
+underneath a running site. Until that exists, the rule stands as written.
