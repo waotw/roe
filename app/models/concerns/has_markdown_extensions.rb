@@ -1332,35 +1332,73 @@ module HasMarkdownExtensions
     CollectionQuery.sort_keyword?(value)
   end
 
-  # A menu's membership: its `order:` url_name list (those items, in that order)
+  # A literal link in a menu's `order:` list — `[RSS](/feed.xml)` or an
+  # outside URL — standing in for a page. Quacks enough like one for
+  # render_menu: a title and a path, nothing else.
+  MenuLink = Struct.new(:title, :path, keyword_init: true) do
+    def url_name = nil
+  end
+
+  # `[text](target)` — markdown link syntax, matched whole.
+  MENU_LINK_RE = /\A\[([^\]]*)\]\(([^)\s]+)\)\z/
+
+  # Split a menu's `order:` on commas, but not on commas inside a
+  # markdown link's brackets or parentheses, so `[Hi, there](/x)` stays
+  # one entry.
+  def split_menu_order(order_list)
+    entries, buf, depth = [], +"", 0
+    order_list.to_s.each_char do |ch|
+      case ch
+      when "[", "(" then depth += 1
+      when "]", ")" then depth -= 1 if depth.positive?
+      end
+      if ch == "," && depth.zero?
+        entries << buf.strip
+        buf = +""
+      else
+        buf << ch
+      end
+    end
+    entries << buf.strip
+    entries.reject(&:empty?)
+  end
+
+  # A menu's membership: its `order:` list (those items, in that order)
   # unioned with anything tagged `collection: <name>` — a page joins by being
   # listed OR by carrying that collection name. Listed items lead, in list
-  # order; tagged-but-unlisted items follow, alphabetically. Unresolved
-  # url_names are skipped (logged in development so a typo is easy to spot).
-  # Reached only when at least one of order/collection is present — an empty
-  # menu is caught earlier with a notice.
+  # order; tagged-but-unlisted items follow, alphabetically. An `order:` entry
+  # is a url_name or an inline markdown link (a feed, an outside site), so a
+  # nav can hold both in one list. Unresolved url_names are skipped (logged
+  # in development so a typo is easy to spot). Reached only when at least one
+  # of order/collection is present — an empty menu is caught earlier.
   def curate_menu(items, order_list, label)
     all      = items.to_a
     has_list = order_list.present? && !sort_keyword?(order_list)
 
     listed = []
     if has_list
-      wanted   = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
       by_slug  = all.index_by { |item| item.url_name.to_s.downcase }
-      resolved = wanted.map { |slug| by_slug[slug] }
+      missing  = []
 
-      if Rails.env.development?
-        missing = wanted.zip(resolved).reject { |_, item| item }.map(&:first)
-        Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}") if missing.any?
+      # Each entry is a page's url_name or, in the same position, an inline
+      # markdown link — a feed, an outside site, anything that isn't a page.
+      listed = split_menu_order(order_list).filter_map do |entry|
+        if (m = MENU_LINK_RE.match(entry))
+          MenuLink.new(title: m[1].strip, path: m[2])
+        else
+          by_slug[entry.downcase] || (missing << entry; nil)
+        end
       end
 
-      listed = resolved.compact
+      if Rails.env.development? && missing.any?
+        Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}")
+      end
     end
 
     tagged = []
     if label.present?
       wanted_names = normalize_collection_names(label)
-      listed_slugs = listed.map { |item| item.url_name.to_s.downcase }
+      listed_slugs = listed.filter_map { |item| item.url_name&.to_s&.downcase }
       tagged = all.select { |item| item.respond_to?(:collection_names) && (item.collection_names & wanted_names).any? }
                   .reject { |item| listed_slugs.include?(item.url_name.to_s.downcase) }
                   .sort_by { |item| item.title.to_s.downcase }
@@ -1701,7 +1739,8 @@ module HasMarkdownExtensions
 
     lis = items.map do |item|
       title = ERB::Util.html_escape(item.title.presence || "Untitled")
-      %Q(  <li class="collection-menu-item"><a href="#{item_path(item)}">#{title}</a></li>)
+      href  = item.is_a?(MenuLink) ? ERB::Util.html_escape(item.path) : item_path(item)
+      %Q(  <li class="collection-menu-item"><a href="#{href}">#{title}</a></li>)
     end.join("\n")
 
     list = %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)

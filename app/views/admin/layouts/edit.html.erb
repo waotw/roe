@@ -13,7 +13,19 @@
   <% end %>-->
 </div>
 
-<div class="mb-5 flex gap-2.5 items-center">
+<%# Navigation builder — one picker for everything a layout can link to,
+    written as a menu collection or as markdown links. The toolbar button
+    reads the caret: ADD NAVIGATION inserts; EDIT NAVIGATION (amber) opens
+    pre-filled from the links or menu block under the caret and replaces it,
+    converting either way or updating in kind. Its own Stimulus controller;
+    the inline script below (save, preview, cursor restore) is unchanged. %>
+<% links_for_picker = useful_links %>
+<% page_options = Page.published.map { |pg| [ pg.title.to_s.presence || pg.url_name, pg.url_name.to_s, "/#{pg.url_name}" ] }.sort_by { |l, _, _| l.downcase } %>
+<div class="mb-5 flex gap-2.5 items-center"
+     data-controller="site-links"
+     data-site-links-convert-url-value="<%= admin_layouts_menu_builder_path %>"
+     data-site-links-textarea-value='[name="content"]'
+     data-site-links-links-value="<%= { pages: page_options }.to_json %>">
   <span style="display: inline; margin: 0;">
     <button type="submit" form="layout-form" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Save</button>
   </span>
@@ -23,33 +35,111 @@
       class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]",
       form: { target: "_blank", style: "display: inline; margin: 0." } %>
 
-  <button type="button" id="toggle-links" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-blue-100 hover:bg-blue-200 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
-    Show Links
+  <button type="button" id="site-links-open" data-site-links-target="toggleButton" data-action="site-links#open"
+          class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-blue-100 hover:bg-blue-200 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">
+    Add Navigation
   </button>
-</div>
 
-<!-- Collapsible Useful Links Section -->
-<div id="useful-links" class="mb-5 p-3 border border-gray-300 bg-gray-50 rounded hidden">
-  <h3 class="text-sm font-bold mb-2">Useful Links (click to copy)</h3>
+  <div data-site-links-target="modal" data-action="click->site-links#backdrop" hidden
+       class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-12 overflow-y-auto">
+    <div class="bg-white shadow-lg w-full max-w-4xl rounded-xs p-6 m-4">
+      <div class="flex items-baseline justify-between mb-1">
+        <h2 class="text-lg font-semibold">Navigation Builder</h2>
+        <span data-site-links-target="modeLabel" class="text-xs text-amber-700"></span>
+      </div>
+      <p class="text-sm text-gray-600 mb-4">
+        Select pages from the left, changes settings on the right.<br>
+        Insert as a <code class="text-xs bg-gray-200 px-0.5 rounded-xs">menu</code> collection (recommended) or as markdown links.
+      </p>
+      <p data-site-links-target="error" class="text-sm text-red-700 mb-3"></p>
 
-  <% useful_links.each do |category, items| %>
-    <div class="mb-3">
-      <h4 class="text-xs font-semibold uppercase text-gray-600 mb-1"><%= category.to_s.titleize %></h4>
-      <div class="grid grid-cols-2 gap-1">
-        <% items.each do |label, url| %>
-          <button type="button"
-                  class="copy-link text-left text-xs px-2 py-1 bg-white border border-gray-300 hover:bg-gray-100 rounded font-mono"
-                  data-url="<%= url %>"
-                  data-label="<%= label %>">
-            <span class="text-gray-600"><%= label %>:</span>
-            <span class="text-blue-600"><%= url %></span>
-          </button>
-        <% end %>
+      <div class="grid grid-cols-2 gap-6">
+        <%# Left: everything pickable %>
+        <div data-site-links-target="available" class="max-h-[26rem] overflow-y-auto pr-1">
+          <h3 class="text-xs font-semibold uppercase text-gray-600 mb-1">Custom link</h3>
+          <div class="flex gap-1 mb-3">
+            <input type="text" data-site-links-target="customText" placeholder="Text" class="w-1/3 font-mono text-xs px-2 py-1 border border-gray-300">
+            <input type="text" data-site-links-target="customUrl" placeholder="https://…" class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300">
+            <button type="button" data-action="site-links#addCustom" class="uppercase text-xs px-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">Add</button>
+          </div>
+          <h3 class="text-xs font-semibold uppercase text-gray-600 mb-2">Pages <span class="text-gray-500 lowercase font-normal">(click to select)</span></h3>
+          <div class="mb-3">
+            <% page_options.each do |label, url_name, path| %>
+              <button type="button" data-action="site-links#toggle"
+                      data-text="<%= label %>" data-target="<%= path %>" data-url-name="<%= url_name %>"
+                      class="block w-full text-left text-xs px-2 py-1 border border-gray-200 hover:bg-gray-100 font-mono mb-0.5">
+                <span class="text-gray-800"><%= label %></span>
+                <span class="text-gray-400 ml-1"><%= url_name %></span>
+              </button>
+            <% end %>
+          </div>
+
+          <% links_for_picker.except(:pages).each do |category, items| %>
+            <h3 class="text-xs font-semibold uppercase text-gray-600 mb-1"><%= category.to_s.titleize %></h3>
+            <div class="mb-3">
+              <% items.each do |label, url| %>
+                <button type="button" data-action="site-links#toggle"
+                        data-text="<%= label %>" data-target="<%= url %>"
+                        class="block w-full text-left text-xs px-2 py-1 border border-gray-200 hover:bg-gray-100 font-mono mb-0.5">
+                  <span class="text-gray-800"><%= label %></span>
+                  <span class="text-blue-600 ml-1"><%= url %></span>
+                </button>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Right: the ordered list that gets inserted %>
+        <div>
+          <h3 class="text-xs font-semibold uppercase text-gray-600 mb-1">In this order</h3>
+          <ul data-site-links-target="chosen" class="mb-4 max-h-[18rem] overflow-y-auto"></ul>
+
+          <div class="border-t border-gray-200 pt-3">
+            <h3 class="text-xs font-semibold uppercase text-gray-600 mb-1">As a menu</h3>
+            <div class="flex gap-2 mb-2">
+              <label class="flex-1 text-xs">
+                <span class="block text-gray-500">Collection name</span>
+                <input type="text" data-site-links-target="name" data-action="input->site-links#nameChanged" value="nav" class="w-full font-mono text-xs px-2 py-1 border border-gray-300">
+              </label>
+              <label class="text-xs">
+                <span class="block text-gray-500">Style</span>
+                <select data-site-links-target="style" class="font-mono text-xs px-2 py-1 border border-gray-300">
+                  <option value="vertical">vertical</option>
+                  <option value="horizontal">horizontal</option>
+                </select>
+              </label>
+            </div>
+            <p class="text-xs text-gray-500 mb-2">
+              Add <code class="bg-gray-100 px-1">collection: <span data-site-links-target="collectionHint">nav</span></code> to any page later and it joins this menu.
+            </p>
+            <button type="button" data-site-links-target="insertMenu" data-action="site-links#insertMenu" disabled
+                    class="w-full uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs disabled:opacity-40">
+              Insert as menu
+            </button>
+          </div>
+
+          <div class="border-t border-gray-200 pt-3 mt-3">
+            <h3 class="text-xs font-semibold uppercase text-gray-600 mb-1">As markdown links</h3>
+            <div class="flex gap-2">
+              <button type="button" data-site-links-target="insertMarkdown" data-action="site-links#insertMarkdown" disabled
+                      class="flex-1 uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs disabled:opacity-40">
+                Insert as markdown
+              </button>
+              <button type="button" data-site-links-target="copy" data-action="site-links#copy" disabled
+                      class="uppercase text-xs px-2 py-1 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs disabled:opacity-40">
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5">
+        <button type="button" data-action="site-links#close"
+                class="uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">Close</button>
       </div>
     </div>
-  <% end %>
-
-  <div class="mt-2 text-xs text-gray-500" id="copy-feedback"></div>
+  </div>
 </div>
 
 <%= form_with url: send("admin_layout_#{@file_key}_path"), method: :patch, id: "layout-form" do |f| %>
@@ -72,38 +162,6 @@
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Toggle useful links
-    const toggleBtn = document.getElementById('toggle-links');
-    const linksPanel = document.getElementById('useful-links');
-
-    toggleBtn.addEventListener('click', () => {
-      const isHidden = linksPanel.classList.contains('hidden');
-      linksPanel.classList.toggle('hidden');
-      toggleBtn.textContent = isHidden ? 'Hide Links' : 'Show Links';
-    });
-
-    // Copy link functionality
-    document.querySelectorAll('.copy-link').forEach(button => {
-      button.addEventListener('click', async (e) => {
-        const url = e.currentTarget.dataset.url;
-        const label = e.currentTarget.dataset.label;
-        const feedback = document.getElementById('copy-feedback');
-
-        try {
-          await window.copyToClipboard(url);
-          feedback.textContent = `\u2713 Copied: ${label} (${url})`;
-          feedback.className = 'mt-2 text-xs text-green-600';
-
-          setTimeout(() => {
-            feedback.textContent = '';
-          }, 2000);
-        } catch (err) {
-          feedback.textContent = '\u2717 Failed to copy';
-          feedback.className = 'mt-2 text-xs text-red-600';
-        }
-      });
-    });
-
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -118,10 +176,10 @@
         document.querySelector('form[target="_blank"]').requestSubmit();
       }
 
-      // Toggle links with Cmd/Ctrl + K
+      // Navigation builder with Cmd/Ctrl + K
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        toggleBtn.click();
+        document.getElementById('site-links-open').click();
       }
     });
 

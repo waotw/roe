@@ -117,6 +117,10 @@ Rails.application.routes.draw do
     delete "layout/sidebar", to: "layouts#destroy_sidebar", as: "destroy_layout_sidebar"
     get "layouts", to: "layouts#index"
     post "layouts/generate_missing", to: "layouts#generate_missing", as: "generate_missing_admin_layouts"
+    # The menu builder: takes the editor's current text, returns the link
+    # list it found with a best-guess page for each. Pure — writes nothing;
+    # the editor applies the result to its own textarea.
+    post "layouts/menu_builder", to: "layouts#menu_builder", as: "layouts_menu_builder"
 
     resources :posts, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       collection do

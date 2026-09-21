@@ -96,6 +96,26 @@ class Admin::LayoutsController < Admin::BaseController
     redirect_to send("admin_layout_#{file_key}_edit_path")
   end
 
+  # Menu builder, step 1: find the link list in the text the editor sent
+  # and guess a page for each link. Returns JSON for the modal; nothing is
+  # written. Step 2 happens in the browser — the confirmed block replaces
+  # the list in the textarea, and the person saves the layout as usual.
+  def menu_builder
+    found = MenuBuilder.find_list(params[:content].to_s)
+    unless found
+      render json: { error: "No list of links found. The builder looks for lines like “- [About](/about)”." }, status: :unprocessable_entity
+      return
+    end
+
+    rows = MenuBuilder.rows_for(found[:lines])
+    render json: {
+      start:  found[:start],
+      finish: found[:finish],
+      pages:  MenuBuilder.page_options,
+      rows:   rows.map { |r| { text: r.text, target: r.target, url_name: r.url_name, confidence: r.confidence } }
+    }
+  end
+
   private
 
   def ensure_layout_directory_exists
@@ -110,7 +130,7 @@ class Admin::LayoutsController < Admin::BaseController
     file_key = action_name.to_s.sub(/\A(edit|update)_/, "")
 
     unless LayoutFiles.exist?(file_key)
-      flash[:alert] = "#{file_key.capitalize} layout file is missing. <a href='#{generate_missing_admin_layouts_path(file_key: file_key)}' class='underline'>Click here to create it</a>".html_safe
+      flash[:alert] = "#{file_key.capitalize} layout file is missing. <a href='#{admin_generate_missing_admin_layouts_path(file_key: file_key)}' class='underline'>Click here to create it</a>".html_safe
       redirect_to admin_layouts_path
     end
   end
