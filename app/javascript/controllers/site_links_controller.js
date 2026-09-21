@@ -323,24 +323,43 @@ export default class extends Controller {
   }
 
   // Replace what's being edited, or insert at the caret on its own lines.
+  //
+  // Goes through execCommand("insertText") rather than setting .value, so
+  // the change lands in the textarea's own undo history: ⌘Z / Ctrl-Z puts
+  // the previous text back, ⌘⇧Z redoes, and it composes with whatever
+  // was typed before and after. Setting .value directly would wipe that
+  // history. execCommand is deprecated but every browser still honours it
+  // for exactly this, and the .value path stays as the fallback.
   write(newLines) {
     const ta = this.textarea;
+    let from, to, text;
+
     if (this.editing) {
       const lines = ta.value.split("\n");
-      lines.splice(this.editing.start, this.editing.finish - this.editing.start + 1, ...newLines);
-      ta.value = lines.join("\n");
-      const pos = lines.slice(0, this.editing.start).join("\n").length;
-      ta.setSelectionRange(pos, pos);
+      from = lines.slice(0, this.editing.start).join("\n").length + (this.editing.start > 0 ? 1 : 0);
+      to = lines.slice(0, this.editing.finish + 1).join("\n").length;
+      text = newLines.join("\n");
     } else {
-      const before = ta.value.slice(0, ta.selectionStart), after = ta.value.slice(ta.selectionEnd);
+      from = ta.selectionStart;
+      to = ta.selectionEnd;
+      const before = ta.value.slice(0, from), after = ta.value.slice(to);
       const lead = before.length && !before.endsWith("\n") ? "\n" : "";
       const tail = after.length && !after.startsWith("\n") ? "\n" : "";
-      const text = lead + newLines.join("\n") + tail;
-      ta.value = before + text + after;
-      const pos = before.length + text.length;
-      ta.setSelectionRange(pos, pos);
+      text = lead + newLines.join("\n") + tail;
     }
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
+
+    ta.focus();
+    ta.setSelectionRange(from, to);
+    let done = false;
+    try { done = document.execCommand("insertText", false, text); } catch (_) { done = false; }
+    if (!done) {
+      ta.setRangeText(text, from, to, "end");
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    // Leave the caret at the end of what was written.
+    const pos = from + text.length;
+    ta.setSelectionRange(pos, pos);
     this.close();
     ta.focus();
     this.updateToggleButton();
