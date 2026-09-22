@@ -1743,7 +1743,20 @@ module HasMarkdownExtensions
       %Q(  <li class="collection-menu-item"><a href="#{href}">#{title}</a></li>)
     end.join("\n")
 
-    list = %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+    # `show_active:` explicitly overrides the file-level highlight default for
+    # this menu's links (LayoutHelper#add_active_nav_class reads the attribute).
+    # Emitted only when set, so an unspecified menu just follows its file's
+    # default — header on, footer/sidebar off. Anything but a clear false reads
+    # as true, matching how the rest of the block options treat truthiness.
+    active_attr =
+      if config.key?(:show_active) && config[:show_active].to_s.strip.present?
+        on = !%w[false no 0 off].include?(config[:show_active].to_s.strip.downcase)
+        %Q( data-show-active="#{on}")
+      else
+        ""
+      end
+
+    list = %Q(<ul class="collection-menu collection-menu-#{style}"#{active_attr}>\n#{lis}\n</ul>)
 
     # In a layout file (header/footer/sidebar) a menu IS site navigation — wrap
     # it in a <nav> landmark. In a page body it's a content list, so leave the
@@ -2444,7 +2457,10 @@ module HasMarkdownExtensions
     "aside"        => %w[link link_text]
   }.freeze
   ACTION_EXTRA_KEYS = { "product" => %w[skus variants] }.freeze
-  COLLECTION_EXTRA_KEYS = %w[part scope search].freeze
+  # `show_active` toggles the current-page `active` class on a menu (see
+  # render_menu / LayoutHelper#add_active_nav_class). It's a layout-only
+  # option with no builder field, so it lives here rather than in the schema.
+  COLLECTION_EXTRA_KEYS = %w[part scope search show_active].freeze
 
   # Every option Roe understands, grouped by the block it belongs to. Built from
   # the same schemas that drive the builder modals, so there's no second

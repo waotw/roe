@@ -22,12 +22,16 @@ export default class extends Controller {
   static targets = [
     "modal", "available", "chosen", "name", "style", "error",
     "toggleButton", "customText", "customUrl", "modeLabel",
-    "insertMenu", "insertMarkdown", "copy", "collectionHint"
+    "insertMenu", "insertMarkdown", "copy", "collectionHint", "showActive"
   ];
   static values = {
     convertUrl: String,
     textarea: String,
     links: Object, // { pages: [[label, url_name, path]] }
+    // The file's highlight default: header on, footer/sidebar off. The menu's
+    // "Highlight the current page" box starts here, and `show_active:` is
+    // written only when the box differs from it (see menuBlock).
+    defaultActive: Boolean,
   };
 
   LINK_LINE = /^\s*[-*+]\s+\[([^\]]*)\]\(([^)\s]+)\)\s*$/;
@@ -122,6 +126,8 @@ export default class extends Controller {
       this.chosen = [];
       this.nameTarget.value = "nav";
       if (this.hasStyleTarget) this.styleTarget.value = "vertical";
+      // A fresh menu starts at the file's highlight default.
+      if (this.hasShowActiveTarget) this.showActiveTarget.checked = this.defaultActiveValue;
     } else if (nav.kind === "menu") {
       this.editing = { kind: "menu", start: nav.start, finish: nav.finish };
       this.loadMenu(nav.body);
@@ -141,6 +147,15 @@ export default class extends Controller {
     const get = (key) => (body.find((l) => l.startsWith(`${key}:`)) || "").slice(key.length + 1).trim();
     this.nameTarget.value = get("collection") || "nav";
     if (this.hasStyleTarget) this.styleTarget.value = get("style") || "vertical";
+
+    // The block's own show_active: wins; without one the menu follows the file
+    // default, so opening it shows the state it actually renders in.
+    if (this.hasShowActiveTarget) {
+      const raw = get("show_active").toLowerCase();
+      this.showActiveTarget.checked = raw === ""
+        ? this.defaultActiveValue
+        : !["false", "no", "0", "off"].includes(raw);
+    }
 
     const byUrl = new Map(this.pages.map(([label, url, path]) => [url.toLowerCase(), { label, url, path }]));
     this.chosen = this.splitOrder(get("order")).map((entry) => {
@@ -181,6 +196,8 @@ export default class extends Controller {
     }
     this.chosen = data.rows.map((r) => ({ text: r.text, target: r.target, url_name: r.url_name, confidence: r.confidence }));
     this.nameTarget.value = "nav";
+    // Converting plain links → a menu: the new menu starts at the file default.
+    if (this.hasShowActiveTarget) this.showActiveTarget.checked = this.defaultActiveValue;
     return true;
   }
 
@@ -305,6 +322,11 @@ export default class extends Controller {
     const entries = this.chosen.map((c) => c.url_name || `[${c.text}](${c.target})`);
     const lines = ["```collection", `collection: ${name}`, "template: menu"];
     if (style && style !== "vertical") lines.push(`style: ${style}`);
+    // Write show_active only when it differs from the file default, so a menu
+    // that just follows the default stays clean (matches the other builders).
+    if (this.hasShowActiveTarget && this.showActiveTarget.checked !== this.defaultActiveValue) {
+      lines.push(`show_active: ${this.showActiveTarget.checked}`);
+    }
     lines.push(`order: ${entries.join(", ")}`, "```");
     return lines;
   }
