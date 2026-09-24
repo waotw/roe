@@ -106,7 +106,9 @@ class Admin::PagesController < Admin::BaseController
     normalize_and_write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    page = Page.find_by(file_path: file_path.to_s)
+    # Match the normalized (realpath) path the model stores — see the note in
+    # PostsController#create and RoeSitePaths.normalize (production symlink).
+    page = Page.find_by(file_path: RoeSitePaths.normalize(file_path))
 
     if page
       redirect_to edit_admin_page_path(page)
@@ -202,7 +204,7 @@ class Admin::PagesController < Admin::BaseController
     normalize_and_write(new_path, "---\n#{yaml_content}\n---\n#{parsed.content}")
     ContentSync.sync_file(new_path)
 
-    new_page = Page.find_by(file_path: new_path.to_s)
+    new_page = Page.find_by(file_path: RoeSitePaths.normalize(new_path))
     if new_page
       redirect_to edit_admin_page_path(new_page), notice: "Page duplicated"
     else

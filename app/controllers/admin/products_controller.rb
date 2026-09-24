@@ -63,7 +63,13 @@ class Admin::ProductsController < Admin::BaseController
     SiteFile.write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    relative_path = file_path.to_s.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
+    # Build the SAME relative key the model stores: strip the normalized
+    # (realpath) site path from the normalized file path. On production
+    # /rails/site is a symlink to /data/site, so stripping the raw SITE_PATH
+    # from the raw file_path wouldn't match — falsely reporting "failed to
+    # sync". See RoeSitePaths.normalize and Product.create_or_update_from_file.
+    relative_path = RoeSitePaths.normalize(file_path)
+                                .sub(RoeSitePaths.normalize(RoeSitePaths::SITE_PATH.to_s) + "/", "")
     product = Product.find_by(file_path: relative_path)
 
     if product

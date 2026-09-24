@@ -238,7 +238,11 @@ class Admin::PostsController < Admin::BaseController
     normalize_and_write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    post = Post.find_by(file_path: file_path.to_s)
+    # Look up by the SAME normalized (realpath) path the model stores. On
+    # production /rails/site is a symlink to /data/site, so the raw file_path
+    # (symlink) wouldn't match the stored realpath and this would falsely report
+    # "failed to sync" for a post that synced fine. See RoeSitePaths.normalize.
+    post = Post.find_by(file_path: RoeSitePaths.normalize(file_path))
 
     if post
       redirect_to edit_admin_post_path(post), notice: "Post created", flash: { new_post: true }
@@ -376,7 +380,7 @@ class Admin::PostsController < Admin::BaseController
     normalize_and_write(new_path, "---\n#{yaml_content}\n---\n#{parsed.content}")
     ContentSync.sync_file(new_path)
 
-    new_post = Post.find_by(file_path: new_path.to_s)
+    new_post = Post.find_by(file_path: RoeSitePaths.normalize(new_path))
     if new_post
       redirect_to edit_admin_post_path(new_post), notice: "Post duplicated"
     else
