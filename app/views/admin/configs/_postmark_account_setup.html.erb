@@ -1,0 +1,101 @@
+  <%# COPY — "Have Roe set up your Postmark integration" (account-API setup).
+    Placeholder copy the user rewrites before commit. Two shapes by env
+    (postmark_setup_mode): production runs the full live setup and verifies the
+    webhook end-to-end; local runs the sandbox-only setup and discards the
+    account token. Owned by the postmark-setup Stimulus controller; posts to its
+    own endpoints so the rest of the page is untouched. %>
+<% mode = postmark_setup_mode %>
+<% pm = @postmark_config %>
+
+<div class="config-section mb-6 p-4 border border-blue-200 bg-blue-50"
+     data-controller="postmark-setup"
+     data-postmark-setup-preview-url-value="<%= admin_postmark_account_setup_preview_config_path %>"
+     data-postmark-setup-status-url-value="<%= admin_postmark_webhook_status_config_path %>"
+     data-postmark-setup-verified-value="<%= pm&.webhook_verified? %>">
+
+  <h3 class="text-base font-semibold text-gray-900 mb-1">Have Roe set up and verify your Postmark integration</h3>
+
+  <% if mode == :live %>
+    <p class="text-sm text-gray-700 mb-3">
+      <%# COPY %>
+      Paste a Postmark <strong>Account API token</strong> and Roe will create your sandbox and
+      live servers, connect the delivery webhook, and send a test to confirm everything works.
+      Your account token is stored encrypted on this server so Roe monitor the integration and let you know about any issues. You can remove your Account API Key in the Danger Zone below.
+    </p>
+  <% else %>
+    <p class="text-sm text-gray-700 mb-3">
+      <%# COPY %>
+      Paste your Postmark <strong>Account API token</strong> and Roe will set up your test server
+      and verify everything's connected. A local install of Roe will never keep your account token or live keys, so you'll run this again when you've deployed a live site — but your sandbox will
+      be ready to test right now.
+    </p>
+    <% unless postmark_local_webhooks_testable? %>
+      <p class="text-xs text-amber-700 mb-3">
+        <%# COPY %>
+        Sandbox sending will work, but Postmark can't reach <code class="font-mono">localhost</code> to
+        test webhook delivery. To test webhooks locally, set a public tunnel host (ngrok, cloudflared)
+        as <code class="font-mono">dev_host</code> in your
+        <%= link_to "development settings", admin_edit_development_config_path, class: "underline" %>.
+      </p>
+    <% end %>
+  <% end %>
+
+  <p data-postmark-setup-target="error" class="text-sm text-red-700 mb-2" hidden></p>
+
+  <%# The real form (step 2). The account-token field is shared by preview and
+      run; preview reads it over fetch, run submits it. %>
+  <%= form_with url: admin_postmark_account_setup_config_path, method: :post, class: "space-y-3" do %>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Account API token</label>
+      <input type="password" name="account_token" autocomplete="off"
+             data-postmark-setup-target="token"
+             placeholder="Found in Postmark → Account → API Tokens"
+             class="w-full font-mono text-sm p-2 border border-gray-300">
+    </div>
+
+    <button type="button" data-action="postmark-setup#preview"
+            class="uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer">
+      Check my account
+    </button>
+
+    <%# Revealed after a successful preview. %>
+    <div data-postmark-setup-target="preview" hidden class="space-y-3 pt-2">
+      <div data-postmark-setup-target="reuse" hidden class="p-3 border border-gray-200 bg-white">
+        <p class="text-sm text-gray-700 mb-2">
+          <%# COPY %>
+          You already have servers on Postmark. Reuse one, or let Roe create new ones.
+          (Your default <span class="font-mono">My First Server</span> is left alone.)
+        </p>
+        <label class="block text-xs text-gray-600 mb-1">Sandbox server</label>
+        <select name="sandbox_reuse_id" data-postmark-setup-target="sandboxReuse"
+                class="w-full font-mono text-xs p-2 border border-gray-300 mb-2"></select>
+        <label class="block text-xs text-gray-600 mb-1">Live server</label>
+        <select name="live_reuse_id" data-postmark-setup-target="liveReuse"
+                class="w-full font-mono text-xs p-2 border border-gray-300"></select>
+      </div>
+
+      <div class="p-3 border border-gray-200 bg-white">
+        <p class="text-xs font-semibold uppercase text-gray-600 mb-1">Sender addresses</p>
+        <ul data-postmark-setup-target="signatures" class="text-sm space-y-0.5"></ul>
+      </div>
+
+      <button type="submit" data-postmark-setup-target="runButton" hidden
+              class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+        <%= mode == :live ? "Set up my Postmark integration" : "Set up my test server" %>
+      </button>
+    </div>
+  <% end %>
+
+  <%# Async webhook-verification status. data-pending is set by the run flash so
+      the controller knows to start polling after the redirect. %>
+  <% if pm&.webhook_probe_message_id.present? %>
+    <p class="text-sm mt-3" data-postmark-setup-target="webhookStatus"
+       data-pending="<%= !pm.webhook_verified? %>">
+      <% if pm.webhook_verified? %>
+        <span class="text-green-700">✓ Webhook confirmed — Postmark reached your site.</span>
+      <% else %>
+        <span class="text-gray-500">Waiting for Postmark's delivery callback…</span>
+      <% end %>
+    </p>
+  <% end %>
+</div>

@@ -5,6 +5,14 @@ class ProcessPostmarkWebhookJob < ApplicationJob
     record_type = webhook_data["RecordType"]
     email = webhook_data["Recipient"] || webhook_data["Email"]
 
+    # A Delivery event may be the setup probe (sent to the site author, who
+    # isn't necessarily a Member), so match it against the stored probe id
+    # BEFORE the member lookup returns early on a non-member recipient. This is
+    # what closes the "is the webhook actually reaching us?" loop.
+    if record_type == "Delivery" && webhook_data["MessageID"].present?
+      PostmarkConfig.current.record_webhook_delivery!(webhook_data["MessageID"])
+    end
+
     return unless email.present?
 
     member = Member.find_by(email: email)

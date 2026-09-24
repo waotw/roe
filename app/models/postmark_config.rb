@@ -9,6 +9,13 @@ class PostmarkConfig < ApplicationRecord
   # AR Encryption — uses master.key
   encrypts :server_token
   encrypts :webhook_token
+  # An Account API token can Manage Servers and read Sender Signatures across
+  # the whole account — a much larger blast radius than a Server token. It is
+  # kept ONLY in production (see store_account_token?), where the box is a
+  # controlled server and the value can't be read back from the admin UI;
+  # keeping it there powers the pre-emptive sender-signature check. Local never
+  # writes it — the setup service uses the token in-request and discards it.
+  encrypts :account_token
 
   # ── Singleton ────────────────────────────────────────────────────────────
 
@@ -186,6 +193,73 @@ class PostmarkConfig < ApplicationRecord
     regenerate_webhook_token!
     Rails.logger.info "[PostmarkConfig] Backfilled a missing webhook token"
     webhook_token
+  end
+
+  # ── Account-API setup token ──────────────────────────────────────────────
+  #
+  # Whether this install may KEEP the account token. Production only: the token
+  # can create and delete servers account-wide, so it's stored (encrypted) only
+  # on a controlled server where it powers the ongoing pre-emptive signature
+  # check. Local runs the same setup but discards the token afterwards — the
+  # setup service is handed the token directly and never persists it here.
+  def self.store_account_token? = Rails.env.production?
+
+  def account_token_present?
+    safe_encrypted_read(:account_token).present?
+  end
+
+  # The stored account token (production only), or nil. Used for the standing
+  # sender-signature check; local always returns nil since it never stored one.
+  def stored_account_token
+    safe_encrypted_read(:account_token)
+  end
+
+  def store_account_token!(token)
+    update!(account_token: token)
+  end
+
+  def remove_account_token!
+    update!(account_token: nil)
+  end
+
+  # ── Webhook round-trip verification ──────────────────────────────────────
+  #
+  # Setting the webhook up is only half the job; these record that it actually
+  # *works*. verify_webhook! sends a probe email and remembers its MessageID;
+  # record_webhook_delivery! (called from ProcessPostmarkWebhookJob when the
+  # Delivery event for that id arrives) stamps webhook_verified_at, closing the
+  # loop. A sandbox server records without delivering, so no Delivery event
+  # ever fires there — webhook verification is inherently a live-server check.
+
+  def webhook_verified? = webhook_verified_at.present?
+
+  # Fire the probe send and remember its id so the inbound Delivery event can be
+  # matched. Clears any earlier verification so the ✓ reflects this attempt.
+  def verify_webhook!(to:)
+    return { success: false, error: SiteSender::MISSING } unless SiteSender.configured?
+
+    result = PostmarkService.send_transactional_email(
+      to_email: to, to_name: to, tag: "webhook-verification",
+      subject: "Webhook test from #{SiteConfig.get('title').presence || 'your Roe site'}",
+      html_content: "<p>Roe sent this to confirm Postmark's delivery webhook " \
+                    "reaches your site. You can ignore it.</p>"
+    )
+
+    if result[:success]
+      update_columns(webhook_probe_message_id: result[:message_id], webhook_verified_at: nil)
+    end
+
+    result
+  end
+
+  # Called from the webhook job on a Delivery event. Stamps verification only
+  # when the delivered message is the probe we're waiting on, so an ordinary
+  # newsletter delivery doesn't masquerade as a webhook test.
+  def record_webhook_delivery!(message_id)
+    return if message_id.blank?
+    return unless message_id == webhook_probe_message_id
+
+    update_columns(webhook_verified_at: Time.current)
   end
 
   # ── Test config file ─────────────────────────────────────────────────────

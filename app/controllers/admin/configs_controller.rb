@@ -1,4 +1,8 @@
 class Admin::ConfigsController < Admin::BaseController
+  # webhook_url (dev/prod callback base) lives in a view helper; the Postmark
+  # account setup needs it controller-side to hand Postmark a reachable URL.
+  include WebhookUrlHelper
+
   # A config save may add/remove a /media/ reference (e.g. the site logo),
   # so any non-GET config action busts the media-usage backlink cache.
   after_action :invalidate_media_usage_index
@@ -1792,6 +1796,122 @@ class Admin::ConfigsController < Admin::BaseController
     redirect_to admin_edit_newsletters_config_path
   end
 
+  # ── Postmark account-API setup ─────────────────────────────────────────────
+  #
+  # "Have Roe set up your Postmark integration." Paste one Account API token;
+  # Roe creates the sandbox + live servers, reads back their Server tokens,
+  # points the webhook at Roe, and reads the account's Sender Signature state.
+  # The account token is kept (encrypted) only in production; local uses it in
+  # this request and discards it. See PostmarkConfig#store_account_token? and
+  # PostmarkAccountSetup.
+
+  # Step 1: validate the token by listing servers, so the view can decide
+  # whether to offer a reuse choice (non-default servers exist) or go straight
+  # to "create them for me". Returns JSON for the Stimulus flow. Nothing is
+  # created or stored here.
+  def postmark_account_setup_preview
+    token = params[:account_token].to_s.strip
+    if token.blank?
+      render json: { ok: false, error: "Enter your Postmark Account API token." } and return
+    end
+
+    setup   = PostmarkAccountSetup.new(token)
+    servers = setup.list_servers
+    # Only non-default servers are worth offering for reuse; the stock
+    # "My First Server" is left alone.
+    reusable = servers.reject { |s| s[:default] }
+
+    render json: {
+      ok: true,
+      reusable: reusable.map { |s| s.slice(:id, :name, :delivery_type) },
+      signatures: setup.sender_signatures
+    }
+  rescue PostmarkAccountSetup::Error => e
+    render json: { ok: false, error: e.message }
+  end
+
+  # Step 2: do the work. Create/reuse the servers, store the tokens per the
+  # env rules, ensure the webhook, and (in an environment that can receive one)
+  # fire the probe send that closes the webhook-verification loop.
+  def postmark_account_setup_run
+    token = params[:account_token].to_s.strip
+    if token.blank?
+      flash[:alert] = "Enter your Postmark Account API token."
+      redirect_to admin_edit_newsletters_config_path and return
+    end
+
+    setup   = PostmarkAccountSetup.new(token)
+    postmark = PostmarkConfig.current
+    site    = SiteConfig.get("title").presence || "Roe"
+
+    sandbox = setup.ensure_server(kind: :sandbox, name: "#{site} - Sandbox",
+                                  reuse_id: params[:sandbox_reuse_id].presence)
+    # Sandbox token is not sensitive (records without delivering) and belongs in
+    # the plaintext test file, which Site Sync carries — so both installs
+    # converge on the same value.
+    save_postmark_sandbox_token(sandbox.token)
+
+    # The live server is created everywhere (so it exists and is webhook-ready),
+    # but its token can only be STORED where live keys are allowed — production.
+    # Locally the live token is read and discarded; Path B (send-to-peer) will
+    # take over that delivery later.
+    live = setup.ensure_server(kind: :live, name: "#{site} - Production",
+                               reuse_id: params[:live_reuse_id].presence)
+    if PostmarkConfig.store_account_token?
+      postmark.update!(server_token: live.token)
+      postmark.store_account_token!(token) # prod keeps it for the standing signature check
+    end
+
+    # Set up the webhook on BOTH servers — each Postmark server has its own
+    # webhooks, and Roe's endpoint (one URL, per-install token) is the same for
+    # both. Postmark verifies the endpoint on create, so this needs a publicly
+    # reachable URL: in production that's the live domain; locally it's nil
+    # unless a dev tunnel host is set, so the webhook step is skipped and its
+    # status ignored (the copy says so). This is what fixes "no webhooks were
+    # created" — previously only one server was wired up.
+    url = webhook_url("/webhooks/postmark/#{postmark.ensure_webhook_token!}")
+    sandbox_hook = setup.ensure_webhook(sandbox.token, url)
+    live_hook    = setup.ensure_webhook(live.token, url)
+
+    postmark.verify!
+    # Fire the probe only when a webhook could actually call back (a URL exists)
+    # and the target server delivers (live) — a sandbox never emits a Delivery
+    # event, so a probe there would wait forever. Production sends from the live
+    # server it just stored.
+    probe_sent = false
+    if live_hook[:ok] && PostmarkConfig.store_account_token? && Current.user&.email_address.present?
+      postmark.verify_webhook!(to: Current.user.email_address)
+      probe_sent = true
+    end
+
+    flash[:notice] = postmark_setup_summary(
+      sandbox:, live:, hook: (PostmarkConfig.store_account_token? ? live_hook : sandbox_hook),
+      probe_sent:, kept: PostmarkConfig.store_account_token?
+    )
+    redirect_to admin_edit_newsletters_config_path(tab: postmark.mode)
+  rescue PostmarkAccountSetup::Error => e
+    flash[:alert] = "Postmark setup failed: #{e.message}"
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  # Poll target for the async webhook ✓ — the Delivery callback lands out of
+  # band, so the page asks until webhook_verified_at is stamped.
+  def postmark_webhook_status
+    postmark = PostmarkConfig.current
+    render json: {
+      verified:    postmark.webhook_verified?,
+      verified_at: postmark.webhook_verified_at&.iso8601
+    }
+  end
+
+  # Production Danger Zone: drop the stored account token. Setup still works
+  # (re-enter it), but the standing pre-emptive signature check goes quiet.
+  def remove_postmark_account_token
+    PostmarkConfig.current.remove_account_token!
+    flash[:notice] = "Account API token removed. Roe kept your server tokens."
+    redirect_to admin_edit_newsletters_config_path
+  end
+
   def edit_snipcart
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     unless File.exist?(path)
@@ -2022,6 +2142,38 @@ class Admin::ConfigsController < Admin::BaseController
       next if value.blank? || value == "•" * 16
       record.public_send(writer, value)
     end
+  end
+
+  # Write the sandbox server token into the plaintext test file (postmark.yml),
+  # the same place a hand-entered test token lives. Merges so nothing else in
+  # the file is lost, then re-syncs SiteConfig and the model's cached copy.
+  def save_postmark_sandbox_token(server_token)
+    return if server_token.blank?
+
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
+    existing = SiteFile.read_yaml(path) || {}
+    existing["test"] ||= {}
+    existing["test"]["server_token"] = server_token
+    write_yaml(path, existing)
+    SiteConfig.sync_from_file("integrations/postmark")
+    PostmarkConfig.save_test_config(existing["test"])
+  end
+
+  # One flash line summarising what the account-setup run did, honestly split
+  # by environment: production stores the live token and can verify the webhook
+  # end-to-end; local sets up the sandbox and reports that live finishes on the
+  # deployed site.
+  def postmark_setup_summary(sandbox:, live:, hook:, probe_sent:, kept:)
+    parts = []
+    parts << (sandbox.created ? "Created your sandbox server" : "Using #{sandbox.name} for sandbox")
+    if kept
+      parts << (live.created ? "created your live server" : "using #{live.name} for live")
+      parts << (hook[:ok] ? "set up the delivery webhook" : "couldn't set up the webhook (#{hook[:error]})")
+      parts << "sent a test to confirm delivery — watch for the ✓" if probe_sent
+    else
+      parts << "your live server is ready, but live keys can only be saved on your deployed site — run this again there to finish"
+    end
+    parts.join(". ") + "."
   end
 
   # Update the active mode (test/live) on an integration record and

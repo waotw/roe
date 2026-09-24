@@ -236,6 +236,10 @@ Rails.application.routes.draw do
     post   "configs/newsletters/send_test_email",           to: "configs#send_test_email_newsletters",        as: "send_test_email_newsletters_config"
     delete "configs/newsletters/disconnect",                to: "configs#disconnect_newsletters",            as: "disconnect_newsletters_config"
     post   "configs/newsletters/regenerate_webhook_token",  to: "configs#regenerate_postmark_webhook_token", as: "regenerate_webhook_token_newsletters_config"
+    post   "configs/newsletters/account_setup/preview",     to: "configs#postmark_account_setup_preview",     as: "postmark_account_setup_preview_config"
+    post   "configs/newsletters/account_setup",             to: "configs#postmark_account_setup_run",         as: "postmark_account_setup_config"
+    get    "configs/newsletters/account_setup/webhook_status", to: "configs#postmark_webhook_status",          as: "postmark_webhook_status_config"
+    delete "configs/newsletters/account_token",             to: "configs#remove_postmark_account_token",      as: "remove_postmark_account_token_config"
 
     get    "configs/snipcart/edit",       to: "configs#edit_snipcart",          as: "edit_snipcart_integration_config"
     patch  "configs/snipcart",            to: "configs#update_snipcart",        as: "snipcart_integration_config"

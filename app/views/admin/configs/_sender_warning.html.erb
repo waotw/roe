@@ -28,15 +28,21 @@
     this appears once a send has actually been refused, either by the Send test
     email button or by a real one failing. %>
 <% elsif PostmarkConfig.current&.sender_rejected? %>
-  <div class="mb-4 border border-amber-300 bg-amber-50 p-4" data-sender-warning data-sender-rejected>
-    <h3 class="text-sm font-semibold text-amber-900 mb-1">Postmark won't send from your address</h3>
+  <div class="mb-4 border border-amber-300 bg-amber-50 p-4  text-amber-800" data-sender-warning data-sender-rejected>
+    <h3 class="text-sm font-semibold text-amber-900 mb-1">Postmark won't send from this email address</h3>
     <p class="text-sm text-amber-800 mb-3">
-      Your author email is set to <code class="font-mono text-xs"><%= SiteSender.address %></code>,
-      but Postmark hasn't confirmed it. Add and confirm it as a Sender Signature in Postmark,
-      then send a test email to check.
+      The Author Email in Roe: <code class="font-mono text-xs"><%= SiteSender.address %></code> has to be confirmed by Postmark as a Sender Signature in order to send emails. Either:
+      <ul class="list-disc text-xs pl-4 mb-4">
+        <li>Add and confirm the above email as a Sender Signature in Postmark.</li>
+        <li>Update your Author Email in <%= link_to "Site Settings", admin_edit_site_config_path,
+                    class: "underline font-medium" %> to match the email you've set up in Postmark.</li>
+        <ul class="list-disc mt-2">
+          <li>Then send a test email below to verify.</li>
+        </ul>
+      </ul>
     </p>
     <p class="text-sm text-amber-800 mb-3">
-      Postmark said: <em><%= PostmarkConfig.current.sender_error %></em>
+      Postmark response: <em><%= PostmarkConfig.current.sender_error %></em>
     </p>
     <p class="text-sm text-amber-800">
       <%= link_to "Open Postmark settings →", admin_edit_newsletters_config_path,
