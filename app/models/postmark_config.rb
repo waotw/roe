@@ -229,15 +229,13 @@ class PostmarkConfig < ApplicationRecord
   #
   #   webhook_configured? — a live, read-only API check that the webhook is
   #     REGISTERED and aimed at our URL (Postmark's side of the config). Cheap,
-  #     no email. Confirms setup, NOT that a POST actually reaches and is
-  #     processed by us.
+  #     no email. Confirms setup, NOT that a POST actually reaches us.
   #
-  #   webhook_verified?  — the round-trip actually FUNCTIONED: a probe event
-  #     left Postmark, reached our endpoint, passed the token check, and the job
-  #     ran (verify_webhook! sends the probe; record_webhook_delivery! stamps it
-  #     when the matching Delivery callback arrives). This is the "it works"
-  #     proof, run on demand in production. A sandbox never delivers, so it's
-  #     inherently a live-server check.
+  #   verify_webhooks!  — asks Postmark to test the endpoint on demand (POST
+  #     /webhooks/{id}/verify): it POSTs a test of each enabled event type
+  #     (Delivery, Bounce, SpamComplaint) to us and reports whether each got a
+  #     200 — synchronously, no email, DKIM-independent. webhook_verified_at is
+  #     stamped only when every webhook passes. This is the "it works" proof.
 
   # Registered with Postmark and pointing at `url`? Live API lookup, no send.
   def webhook_configured?(url)
@@ -248,31 +246,12 @@ class PostmarkConfig < ApplicationRecord
 
   def webhook_verified? = webhook_verified_at.present?
 
-  # Fire the probe send and remember its id so the inbound Delivery event can be
-  # matched. Clears any earlier verification so the ✓ reflects this attempt.
-  def verify_webhook!(to:)
-    return { success: false, error: SiteSender::MISSING } unless SiteSender.configured?
-
-    result = PostmarkService.send_transactional_email(
-      to_email: to, to_name: to, tag: "webhook-verification",
-      subject: "Webhook test from #{SiteConfig.get('title').presence || 'your Roe site'}",
-      html_content: "<p>Roe sent this to confirm Postmark's delivery webhook " \
-                    "reaches your site. You can ignore it.</p>"
-    )
-
-    update_columns(webhook_probe_message_id: result[:message_id], webhook_verified_at: nil) if result[:success]
-
+  # Run Postmark's on-demand verification for every Roe webhook at `url` and
+  # stamp the result. Returns the service's { ok:, results:, error: } hash.
+  def verify_webhooks!(url)
+    result = PostmarkService.verify_webhooks(server_token, url)
+    update_columns(webhook_verified_at: (result[:ok] ? Time.current : nil))
     result
-  end
-
-  # Called from the webhook job on a Delivery event. Stamps verification only
-  # when the delivered message is the probe we're waiting on, so an ordinary
-  # newsletter delivery doesn't masquerade as a webhook test.
-  def record_webhook_delivery!(message_id)
-    return if message_id.blank?
-    return unless message_id == webhook_probe_message_id
-
-    update_columns(webhook_verified_at: Time.current)
   end
 
   # ── Test config file ─────────────────────────────────────────────────────

@@ -15,10 +15,9 @@ class PostmarkStatus
   # nil locally without a dev tunnel host, the live domain in production.
   include WebhookUrlHelper
 
-  Item = Struct.new(:key, :label, :state, :detail, :action, keyword_init: true)
+  Item = Struct.new(:key, :label, :state, :detail, keyword_init: true)
   # state ∈ :ok (green ✓) / :todo (amber, action needed) / :warn (red, broken)
   #        / :unknown (grey, couldn't determine) / :info (neutral fact)
-  # action — optional UI affordance for the row, e.g. :offer_webhook_test
 
   def self.for(config = PostmarkConfig.current)
     new(config).items
@@ -93,24 +92,17 @@ class PostmarkStatus
       todo(:return_path, "Return-Path not set up", "Optional, but improves deliverability.")
   end
 
-  # Webhook status. In production this is a two-stage picture: the passive API
-  # check that the webhook is REGISTERED (from setup), and — once the user runs
-  # the on-demand test — the stronger "round-trip actually WORKED" proof. Local
-  # never needs the webhook working (it activates on the live site), so it's
-  # purely informational there and never an actionable to-do.
+  # Webhook status. Production: verified working (Postmark's on-demand check
+  # passed) or not-yet-verified once registered — the RE-CHECK button lives in
+  # the Postmark Setup section, so here we just report state. Local never needs
+  # the webhook working (it activates on the live site), so it's informational.
   def webhook
     return local_webhook unless Rails.env.production?
 
     if @pm.webhook_verified?
-      ok(:webhook, "Webhooks tested and working", "Roe successfully sent and recieved an event to/from Postmark.")
-    elsif @pm.webhook_probe_message_id.present?
-      Item.new(key: :webhook, label: "Webhooks — test in progress", state: :unknown,
-               detail: "A test event was sent; waiting for Postmark's delivery callback.")
+      ok(:webhook, "All webhooks verified", "Postmark can reach your site — deliveries, bounces, and spam complaints.")
     elsif configured_webhook_url && @pm.webhook_configured?(configured_webhook_url)
-      # Registered, but not yet proven end-to-end. Offer the on-demand test.
-      Item.new(key: :webhook, label: "Webhooks active", state: :ok,
-               detail: "Registered with Postmark. Send a test event to confirm it reaches your site.",
-               action: :offer_webhook_test)
+      todo(:webhook, "Webhooks not verified", "Registered with Postmark. Use RE-CHECK in Postmark Setup to confirm they reach your site.")
     else
       todo(:webhook, "Webhooks not set up", "Run Postmark Setup below to connect the webhook.")
     end

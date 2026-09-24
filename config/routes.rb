@@ -238,8 +238,7 @@ Rails.application.routes.draw do
     post   "configs/newsletters/regenerate_webhook_token",  to: "configs#regenerate_postmark_webhook_token", as: "regenerate_webhook_token_newsletters_config"
     post   "configs/newsletters/account_setup/preview",     to: "configs#postmark_account_setup_preview",     as: "postmark_account_setup_preview_config"
     post   "configs/newsletters/account_setup",             to: "configs#postmark_account_setup_run",         as: "postmark_account_setup_config"
-    post   "configs/newsletters/webhook/test",              to: "configs#postmark_send_test_event",           as: "postmark_send_test_event_config"
-    get    "configs/newsletters/webhook/status",            to: "configs#postmark_webhook_status",            as: "postmark_webhook_status_config"
+    post   "configs/newsletters/webhook/verify",            to: "configs#postmark_verify_webhooks",            as: "postmark_verify_webhooks_config"
     delete "configs/newsletters/account_token",             to: "configs#remove_postmark_account_token",      as: "remove_postmark_account_token_config"
 
     get    "configs/snipcart/edit",       to: "configs#edit_snipcart",          as: "edit_snipcart_integration_config"

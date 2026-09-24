@@ -22,20 +22,21 @@ class PostmarkConfigTest < ActiveSupport::TestCase
     assert @config.webhook_configured?(url)
   end
 
-  test "record_webhook_delivery! stamps only the matching probe id" do
-    @config.update_columns(webhook_probe_message_id: "probe-123", webhook_verified_at: nil)
-
-    @config.record_webhook_delivery!("some-other-id")
-    assert_nil @config.reload.webhook_verified_at, "an unrelated delivery must not verify"
-
-    @config.record_webhook_delivery!("probe-123")
-    assert @config.reload.webhook_verified?, "the probe's own delivery verifies the webhook"
+  test "verify_webhooks! stamps verified_at when Postmark reports success" do
+    @config.update!(server_token: "srv")
+    url = "https://acme.com/webhooks/postmark/tok"
+    PostmarkService.expects(:verify_webhooks).with("srv", url).returns({ ok: true, results: [] })
+    result = @config.verify_webhooks!(url)
+    assert result[:ok]
+    assert @config.reload.webhook_verified?
   end
 
-  test "record_webhook_delivery! ignores a blank id" do
-    @config.update_columns(webhook_probe_message_id: "probe-123")
-    @config.record_webhook_delivery!("")
-    assert_nil @config.reload.webhook_verified_at
+  test "verify_webhooks! clears verified_at when Postmark reports failure" do
+    @config.update!(server_token: "srv", webhook_verified_at: Time.current)
+    url = "https://acme.com/webhooks/postmark/tok"
+    PostmarkService.expects(:verify_webhooks).with("srv", url).returns({ ok: false, error: "nope" })
+    @config.verify_webhooks!(url)
+    assert_not @config.reload.webhook_verified?
   end
 
   # ── Account token: kept only in production ───────────────────────────────

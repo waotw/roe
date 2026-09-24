@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_22_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_24_000000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -177,7 +177,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000000) do
     t.text "server_token"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
-    t.string "webhook_probe_message_id"
     t.string "webhook_token"
     t.datetime "webhook_verified_at"
   end

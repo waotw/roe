@@ -1882,9 +1882,15 @@ class Admin::ConfigsController < Admin::BaseController
 
     postmark.verify!
 
+    # Verify the webhooks the moment they're set up (production, where the live
+    # token is stored). Postmark's own check — POSTs a test of each event type
+    # to our endpoint, synchronous, no email — so a fresh setup lands on "all
+    # webhooks verified" with no extra click. Local can't (sandbox/no live URL).
+    verify = PostmarkConfig.store_account_token? ? postmark.verify_webhooks!(url) : nil
+
     flash[:notice] = postmark_setup_summary(
       sandbox:, live:, hook: (PostmarkConfig.store_account_token? ? live_hook : sandbox_hook),
-      kept: PostmarkConfig.store_account_token?
+      verify:, kept: PostmarkConfig.store_account_token?
     )
     redirect_to admin_edit_newsletters_config_path(tab: postmark.mode)
   rescue PostmarkAccountSetup::Error => e
@@ -1892,36 +1898,21 @@ class Admin::ConfigsController < Admin::BaseController
     redirect_to admin_edit_newsletters_config_path
   end
 
-  # On-demand webhook proof (production). Setup registers the webhook; this
-  # confirms it actually FUNCTIONS end-to-end by sending a probe event and
-  # waiting for Postmark's Delivery callback to land back here. Deliberately not
-  # part of setup: it sends a real email, so the user triggers it when they want
-  # the "it works" proof. Sandbox never delivers, so it's live-only.
-  def postmark_send_test_event
+  # On-demand webhook re-check (the RE-CHECK button). Asks Postmark to test our
+  # endpoint for every registered webhook (POST /webhooks/{id}/verify) — each
+  # event type, synchronous, no email — and stamps the result. Redirects back
+  # with a one-line summary; the status row shows the outcome.
+  def postmark_verify_webhooks
     postmark = PostmarkConfig.current
-    to = Current.user&.email_address
+    url = webhook_url("/webhooks/postmark/#{postmark.webhook_token}")
+    result = postmark.verify_webhooks!(url)
 
-    if to.blank?
-      flash[:alert] = "Roe needs your account email address to send the test."
+    flash[:notice] = if result[:ok]
+      "All webhooks verified — Postmark can reach your site."
     else
-      result = postmark.verify_webhook!(to: to)
-      flash[:notice] = if result[:success]
-        "Sent a test event to #{to}. Watch for the webhook to confirm — it usually takes a few seconds."
-      else
-        "Couldn't send the test event: #{result[:error]}"
-      end
+      "Webhooks not verified#{result[:error] ? ": #{result[:error]}" : ''}. Sign into Postmark to resolve."
     end
     redirect_to admin_edit_newsletters_config_path
-  end
-
-  # Poll target for the async webhook ✓ — the Delivery callback lands out of
-  # band, so the page asks until webhook_verified_at is stamped.
-  def postmark_webhook_status
-    postmark = PostmarkConfig.current
-    render json: {
-      verified:    postmark.webhook_verified?,
-      verified_at: postmark.webhook_verified_at&.iso8601
-    }
   end
 
   # Production Danger Zone: drop the stored account token. Setup still works
@@ -2183,12 +2174,15 @@ class Admin::ConfigsController < Admin::BaseController
   # by environment: production stores the live token and can verify the webhook
   # end-to-end; local sets up the sandbox and reports that live finishes on the
   # deployed site.
-  def postmark_setup_summary(sandbox:, live:, hook:, kept:)
+  def postmark_setup_summary(sandbox:, live:, hook:, verify:, kept:)
     parts = []
     parts << (sandbox.created ? "Created your sandbox server" : "Using #{sandbox.name} for sandbox")
     if kept
       parts << (live.created ? "created your live server" : "using #{live.name} for live")
       parts << (hook[:ok] ? "connected the delivery webhook" : "couldn't set up the webhook (#{hook[:error]})")
+      if verify
+        parts << (verify[:ok] ? "verified your webhooks" : "webhooks not verified — use RE-CHECK or sign into Postmark")
+      end
     else
       parts << "your live server is ready, but live keys can only be saved on your deployed site — run this again there to finish"
     end

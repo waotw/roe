@@ -64,6 +64,7 @@ class PostmarkAccountSetupFlowTest < ActionDispatch::IntegrationTest
     PostmarkAccountSetup.any_instance.stubs(:ensure_webhook)
       .returns({ ok: true, streams: { "outbound" => { ok: true, id: 1 }, "broadcast" => { ok: true, id: 2 } } })
     PostmarkService.stubs(:test_connection).returns({ success: true, server: { "DeliveryType" => "Live" } })
+    PostmarkConfig.any_instance.stubs(:verify_webhooks!).returns({ ok: true, results: [] })
 
     post admin_postmark_account_setup_config_path, params: { account_token: "acct-secret" }
 
@@ -74,39 +75,32 @@ class PostmarkAccountSetupFlowTest < ActionDispatch::IntegrationTest
     assert_equal "acct-secret", pm.stored_account_token
   end
 
-  test "run does not send any verification email (setup only registers)" do
+  test "run verifies the webhooks on setup, sends no email" do
     Rails.env.stubs(:production?).returns(true)
     PostmarkAccountSetup.any_instance.stubs(:ensure_server)
       .returns(server(kind: :sandbox, token: "sbx"), server(kind: :live, token: "live-tok"))
     PostmarkAccountSetup.any_instance.stubs(:ensure_webhook)
       .returns({ ok: true, streams: { "outbound" => { ok: true, id: 1 }, "broadcast" => { ok: true, id: 2 } } })
     PostmarkService.stubs(:test_connection).returns({ success: true })
-    # Setup registers the webhook; the round-trip test is a separate, on-demand
-    # action — so no email is sent here.
+    # Setup asks Postmark to verify the webhooks (its own check) — no email.
+    PostmarkConfig.any_instance.expects(:verify_webhooks!).returns({ ok: true, results: [] })
     PostmarkService.expects(:send_transactional_email).never
 
     post admin_postmark_account_setup_config_path, params: { account_token: "acct-secret" }
     assert_response :redirect
   end
 
-  test "send_test_event fires the probe on demand" do
-    PostmarkConfig.any_instance.expects(:verify_webhook!).with(to: User.take.email_address)
-                  .returns({ success: true, message_id: "probe" })
-    post admin_postmark_send_test_event_config_path
+  test "verify_webhooks re-checks on demand and reports success" do
+    PostmarkConfig.any_instance.expects(:verify_webhooks!).returns({ ok: true, results: [] })
+    post admin_postmark_verify_webhooks_config_path
     assert_response :redirect
-    assert_match(/test event/i, flash[:notice])
+    assert_match(/verified/i, flash[:notice])
   end
 
-  test "send_test_event surfaces a send failure" do
-    PostmarkConfig.any_instance.stubs(:verify_webhook!).returns({ success: false, error: "no sender" })
-    post admin_postmark_send_test_event_config_path
-    assert_match(/couldn't|no sender/i, flash[:alert].to_s + flash[:notice].to_s)
-  end
-
-  test "webhook_status reports verification state" do
-    @pm.update_columns(webhook_probe_message_id: "p", webhook_verified_at: Time.current)
-    get admin_postmark_webhook_status_config_path, as: :json
-    assert JSON.parse(response.body)["verified"]
+  test "verify_webhooks reports failure with Postmark's reason" do
+    PostmarkConfig.any_instance.expects(:verify_webhooks!).returns({ ok: false, error: "no webhook" })
+    post admin_postmark_verify_webhooks_config_path
+    assert_match(/not verified/i, flash[:notice])
   end
 
   test "run locally seeds the sandbox but never stores the account or live token" do

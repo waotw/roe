@@ -33,31 +33,29 @@ class PostmarkStatusTest < ActiveSupport::TestCase
     assert_match(/live site/i, row.detail)
   end
 
-  test "production: registered webhook reads active and offers the test" do
+  test "production: verified webhooks read green" do
     Rails.env.stubs(:production?).returns(true)
     Rails.env.stubs(:test?).returns(false) # take the production webhook-URL branch
+    SiteConfig.stubs(:site_url).returns("https://acme.com")
+    @pm.update!(server_token: "srv", verified_at: Time.current, webhook_verified_at: Time.current)
+    PostmarkService.stubs(:test_connection).returns({ success: true })
+
+    row = item(PostmarkStatus.for(@pm), :webhook)
+    assert_equal :ok, row.state
+    assert_match(/verified/i, row.label)
+  end
+
+  test "production: registered but unverified reads as a todo pointing at RE-CHECK" do
+    Rails.env.stubs(:production?).returns(true)
+    Rails.env.stubs(:test?).returns(false)
     SiteConfig.stubs(:site_url).returns("https://acme.com")
     @pm.update!(server_token: "srv", verified_at: Time.current)
     PostmarkService.stubs(:test_connection).returns({ success: true })
     PostmarkConfig.any_instance.stubs(:webhook_configured?).returns(true)
 
     row = item(PostmarkStatus.for(@pm), :webhook)
-    assert_equal :ok, row.state
-    assert_equal :offer_webhook_test, row.action, "registered-but-unproven offers the on-demand test"
-  end
-
-  test "production: a completed round-trip reads verified working, no test button" do
-    Rails.env.stubs(:production?).returns(true)
-    Rails.env.stubs(:test?).returns(false)
-    SiteConfig.stubs(:site_url).returns("https://acme.com")
-    @pm.update!(server_token: "srv", verified_at: Time.current)
-    @pm.update_columns(webhook_probe_message_id: "p", webhook_verified_at: Time.current)
-    PostmarkService.stubs(:test_connection).returns({ success: true })
-
-    row = item(PostmarkStatus.for(@pm), :webhook)
-    assert_equal :ok, row.state
-    assert_nil row.action, "already verified — nothing to offer"
-    assert_match(/round-trip|reached/i, row.detail)
+    assert_equal :todo, row.state
+    assert_match(/re-check/i, row.detail)
   end
 
   test "production shows a todo when the webhook isn't registered" do

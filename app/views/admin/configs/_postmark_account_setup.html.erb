@@ -75,4 +75,19 @@
       </button>
     </div>
   <% end %>
+
+  <%# RE-CHECK — once the account token is stored (production), let the user
+      re-run Postmark's on-demand webhook verification any time. Synchronous, no
+      email; the flash + status row report the outcome. COPY. %>
+  <% if @postmark_config&.account_token_present? %>
+    <div class="mt-3 pt-3 border-t border-blue-200">
+      <p class="text-xs text-gray-600 mb-2">
+        <%# COPY %>
+        Roe checks your webhooks with Postmark. Run it again any time to confirm they still reach your site.
+      </p>
+      <%= button_to "Re-check", admin_postmark_verify_webhooks_config_path,
+            method: :post,
+            class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer" %>
+    </div>
+  <% end %>
 </div>
