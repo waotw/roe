@@ -21,7 +21,7 @@
 %>
 
 <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
-  <h3 class="text-base font-semibold text-gray-900 mb-3">Email status</h3>
+  <h3 class="text-base font-semibold text-gray-900 mb-3">Integration status</h3>
   <ul class="space-y-2">
     <% items.each do |item| %>
       <li class="flex items-start gap-2 text-sm">
@@ -30,6 +30,25 @@
           <span class="font-medium <%= label_class.call(item.state) %>"><%= item.label %></span>
           <% if item.detail.present? %>
             <span class="text-gray-500"> — <%= item.detail %></span>
+          <% end %>
+
+          <%# On-demand webhook proof (production). The status service flags the
+              "registered but not yet proven" row with action :offer_webhook_test
+              — show a button to send the test event, plus a poller that flips
+              the row to ✓ when Postmark's callback lands. %>
+          <% if item.action == :offer_webhook_test %>
+            <div class="mt-1" data-controller="postmark-webhook-test"
+                 data-postmark-webhook-test-status-url-value="<%= admin_postmark_webhook_status_config_path %>">
+              <%= button_to "Send a test event", admin_postmark_send_test_event_config_path,
+                    method: :post,
+                    class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer" %>
+              <p class="text-xs mt-1" data-postmark-webhook-test-target="result"
+                 data-pending="<%= @postmark_config.webhook_probe_message_id.present? %>">
+                <% if @postmark_config.webhook_probe_message_id.present? %>
+                  <span class="text-gray-500">Waiting for Postmark's delivery callback…</span>
+                <% end %>
+              </p>
+            </div>
           <% end %>
         </span>
       </li>

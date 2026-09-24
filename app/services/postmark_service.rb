@@ -158,6 +158,33 @@ class PostmarkService
       { error: e.message }
     end
 
+    # Whether a webhook aimed at `url` is registered on this server, across both
+    # the outbound and broadcast streams — a live, read-only check (no send).
+    # Used by the settings status to confirm the account-setup webhook is in
+    # place. Any API failure reads as "can't confirm" (false), never raises.
+    def webhook_for_url?(server_token, url)
+      return false if server_token.blank? || url.blank?
+
+      %w[outbound broadcast].any? do |stream|
+        uri = URI("#{API_BASE}/webhooks?MessageStream=#{stream}")
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+
+        request = Net::HTTP::Get.new(uri.request_uri)
+        request["Accept"] = "application/json"
+        request["X-Postmark-Server-Token"] = server_token
+
+        response = http.request(request)
+        next false unless response.code == "200"
+
+        data = JSON.parse(response.body) rescue {}
+        Array(data["Webhooks"]).any? { |w| w["Url"] == url }
+      end
+    rescue => e
+      Rails.logger.warn "Postmark webhook lookup failed: #{e.message}"
+      false
+    end
+
     private
 
     def strip_html(html)

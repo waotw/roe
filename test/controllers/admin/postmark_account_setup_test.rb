@@ -61,16 +61,52 @@ class PostmarkAccountSetupFlowTest < ActionDispatch::IntegrationTest
     Rails.env.stubs(:production?).returns(true)
     PostmarkAccountSetup.any_instance.stubs(:ensure_server)
       .returns(server(kind: :sandbox, token: "sbx"), server(kind: :live, token: "live-tok"))
-    PostmarkAccountSetup.any_instance.stubs(:ensure_webhook).returns({ ok: true, id: 1 })
+    PostmarkAccountSetup.any_instance.stubs(:ensure_webhook)
+      .returns({ ok: true, streams: { "outbound" => { ok: true, id: 1 }, "broadcast" => { ok: true, id: 2 } } })
     PostmarkService.stubs(:test_connection).returns({ success: true, server: { "DeliveryType" => "Live" } })
-    PostmarkConfig.any_instance.stubs(:verify_webhook!).returns({ success: true, message_id: "probe" })
 
     post admin_postmark_account_setup_config_path, params: { account_token: "acct-secret" }
 
     pm = PostmarkConfig.current
     assert_equal "live-tok", pm.live_server_token, "live server token stored in the DB"
+    assert pm.mode_live?, "production switches the config to live mode so the live token is actually used"
     assert pm.account_token_present?, "production keeps the account token"
     assert_equal "acct-secret", pm.stored_account_token
+  end
+
+  test "run does not send any verification email (setup only registers)" do
+    Rails.env.stubs(:production?).returns(true)
+    PostmarkAccountSetup.any_instance.stubs(:ensure_server)
+      .returns(server(kind: :sandbox, token: "sbx"), server(kind: :live, token: "live-tok"))
+    PostmarkAccountSetup.any_instance.stubs(:ensure_webhook)
+      .returns({ ok: true, streams: { "outbound" => { ok: true, id: 1 }, "broadcast" => { ok: true, id: 2 } } })
+    PostmarkService.stubs(:test_connection).returns({ success: true })
+    # Setup registers the webhook; the round-trip test is a separate, on-demand
+    # action — so no email is sent here.
+    PostmarkService.expects(:send_transactional_email).never
+
+    post admin_postmark_account_setup_config_path, params: { account_token: "acct-secret" }
+    assert_response :redirect
+  end
+
+  test "send_test_event fires the probe on demand" do
+    PostmarkConfig.any_instance.expects(:verify_webhook!).with(to: User.take.email_address)
+                  .returns({ success: true, message_id: "probe" })
+    post admin_postmark_send_test_event_config_path
+    assert_response :redirect
+    assert_match(/test event/i, flash[:notice])
+  end
+
+  test "send_test_event surfaces a send failure" do
+    PostmarkConfig.any_instance.stubs(:verify_webhook!).returns({ success: false, error: "no sender" })
+    post admin_postmark_send_test_event_config_path
+    assert_match(/couldn't|no sender/i, flash[:alert].to_s + flash[:notice].to_s)
+  end
+
+  test "webhook_status reports verification state" do
+    @pm.update_columns(webhook_probe_message_id: "p", webhook_verified_at: Time.current)
+    get admin_postmark_webhook_status_config_path, as: :json
+    assert JSON.parse(response.body)["verified"]
   end
 
   test "run locally seeds the sandbox but never stores the account or live token" do
@@ -86,12 +122,6 @@ class PostmarkAccountSetupFlowTest < ActionDispatch::IntegrationTest
     assert_nil pm.live_server_token, "local must not store the live token"
     # Sandbox token landed in the plaintext test file.
     assert_equal "sbx-local", PostmarkConfig.test_config["server_token"]
-  end
-
-  test "webhook_status reports verification state" do
-    @pm.update_columns(webhook_probe_message_id: "p", webhook_verified_at: Time.current)
-    get admin_postmark_webhook_status_config_path, as: :json
-    assert JSON.parse(response.body)["verified"]
   end
 
   test "removing the account token clears it" do

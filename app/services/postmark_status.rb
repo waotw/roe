@@ -15,9 +15,10 @@ class PostmarkStatus
   # nil locally without a dev tunnel host, the live domain in production.
   include WebhookUrlHelper
 
-  Item = Struct.new(:key, :label, :state, :detail, keyword_init: true)
+  Item = Struct.new(:key, :label, :state, :detail, :action, keyword_init: true)
   # state ∈ :ok (green ✓) / :todo (amber, action needed) / :warn (red, broken)
   #        / :unknown (grey, couldn't determine) / :info (neutral fact)
+  # action — optional UI affordance for the row, e.g. :offer_webhook_test
 
   def self.for(config = PostmarkConfig.current)
     new(config).items
@@ -52,7 +53,7 @@ class PostmarkStatus
 
     live = @pm.mode_live?
     Item.new(key: :mode, label: "Mode: #{live ? 'Live' : 'Test'}", state: :info,
-             detail: live ? "Real email is sent." : "Sandbox — nothing is delivered.")
+             detail: live ? "Real email is sent." : "Sandbox — Check Activity on Postmark to confirm.")
   end
 
   # Sender address (the one thing a send actually requires). Pre-emptive when a
@@ -92,29 +93,56 @@ class PostmarkStatus
       todo(:return_path, "Return-Path not set up", "Optional, but improves deliverability.")
   end
 
+  # Webhook status. In production this is a two-stage picture: the passive API
+  # check that the webhook is REGISTERED (from setup), and — once the user runs
+  # the on-demand test — the stronger "round-trip actually WORKED" proof. Local
+  # never needs the webhook working (it activates on the live site), so it's
+  # purely informational there and never an actionable to-do.
   def webhook
+    return local_webhook unless Rails.env.production?
+
     if @pm.webhook_verified?
-      ok(:webhook, "Webhook confirmed", "Postmark reached your site with a delivery event.")
+      ok(:webhook, "Webhooks tested and working", "Roe successfully sent and recieved an event to/from Postmark.")
     elsif @pm.webhook_probe_message_id.present?
-      Item.new(key: :webhook, label: "Webhook — waiting for confirmation", state: :unknown,
-               detail: "A test was sent; the delivery callback hasn't arrived yet.")
-    elsif !webhooks_reachable?
-      # Local without a public tunnel host: Postmark can't call back to
-      # localhost, so no webhook can be created or tested here. Not a to-do the
-      # user can act on from this machine — say where it happens instead.
-      Item.new(key: :webhook, label: "Webhook — set up on your live site", state: :info,
-               detail: "Postmark can't reach localhost, so webhooks are configured when you " \
-                       "run this on your deployed site. To test them here, set a dev_host tunnel.")
+      Item.new(key: :webhook, label: "Webhooks — test in progress", state: :unknown,
+               detail: "A test event was sent; waiting for Postmark's delivery callback.")
+    elsif configured_webhook_url && @pm.webhook_configured?(configured_webhook_url)
+      # Registered, but not yet proven end-to-end. Offer the on-demand test.
+      Item.new(key: :webhook, label: "Webhooks active", state: :ok,
+               detail: "Registered with Postmark. Send a test event to confirm it reaches your site.",
+               action: :offer_webhook_test)
     else
-      Item.new(key: :webhook, label: "Webhook not set up", state: :todo,
-               detail: "Run the setup below to connect and test the delivery webhook.")
+      todo(:webhook, "Webhooks not set up", "Run Postmark Setup below to connect the webhook.")
     end
   end
 
-  # Whether Postmark could POST a webhook to this install — false on localhost
-  # without a dev tunnel host, true in production (the live domain).
-  def webhooks_reachable?
-    webhook_url("/webhooks/postmark/probe").present?
+  # Local never needs the webhook working — it activates on the live site. Say
+  # so, split by whether a live site exists yet, and never nag to "run setup".
+  # Nothing to report until the sandbox is actually set up (the connection row
+  # already covers "not connected"), so omit the row otherwise.
+  def local_webhook
+    return nil unless @pm.keys_present?
+
+    detail = live_site_deployed? ?
+      "They activate on your live site — run Postmark Setup on the live site to enable them." :
+      "They activate on your live site — run Postmark Setup on the live site to enable them once you've deployed."
+    Item.new(key: :webhook, label: "Webhooks created", state: :info, detail: detail)
+  end
+
+  # The URL the account-setup webhook was pointed at, or nil if we can't build
+  # one (no token yet, or no reachable base — production always has the domain).
+  def configured_webhook_url
+    token = @pm.webhook_token
+    return nil if token.blank?
+
+    webhook_url("/webhooks/postmark/#{token}")
+  end
+
+  # Has this install heard from a deployed peer recently (Site Sync's signal)?
+  def live_site_deployed?
+    SiteSync::Exchange.can_call_peer? && SiteSync::Exchange.peer_reachable?
+  rescue StandardError
+    false
   end
 
   # ── Live signature read (production, memoised for one render) ─────────────
@@ -131,13 +159,13 @@ class PostmarkStatus
 
   def reactive_hint
     PostmarkConfig.store_account_token? ?
-      "Run setup, or send a test, to check it." :
-      "Full sender and DKIM checks run on your deployed site; here, send a test to confirm the address."
+      "Run setup, or send a test email, to check it." :
+      "Full sender and DKIM checks run on your deployed site; on the local site, send a test to confirm the address."
   end
 
   def missing_sender
     Item.new(key: :sender, label: "No sender address set", state: :warn,
-             detail: "Add an Author Email in Settings → Site so Roe has an address to send from.")
+             detail: "Add an Author Email in Settings → Site so Roe has an address to send emails from.")
   end
 
   def ok(key, label, detail)   = Item.new(key:, label:, state: :ok,   detail:)

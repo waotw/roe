@@ -6,7 +6,21 @@ class PostmarkConfigTest < ActiveSupport::TestCase
     @config = PostmarkConfig.current
   end
 
-  # ── Webhook round-trip verification ──────────────────────────────────────
+  # ── Webhook status ───────────────────────────────────────────────────────
+
+  test "webhook_configured? is false without a token or URL" do
+    assert_not @config.webhook_configured?(nil), "no URL → not configured"
+    @config.update!(server_token: nil)
+    assert_not @config.webhook_configured?("https://acme.com/webhooks/postmark/x"),
+               "no server token → can't check, so not configured"
+  end
+
+  test "webhook_configured? delegates to a live API lookup when a token is present" do
+    @config.update!(server_token: "srv")
+    url = "https://acme.com/webhooks/postmark/tok"
+    PostmarkService.expects(:webhook_for_url?).with("srv", url).returns(true)
+    assert @config.webhook_configured?(url)
+  end
 
   test "record_webhook_delivery! stamps only the matching probe id" do
     @config.update_columns(webhook_probe_message_id: "probe-123", webhook_verified_at: nil)

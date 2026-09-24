@@ -18,12 +18,4 @@ module PostmarkSetupHelper
   rescue StandardError
     false
   end
-
-  # Whether local webhook delivery can even be tested — Postmark can't POST to
-  # localhost, so it needs a public tunnel host (dev_host / a public
-  # allowed_hosts entry). Drives the "set a tunnel to test webhooks locally"
-  # hint. Always true in production (the live domain is reachable).
-  def postmark_local_webhooks_testable?
-    Rails.env.production? || webhook_url("/webhooks/postmark/probe").present?
-  end
 end

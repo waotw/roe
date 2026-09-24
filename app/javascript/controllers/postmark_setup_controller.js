@@ -14,26 +14,11 @@ import { Controller } from "@hotwired/stimulus";
 export default class extends Controller {
   static targets = [
     "token", "preview", "reuse", "sandboxReuse", "liveReuse",
-    "signatures", "error", "runButton", "webhookStatus",
+    "signatures", "error", "runButton",
   ];
   static values = {
     previewUrl: String,
-    statusUrl: String,
-    verified: Boolean,
   };
-
-  connect() {
-    // If the page loaded already-verified, show it; otherwise, if a probe is in
-    // flight (the run just happened), poll for the callback.
-    if (this.verifiedValue) this.markWebhookVerified();
-    else if (this.hasWebhookStatusTarget && this.webhookStatusTarget.dataset.pending === "true") {
-      this.startPolling();
-    }
-  }
-
-  disconnect() {
-    if (this._poll) clearInterval(this._poll);
-  }
 
   // Step 1 — validate the token and discover servers/signatures.
   async preview(event) {
@@ -93,30 +78,6 @@ export default class extends Controller {
         : '<span class="text-amber-700">pending confirmation</span>';
       return `<li><span class="font-mono">${this.escape(s.email)}</span> — ${mark}</li>`;
     }).join("");
-  }
-
-  // Poll for the delivery callback that verifies the webhook end-to-end.
-  startPolling() {
-    let tries = 0;
-    this._poll = setInterval(async () => {
-      tries += 1;
-      const res = await fetch(this.statusUrlValue, { headers: { Accept: "application/json" } });
-      const data = await res.json();
-      if (data.verified) { this.markWebhookVerified(); clearInterval(this._poll); }
-      else if (tries >= 20) { this.markWebhookPending(); clearInterval(this._poll); } // ~1 min
-    }, 3000);
-  }
-
-  markWebhookVerified() {
-    if (this.hasWebhookStatusTarget) {
-      this.webhookStatusTarget.innerHTML = '<span class="text-green-700">✓ Webhook confirmed — Postmark reached your site.</span>';
-    }
-  }
-
-  markWebhookPending() {
-    if (this.hasWebhookStatusTarget) {
-      this.webhookStatusTarget.innerHTML = '<span class="text-amber-700">Still waiting for Postmark\'s delivery callback. It can take a minute; reload to check again.</span>';
-    }
   }
 
   showError(msg) {

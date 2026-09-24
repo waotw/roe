@@ -1858,7 +1858,14 @@ class Admin::ConfigsController < Admin::BaseController
     live = setup.ensure_server(kind: :live, name: "#{site} - Production",
                                reuse_id: params[:live_reuse_id].presence)
     if PostmarkConfig.store_account_token?
-      postmark.update!(server_token: live.token)
+      # Production runs live: store the live token AND switch the singleton to
+      # live mode, so PostmarkConfig#server_token actually returns it. Without
+      # the mode flip the model falls back to the sandbox token, and every send
+      # — including the webhook probe below — goes through a server that records
+      # but never delivers, so the Delivery webhook never fires and verification
+      # can't complete. (The owner can still switch to Test mode afterwards to
+      # exercise the sandbox.)
+      postmark.update!(server_token: live.token, mode: :live)
       postmark.store_account_token!(token) # prod keeps it for the standing signature check
     end
 
@@ -1874,23 +1881,36 @@ class Admin::ConfigsController < Admin::BaseController
     live_hook    = setup.ensure_webhook(live.token, url)
 
     postmark.verify!
-    # Fire the probe only when a webhook could actually call back (a URL exists)
-    # and the target server delivers (live) — a sandbox never emits a Delivery
-    # event, so a probe there would wait forever. Production sends from the live
-    # server it just stored.
-    probe_sent = false
-    if live_hook[:ok] && PostmarkConfig.store_account_token? && Current.user&.email_address.present?
-      postmark.verify_webhook!(to: Current.user.email_address)
-      probe_sent = true
-    end
 
     flash[:notice] = postmark_setup_summary(
       sandbox:, live:, hook: (PostmarkConfig.store_account_token? ? live_hook : sandbox_hook),
-      probe_sent:, kept: PostmarkConfig.store_account_token?
+      kept: PostmarkConfig.store_account_token?
     )
     redirect_to admin_edit_newsletters_config_path(tab: postmark.mode)
   rescue PostmarkAccountSetup::Error => e
     flash[:alert] = "Postmark setup failed: #{e.message}"
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  # On-demand webhook proof (production). Setup registers the webhook; this
+  # confirms it actually FUNCTIONS end-to-end by sending a probe event and
+  # waiting for Postmark's Delivery callback to land back here. Deliberately not
+  # part of setup: it sends a real email, so the user triggers it when they want
+  # the "it works" proof. Sandbox never delivers, so it's live-only.
+  def postmark_send_test_event
+    postmark = PostmarkConfig.current
+    to = Current.user&.email_address
+
+    if to.blank?
+      flash[:alert] = "Roe needs your account email address to send the test."
+    else
+      result = postmark.verify_webhook!(to: to)
+      flash[:notice] = if result[:success]
+        "Sent a test event to #{to}. Watch for the webhook to confirm — it usually takes a few seconds."
+      else
+        "Couldn't send the test event: #{result[:error]}"
+      end
+    end
     redirect_to admin_edit_newsletters_config_path
   end
 
@@ -2163,13 +2183,12 @@ class Admin::ConfigsController < Admin::BaseController
   # by environment: production stores the live token and can verify the webhook
   # end-to-end; local sets up the sandbox and reports that live finishes on the
   # deployed site.
-  def postmark_setup_summary(sandbox:, live:, hook:, probe_sent:, kept:)
+  def postmark_setup_summary(sandbox:, live:, hook:, kept:)
     parts = []
     parts << (sandbox.created ? "Created your sandbox server" : "Using #{sandbox.name} for sandbox")
     if kept
       parts << (live.created ? "created your live server" : "using #{live.name} for live")
-      parts << (hook[:ok] ? "set up the delivery webhook" : "couldn't set up the webhook (#{hook[:error]})")
-      parts << "sent a test to confirm delivery — watch for the ✓" if probe_sent
+      parts << (hook[:ok] ? "connected the delivery webhook" : "couldn't set up the webhook (#{hook[:error]})")
     else
       parts << "your live server is ready, but live keys can only be saved on your deployed site — run this again there to finish"
     end

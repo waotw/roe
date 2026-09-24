@@ -222,14 +222,29 @@ class PostmarkConfig < ApplicationRecord
     update!(account_token: nil)
   end
 
-  # ── Webhook round-trip verification ──────────────────────────────────────
+  # ── Webhook status ───────────────────────────────────────────────────────
   #
-  # Setting the webhook up is only half the job; these record that it actually
-  # *works*. verify_webhook! sends a probe email and remembers its MessageID;
-  # record_webhook_delivery! (called from ProcessPostmarkWebhookJob when the
-  # Delivery event for that id arrives) stamps webhook_verified_at, closing the
-  # loop. A sandbox server records without delivering, so no Delivery event
-  # ever fires there — webhook verification is inherently a live-server check.
+  # Two complementary checks, because "configured" and "working" aren't the
+  # same thing:
+  #
+  #   webhook_configured? — a live, read-only API check that the webhook is
+  #     REGISTERED and aimed at our URL (Postmark's side of the config). Cheap,
+  #     no email. Confirms setup, NOT that a POST actually reaches and is
+  #     processed by us.
+  #
+  #   webhook_verified?  — the round-trip actually FUNCTIONED: a probe event
+  #     left Postmark, reached our endpoint, passed the token check, and the job
+  #     ran (verify_webhook! sends the probe; record_webhook_delivery! stamps it
+  #     when the matching Delivery callback arrives). This is the "it works"
+  #     proof, run on demand in production. A sandbox never delivers, so it's
+  #     inherently a live-server check.
+
+  # Registered with Postmark and pointing at `url`? Live API lookup, no send.
+  def webhook_configured?(url)
+    return false if url.blank? || server_token.blank?
+
+    PostmarkService.webhook_for_url?(server_token, url)
+  end
 
   def webhook_verified? = webhook_verified_at.present?
 
@@ -245,9 +260,7 @@ class PostmarkConfig < ApplicationRecord
                     "reaches your site. You can ignore it.</p>"
     )
 
-    if result[:success]
-      update_columns(webhook_probe_message_id: result[:message_id], webhook_verified_at: nil)
-    end
+    update_columns(webhook_probe_message_id: result[:message_id], webhook_verified_at: nil) if result[:success]
 
     result
   end

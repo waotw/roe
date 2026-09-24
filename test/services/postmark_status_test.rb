@@ -16,36 +16,58 @@ class PostmarkStatusTest < ActiveSupport::TestCase
 
   def item(items, key) = items.find { |i| i.key == key }
 
-  test "not connected reads as a todo" do
+  test "not connected reads as a todo, no webhook row until set up" do
     items = PostmarkStatus.for(@pm)
     assert_equal :todo, item(items, :connection).state
-    # In the test env (no dev tunnel host) the webhook can't be reached, so it's
-    # informational rather than an actionable todo — see the reachability tests.
-    assert_equal :info, item(items, :webhook).state
+    # Locally, before setup, there's nothing to say about the webhook — the
+    # connection row already covers "not connected".
+    assert_nil item(items, :webhook)
   end
 
-  test "a connected, webhook-verified config reads green" do
+  test "local, once set up, shows webhooks as informational (never a todo)" do
+    @pm.update!(server_token: "sbx")
+    PostmarkService.stubs(:test_connection).returns({ success: true })
+
+    row = item(PostmarkStatus.for(@pm), :webhook)
+    assert_equal :info, row.state, "local webhooks are informational — they activate on the live site"
+    assert_match(/live site/i, row.detail)
+  end
+
+  test "production: registered webhook reads active and offers the test" do
+    Rails.env.stubs(:production?).returns(true)
+    Rails.env.stubs(:test?).returns(false) # take the production webhook-URL branch
+    SiteConfig.stubs(:site_url).returns("https://acme.com")
+    @pm.update!(server_token: "srv", verified_at: Time.current)
+    PostmarkService.stubs(:test_connection).returns({ success: true })
+    PostmarkConfig.any_instance.stubs(:webhook_configured?).returns(true)
+
+    row = item(PostmarkStatus.for(@pm), :webhook)
+    assert_equal :ok, row.state
+    assert_equal :offer_webhook_test, row.action, "registered-but-unproven offers the on-demand test"
+  end
+
+  test "production: a completed round-trip reads verified working, no test button" do
+    Rails.env.stubs(:production?).returns(true)
+    Rails.env.stubs(:test?).returns(false)
+    SiteConfig.stubs(:site_url).returns("https://acme.com")
     @pm.update!(server_token: "srv", verified_at: Time.current)
     @pm.update_columns(webhook_probe_message_id: "p", webhook_verified_at: Time.current)
     PostmarkService.stubs(:test_connection).returns({ success: true })
 
-    items = PostmarkStatus.for(@pm)
-    assert_equal :ok, item(items, :connection).state
-    assert_equal :ok, item(items, :webhook).state
-  end
-
-  test "webhook row is informational (not a todo) on local without a tunnel host" do
-    # No dev_host / public allowed_hosts → webhook_url is nil locally.
-    SiteConfig.stubs(:development).returns(nil)
     row = item(PostmarkStatus.for(@pm), :webhook)
-    assert_equal :info, row.state, "local can't create webhooks, so it's not an actionable todo"
-    assert_match(/live site|dev_host/i, row.detail)
+    assert_equal :ok, row.state
+    assert_nil row.action, "already verified — nothing to offer"
+    assert_match(/round-trip|reached/i, row.detail)
   end
 
-  test "webhook row is a todo when reachable but not yet set up (production-like)" do
-    SiteConfig.stubs(:development).with("dev_host").returns("acme.ngrok.app")
-    SiteConfig.stubs(:development).with("allowed_hosts").returns([])
-    Rails.env.stubs(:development?).returns(true)
+  test "production shows a todo when the webhook isn't registered" do
+    Rails.env.stubs(:production?).returns(true)
+    Rails.env.stubs(:test?).returns(false)
+    SiteConfig.stubs(:site_url).returns("https://acme.com")
+    @pm.update!(server_token: "srv", verified_at: Time.current)
+    PostmarkService.stubs(:test_connection).returns({ success: true })
+    PostmarkConfig.any_instance.stubs(:webhook_configured?).returns(false)
+
     row = item(PostmarkStatus.for(@pm), :webhook)
     assert_equal :todo, row.state
   end
