@@ -324,8 +324,12 @@ class Admin::UpdatesController < Admin::BaseController
 
     # Use Open3 with an array so spaces in Rails.root don't break the shell command.
     require "open3"
+    # NB: split on newlines WITHOUT a leading String#strip — porcelain pads the
+    # status with a leading space for worktree-only changes (" M path"), and
+    # strip would eat the first line's leading space, shifting that one path by a
+    # character (turning "VERSION" into "ERSION"). Drop blank lines individually.
     output, = Open3.capture2("git", "-C", Rails.root.to_s, "status", "--porcelain")
-    lines = output.strip.split("\n").reject(&:empty?)
+    lines = output.split("\n").reject { |l| l.strip.empty? }
 
     changed = lines.map do |line|
       code     = line[0..1].strip

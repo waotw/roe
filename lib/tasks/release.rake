@@ -56,6 +56,7 @@ namespace :release do
     bump_version_files(root, version, today)
     bump_docs_manifest(root, version, touched)
     bump_theme_headers(root, version, touched)
+    regenerate_schemas(root)
 
     puts ""
     puts "Done. Review with `git diff`, then:"
@@ -204,6 +205,52 @@ namespace :release do
     puts "  ✓ #{changed} stamped at #{version}" if changed > 0
     puts "  · #{untouched} unchanged since last tag" if untouched > 0
     puts "  · #{no_line} touched but no `Bundled with:` line (skipped)" if no_line > 0
+  end
+
+  # Regenerate the committed schema dumps so a release ships them in the exact
+  # state a user's first `db:migrate` produces — otherwise they show up as
+  # "modified" in the user's working tree right after updating (this is why
+  # db/cable_schema.rb has perennially shown as uncommitted: in development
+  # `cable` shares the primary database file, so a migrate re-dumps the full
+  # primary schema into cable_schema.rb but the committed copy carried a stale
+  # `version:` stamp, leaving a one-line diff on every install).
+  #
+  # Uses `db:schema:dump` (development), which is READ-ONLY on your data: it
+  # only re-emits db/*_schema.rb from the current database. It assumes the dev
+  # DB is already migrated — the normal state while developing. If migrations
+  # are pending, run `bin/rails db:migrate` first, then re-run the bump.
+  def regenerate_schemas(root)
+    current = File.join(root, "current")
+
+    puts ""
+    puts "Schema dumps:"
+
+    output = nil
+    ok = false
+    Bundler.with_original_env do
+      cmd = "cd #{current.shellescape} && RAILS_ENV=development bin/rails db:schema:dump 2>&1"
+      output = `#{cmd}`
+      ok = $?.success?
+    end
+
+    unless ok
+      puts "  ! db:schema:dump failed — regenerate manually before tagging:"
+      output.to_s.each_line { |l| puts "    #{l.chomp}" }
+      return
+    end
+
+    # Report which of the tracked schema files actually changed, so they stand
+    # out in the diff the maintainer is about to review and commit.
+    changed = Dir.chdir(current) do
+      `git diff --name-only -- db/schema.rb db/cable_schema.rb db/cache_schema.rb db/queue_schema.rb 2>/dev/null`
+        .split("\n").map(&:strip).reject(&:empty?)
+    end
+
+    if changed.any?
+      changed.each { |p| puts "  ✓ regenerated #{p}" }
+    else
+      puts "  · already up to date"
+    end
   end
 
   # Returns the set of absolute paths under current/ that have been
