@@ -45,7 +45,7 @@
 
     <button type="button" data-action="postmark-setup#preview"
             class="uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer">
-      Check my account
+      <%= mode == :live ? "Set up my account" : "Set up test servers" %>
     </button>
 
     <%# Revealed after a successful preview. %>
@@ -71,7 +71,7 @@
 
       <button type="submit" data-postmark-setup-target="runButton" hidden
               class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
-        <%= mode == :live ? "Set up my Postmark integration" : "Set up my test server" %>
+        <%= mode == :live ? "Create servers & connect" : "Create test servers" %>
       </button>
     </div>
   <% end %>
