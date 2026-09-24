@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    <%# Load the editor as a standalone document (full reload on every visit)
-        rather than a Turbo snapshot swap. This makes leaving via Back/Forward/
-        close/reload a real page unload, so the beforeunload unsaved-changes
-        guard fires reliably. In-page links (e.g. "Back to Posts") still route
-        through Turbo + the turbo:before-visit guard. %>
-    <meta name="turbo-visit-control" content="reload">
+    <%# The editor loads as a normal Turbo page (snapshot swap, no full reload)
+        so navigation is smooth. Unsaved work is protected by local draft
+        recovery in editor_controller.js — edits autosave to localStorage and
+        the next visit offers to restore — so losing the full-reload
+        beforeunload guard on Back/Forward no longer means losing changes.
+        In-page links still route through the turbo:before-visit courtesy
+        prompt. no-cache keeps Turbo from restoring a stale editor snapshot
+        (old buffer contents) when navigating back to it. %>
     <meta name="turbo-cache-control" content="no-cache">
 
     <% if SiteConfig.get('favicon').present? %>

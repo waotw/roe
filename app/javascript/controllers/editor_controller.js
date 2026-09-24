@@ -174,10 +174,12 @@ export default class extends Controller {
     this.textareaTarget.addEventListener("input", () => {
       this.updateSaveState();
       this.schedulePreviewUpdate();
+      this.scheduleDraftSave();
     });
     this.metadataPreviewHandler = () => {
       this.updateSaveState();
       this.schedulePreviewUpdate();
+      this.scheduleDraftSave();
     };
     document.addEventListener("metadata:changed", this.metadataPreviewHandler);
 
@@ -206,6 +208,15 @@ export default class extends Controller {
     this.originalMetadata = this.hasMetadataTarget
       ? this.metadataTarget.value
       : "";
+
+    // ── Local draft recovery ──────────────────────────────────────────────
+    // Autosave edits to localStorage so an accidental navigation, reload, tab
+    // close, or crash can't lose unsaved work. This is what lets the editor be
+    // a normal Turbo page (no full-reload flicker) rather than relying on the
+    // full-reload beforeunload guard to protect changes. Set up before the
+    // input listeners below wire autosave; runs the restore prompt at the end
+    // of connect() once the DOM is settled.
+    this.setupDraftRecovery();
 
     // Setup broadcast channel for preview
     const previewId = `${this.resourceTypeValue}-${this.resourceIdValue}`;
@@ -353,6 +364,10 @@ export default class extends Controller {
     // CHECK BUTTON ON INITIAL LOAD
     this.checkInitialButtonState();
 
+    // Offer to restore a locally-saved draft if one is newer than the file and
+    // differs from it. Runs last so the banner mounts into a settled DOM.
+    this.maybeOfferDraftRestore();
+
     // Add global keyboard shortcut handler
     this.globalKeydownHandler = this.handleKeydown.bind(this);
     document.addEventListener("keydown", this.globalKeydownHandler);
@@ -436,6 +451,209 @@ export default class extends Controller {
     }
   }
 
+  // ── Local draft recovery ────────────────────────────────────────────────
+  // Autosaves the in-progress content + metadata to localStorage so unsaved
+  // work survives an accidental navigation, reload, tab close, or crash. This
+  // is the safety net that lets the editor be a normal Turbo page instead of a
+  // full-reload document: even without the browser's Back/Forward beforeunload
+  // prompt, nothing is lost — the next visit offers to restore.
+
+  setupDraftRecovery() {
+    // Scoped per resource so two tabs editing different posts don't collide.
+    this.draftKey = `roe:editor-draft:${this.resourceTypeValue}:${this.resourceIdValue}`;
+
+    // A cheap fingerprint of the file as loaded. Stored with the draft so a
+    // later visit can tell whether the file changed underneath the draft
+    // (another admin session, a git pull, Site Sync) — see maybeOfferDraftRestore.
+    this.draftBaseline = this.fingerprint(
+      this.originalContent,
+      this.originalMetadata,
+    );
+  }
+
+  // Non-cryptographic string hash (djb2-ish). We only need change detection,
+  // not security — this avoids pulling in a hashing lib and works offline.
+  fingerprint(content, metadata) {
+    const str = `${content}\u0000${metadata || ""}`;
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash * 33) ^ str.charCodeAt(i);
+    }
+    // >>> 0 coerces to unsigned; base36 keeps it short.
+    return (hash >>> 0).toString(36) + ":" + str.length.toString(36);
+  }
+
+  currentMetadataValue() {
+    return this.hasMetadataTarget ? this.metadataTarget.value : "";
+  }
+
+  // Debounced — fired from the same input/metadata:changed listeners as the
+  // preview update, so it costs one localStorage write ~1s after typing stops.
+  scheduleDraftSave() {
+    clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = setTimeout(() => this.saveDraft(), 1000);
+  }
+
+  saveDraft() {
+    if (this.isSaving) return;
+    // Only persist a draft while the editor is actually dirty. A clean editor
+    // has nothing worth restoring, and this keeps a stale draft from lingering
+    // after an external change reverts the buffer to match the file.
+    if (!this.isDirty()) {
+      this.clearDraft();
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        this.draftKey,
+        JSON.stringify({
+          content: this.textareaTarget.value,
+          metadata: this.currentMetadataValue(),
+          baseline: this.draftBaseline,
+          savedAt: Date.now(),
+        }),
+      );
+    } catch (e) {
+      // Quota / privacy mode — draft recovery is best-effort, never fatal.
+      console.warn("[editor] could not autosave draft:", e);
+    }
+  }
+
+  clearDraft() {
+    clearTimeout(this.draftSaveTimer);
+    try {
+      localStorage.removeItem(this.draftKey);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  readDraft() {
+    try {
+      const raw = localStorage.getItem(this.draftKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  maybeOfferDraftRestore() {
+    const draft = this.readDraft();
+    if (!draft) return;
+
+    // If the draft matches the file as loaded, there's nothing to restore
+    // (e.g. saved elsewhere, or an empty edit). Drop it and move on.
+    const draftPrint = this.fingerprint(draft.content, draft.metadata);
+    const filePrint = this.fingerprint(
+      this.originalContent,
+      this.originalMetadata,
+    );
+    if (draftPrint === filePrint) {
+      this.clearDraft();
+      return;
+    }
+
+    // Staleness: the file the draft was based on differs from the file now on
+    // disk. Restoring would discard whatever changed the file. Warn, don't block.
+    const stale = draft.baseline && draft.baseline !== filePrint;
+
+    this.renderDraftBanner(draft, stale);
+  }
+
+  renderDraftBanner(draft, stale) {
+    // Remove any prior banner (guards against double-connect).
+    this.dismissDraftBanner();
+
+    const when = this.formatDraftAge(draft.savedAt);
+    const banner = document.createElement("div");
+    banner.dataset.editorDraftBanner = "true";
+    banner.setAttribute("role", "alert");
+    banner.className =
+      "mb-4 flex items-start justify-between gap-4 rounded-xs border px-4 py-3 text-sm " +
+      (stale
+        ? "border-amber-300 bg-amber-50 text-amber-900"
+        : "border-blue-300 bg-blue-50 text-blue-900");
+
+    const message = document.createElement("div");
+    // COPY: draft recovery banner
+    message.innerHTML = stale
+      ? `<strong>Unsaved changes (${when}).</strong><br>` +
+        `Heads up — this file was changed multiple times. (editing the file directly, site sync). ` +
+        `Restoring will replace what you have below with your unsaved changes. ` +
+        `Discarding will keep what you have below right now.`
+      : `<strong>Unsaved changes (${when}).</strong><br>` +
+        `Restore unsaved changes or discard to keep the saved version.`;
+
+    const actions = document.createElement("div");
+    actions.className = "flex shrink-0 gap-2";
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className =
+      "uppercase font-mono rounded-xs bg-blue-600 px-3 py-1.5 font-medium text-white hover:bg-blue-700";
+    restoreBtn.textContent = "Restore"; // COPY
+    restoreBtn.addEventListener("click", () => this.restoreDraft(draft));
+
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className =
+      "uppercase font-mono rounded-xs border border-current px-3 py-1.5 font-medium hover:bg-black/5";
+    discardBtn.textContent = "Discard"; // COPY
+    discardBtn.addEventListener("click", () => {
+      this.clearDraft();
+      this.dismissDraftBanner();
+    });
+
+    actions.append(restoreBtn, discardBtn);
+    banner.append(message, actions);
+
+    // Mount at the top of the editor's element so it's the first thing seen.
+    this.element.prepend(banner);
+    this.draftBanner = banner;
+  }
+
+  restoreDraft(draft) {
+    this.textareaTarget.value = draft.content;
+
+    if (this.hasMetadataTarget) {
+      this.metadataTarget.value = draft.metadata || "";
+      // Let the metadata editor rebuild its fields from the restored YAML.
+      document.dispatchEvent(
+        new CustomEvent("editor:metadata-restored", {
+          detail: { metadata: draft.metadata || "" },
+        }),
+      );
+    }
+
+    this.dismissDraftBanner();
+    this.updateSaveState();
+    this.schedulePreviewUpdate();
+    // The restored buffer is unsaved by definition — keep the draft until the
+    // user actually saves, so a second mishap is still covered.
+    this.textareaTarget.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  dismissDraftBanner() {
+    const existing = this.element.querySelector(
+      '[data-editor-draft-banner="true"]',
+    );
+    if (existing) existing.remove();
+    this.draftBanner = null;
+  }
+
+  formatDraftAge(savedAt) {
+    if (!savedAt) return "a moment ago";
+    const secs = Math.round((Date.now() - savedAt) / 1000);
+    if (secs < 60) return "just now";
+    const mins = Math.round(secs / 60);
+    if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+    const days = Math.round(hrs / 24);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+
   disconnect() {
     // Remove global keyboard handler
     document.removeEventListener("keydown", this.globalKeydownHandler);
@@ -465,6 +683,7 @@ export default class extends Controller {
       );
     }
     clearTimeout(this.previewUpdateTimer);
+    clearTimeout(this.draftSaveTimer);
 
     // Close broadcast channel
     if (this.previewChannel) {
@@ -2024,6 +2243,10 @@ export default class extends Controller {
     if (metadataField) {
       this.originalMetadata = metadataField.value;
     }
+
+    // The file is about to become the source of truth — drop the local draft so
+    // the next load doesn't offer to "restore" what we just saved.
+    this.clearDraft();
 
     // Remove beforeunload handler
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);

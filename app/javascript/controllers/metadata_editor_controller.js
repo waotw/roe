@@ -77,6 +77,17 @@ export default class extends Controller {
       }
     });
 
+    // Rebuild the visible fields when the editor restores a local draft — the
+    // draft carries raw YAML, so re-run the same parse the initial load uses.
+    this.metadataRestoredHandler = (e) => {
+      const yaml = e.detail?.metadata ?? "";
+      this.yamlToForm(yaml);
+    };
+    document.addEventListener(
+      "editor:metadata-restored",
+      this.metadataRestoredHandler,
+    );
+
     // Initialization complete - now start tracking changes
     // Use setTimeout to ensure all initial DOM updates are complete
     setTimeout(() => {
@@ -101,6 +112,12 @@ export default class extends Controller {
       document.removeEventListener(
         "publish-modal:confirmed",
         this.boundPublishConfirm,
+      );
+    }
+    if (this.metadataRestoredHandler) {
+      document.removeEventListener(
+        "editor:metadata-restored",
+        this.metadataRestoredHandler,
       );
     }
   }
