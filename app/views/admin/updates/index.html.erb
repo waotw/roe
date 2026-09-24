@@ -482,12 +482,15 @@
       </div>
 
       <%# ── Running / failed are shown in the active-deploy box pinned to
-          the top of the page — nothing to render here. ── %>
-      <% if deploy_state == :running || deploy_state == :failed %>
+          the top of the page. While one is active we render neither a banner
+          nor the Deploy button here (Start Deploy refuses mid-deploy). ── %>
+      <% unless deploy_state == :running || deploy_state == :failed %>
 
-      <%# ── Completed state (only show if not dismissed) ── %>
-      <% elsif deploy_state == :completed && !@deploy_status[:dismissed] %>
-        <div id="deploy-result" class="bg-green-50 border border-green-200 rounded-xs p-4">
+      <%# ── Completed banner — persistent until dismissed or the next deploy.
+          Additive: it sits ABOVE the deploy button rather than replacing it,
+          so you can deploy again while last deploy's status is still shown. ── %>
+      <% if deploy_state == :completed && !@deploy_status[:dismissed] %>
+        <div id="deploy-result" class="bg-green-50 border border-green-200 rounded-xs p-4 mb-6">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-sm font-semibold text-green-900">Deploy completed successfully</h3>
@@ -514,9 +517,10 @@
             </details>
           <% end %>
         </div>
+      <% end %><%# /completed banner %>
 
       <%# ── Not ready — prerequisites unmet ── %>
-      <% elsif @deploy_issues.any? %>
+      <% if @deploy_issues.any? %>
         <div class="bg-amber-50 border border-amber-200 rounded-xs p-4">
           <h3 class="text-sm font-semibold text-amber-900 mb-2">Not ready to deploy</h3>
           <ul class="text-sm text-amber-800 list-disc list-inside space-y-1 mb-3">
@@ -561,7 +565,9 @@
             </p>
           <% end %>
         </div>
-      <% end %>
+      <% end %><%# /ready-or-not-ready %>
+
+      <% end %><%# /unless running or failed %>
 
     </div><%# /deploy card %>
   </div><%# /deploy section %>
