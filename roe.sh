@@ -1535,6 +1535,64 @@ install_global_cli() {
     cp "$src" "$ROE_BIN_DIR/roe" && chmod +x "$ROE_BIN_DIR/roe"
     log_success "Installed the global 'roe' command at $ROE_BIN_DIR/roe"
     ensure_roe_bin_on_path "$@"
+    ensure_roe_completion
+}
+
+# Write the shell-completion script to ~/.roe and source it from the user's
+# rc, once. Same shape as ensure_roe_bin_on_path: pick the interactive rc for
+# the current shell, write an idempotent marker line, do nothing on reruns.
+# The generated script shells back into `roe`, so site names always come from
+# the live registry — this file never needs regenerating when sites change.
+ensure_roe_completion() {
+    local shell_name; shell_name="$(basename "${SHELL:-}")"
+    case "$shell_name" in
+        bash|zsh) ;;
+        *) return 0 ;;   # only bash/zsh have a script to offer
+    esac
+
+    local comp_file="$ROE_HOME/roe-completion.$shell_name"
+    "$ROE_BIN_DIR/roe" completion "$shell_name" > "$comp_file" 2>/dev/null || {
+        rm -f "$comp_file"; return 0
+    }
+
+    local rc_file marker='# Added by Roe — tab completion for `roe`'
+    rc_file="$(_mise_write_target)" || return 0
+    grep -qF "$marker" "$rc_file" 2>/dev/null && return 0
+
+    {
+        echo ''
+        echo "$marker"
+        echo "[ -f \"$comp_file\" ] && source \"$comp_file\""
+    } >> "$rc_file"
+    log_success "Enabled tab completion for 'roe' in $rc_file (open a new terminal to pick it up)"
+}
+
+# Keep the global CLI in step with the code this install is running. The
+# in-app updater swaps current/ but never touches ~/.roe/bin/roe, so a new
+# bin/roe (a new command, a completion fix) would otherwise only reach the
+# global command the next time someone ran `./roe.sh register` by hand. A
+# registered install calls this on every start: if the shipped bin/roe differs
+# from the installed copy, refresh it (and the completion script with it).
+# Silent when already current, so a normal start says nothing new. PATH and rc
+# lines are only ever ADDED when missing, never re-asked — the copy is the only
+# routine action here.
+refresh_global_cli_if_stale() {
+    is_registered || return 0
+    local src="$APP_DIR/bin/roe"
+    [ -f "$src" ] || return 0
+    # Already current? Nothing to do, stay quiet.
+    if [ -f "$ROE_BIN_DIR/roe" ] && cmp -s "$src" "$ROE_BIN_DIR/roe"; then
+        return 0
+    fi
+    mkdir -p "$ROE_BIN_DIR"
+    cp "$src" "$ROE_BIN_DIR/roe" && chmod +x "$ROE_BIN_DIR/roe" || return 0
+    log_info "Updated the global 'roe' command from this install."
+    # Refresh the completion file too (it's regenerated from the new binary),
+    # and make sure PATH + rc lines exist — all idempotent, all silent when
+    # already in place. "yes" skips the PATH prompt: a running install has
+    # already been through registration, so don't re-ask mid-start.
+    ensure_roe_bin_on_path yes
+    ensure_roe_completion
 }
 
 # Offer to put ~/.roe/bin on PATH in the user's shell rc. Same shape as
@@ -1917,6 +1975,11 @@ cmd_start() {
         load_registry_entry || true
     fi
     local display_host="${ROE_HOST:-localhost}"
+
+    # An update swapped current/ but left ~/.roe/bin/roe untouched; refresh it
+    # from the code we're about to boot so the global command and its
+    # completion match this version. Silent unless it actually changed.
+    refresh_global_cli_if_stale
 
     # Refuse to start a second server for this install. Checks every
     # Puma tagged with this app directory, not just the pidfile, so a

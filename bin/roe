@@ -91,6 +91,7 @@ usage() {
     echo "  restart  Stop, then start"
     echo "  status   Status for each Roe site"
     echo "  open     Open the site in your browser"
+    echo "  completion  Print the tab-completion script for bash or zsh"
     echo ""
     echo -e "${ROE_RED}${BOLD}FLAGS${NC}"
     echo "  --all    Apply start, stop or restart to every registered site"
@@ -108,6 +109,8 @@ usage() {
     echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
     echo "  • To register a site, run './roe.sh register' inside the Roe folder."
     echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
+    echo "  • Tab completion for commands and site names is set up when you register."
+    echo "    To add it by hand: eval \"\$(roe completion zsh)\" (or bash)."
     echo "  • Registry: $ROE_REGISTRY_DIR"
 }
 
@@ -354,6 +357,76 @@ for_target() {
     esac
 }
 
+# ── Shell completion ──────────────────────────────────────────────────────────
+#
+# The completion script (printed by `roe completion bash|zsh`) shells back
+# into these two hidden helpers, so the list of commands and the list of site
+# names have exactly one source. Names come from all_names, i.e. the live
+# registry — a site registered or removed a moment ago completes correctly with
+# nothing to regenerate.
+
+# The commands a bare `roe` accepts, one per line — the first word to complete.
+complete_commands() {
+    printf '%s\n' list start stop restart status open completion help
+}
+
+# The candidates for the SECOND word, given the command being completed for.
+# Only the per-site commands take a name; start/stop/restart also take --all.
+complete_names() {
+    case "$1" in
+        start|stop|restart) echo "--all" ;;
+        status|open) : ;;
+        *) return 0 ;;   # list/completion/help take no site name
+    esac
+    all_names
+}
+
+# Print a completion script for the named shell, for sourcing or eval:
+#   eval "$(roe completion zsh)"      # try it in this shell
+#   roe completion bash > file        # or save it and source from your rc
+completion_script() {
+    case "${1:-}" in
+        bash)
+            cat <<'EOF'
+_roe_complete() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$(roe __complete_commands)" -- "$cur") )
+    elif [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=( $(compgen -W "$(roe __complete_names "${COMP_WORDS[1]}")" -- "$cur") )
+    fi
+}
+complete -F _roe_complete roe
+EOF
+            ;;
+        zsh)
+            cat <<'EOF'
+# compdef isn't defined until compinit has run; do it ourselves if needed so
+# this file is safe to source on its own.
+if ! typeset -f compdef >/dev/null 2>&1; then
+    autoload -Uz compinit && compinit -u
+fi
+_roe_complete() {
+    if (( CURRENT == 2 )); then
+        compadd -- ${(f)"$(roe __complete_commands)"}
+    elif (( CURRENT == 3 )); then
+        compadd -- ${(f)"$(roe __complete_names ${words[2]})"}
+    fi
+}
+compdef _roe_complete roe
+EOF
+            ;;
+        "")
+            log_error "Which shell? Use: roe completion bash | roe completion zsh"
+            return 1
+            ;;
+        *)
+            log_error "Don't know how to complete for '$1'. Use: roe completion bash | roe completion zsh"
+            return 1
+            ;;
+    esac
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
@@ -364,6 +437,10 @@ case "${1:-}" in
     restart)         for_target cmd_restart "${2:-}" ;;
     status)          for_target cmd_status  "${2:-}" ;;
     open)            for_target cmd_open    "${2:-}" ;;
+    completion)      completion_script "${2:-}" ;;
+    # Hidden helpers used by the completion script — not shown in help.
+    __complete_commands) complete_commands ;;
+    __complete_names)    complete_names "${2:-}" ;;
     help|--help|-h)  usage ;;
     *)
         log_error "Unknown command: $1"
