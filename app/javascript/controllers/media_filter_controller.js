@@ -168,11 +168,21 @@ export default class extends Controller {
   setActiveTab(type) {
     this.tabTargets.forEach((tab) => {
       if (tab.dataset.type === type) {
-        tab.classList.remove("border-transparent", "text-gray-500");
-        tab.classList.add("border-blue-500", "text-blue-600");
+        tab.classList.remove(
+          "border-transparent",
+          "text-gray-500",
+          "hover:border-gray-300",
+          "hover:text-gray-700",
+        );
+        tab.classList.add("bg-blue-200", "border-blue-500", "text-blue-500");
       } else {
-        tab.classList.add("border-transparent", "text-gray-500");
-        tab.classList.remove("border-blue-500", "text-blue-600");
+        tab.classList.add(
+          "border-transparent",
+          "text-gray-500",
+          "hover:border-gray-300",
+          "hover:text-gray-700",
+        );
+        tab.classList.remove("bg-blue-200", "border-blue-500", "text-blue-500");
       }
     });
   }
