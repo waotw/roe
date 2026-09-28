@@ -90,9 +90,10 @@ class PostmarkStatus
     return nil unless @pm.respond_to?(:account_pending_approval?) && @pm.account_pending_approval?
 
     same_domain = @sender.to_s.split("@").last.presence
-    hint = "Postmark hasn't approved this account yet, so email only sends to " \
-           "addresses on your own domain. Members on other domains can't sign in " \
-           "until you request approval in Postmark (Servers → your account)."
+    hint = "Postmark hasn't approved this account; you can only send email to " \
+           "addresses on your own domain. To request approval, " \
+           "sign into your Postmark account and click Test Mode near the top. " \
+           "Once approved you can send email to any email address."
     hint += " Until then, test sign-in with an address @#{same_domain}." if same_domain
 
     todo(:account_approval, "Postmark account not approved", hint)
