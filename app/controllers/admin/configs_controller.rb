@@ -566,7 +566,8 @@ class Admin::ConfigsController < Admin::BaseController
         path: "integrations/stripe.yml",
         description: "Stripe test keys",
         edit_path: admin_edit_payments_config_path,
-        unconfigured: SiteFeature.payments_unconfigured?
+        unconfigured: SiteFeature.payments_unconfigured?,
+        live_unconfigured: SiteFeature.payments_live_unconfigured?
       }
     end
 
@@ -579,7 +580,8 @@ class Admin::ConfigsController < Admin::BaseController
         path: "integrations/postmark.yml",
         description: "(email) test keys",
         edit_path: admin_edit_newsletters_config_path,
-        unconfigured: SiteFeature.email_unconfigured?
+        unconfigured: SiteFeature.email_unconfigured?,
+        live_unconfigured: SiteFeature.email_live_unconfigured?
       }
     end
 

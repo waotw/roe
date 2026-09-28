@@ -85,6 +85,15 @@
                         unconfigured
                       </span>
                     <% end %>
+                    <% if file[:live_unconfigured] %>
+                      <%# Production-only: the active mode may be fine, but live
+                          keys aren't set, so the site can't take real money /
+                          send real email yet. Separate tag so the message is
+                          exact rather than a generic "unconfigured". %>
+                      <span data-live-unconfigured class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        live mode not set up
+                      </span>
+                    <% end %>
                     <% if file[:no_sender] %>
                       <%# Separate from "unconfigured": a connected Postmark
                           with no address to send from is still broken, and

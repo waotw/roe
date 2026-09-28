@@ -121,7 +121,8 @@ module SiteFeature
   # Returns true if ANY enabled integration needs attention for current mode.
 
   def any_integration_unconfigured?
-    payments_unconfigured? || email_unconfigured? || snipcart_unconfigured?
+    payments_unconfigured? || email_unconfigured? || snipcart_unconfigured? ||
+      payments_live_unconfigured? || email_live_unconfigured?
   end
 
   # What the admin nav dot asks. Broader than the integrations: a site with no
@@ -156,6 +157,32 @@ module SiteFeature
 
   def snipcart_unconfigured?
     store_enabled? && !snipcart_configured?
+  end
+
+  # ── Live-tier readiness (production only) ─────────────────────────────────
+  #
+  # The active-mode checks above answer "is the site broken right now?". These
+  # answer a different, production-only question: "can this site take REAL money
+  # / send REAL email yet?" — which requires the LIVE keys, regardless of which
+  # mode is currently active.
+  #
+  # A deployed store sitting in test mode with test keys reads as "configured"
+  # by the active-mode checks, yet cannot charge a real card. That's the false
+  # all-clear this closes. Locally these are always false: live keys can't be
+  # saved outside production and setup is meant for the live site, so nagging
+  # about live locally is noise nobody can act on.
+  #
+  # Asymmetry by design: live-not-ready nags; test-not-ready (when live IS
+  # ready) does not — test is an optional convenience, not a requirement.
+
+  def payments_live_unconfigured?
+    return false unless Rails.env.production?
+    payments_feature_enabled? && !StripeConfig.current.live_mode_ready?
+  end
+
+  def email_live_unconfigured?
+    return false unless Rails.env.production?
+    email_feature_enabled? && !PostmarkConfig.current.live_mode_ready?
   end
 
   # ── Payments mode / memberships / donations ─────────────────────────────

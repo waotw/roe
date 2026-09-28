@@ -167,6 +167,9 @@ module ApplicationHelper
   def payments_unconfigured?       = SiteFeature.payments_unconfigured?
   def newsletters_unconfigured?    = SiteFeature.newsletters_unconfigured?
   def snipcart_unconfigured?       = SiteFeature.snipcart_unconfigured?
+  def payments_live_unconfigured?  = SiteFeature.payments_live_unconfigured?
+  def email_live_unconfigured?     = SiteFeature.email_live_unconfigured?
+  alias_method :newsletters_live_unconfigured?, :email_live_unconfigured?
 
   def snipcart_connected?
     store_enabled? && SnipcartConfig.current&.connected?
