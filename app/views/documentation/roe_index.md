@@ -1,4 +1,13 @@
 ```collection
+heading: Roe: Tutorials
+source: documentation/roe
+order: filename
+template: links
+limit: all
+tags: tutorial
+```
+
+```collection
 heading: Roe: Guides
 source: documentation/roe
 order: filename
@@ -86,13 +95,4 @@ order: filename
 template: links
 limit: all
 tags: -tutorial, -definition, system
-```
-
-```collection
-heading: Roe: Tutorials
-source: documentation/roe
-order: filename
-template: links
-limit: all
-tags: tutorial
 ```
