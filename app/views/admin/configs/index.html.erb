@@ -94,6 +94,14 @@
                         live mode not set up
                       </span>
                     <% end %>
+                    <% if file[:pending_approval] %>
+                      <%# Postmark account pending approval (412) caught on a real
+                          send. Distinct from unconfigured — keys work, but the
+                          account can only reach same-domain recipients yet. %>
+                      <span data-pending-approval class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        account not approved
+                      </span>
+                    <% end %>
                     <% if file[:no_sender] %>
                       <%# Separate from "unconfigured": a connected Postmark
                           with no address to send from is still broken, and

@@ -30,7 +30,7 @@ class PostmarkStatus
   end
 
   def items
-    [ connection, mode, sender_address, dkim, return_path, webhook ].compact
+    [ connection, mode, sender_address, account_approval, dkim, return_path, webhook ].compact
   end
 
   private
@@ -79,6 +79,23 @@ class PostmarkStatus
       Item.new(key: :sender, label: "Sender address not checked yet", state: :unknown,
                detail: reactive_hint)
     end
+  end
+
+  # Account pending approval (Postmark ErrorCode 412), only known after a real
+  # send to an outside domain was refused (see MemberMailer + PostmarkConfig).
+  # Only appears once that's happened; silent otherwise. This is the row that
+  # explains why a member on gmail can't sign in while the operator's own
+  # same-domain test worked.
+  def account_approval
+    return nil unless @pm.respond_to?(:account_pending_approval?) && @pm.account_pending_approval?
+
+    same_domain = @sender.to_s.split("@").last.presence
+    hint = "Postmark hasn't approved this account yet, so email only sends to " \
+           "addresses on your own domain. Members on other domains can't sign in " \
+           "until you request approval in Postmark (Servers → your account)."
+    hint += " Until then, test sign-in with an address @#{same_domain}." if same_domain
+
+    todo(:account_approval, "Postmark account not approved", hint)
   end
 
   def dkim

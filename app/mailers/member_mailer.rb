@@ -181,6 +181,9 @@ class MemberMailer
 
         if result[:success]
           Rails.logger.info "✉️  Sent '#{subject}' to #{to} (Message ID: #{result[:message_id]})"
+          # A send got through, so the account isn't approval-restricted anymore
+          # (or never was). Drop any stale pending-approval flag.
+          postmark_config.clear_account_pending_approval!
         else
           Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
 
@@ -190,6 +193,15 @@ class MemberMailer
           # trace in a log the person who tried can't read.
           if result[:error_code].to_i == PostmarkConfig::SENDER_NOT_VERIFIED
             postmark_config.record_sender_rejection!(result[:error])
+          end
+
+          # Account pending approval (412): Postmark only allows same-domain
+          # recipients until it approves the account, so a member on an outside
+          # domain gets an opaque failure. Record it so the operator sees the
+          # real reason on the Postmark settings page instead of the member
+          # hitting a dead end. See PostmarkConfig#account_pending_approval?.
+          if result[:error_code].to_i == PostmarkConfig::ACCOUNT_PENDING_APPROVAL
+            postmark_config.record_account_pending_approval!(result[:error])
           end
         end
 

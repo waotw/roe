@@ -123,6 +123,12 @@ class PostmarkConfig < ApplicationRecord
   # Postmark's code for an unconfirmed or unknown Sender Signature.
   SENDER_NOT_VERIFIED = 400
 
+  # Postmark's code for "account pending approval" — a new account may only send
+  # to recipients on its own domain until Postmark approves it. Same code is used
+  # for a few restrictions; the message names the domain limitation. See
+  # account_pending_approval?.
+  ACCOUNT_PENDING_APPROVAL = 412
+
   def sender_verified?
     SiteSender.configured? && sender_verified_address == SiteSender.address
   end
@@ -160,13 +166,34 @@ class PostmarkConfig < ApplicationRecord
     update_columns(sender_verified_address: nil, sender_error: error.to_s.presence)
   end
 
+  # True once a real send has been refused with ErrorCode 412 (account pending
+  # approval). Reactive: Postmark has no clean read-only "am I approved?" check,
+  # and the built-in test email only goes to the operator's own (same-domain)
+  # address, which the restriction always allows — so this is only known after a
+  # send to an outside domain (a real member) is attempted.
+  def account_pending_approval? = account_approval_error.present?
+
+  # Record a 412 caught in the wild so the status page can warn the operator,
+  # rather than leaving a member with an opaque "couldn't send" error and the
+  # reason buried in a log they can't read.
+  def record_account_pending_approval!(error)
+    update_columns(account_approval_error: error.to_s.presence)
+  end
+
+  # A send succeeded, so the account is clearly no longer restricted — clear any
+  # stale pending-approval flag. Cheap no-op when it's already nil.
+  def clear_account_pending_approval!
+    update_columns(account_approval_error: nil) if account_approval_error.present?
+  end
+
   # ── Disconnect ───────────────────────────────────────────────────────────
 
   def disconnect!
     update!(
       server_token: nil,
       connected_at: nil,
-      verified_at: nil
+      verified_at: nil,
+      account_approval_error: nil
     )
     self.class.clear_test_config
   end

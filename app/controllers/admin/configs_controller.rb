@@ -581,7 +581,8 @@ class Admin::ConfigsController < Admin::BaseController
         description: "(email) test keys",
         edit_path: admin_edit_newsletters_config_path,
         unconfigured: SiteFeature.email_unconfigured?,
-        live_unconfigured: SiteFeature.email_live_unconfigured?
+        live_unconfigured: SiteFeature.email_live_unconfigured?,
+        pending_approval: PostmarkConfig.current.account_pending_approval?
       }
     end
 

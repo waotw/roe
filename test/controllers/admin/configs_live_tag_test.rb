@@ -29,4 +29,13 @@ class Admin::ConfigsLiveTagTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "[data-live-unconfigured]", count: 0
   end
+
+  test "the account-not-approved tag appears when Postmark flagged a 412" do
+    SiteFeature.stubs(:email_feature_enabled?).returns(true)
+    PostmarkConfig.any_instance.stubs(:account_pending_approval?).returns(true)
+
+    get admin_configs_path
+    assert_response :success
+    assert_select "[data-pending-approval]"
+  end
 end

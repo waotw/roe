@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_24_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_000000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -168,6 +168,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_24_000000) do
   end
 
   create_table "postmark_configs", force: :cascade do |t|
+    t.text "account_approval_error"
     t.text "account_token"
     t.datetime "connected_at"
     t.datetime "created_at", null: false

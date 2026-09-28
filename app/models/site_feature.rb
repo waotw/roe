@@ -130,7 +130,13 @@ module SiteFeature
   # than in any integration — so folding it into any_integration_unconfigured?
   # would make that name mean something it doesn't.
   def settings_need_attention?
-    any_integration_unconfigured? || sender_unconfigured?
+    any_integration_unconfigured? || sender_unconfigured? || postmark_pending_approval?
+  end
+
+  # Postmark refused a real send because the account isn't approved yet (412).
+  # A deliverability blocker the operator should see, even though keys verify.
+  def postmark_pending_approval?
+    email_feature_enabled? && PostmarkConfig.current.account_pending_approval?
   end
 
   def payments_unconfigured?
