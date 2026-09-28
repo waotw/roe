@@ -126,11 +126,15 @@ class StripeConfig < ApplicationRecord
   def verify!
     return false unless keys_present?
 
-    # Account.retrieve is a light authenticated call that works with any valid
-    # key, and Roe already needs the Account:Read scope (fetch_currency! uses it).
-    # Using it here means we don't have to ask for Balance:Read just to verify.
+    # Verify against WebhookEndpoint.list — a light authenticated call whose
+    # scope (Webhook Endpoints: Write) Roe *always* requires for setup. This
+    # deliberately does NOT depend on the Accounts scope: currency detection
+    # uses Account.retrieve, but that's best-effort (falls back to usd), so a
+    # fumbled Accounts permission gives a wrong-currency note, not a key that
+    # won't verify. The scope that gates verification is the one the feature
+    # can't work without anyway.
     Stripe.api_key = current_secret_key
-    Stripe::Account.retrieve
+    Stripe::WebhookEndpoint.list(limit: 1)
     update_column(:verified_at, Time.current)
     true
   rescue Stripe::AuthenticationError

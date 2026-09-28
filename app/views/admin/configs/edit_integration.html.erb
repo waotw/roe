@@ -77,6 +77,40 @@
     <%= render "admin/configs/local_setup_hidden" %>
   <% else %>
 
+  <%# Active mode. Sits at the very top: it's global state for the integration,
+      and the Integration Status below reflects whichever mode is active, so the
+      two read together. Live radio is disabled until live keys are saved.
+      Production-only for Stripe/Postmark; always available for Snipcart. %>
+  <% if mode_selectable %>
+    <%# What "live" costs differs per integration, so say the real thing. %>
+    <%
+      test_consequence, live_consequence = case @config_type
+        when 'newsletters' then [ "no emails sent", "real email sent!" ]
+        else                    [ "fake transactions",    "real transactions!"    ]
+      end
+    %>
+    <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
+      <h3 class="text-base font-semibold text-gray-900 mb-3">Active Mode</h3>
+      <!--<p class="text-sm text-gray-500 mt-1 mb-4">Change mode here.</p>-->
+      <%= form_with url: mode_update_path, method: :patch, class: "flex items-center gap-4" do |f| %>
+        <div class="space-y-1">
+        <label class="flex items-center gap-2">
+          <%= f.radio_button :mode, "test", checked: integration_record.mode_test?, class: "form-radio" %>
+          <span class="text-sm">Test Mode (<%= test_consequence %>)</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <%= f.radio_button :mode, "live", checked: integration_record.mode_live?, disabled: !live_ready, class: "form-radio" %>
+          <span class="text-sm <%= live_ready ? 'font-semibold text-red-600' : 'text-gray-400' %>">
+            Live Mode <%= live_ready ? "(#{live_consequence})" : "(add key to the live tab)" %>
+          </span>
+        </label>
+        </div>
+        <%= f.submit "Update Mode",
+                    class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer ml-auto" %>
+      <% end %>
+    </div>
+  <% end %>
+
   <%# Connection status. Newsletters (Postmark) get a richer checklist —
       email needs a token, a confirmed sender, DKIM, and a working webhook —
       so that replaces the generic one-line verify box for this integration. %>
@@ -128,40 +162,6 @@
         This usually means master credentials were rotated. Re-enter the
         affected keys below to repair the integration.
       </p>
-    </div>
-  <% end %>
-
-  <%# Active mode. Sits above the tabs because it's a global state for the
-      integration, not specific to test/live input. Live radio is disabled
-      until live keys are saved. Production-only for Stripe/Postmark; always
-      available for Snipcart (public snippet, runs live locally + on static). %>
-  <% if mode_selectable %>
-    <%# What "live" costs differs per integration, so say the real thing.
-        "no real charges" on the Postmark page described Stripe's stakes on a
-        screen that never takes a payment. %>
-    <%
-      test_consequence, live_consequence = case @config_type
-        when 'newsletters' then [ "no email delivered", "real email sent!" ]
-        else                    [ "no real charges",    "real charges!"    ]
-      end
-    %>
-    <div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
-      <h3 class="text-base font-semibold text-gray-900 mb-3">Active Mode</h3>
-      <p class="text-xs text-gray-500 mt-1">Here you change which mode you are in.<br>This allows you to use Test Mode on the live site before switching to Live Mode.</p>
-      <%= form_with url: mode_update_path, method: :patch, class: "flex items-center gap-6" do |f| %>
-        <label class="flex items-center gap-2">
-          <%= f.radio_button :mode, "test", checked: integration_record.mode_test?, class: "form-radio" %>
-          <span class="text-sm">Test Mode (<%= test_consequence %>)</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <%= f.radio_button :mode, "live", checked: integration_record.mode_live?, disabled: !live_ready, class: "form-radio" %>
-          <span class="text-sm <%= live_ready ? 'font-semibold text-red-600' : 'text-gray-400' %>">
-            Live Mode <%= live_ready ? "(#{live_consequence})" : '(add live keys to enable)' %>
-          </span>
-        </label>
-        <%= f.submit "Update Mode",
-                    class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer ml-auto" %>
-      <% end %>
     </div>
   <% end %>
 

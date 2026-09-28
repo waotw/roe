@@ -50,7 +50,7 @@ class StripeStatus
     # dot. Matches PostmarkStatus. The detail still says what the mode means.
     state = @sc.connected? ? :ok : :info
     Item.new(key: :mode, label: "Mode: #{live ? 'Live' : 'Test'}", state: state,
-             detail: live ? "Real charges are taken." : "Test mode — use Stripe test cards, no real charges.")
+             detail: live ? "Real transactions." : "Test mode — use Stripe test cards, no real transactions.")
   end
 
   # The publishable key is intentionally not tracked: Roe uses hosted Stripe

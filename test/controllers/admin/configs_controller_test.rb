@@ -154,7 +154,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     stripe = StripeConfig.current
     stripe.update!(publishable_key_test: "pk_test_123", secret_key_test: "sk_test_123")
 
-    Stripe::Account.expects(:retrieve).returns(OpenStruct.new(object: "account", default_currency: "usd"))
+    Stripe::WebhookEndpoint.expects(:list).returns(OpenStruct.new(data: []))
 
     post admin_verify_payments_config_path
 

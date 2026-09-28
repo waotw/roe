@@ -28,17 +28,25 @@
   key_saved     = reader.call("secret_key").present?
   signing_saved = reader.call("webhook_signing_secret").present?
 
+  # verify!/webhook setup always act on the ACTIVE mode (StripeConfig.current),
+  # so the diagnostics + retry below only make sense on the active mode's tab.
+  active_mode        = mode.to_s == sc.mode
+  key_verified       = sc.verified_at.present?
+  webhook_connected  = key_saved && signing_saved && webhook_ready && sc.webhook_configured?(resolved_webhook_url)
+
   # The exact RAK scopes Roe needs — derived from every Stripe call Roe makes.
-  # No Balance: Roe never reads your Stripe balance. Revenue figures come from
-  # Roe's own database (populated by webhooks), and key verification uses
-  # Account.retrieve (below), so Balance:Read isn't needed.
+  # No Balance: Roe never reads your Stripe balance; revenue figures come from
+  # Roe's own database (populated by webhooks). Key verification uses
+  # WebhookEndpoint.list (Webhook Endpoints scope), so it doesn't depend on the
+  # Accounts scope — Accounts is only for reading your currency, and that falls
+  # back to USD if it's missing.
   rak_permissions = [
     [ "Checkout Sessions", "Write", "create the pay button for members & donations" ],
     [ "Products",          "Write", "sync your products to Stripe" ],
     [ "Prices",            "Write", "set product prices on Stripe" ],
-    [ "Webhook Endpoints", "Write", "let Roe create & manage webhooks" ],
+    [ "Webhook Endpoints", "Write", "create & manage webhooks, and verify your key works" ],
     [ "Customers",         "Read",  "look up a member's Stripe customer" ],
-    [ "Accounts v2",       "Read",  "read your currency & verify the key works" ],
+    [ "Accounts (Connect)", "Read", "read your store currency (optional — defaults to USD)" ],
   ]
 %>
 
@@ -151,13 +159,60 @@
         <% if key_saved %>
           <span class="text-xs text-green-700" data-test="stripe-keys-saved-<%= mode %>">✓ Key saved</span>
         <% end %>
-        <% if key_saved && signing_saved && webhook_ready && sc.webhook_configured?(resolved_webhook_url) %>
+        <% if webhook_connected %>
           <span class="text-xs text-green-700" data-test="stripe-webhook-ok-<%= mode %>">✓ Webhook connected</span>
         <% elsif key_saved && !webhook_ready %>
           <%# No public URL locally — the webhook activates on the deployed site. %>
           <span class="text-xs text-gray-500" data-test="stripe-webhook-pending-<%= mode %>">Webhook activates on your live site</span>
         <% end %>
       </div>
+    <% end %>
+
+    <%# Webhook diagnostics + retry. Setup now happens automatically on save, but
+        it can fail (wrong RAK scope, Stripe unreachable, URL mismatch) — and
+        without a visible next step the page just reads "not set up" with no way
+        forward. So when the active mode has a saved key but no working webhook,
+        say exactly what's wrong and offer a one-click retry. %>
+    <% if active_mode && key_saved %>
+      <% if !key_verified %>
+        <div class="mt-4 p-3 border border-red-300 bg-red-50 rounded-xs" data-test="stripe-key-unverified-<%= mode %>">
+          <p class="text-sm font-semibold text-red-900 mb-1">✕ Stripe rejected this key</p>
+          <p class="text-xs text-red-800">
+            <%# COPY %>
+            The key is saved but Stripe didn't accept it. Almost always this means the
+            restricted key is missing a permission. Open your key on
+            <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener" class="underline">Stripe → API keys ↗</a>,
+            confirm every permission in the table above is set (in particular
+            <span class="font-mono">Webhook Endpoints: Write</span>, which Roe uses to verify the key),
+            then create a fresh key and save it again.
+          </p>
+        </div>
+      <% elsif !webhook_ready %>
+        <div class="mt-4 p-3 border border-amber-300 bg-amber-50 rounded-xs" data-test="stripe-webhook-nourl-<%= mode %>">
+          <p class="text-sm text-amber-900">
+            <%# COPY %>
+            Your key works, but there's no public URL to receive webhooks yet. Set your
+            <%= link_to "Site URL", admin_edit_deploy_config_path, class: "underline" rescue nil %>
+            (or a dev tunnel host) so Stripe can reach <span class="font-mono">/webhooks/stripe</span>.
+          </p>
+        </div>
+      <% elsif !webhook_connected %>
+        <div class="mt-4 p-3 border border-amber-300 bg-amber-50 rounded-xs" data-test="stripe-webhook-missing-<%= mode %>">
+          <p class="text-sm font-semibold text-amber-900 mb-1">Webhook not set up yet</p>
+          <p class="text-xs text-amber-800 mb-3">
+            <%# COPY %>
+            Your key works, but Roe couldn't find its webhook at
+            <span class="font-mono"><%= resolved_webhook_url %></span>.
+            This usually means the automatic setup on save failed — most often because the
+            key is missing <span class="font-mono">Webhook Endpoints: Write</span>. Confirm that
+            permission on your key, then set up the webhook:
+          </p>
+          <%= button_to "Set up webhook", admin_setup_payments_webhook_config_path,
+                method: :post,
+                data: { test: "stripe-setup-webhook-#{mode}" },
+                class: "uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer" %>
+        </div>
+      <% end %>
     <% end %>
   </div>
 </div>
