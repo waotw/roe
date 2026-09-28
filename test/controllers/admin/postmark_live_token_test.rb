@@ -52,15 +52,17 @@ class PostmarkLiveTokenTest < ActionDispatch::IntegrationTest
     assert_equal "live-abc-123", config.live_server_token
   end
 
-  # A saved token has to read back as bullets. Reading back blank looks exactly
-  # like a save that didn't happen, which is how this was reported.
-  test "a saved token shows as masked, not empty" do
+  # The newsletters page is read-only now — Postmark Setup owns token entry, so
+  # there's no manual live-token input to mask. What still matters is that the
+  # token reads back through the model (covered above) and the page renders.
+  test "the read-only newsletters page renders with a saved live token" do
     PostmarkConfig.current.update!(server_token: "live-abc-123")
 
     get admin_edit_newsletters_config_path(tab: "live")
 
     assert_response :success
-    assert_select "input[name='live[server_token]'][value=?]", "•" * 16
+    # No manual key-input form on the read-only page.
+    assert_select "input[name='live[server_token]']", count: 0
   end
 
   # Live Mode stayed greyed out no matter what was saved: the view guards on

@@ -154,7 +154,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     stripe = StripeConfig.current
     stripe.update!(publishable_key_test: "pk_test_123", secret_key_test: "sk_test_123")
 
-    Stripe::Balance.expects(:retrieve).returns(OpenStruct.new(object: "balance"))
+    Stripe::Account.expects(:retrieve).returns(OpenStruct.new(object: "account", default_currency: "usd"))
 
     post admin_verify_payments_config_path
 
@@ -167,10 +167,13 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
   # ── Newsletters (Postmark) ───────────────────────────────────────────────
 
-  test "edit_newsletters renders the integration form" do
+  test "edit_newsletters renders the read-only Postmark UI" do
     get admin_edit_newsletters_config_path
     assert_response :success
-    assert_select "form[action=?]", admin_newsletters_config_path
+    # Read-only: a test panel + webhook status, and NO manual key-input form.
+    assert_select "[data-test=postmark-test-test]"
+    assert_select "[data-test=postmark-webhook-status]"
+    assert_select "form[action=?]", admin_newsletters_config_path, count: 0
   end
 
   test "update_newsletters writes test token to YAML and syncs" do

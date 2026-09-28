@@ -1,0 +1,50 @@
+<%# COPY — read-only Postmark test panel for one server (test or live). The
+    Postmark Setup flow owns all key input, so this page shows no key fields.
+    Test server = sandbox: it records without delivering, so we link to the
+    server's Activity page to confirm the message reached Postmark. Live server
+    sends for real, so we point at the inbox instead — no activity link.
+    `server_kind` is "test" or "live"; `server_token` is that server's token.
+    Placeholder copy — rewrite before commit. %>
+<%
+  connected = server_token.present?
+  info      = connected ? @postmark_config.server_info_for(server_token) : nil
+  live      = server_kind == "live"
+%>
+<div class="config-section" data-test="postmark-test-<%= server_kind %>">
+  <div class="flex items-center gap-3 flex-wrap">
+    <% if connected %>
+      <%= link_to "Send test email",
+            admin_send_test_email_newsletters_config_path(server: server_kind),
+            data: { turbo_method: :post, test: "postmark-send-test-#{server_kind}" },
+            class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer no-underline text-gray-900" %>
+
+      <%# Activity link only for the sandbox (test) server — the live server
+          delivers, so the inbox is the proof, not Postmark's activity log. %>
+      <% if !live && info&.activity_url.present? %>
+        <%= link_to "Open Postmark server activity →", info.activity_url,
+              target: "_blank", rel: "noopener",
+              data: { test: "postmark-activity-#{server_kind}" },
+              class: "inline-flex items-center uppercase text-xs px-1.5 py-1 border border-gray-800 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs no-underline text-gray-900" %>
+      <% end %>
+    <% else %>
+      <span data-test="postmark-test-disabled-<%= server_kind %>"
+            title="Set up Postmark above first"
+            class="inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-300 bg-gray-50 text-gray-400 font-mono rounded-xs cursor-not-allowed select-none">
+        Send test email
+      </span>
+    <% end %>
+  </div>
+
+  <% if live %>
+    <p class="text-xs text-gray-500 mt-2">
+      <%# COPY — live server delivers a real email. %>
+      Sends a test email to: <%= SiteSender.address.presence || "your author email" %>.
+      Check your email inbox to verify the email was sent. If you received the email, Postmark is working.
+    </p>
+  <% else %>
+    <p class="text-xs text-gray-500 mt-2">
+      <%# COPY — sandbox records but never delivers, so verify via Activity. %>
+      Sends a test email to this server<%= info&.name.present? ? ": #{info.name}" : "" %> on Postmark. Click <code class="text-gray-600 font-mono bg-gray-200 px-1 py-0.5 rounded-xs">OPEN POSTMARK SERVER ACTIVITY →</code> to verify the message made it to Postmark.
+    </p>
+  <% end %>
+</div>

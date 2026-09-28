@@ -134,14 +134,15 @@ class PostmarkConfig < ApplicationRecord
 
   # Send a real message to prove the From address is accepted. Returns the
   # PostmarkService result so the caller can report what happened.
-  def verify_sender!(to:)
+  def verify_sender!(to:, server_token: nil)
     return { success: false, error: SiteSender::MISSING } unless SiteSender.configured?
 
     result = PostmarkService.send_transactional_email(
       to_email: to, to_name: to, tag: "sender-verification",
       subject: "Test email from #{SiteConfig.get('title').presence || 'your Roe site'}",
       html_content: "<p>This is a test. If you're reading it, Roe can send email " \
-                    "from #{ERB::Util.html_escape(SiteSender.address)}.</p>"
+                    "from #{ERB::Util.html_escape(SiteSender.address)}.</p>",
+      server_token: server_token
     )
 
     if result[:success]
@@ -254,7 +255,39 @@ class PostmarkConfig < ApplicationRecord
     result
   end
 
-  # ── Test config file ─────────────────────────────────────────────────────
+  # ── Server activity page (Postmark dashboard deep-link) ──────────────────
+  #
+  # The activity/events page for a server lives at
+  #   https://account.postmarkapp.com/servers/{ID}/streams/outbound/events
+  # Neither the {ID} nor the server name is stored — both come back on the
+  # /server call that test_connection already makes. Fetched live per token so
+  # the link and name always describe the server the given tab sends through.
+  ACTIVITY_URL = "https://account.postmarkapp.com/servers/%<id>s/streams/outbound/events"
+
+  ServerInfo = Struct.new(:id, :name, :delivery_type, :activity_url, keyword_init: true)
+
+  # One /server lookup → { name:, activity_url:, … }, or nil on blank token /
+  # API failure (callers treat nil as "couldn't reach it").
+  def server_info_for(token)
+    return nil if token.blank?
+
+    result = PostmarkService.test_connection(token)
+    server = result[:server]
+    return nil unless server.is_a?(Hash) && server["ID"].present?
+
+    ServerInfo.new(
+      id: server["ID"], name: server["Name"], delivery_type: server["DeliveryType"],
+      activity_url: format(ACTIVITY_URL, id: server["ID"])
+    )
+  rescue StandardError
+    nil
+  end
+
+  def activity_url_for(token)
+    server_info_for(token)&.activity_url
+  end
+
+
 
   def self.test_config
     return {} unless File.exist?(TEST_CONFIG_PATH)

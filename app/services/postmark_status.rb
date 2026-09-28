@@ -19,13 +19,14 @@ class PostmarkStatus
   # state ∈ :ok (green ✓) / :todo (amber, action needed) / :warn (red, broken)
   #        / :unknown (grey, couldn't determine) / :info (neutral fact)
 
-  def self.for(config = PostmarkConfig.current)
-    new(config).items
+  def self.for(config = PostmarkConfig.current, ui_production: Rails.env.production?)
+    new(config, ui_production:).items
   end
 
-  def initialize(config)
+  def initialize(config, ui_production: Rails.env.production?)
     @pm = config
     @sender = SiteSender.address
+    @ui_production = ui_production
   end
 
   def items
@@ -36,8 +37,8 @@ class PostmarkStatus
 
   def connection
     if @pm.connected?
-      Item.new(key: :connection, label: "Connected to Postmark", state: :ok,
-               detail: "Your server token works.")
+      Item.new(key: :connection, label: "Sandbox server created on Postmark", state: :ok,
+               detail: "Your server token is connected and working.")
     elsif @pm.keys_present?
       Item.new(key: :connection, label: "Postmark token not verified", state: :warn,
                detail: "A token is saved but Postmark didn't accept it.")
@@ -51,8 +52,12 @@ class PostmarkStatus
     return nil unless @pm.respond_to?(:mode)
 
     live = @pm.mode_live?
-    Item.new(key: :mode, label: "Mode: #{live ? 'Live' : 'Test'}", state: :info,
-             detail: live ? "Real email is sent." : "Sandbox — Check Activity on Postmark to confirm.")
+    # A working setup is a working setup — show ✓, not a neutral dot, once the
+    # token verifies. Sandbox still says what "test" means, but it's not an
+    # action item when everything's connected.
+    state = @pm.connected? ? :ok : :info
+    Item.new(key: :mode, label: "Mode: #{live ? 'Live' : 'Test'}", state: state,
+             detail: live ? "Real email is sent." : "Sandbox — check Activity on Postmark to confirm.")
   end
 
   # Sender address (the one thing a send actually requires). Pre-emptive when a
@@ -97,7 +102,7 @@ class PostmarkStatus
   # the Postmark Setup section, so here we just report state. Local never needs
   # the webhook working (it activates on the live site), so it's informational.
   def webhook
-    return local_webhook unless Rails.env.production?
+    return local_webhook unless @ui_production
 
     if @pm.webhook_verified?
       ok(:webhook, "All webhooks verified", "Postmark can reach your site — deliveries, bounces, and spam complaints.")
@@ -108,17 +113,14 @@ class PostmarkStatus
     end
   end
 
-  # Local never needs the webhook working — it activates on the live site. Say
-  # so, split by whether a live site exists yet, and never nag to "run setup".
-  # Nothing to report until the sandbox is actually set up (the connection row
-  # already covers "not connected"), so omit the row otherwise.
+  # Local never needs the webhook working — it activates on the live site, and
+  # Roe sets it up there. So once the sandbox is connected this is a settled ✓,
+  # not a neutral note or an action item. Omit the row until the sandbox exists
+  # (the connection row already covers "not connected").
   def local_webhook
     return nil unless @pm.keys_present?
 
-    detail = live_site_deployed? ?
-      "They activate on your live site — run Postmark Setup on the live site to enable them." :
-      "They activate on your live site — run Postmark Setup on the live site to enable them once you've deployed."
-    Item.new(key: :webhook, label: "Webhooks created", state: :info, detail: detail)
+    ok(:webhook, "Webhooks work on your live site", "Roe sets them up and verifies them there — nothing to do locally.")
   end
 
   # The URL the account-setup webhook was pointed at, or nil if we can't build
@@ -128,13 +130,6 @@ class PostmarkStatus
     return nil if token.blank?
 
     webhook_url("/webhooks/postmark/#{token}")
-  end
-
-  # Has this install heard from a deployed peer recently (Site Sync's signal)?
-  def live_site_deployed?
-    SiteSync::Exchange.can_call_peer? && SiteSync::Exchange.peer_reachable?
-  rescue StandardError
-    false
   end
 
   # ── Live signature read (production, memoised for one render) ─────────────

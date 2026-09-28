@@ -226,6 +226,7 @@ Rails.application.routes.draw do
     patch  "configs/payments/live",       to: "configs#update_payments_live",   as: "live_payments_config"
     patch  "configs/payments/mode",       to: "configs#update_payments_mode",   as: "mode_payments_config"
     post   "configs/payments/verify",     to: "configs#verify_payments",        as: "verify_payments_config"
+    post   "configs/payments/webhook",    to: "configs#setup_payments_webhook", as: "setup_payments_webhook_config"
     delete "configs/payments/disconnect", to: "configs#disconnect_payments",    as: "disconnect_payments_config"
 
     get    "configs/newsletters/edit",                      to: "configs#edit_newsletters",                  as: "edit_newsletters_config"

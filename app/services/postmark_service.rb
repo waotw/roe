@@ -36,7 +36,7 @@ class PostmarkService
       { success: false, error: e.message }
     end
 
-    def send_transactional_email(to_email:, to_name:, subject:, html_content:, tag: nil)
+    def send_transactional_email(to_email:, to_name:, subject:, html_content:, tag: nil, server_token: nil)
       return { success: false, error: "Postmark not configured" } unless configured?
 
       # No stand-in address: Postmark rejects an unverified From, so sending
@@ -55,7 +55,9 @@ class PostmarkService
       request = Net::HTTP::Post.new(uri.path)
       request["Accept"] = "application/json"
       request["Content-Type"] = "application/json"
-      request["X-Postmark-Server-Token"] = config.server_token
+      # Target a specific server when the caller names one (the read-only
+      # test/live panels each test THEIR server), else the active-mode token.
+      request["X-Postmark-Server-Token"] = server_token.presence || config.server_token
 
       body = {
         From: from,

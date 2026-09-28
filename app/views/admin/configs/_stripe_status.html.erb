@@ -1,9 +1,10 @@
-<%# COPY — Postmark status checklist. Shown at the top of the Email (Postmark)
-    settings page in place of the generic "Connected" box, because email needs
-    several things right (token, sender confirmed, DKIM, webhook), not one. Each
-    row is a PostmarkStatus::Item with a state that picks its colour/icon.
-    Placeholder copy — rewrite before commit. %>
-<% items = PostmarkStatus.for(@postmark_config, ui_production: integration_ui_production?) %>
+<%# COPY — Stripe status checklist. Shown at the top of the Payments (Stripe)
+    settings page in place of the generic "Connected" box, mirroring the
+    Postmark status list, because payments needs several things right (key +
+    permissions, publishable key, webhook), not one. Each row is a
+    StripeStatus::Item whose state picks its colour/icon. Placeholder copy —
+    rewrite before commit. %>
+<% items = StripeStatus.for(@stripe_config, ui_production: integration_ui_production?) %>
 <%
   icon = ->(state) do
     case state
@@ -20,7 +21,7 @@
   end
 %>
 
-<div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50">
+<div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50" data-test="stripe-status">
   <h3 class="text-base font-semibold text-gray-900 mb-3">Integration Status</h3>
   <ul class="space-y-2">
     <% items.each do |item| %>

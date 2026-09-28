@@ -42,7 +42,10 @@
     when 'snipcart'    then 'Store (Snipcart)'
   end
 
-  is_production = Rails.env.production?
+  # Renders as production in production, or locally with ?preview=production
+  # (dev-only) so the production copy/UI can be reviewed. See
+  # IntegrationSetupHelper#integration_ui_production?.
+  is_production = integration_ui_production?
   has_mode      = integration_record&.respond_to?(:mode)
   live_ready    = integration_record&.respond_to?(:live_mode_ready?) && integration_record.live_mode_ready?
 
@@ -50,6 +53,12 @@
   # static build, so its mode is selectable in every environment. Stripe and
   # Postmark keep live mode production-only (real secrets / real charges).
   mode_selectable = has_mode && (is_production || @config_type == "snipcart")
+
+  # Hide the local setup surface for integrations whose setup can't complete
+  # locally and gets redone in production (payments today). Reversible via
+  # development.show_local_integration_setup. When hidden we render a single
+  # "set this up on your live site" panel instead of the whole setup UI.
+  setup_hidden = local_integration_setup_hidden?(@config_type)
 %>
 
 <div class="max-w-3xl mx-auto p-8 bg-white">
@@ -64,11 +73,17 @@
     </div>
   </div>
 
+  <% if setup_hidden %>
+    <%= render "admin/configs/local_setup_hidden" %>
+  <% else %>
+
   <%# Connection status. Newsletters (Postmark) get a richer checklist —
       email needs a token, a confirmed sender, DKIM, and a working webhook —
       so that replaces the generic one-line verify box for this integration. %>
   <% if @config_type == 'newsletters' %>
     <%= render "admin/configs/postmark_status" %>
+  <% elsif @config_type == 'payments' %>
+    <%= render "admin/configs/stripe_status" %>
   <% else %>
   <div class="p-4 border border-gray-200 bg-gray-50 mb-6"
        data-controller="integration-verify"
@@ -159,6 +174,59 @@
                update_path: update_path,
                live_update_path: live_update_path,
                record: integration_record %>
+  <% elsif @config_type == "newsletters" %>
+    <%# Read-only Postmark view. The Setup flow owns all key input, so no tabs
+        with forms — just "does it work" per server. Production has both a
+        sandbox (test) and live server, so it keeps two tabs; dev only ever has
+        the sandbox, so it shows a single panel. %>
+    <% if is_production %>
+      <div data-controller="tabs" data-tabs-default-value="<%= integration_record&.mode %>">
+        <div class="border-b border-gray-200 mb-6">
+          <nav class="flex gap-4">
+            <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="test"
+                    class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">Test</button>
+            <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="live"
+                    class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Live</button>
+          </nav>
+        </div>
+        <div data-tabs-target="panel" data-tabs-panel="test">
+          <%= render "admin/configs/postmark_test_panel", server_kind: "test", server_token: integration_record.test_server_token %>
+        </div>
+        <div data-tabs-target="panel" data-tabs-panel="live" class="hidden">
+          <%= render "admin/configs/postmark_test_panel", server_kind: "live", server_token: integration_record.live_server_token %>
+        </div>
+      </div>
+    <% else %>
+      <%= render "admin/configs/postmark_test_panel", server_kind: "test", server_token: integration_record.test_server_token %>
+    <% end %>
+  <% elsif @config_type == "payments" %>
+    <%# Stripe setup, folded into tabs. Production has both Test and Live modes;
+        dev only sets up test keys (the controller refuses to persist live keys
+        outside production), so dev shows a single Test panel. Each panel is the
+        full guided flow: create+paste the restricted key, then set up the
+        webhook. Mirrors the Postmark read-only shape, but keeps the paste form
+        because Stripe has no key-minting API. %>
+    <% if is_production %>
+      <div data-controller="tabs" data-tabs-default-value="<%= integration_record&.mode %>">
+        <div class="border-b border-gray-200 mb-6">
+          <nav class="flex gap-4">
+            <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="test"
+                    class="py-2 px-1 text-sm font-medium border-b-2 border-blue-600 text-blue-600">Test</button>
+            <button type="button" data-tabs-target="tab" data-action="click->tabs#show" data-tabs-panel="live"
+                    class="py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Live</button>
+          </nav>
+        </div>
+        <div data-tabs-target="panel" data-tabs-panel="test">
+          <%= render "admin/configs/stripe_setup", mode: "test" %>
+        </div>
+        <div data-tabs-target="panel" data-tabs-panel="live" class="hidden">
+          <%= render "admin/configs/stripe_setup", mode: "live" %>
+        </div>
+      </div>
+    <% else %>
+      <p class="text-sm pl-2 mb-3 bg-amber-200 border border-amber-600 text-amber-600 rounded-xs font-mono">TEST MODE — live keys are set up on your deployed site.</p>
+      <%= render "admin/configs/stripe_setup", mode: "test" %>
+    <% end %>
   <% else %>
   <div data-controller="tabs" data-tabs-default-value="<%= integration_record&.mode %>">
     <div class="border-b border-gray-200 mb-6">
@@ -337,8 +405,6 @@
       the disabled-state UI below. %>
   <%
     webhook_path = case @config_type
-      when 'payments'
-        "/webhooks/stripe"
       when 'newsletters'
         token = integration_record&.respond_to?(:webhook_token) ? integration_record.webhook_token : nil
         token.present? ? "/webhooks/postmark/#{token}" : nil
@@ -346,7 +412,9 @@
     resolved_webhook_url = webhook_path ? webhook_url(webhook_path) : nil
   %>
   <% if webhook_path %>
-    <% if resolved_webhook_url %>
+    <% if @config_type == 'newsletters' %>
+      <%= render "admin/configs/postmark_webhook_status", resolved_webhook_url: resolved_webhook_url %>
+    <% elsif resolved_webhook_url %>
       <div class="config-section mb-0 mt-8 p-4 border border-gray-200 bg-gray-50">
         <h3 class="text-base font-semibold text-gray-900 mb-2">Webhook URL</h3>
         <p class="text-sm text-gray-600 mb-3">
@@ -355,10 +423,10 @@
             events (opens, clicks, bounces) reach Roe. The token at the end is unique
             to this install — keep it secret. <span class="text-amber-600">You can regenerate a new token in the Danger Zone below.</span>
           <% elsif @config_type == 'payments' %>
-            Add this URL as a webhook endpoint in your Stripe dashboard. Stripe will
-            give you a signing secret in return — paste that into the
-            <em>Webhook Signing Secret</em> field in the appropriate tab below.
-            Test and Live modes use the same URL but separate domains / signing secrets.
+            This is the URL Roe's webhook lives at. You don't need to add it in
+            Stripe by hand — use <em>Stripe Setup</em> above to create the endpoint
+            and save its signing secret automatically. It's shown here for reference,
+            and in case you'd rather set it up manually.
           <% end %>
         </p>
         <input type="text"
@@ -424,4 +492,5 @@
       <% end %>
     </div>
   </div>
+  <% end %>
 </div>

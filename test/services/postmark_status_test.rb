@@ -16,6 +16,15 @@ class PostmarkStatusTest < ActiveSupport::TestCase
 
   def item(items, key) = items.find { |i| i.key == key }
 
+  test "local, once set up, shows the mode row as a settled ✓ (not a neutral dot)" do
+    @pm.update!(server_token: "sbx", verified_at: Time.current)
+    PostmarkService.stubs(:test_connection).returns({ success: true })
+
+    row = item(PostmarkStatus.for(@pm), :mode)
+    assert_equal :ok, row.state, "a connected sandbox is working — show ✓, not the info dot"
+    assert_match(/test/i, row.label)
+  end
+
   test "not connected reads as a todo, no webhook row until set up" do
     items = PostmarkStatus.for(@pm)
     assert_equal :todo, item(items, :connection).state
@@ -24,13 +33,13 @@ class PostmarkStatusTest < ActiveSupport::TestCase
     assert_nil item(items, :webhook)
   end
 
-  test "local, once set up, shows webhooks as informational (never a todo)" do
+  test "local, once set up, shows webhooks as a settled ✓ (never a todo)" do
     @pm.update!(server_token: "sbx")
     PostmarkService.stubs(:test_connection).returns({ success: true })
 
     row = item(PostmarkStatus.for(@pm), :webhook)
-    assert_equal :info, row.state, "local webhooks are informational — they activate on the live site"
-    assert_match(/live site/i, row.detail)
+    assert_equal :ok, row.state, "local webhooks are settled — Roe handles them on the live site"
+    assert_match(/live site/i, row.label)
   end
 
   test "production: verified webhooks read green" do

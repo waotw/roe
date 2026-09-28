@@ -86,25 +86,26 @@ class Admin::SenderWarningTest < ActionDispatch::IntegrationTest
   # ── Send test email button ───────────────────────────────────────────────
 
   test "the test email button is offered once Postmark is connected" do
-    PostmarkConfig.any_instance.stubs(:connected?).returns(true)
+    PostmarkConfig.any_instance.stubs(:test_server_token).returns("tok-test")
 
     get admin_edit_newsletters_config_path
 
     assert_response :success
-    assert_select "a[href=?][data-turbo-method=post]", admin_send_test_email_newsletters_config_path
-    assert_select "[data-test-email-disabled]", 0
+    assert_select "a[href=?][data-turbo-method=post]",
+                  admin_send_test_email_newsletters_config_path(server: "test")
+    assert_select "[data-test=postmark-test-disabled-test]", 0
   end
 
   test "the test email button is shown disabled before there's a connection" do
     # Greyed rather than hidden, so it's clear the step exists and what has to
     # happen first.
-    PostmarkConfig.any_instance.stubs(:connected?).returns(false)
+    PostmarkConfig.any_instance.stubs(:test_server_token).returns(nil)
 
     get admin_edit_newsletters_config_path
 
     assert_response :success
-    assert_select "[data-test-email-disabled]"
-    assert_select "a[href=?]", admin_send_test_email_newsletters_config_path, 0
+    assert_select "[data-test=postmark-test-disabled-test]"
+    assert_select "a[href=?]", admin_send_test_email_newsletters_config_path(server: "test"), 0
   end
 
   # ── What the flash claims ────────────────────────────────────────────────
@@ -121,8 +122,8 @@ class Admin::SenderWarningTest < ActionDispatch::IntegrationTest
     post admin_send_test_email_newsletters_config_path
 
     assert_match(/sandbox/i, flash[:notice])
-    assert_match(/nothing was delivered/i, flash[:notice])
-    assert_no_match(/if it arrives/i, flash[:notice])
+    assert_match(/no emails are sent/i, flash[:notice])
+    assert_no_match(/if an email arrives/i, flash[:notice])
   end
 
   test "a live server is described as having sent the email" do
@@ -133,7 +134,7 @@ class Admin::SenderWarningTest < ActionDispatch::IntegrationTest
 
     post admin_send_test_email_newsletters_config_path
 
-    assert_match(/if it arrives/i, flash[:notice])
+    assert_match(/if an email arrives/i, flash[:notice])
     assert_no_match(/sandbox/i, flash[:notice])
   end
 

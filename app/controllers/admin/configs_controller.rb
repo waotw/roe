@@ -329,17 +329,15 @@ class Admin::ConfigsController < Admin::BaseController
     test_keys: {
       label: "Stripe Test Keys",
       fields: {
-        "publishable_key" => { type: :text,     label: "Publishable Key (Test)", hint: "Starts with pk_test_" },
-        "secret_key"      => { type: :password, label: "Secret Key (Test)",      hint: "Starts with sk_test_" },
-        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Test)", hint: "Starts with whsec_" }
+        "secret_key"      => { type: :password, label: "Restricted Key (Test)",  hint: "Starts with rk_test_ (or sk_test_). Create it with the permissions listed in Stripe Setup above." },
+        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Test)", hint: "Starts with whsec_. Roe fills this in for you automatically — only paste it here if you set the webhook up manually." }
       }
     },
     live_keys: {
       label: "Stripe Live Keys",
       fields: {
-        "publishable_key" => { type: :text,     label: "Publishable Key (Live)", hint: "Starts with pk_live_" },
-        "secret_key"      => { type: :password, label: "Secret Key (Live)",      hint: "Starts with sk_live_" },
-        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Live)", hint: "Starts with whsec_" }
+        "secret_key"      => { type: :password, label: "Restricted Key (Live)",  hint: "Starts with rk_live_ (or sk_live_). Create it with the permissions listed in Stripe Setup above." },
+        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Live)", hint: "Starts with whsec_. Roe fills this in for you automatically — only paste it here if you set the webhook up manually." }
       }
     }
   }.freeze
@@ -1631,7 +1629,11 @@ class Admin::ConfigsController < Admin::BaseController
     StripeConfig.save_test_config(existing["test"])
     stripe.verify!
 
-    flash[:notice] = "Stripe configuration saved"
+    # Fold webhook setup into the save: once the key verifies and a public URL
+    # exists, create/refresh the endpoint and capture its signing secret — no
+    # separate button. Skipped silently when there's no reachable URL (the
+    # common local case; the webhook activates on the live site).
+    flash[:notice] = "Stripe configuration saved#{auto_setup_stripe_webhook(stripe)}"
     redirect_to admin_edit_payments_config_path(tab: "test")
   end
 
@@ -1645,6 +1647,68 @@ class Admin::ConfigsController < Admin::BaseController
     }
   end
 
+  # Create (or refresh) the Stripe webhook endpoint Roe needs and capture its
+  # signing secret automatically — the one credential that otherwise has to be
+  # hand-copied from the dashboard. Uses the current mode's secret key.
+  #
+  # Runs for whichever mode is active: test-mode setup works locally when a
+  # dev_host/tunnel gives a reachable webhook URL; live-mode setup is
+  # production-only (same reason as live keys) and needs a deployed site.
+  def setup_payments_webhook
+    stripe = StripeConfig.current
+
+    if stripe.mode_live? && !Rails.env.production?
+      flash[:alert] = "Live webhooks are only set up in production."
+      redirect_to admin_edit_payments_config_path(tab: stripe.mode) and return
+    end
+
+    url = webhook_url("/webhooks/stripe")
+    if url.blank?
+      flash[:alert] = "No public webhook URL yet. Deploy your site (or set a dev tunnel host) first."
+      redirect_to admin_edit_payments_config_path(tab: stripe.mode) and return
+    end
+
+    if stripe.current_secret_key.blank?
+      flash[:alert] = "Add your Stripe #{stripe.mode} secret key first, then set up the webhook."
+      redirect_to admin_edit_payments_config_path(tab: stripe.mode) and return
+    end
+
+    result = StripeWebhookSetup.new(stripe.current_secret_key).ensure_endpoint(url)
+    stripe.store_webhook_signing_secret!(result[:signing_secret])
+    stripe.verify!
+
+    flash[:notice] = result[:recreated] ?
+      "Stripe webhook refreshed and its signing secret saved." :
+      "Stripe webhook created and its signing secret saved."
+    redirect_to admin_edit_payments_config_path(tab: stripe.mode)
+  rescue StripeWebhookSetup::Error => e
+    flash[:alert] = "Stripe webhook setup failed: #{e.message}"
+    redirect_to admin_edit_payments_config_path(tab: StripeConfig.current.mode)
+  end
+
+  # Fold webhook creation into the key-save flow. Returns a short suffix for the
+  # save flash (" · webhook connected." etc.), or "" when there's nothing to do.
+  # Never raises into the save — a webhook failure must not lose the saved key.
+  #
+  # Skips silently (no public URL) in the common local case, where the webhook
+  # activates on the deployed site. Live-mode setup stays production-only.
+  def auto_setup_stripe_webhook(stripe)
+    return "" if stripe.current_secret_key.blank?
+    return "" unless stripe.verified_at.present? # bad key → don't try
+    return "" if stripe.mode_live? && !Rails.env.production?
+
+    url = webhook_url("/webhooks/stripe")
+    return "" if url.blank? # no reachable URL (local without a tunnel)
+
+    result = StripeWebhookSetup.new(stripe.current_secret_key).ensure_endpoint(url)
+    stripe.store_webhook_signing_secret!(result[:signing_secret])
+    stripe.verify!
+    result[:recreated] ? " · webhook refreshed." : " · webhook connected."
+  rescue StripeWebhookSetup::Error => e
+    Rails.logger.warn "Stripe webhook auto-setup failed: #{e.message}"
+    " · but the webhook couldn't be set up: #{e.message}"
+  end
+
   def update_payments_live
     unless Rails.env.production?
       flash[:notice] = "Live keys are only saved in production."
@@ -1652,11 +1716,11 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     stripe = StripeConfig.current
-    apply_live_keys(stripe, params[:live] || {}, %w[publishable_key secret_key webhook_signing_secret])
+    apply_live_keys(stripe, params[:live] || {}, %w[secret_key webhook_signing_secret])
 
     if stripe.save
       stripe.verify!
-      flash[:notice] = "Stripe live keys saved"
+      flash[:notice] = "Stripe live keys saved#{auto_setup_stripe_webhook(stripe)}"
     else
       flash[:error] = "Failed to save Stripe live keys"
     end
@@ -1736,13 +1800,23 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_edit_newsletters_config_path and return
     end
 
-    result = PostmarkConfig.current.verify_sender!(to: to)
+    # Which server to test. The read-only Test/Live panels each test THEIR own
+    # server, so honour an explicit ?server=test|live; default to active mode.
+    config = PostmarkConfig.current
+    requested = params[:server].to_s
+    token = case requested
+    when "live" then config.live_server_token
+    when "test" then config.test_server_token
+    else             config.server_token
+    end
+
+    result = config.verify_sender!(to: to, server_token: token)
 
     # Whether anything was actually delivered is a property of the Postmark
     # server, not of the environment — a sandbox server accepts a message and
     # records it in Activity without sending it. Asked here rather than stored,
     # because it's one call on a button press and nothing else needs it.
-    sandbox = PostmarkService.test_connection(PostmarkConfig.current.server_token)
+    sandbox = PostmarkService.test_connection(token)
                              .dig(:server, "DeliveryType").to_s.casecmp("sandbox").zero? rescue false
 
     if result[:success] && sandbox
@@ -1758,7 +1832,7 @@ class Admin::ConfigsController < Admin::BaseController
       flash[:alert] = result[:error].to_s.presence || "Postmark refused the message."
     end
 
-    redirect_to admin_edit_newsletters_config_path(tab: PostmarkConfig.current.mode)
+    redirect_to admin_edit_newsletters_config_path(tab: requested.presence || config.mode)
   end
 
   def update_newsletters_live

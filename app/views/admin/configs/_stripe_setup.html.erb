@@ -1,0 +1,163 @@
+<%# COPY — "Stripe Setup" guided panel for ONE mode (test or live), rendered
+    inside a tab. Unlike Postmark (paste one account token, Roe mints the rest),
+    Stripe has NO API to create a key for your own account — key creation is
+    Dashboard + 2FA by design. So the irreducible manual step is "create one
+    restricted key with these permissions and paste it here." Everything
+    downstream (webhook create + signing-secret capture + verify) is automatic.
+    Locals: `mode` ("test"/"live"). Placeholder copy — rewrite before commit. %>
+<%
+  sc   = @stripe_config
+  live = mode.to_s == "live"
+
+  # Where this mode's form posts, and where its saved values are read from.
+  form_url = live ? admin_live_payments_config_path : admin_payments_config_path
+  param_ns = live ? "live" : "test"
+
+  reader = ->(field) do
+    if live
+      m = "#{field}_live"
+      sc.respond_to?(m) ? sc.public_send(m).to_s : ""
+    else
+      @config_hash[field].to_s
+    end
+  end
+  masked = ->(field) { reader.call(field).present? ? "••••••••••••••••" : "" }
+
+  resolved_webhook_url = webhook_url("/webhooks/stripe") rescue nil
+  webhook_ready = resolved_webhook_url.present?
+  key_saved     = reader.call("secret_key").present?
+  signing_saved = reader.call("webhook_signing_secret").present?
+
+  # The exact RAK scopes Roe needs — derived from every Stripe call Roe makes.
+  # No Balance: Roe never reads your Stripe balance. Revenue figures come from
+  # Roe's own database (populated by webhooks), and key verification uses
+  # Account.retrieve (below), so Balance:Read isn't needed.
+  rak_permissions = [
+    [ "Checkout Sessions", "Write", "create the pay button for members & donations" ],
+    [ "Products",          "Write", "sync your products to Stripe" ],
+    [ "Prices",            "Write", "set product prices on Stripe" ],
+    [ "Webhook Endpoints", "Write", "let Roe create & manage webhooks" ],
+    [ "Customers",         "Read",  "look up a member's Stripe customer" ],
+    [ "Accounts v2",       "Read",  "read your currency & verify the key works" ],
+  ]
+%>
+
+<div class="config-section" data-test="stripe-setup" data-stripe-mode="<%= mode %>">
+  <%# ── Step 1: create + paste the restricted key ──────────────────────────── %>
+  <div class="p-4 border border-blue-200 bg-blue-50 rounded-xs mb-4">
+    <h3 class="text-base font-semibold text-gray-900 mb-1">Stripe Setup — <%= live ? "Live" : "Test" %></h3>
+    <% if live %>
+      <span class="rounded-xs text-xs bg-amber-200 px-1 py-0.5 font-mono">This is the Live setup: make sure you’re not in test/sandbox mode on Stripe.</span>
+    <% else %>
+      <span class="rounded-xs text-xs bg-amber-200 px-1 py-0.5 font-mono">This is the Test setup: make sure you’re in test/sandbox mode on Stripe.</span>
+    <% end %>
+    <p class="text-sm text-gray-700 my-3">
+      <%# COPY %>
+      There is one manual step: create a <strong>restricted key</strong> on your Stripe account following the instrucions below, then paste it in this form and save. Roe takes care of the rest.
+    </p>
+
+    <ol class="text-sm text-gray-700 list-decimal pl-5 space-y-2.5 mb-4">
+      <li>
+        In Stripe, open
+        <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener"
+           class="underline text-blue-600">Developers → API keys ↗</a>
+        and click <strong>Create restricted key</strong>
+        (<%= live ? "in Live mode" : "in a Test sandbox" %>).
+      <ul class="list-inside list-disc mt-2">
+        <li class="text-xs text-gray-800 mb-3">
+            Stripe Documentation: <a href="https://docs.stripe.com/keys/restricted-api-keys#create-a-restricted-api-key" class="underline" target="_blank" >Create a restricted API key ↗</a>
+        </li>
+      </ul>
+      </li>
+      <li>Stripe: “How will you be using this key?”. Choose <strong>Powering an integration you built</strong> and click <b>Continue</b>.</li>
+      <li>Stripe: “Choose a permission template”. Click <strong>Choose your own →</strong> at the bottom.</li>
+      <li>Give the key a descriptive name (example: <span class="rounded-xs text-xs bg-white px-1 py-0.5 font-mono">Roe - My Site Name</span>)
+      <li>
+        Set these permissions (leave everything else <span class="rounded-xs text-xs bg-white px-1 py-0.5 font-mono">None</span>):
+        <ul class="list-inside list-disc mt-2">
+          <li class="text-xs text-gray-800 mb-3">
+              Use search to filter down the resource list on Stripe.
+          </li>
+        </ul>
+        <div class="mt-2 border border-gray-200 bg-white rounded-xs overflow-hidden">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 text-gray-500 uppercase">
+              <tr>
+                <th class="text-left font-medium px-3 py-1.5">Resource</th>
+                <th class="text-left font-medium px-3 py-1.5">Permission</th>
+                <th class="text-left font-medium px-3 py-1.5">Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rak_permissions.each do |resource, perm, why| %>
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 font-mono text-gray-900"><%= resource %></td>
+                  <td class="px-3 py-1.5">
+                    <span class="font-mono px-1.5 py-0.5 rounded-xs <%= perm == 'Write' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700' %>"><%= perm %></span>
+                  </td>
+                  <td class="px-3 py-1.5 text-gray-500"><%= why %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </li>
+      <li>Click <b>Create Key</b> and copy it (<span class="rounded-xs text-xs bg-white px-1 py-0.5 font-mono">rk_<%= mode %>_…</span>). Stripe shows it only once, make sure to save it in a safe place, then paste it below and click <span class="rounded-xs text-xs bg-blue-200 border border-blue-900 px-1 py-0.5 font-mono">SAVE <%= live ? "LIVE" : "TEST" %> KEYS</span>.</li>
+    </ol>
+
+    <%# The paste form — folded into the setup flow, not a separate tab form.
+        One key: the restricted key. Roe uses hosted Stripe Checkout, so no
+        publishable key is needed. Saving also creates/refreshes the webhook and
+        captures its signing secret automatically (see auto_setup_stripe_webhook). %>
+    <%= form_with url: form_url, method: :patch, class: "space-y-4", data: { test: "stripe-keys-form-#{mode}" } do %>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Restricted Key (<%= live ? "Live" : "Test" %>)</label>
+        <input type="password" name="<%= param_ns %>[secret_key]"
+               value="<%= masked.call('secret_key') %>"
+               placeholder="rk_<%= mode %>_…"
+               autocomplete="off"
+               class="w-full font-mono text-sm p-2 border border-gray-300">
+        <p class="text-xs text-gray-500 mt-1">The restricted key you just created.</p>
+      </div>
+
+      <%# Advanced: the signing secret is captured automatically when you save,
+          so it's tucked away — only needed if you wire the webhook by hand. The
+          ✓ on the summary shows it's already stored. %>
+      <details class="border border-gray-200 rounded-xs" data-test="stripe-advanced-<%= mode %>">
+        <summary class="cursor-pointer select-none text-xs uppercase font-mono text-gray-600 px-3 py-2 flex items-center gap-2">
+          <span>advanced: Manual webhook secret</span>
+          <% if signing_saved %>
+            <span class="text-green-700 normal-case" data-test="stripe-signing-saved-<%= mode %>">✓ webhook secret saved</span>
+          <% end %>
+        </summary>
+        <div class="p-3 border-t border-gray-200">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Webhook Signing Secret (<%= live ? "Live" : "Test" %>)</label>
+          <input type="password" name="<%= param_ns %>[webhook_signing_secret]"
+                 value="<%= masked.call('webhook_signing_secret') %>"
+                 placeholder="whsec_…"
+                 autocomplete="off"
+                 class="w-full font-mono text-sm p-2 border border-gray-300">
+          <p class="rounded-xs text-xs bg-amber-200 px-1 py-0.5 font-mono mt-2">
+            <%# COPY %>
+            Roe saves this secret for you when you add and save your key.
+            Only paste a key here if you've customized it yourself on Stripe.
+          </p>
+        </div>
+      </details>
+
+      <div class="flex items-center gap-3 pt-3 border-t border-gray-200 flex-wrap">
+        <input type="submit" value="Save <%= live ? "Live" : "Test" %> Keys"
+               class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
+        <% if key_saved %>
+          <span class="text-xs text-green-700" data-test="stripe-keys-saved-<%= mode %>">✓ Key saved</span>
+        <% end %>
+        <% if key_saved && signing_saved && webhook_ready && sc.webhook_configured?(resolved_webhook_url) %>
+          <span class="text-xs text-green-700" data-test="stripe-webhook-ok-<%= mode %>">✓ Webhook connected</span>
+        <% elsif key_saved && !webhook_ready %>
+          <%# No public URL locally — the webhook activates on the deployed site. %>
+          <span class="text-xs text-gray-500" data-test="stripe-webhook-pending-<%= mode %>">Webhook activates on your live site</span>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

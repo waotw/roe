@@ -66,15 +66,47 @@ class StripeConfig < ApplicationRecord
     mode_test? ? webhook_signing_secret_test : webhook_signing_secret_live
   end
 
+  # Store a signing secret captured from StripeWebhookSetup into the column
+  # for the current mode. Test-mode secrets also live in the plaintext
+  # stripe.yml (Site Sync carries them, same as the other test keys); live
+  # secrets are DB-only and production-only. Mirrors how the rest of the
+  # config splits test vs. live.
+  def store_webhook_signing_secret!(secret)
+    return false if secret.to_s.strip.empty?
+
+    if mode_test?
+      cfg = self.class.test_config.merge("webhook_signing_secret" => secret)
+      self.class.save_test_config(cfg)
+      update!(webhook_signing_secret_test: secret)
+    else
+      update!(webhook_signing_secret_live: secret)
+    end
+    true
+  end
+
+  # Read-only registration check for the current mode's webhook endpoint —
+  # proves it's registered at Roe's URL, not that events flow. Any API
+  # failure reads as "not configured"; never raises. Mirrors
+  # PostmarkConfig#webhook_configured?.
+  def webhook_configured?(url)
+    return false if current_secret_key.blank? || url.to_s.strip.empty?
+
+    StripeWebhookSetup.new(current_secret_key).endpoint_registered?(url)
+  rescue StandardError
+    false
+  end
+
   def self.request_options
     { api_key: current.current_secret_key }
   end
 
   # ── Connection status ────────────────────────────────────────────────────
 
-  # Keys present for current mode
+  # Keys present for current mode. Roe uses hosted Stripe Checkout (server-side
+  # redirect), never Stripe.js, so the publishable key is not required — only the
+  # secret/restricted key, which every API call needs.
   def keys_present?
-    current_publishable_key.present? && current_secret_key.present?
+    current_secret_key.present?
   end
 
   # Verified = keys present AND last API check succeeded
@@ -83,7 +115,7 @@ class StripeConfig < ApplicationRecord
   end
 
   def live_mode_ready?
-    publishable_key_live.present? && secret_key_live.present?
+    secret_key_live.present?
   end
 
   # ── API verification ─────────────────────────────────────────────────────
@@ -94,10 +126,11 @@ class StripeConfig < ApplicationRecord
   def verify!
     return false unless keys_present?
 
-    # Balance.retrieve is the lightest auth check — works with any valid
-    # secret key without needing a connected account.
+    # Account.retrieve is a light authenticated call that works with any valid
+    # key, and Roe already needs the Account:Read scope (fetch_currency! uses it).
+    # Using it here means we don't have to ask for Balance:Read just to verify.
     Stripe.api_key = current_secret_key
-    Stripe::Balance.retrieve
+    Stripe::Account.retrieve
     update_column(:verified_at, Time.current)
     true
   rescue Stripe::AuthenticationError
