@@ -121,6 +121,6 @@ module AdminHelper
 
   def stripe_membership_ready?
     stripe_config = StripeConfig.current
-    stripe_config.connected? && stripe_config.price_id.present?
+    stripe_config.connected? && stripe_config.current_price_id.present?
   end
 end

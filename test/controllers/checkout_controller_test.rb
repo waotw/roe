@@ -12,7 +12,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
 
@@ -75,7 +75,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
     sign_in_member(@member)
@@ -93,7 +93,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
     sign_in_member(@member)
@@ -132,7 +132,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
     sign_in_member(@member)
@@ -151,7 +151,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
     sign_in_member(@member)
@@ -175,7 +175,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
 
@@ -191,7 +191,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
     sign_in_member(@member)
@@ -213,7 +213,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_123",
+      price_id_test: "price_123",
       verified_at: Time.current
     )
     sign_in_member(@member)

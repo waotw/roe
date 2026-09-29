@@ -16,7 +16,7 @@ class CheckoutPaymentFlowTest < ActionDispatch::IntegrationTest
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      price_id: "price_test_123",
+      price_id_test: "price_test_123",
       webhook_signing_secret_test: "whsec_test_123",
       mode: :test,
       verified_at: Time.current
@@ -76,7 +76,7 @@ class CheckoutPaymentFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "checkout fails when stripe not configured" do
-    @stripe_config.update!(price_id: nil)
+    @stripe_config.update!(price_id_test: nil)
 
     sign_in_member(@free_member)
     post "/checkout"

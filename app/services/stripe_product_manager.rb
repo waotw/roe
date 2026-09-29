@@ -22,11 +22,9 @@ class StripeProductManager
     price = create_price!(product.id, price_amount)
     return false unless price
 
-    # Update StripeConfig with IDs
-    stripe_config.update!(
-      product_id: product.id,
-      price_id: price.id
-    )
+    # Update StripeConfig with IDs for the CURRENT mode (test IDs are invalid
+    # for a live key and vice-versa).
+    stripe_config.store_product_and_price!(product_id: product.id, price_id: price.id)
 
     true
   rescue Stripe::StripeError => e
@@ -61,10 +59,10 @@ class StripeProductManager
   end
 
   def ensure_product_exists!
-    # If we already have a product_id, retrieve it
-    if stripe_config.product_id.present?
+    # If we already have a product_id for this mode, retrieve it
+    if stripe_config.current_product_id.present?
       begin
-        return Stripe::Product.retrieve(stripe_config.product_id, request_options)
+        return Stripe::Product.retrieve(stripe_config.current_product_id, request_options)
       rescue Stripe::InvalidRequestError
         # Product was deleted, create a new one
         Rails.logger.warn "Stripe product not found, creating new one"

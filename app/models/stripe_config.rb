@@ -66,6 +66,25 @@ class StripeConfig < ApplicationRecord
     mode_test? ? webhook_signing_secret_test : webhook_signing_secret_live
   end
 
+  # Product/price IDs are mode-specific (a test-mode ID is invalid for a live
+  # key), so they're stored per mode like the keys. current_* picks the active
+  # mode's ID; the writer stores into the active mode's slot.
+  def current_product_id
+    mode_test? ? product_id_test : product_id_live
+  end
+
+  def current_price_id
+    mode_test? ? price_id_test : price_id_live
+  end
+
+  def store_product_and_price!(product_id:, price_id:)
+    if mode_test?
+      update!(product_id_test: product_id, price_id_test: price_id)
+    else
+      update!(product_id_live: product_id, price_id_live: price_id)
+    end
+  end
+
   # Store a signing secret captured from StripeWebhookSetup into the column
   # for the current mode. Test-mode secrets also live in the plaintext
   # stripe.yml (Site Sync carries them, same as the other test keys); live
@@ -156,6 +175,10 @@ class StripeConfig < ApplicationRecord
       secret_key_live: nil,
       webhook_signing_secret_test: nil,
       webhook_signing_secret_live: nil,
+      product_id_test: nil,
+      product_id_live: nil,
+      price_id_test: nil,
+      price_id_live: nil,
       connected_at: nil,
       verified_at: nil
     )

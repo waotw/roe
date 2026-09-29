@@ -49,7 +49,7 @@ module Members
         # Create Stripe checkout session
         stripe_config = StripeConfig.current
 
-        unless stripe_config.connected? && stripe_config.price_id.present?
+        unless stripe_config.connected? && stripe_config.current_price_id.present?
           redirect_to root_path, alert: "Payments are not configured"
           return
         end
@@ -59,7 +59,7 @@ module Members
             {
               customer_email: @member.email,
               line_items: [ {
-                price: stripe_config.price_id,
+                price: stripe_config.current_price_id,
                 quantity: 1
               } ],
               mode: "payment",
