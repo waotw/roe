@@ -98,6 +98,35 @@ class AnimatedGifTest < ActiveSupport::TestCase
     assert_includes ImageVariantGenerator.send(:variant_names_for, still), :small
   end
 
+  # ── Baseline / admin grid ────────────────────────────────────────────
+  #
+  # Regression: an animated GIF's only variant is :thumb, so the old
+  # baseline_variant_names (which stripped :thumb) returned [] → baseline_ready?
+  # was FOREVER false → the admin card stayed variants-pending and the browser
+  # polled it every 1.5s, re-injecting the card (which also broke tab filtering).
+  # The thumb IS the animated GIF's baseline preview.
+  test "an animated GIF's baseline is its thumb, not empty" do
+    anim = write_gif("anim.gif", frames: 2)
+    assert_equal [ :thumb ], ImageVariantGenerator.baseline_variant_names(anim)
+  end
+
+  test "an animated GIF becomes baseline-ready once its thumb exists" do
+    skip "libvips not installed" unless ImageVariantGenerator.available?
+    anim = write_gif("anim.gif", frames: 2)
+
+    assert_not ImageVariantGenerator.baseline_exists?(anim), "no thumb yet"
+    ImageVariantGenerator.generate_variants("/media/images/gif_test/anim.gif")
+    assert ImageVariantGenerator.baseline_exists?(anim), "thumb present → baseline ready"
+  end
+
+  test "a still GIF's baseline is the normal small+largest set, not the thumb" do
+    still = write_gif("still.gif", frames: 1)
+    ImageVariantGenerator.stubs(:available?).returns(false)
+    names = ImageVariantGenerator.baseline_variant_names(still)
+    assert_includes names, :small
+    assert_not_includes names, :thumb
+  end
+
   # ── Rendering ────────────────────────────────────────────────────────
 
   test "renders an animated GIF as the original file with no srcset" do

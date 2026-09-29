@@ -196,7 +196,14 @@ class ImageVariantGenerator
     # pages, and the static build fills the full set synchronously so baked
     # pages ship the complete srcset.
     def baseline_variant_names(source_path)
-      limits = variant_names_for(normalize_path(source_path)).reject { |n| n == :thumb }
+      names = variant_names_for(normalize_path(source_path))
+      # An animated GIF has only a thumb (it's served as its own original at
+      # full size, never resized). That thumb IS the admin grid's baseline
+      # preview — so treat it as the baseline, or baseline_ready? is forever
+      # false and the card polls variants endlessly.
+      return [ :thumb ] if names == [ :thumb ]
+
+      limits = names.reject { |n| n == :thumb }
       return [] if limits.empty?
       [ :small, limits.last ].uniq
     end

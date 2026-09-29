@@ -73,10 +73,28 @@ export default class extends Controller {
     if (card) {
       placeholder.replaceWith(card);
       this.watchVariants(card);
+      // Apply the active tab/search filter to the newly-inserted card.
+      this.reapplyFilters();
     } else {
       placeholder.remove();
     }
     if (message) this.toast(message);
+  }
+
+  // Re-run the media-filter controller so a card injected or swapped after
+  // load (upload result, variant-poll refresh) obeys the active tab, search,
+  // and audience filters instead of showing everywhere. media-filter shares
+  // this controller's element, so find it there.
+  reapplyFilters() {
+    const app = this.application;
+    if (!app) return;
+    const filter = app.getControllerForElementAndIdentifier(
+      this.element,
+      "media-filter",
+    );
+    if (filter && typeof filter.applyFilters === "function") {
+      filter.applyFilters();
+    }
   }
 
   // Poll the card endpoint while its image variants are processing, swapping
@@ -99,7 +117,13 @@ export default class extends Controller {
           const tmp = document.createElement("div");
           tmp.innerHTML = (data.card_html || "").trim();
           const fresh = tmp.firstElementChild;
-          if (fresh) current.replaceWith(fresh);
+          if (fresh) {
+            current.replaceWith(fresh);
+            // A freshly-injected card has no display filtering applied, so it
+            // would show under every tab (Audio/Video/Unused) regardless of
+            // type. Re-run the active filter so the swapped card obeys it.
+            this.reapplyFilters();
+          }
           if (data.pending && attempts < 8) setTimeout(poll, 1500);
         })
         .catch(() => {});
