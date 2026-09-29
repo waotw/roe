@@ -281,6 +281,10 @@ Rails.application.routes.draw do
       end
     end
 
+    # Shop orders received from Snipcart webhooks. Not in the admin nav yet —
+    # linked from the dashboard — but a real top-level page.
+    resources :orders, only: [ :index, :show ]
+
     resources :imports, only: [ :index, :new, :create, :show, :destroy ] do
       member do
         get :phase_2
@@ -529,6 +533,10 @@ Rails.application.routes.draw do
 
   # Stripe webhooks
   post "webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
+
+  # Snipcart webhooks — one URL for all store events; authenticated per-request
+  # via X-Snipcart-RequestToken (validated by calling Snipcart back).
+  post "webhooks/snipcart", to: "webhooks/snipcart#create", as: :snipcart_webhook
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page

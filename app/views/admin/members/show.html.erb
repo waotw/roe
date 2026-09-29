@@ -260,7 +260,7 @@
       to whoever is reconciling them. %>
   <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden">
     <div class="px-4 py-5 sm:p-6">
-      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Payment History</h3>
+      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Payment History <span class="text-xs">(memberships and donations)</span></h3>
 
       <% payments = MemberPayments.for(@member) %>
 
@@ -342,7 +342,7 @@
   <!-- Newsletter Delivery History -->
   <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden">
     <div class="px-4 py-5 sm:p-6">
-      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Newsletter Delivery History</h3>
+      <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Newsletter History <span class="text-xs">(deliveries)</span></h3>
 
       <%# Counted by status. A failed send is a row too now, and calling those
           "delivered" is the same miscount the post panel had. %>
@@ -435,4 +435,73 @@
       <% end %>
     </div>
   </div>
+
+  <!-- Store History -->
+  <%# COPY — Snipcart orders placed by this member, matched by email. Only shown
+      when there are any. Mirrors the Payment/Newsletter history style; links to
+      the order detail page. Placeholder copy — rewrite before commit. %>
+  <% store_orders = SnipcartOrder.where("LOWER(email) = ?", @member.email.to_s.downcase).recent %>
+  <% if store_orders.any? %>
+    <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden" data-test="member-store-history">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Store History <span class="text-xs">(orders)</span></h3>
+
+        <p class="mt-2 text-sm text-gray-600 font-sans">
+          <%= pluralize(store_orders.count, "order") %> from this member
+        </p>
+
+        <div class="mt-5 border border-gray-200 rounded-xs overflow-hidden">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% store_orders.each do |order| %>
+                <tr class="hover:bg-gray-50" data-test="member-order-row">
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900"><%= order.name.presence || "Order" %></div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <div class="text-sm text-gray-900"><%= order.placed_at&.strftime("%b %d, %Y") || "—" %></div>
+                    <div class="text-xs text-gray-500"><%= order.placed_at&.strftime("%I:%M %p") %></div>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <% if order.total %>
+                      <div class="text-sm <%= order.refunded? ? 'text-red-700' : 'text-green-700' %>">
+                        <%= number_to_currency(order.total, unit: (order.currency || "usd").upcase + " ") %>
+                      </div>
+                    <% else %>
+                      <div class="text-sm text-gray-900">—</div>
+                    <% end %>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <% if order.refunded? %>
+                      <span class="inline-flex bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800">
+                        Refunded
+                      </span>
+                    <% else %>
+                      <span class="inline-flex bg-green-100 px-2 py-1 text-xs font-semibold text-green-800"><%= order.status.presence || "Paid" %></span>
+                    <% end %>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                    <%= link_to "View Order", admin_order_path(order), class: "text-blue-600 hover:text-blue-900 text-xs" %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mt-3 text-xs text-gray-500 font-sans">
+          Orders are matched to this member by email. Manage them (ship, refund) in your Snipcart account.
+        </p>
+      </div>
+    </div>
+  <% end %>
 </div>

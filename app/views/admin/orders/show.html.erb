@@ -1,0 +1,49 @@
+<%# COPY — single order detail. Placeholder copy; data-test anchors are stable. %>
+<div class="px-4 sm:px-0 font-mono max-w-2xl">
+  <div class="mb-4">
+    <%= link_to "← Back to Orders", admin_orders_path,
+          class: "uppercase text-sm px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 rounded-xs no-underline text-gray-900" %>
+  </div>
+
+  <div class="border border-gray-200 bg-white p-4" data-test="order-detail">
+    <div class="flex items-baseline gap-2 mb-3 font-sans">
+      <h1 class="text-2xl font-bold text-gray-900"><%= @order.name.presence || "Order" %></h1>
+      <% if @order.member? %>
+        <%= link_to "member", admin_member_path(@order.member),
+              data: { test: "order-member-badge" },
+              class: "uppercase text-[10px] px-1 py-0.5 border border-gray-800 bg-blue-100 hover:bg-blue-200 rounded-xs no-underline text-gray-900" %>
+      <% end %>
+    </div>
+
+    <dl class="grid grid-cols-3 gap-y-2 text-sm">
+      <dt class="text-gray-500 uppercase text-xs">Email</dt>
+      <dd class="col-span-2"><%= @order.email.presence || "—" %></dd>
+
+      <dt class="text-gray-500 uppercase text-xs">Amount</dt>
+      <dd class="col-span-2 tabular-nums">
+        <% if @order.total %>
+          <%= number_to_currency(@order.total, unit: (@order.currency || "usd").upcase + " ") %>
+        <% else %>—<% end %>
+      </dd>
+
+      <dt class="text-gray-500 uppercase text-xs">Date</dt>
+      <dd class="col-span-2"><%= @order.placed_at&.strftime("%b %-d, %Y %l:%M %p") || "—" %></dd>
+
+      <dt class="text-gray-500 uppercase text-xs">Status</dt>
+      <dd class="col-span-2"><%= @order.status.presence || "—" %></dd>
+
+      <% if @order.refunded? %>
+        <dt class="text-gray-500 uppercase text-xs">Refunded</dt>
+        <dd class="col-span-2 text-red-700" data-test="order-refunded">
+          <% if @order.refunded_amount_cents %>
+            <%= number_to_currency(@order.refunded_amount_cents / 100.0, unit: (@order.refunded_currency || @order.currency || "usd").upcase + " ") %>
+          <% end %>
+          <%= "on #{@order.refunded_at.strftime('%b %-d, %Y')}" if @order.refunded_at %>
+        </dd>
+      <% end %>
+
+      <dt class="text-gray-500 uppercase text-xs">Snipcart token</dt>
+      <dd class="col-span-2 break-all text-xs text-gray-600"><%= @order.snipcart_token %></dd>
+    </dl>
+  </div>
+</div>

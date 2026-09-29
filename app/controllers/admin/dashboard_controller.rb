@@ -11,6 +11,13 @@ class Admin::DashboardController < Admin::BaseController
     # visitors. Surfaced rather than repaired silently — see PageStatusRepair.
     @pages_needing_status = PageStatusRepair.count
 
+    # Shop orders received from Snipcart (webhook-fed). Shown when the store is
+    # on, independent of Stripe payments — Snipcart is its own revenue source.
+    if SiteFeature.store_enabled?
+      @snipcart_orders_count = SnipcartOrder.count
+      @snipcart_recent_orders = SnipcartOrder.recent.limit(5)
+    end
+
     return unless SiteFeature.payments_enabled?
 
     if SiteFeature.memberships_enabled?

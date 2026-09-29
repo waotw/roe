@@ -178,4 +178,30 @@
     </div>
   <% end %>
 
+  <!-- ─── STORE / ORDERS ─── -->
+  <%# COPY — shop orders summary; links to the full Orders page (not in nav). %>
+  <% if SiteFeature.store_enabled? %>
+    <div class="relative border-2 border-gray-800 mt-6" data-test="dashboard-orders">
+      <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
+        ── Store ──
+      </div>
+      <div class="p-4 bg-[#fffdf9] flex items-center justify-between">
+        <div>
+          <div class="text-sm text-gray-700">
+            <strong><%= @snipcart_orders_count.to_i %></strong>
+            <%= "order".pluralize(@snipcart_orders_count.to_i) %> from your store
+          </div>
+          <% if @snipcart_recent_orders&.any? %>
+            <div class="text-xs text-gray-500 mt-1">
+              Latest: <%= @snipcart_recent_orders.first.name.presence || @snipcart_recent_orders.first.email.presence || "—" %>
+              <%= "· #{@snipcart_recent_orders.first.placed_at.strftime('%b %-d')}" if @snipcart_recent_orders.first.placed_at %>
+            </div>
+          <% end %>
+        </div>
+        <%= link_to "View orders →", admin_orders_path,
+              class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs no-underline text-gray-900" %>
+      </div>
+    </div>
+  <% end %>
+
 </div>
