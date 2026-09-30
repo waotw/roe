@@ -28,7 +28,20 @@ class Admin::MemberStoreHistoryTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "[data-test=member-store-history]"
     assert_select "[data-test=member-order-row]", count: 1
+    assert_select "[data-test=member-store-test-badge]" # test mode → badged
     assert_select "a[href=?]", admin_order_path(SnipcartOrder.find_by(snipcart_token: "o1"))
+  end
+
+  test "no test-mode badge on the store history in live mode" do
+    SnipcartConfig.current.update!(mode: :live)
+    SnipcartOrder.record_completed!({
+      "token" => "o1", "email" => "Buyer@Example.com", "finalGrandTotal" => 42.0, "currency" => "usd"
+    }, mode: "live")
+
+    get admin_member_path(@member)
+    assert_response :success
+    assert_select "[data-test=member-store-history]"
+    assert_select "[data-test=member-store-test-badge]", count: 0
   end
 
   test "another member's orders don't appear here" do

@@ -261,6 +261,9 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     get admin_edit_snipcart_integration_config_path
     assert_response :success
     assert_select "form[action=?]", admin_snipcart_integration_config_path
+    # Status checklist + webhook URL section, matching the other integrations.
+    assert_select "[data-test=snipcart-status]"
+    assert_select "[data-test=snipcart-webhook-section]"
   end
 
   test "edit_snipcart renders snippet-only tabs that work locally" do

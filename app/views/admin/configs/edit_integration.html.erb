@@ -118,6 +118,8 @@
     <%= render "admin/configs/postmark_status" %>
   <% elsif @config_type == 'payments' %>
     <%= render "admin/configs/stripe_status" %>
+  <% elsif @config_type == 'snipcart' %>
+    <%= render "admin/configs/snipcart_status" %>
   <% else %>
   <div class="p-4 border border-gray-200 bg-gray-50 mb-6"
        data-controller="integration-verify"

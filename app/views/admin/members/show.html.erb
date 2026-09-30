@@ -445,7 +445,15 @@
   <% if store_orders.any? %>
     <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden" data-test="member-store-history">
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">Store History <span class="text-xs">(orders)</span></h3>
+        <h3 class="text-lg font-medium leading-6 text-gray-900 font-sans">
+          Store History <span class="text-xs">(orders)</span>
+          <%# COPY — test-mode badge so a test order isn't mistaken for a real
+              purchase by this member. Shown only in test mode; the section is
+              scoped to the current Snipcart mode, so all rows here are that mode. %>
+          <% if SnipcartConfig.current.mode_test? %>
+            <span data-test="member-store-test-badge" class="align-middle uppercase text-[10px] px-1.5 py-0.5 border border-yellow-600 bg-yellow-100 text-yellow-800 rounded-xs">Test mode</span>
+          <% end %>
+        </h3>
 
         <p class="mt-2 text-sm text-gray-600 font-sans">
           <%= pluralize(store_orders.count, "order") %> from this member
