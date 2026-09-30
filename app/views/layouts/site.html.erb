@@ -408,6 +408,98 @@
             });
           })();
         </script>
+
+        <%# ── Snipcart checkout error surfacing ───────────────────────────
+            Snipcart's checkout validation can fail server-side (a digital
+            file GUID that isn't in the Snipcart account, a price mismatch,
+            an unreachable product URL). Without a listener the widget just
+            spins and the reason lives only in the browser console. Snipcart
+            fires JS events for these; we catch them and show a visible
+            banner instead. Admins additionally see the raw reason + a docs
+            link so they can act; the public sees a plain "please try again
+            / contact us" message. COPY — placeholder, rewrite before commit. %>
+        <script nonce="<%= safe_csp_nonce %>" data-turbo-eval="false">
+          (function () {
+            var IS_ADMIN = <%= authenticated? ? "true" : "false" %>;
+            var DOCS_URL = "https://go-roe.com/documentation/roe/store";
+
+            function banner() {
+              var id = "roe-snipcart-error";
+              var el = document.getElementById(id);
+              if (el) return el;
+              el = document.createElement("div");
+              el.id = id;
+              el.setAttribute("role", "alert");
+              el.style.cssText =
+                "position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);" +
+                "z-index:2147483647;max-width:32rem;width:calc(100% - 2rem);" +
+                "background:#fef3c7;border:1px solid #b45309;color:#7c2d12;" +
+                "font:14px/1.5 system-ui,sans-serif;padding:.75rem 2.25rem .75rem .9rem;" +
+                "border-radius:4px;box-shadow:0 4px 16px rgba(0,0,0,.15);";
+              var close = document.createElement("button");
+              close.textContent = "\u00d7";
+              close.setAttribute("aria-label", "Dismiss");
+              close.style.cssText =
+                "position:absolute;top:.35rem;right:.5rem;border:0;background:none;" +
+                "font-size:1.1rem;line-height:1;cursor:pointer;color:inherit;";
+              close.addEventListener("click", function () { el.remove(); });
+              el.appendChild(close);
+              el._body = document.createElement("div");
+              el.appendChild(el._body);
+              document.body.appendChild(el);
+              return el;
+            }
+
+            // Pull whatever human-readable reasons Snipcart put on the error.
+            function reasonsFrom(err) {
+              try {
+                var errs = (err && (err.errors || (err.data && err.data.errors))) || null;
+                if (!errs) return [];
+                var out = [];
+                Object.keys(errs).forEach(function (k) {
+                  var v = errs[k];
+                  (Array.isArray(v) ? v : [v]).forEach(function (m) {
+                    out.push(k + ": " + m);
+                  });
+                });
+                return out;
+              } catch (e) { return []; }
+            }
+
+            function show(err) {
+              var el = banner();
+              var reasons = reasonsFrom(err);
+              if (IS_ADMIN) {
+                var detail = reasons.length ? reasons.join("; ") : "unspecified error";
+                el._body.innerHTML =
+                  "<strong>Checkout failed:</strong> " +
+                  detail.replace(/</g, "&lt;") +
+                  '. <a href="' + DOCS_URL + '" target="_blank" rel="noopener" ' +
+                  'style="color:inherit;text-decoration:underline;">Store troubleshooting \u2197</a>';
+              } else {
+                el._body.textContent =
+                  "Sorry — we couldn't complete your order. Please try again, " +
+                  "or contact us if the problem continues.";
+              }
+            }
+
+            function bind(sc) {
+              if (!sc || !sc.events || bind._done) return;
+              bind._done = true;
+              // Snipcart v3 event names (docs.snipcart.com/v3/sdk/events):
+              // cart.confirm.error = order failed confirmation/validation
+              //   (this is the digital_files_not_found / price-mismatch case);
+              // payment.failed = order rejected at the payment step.
+              [ "cart.confirm.error", "payment.failed" ].forEach(function (evt) {
+                try { sc.events.on(evt, show); } catch (e) {}
+              });
+            }
+
+            // Snipcart may already be ready, or fire `snipcart.ready` later.
+            document.addEventListener("snipcart.ready", function () { bind(window.Snipcart); });
+            if (window.Snipcart) bind(window.Snipcart);
+          })();
+        </script>
       <% end %>
     <% end %>
 
