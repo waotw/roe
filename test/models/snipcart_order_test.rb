@@ -45,10 +45,10 @@ class SnipcartOrderTest < ActiveSupport::TestCase
 
   test "record_refund! stamps refund fields on the existing order" do
     SnipcartOrder.record_completed!(completed_payload)
-    SnipcartOrder.record_refund!(
+    SnipcartOrder.record_refund!({
       "token" => "abc-123", "refundsAmount" => 49.0, "currency" => "usd",
       "status" => "Refunded", "modificationDate" => "2026-10-01T09:00:00Z"
-    )
+    })
 
     order = SnipcartOrder.find_by(snipcart_token: "abc-123")
     assert order.refunded?
@@ -70,5 +70,18 @@ class SnipcartOrderTest < ActiveSupport::TestCase
     order = SnipcartOrder.record_completed!(completed_payload("email" => "nobody@example.com"))
     assert_nil order.member
     assert_not order.member?
+  end
+
+  test "mode is recorded and for_mode scopes to it" do
+    SnipcartOrder.record_completed!(completed_payload("token" => "t-test"), mode: "test")
+    SnipcartOrder.record_completed!(completed_payload("token" => "t-live"), mode: "live")
+
+    assert_equal %w[t-test], SnipcartOrder.for_mode("test").pluck(:snipcart_token)
+    assert_equal %w[t-live], SnipcartOrder.for_mode("live").pluck(:snipcart_token)
+  end
+
+  test "an unknown mode defaults to test" do
+    order = SnipcartOrder.record_completed!(completed_payload, mode: "banana")
+    assert order.mode_test?
   end
 end

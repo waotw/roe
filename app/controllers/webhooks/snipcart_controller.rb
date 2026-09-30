@@ -1,31 +1,29 @@
 class Webhooks::SnipcartController < ApplicationController
   # Snipcart posts every store event to ONE URL (no per-event registration, no
-  # management API), and there is no HMAC signature. The only authentication is
-  # a per-request token in the X-Snipcart-RequestToken header, which we validate
-  # by calling Snipcart back — a request Snipcart itself made will validate; a
-  # forged one won't. See the Snipcart integration notes.
+  # management API). Snipcart offers no HMAC, and its requestvalidation callback
+  # needs the secret API key — which Roe is dropping (see the Snipcart cleanup
+  # cards). So we authenticate the same way as Postmark: an unguessable token in
+  # the URL path, matched against SnipcartConfig#webhook_token. The operator
+  # pastes the full tokenised URL into Snipcart.
   #
-  # We store order.completed and refund events (SnipcartOrder); other events are
-  # accepted (200) and ignored so Snipcart doesn't retry them.
+  # We store order.completed and refund.created (as SnipcartOrder), tagged with
+  # the payload's mode (Test/Live). Other events are accepted (200) and ignored
+  # so Snipcart doesn't retry them.
   skip_before_action :verify_authenticity_token
   skip_before_action :require_authentication
 
-  VALIDATION_URL = "https://app.snipcart.com/api/requestvalidation"
-
-  # Events we act on. Anything else is a no-op 200.
-  HANDLED_EVENTS = %w[order.completed refund.created].freeze
+  before_action :verify_webhook_token
 
   def create
-    return head(:unauthorized) unless valid_request_token?
-
     event   = params[:eventName].to_s
     content = webhook_content
+    mode    = webhook_mode
 
     case event
     when "order.completed"
-      SnipcartOrder.record_completed!(content) if content.present?
+      SnipcartOrder.record_completed!(content, mode: mode) if content.present?
     when "refund.created"
-      SnipcartOrder.record_refund!(content) if content.present?
+      SnipcartOrder.record_refund!(content, mode: mode) if content.present?
     end
 
     head :ok
@@ -39,12 +37,35 @@ class Webhooks::SnipcartController < ApplicationController
 
   private
 
+  # Reject anything whose path token doesn't match this install's. A tokenless
+  # URL (the legacy route, or a stale paste) fails here too.
+  def verify_webhook_token
+    expected = SnipcartConfig.current.webhook_token.to_s
+    provided = params[:token].to_s
+
+    if expected.blank? || !ActiveSupport::SecurityUtils.secure_compare(provided, expected)
+      Rails.logger.warn "Snipcart webhook: bad or missing token"
+      head :unauthorized
+    end
+  end
+
+  # "test" or "live" from the webhook envelope's `mode` field (Snipcart sends
+  # "Test"/"Live"). Falls back to the config's current mode if absent.
+  def webhook_mode
+    raw = (request_body["mode"] || params[:mode]).to_s.downcase
+    return "live" if raw == "live"
+    return "test" if raw == "test"
+
+    SnipcartConfig.current.mode
+  end
+
   # The order/refund object Snipcart nests under `content` in the webhook body.
-  # Read from the raw parsed JSON, not strong params — the payload is deep and
-  # we store it whole rather than permitting each field.
   def webhook_content
-    body = request.request_parameters.presence || parsed_body
-    (body || {})["content"] || {}
+    request_body["content"] || {}
+  end
+
+  def request_body
+    @request_body ||= (request.request_parameters.presence || parsed_body) || {}
   end
 
   def parsed_body
@@ -52,22 +73,5 @@ class Webhooks::SnipcartController < ApplicationController
     JSON.parse(request.body.read)
   rescue JSON::ParserError
     {}
-  end
-
-  # Validate the X-Snipcart-RequestToken by calling Snipcart back. A token from
-  # a genuine Snipcart request returns 200; a forged/expired one does not. No
-  # token at all is rejected. In development we skip the callout (no real
-  # Snipcart requests reach localhost) so the endpoint can be exercised.
-  def valid_request_token?
-    token = request.headers["X-Snipcart-RequestToken"].to_s
-    return false if token.blank?
-    return true if Rails.env.development? || Rails.env.test?
-
-    uri = URI("#{VALIDATION_URL}/#{token}")
-    res = Net::HTTP.get_response(uri)
-    res.is_a?(Net::HTTPSuccess)
-  rescue => e
-    Rails.logger.warn "Snipcart token validation failed: #{e.message}"
-    false
   end
 end

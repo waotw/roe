@@ -440,7 +440,8 @@
   <%# COPY — Snipcart orders placed by this member, matched by email. Only shown
       when there are any. Mirrors the Payment/Newsletter history style; links to
       the order detail page. Placeholder copy — rewrite before commit. %>
-  <% store_orders = SnipcartOrder.where("LOWER(email) = ?", @member.email.to_s.downcase).recent %>
+  <% store_orders = SnipcartOrder.for_mode(SnipcartConfig.current.mode)
+                                 .where("LOWER(email) = ?", @member.email.to_s.downcase).recent %>
   <% if store_orders.any? %>
     <div class="mt-6 bg-white border border-gray-300 rounded-xs overflow-hidden" data-test="member-store-history">
       <div class="px-4 py-5 sm:p-6">

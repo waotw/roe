@@ -6,11 +6,35 @@ class SnipcartConfig < ApplicationRecord
   validates :mode, presence: true
 
   before_create :set_connected_at
+  before_create :generate_webhook_token
 
   # ── Singleton ────────────────────────────────────────────────────────────
 
   def self.current
     first_or_create!(mode: :test)
+  end
+
+  # ── Webhook token ────────────────────────────────────────────────────────
+  #
+  # Snipcart has no HMAC, and its requestvalidation callback needs the secret
+  # API key (which Roe is dropping). So the webhook is authenticated the same
+  # way as Postmark's: an unguessable token in the URL path. The operator pastes
+  # the full tokenised URL into Snipcart; Webhooks::SnipcartController checks it.
+
+  def regenerate_webhook_token!
+    update!(webhook_token: SecureRandom.hex(32))
+  end
+
+  # Backfill a missing token — the singleton row may predate this column, and
+  # first_or_create! never re-runs before_create on it. Without a token the
+  # webhook URL can't be built, which reads as "webhooks unavailable" rather
+  # than "not set up yet". Repair on read.
+  def ensure_webhook_token!
+    return webhook_token if webhook_token.present?
+
+    regenerate_webhook_token!
+    Rails.logger.info "[SnipcartConfig] Backfilled a missing webhook token"
+    webhook_token
   end
 
   # ── Snippet accessors (from YAML, public data) ───────────────────────────
@@ -167,5 +191,9 @@ class SnipcartConfig < ApplicationRecord
 
   def set_connected_at
     self.connected_at ||= Time.current if current_snippet.present?
+  end
+
+  def generate_webhook_token
+    self.webhook_token ||= SecureRandom.hex(32)
   end
 end

@@ -8,6 +8,7 @@ require "test_helper"
 class Admin::MemberStoreHistoryTest < ActionDispatch::IntegrationTest
   setup do
     sign_in_as(User.take)
+    SnipcartConfig.current.update!(mode: :test)
     @member = create(:member, email: "buyer@example.com", name: "Buyer", tier: :free, status: :active)
   end
 
@@ -18,10 +19,10 @@ class Admin::MemberStoreHistoryTest < ActionDispatch::IntegrationTest
   end
 
   test "Store History lists the member's orders, matched case-insensitively" do
-    SnipcartOrder.record_completed!(
+    SnipcartOrder.record_completed!({
       "token" => "o1", "email" => "Buyer@Example.com",
       "finalGrandTotal" => 42.0, "currency" => "usd", "status" => "Processed"
-    )
+    }, mode: "test")
 
     get admin_member_path(@member)
     assert_response :success
@@ -31,10 +32,10 @@ class Admin::MemberStoreHistoryTest < ActionDispatch::IntegrationTest
   end
 
   test "another member's orders don't appear here" do
-    SnipcartOrder.record_completed!(
+    SnipcartOrder.record_completed!({
       "token" => "o2", "email" => "someone-else@example.com",
       "finalGrandTotal" => 10.0, "currency" => "usd"
-    )
+    }, mode: "test")
 
     get admin_member_path(@member)
     assert_response :success

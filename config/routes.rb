@@ -534,9 +534,12 @@ Rails.application.routes.draw do
   # Stripe webhooks
   post "webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
 
-  # Snipcart webhooks — one URL for all store events; authenticated per-request
-  # via X-Snipcart-RequestToken (validated by calling Snipcart back).
-  post "webhooks/snipcart", to: "webhooks/snipcart#create", as: :snipcart_webhook
+  # Snipcart webhooks — one URL for all store events. Snipcart offers no HMAC
+  # and its validation callback needs the secret API key, so we authenticate
+  # with an unguessable token in the path (Postmark-style). Legacy tokenless
+  # route kept so an old pasted URL fails clearly (401) rather than 404.
+  post "webhooks/snipcart/:token", to: "webhooks/snipcart#create", as: :snipcart_webhook
+  post "webhooks/snipcart", to: "webhooks/snipcart#create"
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page

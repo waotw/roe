@@ -1,13 +1,23 @@
 require "test_helper"
 
-# The admin Orders page: lists Snipcart orders, badges buyers who are members,
-# and shows an empty state (with the webhook URL to paste) when there are none.
-# Anchored on data-test, not copy.
+# The admin Orders page: lists the CURRENT Snipcart mode's orders (test in test
+# mode, live in live), badges buyers who are members, and shows an empty state
+# with the webhook URL when there are none. Anchored on data-test, not copy.
 class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
-  setup { sign_in_as(User.take) }
+  setup do
+    sign_in_as(User.take)
+    SnipcartOrder.delete_all
+    SnipcartConfig.current.update!(mode: :test) # page defaults to showing test orders
+  end
+
+  def completed(token, email, mode: "test")
+    SnipcartOrder.record_completed!(
+      { "token" => token, "email" => email, "finalGrandTotal" => 10.0, "currency" => "usd" },
+      mode: mode
+    )
+  end
 
   test "empty state shows the webhook URL to paste" do
-    SnipcartOrder.delete_all
     get admin_orders_path
     assert_response :success
     assert_select "[data-test=orders-empty]"
@@ -16,8 +26,8 @@ class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "lists orders with a member badge only for buyers who are members" do
-    SnipcartOrder.record_completed!("token" => "t1", "email" => "member@example.com", "finalGrandTotal" => 10.0, "currency" => "usd")
-    SnipcartOrder.record_completed!("token" => "t2", "email" => "stranger@example.com", "finalGrandTotal" => 20.0, "currency" => "usd")
+    completed("t1", "member@example.com")
+    completed("t2", "stranger@example.com")
     create(:member, email: "member@example.com", name: "M", tier: :free, status: :active)
 
     get admin_orders_path
@@ -26,8 +36,24 @@ class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-test=order-member-badge]", count: 1
   end
 
+  test "only the current mode's orders are shown" do
+    completed("t1", "a@b.com", mode: "test")
+    completed("t2", "c@d.com", mode: "live")
+
+    # In test mode, only the test order appears.
+    get admin_orders_path
+    assert_select "[data-test=order-row]", count: 1
+    assert_select "[data-test=orders-mode]", text: /test/i
+
+    # Switch to live mode → only the live order.
+    SnipcartConfig.current.update!(mode: :live)
+    get admin_orders_path
+    assert_select "[data-test=order-row]", count: 1
+    assert_select "[data-test=orders-mode]", text: /live/i
+  end
+
   test "show renders a single order" do
-    order = SnipcartOrder.record_completed!("token" => "t1", "email" => "a@b.com", "finalGrandTotal" => 10.0, "currency" => "usd")
+    order = completed("t1", "a@b.com")
     get admin_order_path(order)
     assert_response :success
     assert_select "[data-test=order-detail]"

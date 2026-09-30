@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_30_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_30_160000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -236,12 +236,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_150000) do
     t.text "snippet"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
+    t.string "webhook_token"
   end
 
   create_table "snipcart_orders", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "currency"
     t.string "email"
+    t.integer "mode", default: 0, null: false
     t.string "name"
     t.json "payload", default: {}, null: false
     t.datetime "placed_at"
@@ -253,6 +255,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_150000) do
     t.integer "total_cents"
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_snipcart_orders_on_email"
+    t.index ["mode"], name: "index_snipcart_orders_on_mode"
     t.index ["placed_at"], name: "index_snipcart_orders_on_placed_at"
     t.index ["snipcart_token"], name: "index_snipcart_orders_on_snipcart_token", unique: true
   end
