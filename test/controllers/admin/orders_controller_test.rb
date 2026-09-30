@@ -17,12 +17,23 @@ class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
-  test "empty state shows the webhook URL to paste" do
+  test "empty state shows the webhook-unavailable note when no dev host is set" do
+    SiteConfig.stubs(:development).returns(nil)
     get admin_orders_path
     assert_response :success
     assert_select "[data-test=orders-empty]"
-    assert_select "[data-test=orders-webhook-url]"
+    assert_select "[data-test=orders-webhook-unavailable]"
+    assert_select "[data-test=orders-webhook-url]", count: 0
     assert_select "[data-test=orders-table]", count: 0
+  end
+
+  test "the webhook URL shows once a dev host is set" do
+    SiteConfig.stubs(:development).returns(nil)
+    SiteConfig.stubs(:development).with("dev_host").returns("tunnel.example.com")
+    get admin_orders_path
+    assert_response :success
+    assert_select "[data-test=orders-webhook-url]"
+    assert_select "[data-test=orders-webhook-unavailable]", count: 0
   end
 
   test "lists orders with a member badge only for buyers who are members" do

@@ -78,9 +78,7 @@
         operator may need to re-paste it (new token, moving stores). %>
     <details class="mt-4 text-sm text-gray-600" data-test="orders-webhook-details">
       <summary class="cursor-pointer">Snipcart webhook URL</summary>
-      <p class="mt-2 text-xs font-mono bg-white border border-gray-300 px-2 py-1 inline-block" data-test="orders-webhook-url">
-        <%= snipcart_webhook_url %>
-      </p>
+      <%= render "admin/orders/webhook_url" %>
     </details>
   <% else %>
     <%# COPY — empty state names what this page is for and where orders come
@@ -92,9 +90,7 @@
         Roe receives them by webhook — add your webhook URL in Snipcart
         (Store Configurations → Webhooks) so orders start arriving:
       </p>
-      <p class="mt-2 text-xs font-mono bg-white border border-gray-300 px-2 py-1 inline-block" data-test="orders-webhook-url">
-        <%= snipcart_webhook_url %>
-      </p>
+      <%= render "admin/orders/webhook_url" %>
     </div>
   <% end %>
 </div>

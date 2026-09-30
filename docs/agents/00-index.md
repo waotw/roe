@@ -40,7 +40,10 @@ while converting these notes:
 - **The `backups/` layout has shipped** and replaced `site_backups/`.
 - **The primary repository is now GitHub**, with Codeberg and Sourcehut as push
   mirrors. Older notes referring to Codeberg as primary predate that move.
-- **Snipcart no longer stores a secret key.** Its store runs on a public snippet,
-  so `SnipcartConfig` has no encrypted attributes.
+- **Snipcart stores no provider secret key.** Its store runs on a public
+  snippet, so `SnipcartConfig` has no encrypted Snipcart API key. Its webhooks
+  are authenticated by an unguessable path token (a `webhook_token` column, not
+  an `encrypts` attribute) — a deliberate choice over Snipcart's secret-key
+  validation; see [backups-secrets-and-data.md](backups-secrets-and-data.md).
 
 Nothing in `conventions.md` has expired. Those still stand.

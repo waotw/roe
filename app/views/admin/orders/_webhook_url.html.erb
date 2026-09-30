@@ -1,0 +1,16 @@
+<%# COPY — Snipcart webhook URL to paste into the dashboard, or a "set a tunnel
+    host" note when there's nowhere reachable to receive it (dev without an
+    explicit dev_host). Shared by the Orders page and the Snipcart config page.
+    Placeholder copy — rewrite before commit. %>
+<% url = snipcart_webhook_url %>
+<% if url.present? %>
+  <p class="mt-2 text-xs font-mono bg-white border border-gray-300 px-2 py-1 inline-block break-all" data-test="orders-webhook-url">
+    <%= url %>
+  </p>
+<% else %>
+  <p class="mt-2 text-sm text-amber-800" data-test="orders-webhook-unavailable">
+    No public URL to receive webhooks locally. Deploy your site, or set a
+    <%= link_to "dev tunnel host", admin_edit_development_config_path, class: "underline" %>
+    in <code class="font-mono text-xs">development.yml</code> to test locally — then this shows the URL to paste into Snipcart.
+  </p>
+<% end %>

@@ -30,10 +30,32 @@ new file under `site/system/secrets/` — that location is only for Rails bootst
 material (`master.key`, `secret_key_base`, the Active Record encryption keys
 themselves).
 
-One exception worth knowing: **Snipcart no longer stores a secret at all.** Its
-store runs on a public client-side snippet and its webhooks are validated by
-token, so `SnipcartConfig` has no `encrypts` and is deliberately absent from
-`RestoreCheck::PROBE_MODELS`.
+One exception worth knowing: **Snipcart stores no provider secret key.** Its
+store runs on a public client-side snippet, so `SnipcartConfig` has no `encrypts`
+for a Snipcart API key and is deliberately absent from `RestoreCheck::PROBE_MODELS`.
+
+**Snipcart webhook authentication is a deliberate decision, recorded here so it
+isn't "corrected" later.** Snipcart's *recommended* webhook security is to
+validate each request's `X-Snipcart-RequestToken` header against their
+`requestvalidation` API — which requires the account **secret API key**. Roe does
+NOT do this, on purpose: storing that secret key would reverse the standing
+decision to keep Snipcart secret-free (and its two cleanup cards). Instead Roe
+authenticates the same way it does Postmark — an unguessable token in the URL
+path (`/webhooks/snipcart/:token`, matched against a `webhook_token` column on
+`SnipcartConfig`). It's a weaker guarantee than Snipcart's method (it proves the
+caller knows the secret URL, not that the request is a fresh, genuine Snipcart
+call), but proportionate for an orders-*display* feature where no money moves and
+nothing is fulfilled. **Do not switch this to secret-key validation** unless the
+store grows beyond displaying orders — and even then, weigh it against
+re-introducing the secret-key storage.
+
+The webhook URL is only *advertised* when there's somewhere reachable to receive
+it: production (live domain), or dev/test with an **explicit `dev_host`**.
+`WebhookUrlHelper#snipcart_webhook_url` deliberately will NOT fall back to an
+inferred `allowed_hosts` entry the way the generic `webhook_url` does — that entry
+is routinely a stale ngrok host (free ngrok rotates on every restart), so showing
+it as "paste this into Snipcart" is misleading. No `dev_host` → no URL shown, just
+a "set a tunnel host / deploy" note.
 
 Test keys for integrations are kept in YAML under `site/system/integrations/`;
 live keys are encrypted in the database and environment-specific.

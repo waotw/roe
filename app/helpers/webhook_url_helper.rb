@@ -30,6 +30,21 @@ module WebhookUrlHelper
     "#{base}#{path}"
   end
 
+  # The Snipcart webhook URL to paste into the dashboard, or nil when there's
+  # nowhere reachable to receive it. Snipcart can't be tested locally without a
+  # real tunnel, and — unlike the other integrations — we DON'T trust an inferred
+  # allowed_hosts entry here: it's routinely a stale ngrok host (rotates every
+  # restart), so advertising it as "paste this" is misleading. Show a URL only
+  # in production (live domain) or in dev/test with an EXPLICIT dev_host set.
+  def snipcart_webhook_url
+    if Rails.env.development? || Rails.env.test?
+      return nil if SiteConfig.development("dev_host").to_s.strip.blank?
+    end
+
+    token = SnipcartConfig.current.ensure_webhook_token!
+    webhook_url("/webhooks/snipcart/#{token}")
+  end
+
   private
 
   def webhook_base_url

@@ -48,6 +48,22 @@ class Webhooks::SnipcartControllerTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
+  # Snipcart customer-account installs fire customauth:* events alongside orders.
+  # Real envelope shape (from a live Snipcart delivery): valid token, non-order
+  # event → accepted and ignored, nothing stored.
+  test "a real customauth customer event is accepted and ignored" do
+    assert_no_difference "SnipcartOrder.count" do
+      post "/webhooks/snipcart/#{@token}",
+        params: {
+          eventName: "customauth:customer_updated",
+          mode: "Test",
+          content: { "id" => "cust-1", "email" => "ben@example.com" }
+        }.to_json,
+        headers: { "Content-Type" => "application/json" }
+    end
+    assert_response :ok
+  end
+
   test "a request with the wrong token is rejected" do
     assert_no_difference "SnipcartOrder.count" do
       post_event("order.completed", { "token" => "t1" }, token: "not-the-token")
