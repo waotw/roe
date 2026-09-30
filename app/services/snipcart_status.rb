@@ -93,7 +93,7 @@ class SnipcartStatus
       ok(:webhook, "Order webhook working", "Roe has received #{@sc.mode}-mode orders from Snipcart.")
     elsif snipcart_webhook_url.present?
       todo(:webhook, "No orders received yet",
-           "Paste the webhook URL below into Snipcart (Store Configurations → Webhooks). Orders appear here once one comes through.")
+           "Paste the webhook URL below into Snipcart (Store Configurations → Webhooks). Orders appear in Roe once the webhook is connected.")
     else
       info(:webhook, "Webhook activates on your live site",
            "Snipcart can't reach localhost. Deploy, or set a dev tunnel host, then paste the URL into Snipcart.")
