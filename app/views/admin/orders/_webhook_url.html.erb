@@ -9,8 +9,8 @@
   </p>
 <% else %>
   <p class="mt-2 text-sm text-amber-800" data-test="orders-webhook-unavailable">
-    No public URL to receive webhooks locally. Deploy your site, or set a
+    You need a public URL to use webhooks. Deploy your site to a live URL or set a
     <%= link_to "dev tunnel host", admin_edit_development_config_path, class: "underline" %>
-    in <code class="font-mono text-xs">development.yml</code> to test locally — then this shows the URL to paste into Snipcart.
+    in <code class="font-mono text-xs">development.yml</code> to test locally.
   </p>
 <% end %>

@@ -180,10 +180,10 @@
         order events and lists them under Orders. Same partial as the Orders
         page. Placeholder copy — rewrite before commit. %>
     <div class="config-section mt-8 p-4 border border-gray-200 bg-gray-50" data-test="snipcart-webhook-section">
-      <h3 class="text-base font-semibold text-gray-900 mb-1">Order webhook</h3>
+      <h3 class="text-base font-semibold text-gray-900 mb-1">Snipcart webhook</h3>
       <p class="text-sm text-gray-600 mb-2">
         Paste this into Snipcart → Store Configurations → Webhooks so completed
-        orders appear under <%= link_to "Orders", admin_orders_path, class: "underline" %>.
+        orders appear in Roe under <%= link_to "Orders", admin_orders_path, class: "underline" %>.
       </p>
       <%= render "admin/orders/webhook_url" %>
     </div>
