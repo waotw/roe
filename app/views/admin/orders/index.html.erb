@@ -26,8 +26,8 @@
       <table class="min-w-full divide-y divide-gray-200 text-xs">
         <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
           <tr>
-            <th class="text-left font-medium px-3 py-2">Name</th>
             <th class="text-left font-medium px-3 py-2">Email</th>
+            <th class="text-left font-medium px-3 py-2">Product</th>
             <th class="text-right font-medium px-3 py-2">Amount</th>
             <th class="text-left font-medium px-3 py-2">Date</th>
             <th class="text-left font-medium px-3 py-2">Status</th>
@@ -37,7 +37,7 @@
           <% @orders.each do |order| %>
             <tr class="hover:bg-gray-50" data-test="order-row">
               <td class="px-3 py-2">
-                <%= link_to (order.name.presence || "—"), admin_order_path(order),
+                <%= link_to (order.email.presence || "—"), admin_order_path(order),
                       class: "text-blue-600 hover:text-blue-800 hover:underline" %>
                 <% if order.member? %>
                   <%= link_to "m", admin_member_path(order.member),
@@ -45,7 +45,19 @@
                         class: "ml-1 uppercase text-[10px] px-1 py-0.5 border border-gray-800 bg-blue-100 hover:bg-blue-200 rounded-xs no-underline text-gray-900" %>
                 <% end %>
               </td>
-              <td class="px-3 py-2 text-gray-700"><%= order.email.presence || "—" %></td>
+              <td class="px-3 py-2 text-gray-700" data-test="order-product">
+                <%# COPY — the SKU of what they bought, linking to the product page
+                    when the order captured a URL. "+N more" for multi-item orders. %>
+                <% if order.sku_summary.present? %>
+                  <% product_url = order.items.first&.url %>
+                  <% if product_url.present? %>
+                    <%= link_to order.sku_summary, product_url, target: "_blank", rel: "noopener",
+                          class: "text-blue-600 hover:text-blue-800 hover:underline" %>
+                  <% else %>
+                    <%= order.sku_summary %>
+                  <% end %>
+                <% else %>—<% end %>
+              </td>
               <td class="px-3 py-2 text-right tabular-nums">
                 <% if order.total %>
                   <span class="<%= order.refunded? ? 'text-red-700' : 'text-green-700' %>">

@@ -16,6 +16,34 @@
     </div>
 
     <dl class="grid grid-cols-3 gap-y-2 text-sm">
+      <%# COPY — what was purchased. Read from the stored payload's line items;
+          most orders are a single product. Links to the product page when the
+          order captured a URL. %>
+      <dt class="text-gray-500 uppercase text-xs">Product<%= "s" if @order.items.size > 1 %></dt>
+      <dd class="col-span-2" data-test="order-products">
+        <% if @order.items.any? %>
+          <ul class="space-y-1">
+            <% @order.items.each do |item| %>
+              <li>
+                <% label = item.name.presence || item.sku %>
+                <% if item.url.present? %>
+                  <%= link_to label, item.url, target: "_blank", rel: "noopener",
+                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
+                <% else %>
+                  <%= label %>
+                <% end %>
+                <% if item.sku.present? && item.name.present? %>
+                  <span class="text-xs text-gray-500">(<%= item.sku %>)</span>
+                <% end %>
+                <% if item.quantity.to_i > 1 %>
+                  <span class="text-xs text-gray-500">× <%= item.quantity %></span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>—<% end %>
+      </dd>
+
       <dt class="text-gray-500 uppercase text-xs">Email</dt>
       <dd class="col-span-2"><%= @order.email.presence || "—" %></dd>
 

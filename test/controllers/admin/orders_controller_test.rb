@@ -10,11 +10,10 @@ class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
     SnipcartConfig.current.update!(mode: :test) # page defaults to showing test orders
   end
 
-  def completed(token, email, mode: "test")
-    SnipcartOrder.record_completed!(
-      { "token" => token, "email" => email, "finalGrandTotal" => 10.0, "currency" => "usd" },
-      mode: mode
-    )
+  def completed(token, email, mode: "test", items: nil)
+    payload = { "token" => token, "email" => email, "finalGrandTotal" => 10.0, "currency" => "usd" }
+    payload["items"] = items if items
+    SnipcartOrder.record_completed!(payload, mode: mode)
   end
 
   test "empty state shows the webhook-unavailable note when no dev host is set" do
@@ -45,6 +44,17 @@ class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "[data-test=order-row]", count: 2
     assert_select "[data-test=order-member-badge]", count: 1
+  end
+
+  test "shows the product SKU linking to the product page" do
+    completed("t1", "a@b.com", items: [
+      { "name" => "Zine", "id" => "ZINE-01", "url" => "https://shop.example.com/store/zine" }
+    ])
+
+    get admin_orders_path
+    assert_response :success
+    assert_select "[data-test=order-product]", text: /ZINE-01/
+    assert_select "[data-test=order-product] a[href=?]", "https://shop.example.com/store/zine"
   end
 
   test "only the current mode's orders are shown" do

@@ -34,6 +34,39 @@ class SnipcartOrder < ApplicationRecord
     refunded_at.present?
   end
 
+  # ── Line items (read from the stored raw payload) ──────────────────────────
+  #
+  # Snipcart nests purchased items under content["items"], each a hash with
+  # "name", "id" (the SKU/data-item-id), "url", "price", "quantity". We stored
+  # the whole payload, so read them here rather than modelling separate rows.
+  # Returns [] for an order with no captured items (e.g. a bare refund row).
+  Item = Struct.new(:name, :sku, :url, :quantity, keyword_init: true)
+
+  def items
+    Array(payload["items"]).filter_map do |i|
+      next unless i.is_a?(Hash)
+      Item.new(
+        name:     i["name"].presence,
+        sku:      i["id"].presence,
+        url:      i["url"].presence,
+        quantity: i["quantity"]
+      )
+    end
+  end
+
+  # A one-line "what they bought" for the index: the SKU of the first item (most
+  # orders are a single item), with a "+N more" when there are several. nil when
+  # no items were captured.
+  def sku_summary
+    list = items
+    return nil if list.empty?
+
+    first = list.first.sku || list.first.name
+    return nil if first.blank?
+
+    list.size > 1 ? "#{first} +#{list.size - 1} more" : first
+  end
+
   # ── Ingest from a Snipcart webhook payload ────────────────────────────────
   #
   # Upsert by snipcart_token so a webhook retry (Snipcart re-sends on non-2xx)
@@ -52,7 +85,7 @@ class SnipcartOrder < ApplicationRecord
       currency:    content["currency"],
       status:      content["status"],
       placed_at:   parse_time(content["completionDate"] || content["creationDate"]),
-      payload:     content
+      payload:     sanitize_payload(content)
     )
     order.save!
     order
@@ -75,10 +108,35 @@ class SnipcartOrder < ApplicationRecord
       refunded_currency:     content["currency"],
       refunded_at:           parse_time(content["modificationDate"]) || Time.current,
       status:                content["status"] || order.status,
-      payload:               content
+      payload:               sanitize_payload(content)
     )
     order.save!
     order
+  end
+
+  # Strip purchaser address/phone data before persisting the payload. Roe never
+  # uses it (Snipcart owns fulfillment), and not holding it is stronger than
+  # hiding it: nothing to leak in a backup, export, or breach. We keep the whole
+  # payload otherwise (line items, totals, tokens) for future features. Applied
+  # on ingest, so the DB never sees the removed fields. Recursive so nested or
+  # future address/phone-shaped keys are caught too.
+  REDACTED_KEYS = %w[
+    billingaddress shippingaddress address address1 address2 fulladdress
+    phone phonenumber
+  ].freeze
+
+  def self.sanitize_payload(node)
+    case node
+    when Hash
+      node.each_with_object({}) do |(k, v), out|
+        next if REDACTED_KEYS.include?(k.to_s.downcase.delete("_-"))
+        out[k] = sanitize_payload(v)
+      end
+    when Array
+      node.map { |v| sanitize_payload(v) }
+    else
+      node
+    end
   end
 
   def self.normalize_mode(mode)

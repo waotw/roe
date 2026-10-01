@@ -84,4 +84,58 @@ class SnipcartOrderTest < ActiveSupport::TestCase
     order = SnipcartOrder.record_completed!(completed_payload, mode: "banana")
     assert order.mode_test?
   end
+
+  test "items and sku_summary read line items from the payload" do
+    order = SnipcartOrder.record_completed!(completed_payload(
+      "items" => [
+        { "name" => "Zine PDF", "id" => "ZINE-01", "url" => "https://shop.example.com/store/zine", "quantity" => 1 },
+        { "name" => "Sticker",  "id" => "STK-02",  "url" => "https://shop.example.com/store/sticker", "quantity" => 3 }
+      ]
+    ))
+
+    assert_equal 2, order.items.size
+    assert_equal "Zine PDF", order.items.first.name
+    assert_equal "ZINE-01", order.items.first.sku
+    assert_equal "https://shop.example.com/store/zine", order.items.first.url
+    assert_equal "ZINE-01 +1 more", order.sku_summary
+  end
+
+  test "sku_summary is a bare sku for a single-item order, nil for none" do
+    one = SnipcartOrder.record_completed!(completed_payload("token" => "one",
+      "items" => [ { "name" => "Zine", "id" => "ZINE-01" } ]))
+    assert_equal "ZINE-01", one.sku_summary
+
+    none = SnipcartOrder.record_completed!(completed_payload("token" => "none"))
+    assert_empty none.items
+    assert_nil none.sku_summary
+  end
+
+  test "address and phone data is stripped from the stored payload" do
+    order = SnipcartOrder.record_completed!(completed_payload(
+      "phone"           => "555-1234",
+      "billingAddress"  => { "fullName" => "Buyer Person", "address1" => "1 Main St", "phone" => "555-1234" },
+      "shippingAddress" => { "address1" => "1 Main St", "city" => "Townsville" }
+    ))
+
+    payload = order.reload.payload
+    # the removed keys are gone entirely
+    assert_not payload.key?("phone")
+    assert_not payload.key?("billingAddress")
+    assert_not payload.key?("shippingAddress")
+    # a full recursive scan finds no address/phone remnants
+    flat = payload.to_json.downcase
+    assert_not_includes flat, "1 main st"
+    assert_not_includes flat, "555-1234"
+    assert_not_includes flat, "townsville"
+    # non-PII we rely on is untouched
+    assert_equal "usd", payload["currency"]
+  end
+
+  test "the buyer name is still captured even though billingAddress is stripped" do
+    order = SnipcartOrder.record_completed!(completed_payload(
+      "billingAddress" => { "fullName" => "Buyer Person", "address1" => "1 Main St" }
+    ))
+    assert_equal "Buyer Person", order.name           # kept in its own column
+    assert_not order.reload.payload.key?("billingAddress") # but not in the payload
+  end
 end
