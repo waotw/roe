@@ -1,8 +1,19 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 0.1.0
+   Version: 1.2
    Fingerprint: 44f1a9f7
-   Bundled with: Roe v0.2.0
+   Bundled with: Roe v0.4.0.
+
+   This theme was installed from Roe. Leave this comment
+   in place and the admin will detect when a new version
+   is available and offer to update it.
+
+   Either of these actions will create a custom theme outside of the updates system:
+
+   - Change the "Roe Theme" name to anything else
+   - install and rename css file in /site/theme/
+
+   You can always download a fresh copy of the newest version of any built in theme.
 
    A deliberately minimal theme that stays as close to plain HTML
    rendering as possible while still supporting Roe's components.

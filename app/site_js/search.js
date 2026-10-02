@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: search
-   Version: 1.1.0
-   Fingerprint: e2a03253
+   Version: 1.1.1
+   Fingerprint: 4af3392b
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -258,20 +258,13 @@
         return false;
       return true;
     }
-    // Title matches outrank headings, which outrank body text. Headings are
-    // kept as prose in the index (the phrases people remember from a post),
-    // while text past the first couple of thousand characters is a
-    // vocabulary — so a multi-word query matches there when every word is
-    // present, not only when they're adjacent.
     function score(entry, tokens) {
       var title = (entry.title || "").toLowerCase();
-      var headings = (entry.headings || "").toLowerCase();
       var text = (entry.text || "").toLowerCase();
       var total = 0;
       for (var i = 0; i < tokens.length; i++) {
         var t = tokens[i];
         if (title.indexOf(t) !== -1) total += 3;
-        else if (headings.indexOf(t) !== -1) total += 2;
         else if (text.indexOf(t) !== -1) total += 1;
         else return 0;
       }

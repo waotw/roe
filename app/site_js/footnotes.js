@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: footnotes
-   Version: 1.0.0
-   Fingerprint: 5853db65
+   Version: 1.0.1
+   Fingerprint: 2405520e
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -20,7 +20,6 @@
 //
 // Progressive: with no JavaScript the HTML return link still works, and
 // nothing here is required to read a footnote.
-
 (function () {
   "use strict";
 
