@@ -73,30 +73,53 @@ echo ""
 
 echo "→ Shipped site files (version check + fingerprint, in site/, before the copy):"
 # Themes and site JS are developed in site/ and copied into current/ by
-# the two steps that follow. Before that copy: refuse if a body changed
-# since the last commit but its Version didn't (the bump is what tells a
-# site an update exists, and it's the one thing that's easy to forget),
-# then stamp the header's Fingerprint from the body — in site/, so the
-# dev site and the shipped file agree and the Themes page here doesn't
-# call your own work "edited". Version is yours to set; Fingerprint is
-# this script's. Writing into site/ is fine here: it's the developer's
-# own install and they ran the command (rule 8 is about boot).
+# the two steps that follow. Before that copy: for each file whose body
+# changed since the last commit without a Version bump, report it and
+# leave it OUT of the copy — the bump is what tells a site an update
+# exists (the Themes/Scripts page compares version numbers only), so an
+# unbumped change would ship but reach no one, and copying it would just
+# overwrite current/ with that dead change. Files that pass get their
+# header Fingerprint stamped from the body — in site/, so the dev site
+# and the shipped file agree and the Themes page here doesn't call your
+# own work "edited". Version is yours to set; Fingerprint is this
+# script's. Writing into site/ is fine here: it's the developer's own
+# install and they ran the command (rule 8 is about boot).
+#
+# A forgotten bump no longer aborts the whole sync — only the offending
+# file is skipped; everything else syncs. The skipped files are listed
+# loudly at the end and the script exits non-zero so a release isn't cut
+# with a stale file.
 echo "    site/theme/*.css, site/javascript/*.js"
+FAILED_FILES=""
 if [[ -z "$DRY_RUN" ]]; then
-  (cd current && bin/rails runner 'exit(ShippedFileInspector.check_release!(site_root: RoeSitePaths::SITE_PATH) ? 0 : 1)' 2>/dev/null) || {
-    echo ""
-    echo "  ✗ A shipped file's body changed without a version bump — see above."
-    echo "    Bump Version: in its header in site/ and run again."
-    exit 1
-  }
+  check_out="$(cd current && bin/rails runner 'failed = ShippedFileInspector.check_release!(site_root: RoeSitePaths::SITE_PATH); failed.each { |rel| $stdout.puts "::FAILED::#{rel}" }' 2>/dev/null)"
+  echo "$check_out" | grep -v '^::FAILED::' || true
+  FAILED_FILES="$(printf '%s\n' "$check_out" | sed -n 's/^::FAILED:://p')"
 else
   echo "    (skipped in dry run)"
 fi
 echo ""
 
+# Build per-subtree rsync excludes for any file that failed the version
+# check, so it is NOT copied. Everything else syncs normally. (bash 3.2
+# on macOS: arrays are fine; the ${arr[@]+...} guard below keeps an empty
+# array from tripping `set -u`.)
+THEME_EXCLUDES=()
+JS_EXCLUDES=()
+if [[ -n "$FAILED_FILES" ]]; then
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    base="$(basename "$rel")"
+    case "$rel" in
+      app/themes/*)  THEME_EXCLUDES+=(--exclude="$base") ;;
+      app/site_js/*) JS_EXCLUDES+=(--exclude="$base") ;;
+    esac
+  done <<< "$FAILED_FILES"
+fi
+
 echo "→ Themes (update existing files only, --existing on, --delete off):"
 echo "    site/theme/  →  current/app/themes/"
-rsync -avc $DRY_RUN --existing \
+rsync -avc $DRY_RUN --existing ${THEME_EXCLUDES[@]+"${THEME_EXCLUDES[@]}"} \
   site/theme/ \
   current/app/themes/
 echo ""
@@ -106,7 +129,7 @@ echo "→ Site JavaScript (update existing files only, --existing on, --delete o
 # where it's live, then bring it back here for release. Only files Roe
 # already ships are updated; a site-only file stays where it is.
 echo "    site/javascript/  →  current/app/site_js/"
-rsync -avc $DRY_RUN --existing \
+rsync -avc $DRY_RUN --existing ${JS_EXCLUDES[@]+"${JS_EXCLUDES[@]}"} \
   site/javascript/ \
   current/app/site_js/
 echo ""
@@ -249,6 +272,21 @@ echo ""
 
 if [[ -n "$DRY_RUN" ]]; then
   echo "Dry run complete. Re-run without --dry-run to apply."
+elif [[ -n "$FAILED_FILES" ]]; then
+  echo "  ================================================================"
+  echo "  !!  FILE CHANGED BUT NO VERSION BUMP  —  NOT SYNCED"
+  echo "  ================================================================"
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    echo "      - $rel"
+  done <<< "$FAILED_FILES"
+  echo ""
+  echo "      Their bodies changed but Version: did not, so no site would"
+  echo "      ever be offered the update. They were SKIPPED; everything"
+  echo "      else synced. Bump Version: in the header in site/ and run"
+  echo "      again to ship them."
+  echo "  ================================================================"
+  exit 1
 else
   echo "Done."
 fi

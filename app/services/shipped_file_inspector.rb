@@ -181,9 +181,16 @@ class ShippedFileInspector
 
   # The pre-release guard. For each shipped file: if its body changed since
   # the last commit but its Version didn't, that's a change no site would
-  # ever be offered — say so and fail. Otherwise stamp the fingerprint so
-  # the header matches the body that ships. Prints a line per file; returns
-  # true when everything is in order.
+  # ever be offered (the Themes/Scripts page compares version numbers only,
+  # so an unbumped change ships but reaches no one who already installed the
+  # file) — report it and leave it unstamped. Otherwise stamp the fingerprint
+  # so the header matches the body that ships. Prints a line per file.
+  #
+  # Returns the list of failing files (relative paths under current/); an
+  # empty list means everything is in order. A failing file is deliberately
+  # NOT stamped and should NOT be copied — bin/sync-from-site excludes exactly
+  # these from the rsync and syncs the rest, rather than aborting the whole
+  # run over one forgotten version bump.
   #
   # `site_root:` runs the same check against a site's copies instead —
   # bin/sync-from-site stamps there BEFORE copying into current/, so the
@@ -191,7 +198,7 @@ class ShippedFileInspector
   # dev install doesn't call its own work "edited". The comparison is
   # still against the committed copy in current/.
   def self.check_release!(out: $stdout, site_root: nil)
-    ok = true
+    failed = []
     shipped_files.sort.each do |path|
       rel    = path.sub("#{Rails.root}/", "")
       target = site_root ? site_path_for(rel, site_root) : path
@@ -200,7 +207,7 @@ class ShippedFileInspector
       header = parse_header(target)
       unless header
         out.puts "    #{rel}: no header — add one (Roe Script/Theme, Version)"
-        ok = false
+        failed << rel
         next
       end
 
@@ -211,7 +218,7 @@ class ShippedFileInspector
         new_fp      = fingerprint_of(File.read(target))
         if old_header && old_fp != new_fp && old_header.version == header.version
           out.puts "    #{rel}: body changed but Version is still #{header.version} — bump it"
-          ok = false
+          failed << rel
           next
         end
       end
@@ -221,7 +228,7 @@ class ShippedFileInspector
       when :unchanged then out.puts "    #{rel}: v#{header.version}, up to date"
       end
     end
-    ok
+    failed
   end
 
   # Where a shipped file lives in a site: app/themes/x.css → site/theme/x.css,
