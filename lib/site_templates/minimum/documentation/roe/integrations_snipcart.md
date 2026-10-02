@@ -29,7 +29,7 @@ The Store feature lets you sell products directly from your site using [Snipcart
 2. Your Store settings need to be configured — see [Store](/documentation/roe/store).
 3. You need at least one product — see [Products](/documentation/roe/products).
 
-## The Snipcart side
+## Setting things up on the Snipcart side
 
 Snipcart walks you through setting up an account when you sign up in the "Get started with Snipcart" steps. Go through each step in that list and you'll be ready to test and process real payments.
 
@@ -40,17 +40,28 @@ Snipcart has a [Test mode and a Live mode ↗](https://docs.snipcart.com/v3/test
 - **Test** — fake payments, for setting things up and checking everything works.
 - **Live** — real payments, for when you're ready to sell.
 
-In Roe, each mode's snippet lives on its own tab — **Local/Test** and **Live/Static Site** — and the Active Mode toggle picks which one is active. In either mode, Roe needs just one thing from Snipcart: its `<script>` snippet.
+In Roe, each mode's snippet lives on its own tab — **Test** and **Live** — and the Active Mode toggle picks which one is active. In either mode, Roe needs just one thing from Snipcart: its `<script>` snippet.
 
 To add it:
 
-1. Open Snipcart's [API Keys ↗](https://app.snipcart.com/dashboard/account/credentials) page. The label at the top — **Public Test** or **Public Live** — tells you which mode you're using in Snipcart.
+1. Open Snipcart's [API Keys ↗](https://app.snipcart.com/dashboard/account/credentials) page. The label at the top — **Test** or **Live** — tells you which mode you're using in Snipcart.
 2. Copy the `<script>` snippet in full.
-3. In Roe, open [Settings → Roe → Store (Snipcart)](/admin/configs/snipcart/edit).
-4. Paste it into the matching tab: **Local/Test** or **Live/Static Site**.
+3. **In Roe**, open [Settings → Roe → Store (Snipcart)](/admin/configs/snipcart/edit).
+4. Paste it into the matching tab: **Test** or **Live**.
 5. Click **Save Test Snippet** (or **Save Live Snippet**).
 
 That's it — you're ready to work with the Store and Snipcart.
+
+### Allow Roe to track orders
+
+When you deploy your site to a live URL, your Snipcart settings page in Roe will have a [webhook](/documentation/roe/glossary#webhook) url. Add this URL to Snipcart's settings:
+
+1. Sign into Snipcart and pick your mode (Test or Live)
+2. Then go to your [webhooks settings in Snipcart](https://app.snipcart.com/dashboard/webhooks)
+3. Paste your Snipcart webhook from Roe into Webhooks URL on Snipcart.
+4. Click `SAVE`.
+
+Once you do this, you'll be able to see orders on Roe. This works for members as well. Their member page will show which orders they've made on your site.
 
 ### Domains and going live
 
@@ -77,7 +88,7 @@ A GUID is the only link between your product in Roe and the file in Snipcart, an
    Snipcart uploads it and shows you a `GUID`.
 2. Copy the `GUID`.
 3. In Roe, open or create a Product for this file — see [Products](/documentation/roe/products).
-4. In the product's metadata, check the `digital` toggle let Roe know this is a digital good.
+4. In the product's metadata, check the `digital` toggle to let Roe know this is a digital good.
    A `file_guid` field appears below it.
 5. Paste the GUID into `file_guid`.
 6. Save.

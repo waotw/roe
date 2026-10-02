@@ -1,25 +1,13 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 0.1.2
-   Fingerprint: 3679d27e
-   Bundled with: Roe v0.4.0
+   Version: 0.1.0
+   Fingerprint: 44f1a9f7
+   Bundled with: Roe v0.2.0
 
-   This theme was installed by Roe. Leave this comment
-   in place and the Themes System will detect when a new
-   version is available.
-
-   Edit anything below this THEME INFO section. The Themes
-   System will know that you've made changes and will never
-   overwrite this file without asking. You will always
-   have the option to keep your version.
-
-   To take this file out of the Themes System entirely:
-   - change the "Roe Theme" name above, or
-   - rename this file in /site/theme/
-
-   You can always download a fresh copy of the newest version of any built in theme.
-
-/*
+   A deliberately minimal theme that stays as close to plain HTML
+   rendering as possible while still supporting Roe's components.
+   Leave this comment in place so the admin can detect updates.
+*/
 
 /* ============ THEME VARIABLES ============ */
 
@@ -3582,23 +3570,6 @@ hr.clear-floats {
 }
 
 .private-feeds-regenerate-form {
-  display: inline;
-}
-
-/* Newsletter on/off on the account page. Same shape as the private feeds
-   block above: a heading, a note, one button. */
-.account-newsletter {
-  margin: var(--space-6) 0;
-}
-
-.account-newsletter-note {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--color-text-muted, currentColor);
-  opacity: 0.8;
-}
-
-.account-newsletter-form {
   display: inline;
 }
 

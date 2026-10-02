@@ -35,9 +35,9 @@ Site Sync:
 2. **Site Sync** → Push content to live
 3. (Weeks later) Roe releases an update
 4. Update your local version of Roe
-4. **Deploy** → Send update to live site
-5. Make some edits to a post on the live site
-5. **Site Sync** → Pull those changes to your local site
+5. **Deploy** → Send update to live site
+6. Make some edits to a post on the live site
+7. **Site Sync** → Pull those changes to your local site
 
 ## When to Use Site Sync
 

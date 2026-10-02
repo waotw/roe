@@ -26,7 +26,7 @@ Updates are handled on this page: [Admin → Updates & Deploy](/admin/updates). 
 - If an update is available, you'll see an `Update Now` button
 - You'll see a running log of what is happening…
 - When it finishes, Roe asks you to restart. Open any terminal window, type `roe restart` and press `return/enter` — if you have more than one Roe site, the page shows the exact command with your site's name. Then refresh the page.
-  - If something goes wrong during the update, the same `roe restart` gets you back to a clean state.
+    - If `roe` isn't set up, or something goes wrong during the update, open your Roe folder in the terminal and restart there instead: `ctrl-c` to stop it and `./roe.sh start` to start it again.
 
 ## Deployment
 

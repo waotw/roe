@@ -77,7 +77,20 @@ You can send yourself a test email using the `SEND TEST` button. This allows you
 
 4. Click **"Publish"**
 
-The newsletter is queued and sent in the background. Visit this post in Roe's Admin and you'll see how many members this Newsletter was sent to and when.
+The newsletter is queued and sent in the background. Under `url_name` you'll see how many members this Newsletter was sent to and when.
+
+### Resending to New Members
+
+1. If new members have joined, you'll see: **"Resend to X new members"**
+2. Click the button
+3. Confirm the send
+
+**How it works:**
+
+- Only sends to members who joined after the original send
+- Respects the post's audience setting (everyone vs paid)
+- Prevents duplicate sends automatically
+- Queues in background just like original send
 
 ## Bounce & Spam Tracking
 
@@ -160,11 +173,7 @@ Every newsletter includes an unsubscribe link in the footer:
 
 ### 2. Account Settings
 
-Signed-in members can:
-
-- Unsubscribe from or resubscribe to the newsletter
-- Change their name/email address
-- Delete their account (this cannot be undone and requires confirmation)
+Signed-in members can manage their subscription in their account page.
 
 ## Email Templates
 

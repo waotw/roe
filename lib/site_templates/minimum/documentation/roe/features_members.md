@@ -144,13 +144,11 @@ Each member has two tokens associtated with their membership.
 | **Access token** | Signs them in. It's what a magic-link email carries — treat it like a password. |
 | **Media token** | Gives them access to `paid` feeds, files and content. |
 
-A site owner can see these details for any member here: [Admin → Members](/admin/members).
+A site owner can see them for any member here: [Admin → Members](/admin/members).
 
 A member's private feed addresses are listed on their account page: a paid feed from [feeds.yml](/documentation/roe/feeds-rss-atom), a podcast with paid episodes, or a music release with paid tracks. Each has a Copy button, and **Refresh your private links** issues a fresh set if one gets shared — the old links stop working straight away. The benefit of a media token is that they don't have to sign in to their account to access files. This is what allows them to subsribe in a podcast or RSS reader without being signed in.
 
-Members can edit their name and email, unsubscribe or resubscribe to the newsletter and delete their account.
-
-Deleting an account will invalidate both tokens. A cancelled or downgraded member's media token stops opening files immediately.
+Cancelling an account will invalidate both tokens. A cancelled or downgraded member's media token stops opening files immediately.
 
 ## Static Site Generation
 

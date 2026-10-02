@@ -1,5 +1,5 @@
 ---
-title: Roe Commands
+title: Roe App Commands
 status: published
 tags: guide
 url_name: roe-application-commands
@@ -13,7 +13,7 @@ related: true
 template: links
 ```
 
-# Roe application commands
+# Roe app commands
 
 ## Global Roe Commands
 
@@ -84,7 +84,7 @@ When Roe is running in this way, you don't run any more commands in that window 
 ### Setup commands
 
 - `./roe.sh install` — Check your computer for the tools Roe needs and offer to install anything missing. This is the first command you run on a new install.
-- `./roe.sh setup` — Run the full setup: install Roe's libraries, create your `/site` folder, prepare the database, and create your admin account. Runs `check` first.
+- `./roe.sh setup` — Run the full setup: install Roe's libraries, create your `/site` folder, prepare the database, and create your admin account. Runs `install` first.
 - `./roe.sh setup-mise` — Add the `mise activate` line to your shell's startup file, so the right version of Ruby is ready in new Terminal windows.
 
 ### Maintenance

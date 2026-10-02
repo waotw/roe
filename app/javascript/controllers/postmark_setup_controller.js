@@ -13,8 +13,14 @@ import { Controller } from "@hotwired/stimulus";
 // of edit_integration.html.erb is untouched.
 export default class extends Controller {
   static targets = [
-    "token", "preview", "reuse", "sandboxReuse", "liveReuse",
-    "signatures", "error", "runButton",
+    "token",
+    "preview",
+    "reuse",
+    "sandboxReuse",
+    "liveReuse",
+    "signatures",
+    "error",
+    "runButton",
   ];
   static values = {
     previewUrl: String,
@@ -25,19 +31,26 @@ export default class extends Controller {
     event?.preventDefault();
     const token = this.tokenTarget.value.trim();
     this.clearError();
-    if (!token) { this.showError("Enter your Postmark Account API token."); return; }
+    if (!token) {
+      this.showError("Enter your Postmark Account API token.");
+      return;
+    }
 
     const res = await fetch(this.previewUrlValue, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content,
+        "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')
+          ?.content,
         Accept: "application/json",
       },
       body: JSON.stringify({ account_token: token }),
     });
     const data = await res.json();
-    if (!data.ok) { this.showError(data.error || "Postmark didn't accept that token."); return; }
+    if (!data.ok) {
+      this.showError(data.error || "Postmark didn't accept that token.");
+      return;
+    }
 
     this.renderReuse(data.reusable || []);
     this.renderSignatures(data.signatures || []);
@@ -49,10 +62,13 @@ export default class extends Controller {
   // run creates fresh servers and there's nothing to choose.
   renderReuse(servers) {
     if (!this.hasReuseTarget) return;
-    if (servers.length === 0) { this.reuseTarget.hidden = true; return; }
+    if (servers.length === 0) {
+      this.reuseTarget.hidden = true;
+      return;
+    }
 
     const options = (sel) => {
-      sel.innerHTML = '<option value="">Create a new one</option>';
+      sel.innerHTML = '<option value="">Have Roe create the server</option>';
       servers.forEach((s) => {
         const o = document.createElement("option");
         o.value = s.id;
@@ -72,19 +88,27 @@ export default class extends Controller {
         '<li class="text-amber-700">No sender signatures yet — add and confirm your From address in Postmark.</li>';
       return;
     }
-    this.signaturesTarget.innerHTML = sigs.map((s) => {
-      const mark = s.confirmed
-        ? '<span class="text-green-700">✓ confirmed</span>'
-        : '<span class="text-amber-700">pending confirmation</span>';
-      return `<li><span class="font-mono">${this.escape(s.email)}</span> — ${mark}</li>`;
-    }).join("");
+    this.signaturesTarget.innerHTML = sigs
+      .map((s) => {
+        const mark = s.confirmed
+          ? '<span class="text-green-700">✓ confirmed</span>'
+          : '<span class="text-amber-700">pending confirmation</span>';
+        return `<li><span class="font-mono">${this.escape(s.email)}</span> — ${mark}</li>`;
+      })
+      .join("");
   }
 
   showError(msg) {
-    if (this.hasErrorTarget) { this.errorTarget.textContent = msg; this.errorTarget.hidden = false; }
+    if (this.hasErrorTarget) {
+      this.errorTarget.textContent = msg;
+      this.errorTarget.hidden = false;
+    }
   }
   clearError() {
-    if (this.hasErrorTarget) { this.errorTarget.textContent = ""; this.errorTarget.hidden = true; }
+    if (this.hasErrorTarget) {
+      this.errorTarget.textContent = "";
+      this.errorTarget.hidden = true;
+    }
   }
   escape(text) {
     const d = document.createElement("div");

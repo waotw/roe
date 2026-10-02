@@ -1,21 +1,17 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.1.2
-   Fingerprint: e9ea980a
-   Bundled with: Roe v0.4.0
+   Version: 0.9.9
+   Fingerprint: b55bf632
+   Bundled with: Roe v0.2.0
 
-   This theme was installed by Roe. Leave this comment
-   in place and the Themes System will detect when a new
-   version is available.
+   This theme was installed from Roe. Leave this comment
+   in place and the admin will detect when a new version
+   is available and offer to update it.
 
-   Edit anything below this THEME INFO section. The Themes
-   System will know that you've made changes and will never
-   overwrite this file without asking. You will always
-   have the option to keep your version.
+   Either of these actions will create a custom theme outside of the updates system:
 
-   To take this file out of the Themes System entirely:
-   - change the "Roe Theme" name above, or
-   - rename this file in /site/theme/
+   - Change the "Roe Theme" name to anything else
+   - install and rename css file in /site/theme/
 
    You can always download a fresh copy of the newest version of any built in theme.
 */
@@ -3591,10 +3587,10 @@ hr.clear-floats {
    products, member forms). Member pages override the .btn-* palette at higher
    specificity — those overrides live in the Members section. */
 
-.btn-primary {
+.btn-primary,
+a.btn-primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-2);
   background: var(--color-heading);
   color: var(--color-bg);
   border: 1px solid var(--color-heading);
@@ -3611,7 +3607,7 @@ hr.clear-floats {
 
 .btn-secondary {
   display: inline-block;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-2);
   background: transparent;
   color: var(--color-heading);
   border: 1px solid var(--color-text);
@@ -3669,6 +3665,12 @@ hr.clear-floats {
 
 .btn-grid {
   padding: var(--space-1) var(--space-1);
+  font-size: var(--text-sm);
+}
+
+a.btn-grid {
+  padding: var(--space-1) var(--space-2);
+  line-height: 1.2;
   font-size: var(--text-sm);
 }
 
@@ -3784,7 +3786,6 @@ hr.clear-floats {
   text-decoration: none;
   text-wrap: nowrap;
   box-sizing: border-box;
-  line-height: normal;
 }
 
 .member-page button:hover,
@@ -3889,23 +3890,6 @@ hr.clear-floats {
 }
 
 .private-feeds-regenerate-form {
-  display: inline;
-}
-
-/* Newsletter on/off on the account page. Same shape as the private feeds
-   block above: a heading, a note, one button. */
-.account-newsletter {
-  margin: var(--space-6) 0;
-}
-
-.account-newsletter-note {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--color-text-muted, currentColor);
-  opacity: 0.8;
-}
-
-.account-newsletter-form {
   display: inline;
 }
 

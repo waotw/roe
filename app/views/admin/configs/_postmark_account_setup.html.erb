@@ -45,7 +45,7 @@
 
     <button type="button" data-action="postmark-setup#preview"
             class="uppercase text-sm px-3 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs cursor-pointer">
-      <%= mode == :live ? "Set up my account" : "Set up test servers" %>
+      Set up Postmark Integration
     </button>
 
     <%# Revealed after a successful preview. %>
@@ -53,8 +53,8 @@
       <div data-postmark-setup-target="reuse" hidden class="p-3 border border-gray-200 bg-white">
         <p class="text-sm text-gray-700 mb-2">
           <%# COPY %>
-          You already have servers on Postmark. Reuse one, or let Roe create new ones.
-          (Your default <span class="font-mono">My First Server</span> is left alone.)
+          You already have servers on Postmark. Reuse them, or let Roe create new ones.
+          (The default <span class="font-mono">My First Server</span> is left alone.)
         </p>
         <label class="block text-xs text-gray-600 mb-1">Sandbox server</label>
         <select name="sandbox_reuse_id" data-postmark-setup-target="sandboxReuse"
@@ -71,7 +71,7 @@
 
       <button type="submit" data-postmark-setup-target="runButton" hidden
               class="uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">
-        <%= mode == :live ? "Create servers & connect" : "Create test servers" %>
+        Confirm &amp; Connect
       </button>
     </div>
   <% end %>
