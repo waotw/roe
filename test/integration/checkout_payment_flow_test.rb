@@ -82,7 +82,7 @@ class CheckoutPaymentFlowTest < ActionDispatch::IntegrationTest
     post "/checkout"
 
     assert_redirected_to "/"
-    assert_equal "Payments not available", flash[:alert]
+    assert_match(/upgrade system/i, flash[:alert])
   end
 
   # ============================================================================

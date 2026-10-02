@@ -47,7 +47,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     post "/checkout"
 
     assert_redirected_to root_path
-    assert_equal "Payments not available", flash[:alert]
+    assert_match(/upgrade system/i, flash[:alert])
   end
 
   test "redirects to root when price_id not set" do
@@ -61,7 +61,7 @@ class CheckoutControllerTest < ActionDispatch::IntegrationTest
     post "/checkout"
 
     assert_redirected_to root_path
-    assert_equal "Payments not available", flash[:alert]
+    assert_match(/upgrade system/i, flash[:alert])
   end
 
   test "redirects to signin when not authenticated" do

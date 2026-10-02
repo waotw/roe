@@ -26,7 +26,7 @@ class StripeStatus
   end
 
   def items
-    [ connection, mode, webhook ].compact
+    [ connection, mode, price, webhook ].compact
   end
 
   private
@@ -56,6 +56,53 @@ class StripeStatus
   # The publishable key is intentionally not tracked: Roe uses hosted Stripe
   # Checkout (server-side redirect), never Stripe.js in the browser, so a
   # publishable key is never needed. Only the restricted/secret key matters.
+
+  # Price: checkout needs a Stripe Price for the CURRENT mode (current_price_id,
+  # exactly what CheckoutController requires alongside connected?). The AMOUNT is
+  # mode-agnostic and lives in members.yml; Roe turns it into a per-mode Stripe
+  # Price automatically (on members-config save, and on mode switch). This row
+  # reports the amount the owner set and whether this mode's price is live yet —
+  # so an all-green page can't hide a dead checkout. Only shown when payments are
+  # enabled; nothing to report until keys are present (connection row covers it).
+  def price
+    return nil unless @sc.keys_present?
+
+    payments = SiteConfig.feature("members", "payments")
+    return nil unless payments && ActiveModel::Type::Boolean.new.cast(payments["enabled"])
+
+    amount = payments["price"].presence
+    if amount.blank?
+      return todo(:price, "No membership price set", no_price_detail)
+    end
+
+    label = "Price set in members.yml (#{format_price(amount)})"
+    if @sc.current_price_id.present?
+      ok(:price, label, "Ready for checkout in #{@sc.mode} mode.")
+    elsif @sc.connected?
+      todo(:price, label, "Click “Update Mode” above to create this #{@sc.mode} price in Stripe.")
+    else
+      todo(:price, label, "Connect your Stripe key; the #{@sc.mode} price is created automatically.")
+    end
+  end
+
+  # "set a price in members.yml" with members.yml linking to its editor.
+  def no_price_detail
+    path = Rails.application.routes.url_helpers.admin_edit_members_config_path
+    link = %(<a href="#{path}" class="underline">members.yml</a>).html_safe
+    (ERB::Util.html_escape("You must set a price in ") + link +
+     ERB::Util.html_escape(", then return here and click “Update Mode”.")).html_safe
+  end
+
+  def format_price(amount)
+    num = begin
+      Float(amount)
+    rescue ArgumentError, TypeError
+      nil
+    end
+    cur = (@sc.currency.presence || "usd").to_s.upcase
+    body = num ? format("%.2f", num) : amount.to_s
+    cur == "USD" ? "$#{body}" : "#{body} #{cur}"
+  end
 
   # Webhook: production reports registered/verified; local is informational
   # because a real event can't reach localhost without a tunnel. Nothing to

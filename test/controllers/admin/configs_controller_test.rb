@@ -125,6 +125,66 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert StripeConfig.current.mode_test?
   end
 
+  # Writes a members.yml whose mode-agnostic amount drives the per-mode Stripe
+  # price. The fixture ensure_feature_file leaves price unset on purpose.
+  def write_members_price(price, enabled: true)
+    path = SiteConfig::FEATURES_PATH.join("members.yml")
+    File.write(path, <<~YAML)
+      payments:
+        enabled: #{enabled}
+        price: #{price}
+      newsletter:
+        enabled: true
+    YAML
+    SiteConfig.sync_from_file("features/members")
+    SiteConfig.reload!("features/members")
+  end
+
+  test "update_payments_mode regenerates the new mode's price from members.yml when it has none" do
+    write_members_price("5.00")
+    stripe = StripeConfig.current
+    stripe.update!(secret_key_live: "sk_live_123", verified_at: Time.current)
+    stripe.stubs(:current_price_id).returns(nil) # live price not created yet
+    StripeConfig.stubs(:current).returns(stripe)
+
+    # The owner set the amount; switching to live should create the live price
+    # silently, with no extra flash beyond the mode-change notice. (YAML parses
+    # the bare number as a Float — StripeProductManager#parse_price handles it.)
+    StripeProductManager.any_instance.expects(:sync_from_config)
+                        .with(has_entry("price", 5.0)).returns(true)
+
+    patch admin_mode_payments_config_path, params: { mode: "live" }
+
+    assert stripe.reload.mode_live?
+    assert_equal "Payments mode set to Live", flash[:notice]
+  end
+
+  test "update_payments_mode does not regenerate a price that already exists (never orphans a working one)" do
+    write_members_price("5.00")
+    stripe = StripeConfig.current
+    stripe.update!(secret_key_live: "sk_live_123", verified_at: Time.current)
+    stripe.stubs(:current_price_id).returns("price_live_existing")
+    StripeConfig.stubs(:current).returns(stripe)
+
+    StripeProductManager.any_instance.expects(:sync_from_config).never
+
+    patch admin_mode_payments_config_path, params: { mode: "live" }
+    assert stripe.reload.mode_live?
+  end
+
+  test "update_payments_mode skips price regeneration when no amount is set in members.yml" do
+    write_members_price("", enabled: true)
+    stripe = StripeConfig.current
+    stripe.update!(secret_key_live: "sk_live_123", verified_at: Time.current)
+    stripe.stubs(:current_price_id).returns(nil)
+    StripeConfig.stubs(:current).returns(stripe)
+
+    StripeProductManager.any_instance.expects(:sync_from_config).never
+
+    patch admin_mode_payments_config_path, params: { mode: "live" }
+    assert stripe.reload.mode_live?
+  end
+
   test "disconnect_payments clears all keys" do
     stripe = StripeConfig.current
     stripe.update!(

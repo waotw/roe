@@ -50,7 +50,7 @@ module Members
         stripe_config = StripeConfig.current
 
         unless stripe_config.connected? && stripe_config.current_price_id.present?
-          redirect_to root_path, alert: "Payments are not configured"
+          redirect_to root_path, alert: "There was an issue with the upgrade system. Please contact the site owner."
           return
         end
 

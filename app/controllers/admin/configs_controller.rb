@@ -1732,9 +1732,36 @@ class Admin::ConfigsController < Admin::BaseController
 
   def update_payments_mode
     update_integration_mode(StripeConfig.current, "Payments")
+    # The membership amount lives in members.yml and is mode-agnostic, but each
+    # Stripe mode needs its OWN Price object built from that amount (a test price
+    # is invalid against a live key and vice-versa). Generate the now-active
+    # mode's price if it doesn't have one yet, so checkout works right after the
+    # switch. The owner already set the amount, so this is the expected behaviour
+    # — no flash. If it can't run (keys unverified, amount blank) the Integration
+    # Status "price" row says what to do.
+    resync_payments_price_for_current_mode
     # Reopen the tab matching the now-active mode (the tabs controller reads
     # ?tab= on load). Falls back to the current mode if the switch was rejected.
     redirect_to admin_edit_payments_config_path(tab: StripeConfig.current.mode)
+  end
+
+  # Generate the current Stripe mode's Price from the members.yml amount, but
+  # only when that mode has none yet — Stripe::Price.create makes a NEW object
+  # every call, so regenerating an existing, working price would just orphan it.
+  # A price-amount CHANGE is handled separately by the members-config save path.
+  def resync_payments_price_for_current_mode
+    stripe = StripeConfig.current
+    return unless stripe.connected?
+    return if stripe.current_price_id.present?
+
+    payments = SiteConfig.feature("members", "payments")
+    return unless payments && ActiveModel::Type::Boolean.new.cast(payments["enabled"])
+    return if payments["price"].blank?
+
+    StripeProductManager.new.sync_from_config(payments)
+  rescue StandardError => e
+    Rails.logger.error "Payments price resync on mode switch failed: #{e.message}"
+    nil
   end
 
   def disconnect_payments
