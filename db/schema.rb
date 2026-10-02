@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_30_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_30_170000) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -231,8 +231,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_160000) do
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
-    t.text "secret_key_live"
-    t.text "secret_key_test"
     t.text "snippet"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
