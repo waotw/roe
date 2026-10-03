@@ -10,15 +10,20 @@
 #   roe list                 every registered site, running or not
 #   roe start <name>         start a site in the background
 #   roe stop <name>          stop it
-#   roe restart <name>
+#   roe restart <name>       restart it, reusing the same port
 #   roe status <name>
-#   roe open <name>          open the site in your browser
+#   roe open <name>          open the site — home and admin — in your browser
+#   roe home <name>          open just the home page
+#   roe admin <name>         open just the admin page
+#   roe folder [name]        show the cd command for a site's folder (all sites if omitted)
+#   roe install [tool]       install an optional tool Roe can use (e.g. libvips)
 #   roe start --all          start every registered site
 #   roe stop --all
 #   roe -h                   help (so does a bare `roe`)
 #
 # The name can be left off when there is only one registered site, or —
-# for stop, restart, status and open — when only one site is running.
+# for stop, restart, status, open, home and admin — when only one site is
+# running. `folder` with no name lists every site's cd command.
 #
 # Names are the slugified folder name — "The Briefcase" is the-briefcase.
 # Register a site by running ./roe.sh register inside it.
@@ -50,6 +55,8 @@ esac
 
 log_error()   { echo -e "${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
+log_info()    { echo -e "${CYAN}[i]${NC} $1"; }
+log_success() { echo -e "${GREEN}[✓]${NC} $1"; }
 
 # Read one KEY from a .conf — first match, everything after the first "=".
 _conf_get() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
@@ -85,27 +92,34 @@ usage() {
     echo "  roe <command> [name | --all]"
     echo ""
     echo -e "${ROE_RED}${BOLD}COMMANDS${NC}"
-    echo "  list     Show every registered site and whether it's running"
-    echo "  start    Start a site in the background"
-    echo "  stop     Stop a site"
-    echo "  restart  Stop, then start"
-    echo "  status   Status for each Roe site"
-    echo "  open     Open the site in your browser"
-    echo "  completion  Print the tab-completion script for bash or zsh"
+    echo -e "  ${ROE_ORANGE}list${NC}        Show every registered site and whether it's running"
+    echo -e "  ${ROE_ORANGE}start${NC}       Start a site in the background"
+    echo -e "  ${ROE_ORANGE}stop${NC}        Stop a site"
+    echo -e "  ${ROE_ORANGE}restart${NC}     Stop, then start again on the same port"
+    echo -e "  ${ROE_ORANGE}status${NC}      Status for each Roe site"
+    echo -e "  ${ROE_ORANGE}open${NC}        Open the site — home and admin — in your browser"
+    echo -e "  ${ROE_ORANGE}home${NC}        Open just the home page"
+    echo -e "  ${ROE_ORANGE}admin${NC}       Open just the admin page"
+    echo -e "  ${ROE_ORANGE}folder${NC}      Show the cd command for each site's folder"
+    echo -e "  ${ROE_ORANGE}install${NC}     Install an optional tool Roe can use (libvips, …)"
+    echo -e "  ${ROE_ORANGE}completion${NC}  Hit the tab key to auto-complete site names"
     echo ""
     echo -e "${ROE_RED}${BOLD}FLAGS${NC}"
-    echo "  --all    Apply start, stop or restart to every registered site"
-    echo "  -h       Show this help"
+    echo -e "  ${ROE_ORANGE}--all${NC}    Apply start, stop or restart to every registered site"
+    echo -e "  ${ROE_ORANGE}-h${NC}      Show this help"
     echo ""
     echo -e "${ROE_RED}${BOLD}EXAMPLES${NC}"
-    echo "  $ roe list"
-    echo "  $ roe start roe-site-name"
-    echo "  $ roe open"
-    echo "  $ roe stop --all"
+    echo -e "  $ ${ROE_ORANGE}roe list${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe start roe-site-name${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe open${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe install libvips${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe stop --all${NC}"
     echo ""
     echo -e "${ROE_RED}${BOLD}NOTES${NC}"
     echo "  • If you only have one Roe site, just use 'roe start/stop',"
     echo "    you don't need to add a site name."
+    echo "  • 'roe install' lists the optional tools; 'roe install <tool>'"
+    echo "    installs one. The name there is a tool, not a site."
     echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
     echo "  • To register a site, run './roe.sh register' inside the Roe folder."
     echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
@@ -244,7 +258,13 @@ run_in() {
     local script root
     script="$(roe_sh_for "$f")" || return 1
     root="$(_conf_get "$f" ROOT)"
-    ( cd "$root" && env -u PORT -u ROE_HOST ROE_CLI=1 "$script" "$@" )
+    # ROE_PREFERRED_PORT is the one PORT we let through (restart reusing the
+    # port it just left). Ambient PORT is still stripped — only this explicit
+    # opt-in survives, and `env -u PORT … PORT=<n>` unsets then re-sets so the
+    # child sees exactly the port we chose.
+    local -a portenv=()
+    [ -n "${ROE_PREFERRED_PORT:-}" ] && portenv=(PORT="$ROE_PREFERRED_PORT")
+    ( cd "$root" && env -u PORT -u ROE_HOST ROE_CLI=1 "${portenv[@]}" "$script" "$@" )
 }
 
 cmd_start() {
@@ -270,26 +290,133 @@ cmd_stop() {
 }
 
 cmd_restart() {
+    # Reuse the port the server is on right now, so a refreshed browser tab
+    # still lands on the same address. Captured before we stop it; handed to
+    # cmd_start via ROE_PREFERRED_PORT, where resolve_port_collision only
+    # bumps to an alternate if that port is genuinely taken by then. If the
+    # port can't be read (no lsof, server already down), fall back to the
+    # normal registry-port behaviour.
+    local f="$1" pid running_port=""
+    if pid="$(server_pid_for "$(_conf_get "$f" ROOT)")"; then
+        running_port="$(port_for_pid "$pid")"
+    fi
     cmd_stop "$1"
     sleep 1
-    cmd_start "$1"
+    ROE_PREFERRED_PORT="$running_port" cmd_start "$1"
 }
 
 cmd_status() { run_in "$1" status; }
 
-cmd_open() {
-    local f="$1" url
-    url="$(url_for "$f")"
-    if ! server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
-        log_warning "$(basename "$f" .conf) isn't running — start it first: roe start $(basename "$f" .conf)"
-        return 1
-    fi
+# Open one URL in the platform's browser. Echoes it as a fallback when no
+# opener is available (headless, bare container).
+open_url() {
+    local url="$1"
     if command -v open >/dev/null 2>&1; then open "$url"
     elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"
     elif command -v wslview >/dev/null 2>&1; then wslview "$url"
     elif command -v explorer.exe >/dev/null 2>&1; then explorer.exe "$url" >/dev/null 2>&1 || true
     else echo "$url"
     fi
+}
+
+# Shared guard for the browser commands: the site has to be running, or the
+# URL points at nothing. Prints the start hint and fails when it isn't.
+require_running() {
+    local f="$1" name
+    name="$(basename "$f" .conf)"
+    if ! server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$name isn't running — start it first: roe start $name"
+        return 1
+    fi
+}
+
+# open: both the home page and the admin page — the two places you'd want
+# after starting a site. home / admin open just the one.
+cmd_open() {
+    local f="$1" url
+    require_running "$f" || return 1
+    url="$(url_for "$f")"
+    open_url "$url"
+    open_url "$url/admin"
+}
+
+cmd_home() {
+    local f="$1"
+    require_running "$f" || return 1
+    open_url "$(url_for "$f")"
+}
+
+cmd_admin() {
+    local f="$1"
+    require_running "$f" || return 1
+    open_url "$(url_for "$f")/admin"
+}
+
+# folder: print the cd command for each site's folder. A child process can't
+# change the parent shell's working directory, so rather than try, we hand
+# over a copy-paste command. Paths are quoted because a Roe folder can sit at
+# a path with spaces and other shell metacharacters (e.g. "S&M 2019").
+#   roe folder              table for every site
+#   roe folder <name>       just that site's row
+#   roe folder <name> --path   bare path only, for: cd "$(roe folder <name> --path)"
+cmd_folder() {
+    local want="" path_only=0 arg
+    for arg in "$@"; do
+        case "$arg" in
+            --path) path_only=1 ;;
+            --*)    log_error "Unknown option: $arg"; return 1 ;;
+            *)      want="$arg" ;;
+        esac
+    done
+
+    # --path: resolve exactly one site and print its raw (unquoted) path and
+    # nothing else, so it drops straight into cd "$(…)". The caller's quotes
+    # handle the spaces, so we must NOT add our own here.
+    if [ "$path_only" = "1" ]; then
+        local pf
+        if [ -n "$want" ]; then
+            pf="$(resolve "$want")" || return 1
+        elif [ "$(all_names | grep -c .)" = "1" ]; then
+            pf="$(conf_for "$(all_names)")"
+        else
+            log_error "Which site? roe folder <name> --path"
+            return 1
+        fi
+        _conf_get "$pf" ROOT
+        return 0
+    fi
+
+    local names
+    if [ -n "$want" ]; then
+        local wf; wf="$(resolve "$want")" || return 1
+        names="$(basename "$wf" .conf)"
+    else
+        names="$(all_names)"
+    fi
+
+    if [ -z "$names" ]; then
+        log_error "No sites registered yet."
+        echo "  Run ./roe.sh register inside a Roe folder to add one." >&2
+        return 1
+    fi
+
+    # SITE column as wide as the longest name shown (header is 4 chars).
+    local name w=4
+    for name in $names; do [ "${#name}" -gt "$w" ] && w="${#name}"; done
+
+    echo "Roe folders — copy/paste the command for the folder you want to open and hit enter/return:"
+    echo ""
+    printf "${BOLD}  %-${w}s  %s${NC}\n" "SITE" "COMMAND"
+    local f root
+    for name in $names; do
+        f="$(conf_for "$name")"
+        root="$(_conf_get "$f" ROOT)"
+        if [ -d "$root" ]; then
+            printf "  %-${w}s  ${CYAN}cd \"%s\"${NC}\n" "$name" "$root"
+        else
+            printf "  %-${w}s  ${CYAN}cd \"%s\"${NC} ${DIM}(folder missing)${NC}\n" "$name" "$root"
+        fi
+    done
 }
 
 # Names of every registered site whose server is up right now.
@@ -313,7 +440,7 @@ default_name() {
         return 0
     fi
     case "$fn" in
-        cmd_stop|cmd_restart|cmd_status|cmd_open)
+        cmd_stop|cmd_restart|cmd_status|cmd_open|cmd_home|cmd_admin)
             running="$(running_names)"
             if [ "$(printf '%s\n' "$running" | grep -c .)" -eq 1 ]; then
                 echo "$running"
@@ -357,6 +484,120 @@ for_target() {
     esac
 }
 
+# ── Install optional tools ────────────────────────────────────────────────────
+#
+# Roe can use optional native tools (libvips, and later ffmpeg) that it doesn't
+# bundle. The knowledge of what each tool is called on this platform already
+# lives in Rails (ManagedTools), so `roe install` asks an install's Rails for
+# the list and the exact command rather than hardcoding package names here.
+# Any registered install will do — they share the same ManagedTools registry.
+
+# Path to a bin/rails we can run ManagedTools through: the first registered
+# install whose folder still has one. Echoes the rails path, or fails.
+a_rails() {
+    local name f root
+    for name in $(all_names); do
+        f="$(conf_for "$name")"
+        root="$(_conf_get "$f" ROOT)"
+        [ -x "$root/current/bin/rails" ] && { echo "$root/current/bin/rails"; return 0; }
+    done
+    return 1
+}
+
+# Ask Rails for the managed-tools table as tab-separated lines:
+#   key <TAB> label <TAB> installed(yes/no) <TAB> command <TAB> needs_sudo(yes/no)
+managed_tools_table() {
+    local rails="$1"
+    "$rails" runner '
+      ManagedTools.statuses.each do |s|
+        puts [s[:key], s[:label], (s[:installed] ? "yes" : "no"),
+              s[:install_command].to_s, (s[:needs_sudo] ? "yes" : "no")].join("\t")
+      end
+    ' 2>/dev/null
+}
+
+cmd_install() {
+    local want="$1" rails table
+    rails="$(a_rails)" || {
+        log_error "No usable Roe install found to read the tool list from."
+        echo "  Register a site first: ./roe.sh register inside a Roe folder." >&2
+        return 1
+    }
+
+    table="$(managed_tools_table "$rails")"
+    if [ -z "$table" ]; then
+        log_error "Couldn't read the tool list from Roe."
+        return 1
+    fi
+
+    # No tool named: list what's available and each tool's state.
+    if [ -z "$want" ]; then
+        echo -e "${BOLD}Optional tools Roe can use${NC}"
+        echo ""
+        printf "${BOLD}  %-12s %-14s %s${NC}\n" "TOOL" "STATE" "INSTALL WITH"
+        while IFS=$'\t' read -r key label installed command _sudo; do
+            [ -n "$key" ] || continue
+            if [ "$installed" = "yes" ]; then
+                printf "  %-12s ${GREEN}%-14s${NC} ${DIM}%s${NC}\n" "$key" "installed" "—"
+            else
+                printf "  %-12s ${DIM}%-14s${NC} ${CYAN}%s${NC}\n" "$key" "not installed" "${command:-see docs}"
+            fi
+        done <<EOF
+$table
+EOF
+        echo ""
+        echo -e "  Install one with: ${CYAN}roe install <tool>${NC}"
+        return 0
+    fi
+
+    # A tool was named: find its row.
+    local key label installed command needs_sudo found=""
+    while IFS=$'\t' read -r key label installed command needs_sudo; do
+        [ "$key" = "$want" ] && { found=1; break; }
+    done <<EOF
+$table
+EOF
+
+    if [ -z "$found" ]; then
+        log_error "Roe doesn't manage a tool called '$want'."
+        echo "  Run 'roe install' to see the ones it does." >&2
+        return 1
+    fi
+
+    if [ "$installed" = "yes" ]; then
+        log_warning "$label is already installed."
+        return 0
+    fi
+
+    if [ -z "$command" ]; then
+        log_error "Roe doesn't know how to install $label on this system."
+        echo "  Install it yourself, then it'll be detected automatically." >&2
+        return 1
+    fi
+
+    # Never run the command silently — especially with sudo. Show exactly
+    # what will run and let the user confirm.
+    echo -e "${BOLD}Install $label${NC}"
+    echo -e "  This will run: ${CYAN}${command}${NC}"
+    [ "$needs_sudo" = "yes" ] && echo -e "  ${YELLOW}It uses sudo — you may be asked for your password.${NC}"
+    echo ""
+    printf "  Run it now? [Y/n]: "
+    read -r reply
+    case "${reply:-y}" in
+        [Nn]*) log_info "Left it for you to run when ready."; return 0 ;;
+    esac
+
+    echo ""
+    if eval "$command"; then
+        echo ""
+        log_success "$label installed. Roe will pick it up automatically."
+    else
+        echo ""
+        log_error "That didn't finish cleanly. You can run the command above by hand."
+        return 1
+    fi
+}
+
 # ── Shell completion ──────────────────────────────────────────────────────────
 #
 # The completion script (printed by `roe completion bash|zsh`) shells back
@@ -367,18 +608,28 @@ for_target() {
 
 # The commands a bare `roe` accepts, one per line — the first word to complete.
 complete_commands() {
-    printf '%s\n' list start stop restart status open completion help
+    printf '%s\n' list start stop restart status open home admin folder install completion help
 }
 
 # The candidates for the SECOND word, given the command being completed for.
-# Only the per-site commands take a name; start/stop/restart also take --all.
+# Per-site commands take a name; start/stop/restart also take --all; install
+# takes a tool name (not a site).
 complete_names() {
     case "$1" in
         start|stop|restart) echo "--all" ;;
-        status|open) : ;;
-        *) return 0 ;;   # list/completion/help take no site name
+        status|open|home|admin|folder) : ;;
+        install) complete_tools; return 0 ;;
+        *) return 0 ;;   # list/completion/help take no argument
     esac
     all_names
+}
+
+# Tool keys for `roe install <TAB>`, read from the live ManagedTools registry
+# (same source as the command itself). Silent if no install is reachable.
+complete_tools() {
+    local rails
+    rails="$(a_rails)" || return 0
+    managed_tools_table "$rails" | cut -f1
 }
 
 # Print a completion script for the named shell, for sourcing or eval:
@@ -437,6 +688,10 @@ case "${1:-}" in
     restart)         for_target cmd_restart "${2:-}" ;;
     status)          for_target cmd_status  "${2:-}" ;;
     open)            for_target cmd_open    "${2:-}" ;;
+    home)            for_target cmd_home    "${2:-}" ;;
+    admin)           for_target cmd_admin   "${2:-}" ;;
+    folder)          shift; cmd_folder "$@" ;;
+    install)         cmd_install "${2:-}" ;;
     completion)      completion_script "${2:-}" ;;
     # Hidden helpers used by the completion script — not shown in help.
     __complete_commands) complete_commands ;;

@@ -761,12 +761,29 @@ _rc_candidate_files() {
     esac
 }
 
-# The single rc file we WRITE `mise activate` into — the interactive
-# rc, ZDOTDIR-aware for zsh.
+# The single rc file we WRITE interactive setup lines into (mise activate,
+# PATH, completion) — ZDOTDIR-aware for zsh.
+#
+# For zsh the target MUST be the file zsh actually loads at startup, which is
+# $ZDOTDIR/.zshrc where ZDOTDIR is whatever ~/.zshenv (or /etc/zshenv) sets —
+# NOT a ZDOTDIR a later-running .zshrc reassigns. We can't trust the inherited
+# $ZDOTDIR: roe.sh is invoked from inside the user's shell, so a dotfile setup
+# that does `export ZDOTDIR=$HOME/.zsh` in ~/.zshrc (without sourcing
+# $ZDOTDIR/.zshrc) would hand us ~/.zsh/.zshrc — a file the interactive shell
+# never reads, so the line we write there silently does nothing (this is
+# exactly how tab completion stopped registering). Ask a fresh zsh with the
+# inherited value cleared, so it reports the real startup ZDOTDIR; fall back to
+# the inherited value, then $HOME, if zsh isn't runnable.
 _mise_write_target() {
     local shell_name; shell_name="$(basename "${SHELL:-}")"
     case "$shell_name" in
-        zsh)  echo "${ZDOTDIR:-$HOME}/.zshrc" ;;
+        zsh)
+            local zdot=""
+            command -v zsh >/dev/null 2>&1 && \
+                zdot="$(env -u ZDOTDIR zsh -c 'print -r -- "${ZDOTDIR:-$HOME}"' 2>/dev/null)"
+            [ -n "$zdot" ] || zdot="${ZDOTDIR:-$HOME}"
+            echo "$zdot/.zshrc"
+            ;;
         bash) echo "$HOME/.bash_profile" ;;
         *)    return 1 ;;
     esac
@@ -2228,6 +2245,23 @@ cmd_stop() {
 
 cmd_restart() {
     log_info "Restarting Roe..."
+
+    # Reuse the port the server is on right now, so a browser tab still lands
+    # on the same address after a refresh. Capture it before we stop, then
+    # export it as PORT so cmd_start prefers it; resolve_port_collision still
+    # bumps to an alternate only if it's genuinely taken by the time we rebind.
+    # Skipped when the caller already set PORT, when nothing is running, or
+    # when lsof can't read the port — all fall back to the old behaviour.
+    if [ -z "${PORT:-}" ]; then
+        local restart_pids restart_pid restart_port=""
+        restart_pids="$(server_pids_for_this_install)"
+        for restart_pid in $restart_pids; do
+            restart_port="$(listening_port_for_pid "$restart_pid")"
+            [ -n "$restart_port" ] && break
+        done
+        [ -n "$restart_port" ] && export PORT="$restart_port"
+    fi
+
     cmd_stop
     sleep 1
     cmd_start "$@"

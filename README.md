@@ -139,13 +139,18 @@ once, to add the address to `/etc/hosts`.
 roe list                    # every registered site, running or stopped
 roe start the-briefcase     # runs in the background
 roe stop the-briefcase
-roe open the-briefcase      # opens it in your browser
+roe restart the-briefcase   # comes back on the same port
+roe open the-briefcase      # opens the home page and the admin
+roe admin the-briefcase     # just the admin
+roe folder                  # the cd command for each site's folder
+roe install libvips         # install an optional tool Roe can use
 roe start --all
 roe                         # help
 ```
 
 With only one site registered you can leave the name off: `roe start`,
-`roe stop`, `roe open`.
+`roe stop`, `roe open`. `roe install` on its own lists the optional tools
+and whether each is installed.
 
 Each site has its own address so you can be signed in to all of them at
 once. `./roe.sh start` inside a folder still works exactly as before.
