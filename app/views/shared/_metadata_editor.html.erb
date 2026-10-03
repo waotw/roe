@@ -196,7 +196,7 @@
                 field by construction. It used to be a separate row indented by
                 a spacer that copied the label's width — two rules that had to
                 agree, and didn't. %>
-            <div class="flex-1 min-w-0">
+            <div class="flex-1 min-w-0 max-w-[500px]">
               <div class="flex <%= checkbox_row ? 'items-center' : 'items-start' %> gap-2">
             <% case config[:type] %>
               <% when :text %>
