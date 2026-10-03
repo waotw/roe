@@ -125,9 +125,6 @@ class NewsletterRenderer
         <style>
           #{theme_css}
         </style>
-        <style>
-          #{email_responsive_css}
-        </style>
       </head>
       <body>
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto;">
@@ -138,6 +135,7 @@ class NewsletterRenderer
               <article>
                 <h1>#{post_title}</h1>
                 #{post_metadata_html}
+                #{post_header_image}
 
                 <div class="post-content">
                   #{content_html}
@@ -175,6 +173,22 @@ class NewsletterRenderer
     )
 
     premailer.to_inline_css
+  end
+
+  # The post's header/featured image, shown only when the post opts into it
+  # (metadata image + image_in_header), mirroring the web post header. Runs the
+  # bare <img> through the email transformer so it gets the large variant, an
+  # absolute URL, and email-safe sizing like every other image.
+  def post_header_image
+    return "" unless post.respond_to?(:image) && post.image.present?
+    return "" unless post.metadata["image_in_header"].to_s == "true"
+
+    # Build the responsive <picture> the same way the web header does, then let
+    # the transformer collapse it to a single large-variant <img> for email.
+    # (post.image is a raw source path, not a variant, so it must go through
+    # ResponsiveImageRenderer first to resolve the variant set.)
+    picture = ResponsiveImageRenderer.render(post.image, alt: post_title)
+    NewsletterImageTransformer.transform(picture, site_url: email_site_url)
   end
 
   # Email header (logo, etc)
@@ -245,22 +259,6 @@ class NewsletterRenderer
     date.strftime("%B %d, %Y")
   rescue
     date_value.to_s
-  end
-
-  # Mobile stacking for multi-column gallery tables. Kept in its own <style>
-  # block (not inlined) so the @media query survives Premailer — clients that
-  # honour it (Apple Mail, iOS) drop a 3/4-up grid to full-width rows on a
-  # phone; clients that ignore it (Gmail) keep the N-up layout, which is an
-  # acceptable fallback. The !important beats the inline width on the cell.
-  def email_responsive_css
-    <<~CSS
-      @media only screen and (max-width: 480px) {
-        table[role="presentation"] td.eg-cell {
-          display: block !important;
-          width: 100% !important;
-        }
-      }
-    CSS
   end
 
   # Fallback CSS if theme doesn't have a stylesheet

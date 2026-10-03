@@ -2,9 +2,11 @@
 
 require "test_helper"
 
-# Verifies the web→email image rewrite: no srcset/<picture> (email ignores
-# them), galleries become <table>s, URLs go absolute, and variants are chosen
-# by context for retina sharpness.
+# Verifies the web→email image rewrite: standalone <picture>/srcset collapses
+# to a single absolute <img> at a retina variant, and galleries are dropped
+# entirely (email can't render the CSS-grid/object-fit layout faithfully, so
+# they're deferred to the variant epic rather than shown with ragged aspect
+# ratios).
 class NewsletterImageTransformerTest < ActiveSupport::TestCase
   SITE = "https://example.com"
   BASE = "/media/images/variants/photo"
@@ -38,17 +40,12 @@ class NewsletterImageTransformerTest < ActiveSupport::TestCase
       %(</picture>)
   end
 
-  def grid(cols:, n: cols)
-    html = +%(<div class="gallery"><div class="gallery-row gallery-col-#{cols}">)
+  def gallery(cols:, n: cols, carousel: false)
+    cls = carousel ? "gallery gallery-carousel" : "gallery"
+    attr = carousel ? " data-gallery-carousel" : ""
+    html = +%(<div class="#{cls}"#{attr}><div class="gallery-row gallery-col-#{cols}">)
     n.times { html << %(<div class="gallery-item"><button class="gallery-zoom-link" popovertarget="z">#{picture}</button></div>) }
     html << %(</div></div>)
-    html
-  end
-
-  def carousel(n: 3)
-    html = +%(<div class="gallery gallery-carousel" data-gallery-carousel><div class="gallery-track">)
-    n.times { |i| html << %(<div class="gallery-item"><button class="gallery-zoom-link" popovertarget="z#{i}">#{picture}</button></div>) }
-    html << %(</div><div id="z0" popover class="gallery-zoom"><img src="#{BASE}-xl.jpg"></div></div>)
     html
   end
 
@@ -62,24 +59,10 @@ class NewsletterImageTransformerTest < ActiveSupport::TestCase
     assert_equal 1, Nokogiri::HTML.fragment(out).css("img").length
   end
 
-  test "no relative /media URL survives — every image src is absolute" do
-    out = transform(grid(cols: 3))
-    Nokogiri::HTML.fragment(out).css("img").each do |img|
-      assert img["src"].start_with?("#{SITE}/media/"), "relative src left: #{img['src']}"
-    end
-  end
-
-  # ── Retina variant selection by context ───────────────────────────────────
-
-  test "standalone image uses the large (2x of 600) variant" do
+  test "standalone image is made absolute and uses the large (2x of 600) variant" do
     out = transform(picture(variant: "medium"))
+    assert_includes out, "#{SITE}/media/", "src must be absolute"
     assert_includes out, "#{BASE}-large.jpg"
-  end
-
-  test "grid variant scales with column count" do
-    assert_includes transform(grid(cols: 1)), "#{BASE}-large.jpg"   # 1 col -> large
-    assert_includes transform(grid(cols: 2)), "#{BASE}-medium.jpg"  # 2 col -> medium
-    assert_includes transform(grid(cols: 3)), "#{BASE}-small.jpg"   # 3 col -> small
   end
 
   test "picks the next variant down when the preferred one is missing" do
@@ -92,49 +75,37 @@ class NewsletterImageTransformerTest < ActiveSupport::TestCase
     assert_not_includes out, "#{BASE}-large.jpg"
   end
 
-  # ── Galleries become tables, faithful to the column layout ─────────────────
+  # ── Galleries are dropped entirely (deferred to the variant epic) ──────────
 
-  test "grid gallery becomes a presentation table with one cell per image" do
-    out = transform(grid(cols: 3))
+  test "a grid gallery is removed from the email completely" do
+    out = transform(gallery(cols: 3, n: 9))
     frag = Nokogiri::HTML.fragment(out)
-    assert_equal 1, frag.css('table[role="presentation"]').length
-    assert_equal 3, frag.css("td.eg-cell").length
-    assert_not_includes out, "gallery-row"
+    assert_equal 0, frag.css("img").length, "no gallery images should remain"
+    assert_not_includes out, "gallery"
+    assert_not_includes out, "<table"
   end
 
-  test "column count is read from the class, so a 4-up grid just works" do
-    out = transform(grid(cols: 4))
-    frag = Nokogiri::HTML.fragment(out)
-    assert_equal 4, frag.css("td.eg-cell").length
-    assert_equal "25.0%", frag.css("td.eg-cell").first["width"]
-    assert_includes out, "#{BASE}-small.jpg"
+  test "a carousel gallery is removed from the email completely" do
+    out = transform(gallery(cols: 3, n: 4, carousel: true))
+    assert_equal 0, Nokogiri::HTML.fragment(out).css("img").length
+    assert_not_includes out, "gallery"
   end
 
-  test "the zoom lightbox markup is stripped (no popover reaches email)" do
-    out = transform(grid(cols: 2))
+  test "removing a gallery takes its lightbox/popover markup with it" do
+    out = transform(gallery(cols: 2))
     assert_not_includes out, "popover"
     assert_not_includes out, "gallery-zoom"
     assert_not_includes out, "<button"
+    assert_not_includes out, "srcset"
   end
 
-  test "gallery cells link to the post when a post_url is given" do
-    out = transform(grid(cols: 2), post_url: "/posts/hello")
-    Nokogiri::HTML.fragment(out).css("td.eg-cell").each do |td|
-      a = td.at_css("a")
-      assert_not_nil a, "cell should wrap its image in a link"
-      assert_equal "#{SITE}/posts/hello", a["href"]
-    end
-  end
-
-  # ── Carousel: first image only ─────────────────────────────────────────────
-
-  test "carousel collapses to only its first image, linked, at large size" do
-    out = transform(carousel(n: 4))
+  test "a standalone image survives even when a gallery is also present" do
+    html = "#{picture}#{gallery(cols: 3, n: 6)}"
+    out = transform(html)
     frag = Nokogiri::HTML.fragment(out)
-    assert_equal 1, frag.css("img").length, "carousel should show exactly one image"
+    assert_equal 1, frag.css("img").length, "only the standalone image should remain"
     assert_includes out, "#{BASE}-large.jpg"
-    assert_not_nil frag.at_css("a"), "the one image should link to the post"
-    assert_not_includes out, "gallery-track"
+    assert_not_includes out, "gallery"
   end
 
   # ── Email-safe sizing ──────────────────────────────────────────────────────

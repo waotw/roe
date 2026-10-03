@@ -21,24 +21,11 @@ class NewsletterImageTransformer
   # web renderer already chose for the <img> fallback.
   VARIANT_RE = /-(thumb|small|medium|large|xl)(\.(?:jpe?g|png|gif))$/i
 
-  # Variant to drop into each cell by the gallery's column count. Each is ~2x
-  # its display width in a 600px email body (1-col≈600, 2-col≈300, 3/4-col≈
-  # 200/150), so the image stays sharp on retina without a bespoke crop:
-  #   1 col  -> large  (1200px)   2x of 600
-  #   2 cols -> medium (800px)    ~2.7x of 300
-  #   3+ cols-> small  (400px)    2x+ of <=200
-  GRID_VARIANT_BY_COLS = { 1 => :large, 2 => :medium }.freeze
-  GRID_VARIANT_DEFAULT = :small
-
   # Standalone (non-gallery) body images: full body width, 2x retina.
   STANDALONE_VARIANT = :large
 
   # Email body width the display sizes are computed against.
   EMAIL_BODY_WIDTH = 600
-
-  # Don't build absurdly narrow cells even if a future theme raises the
-  # gallery column cap — below this the images are illegible on a phone.
-  MAX_GRID_COLS = 6
 
   def initialize(html, site_url:, post_url: nil)
     @html = html.to_s
@@ -54,88 +41,23 @@ class NewsletterImageTransformer
     return @html if @html.blank?
 
     doc = Nokogiri::HTML.fragment(@html)
-    transform_galleries(doc)
+    remove_galleries(doc)
     transform_standalone_pictures(doc)
     doc.to_html
   end
 
   private
 
-  # Each `div.gallery` becomes either a stacked set of column tables (grid) or
-  # a single linked image (carousel/slideshow). Replacing the whole `.gallery`
-  # also drops its popover lightbox overlays, which live inside it.
-  def transform_galleries(doc)
-    doc.css("div.gallery").each do |gallery|
-      replacement =
-        if carousel?(gallery)
-          build_carousel(gallery)
-        else
-          build_grid(gallery)
-        end
-      gallery.replace(replacement) if replacement
-    end
-  end
-
-  def carousel?(gallery)
-    gallery["class"].to_s.split.include?("gallery-carousel") ||
-      gallery.key?("data-gallery-carousel")
-  end
-
-  # Carousel: show only the first image (the author chose "don't show all at
-  # once"), linked to the post, at full body width. No "+N more" by decision.
-  def build_carousel(gallery)
-    img = gallery.at_css("img")
-    return "" unless img
-
-    src = first_present(img["src"])
-    return "" if src.blank?
-
-    tag = email_img(src, alt: img["alt"], prefer: [ STANDALONE_VARIANT ],
-                    display_width: EMAIL_BODY_WIDTH, style: standalone_style)
-    link_to_post(tag)
-  end
-
-  # Grid: one borderless table per gallery-row, stacked. Column count is read
-  # from the gallery-col-N class, so raising the theme's column cap needs no
-  # change here. Cells carry an "eg-cell" class the template's media query can
-  # stack on narrow screens (clients that ignore it keep N-up — acceptable).
-  def build_grid(gallery)
-    rows = gallery.css("div.gallery-row")
-    rows = [ gallery ] if rows.empty? # defensive: a gallery with loose items
-    tables = rows.map { |row| build_grid_row(row) }.compact
-    tables.join("\n")
-  end
-
-  def build_grid_row(row)
-    items = row.css("div.gallery-item, figure.gallery-item")
-    items = row.css("img").map { |i| i } if items.empty?
-    imgs = items.map { |it| it.name == "img" ? it : it.at_css("img") }.compact
-    return nil if imgs.empty?
-
-    cols = column_count(row, imgs.length)
-    variant = GRID_VARIANT_BY_COLS.fetch(cols, GRID_VARIANT_DEFAULT)
-    cell_pct = (100.0 / cols).round(2)
-    display_w = (EMAIL_BODY_WIDTH / cols)
-
-    cells = imgs.map do |img|
-      src = first_present(img["src"])
-      next "" if src.blank?
-
-      tag = email_img(src, alt: img["alt"], prefer: [ variant ],
-                      display_width: display_w, style: grid_img_style)
-      tag = link_to_post(tag)
-      %(<td class="eg-cell" valign="top" width="#{cell_pct}%" style="padding:4px;">#{tag}</td>)
-    end.join
-
-    %(<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ) +
-      %(style="border-collapse:collapse;margin:0 0 8px;"><tr>#{cells}</tr></table>)
-  end
-
-  def column_count(row, fallback)
-    klass = row["class"].to_s
-    n = klass[/gallery-col-(\d+)/, 1]&.to_i
-    n = fallback if n.nil? || n <= 0
-    n.clamp(1, MAX_GRID_COLS)
+  # Galleries are dropped from newsletters entirely. The web lays them out with
+  # CSS grid and crops cells to squares with object-fit — neither of which email
+  # supports, so a faithful render isn't possible yet. Rendering them with their
+  # natural aspect ratios looked unpredictable (wide and portrait images jammed
+  # together), so until the variant epic can composite a gallery into one
+  # flattened image (Substack-style), the whole `div.gallery` is removed —
+  # images, captions, and lightbox markup with it. Standalone images are
+  # untouched and still render.
+  def remove_galleries(doc)
+    doc.css("div.gallery").each(&:remove)
   end
 
   # Standalone images: collapse each <picture> (and its srcset) to one <img>
@@ -236,10 +158,6 @@ class NewsletterImageTransformer
 
   def standalone_style
     "display:block;max-width:100%;height:auto;margin:0 auto;"
-  end
-
-  def grid_img_style
-    "display:block;width:100%;max-width:100%;height:auto;border:0;"
   end
 
   def merge_style(node, style)
