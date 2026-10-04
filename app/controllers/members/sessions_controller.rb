@@ -27,6 +27,10 @@ module Members
     end
 
     def create
+      # Password mode (email off): no magic link to send — authenticate the
+      # email + password here and sign in directly.
+      return create_with_password if SiteFeature.member_passwords_enabled?
+
       member = Member.find_by(email: params[:member][:email])
 
       if member&.active?
@@ -49,6 +53,23 @@ module Members
         end
       else
         flash.now[:alert] = "No account found with that email"
+        @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")
+        render "pages/show", status: :unprocessable_entity
+      end
+    end
+
+    # Email-off sign-in: match the password against the member's digest. A
+    # single generic error for both "no such member" and "wrong password" so
+    # the form never reveals which emails have accounts.
+    def create_with_password
+      member = Member.find_by(email: params.dig(:member, :email).to_s.strip.downcase)
+      password = params.dig(:member, :password).to_s
+
+      if member&.active? && member.password_digest.present? && member.authenticate(password)
+        session[:member_id] = member.id
+        redirect_to root_path, notice: "Signed in successfully"
+      else
+        flash.now[:alert] = "Incorrect email or password"
         @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")
         render "pages/show", status: :unprocessable_entity
       end

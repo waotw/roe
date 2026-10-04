@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_30_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -103,6 +103,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_170000) do
     t.index ["medium_id"], name: "index_media_references_on_medium_id"
     t.index ["referenceable_type", "referenceable_id", "medium_id"], name: "index_media_references_on_referenceable_and_medium", unique: true
     t.index ["referenceable_type", "referenceable_id"], name: "index_media_references_on_referenceable"
+  end
+
+  create_table "member_recovery_codes", force: :cascade do |t|
+    t.string "code_digest", null: false
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.integer "member_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["member_id"], name: "index_member_recovery_codes_on_member_id"
   end
 
   create_table "members", force: :cascade do |t|
@@ -342,6 +351,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_30_170000) do
   add_foreign_key "donations", "members"
   add_foreign_key "media", "imports"
   add_foreign_key "media_references", "media"
+  add_foreign_key "member_recovery_codes", "members"
   add_foreign_key "members", "imports"
   add_foreign_key "newsletter_sends", "imports"
   add_foreign_key "posts", "imports"

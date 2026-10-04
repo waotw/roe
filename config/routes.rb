@@ -212,6 +212,7 @@ Rails.application.routes.draw do
         get :new_members_setup
         post :create_members
         delete :delete_members
+        post :confirm_members_passwords
         get :new_store_setup
         post :create_store
         delete :delete_store
@@ -416,6 +417,11 @@ Rails.application.routes.draw do
   delete "signout", to: "members/sessions#destroy"
   get "signin/:token", to: "members/sessions#signin_with_token", as: :token_signin
 
+  # Member password recovery via recovery codes (email-off sites). The page
+  # lives at /recover-account (a Roe Page); the POST resets the password.
+  get "recover-account", to: "members/recovery#new", as: :member_recovery
+  post "recover-account", to: "members/recovery#create"
+
   # GET aliases for the public signin/signup PAGES. The post routes above
   # handle form submissions to /signin and /signup, but Rails' signin_path
   # / signup_path helpers resolve to those URLs, and a guest redirected
@@ -436,6 +442,9 @@ Rails.application.routes.draw do
   # New private feed URLs, when the old ones have been shared or leaked.
   post "account/feeds/regenerate", to: "members/accounts#regenerate_media_token",
        as: :regenerate_media_token
+  # New recovery codes (password-mode / email-off sites).
+  post "account/recovery-codes/regenerate", to: "members/accounts#regenerate_recovery_codes",
+       as: :regenerate_recovery_codes
   # Newsletter on/off from the account page, so a member isn't dependent on
   # finding the unsubscribe link in an email — or on having ever received one.
   patch "account/newsletter", to: "members/accounts#update_newsletter",

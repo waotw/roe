@@ -59,6 +59,41 @@
     <% end %>
   </div>
 
+  <%# Recovery codes — only when the site runs on passwords (email off), the
+      one way back in after a forgotten password. One-time display of a freshly
+      generated set comes through flash[:recovery_codes]; otherwise the section
+      just offers to regenerate. Own class prefix (account-recovery*) so it
+      can't collide with a sibling block's styles or tests. %>
+  <% if SiteFeature.member_passwords_enabled? %>
+    <div class="account-recovery">
+      <h2>Recovery codes</h2>
+      <% if flash[:recovery_codes].present? %>
+        <p class="account-recovery-note">
+          Save these somewhere safe. Each one can reset your password once, and
+          this is the only time they're shown. If you lose them, sign in and
+          generate a new set.
+        </p>
+        <ul class="account-recovery-codes">
+          <% Array(flash[:recovery_codes]).each do |code| %>
+            <li class="account-recovery-code"><code><%= code %></code></li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="account-recovery-note">
+          Recovery codes let you reset your password if you forget it — there's
+          no password-reset email on this site. Generating a new set replaces
+          any you had before.
+        </p>
+      <% end %>
+      <%= button_to "Generate new recovery codes",
+            regenerate_recovery_codes_path,
+            method: :post,
+            class: "btn-secondary",
+            form_class: "account-recovery-form",
+            data: { turbo_confirm: "Generate a new set? Any recovery codes you saved before will stop working." } %>
+    </div>
+  <% end %>
+
   <%# Deleting is last, separated, and asks for a typed word — it can't be
       undone and shouldn't sit next to Edit Account where a mis-click lands.
       The copy names what survives, including the copies Stripe and Postmark

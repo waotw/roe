@@ -132,7 +132,7 @@ class ConfigGenerator
   #      already written it, so the existence check trips and it's
   #      skipped — no double write, no overwrite.
   #   3. Conditional integration drop-ins (Stripe / Postmark).
-  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", newsletter_enabled: false)
+  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", email_enabled: true, newsletter_enabled: false)
     overwrite_from_template(
       folder:   "features/members",
       template: "system/features/members.yml.erb",
@@ -140,6 +140,7 @@ class ConfigGenerator
       locals: {
         payments_enabled:   payments_enabled,
         payment_price:      payment_price,
+        email_enabled:      email_enabled,
         newsletter_enabled: newsletter_enabled,
         show_paid_content:  show_paid_content
       },
@@ -148,7 +149,10 @@ class ConfigGenerator
     install_folder("features/members")
 
     generate_payments_config    if payments_enabled
-    generate_newsletters_config if newsletter_enabled
+    # Postmark backs both the magic-link sign-in and the newsletter, so it's
+    # generated whenever EMAIL is on — not only for newsletters. With email off
+    # there's no mailer to configure (members sign in by password).
+    generate_newsletters_config if email_enabled
   end
 
   # Store. Same pattern as members: overwrite store.yml with the

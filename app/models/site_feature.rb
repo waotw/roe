@@ -43,16 +43,24 @@ module SiteFeature
     SiteConfig.feature("members", "payments.enabled") == true
   end
 
-  # Email is required by members, not optional alongside them: a magic link IS
-  # the sign-in mechanism, so a members site with no way to send one has no way
-  # to let anyone in. Enabled with members, never separately.
+  # Email for members. Was hardcoded to members_enabled? because a magic link
+  # was the only sign-in. Now members can run password-only with no email at
+  # all, so this reads auth.email_enabled from members.yml.
   #
-  # This used to hang off newsletter.enabled, which meant a site running free
-  # members with newsletters off never had postmark.yml generated and never saw
-  # the setting in Settings — so every sign-in email fell through to a fallback
-  # mailer that reports success and delivers nothing.
+  # Defaults to ON when the key is absent: a members.yml written before this
+  # setting existed was, by definition, a magic-link site that needs email —
+  # so a missing key must mean "email on", never off, or an upgrade would lock
+  # every existing member out. Only an explicit `false` turns it off.
   def email_feature_enabled?
-    members_enabled?
+    return false unless members_enabled?
+    SiteConfig.feature("members", "auth.email_enabled") != false
+  end
+
+  # Password sign-in is the mode exactly when email is off: with no way to send
+  # a magic link, a password is the only way in. Self-enforcing — there's no
+  # separate auth-mode toggle to contradict the email setting.
+  def member_passwords_enabled?
+    members_enabled? && !email_feature_enabled?
   end
 
   # Newsletters enabled = members enabled AND newsletter.enabled in members.yml.

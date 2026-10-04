@@ -105,6 +105,18 @@ module Members
       end
     end
 
+    # Fresh recovery codes for a password-mode (email-off) member, shown once
+    # via flash. Replaces any existing set. No-op guard for email-on sites,
+    # where recovery is by magic link and codes have no meaning.
+    def regenerate_recovery_codes
+      unless SiteFeature.member_passwords_enabled?
+        redirect_to account_path and return
+      end
+
+      flash[:recovery_codes] = current_member.generate_recovery_codes!
+      redirect_to account_path, notice: "New recovery codes generated. Save them below — your old codes have stopped working, and this is the only time these are shown."
+    end
+
     private
 
     def account_params

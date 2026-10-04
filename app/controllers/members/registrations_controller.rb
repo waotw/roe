@@ -27,10 +27,27 @@ module Members
       @member.tier = :free
       @member.status = :active
 
+      # Password mode (email off): a password is required at signup — it's the
+      # only way the member will ever sign in, there's no magic link fallback.
+      if SiteFeature.member_passwords_enabled? && params.dig(:member, :password).blank?
+        @member.errors.add(:password, "can't be blank")
+        render "pages/show", status: :unprocessable_entity
+        return
+      end
+
       if @member.save
         # Auto-signin after signup
         session[:member_id] = @member.id
-        redirect_to root_path, notice: "Welcome! You're signed up."
+
+        # Password mode: give the member recovery codes now and show them once —
+        # with no email, this is their only way back in after a forgotten
+        # password. flash.now can't survive a redirect, so stash for one display.
+        if SiteFeature.member_passwords_enabled?
+          flash[:recovery_codes] = @member.generate_recovery_codes!
+          redirect_to account_path, notice: "You're signed up. Save your recovery codes below — you'll need one to reset your password, and this is the only time they're shown."
+        else
+          redirect_to root_path, notice: "Welcome! You're signed up."
+        end
       else
         # Render the page template to preserve the full page content with form
         render "pages/show", status: :unprocessable_entity
@@ -87,7 +104,10 @@ module Members
     private
 
     def registration_params
-      params.require(:member).permit(:email, :name)
+      # Password is permitted so a password-mode (email off) signup can set one;
+      # has_secure_password ignores a blank password, so email-mode signups that
+      # never send the field are unaffected.
+      params.require(:member).permit(:email, :name, :password)
     end
 
     def redirect_if_signed_in

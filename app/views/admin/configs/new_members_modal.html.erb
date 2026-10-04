@@ -58,12 +58,43 @@
         </div>
       </div>
 
+      <!-- Email (Postmark) -->
+      <%# COPY: placeholder wording — owner will rewrite %>
+      <div class="bg-gray-50 border border-gray-300 p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">Email</h3>
+
+        <p class="text-sm text-gray-700 mb-4">
+          Send members a sign-in link and account emails via Postmark. Postmark
+          costs about $20/month at their base plan. Leave this off to run
+          members with passwords instead and no external email service. Required
+          if you want a newsletter.
+        </p>
+
+        <div class="space-y-3">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <%= f.radio_button :email_enabled, 'true', checked: true, class: "mt-1" %>
+            <div>
+              <div class="font-medium text-gray-900">Enabled</div>
+              <div class="text-sm text-gray-600">Members sign in with an emailed link (requires Postmark)</div>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 cursor-pointer">
+            <%= f.radio_button :email_enabled, 'false', class: "mt-1" %>
+            <div>
+              <div class="font-medium text-gray-900">Disabled</div>
+              <div class="text-sm text-gray-600">Members sign in with a password — no email service needed</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- Newsletter -->
       <div class="bg-gray-50 border border-gray-300 p-6">
         <h3 class="font-semibold text-gray-900 mb-3">Newsletter</h3>
 
         <p class="text-sm text-gray-700 mb-4">
-          Send newsletters to members via Postmark (requires Postmark configuration)
+          Send newsletters to members via Postmark (requires Email, above, to be enabled)
         </p>
 
         <div class="space-y-3">

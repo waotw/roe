@@ -3196,6 +3196,8 @@ module HasMarkdownExtensions
       render_signup_form(button_text, upgrade_text)
     when "signin"
       render_signin_form(button_text)
+    when "recovery"
+      render_recovery_form(button_text)
     when "checkout"
       member_text = config["member-button-text"] || config["member_button_text"] || button_text
       non_member_text = config["non-member-button-text"] || config["non_member_button_text"]
@@ -3271,6 +3273,7 @@ module HasMarkdownExtensions
     {
       "signup" => "Sign Up",
       "signin" => "Sign In",
+      "recovery" => "Reset Password",
       "checkout" => "Upgrade",
       "donate" => "Donate"
     }[form_type] || "Submit"
@@ -3481,6 +3484,19 @@ module HasMarkdownExtensions
     name_value = member ? CGI.escape_html(member.name.to_s) : ""
     email_value = member ? CGI.escape_html(member.email.to_s) : ""
 
+    # Password mode (email off): the member sets a password at signup, since
+    # there's no magic link and no email to send a set-password link to.
+    password_field = if SiteFeature.member_passwords_enabled?
+      <<~HTML
+        <div class="form-field">
+          <label for="member_password">Password</label>
+          <input type="password" name="member[password]" id="member_password" required>
+        </div>
+      HTML
+    else
+      ""
+    end
+
     <<~HTML
       <form action="/signup" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
@@ -3496,6 +3512,8 @@ module HasMarkdownExtensions
           <label for="member_email">Email</label>
           <input type="email" name="member[email]" id="member_email" value="#{email_value}" required>
         </div>
+
+        #{password_field}
 
         <button type="submit" class="btn-outline">#{button_text}</button>
         #{upgrade_button}
@@ -3515,6 +3533,31 @@ module HasMarkdownExtensions
       HTML
     end
 
+    # Password mode (email off): a magic link can't be sent, so sign-in is
+    # email + password. The button text default only fits the magic-link case,
+    # so swap it when the caller left it at the default.
+    if SiteFeature.member_passwords_enabled?
+      pw_button = button_text == "Send Magic Link" ? "Sign In" : button_text
+      return <<~HTML
+        <form action="/signin" method="post">
+          <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+
+          <div class="form-field">
+            <label for="member_email">Email</label>
+            <input type="email" name="member[email]" id="member_email" required>
+          </div>
+
+          <div class="form-field">
+            <label for="member_password">Password</label>
+            <input type="password" name="member[password]" id="member_password" required>
+          </div>
+
+          <button type="submit" class="btn-outline">#{CGI.escape_html(pw_button)}</button>
+          <p class="signin-recovery-link"><a href="/recover-account">Forgot your password?</a></p>
+        </form>
+      HTML
+    end
+
     <<~HTML
       <form action="/signin" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
@@ -3525,6 +3568,49 @@ module HasMarkdownExtensions
         </div>
 
         <button type="submit" class="btn-outline">#{button_text}</button>
+      </form>
+    HTML
+  end
+
+  # Password reset via a recovery code, for an email-off site. Only renders in
+  # password mode — with email on, there's nothing to recover this way (members
+  # reset by magic link). Posts to /recover-account (Members::RecoveryController).
+  def render_recovery_form(button_text = "Reset Password")
+    return "" unless SiteFeature.member_passwords_enabled?
+
+    if @rendering_static
+      return <<~HTML
+        <div class="recovery-link-block">
+          <a href="/recover-account" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+        </div>
+      HTML
+    end
+
+    <<~HTML
+      <form action="/recover-account" method="post">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+
+        <div class="form-field">
+          <label for="recovery_email">Email</label>
+          <input type="email" name="email" id="recovery_email" required>
+        </div>
+
+        <div class="form-field">
+          <label for="recovery_code">Recovery code</label>
+          <input type="text" name="recovery_code" id="recovery_code" required>
+        </div>
+
+        <div class="form-field">
+          <label for="recovery_password">New password</label>
+          <input type="password" name="password" id="recovery_password" required>
+        </div>
+
+        <div class="form-field">
+          <label for="recovery_password_confirmation">Confirm new password</label>
+          <input type="password" name="password_confirmation" id="recovery_password_confirmation" required>
+        </div>
+
+        <button type="submit" class="btn-outline">#{CGI.escape_html(button_text)}</button>
       </form>
     HTML
   end

@@ -9,6 +9,12 @@ class Member < ApplicationRecord
 
   belongs_to :import, optional: true
 
+  # Recovery codes for a password reset when the site runs with email off.
+  # Mirrors the admin User#recovery_codes. See MemberRecoveryCode.
+  has_many :member_recovery_codes, dependent: :destroy
+
+  RECOVERY_CODE_COUNT = 8
+
   # No dependent: — a donation is a payment record and outlives the account.
   has_many :donations
   has_many :newsletter_sends, dependent: :destroy
@@ -287,6 +293,37 @@ class Member < ApplicationRecord
         password: password,
         password_confirmation: password
       )
+    end
+  end
+
+  # Wipe + regenerate this member's recovery codes, returning the plaintext set
+  # (dash-formatted) for one-time display. Plaintext is never stored — only the
+  # bcrypt digest of each normalized code. Mirrors User#generate_recovery_codes!.
+  def generate_recovery_codes!
+    plaintexts = Array.new(RECOVERY_CODE_COUNT) { RecoveryCode.generate_plaintext }
+    transaction do
+      member_recovery_codes.destroy_all
+      plaintexts.each do |display|
+        normalized = RecoveryCode.normalize_plaintext(display)
+        member_recovery_codes.create!(code_digest: BCrypt::Password.create(normalized))
+      end
+    end
+    plaintexts
+  end
+
+  # Find the MemberRecoveryCode whose digest matches the supplied plaintext
+  # (with or without dashes), consumed or not. nil on a miss. Caller checks
+  # #consumed? to tell a spent code from an invalid one. Mirrors
+  # User#find_recovery_code.
+  def find_recovery_code(plaintext)
+    normalized = RecoveryCode.normalize_plaintext(plaintext)
+    return nil if normalized.empty?
+    member_recovery_codes.find do |rc|
+      begin
+        BCrypt::Password.new(rc.code_digest) == normalized
+      rescue BCrypt::Errors::InvalidHash
+        false
+      end
     end
   end
 

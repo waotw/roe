@@ -85,6 +85,30 @@ class MemberMailer
       )
     end
 
+    # The one final email a site sends when switching from magic-link to
+    # password sign-in: a temporary password the member resets after signing
+    # in. Sent once, per member, during the email->off migration — after this
+    # the site has no mailer.
+    def final_password(member, temp_password)
+      site_name = SiteConfig.get("title") || "the site"
+      signin_url = Rails.application.routes.url_helpers.signin_url(host: site_url)
+
+      html_body = EmailRenderer.render("final_password", {
+        member_name: member.name || "there",
+        member_email: member.email,
+        temp_password: temp_password,
+        signin_url: signin_url,
+        site_name: site_name
+      })
+
+      send_email(
+        to: member.email,
+        to_name: member.name || member.email,
+        subject: "Your new password for #{site_name}",
+        html_content: html_body
+      )
+    end
+
     def email_changed(member, old_email)
       site_name = SiteConfig.get("title") || "the site"
 

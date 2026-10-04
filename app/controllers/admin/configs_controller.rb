@@ -1285,7 +1285,47 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_members
+    # Turning email OFF on a live members site is a one-way door for how members
+    # sign in — magic links stop, passwords start. Intercept and make the owner
+    # choose explicitly (switch to passwords, or turn members off) rather than
+    # flipping silently and locking existing members out. Only when email is
+    # actually going on -> off AND there are members who'd be affected.
+    if members_email_turning_off?(params[:content]) && Member.active.exists?
+      @config_type = "members"
+      @config_content = params[:content]
+      @affected_member_count = Member.active.count
+      render :confirm_email_off and return
+    end
+
     update_config("features/members", SiteConfig::FEATURES_PATH.join("members.yml"))
+  end
+
+  # The owner chose, on the confirm screen, to switch to passwords. Save the
+  # members.yml with email off, give every active member a generated password,
+  # and send each one final email with it. After this the site has no mailer —
+  # so this is the last thing email is used for, and it has to run BEFORE the
+  # config save would make email_feature_enabled? false.
+  def confirm_members_passwords
+    content = params[:content].to_s
+
+    # Send the final-password emails while email still works (config not yet
+    # saved). Each member gets a fresh generated password, hashed into their
+    # digest; the plaintext only lives long enough to email.
+    sent = 0
+    Member.active.find_each do |member|
+      temp = Member.generate_password
+      member.update!(password: temp, password_confirmation: temp)
+      result = MemberMailer.final_password(member, temp)
+      sent += 1 unless result.is_a?(Hash) && result[:success] == false
+    end
+
+    # Now commit the config (email off). update_config redirects on success.
+    SiteFile.write(SiteConfig::FEATURES_PATH.join("members.yml"), content)
+    SiteConfig.sync_from_file("features/members")
+    Rails.cache.clear
+
+    flash[:notice] = "Members now sign in with a password. Sent a temporary password to #{sent} #{'member'.pluralize(sent)}; they'll reset it after signing in."
+    redirect_to admin_edit_members_config_path
   end
 
   def new_members_setup
@@ -1301,12 +1341,16 @@ class Admin::ConfigsController < Admin::BaseController
     show_paid = params[:show_paid_content] == "true"
     payments_enabled = params[:payments_enabled] == "true"
     payment_price = params[:payment_price].presence || "0.00"
-    newsletter_enabled = params[:newsletter_enabled] == "true"
+    email_enabled = params[:email_enabled] != "false"
+    # Newsletter needs email to send — can't broadcast with no mailer. If email
+    # is off, newsletter is forced off regardless of what the form said.
+    newsletter_enabled = email_enabled && params[:newsletter_enabled] == "true"
 
     ConfigGenerator.new.generate_members_defaults(
       show_paid_content: show_paid,
       payments_enabled: payments_enabled,
       payment_price: payment_price,
+      email_enabled: email_enabled,
       newsletter_enabled: newsletter_enabled
     )
     SiteConfig.sync_from_file("defaults/members")
@@ -2422,21 +2466,40 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   # Settings that read as on/off rather than as a choice between two things.
-  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon" ].freeze
+  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon", "auth.email_enabled", "newsletter.enabled" ].freeze
 
-  # Display defaults for a members.yml written before this section existed.
-  # Merged ahead of the file's own keys so the section renders first, and only
-  # for keys the file doesn't already set — saving the form writes it back, so
-  # this seeds the setting once rather than on every load.
+  # Whether the submitted members.yml turns email from on -> off, compared to
+  # the current on-disk state via the same rule SiteFeature uses (absent key =
+  # on). Drives the confirm-email-off interception in update_members.
+  def members_email_turning_off?(content)
+    return false unless SiteFeature.email_feature_enabled? # currently on?
+    pending = begin
+      YAML.safe_load(content.to_s, permitted_classes: [ Date, Time, Symbol ], aliases: true)
+    rescue Psych::Exception
+      nil
+    end
+    return false unless pending.is_a?(Hash)
+    pending.dig("auth", "email_enabled") == false
+  end
+
+  # Display defaults for a members.yml written before a section existed. Merged
+  # ahead of the file's own keys so the section renders, and only for keys the
+  # file doesn't already set — saving the form writes it back, so this seeds
+  # the setting once rather than on every load.
   def with_members_display_defaults(config)
     display = { "always_show_member_icon" => false }.merge(config["display"] || {})
-    { "display" => display }.merge(config)
+    # Seed auth.email_enabled so the Email checkbox always renders. Default true
+    # for a members.yml written before this setting existed — it was a
+    # magic-link site, so email is on (matches SiteFeature#email_feature_enabled?).
+    auth = { "email_enabled" => true }.merge(config["auth"] || {})
+    { "display" => display, "auth" => auth }.merge(config)
   end
 
   def build_field_options_for_members
     {
       "payments.enabled" => [ "false", "true" ],
       "payments.mode" => [ "memberships", "donations", "both" ],
+      "auth.email_enabled" => [ "false", "true" ],
       "newsletter.enabled" => [ "false", "true" ],
       "everyone.show_paid_content" => [ "true", "false" ]
     }
@@ -2483,7 +2546,8 @@ class Admin::ConfigsController < Admin::BaseController
       "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.",
       "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       "payments.donation_amounts" => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
-      "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Postmark account & configuration)",
+      "auth.email_enabled" => "Use email for members (requires Postmark, about $20/month). On: members sign in with an emailed link and get account emails. Off: members sign in with a password and no email service is needed. Must be on to send a newsletter.",
+      "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Email, above, to be enabled)",
       "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.",
       "display.always_show_member_icon" => "Keep the account icon in the site header for everyone, not just signed-in members. Signed out, it links to your sign-in page. Leave this off and the icon appears only once someone signs in."
     }
