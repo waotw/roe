@@ -4,12 +4,12 @@
 
     <div class="mb-6">
       <p class="text-gray-700 mb-4">
-        Once enabled, you'll see extra settings in the upper right of the Admin ↗ where you can set up Postmark for newsletters, Payments with Stripe and manage Members.
+        Once enabled, there will be a new Members link to manage members ↗ and settings on the Settings → Roe page where you can set up Postmark and Stripe integrations (if needed).
       </p>
       <div class="bg-blue-50 border border-blue-300 p-4">
         <p class="text-sm text-gray-700 leading-7">
           <strong>Note:</strong> You can change these settings anytime at: <br>
-          <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">Settings → Defaults → members.yml </code>
+          <code class="bg-white px-2 py-1 text-xs font-mono border border-gray-300">Settings → Roe → Features → members.yml </code>
         </p>
       </div>
     </div>
@@ -21,7 +21,7 @@
         <h3 class="font-semibold text-gray-900 mb-3">Paid Memberships</h3>
 
         <p class="text-sm text-gray-700 mb-4">
-          Enable one-time payments via Stripe (requires Stripe connection)
+          Enable one-time payments and donations via Stripe (requires Stripe connection)
         </p>
 
         <div class="space-y-3">
@@ -44,7 +44,7 @@
 
         <div id="payment-price-field" class="mt-4">
           <label class="block">
-            <span class="text-sm font-medium text-gray-900">Price (one-time payment)</span>
+            <span class="text-sm font-medium text-gray-900">Membership Price (one-time payment)</span>
             <div class="mt-1 flex items-center gap-2">
               <span class="text-gray-700">$</span>
               <%= f.text_field :payment_price,
@@ -53,7 +53,7 @@
                   class: "w-32 px-3 py-2 border border-gray-300 rounded text-sm font-mono" %>
               <span class="text-sm text-gray-600">USD</span>
             </div>
-            <p class="text-xs text-gray-500 mt-1">Enter amount in dollars (e.g., 49.00)</p>
+            <p class="text-xs text-gray-500 mt-1">Enter amount in dollars (e.g., 120.00)</p>
           </label>
         </div>
       </div>
@@ -94,7 +94,7 @@
         <h3 class="font-semibold text-gray-900 mb-3">Newsletter</h3>
 
         <p class="text-sm text-gray-700 mb-4">
-          Send newsletters to members via Postmark (requires Email, above, to be enabled)
+          Send newsletters to members via Postmark (requires Email ↑ to be enabled)
         </p>
 
         <div class="space-y-3">
@@ -102,7 +102,7 @@
             <%= f.radio_button :newsletter_enabled, 'false', checked: true, class: "mt-1" %>
             <div>
               <div class="font-medium text-gray-900">Disabled</div>
-              <div class="text-sm text-gray-600">No newsletter sending</div>
+              <div class="text-sm text-gray-600">No newsletter</div>
             </div>
           </label>
 
@@ -137,7 +137,7 @@
                     <path d="M5.12 10.89c0 .56.24.82.77.82h3.97c.52 0 .77-.26.77-.82V7.87c0-.51-.22-.77-.64-.81v-.86c0-1.45-.85-2.42-2.12-2.42-1.26 0-2.12.97-2.12 2.42v.86c-.42.04-.64.3-.64.82zm1.52-3.84V6.1c0-.88.49-1.46 1.23-1.46s1.24.58 1.24 1.46v.95z"/>
                   </svg>
                 </span>
-                indicator.
+                indicator and previews of paid posts.
               </div>
             </div>
           </label>

@@ -1,5 +1,6 @@
 <div class="px-4 sm:px-0 font-mono"
-     data-controller="members-filter"
+     data-controller="members-filter members-bulk-select"
+     data-action="members-filter:changed->members-bulk-select#refresh"
      data-members-filter-total-value="<%= @members.count %>">
 
   <div class="sm:flex sm:items-center">
@@ -12,26 +13,9 @@
     </div>
   </div>
 
-  <!-- Tabs for Tiers -->
-  <div class="mt-6 border-b border-gray-200">
-    <nav class="-mb-px flex space-x-8" data-members-filter-target="tabContainer">
-      <button data-action="click->members-filter#filterByTier" data-tier="all" data-members-filter-target="tab"
-              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-        All
-      </button>
-      <button data-action="click->members-filter#filterByTier" data-tier="free" data-members-filter-target="tab"
-              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-        Free
-      </button>
-      <button data-action="click->members-filter#filterByTier" data-tier="paid" data-members-filter-target="tab"
-              class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-        Paid
-      </button>
-    </nav>
-  </div>
-
   <!-- Filters & Search -->
-  <div class="mt-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+  <div class="mt-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-wrap">
+
     <!-- Status Filter -->
     <div class="flex-shrink-0">
       <select
@@ -45,18 +29,21 @@
       </select>
     </div>
 
-    <!-- Newsletter Status Filter -->
-    <div class="flex-shrink-0">
-      <select
-        data-members-filter-target="newsletterStatusFilter"
-        data-action="change->members-filter#filterByNewsletterStatus"
-        class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat">
-        <option value="all">All Newsletter Status</option>
-        <option value="subscribed">📬 Subscribed</option>
-        <option value="unsubscribed">🔕 Unsubscribed</option>
-        <option value="bounced">⚠️ Bounced</option>
-      </select>
-    </div>
+    <%# Newsletter Status Filter — only meaningful when newsletters are a
+        feature. Without them, every member's newsletter_status is noise. %>
+    <% if @show_newsletter_filter %>
+      <div class="flex-shrink-0">
+        <select
+          data-members-filter-target="newsletterStatusFilter"
+          data-action="change->members-filter#filterByNewsletterStatus"
+          class="block w-full bg-white rounded-xs border border-gray-500 text-xs focus:border-blue-50 focus:ring-blue-300 pl-2 pr-7 py-2 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem] bg-[right_0.20rem_center] bg-no-repeat">
+          <option value="all">All Newsletter Status</option>
+          <option value="subscribed">📬 Subscribed</option>
+          <option value="unsubscribed">🔕 Unsubscribed</option>
+          <option value="bounced">⚠️ Bounced</option>
+        </select>
+      </div>
+    <% end %>
 
     <!-- Sort Dropdown -->
     <div class="flex-shrink-0">
@@ -83,23 +70,221 @@
   </div>
 
   <!-- Results Counter -->
-  <p class="mt-3 text-xs text-gray-500 font-sans">
-    Showing <span data-members-filter-target="count"><%= @members.count %></span> of <%= @members.count %> members
-  </p>
+  <div class="flex gap-4 mt-2 justify-between items-center">
+    <p class="text-xs text-gray-500 font-sans">
+      Showing <span data-members-filter-target="count"><%= @members.count %></span> of <%= @members.count %> members
+    </p>
+    <div class="flex gap-4">
+      <%# Imported — its own checkbox (doesn't fit under tier/status). Only when
+          some member actually came from an import. %>
+      <% if @has_imported %>
+        <div class="flex-shrink-0 flex items-center border border-gray-300 rounded-xs px-3 py-1.5 bg-white">
+          <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+            <input type="checkbox" data-members-filter-target="importedFilter"
+                  data-action="change->members-filter#filterByImported" value="1" class="w-4 h-4">
+            Imported
+          </label>
+        </div>
+      <% end %>
 
-  <div class="mt-4 flex flex-col">
+      <%# Tier filter as checkboxes (media-browser style), replacing the old
+          ALL/FREE/PAID tabs. Only shown when the site has BOTH free and paid
+          members — with one kind there's nothing to filter. Both unchecked OR
+          both checked = show all. %>
+      <% if @show_tier_filter %>
+        <div class="flex-shrink-0 flex items-center gap-3 border border-gray-300 rounded-xs px-3 py-1.5 bg-white">
+          <!--<span class="text-xs uppercase text-gray-500 font-sans">Tier</span>-->
+          <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+            <input type="checkbox" data-members-filter-target="tierFilter"
+                  data-action="change->members-filter#filterByTier" value="free" class="w-4 h-4">
+            Free
+          </label>
+          <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+            <input type="checkbox" data-members-filter-target="tierFilter"
+                  data-action="change->members-filter#filterByTier" value="paid" class="w-4 h-4">
+            Paid
+          </label>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Bulk action toolbar — appears when rows are selected (SELECT toggle on
+      the table). Members-specific actions; see members_bulk_select_controller.
+      Each action is its own form carrying a hidden ids container the controller
+      fills from the current selection on submit. %>
+  <div data-members-bulk-select-target="toolbar"
+       class="hidden flex-col gap-2 mt-3 p-3 border border-blue-300 bg-blue-50 rounded-xs flex">
+    <%# Row 1 — selection summary + select-all-visible/clear. %>
+    <div class="flex items-center gap-2 flex-wrap">
+      <p class="text-xs font-mono text-blue-800"><span data-members-bulk-select-target="count">0</span> selected:</p>
+      <button type="button" data-action="members-bulk-select#selectAllVisible"
+              class="text-xs px-3 py-1.5 border border-blue-600 bg-blue-100 hover:bg-blue-200 rounded-xs font-mono uppercase cursor-pointer">
+        Select all visible<span data-members-bulk-select-target="visibleCount"></span>
+      </button>
+      <button type="button" data-action="members-bulk-select#clearSelection"
+              class="text-xs px-3 py-1.5 border border-gray-600 bg-white hover:bg-gray-100 rounded-xs font-mono uppercase cursor-pointer">
+        Clear Selection
+      </button>
+    </div>
+
+    <%# Row 2 — the actions. Uniform gap-2 between every button; the only
+        grouping is proximity (related buttons sit next to each other). %>
+    <div class="flex items-center gap-2 flex-wrap">
+      <span data-members-bulk-select-target="normalAction" class="contents">
+      <%# UPGRADE / DOWNGRADE — shown by selection: free→Upgrade, paid→Downgrade,
+          mixed→both (each makes the whole selection that tier). %>
+      <%= form_with url: bulk_set_tier_admin_members_path, method: :post, data: { turbo: false }, class: "contents" do %>
+        <%= hidden_field_tag :tier, "paid" %>
+        <div data-members-bulk-select-target="formIds" class="hidden"></div>
+        <button type="submit" data-members-bulk-select-target="upgradeButton"
+                data-action="members-bulk-select#submitTier"
+                class="hidden text-xs px-3 py-1.5 border border-green-600 bg-green-100 hover:bg-green-200 rounded-xs font-mono uppercase cursor-pointer">
+          Upgrade to Paid
+        </button>
+      <% end %>
+
+      <%= form_with url: bulk_set_tier_admin_members_path, method: :post, data: { turbo: false }, class: "contents" do %>
+        <%= hidden_field_tag :tier, "free" %>
+        <div data-members-bulk-select-target="formIds" class="hidden"></div>
+        <button type="submit" data-members-bulk-select-target="downgradeButton"
+                data-action="members-bulk-select#submitTier"
+                class="hidden text-xs px-3 py-1.5 border border-amber-600 bg-amber-100 hover:bg-amber-200 rounded-xs font-mono uppercase cursor-pointer">
+          Downgrade to Free
+        </button>
+      <% end %>
+
+      <%# SUBSCRIBE / UNSUBSCRIBE — only when newsletters are enabled. %>
+      <% if @show_newsletter_filter %>
+        <%= form_with url: bulk_newsletter_admin_members_path, method: :post, data: { turbo: false }, class: "contents" do %>
+          <%= hidden_field_tag :newsletter, "subscribe" %>
+          <div data-members-bulk-select-target="formIds" class="hidden"></div>
+          <button type="submit" data-action="members-bulk-select#submitNewsletter"
+                  data-members-bulk-select-target="subscribeButton"
+                  class="hidden text-xs px-3 py-1.5 border border-green-600 bg-green-100 hover:bg-green-200 rounded-xs font-mono uppercase cursor-pointer">
+            Subscribe
+          </button>
+        <% end %>
+        <%= form_with url: bulk_newsletter_admin_members_path, method: :post, data: { turbo: false }, class: "contents" do %>
+          <%= hidden_field_tag :newsletter, "unsubscribe" %>
+          <div data-members-bulk-select-target="formIds" class="hidden"></div>
+          <button type="submit" data-action="members-bulk-select#submitNewsletter"
+                  data-members-bulk-select-target="unsubscribeButton"
+                  class="hidden text-xs px-3 py-1.5 border border-amber-600 bg-amber-100 hover:bg-amber-200 rounded-xs font-mono uppercase cursor-pointer">
+            Unsubscribe
+          </button>
+        <% end %>
+      <% end %>
+
+      <button type="button" data-action="members-bulk-select#openDelete"
+              class="text-xs px-3 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 rounded-xs font-mono uppercase cursor-pointer">
+        Delete Selected
+      </button>
+      </span>
+
+      <%# Purge — only rendered active when EVERY selected row is an already-
+          deleted account (members_bulk_select#update swaps to this). Hidden by
+          default. Its own heavy modal names the permanent record loss. %>
+      <button type="button" data-members-bulk-select-target="purgeButton"
+              data-action="members-bulk-select#openPurge"
+              class="hidden text-xs px-3 py-1.5 border border-red-700 bg-red-700 text-white hover:bg-red-800 rounded-xs font-mono uppercase cursor-pointer">
+        Permanently Delete
+      </button>
+    </div>
+  </div>
+
+  <%# Delete confirm — type DELETE. Routes through the same erase/anonymise
+      rules as single delete (payment/delivery history is kept). %>
+  <div data-members-bulk-select-target="deleteModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4">
+      <h3 class="text-lg font-bold text-gray-900 mb-2">Delete selected members?</h3>
+      <p class="text-sm text-gray-600 mb-4">
+        Members with nothing behind them are removed. Any with payment or
+        delivery history are anonymised instead — their records are kept without
+        a name or email. This can't be undone.
+      </p>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Type <strong>DELETE</strong> to confirm:</label>
+        <input type="text" data-members-bulk-select-target="deleteInput"
+               data-action="input->members-bulk-select#deleteInputChanged keydown->members-bulk-select#deleteInputKeydown"
+               class="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+               placeholder="DELETE" autocomplete="off">
+      </div>
+      <%= form_with url: bulk_destroy_admin_members_path, method: :post, data: { turbo: false } do %>
+        <div data-members-bulk-select-target="deleteIds"></div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" data-action="members-bulk-select#closeModals"
+                  class="px-4 py-2 border font-mono border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 hover:text-gray-600 rounded-xs">CANCEL</button>
+          <button type="submit" data-members-bulk-select-target="deleteSubmit" disabled
+                  class="px-4 py-2 font-mono border border-transparent text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xs">
+            DELETE PERMANENTLY
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Purge confirm — the heavy one. Permanently destroys the account and ALL
+      records (donations, delivery history, recovery codes). Only valid on
+      already-deleted accounts; the server re-checks. Type DELETE. %>
+  <div data-members-bulk-select-target="purgeModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div class="bg-white p-6 shadow-xl max-w-md w-full mx-4 border-2 border-red-700">
+      <h3 class="text-lg font-bold text-red-800 mb-2">Permanently delete these accounts?</h3>
+      <p class="text-sm text-gray-700 mb-2">
+        This is not the same as deleting a member. It permanently erases each
+        selected account <strong>and every record attached to it</strong> —
+        payment and donation history, amounts, and delivery history — with
+        nothing kept.
+      </p>
+      <p class="text-sm text-red-700 font-semibold mb-4">
+        This cannot be undone, and it removes financial records you may need for
+        accounting. Only do this for accounts you're certain you'll never need.
+      </p>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Type <strong>DELETE</strong> to confirm:</label>
+        <input type="text" data-members-bulk-select-target="purgeInput"
+               data-action="input->members-bulk-select#purgeInputChanged keydown->members-bulk-select#purgeInputKeydown"
+               class="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+               placeholder="DELETE" autocomplete="off">
+      </div>
+      <%= form_with url: bulk_purge_admin_members_path, method: :post, data: { turbo: false } do %>
+        <div data-members-bulk-select-target="purgeIds"></div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" data-action="members-bulk-select#closeModals"
+                  class="px-4 py-2 border font-mono border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50 hover:text-gray-500 rounded-xs">CANCEL</button>
+          <button type="submit" data-members-bulk-select-target="purgeSubmit" disabled
+                  class="px-4 py-2 font-mono border border-transparent text-sm text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xs">
+            PERMANENTLY DELETE
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="mt-5 flex flex-col">
     <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
         <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
           <table class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Email</th>
+                <th scope="col" data-members-bulk-select-target="selectColumn" class="hidden py-2 pl-4 pr-2 w-8">
+                  <span class="sr-only">Select</span>
+                </th>
+                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">
+                  <span class="inline-flex items-center gap-2">
+                    Email
+                    <button type="button" data-action="members-bulk-select#toggleMode" data-members-bulk-select-target="toggle"
+                            class="uppercase text-[10px] px-2 py-0.5 border border-gray-800 bg-white hover:bg-gray-200 font-mono rounded-xs cursor-pointer">Select</button>
+                  </span>
+                </th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Name</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Tier</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Newsletter</th>
-                <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Joined</th>
+                <% if @show_newsletter_filter %>
+                  <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Newsletter</th>
+                <% end %>
+                <!--<th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Joined</th>-->
                 <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
                   <span class="sr-only">Actions</span>
                 </th>
@@ -111,23 +296,33 @@
                     data-tier="<%= member.tier %>"
                     data-status="<%= member.status %>"
                     data-newsletter-status="<%= member.newsletter_status %>"
+                    data-imported="<%= member.metadata['substack_imported'] ? '1' : '0' %>"
                     data-created-at="<%= member.created_at.to_i %>"
                     data-email="<%= member.email %>"
                     data-searchable="<%= [member.email, member.name].compact.join(' ').downcase %>">
-                  <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-sm font-medium text-gray-900">
+                  <td data-members-bulk-select-target="selectColumn" class="hidden pl-4 pr-2 w-8 align-middle">
+                    <input type="checkbox"
+                           data-members-bulk-select-target="checkbox"
+                           data-action="change->members-bulk-select#update"
+                           data-id="<%= member.id %>"
+                           data-tier="<%= member.tier %>"
+                           data-newsletter-status="<%= member.newsletter_status %>"
+                           data-deleted="<%= member.anonymized? ? '1' : '0' %>">
+                  </td>
+                  <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-xs font-medium text-gray-900">
                     <%= link_to member.email, admin_member_path(member), class: "text-blue-600 hover:text-blue-900" %>
                   </td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                  <td class="whitespace-nowrap px-1.5 py-2 text-xs text-gray-500">
                     <%= member.name %>
                   </td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                  <td class="whitespace-nowrap px-1.5 py-2 text-sm text-gray-500">
                     <% if member.paid? %>
                       <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800">Paid</span>
                     <% else %>
                       <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">Free</span>
                     <% end %>
                   </td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                  <td class="whitespace-nowrap px-1.5 py-2 text-sm text-gray-500">
                     <% if member.active? %>
                       <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Active</span>
                     <% elsif member.anonymized? %>
@@ -136,21 +331,23 @@
                       <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">Cancelled</span>
                     <% end %>
                   </td>
-                  <!-- NEW: Newsletter Status Column -->
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
-                    <% if member.newsletter_subscribed? %>
-                      <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">📬 Subscribed</span>
-                    <% elsif member.newsletter_status == 'bounced' %>
-                      <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">⚠️ Bounced</span>
-                    <% else %>
-                      <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">🔕 Unsubscribed</span>
-                    <% end %>
-                  </td>
-                  <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
+                  <!-- Newsletter Status Column — only when newsletters are enabled -->
+                  <% if @show_newsletter_filter %>
+                    <td class="whitespace-nowrap py-2 text-sm text-gray-500">
+                      <% if member.newsletter_subscribed? %>
+                        <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">📬 Sub…</span>
+                      <% elsif member.newsletter_status == 'bounced' %>
+                        <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">⚠️ Bounced</span>
+                      <% else %>
+                        <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">🔕 Unsub…</span>
+                      <% end %>
+                    </td>
+                  <% end %>
+                  <!--<td class="whitespace-nowrap px-1.5 py-2 text-xs text-gray-500">
                     <%= member.subscribed_at&.strftime("%b %d, %Y") || member.created_at.strftime("%b %d, %Y") %>
-                  </td>
-                  <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-                    <%= link_to "View/Edit", admin_member_path(member), class: "text-blue-600 hover:text-blue-900 mr-4 text-xs" %>
+                  </td>-->
+                  <td class="relative whitespace-nowrap py-2 pl-1 pr-1 text-right text-sm font-medium">
+                    <%= link_to "View/Edit", admin_member_path(member), class: "text-blue-600 hover:text-blue-900 text-xs" %>
                   </td>
                 </tr>
               <% end %>

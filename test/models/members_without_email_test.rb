@@ -105,3 +105,33 @@ class MemberPasswordSigninTest < ActionDispatch::IntegrationTest
     post "/signin", params: { member: { email: member.email, password: "right-pass-11" } }
   end
 end
+
+# Turning email off is a silent switch — it never emails members (inviting them
+# is a separate, explicit step done while email still works). Guards against the
+# regression where imported-but-not-launched members got blasted sign-in emails.
+class ConfirmMembersPasswordsTest < ActionDispatch::IntegrationTest
+  setup do
+    user = User.create!(email_address: "admin-probe@example.com", password: "probe-pass-123", password_confirmation: "probe-pass-123") rescue User.first
+    post "/session", params: { email_address: user.email_address, password: "probe-pass-123" }
+    @fp = RoeSitePaths::SITE_PATH + "/system/features/members.yml"
+    FileUtils.mkdir_p(File.dirname(@fp))
+    File.write(@fp, "payments:\n  enabled: false\n") # email on (no auth key)
+    SiteConfig.sync_from_file("features/members")
+    create(:member, :active)
+    @off = "auth:\n  email_enabled: false\npayments:\n  enabled: false\n"
+  end
+
+  teardown { File.delete(@fp) if File.exist?(@fp) }
+
+  test "switch without acknowledgment does nothing" do
+    MemberMailer.expects(:final_password).never
+    post "/admin/configs/confirm_members_passwords", params: { content: @off }
+    refute File.read(@fp).include?("email_enabled: false"), "email must stay on until acknowledged"
+  end
+
+  test "acknowledged switch turns email off and sends no email" do
+    MemberMailer.expects(:final_password).never
+    post "/admin/configs/confirm_members_passwords", params: { content: @off, acknowledge_invited: "1" }
+    assert File.read(@fp).include?("email_enabled: false"), "email is now off"
+  end
+end

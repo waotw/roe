@@ -27,6 +27,16 @@ module Admin
                                   "%#{params[:search]}%",
                                   "%#{params[:search]}%")
       end
+
+      # Which filter controls to render. Tier checkboxes only make sense when
+      # the site actually has both free and paid members — with one kind there
+      # is nothing to filter. Imported only when some member came from an
+      # import. Newsletter status only when newsletters are a feature at all.
+      @has_free        = Member.free_tier.exists?
+      @has_paid        = Member.paid_tier.exists?
+      @show_tier_filter = @has_free && @has_paid
+      @has_imported    = Member.imported.exists?
+      @show_newsletter_filter = SiteFeature.newsletters_feature_enabled?
     end
 
     def show
@@ -110,7 +120,117 @@ module Admin
       redirect_to admin_member_path(@member), notice: "Membership reactivated"
     end
 
+    # ── Bulk actions ─────────────────────────────────────────────────────────
+    # Selection happens client-side (bulk_select_controller.js); these receive
+    # the chosen ids. Deliberately NOT the file-oriented BulkContentActions
+    # concern — members are DB records with their own delete rules (erase vs
+    # anonymise) and member-specific actions (tier, newsletter).
+
+    # Delete each selected member by the same rule as single delete: erase the
+    # ones with nothing behind them, anonymise the rest (Member#anonymize!), so
+    # payment/delivery history is never collaterally destroyed. Deleted-account
+    # rows are skipped — there's nothing left to remove.
+    def bulk_destroy
+      erased = 0
+      anonymized = 0
+      Member.where(id: bulk_member_ids).find_each do |member|
+        next if member.anonymized?
+        if member.erasable?
+          member.destroy
+          erased += 1
+        else
+          member.anonymize!(by: :admin)
+          anonymized += 1
+        end
+      end
+      notice = "Deleted #{helpers.pluralize(erased + anonymized, 'member')}."
+      notice += " #{anonymized} kept as anonymised records (they had payment or delivery history)." if anonymized.positive?
+      redirect_to admin_members_path, notice: notice
+    end
+
+    # Set every selected member to one tier. The UI sends tier=free|paid; when
+    # the selection is mixed it offers both buttons and each makes them all the
+    # same. Downgrading clears the password digest (matches single downgrade);
+    # upgrading needs a password, so generate one per member being upgraded.
+    def bulk_set_tier
+      tier = params[:tier].to_s
+      return redirect_to(admin_members_path, alert: "Unknown tier.") unless %w[free paid].include?(tier)
+
+      changed = 0
+      Member.where(id: bulk_member_ids).find_each do |member|
+        next if member.anonymized?
+        if tier == "paid"
+          next if member.tier_paid?
+          member.upgrade_to_paid!(password: Member.generate_password)
+        else
+          next if member.tier_free?
+          member.update!(tier: :free, password_digest: nil)
+        end
+        changed += 1
+      end
+      redirect_to admin_members_path, notice: "Changed #{helpers.pluralize(changed, 'member')} to #{tier}."
+    end
+
+    # Subscribe / unsubscribe the selected members. Only reachable when
+    # newsletters are enabled (the UI hides it otherwise); re-checked here. A
+    # bounced address can't be resubscribed — delivery is broken, not consent —
+    # so those are skipped on subscribe.
+    def bulk_newsletter
+      return redirect_to(admin_members_path, alert: "Newsletters aren't enabled.") unless SiteFeature.newsletters_feature_enabled?
+      action = params[:newsletter].to_s
+      return redirect_to(admin_members_path, alert: "Unknown action.") unless %w[subscribe unsubscribe].include?(action)
+
+      changed = 0
+      skipped_bounced = 0
+      Member.where(id: bulk_member_ids).find_each do |member|
+        next if member.anonymized?
+        if action == "subscribe"
+          if member.newsletter_status_bounced?
+            skipped_bounced += 1
+            next
+          end
+          member.resubscribe_to_newsletter!
+        else
+          member.unsubscribe_from_newsletter!
+        end
+        changed += 1
+      end
+      notice = "#{action == 'subscribe' ? 'Subscribed' : 'Unsubscribed'} #{helpers.pluralize(changed, 'member')}."
+      notice += " Skipped #{skipped_bounced} with a bounced address." if skipped_bounced.positive?
+      redirect_to admin_members_path, notice: notice
+    end
+
+    # Permanently delete already-deleted (anonymised) accounts — the record and
+    # EVERYTHING under it: donations, delivery history, recovery codes. This is
+    # the irreversible purge, distinct from bulk_destroy (which anonymises).
+    #
+    # Refuses any member that isn't already anonymised: you purge a tombstone,
+    # never a live member. Donations have a foreign key and no dependent:, so a
+    # plain destroy would raise — they're destroyed explicitly first.
+    def bulk_purge
+      purged = 0
+      skipped = 0
+      Member.where(id: bulk_member_ids).find_each do |member|
+        unless member.anonymized?
+          skipped += 1
+          next
+        end
+        Member.transaction do
+          member.donations.destroy_all # FK-protected, no cascade — must go first
+          member.destroy               # newsletter_sends + recovery codes cascade
+        end
+        purged += 1
+      end
+      notice = "Permanently deleted #{helpers.pluralize(purged, 'account')} and all their records."
+      notice += " Skipped #{skipped} that weren't already deleted." if skipped.positive?
+      redirect_to admin_members_path(status: "deleted"), notice: notice
+    end
+
     private
+
+    def bulk_member_ids
+      Array(params[:ids]).flatten.map(&:to_s).select { |s| s.match?(/\A\d+\z/) }
+    end
 
     def set_member
       @member = Member.find(params[:id])

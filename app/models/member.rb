@@ -56,6 +56,12 @@ class Member < ApplicationRecord
     where("json_extract(metadata, '$.substack_imported') IS NULL OR json_extract(metadata, '$.substack_imported') = 0")
   }
 
+  # The inverse: members that came from an import (Substack today). Used by the
+  # Members admin to filter the imported set — e.g. to bulk-remove free imports.
+  scope :imported, -> {
+    where("json_extract(metadata, '$.substack_imported') = 1 OR json_extract(metadata, '$.substack_imported') = true")
+  }
+
   # Scope for newsletter recipients based on content audience
   scope :for_newsletter, ->(audience) {
     case audience
@@ -199,6 +205,17 @@ class Member < ApplicationRecord
         donation.update_columns(email: self.class.anonymized_email_for(id))
       end
 
+      # Metadata is wiped to drop anything personal stashed in it, but a few
+      # non-identifying origin facts are kept so the record stays filterable
+      # after deletion: who deleted it, and whether it came from an import (a
+      # boolean about provenance, not a person — the admin wants to purge
+      # imported tombstones specifically).
+      kept_metadata = { "deleted_by" => by.to_s }
+      if metadata["substack_imported"]
+        kept_metadata["substack_imported"] = true
+        kept_metadata["substack_imported_at"] = metadata["substack_imported_at"]
+      end
+
       update!(
         email: self.class.anonymized_email_for(id),
         name: ANONYMIZED_NAME,
@@ -207,7 +224,7 @@ class Member < ApplicationRecord
         email_confirmation_token: nil,
         email_confirmation_sent_at: nil,
         stripe_customer_id: nil,
-        metadata: { "deleted_by" => by.to_s },
+        metadata: kept_metadata,
         access_token: self.class.generate_password,
         media_token: self.class.generate_media_token,
         newsletter_status: :unsubscribed,

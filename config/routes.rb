@@ -280,6 +280,12 @@ Rails.application.routes.draw do
         patch :cancel_membership
         patch :reactivate_membership
       end
+      collection do
+        post :bulk_destroy
+        post :bulk_purge
+        post :bulk_set_tier
+        post :bulk_newsletter
+      end
     end
 
     # Shop orders received from Snipcart webhooks. Not in the admin nav yet —

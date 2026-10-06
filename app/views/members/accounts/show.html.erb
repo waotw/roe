@@ -70,8 +70,7 @@
       <% if flash[:recovery_codes].present? %>
         <p class="account-recovery-note">
           Save these somewhere safe. Each one can reset your password once, and
-          this is the only time they're shown. If you lose them, sign in and
-          generate a new set.
+          this is the only time they're shown. If you lose them, you won't be able to sign in without your password.
         </p>
         <ul class="account-recovery-codes">
           <% Array(flash[:recovery_codes]).each do |code| %>
@@ -81,8 +80,7 @@
       <% else %>
         <p class="account-recovery-note">
           Recovery codes let you reset your password if you forget it — there's
-          no password-reset email on this site. Generating a new set replaces
-          any you had before.
+          no password-reset email on this site. Generating a new set replaces the existing set.
         </p>
       <% end %>
       <%= button_to "Generate new recovery codes",

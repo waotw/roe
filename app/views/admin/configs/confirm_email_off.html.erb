@@ -4,12 +4,15 @@
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Turn off email for members?</h1>
 
     <div class="bg-yellow-50 border border-yellow-400 p-4 mb-6">
-      <p class="text-sm text-gray-800 leading-7">
-        Your members sign in with an emailed link. If you turn email off, that
-        link stops working and
+      <p class="text-sm text-gray-800">
+        Your members sign into your site with a link that is emailed to them. If you turn email off, that link stops working and
         <strong><%= @affected_member_count %>
         <%= "member".pluralize(@affected_member_count) %></strong>
-        will need a password instead. Choose how to continue:
+        will sign in with a password instead.
+      </p>
+      <p class="text-sm text-gray-800 mt-2">
+        <strong>Email turns off immediately — you'll have to invite existing members to the password system; while email still works.</strong> Send sign-in details from the
+        Members page; this only applies to existing members. New members can create a password when they sign up.
       </p>
     </div>
 
@@ -17,23 +20,65 @@
       <div class="bg-gray-50 border border-gray-300 p-6">
         <h3 class="font-semibold text-gray-900 mb-2">Switch to passwords</h3>
         <p class="text-sm text-gray-700 mb-4">
-          Send every current member one final email with a temporary password
-          they can reset after signing in. After that, email is off and members
-          sign in with a password. This is the last email the site will send.
+          Members sign in with a password from now on. If you want existing members to be able to sign in, invite them from the Members page before turning email off.
         </p>
-        <%= form_with url: confirm_members_passwords_admin_configs_path, method: :post do |f| %>
+        <p class="mb-4">
+          <%= link_to "Go to Members to invite members ↗", admin_members_path,
+              class: "text-sm font-mono underline text-blue-700 hover:text-blue-900",
+              target: "_blank" %>
+        </p>
+        <%= form_with url: confirm_members_passwords_admin_configs_path, method: :post, id: "switch-passwords-form" do |f| %>
           <%= hidden_field_tag :content, @config_content %>
-          <%= f.submit "Switch to passwords & email everyone once",
+          <label class="flex items-start gap-2 text-sm text-gray-800 mb-4 cursor-pointer">
+            <%= check_box_tag :acknowledge_invited, "1", false, class: "mt-0.5 w-4 h-4", id: "acknowledge-invited" %>
+            <span>I've already invited everyone I want to be able to sign in, or I don't need to invite anyone.</span>
+          </label>
+          <p id="acknowledge-error" class="text-sm text-red-700 mb-3 hidden">Please confirm the box above before switching.</p>
+          <%= f.submit "Switch to passwords",
+              id: "switch-passwords-submit",
               class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer",
-              data: { turbo_confirm: "Send a temporary password to #{@affected_member_count} #{'member'.pluralize(@affected_member_count)} and switch to password sign-in?" } %>
+              data: { turbo_confirm: "Turn email off and switch to password sign-in? No emails will be sent." } %>
         <% end %>
+
+        <%# Gate the submit on the checkbox BEFORE Turbo's confirm dialog fires.
+            A capture-phase submit listener that stops the event when the box is
+            unticked means the browser confirm never appears and the form never
+            posts; it also underlines the button and shows the inline error. The
+            server still re-checks acknowledge_invited, so this is UX only. %>
+        <script>
+          (function () {
+            var form = document.getElementById("switch-passwords-form");
+            if (!form) return;
+            var box = document.getElementById("acknowledge-invited");
+            var submit = document.getElementById("switch-passwords-submit");
+            var err = document.getElementById("acknowledge-error");
+
+            form.addEventListener("submit", function (e) {
+              if (!box.checked) {
+                e.preventDefault();
+                e.stopImmediatePropagation(); // beat Turbo's confirm handler
+                err.classList.remove("hidden");
+                submit.style.textDecoration = "underline";
+                submit.style.textDecorationColor = "#b91c1c";
+                submit.style.textDecorationThickness = "2px";
+              }
+            }, true);
+
+            box.addEventListener("change", function () {
+              if (box.checked) {
+                err.classList.add("hidden");
+                submit.style.textDecoration = "none";
+              }
+            });
+          })();
+        </script>
       </div>
 
-      <div class="bg-gray-50 border border-gray-300 p-6">
+      <div class="bg-gray-50 border border-gray-300 p-6 mt-6">
         <h3 class="font-semibold text-gray-900 mb-2">Turn off members entirely</h3>
         <p class="text-sm text-gray-700 mb-4">
           Disable the members feature. No emails are sent and nobody can sign
-          in any longer. Member records are kept.
+          in any longer. Member records are kept. You can turn this back on in the future if you wish.
         </p>
         <%= form_with url: delete_members_admin_configs_path, method: :delete do |f| %>
           <%= f.submit "Turn off members",
@@ -41,11 +86,11 @@
               data: { turbo_confirm: "Turn off the members feature? Members will no longer be able to sign in." } %>
         <% end %>
       </div>
-    </div>
 
-    <div class="mt-6">
-      <%= link_to "Cancel — keep email on", admin_edit_members_config_path,
-          class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+      <div class="mt-6">
+        <%= link_to "Cancel — keep email on", admin_edit_members_config_path,
+            class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs" %>
+      </div>
     </div>
   </div>
 </div>

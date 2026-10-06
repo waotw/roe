@@ -4,8 +4,9 @@ export default class extends Controller {
   static targets = [
     "row",
     "count",
-    "tab",
     "search",
+    "tierFilter",
+    "importedFilter",
     "statusFilter",
     "newsletterStatusFilter",
     "sortFilter",
@@ -14,15 +15,18 @@ export default class extends Controller {
   static values = { total: Number };
 
   connect() {
-    this.filterRows();
     this.restoreStateFromURL();
+    this.filterRows();
   }
 
-  filterByTier(event) {
-    const tier = event.currentTarget.dataset.tier;
-    this.updateTabs(event.currentTarget);
-    this.currentTier = tier;
-    this.updateURL({ tier });
+  // Tier is now a set of checkboxes (Free / Paid) rather than tabs. The checked
+  // set is the filter: none checked OR all checked = show everything, since
+  // filtering to "both" is the same as not filtering.
+  filterByTier() {
+    this.filterRows();
+  }
+
+  filterByImported() {
     this.filterRows();
   }
 
@@ -32,7 +36,6 @@ export default class extends Controller {
     this.filterRows();
   }
 
-  // Newsletter status filter
   filterByNewsletterStatus(event) {
     this.currentNewsletterStatus = event.target.value;
     this.updateURL({ newsletter_status: this.currentNewsletterStatus });
@@ -49,19 +52,32 @@ export default class extends Controller {
     this.sortRows(field, direction);
   }
 
+  // The tiers currently checked. Empty set means "no tier filter".
+  checkedTiers() {
+    if (!this.hasTierFilterTarget) return [];
+    return this.tierFilterTargets
+      .filter((cb) => cb.checked)
+      .map((cb) => cb.value);
+  }
+
+  importedOnly() {
+    return this.hasImportedFilterTarget && this.importedFilterTarget.checked;
+  }
+
   filterRows() {
+    const tiers = this.checkedTiers();
+    const importedOnly = this.importedOnly();
     let visibleCount = 0;
 
     this.rowTargets.forEach((row) => {
+      // Empty or both-checked = match any tier.
       const tierMatch =
-        !this.currentTier ||
-        this.currentTier === "all" ||
-        row.dataset.tier === this.currentTier;
+        tiers.length === 0 || tiers.includes(row.dataset.tier);
+      const importedMatch = !importedOnly || row.dataset.imported === "1";
       const statusMatch =
         !this.currentStatus ||
         this.currentStatus === "all" ||
         row.dataset.status === this.currentStatus;
-      // Newsletter status matching
       const newsletterStatusMatch =
         !this.currentNewsletterStatus ||
         this.currentNewsletterStatus === "all" ||
@@ -69,7 +85,13 @@ export default class extends Controller {
       const searchMatch =
         !this.searchTerm || row.dataset.searchable.includes(this.searchTerm);
 
-      if (tierMatch && statusMatch && newsletterStatusMatch && searchMatch) {
+      if (
+        tierMatch &&
+        importedMatch &&
+        statusMatch &&
+        newsletterStatusMatch &&
+        searchMatch
+      ) {
         row.style.display = "";
         visibleCount++;
       } else {
@@ -77,7 +99,12 @@ export default class extends Controller {
       }
     });
 
-    this.countTarget.textContent = visibleCount;
+    if (this.hasCountTarget) this.countTarget.textContent = visibleCount;
+
+    // Tell the bulk-select controller the visible set changed, so it can drop
+    // now-hidden rows from the selection and refresh its "select all visible"
+    // count. Both controllers live on the same root element.
+    this.dispatch("changed");
   }
 
   sortRows(field, direction) {
@@ -107,16 +134,6 @@ export default class extends Controller {
     rows.forEach((row) => this.tbodyTarget.appendChild(row));
   }
 
-  updateTabs(activeTab) {
-    this.tabTargets.forEach((tab) => {
-      tab.classList.remove("border-blue-500", "text-blue-600");
-      tab.classList.add("border-transparent", "text-gray-500");
-    });
-
-    activeTab.classList.add("border-blue-500", "text-blue-600");
-    activeTab.classList.remove("border-transparent", "text-gray-500");
-  }
-
   updateURL(params) {
     const url = new URL(window.location);
     Object.entries(params).forEach(([key, value]) => {
@@ -131,28 +148,17 @@ export default class extends Controller {
 
   restoreStateFromURL() {
     const url = new URL(window.location);
-    const tier = url.searchParams.get("tier") || "all";
     const status = url.searchParams.get("status") || "all";
     const newsletterStatus = url.searchParams.get("newsletter_status") || "all";
 
-    this.currentTier = tier;
     this.currentStatus = status;
     this.currentNewsletterStatus = newsletterStatus;
 
-    // Set active tab
-    const activeTab = this.tabTargets.find((tab) => tab.dataset.tier === tier);
-    if (activeTab) this.updateTabs(activeTab);
-
-    // Set status filter
     if (this.hasStatusFilterTarget) {
       this.statusFilterTarget.value = status;
     }
-
-    // Set newsletter status filter
     if (this.hasNewsletterStatusFilterTarget) {
       this.newsletterStatusFilterTarget.value = newsletterStatus;
     }
-
-    this.filterRows();
   }
 }

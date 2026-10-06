@@ -1294,37 +1294,34 @@ class Admin::ConfigsController < Admin::BaseController
       @config_type = "members"
       @config_content = params[:content]
       @affected_member_count = Member.active.count
-      render :confirm_email_off and return
+      # 422, not 200: the form submits via Turbo, which only replaces the page
+      # on a redirect or a non-2xx render. A 200 here would be silently
+      # discarded and the owner would never see the confirmation screen.
+      render :confirm_email_off, status: :unprocessable_entity and return
     end
 
     update_config("features/members", SiteConfig::FEATURES_PATH.join("members.yml"))
   end
 
-  # The owner chose, on the confirm screen, to switch to passwords. Save the
-  # members.yml with email off, give every active member a generated password,
-  # and send each one final email with it. After this the site has no mailer —
-  # so this is the last thing email is used for, and it has to run BEFORE the
-  # config save would make email_feature_enabled? false.
+  # The owner confirmed, on the confirm screen, to switch to passwords. This is
+  # now a SILENT switch — it does NOT email anyone. Inviting members (sending
+  # them sign-in details) is a separate, explicit step the owner does from the
+  # Members admin WHILE email still works, before coming here. Auto-emailing
+  # here was wrong: imported-but-not-yet-launched members (e.g. 100 from
+  # Substack) are `active` by default, so it would blast sign-in emails to
+  # people who've never used the site. The confirm screen requires the owner to
+  # acknowledge they've already invited anyone who needs to sign in.
   def confirm_members_passwords
-    content = params[:content].to_s
-
-    # Send the final-password emails while email still works (config not yet
-    # saved). Each member gets a fresh generated password, hashed into their
-    # digest; the plaintext only lives long enough to email.
-    sent = 0
-    Member.active.find_each do |member|
-      temp = Member.generate_password
-      member.update!(password: temp, password_confirmation: temp)
-      result = MemberMailer.final_password(member, temp)
-      sent += 1 unless result.is_a?(Hash) && result[:success] == false
+    unless params[:acknowledge_invited] == "1"
+      redirect_to admin_edit_members_config_path and return
     end
 
-    # Now commit the config (email off). update_config redirects on success.
+    content = params[:content].to_s
     SiteFile.write(SiteConfig::FEATURES_PATH.join("members.yml"), content)
     SiteConfig.sync_from_file("features/members")
     Rails.cache.clear
 
-    flash[:notice] = "Members now sign in with a password. Sent a temporary password to #{sent} #{'member'.pluralize(sent)}; they'll reset it after signing in."
+    flash[:notice] = "Members now sign in with a password. No emails were sent — members use the sign-in details you already gave them, or reset with a recovery code."
     redirect_to admin_edit_members_config_path
   end
 
@@ -2466,7 +2463,7 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   # Settings that read as on/off rather than as a choice between two things.
-  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon", "auth.email_enabled", "newsletter.enabled" ].freeze
+  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon", "auth.email_enabled", "newsletter.enabled", "payments.enabled", "everyone.show_paid_content" ].freeze
 
   # Whether the submitted members.yml turns email from on -> off, compared to
   # the current on-disk state via the same rule SiteFeature uses (absent key =
@@ -2497,11 +2494,7 @@ class Admin::ConfigsController < Admin::BaseController
 
   def build_field_options_for_members
     {
-      "payments.enabled" => [ "false", "true" ],
-      "payments.mode" => [ "memberships", "donations", "both" ],
-      "auth.email_enabled" => [ "false", "true" ],
-      "newsletter.enabled" => [ "false", "true" ],
-      "everyone.show_paid_content" => [ "true", "false" ]
+      "payments.mode" => [ "memberships", "donations", "both" ]
     }
   end
 
@@ -2543,10 +2536,10 @@ class Admin::ConfigsController < Admin::BaseController
 
     {
       "payments.enabled" => "Turn on the payments system (requires connection to your Stripe account). Then choose what you want to offer in the mode field below.",
-      "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.",
+      "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both options.",
       "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       "payments.donation_amounts" => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
-      "auth.email_enabled" => "Use email for members (requires Postmark, about $20/month). On: members sign in with an emailed link and get account emails. Off: members sign in with a password and no email service is needed. Must be on to send a newsletter.",
+      "auth.email_enabled" => "Use email for members (requires Postmark, about $20/month). On: members sign in with an emailed link and get account emails. Off: members sign in with a password and no email service is needed. **Must be on to send a newsletter.**",
       "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Email, above, to be enabled)",
       "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.",
       "display.always_show_member_icon" => "Keep the account icon in the site header for everyone, not just signed-in members. Signed out, it links to your sign-in page. Leave this off and the icon appears only once someone signs in."
