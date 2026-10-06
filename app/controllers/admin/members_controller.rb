@@ -49,6 +49,10 @@ module Admin
 
     def create
       @member = Member.new(member_params)
+      # Mark origin: an admin created this member, so it's invite-eligible (it
+      # didn't self-sign-up and has no access yet). Distinct from a direct
+      # signup, which carries no origin marker. See Member#admin_created?.
+      @member.metadata = (@member.metadata || {}).merge("admin_created" => true)
 
       if @member.save
         redirect_to admin_member_path(@member), notice: "Member created successfully"
@@ -197,6 +201,71 @@ module Admin
       end
       notice = "#{action == 'subscribe' ? 'Subscribed' : 'Unsubscribed'} #{helpers.pluralize(changed, 'member')}."
       notice += " Skipped #{skipped_bounced} with a bounced address." if skipped_bounced.positive?
+      redirect_to admin_members_path, notice: notice
+    end
+
+    # Step 1 of the invite flow: stash the selected members in the session and
+    # open the invite email in the editor. The owner edits the message, then
+    # Send (send_invite) saves it and mails it. Separating compose from send is
+    # what lets them write the email before it goes out — and the saved template
+    # becomes the draft the next invite opens with.
+    #
+    # Only invitable members are carried forward (imported or admin-created, and
+    # live); a direct signup already has credentials. Refuses if email is off.
+    def compose_invite
+      return redirect_to(admin_members_path, alert: "Email is turned off, so invites can't be sent. Turn email on first.") unless SiteFeature.email_feature_enabled?
+
+      ids = Member.where(id: bulk_member_ids).select(&:invitable?).map(&:id)
+      if ids.empty?
+        return redirect_to admin_members_path, alert: "None of the selected members can be invited (they signed up themselves, or are deleted)."
+      end
+
+      session[:invite_member_ids] = ids
+      redirect_to edit_admin_email_path("invite")
+    end
+
+    # Step 2: save the edited invite template, then send it to the members
+    # stashed by compose_invite. Saving first means the file always reflects what
+    # was actually sent, so it's the draft the next compose opens with.
+    #
+    # Re-checks invitable? per member (never trusts the stashed list) and mints a
+    # fresh temp password each send, overwriting any the member had set.
+    def send_invite
+      return redirect_to(admin_members_path, alert: "Email is turned off, so invites can't be sent. Turn email on first.") unless SiteFeature.email_feature_enabled?
+
+      ids = Array(session[:invite_member_ids])
+      if ids.empty?
+        return redirect_to admin_members_path, alert: "That invite expired — start again by selecting members."
+      end
+
+      # Save the edited content back to invite.md (the editor posts it here).
+      if params[:content].present?
+        path = File.join(RoeSitePaths::SITE_PATH, "emails", "invite.md")
+        File.write(path, params[:content].to_s.gsub(/\r\n/, "\n"))
+      end
+
+      sent = 0
+      skipped = 0
+      failed = 0
+      Member.where(id: ids).find_each do |member|
+        unless member.invitable?
+          skipped += 1
+          next
+        end
+        temp_password = Member.generate_password
+        member.update!(password: temp_password)
+        result = MemberMailer.invite(member, temp_password)
+        if result.is_a?(Hash) && result[:success] == false
+          failed += 1
+        else
+          sent += 1
+        end
+      end
+
+      session.delete(:invite_member_ids)
+      notice = "Sent #{helpers.pluralize(sent, 'password invite')}."
+      notice += " #{failed} couldn't be emailed (check your email settings)." if failed.positive?
+      notice += " Skipped #{skipped} that can't be invited (they signed up themselves or are deleted)." if skipped.positive?
       redirect_to admin_members_path, notice: notice
     end
 

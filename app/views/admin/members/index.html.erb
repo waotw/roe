@@ -176,6 +176,21 @@
         <% end %>
       <% end %>
 
+      <%# INVITE — opens the invite email in the editor (compose_invite stashes
+          the selection). Only when email is on, and only shown for a selection
+          that's entirely invitable (imported or admin-created, live); a direct
+          signup already has its own credentials. %>
+      <% if SiteFeature.email_feature_enabled? %>
+        <%= form_with url: compose_invite_admin_members_path, method: :post, data: { turbo: false }, class: "contents" do %>
+          <div data-members-bulk-select-target="formIds" class="hidden"></div>
+          <button type="submit" data-action="members-bulk-select#submitInvite"
+                  data-members-bulk-select-target="inviteButton"
+                  class="hidden text-xs px-3 py-1.5 border border-blue-600 bg-blue-100 hover:bg-blue-200 rounded-xs font-mono uppercase cursor-pointer">
+            Send Password Invite
+          </button>
+        <% end %>
+      <% end %>
+
       <button type="button" data-action="members-bulk-select#openDelete"
               class="text-xs px-3 py-1.5 border border-red-600 bg-red-100 hover:bg-red-200 rounded-xs font-mono uppercase cursor-pointer">
         Delete Selected
@@ -307,6 +322,7 @@
                            data-id="<%= member.id %>"
                            data-tier="<%= member.tier %>"
                            data-newsletter-status="<%= member.newsletter_status %>"
+                           data-invitable="<%= member.invitable? ? '1' : '0' %>"
                            data-deleted="<%= member.anonymized? ? '1' : '0' %>">
                   </td>
                   <td class="whitespace-nowrap py-1.5 pl-4 pr-3 text-xs font-medium text-gray-900">

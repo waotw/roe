@@ -596,7 +596,7 @@ class MarkdownDoctor
     @issues << {
       type: :under_indented_footnote,
       line: line_num,
-      message: "Indented #{indent} #{indent == 1 ? 'space' : 'spaces'}, so this leaves the footnote — a continuation needs four"
+      message: "Indented #{indent} #{indent == 1 ? 'space' : 'spaces'}, so this breaks out of the footnote — indent 4 spaces"
     }
   end
 

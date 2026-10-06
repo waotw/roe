@@ -62,6 +62,19 @@ class Member < ApplicationRecord
     where("json_extract(metadata, '$.substack_imported') = 1 OR json_extract(metadata, '$.substack_imported') = true")
   }
 
+  # Members an admin can send a password invite to: imported or admin-created,
+  # and still live. These didn't self-sign-up, so they have no credentials yet —
+  # unlike a direct signup, which set its own and needs no invite. Used to gate
+  # the bulk Invite action (send sign-in details before email is turned off).
+  scope :invitable, -> {
+    where(status: :active).where(
+      "json_extract(metadata, '$.substack_imported') = 1 OR " \
+      "json_extract(metadata, '$.substack_imported') = true OR " \
+      "json_extract(metadata, '$.admin_created') = 1 OR " \
+      "json_extract(metadata, '$.admin_created') = true"
+    )
+  }
+
   # Scope for newsletter recipients based on content audience
   scope :for_newsletter, ->(audience) {
     case audience
@@ -91,6 +104,14 @@ class Member < ApplicationRecord
   def self.anonymized_email_for(id) = "deleted-#{id}@#{ANONYMIZED_DOMAIN}"
 
   def anonymized? = status_deleted?
+
+  # Origin predicates. imported? = came from an import (Substack today);
+  # admin_created? = an admin added it by hand. Either means the member didn't
+  # self-sign-up, so it has no credentials yet and can be sent a password invite
+  # (while it's still live). A direct signup is neither and needs no invite.
+  def imported? = !!metadata&.dig("substack_imported")
+  def admin_created? = !!metadata&.dig("admin_created")
+  def invitable? = status_active? && (imported? || admin_created?)
 
   # :member, :admin, or nil for accounts deleted before this was recorded —
   # the admin panel falls back to neutral wording rather than guessing.

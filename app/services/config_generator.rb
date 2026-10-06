@@ -16,6 +16,12 @@ class ConfigGenerator
   def self.generate_newsletters;  new.generate_newsletters_config;   end
   def self.generate_snipcart;     new.generate_snipcart_config;      end
 
+  # Reinstall missing files for any enabled feature (skip-if-exists), so a
+  # template added in a new Roe version reaches sites that enabled the feature
+  # before it shipped. Runs on boot. Never overwrites: the loader skips any file
+  # already in /site, so hand-edits and settings (members.yml etc.) are safe.
+  def self.ensure_enabled_feature_files; new.ensure_enabled_feature_files; end
+
   def self.generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
     new.generate_store_defaults(
       currency:           currency,
@@ -153,6 +159,28 @@ class ConfigGenerator
     # generated whenever EMAIL is on — not only for newsletters. With email off
     # there's no mailer to configure (members sign in by password).
     generate_newsletters_config if email_enabled
+  end
+
+  # For each enabled feature (its <feature>.yml exists), reinstall the feature's
+  # template folder skip-if-exists. This is how a NEW file in a feature bundle —
+  # e.g. emails/invite.md added in a later version — reaches a site that enabled
+  # the feature before that file existed. members.yml and every hand-edited file
+  # already in /site are skipped by the loader, so nothing is overwritten. Boot
+  # calls this; it's a cheap no-op once every file is present. PUBLIC: the
+  # self.ensure_enabled_feature_files class wrapper calls it via new.
+  FEATURE_FOLDERS = {
+    "members.yml" => "features/members",
+    "store.yml"   => "features/store",
+    "podcast.yml" => "features/podcast",
+    "music.yml"   => "features/music",
+  }.freeze
+
+  def ensure_enabled_feature_files
+    FEATURE_FOLDERS.each do |yml, folder|
+      next unless File.exist?(File.join(FEATURES_PATH, yml))
+      next unless SiteTemplates::Loader::TEMPLATES_ROOT.join(folder).directory?
+      install_folder(folder)
+    end
   end
 
   # Store. Same pattern as members: overwrite store.yml with the

@@ -285,6 +285,8 @@ Rails.application.routes.draw do
         post :bulk_purge
         post :bulk_set_tier
         post :bulk_newsletter
+        post :compose_invite
+        patch :send_invite
       end
     end
 

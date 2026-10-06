@@ -51,6 +51,10 @@ if should_run
         # writing the stock header over their content. (one-time, idempotent)
         LayoutFiles.migrate_navigation_to_header!
         ConfigGenerator.generate_all
+        # Reinstall missing files for enabled features (skip-if-exists), so a
+        # template added in a newer Roe version — e.g. emails/invite.md — lands
+        # on sites that enabled the feature before it shipped. Never overwrites.
+        ConfigGenerator.ensure_enabled_feature_files
         PageGenerator.generate_defaults
         SiteJavascript.seed! # copy shipped JS into site/javascript so the site is self-contained
         ContentSync.sync_all

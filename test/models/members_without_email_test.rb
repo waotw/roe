@@ -124,13 +124,13 @@ class ConfirmMembersPasswordsTest < ActionDispatch::IntegrationTest
   teardown { File.delete(@fp) if File.exist?(@fp) }
 
   test "switch without acknowledgment does nothing" do
-    MemberMailer.expects(:final_password).never
+    PostmarkService.expects(:send_transactional_email).never
     post "/admin/configs/confirm_members_passwords", params: { content: @off }
     refute File.read(@fp).include?("email_enabled: false"), "email must stay on until acknowledged"
   end
 
   test "acknowledged switch turns email off and sends no email" do
-    MemberMailer.expects(:final_password).never
+    PostmarkService.expects(:send_transactional_email).never
     post "/admin/configs/confirm_members_passwords", params: { content: @off, acknowledge_invited: "1" }
     assert File.read(@fp).include?("email_enabled: false"), "email is now off"
   end

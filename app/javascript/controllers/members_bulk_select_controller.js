@@ -12,6 +12,7 @@ export default class extends Controller {
   static targets = [
     "checkbox", "selectColumn", "toggle", "toolbar", "count", "visibleCount",
     "upgradeButton", "downgradeButton", "subscribeButton", "unsubscribeButton",
+    "inviteButton",
     "normalAction",
     "purgeButton", "purgeModal", "purgeIds", "purgeInput", "purgeSubmit",
     "deleteModal", "deleteIds", "deleteInput", "deleteSubmit",
@@ -120,6 +121,15 @@ export default class extends Controller {
     if (this.hasUnsubscribeButtonTarget) {
       this.unsubscribeButtonTarget.classList.toggle("hidden", !statuses.has("subscribed"));
     }
+
+    // Invite: only when EVERY selected member is invitable (imported or
+    // admin-created, live). A direct signup already has credentials, so a mixed
+    // selection hides the button — you can't meaningfully "invite" someone who
+    // signed themselves up, and we don't want to half-apply it.
+    if (this.hasInviteButtonTarget) {
+      const allInvitable = selected.every((cb) => cb.dataset.invitable === "1");
+      this.inviteButtonTarget.classList.toggle("hidden", !allInvitable);
+    }
   }
 
   // Toggle every normal action off and the purge button on (or vice versa).
@@ -194,6 +204,12 @@ export default class extends Controller {
   }
 
   submitNewsletter(event) {
+    this.fillAndSubmit(event);
+  }
+
+  // Invite opens the email editor (compose_invite) rather than sending straight
+  // away — the editor is the review step, so no window.confirm here.
+  submitInvite(event) {
     this.fillAndSubmit(event);
   }
 
