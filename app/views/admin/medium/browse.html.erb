@@ -1,3 +1,8 @@
+<%# media-upload wraps BOTH the upload input (in the header below) and the grid
+    (in the content div). Stimulus only wires actions/targets inside the
+    controller's element, so the input and grid must share one scope — hence
+    this outer wrapper rather than putting media-upload on the content div. %>
+<div data-controller="media-upload">
 <div class="mb-0 pb-2 border-b border-gray-300">
   <div class="flex items-start justify-between">
     <div class="flex gap-4">
@@ -31,7 +36,7 @@
   <%= render 'image_optimization' %>
 </div>
 
-<div data-controller="media-filter media-bulk-select media-upload"
+<div data-controller="media-filter media-bulk-select"
      data-media-filter-total-value="<%= @media.count %>">
 
   <!-- Tabs for Media Types -->
@@ -249,3 +254,5 @@
     });
   }
 </script>
+</div>
+<%# /media-upload wrapper %>
