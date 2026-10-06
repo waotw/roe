@@ -27,6 +27,8 @@ class MemberMailer
     end
 
     def email_confirmation(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
       confirmation_url = Rails.application.routes.url_helpers.confirm_email_url(
         token: member.email_confirmation_token,
@@ -49,6 +51,8 @@ class MemberMailer
     end
 
     def welcome(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("welcome", {
@@ -66,6 +70,8 @@ class MemberMailer
     end
 
     def upgrade_success(member, password)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
       account_url = Rails.application.routes.url_helpers.account_url(host: site_url)
 
@@ -111,6 +117,8 @@ class MemberMailer
     end
 
     def email_changed(member, old_email)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("email_changed", {
@@ -132,6 +140,8 @@ class MemberMailer
     end
 
     def membership_cancelled(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("membership_cancelled", {
@@ -149,6 +159,8 @@ class MemberMailer
     end
 
     def payment_failed(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
       update_payment_url = Rails.application.routes.url_helpers.account_url(host: site_url)
 
@@ -168,6 +180,8 @@ class MemberMailer
     end
 
     def account_deletion(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("account_deletion", {
@@ -185,6 +199,21 @@ class MemberMailer
     end
 
     private
+
+    # The 7 non-login notifications (welcome, receipts, cancellation, etc.) are
+    # courtesy mail, not a login path. With email off the site has no mailer, so
+    # they must become clean no-ops rather than falling through to the fallback,
+    # which reports success and delivers nothing. magic_link and invite are NOT
+    # guarded — they're deliberate sends an operator triggers while email still
+    # works. Returns a skipped result so callers that inspect :success don't
+    # mistake a no-op for a real send.
+    def email_off?
+      !SiteFeature.email_feature_enabled?
+    end
+
+    def skipped_result
+      { success: false, skipped: true, reason: "email feature disabled" }
+    end
 
     def send_email(to:, to_name:, subject:, html_content:)
       Rails.logger.info "🔍 Attempting to send email to #{to}"

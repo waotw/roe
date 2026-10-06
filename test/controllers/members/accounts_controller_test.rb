@@ -135,6 +135,7 @@ class Members::AccountsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
 
   test "initiates email change with confirmation" do
+    SiteFeature.stubs(:email_feature_enabled?).returns(true)
     sign_in_member(@free_member)
 
     patch "/account", params: {
@@ -156,6 +157,26 @@ class Members::AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil @free_member.email_confirmation_token
   end
 
+  test "email change applies immediately when email feature is off" do
+    # Password-mode site: email isn't a login credential, there's no mailer to
+    # confirm with, so the change takes effect at once — no pending/token/email.
+    SiteFeature.stubs(:email_feature_enabled?).returns(false)
+    PostmarkService.expects(:send_transactional_email).never
+    sign_in_member(@free_member)
+
+    patch "/account", params: {
+      member: { name: @free_member.name, email: "newemail@example.com" }
+    }
+
+    assert_redirected_to "/account"
+    assert_match(/updated/i, flash[:notice])
+
+    @free_member.reload
+    assert_equal "newemail@example.com", @free_member.email, "email changed immediately"
+    assert_nil @free_member.pending_email, "no pending email with email off"
+    assert_nil @free_member.email_confirmation_token, "no confirmation token with email off"
+  end
+
   test "does not send confirmation when email unchanged" do
     sign_in_member(@free_member)
 
@@ -175,6 +196,7 @@ class Members::AccountsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "handles email change to existing email" do
+    SiteFeature.stubs(:email_feature_enabled?).returns(true)
     existing_member = create(:member, email: "existing@example.com")
     sign_in_member(@free_member)
 
@@ -193,6 +215,7 @@ class Members::AccountsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "prevents duplicate pending email between members" do
+    SiteFeature.stubs(:email_feature_enabled?).returns(true)
     member_a = create(:member, email: "member-a@example.com")
     member_b = create(:member, email: "member-b@example.com")
 
@@ -286,6 +309,7 @@ class Members::AccountsControllerTest < ActionDispatch::IntegrationTest
   # ============================================================================
 
   test "handles simultaneous name and email update" do
+    SiteFeature.stubs(:email_feature_enabled?).returns(true)
     sign_in_member(@free_member)
 
     patch "/account", params: {

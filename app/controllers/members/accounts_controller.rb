@@ -8,6 +8,9 @@ module Members
     def show
       @member = current_member
       @private_feeds = PrivateFeeds.for(@member)
+      # Receipt link for paid members, fetched live from Stripe (see
+      # Member#stripe_receipt_url — rescued, so a Stripe hiccup just hides it).
+      @receipt_url = @member.stripe_receipt_url if @member.paid?
     end
 
     def edit
@@ -19,17 +22,34 @@ module Members
 
       # Check if email is changing
       if account_params[:email].present? && account_params[:email] != @member.email
-        # Store new email as pending and update name simultaneously
-        @member.pending_email = account_params[:email]
-        @member.name = account_params[:name] if account_params[:name].present?
+        if SiteFeature.email_feature_enabled?
+          # Email on: confirm the new address before it takes effect. The member
+          # could be using email to sign in, so an unverified change could lock
+          # them out — the confirmation link proves they own the new address.
+          @member.pending_email = account_params[:email]
+          @member.name = account_params[:name] if account_params[:name].present?
 
-        if @member.save
-          @member.generate_email_confirmation_token!
-          MemberMailer.email_confirmation(@member)
+          if @member.save
+            @member.generate_email_confirmation_token!
+            MemberMailer.email_confirmation(@member)
 
-          redirect_to account_path, notice: "A confirmation email has been sent to #{@member.pending_email}. Click the link to confirm your new email address."
+            redirect_to account_path, notice: "A confirmation email has been sent to #{@member.pending_email}. Click the link to confirm your new email address."
+          else
+            render :edit, status: :unprocessable_entity
+          end
         else
-          render :edit, status: :unprocessable_entity
+          # Email off: email isn't a login credential (members sign in with a
+          # password), so there's no mailer to confirm with and nothing to
+          # protect. Apply the change immediately — it's just a contact address
+          # for the Stripe receipt. No pending_email, no token, no email.
+          @member.email = account_params[:email]
+          @member.name = account_params[:name] if account_params[:name].present?
+
+          if @member.save
+            redirect_to account_path, notice: "Email updated"
+          else
+            render :edit, status: :unprocessable_entity
+          end
         end
       else
         # Just updating name or other fields

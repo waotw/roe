@@ -430,6 +430,24 @@ class Member < ApplicationRecord
     nil
   end
 
+  # The hosted Stripe receipt for this member's payment, fetched live. The URL
+  # lives on the Charge, not the PaymentIntent, so we expand latest_charge in
+  # one call. Not stored: it always reflects the current charge (refunds etc.)
+  # and keeps no Stripe data in Roe. Any Stripe hiccup returns nil so the
+  # account page degrades to "Receipt emailed by Stripe" rather than 500-ing.
+  def stripe_receipt_url
+    return nil if stripe_payment_intent_id.blank?
+
+    pi = Stripe::PaymentIntent.retrieve(
+      { id: stripe_payment_intent_id, expand: [ "latest_charge" ] },
+      StripeConfig.request_options
+    )
+    pi.latest_charge&.receipt_url
+  rescue Stripe::StripeError => e
+    Rails.logger.warn "[Member##{id}] receipt lookup failed: #{e.class} #{e.message}"
+    nil
+  end
+
   def generate_email_confirmation_token!
     update!(
       email_confirmation_token: self.class.generate_password,

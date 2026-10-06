@@ -29,6 +29,20 @@
       </div>
     <% end %>
 
+    <%# Receipt: link to Stripe's hosted receipt when we can fetch it, otherwise
+        tell the member where it is. Stripe emails the receipt on upgrade
+        regardless of Roe's email setting. COPY %>
+    <% if @member.paid? %>
+      <div class="detail-row">
+        <strong>Receipt:</strong>
+        <% if @receipt_url %>
+          <span><a href="<%= @receipt_url %>" target="_blank" rel="noopener">View receipt</a></span>
+        <% else %>
+          <span>Receipt emailed by Stripe</span>
+        <% end %>
+      </div>
+    <% end %>
+
     <div class="detail-row">
       <strong>Member since:</strong>
       <span><%= @member.subscribed_at.strftime("%B %d, %Y") %></span>
