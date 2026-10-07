@@ -104,6 +104,10 @@
     <main data-controller="footnote-tooltip<%= " heading-anchor" if heading_links_on %><%= " preview-receiver" if preview_live %>"
           <% if preview_live %>data-preview-receiver-id-value="<%= preview_recv_id %>"<% end %>>
       <% flash.each do |type, message| %>
+        <%# recovery_codes is an array rendered deliberately in the account page,
+            not a flash string — skip it here so the codes don't leak into the
+            floating flash strip. %>
+        <% next if type.to_s == "recovery_codes" %>
         <% flash_classes = "flash flash-#{type}" %>
         <div class="<%= flash_classes %>">
           <mark>&nbsp; • <%= message %> • &nbsp;</mark>

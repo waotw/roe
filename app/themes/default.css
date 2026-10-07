@@ -3741,6 +3741,22 @@ a.btn-grid {
   margin: 0 0 var(--space-6) 0;
 }
 
+/* Recovery codes: one per line, selectable, no whitespace collapsing. The
+   <code> is inline by default, so block + pre is what makes each code sit on
+   its own line (the ERB joins them with newlines and no trailing space). */
+.member-page .account-recovery-codes {
+  display: block;
+  width: fit-content;
+  white-space: pre;
+  cursor: pointer;
+  margin: var(--space-2) 0 var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-bg-dim);
+  border: 1px solid var(--color-border);
+  line-height: 1.6;
+  user-select: all;
+}
+
 .member-page .account-actions {
   display: flex;
   flex-direction: row;

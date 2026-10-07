@@ -52,26 +52,31 @@
   <%# The newsletter switch. Until this existed the only way off the list
       was the link in an email, which a member may never have had — an
       imported subscriber, or one who deleted the emails. Same shape as the
-      private-feeds block: a heading, a note, one button. %>
-  <div class="account-newsletter">
-    <h2>Newsletter</h2>
-    <% if @member.newsletter_status_subscribed? %>
-      <p class="account-newsletter-note">You're subscribed. New posts arrive by email.</p>
-      <%= button_to "Unsubscribe", account_newsletter_path,
-            method: :patch, params: { newsletter: "unsubscribe" },
-            class: "btn-secondary", form_class: "account-newsletter-form" %>
-    <% elsif @member.newsletter_status_bounced? %>
-      <p class="account-newsletter-note">
-        Email to <%= @member.email %> has bounced, so the newsletter is paused.
-        Change your email address to start receiving it again.
-      </p>
-    <% else %>
-      <p class="account-newsletter-note">You're not subscribed. New posts won't be emailed to you.</p>
-      <%= button_to "Subscribe", account_newsletter_path,
-            method: :patch, params: { newsletter: "subscribe" },
-            class: "btn-secondary", form_class: "account-newsletter-form" %>
-    <% end %>
-  </div>
+      private-feeds block: a heading, a note, one button. Only shown when the
+      newsletter feature is actually turned on and configured — a site with
+      no newsletter has nothing to subscribe to. "Configured" means the feature
+      is on AND Postmark has keys — a flag with no sending ability is no good. %>
+  <% if SiteFeature.newsletters_enabled? %>
+    <div class="account-newsletter">
+      <h2>Newsletter</h2>
+      <% if @member.newsletter_status_subscribed? %>
+        <p class="account-newsletter-note">You're subscribed. New posts arrive by email.</p>
+        <%= button_to "Unsubscribe", account_newsletter_path,
+              method: :patch, params: { newsletter: "unsubscribe" },
+              class: "btn-secondary", form_class: "account-newsletter-form" %>
+      <% elsif @member.newsletter_status_bounced? %>
+        <p class="account-newsletter-note">
+          Email to <%= @member.email %> has bounced, so the newsletter is paused.
+          Change your email address to start receiving it again.
+        </p>
+      <% else %>
+        <p class="account-newsletter-note">You're not subscribed. New posts won't be emailed to you.</p>
+        <%= button_to "Subscribe", account_newsletter_path,
+              method: :patch, params: { newsletter: "subscribe" },
+              class: "btn-secondary", form_class: "account-newsletter-form" %>
+      <% end %>
+    </div>
+  <% end %>
 
   <%# Recovery codes — only when the site runs on passwords (email off), the
       one way back in after a forgotten password. One-time display of a freshly
@@ -79,30 +84,65 @@
       just offers to regenerate. Own class prefix (account-recovery*) so it
       can't collide with a sibling block's styles or tests. %>
   <% if SiteFeature.member_passwords_enabled? %>
-    <div class="account-recovery">
+    <%# Routine password change. Lives in password mode only — with email on,
+        members sign in with magic links and have no password to rotate.
+        Asks for the current password (this is the logged-in path; the lockout
+        path is recovery codes). COPY %>
+    <div class="account-password">
+      <h2>Change password</h2>
+      <%= form_with url: update_account_password_path, method: :patch, local: true, class: "account-password-form" do |f| %>
+        <div class="form-field">
+          <label for="current_password">Current password</label>
+          <%= password_field_tag :current_password, nil, id: "current_password", required: true, autocomplete: "current-password" %>
+        </div>
+        <div class="form-field">
+          <label for="new_password">New password</label>
+          <%= password_field_tag :password, nil, id: "new_password", required: true, autocomplete: "new-password", maxlength: 72 %>
+        </div>
+        <div class="form-field">
+          <label for="password_confirmation">Confirm new password</label>
+          <%= password_field_tag :password_confirmation, nil, id: "password_confirmation", required: true, autocomplete: "new-password", maxlength: 72 %>
+        </div>
+        <%= f.submit "Update password", class: "btn-primary" %>
+      <% end %>
+    </div>
+
+    <div class="account-recovery" data-controller="recovery-codes-copy">
       <h2>Recovery codes</h2>
       <% if flash[:recovery_codes].present? %>
+        <% codes_text = Array(flash[:recovery_codes]).join("\n") %>
         <p class="account-recovery-note">
           Save these somewhere safe. Each one can reset your password once, and
           this is the only time they're shown. If you lose them, you won't be able to sign in without your password.
         </p>
-        <ul class="account-recovery-codes">
-          <% Array(flash[:recovery_codes]).each do |code| %>
-            <li class="account-recovery-code"><code><%= code %></code></li>
-          <% end %>
-        </ul>
+        <%# Click the block to copy the exact list (one per line, no stray
+            whitespace) — a manual selection on a block element picks up the
+            highlight past each line, so we don't rely on it. The copied text
+            is the canonical newline-joined value, not the rendered selection. %>
+        <code class="account-recovery-codes"
+              tabindex="0"
+              role="button"
+              title="Click to copy"
+              data-recovery-codes-copy-target="codes"
+              data-recovery-codes-copy-text-value="<%= codes_text %>"
+              data-action="click->recovery-codes-copy#copy"><% Array(flash[:recovery_codes]).each_with_index do |code, i| %><%= "\n" if i.positive? %><%= code %><% end %></code>
       <% else %>
         <p class="account-recovery-note">
           Recovery codes let you reset your password if you forget it — there's
           no password-reset email on this site. Generating a new set replaces the existing set.
         </p>
       <% end %>
+      <%# The Generate button doubles as the copy-confirmation surface: clicking
+          the codes flips its label to "Copied" for a beat (same colour, not
+          disabled). When there are codes to copy, a plain click copies; the
+          submit (generating a fresh set) stays on the button's own form. %>
       <%= button_to "Generate new recovery codes",
             regenerate_recovery_codes_path,
             method: :post,
             class: "btn-secondary",
             form_class: "account-recovery-form",
-            data: { turbo_confirm: "Generate a new set? Any recovery codes you saved before will stop working." } %>
+            data: { "recovery-codes-copy-target": "feedback",
+                    turbo_confirm: "Generate a new set? Any recovery codes you saved before will stop working." } %>
     </div>
   <% end %>
 

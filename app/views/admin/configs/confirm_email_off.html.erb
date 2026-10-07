@@ -29,15 +29,15 @@
         </p>
         <%= form_with url: confirm_members_passwords_admin_configs_path, method: :post, id: "switch-passwords-form" do |f| %>
           <%= hidden_field_tag :content, @config_content %>
-          <label class="flex items-start gap-2 text-sm text-gray-800 mb-4 cursor-pointer">
+          <label class="flex items-start gap-2 text-sm text-gray-800 mb-2 cursor-pointer">
             <%= check_box_tag :acknowledge_invited, "1", false, class: "mt-0.5 w-4 h-4", id: "acknowledge-invited" %>
             <span>I've already invited everyone I want to be able to sign in, or I don't need to invite anyone.</span>
           </label>
-          <p id="acknowledge-error" class="text-sm text-red-700 mb-3 hidden">Please confirm the box above before switching.</p>
+          <p id="acknowledge-error" class="text-sm text-red-700 mb-3 hidden">You need to check the box above in order to proceed.</p>
           <%= f.submit "Switch to passwords",
               id: "switch-passwords-submit",
-              class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer",
-              data: { turbo_confirm: "Turn email off and switch to password sign-in? No emails will be sent." } %>
+              class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer"
+          %>
         <% end %>
 
         <%# Gate the submit on the checkbox BEFORE Turbo's confirm dialog fires.

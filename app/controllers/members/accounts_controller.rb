@@ -3,7 +3,7 @@ module Members
     include MemberAuthentication
 
     skip_before_action :require_authentication
-    before_action :require_member
+    before_action :require_member, except: [ :confirm_email ]
 
     def show
       @member = current_member
@@ -114,14 +114,38 @@ module Members
         notice: "Your account has been deleted. Your name and email address have been removed."
     end
 
+    # Confirm a pending email change. Self-authenticating: the token in the
+    # link IS the proof of ownership — clicking a link delivered to the new
+    # address is what verifies it — so this is the one account action that
+    # does NOT require a session (require_member skips it above). That's why
+    # it works from the email client, a phone, or any browser, signed in or
+    # not. We look the member up BY token rather than trusting current_member.
+    #
+    # Low-entropy token is fine here: confirming only completes a change the
+    # member already initiated while authenticated (they set pending_email),
+    # so a guessed token can't plant an attacker's address — worst case it
+    # finishes the member's own pending switch.
     def confirm_email
-      @member = current_member
-      token = params[:token]
+      token  = params[:token].to_s
+      member = Member.find_by(email_confirmation_token: token) if token.present?
 
-      if @member.confirm_email!(token)
-        redirect_to account_path, notice: "Email address confirmed successfully!"
+      if member&.confirm_email!(token)
+        notice = "Email address confirmed successfully!"
+        # Land them somewhere that won't bounce: the account page needs a
+        # session, so only send there if they're already signed in. Otherwise
+        # point at sign-in — their new address is now the one to use.
+        if member_signed_in?
+          redirect_to account_path, notice: notice
+        else
+          redirect_to "/sign-in", notice: "#{notice} Sign in with your new email address."
+        end
       else
-        redirect_to account_path, alert: "Invalid or expired confirmation link."
+        # No session to fall back on, so this can't assume account_path either.
+        if member_signed_in?
+          redirect_to account_path, alert: "Invalid or expired confirmation link."
+        else
+          redirect_to "/sign-in", alert: "Invalid or expired confirmation link."
+        end
       end
     end
 
@@ -135,6 +159,32 @@ module Members
 
       flash[:recovery_codes] = current_member.generate_recovery_codes!
       redirect_to account_path, notice: "New recovery codes generated. Save them below — your old codes have stopped working, and this is the only time these are shown."
+    end
+
+    # Routine password change for a signed-in member. Only meaningful in
+    # password mode (email-on members sign in with magic links and have no
+    # password to rotate), so it's gated the same way the recovery UI is.
+    # Requires the current password — this is a logged-in convenience change,
+    # not the lockout path (that's RecoveryController, which proves identity
+    # with a recovery code instead).
+    def update_password
+      unless SiteFeature.member_passwords_enabled?
+        redirect_to account_path and return
+      end
+
+      current_password = params[:current_password].to_s
+      new_password     = params[:password].to_s
+      confirmation     = params[:password_confirmation].to_s
+
+      if !current_member.authenticate(current_password)
+        redirect_to account_path, alert: "Current password is incorrect." and return
+      elsif new_password.blank? || new_password != confirmation
+        redirect_to account_path, alert: "New password and confirmation must match and not be blank." and return
+      elsif current_member.update(password: new_password)
+        redirect_to account_path, notice: "Password updated."
+      else
+        redirect_to account_path, alert: "Couldn't update password: #{current_member.errors.full_messages.to_sentence}"
+      end
     end
 
     private

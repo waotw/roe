@@ -1321,7 +1321,7 @@ class Admin::ConfigsController < Admin::BaseController
     SiteConfig.sync_from_file("features/members")
     Rails.cache.clear
 
-    flash[:notice] = "Members now sign in with a password. No emails were sent — members use the sign-in details you already gave them, or reset with a recovery code."
+    flash[:notice] = "Email is off. Members now sign in with a password."
     redirect_to admin_edit_members_config_path
   end
 

@@ -13,7 +13,10 @@ module Members
     limit_requests :recovery, only: :create, with: -> { too_many_attempts }
 
     def new
-      # Renders the recover-account page (a Roe Page) with the form.
+      # Renders the recover-account page (a Roe Page) with the form. Explicit
+      # because there's no recovery/new.html.erb — the page content and form
+      # live in the Page, same as create/reject render it.
+      render "pages/show"
     end
 
     def create
@@ -44,7 +47,20 @@ module Members
         matched.consume!
       end
 
-      redirect_to "/sign-in", notice: "Password reset using a recovery code. Sign in with your new password."
+      # Sign them straight in: whoever completed this held a valid, unconsumed
+      # recovery code AND set a new password — a stronger proof than a normal
+      # sign-in, so re-typing the password they just chose would be friction,
+      # not security. reset_session first guards against session fixation (an
+      # attacker who planted a session cookie can't ride it into the now-
+      # authenticated session). Guarded on active? so a suspended member can't
+      # reset into an active session.
+      if member.active?
+        reset_session
+        session[:member_id] = member.id
+        redirect_to root_path, notice: "Password updated and you're signed in."
+      else
+        redirect_to "/sign-in", notice: "Password reset using a recovery code. Sign in with your new password."
+      end
     end
 
     private

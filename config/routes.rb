@@ -453,6 +453,9 @@ Rails.application.routes.draw do
   # New recovery codes (password-mode / email-off sites).
   post "account/recovery-codes/regenerate", to: "members/accounts#regenerate_recovery_codes",
        as: :regenerate_recovery_codes
+  # Routine password change for a signed-in member (password-mode sites).
+  patch "account/password", to: "members/accounts#update_password",
+        as: :update_account_password
   # Newsletter on/off from the account page, so a member isn't dependent on
   # finding the unsubscribe link in an email — or on having ever received one.
   patch "account/newsletter", to: "members/accounts#update_newsletter",

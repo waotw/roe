@@ -6,6 +6,10 @@ require "test_helper"
 class Members::AccountNewsletterTest < ActionDispatch::IntegrationTest
   def setup
     super
+    # The newsletter block on the account page is now gated on the newsletter
+    # feature being on and configured; these tests exercise the block, so turn
+    # the feature on.
+    SiteFeature.stubs(:newsletters_enabled?).returns(true)
     @member = create(:member, tier: :free, status: :active,
       name: "Newsletter Reader", email: "reader@example.com")
   end
