@@ -23,4 +23,18 @@ class ReceiptRowRenderTest < ActionDispatch::IntegrationTest
     assert_match(%r{https://pay\.stripe\.com/receipts/abc}, response.body)
     assert_match(/View receipt/i, response.body)
   end
+
+  # Stripe being slow or down must not take the account page with it. The
+  # lookup is rescued, so a StripeError just means no link — the page still
+  # renders 200 and falls back to the "emailed by Stripe" text.
+  test "paid member still sees the page when Stripe is unreachable (link hidden)" do
+    m = create(:member, tier: :paid, status: :active, name: "Paid", email: "p3@example.com")
+    m.update_column(:stripe_payment_intent_id, "pi_test_down")
+    Stripe::PaymentIntent.stubs(:retrieve).raises(Stripe::APIConnectionError.new("timeout"))
+    sign_in_member(m)
+    get "/account"
+    assert_response :success
+    assert_match(/Receipt emailed by Stripe/i, response.body)
+    assert_no_match(/pay\.stripe\.com\/receipts/, response.body)
+  end
 end
