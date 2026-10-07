@@ -113,6 +113,18 @@ module AdminHelper
     member_links
   end
 
+  # Mode-aware Stripe Dashboard deep link to a single payment, keyed by its
+  # payment-intent id (what MemberPayments exposes as `reference`). From that
+  # page the owner can view the hosted receipt, resend the receipt email, and
+  # issue a refund — so it covers both needs without an API call here. nil for
+  # a blank reference (an imported payment with no intent on record).
+  def stripe_payment_url(payment_intent_id)
+    return nil if payment_intent_id.blank?
+
+    base = StripeConfig.current.mode_test? ? "https://dashboard.stripe.com/test" : "https://dashboard.stripe.com"
+    "#{base}/payments/#{payment_intent_id}"
+  end
+
   private
 
   # MemberPages owns this question — it checks a declared page_type and the form
