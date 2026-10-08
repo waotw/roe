@@ -18,8 +18,10 @@ template: links
 
 Postmark is how Roe sends email. That covers two different things:
 
-- **Sign-in links and confirmations**, required by the Members feature in Roe. Members sign in with their email address.
+- **Sign-in links and confirmations**, used by the Members feature if emails is enabled (the default).
 - **Newsletters**, if you turn them on.
+
+<mark>Note:</mark> Email is optional for Members. If you've turned email off and your members sign in with a password instead, Roe sends no sign-in mail and you only need Postmark if you want to send Newsletters. See [Members → How Members Sign In](/documentation/roe/members#how-members-sign-in).
 
 #### Before Postmark
 
