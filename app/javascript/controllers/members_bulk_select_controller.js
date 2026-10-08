@@ -1,16 +1,15 @@
 import { Controller } from "@hotwired/stimulus";
 
-// Multi-select + bulk actions for the Members index. Same shape as
-// bulk_select_controller (SELECT toggle reveals a checkbox column; a toolbar
-// appears when rows are picked; select-all-visible respects the client-side
-// filter via offsetParent), but with members-specific actions: delete (erase/
-// anonymise server-side), tier up/down, and newsletter subscribe/unsubscribe.
+// Multi-select + bulk actions for the Members index. The checkbox column is
+// always visible; a toolbar appears when one or more rows are picked, with
+// members-specific actions: delete (erase/anonymise server-side), tier up/down,
+// and newsletter subscribe/unsubscribe.
 //
 // The tier buttons adapt to the selection: all-free shows Upgrade, all-paid
 // shows Downgrade, mixed shows both (each makes the whole selection that tier).
 export default class extends Controller {
   static targets = [
-    "checkbox", "selectColumn", "toggle", "toolbar", "count", "visibleCount",
+    "checkbox", "selectColumn", "toolbar", "count", "visibleCount",
     "upgradeButton", "downgradeButton", "subscribeButton", "unsubscribeButton",
     "inviteButton",
     "normalAction",
@@ -20,23 +19,6 @@ export default class extends Controller {
   ];
 
   connect() {
-    this.selecting = false;
-    this.update();
-  }
-
-  toggleMode(event) {
-    event.preventDefault();
-    this.selecting = !this.selecting;
-    this.selectColumnTargets.forEach((el) => el.classList.toggle("hidden", !this.selecting));
-    if (this.hasToggleTarget) {
-      this.toggleTarget.textContent = this.selecting ? "Cancel" : "Select";
-      this.toggleTarget.classList.toggle("bg-white", !this.selecting);
-      this.toggleTarget.classList.toggle("bg-gray-800", this.selecting);
-      this.toggleTarget.classList.toggle("text-white", this.selecting);
-    }
-    if (!this.selecting) {
-      this.checkboxTargets.forEach((cb) => (cb.checked = false));
-    }
     this.update();
   }
 
@@ -79,7 +61,7 @@ export default class extends Controller {
 
   update() {
     const selected = this.selected();
-    if (selected.length === 0 || !this.selecting) {
+    if (selected.length === 0) {
       this.toolbarTarget.classList.add("hidden");
       return;
     }

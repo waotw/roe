@@ -283,15 +283,11 @@
           <table class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" data-members-bulk-select-target="selectColumn" class="hidden py-2 pl-4 pr-2 w-8">
+                <th scope="col" data-members-bulk-select-target="selectColumn" class="py-2 pl-4 pr-2 w-8">
                   <span class="sr-only">Select</span>
                 </th>
                 <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">
-                  <span class="inline-flex items-center gap-2">
-                    Email
-                    <button type="button" data-action="members-bulk-select#toggleMode" data-members-bulk-select-target="toggle"
-                            class="uppercase text-[10px] px-2 py-0.5 border border-gray-800 bg-white hover:bg-gray-200 font-mono rounded-xs cursor-pointer">Select</button>
-                  </span>
+                  Email
                 </th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Name</th>
                 <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Tier</th>
@@ -315,7 +311,7 @@
                     data-created-at="<%= member.created_at.to_i %>"
                     data-email="<%= member.email %>"
                     data-searchable="<%= [member.email, member.name].compact.join(' ').downcase %>">
-                  <td data-members-bulk-select-target="selectColumn" class="hidden pl-4 pr-2 w-8 align-middle">
+                  <td data-members-bulk-select-target="selectColumn" class="pl-4 pr-2 w-8 align-middle">
                     <input type="checkbox"
                            data-members-bulk-select-target="checkbox"
                            data-action="change->members-bulk-select#update"
