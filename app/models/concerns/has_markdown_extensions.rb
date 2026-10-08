@@ -3497,8 +3497,14 @@ module HasMarkdownExtensions
       ""
     end
 
+    # data-turbo="false" on the form: the upgrade button uses
+    # formaction="/signup_and_checkout" to post somewhere other than the form's
+    # own action. Turbo Drive ignores a secondary button's formaction and posts
+    # to the form action regardless, so with Turbo on, "upgrade" silently ran
+    # the free /signup path and the page just re-rendered. A native submit
+    # honors formaction.
     <<~HTML
-      <form action="/signup" method="post">
+      <form action="/signup" method="post" data-turbo="false">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
 
         #{error_html}

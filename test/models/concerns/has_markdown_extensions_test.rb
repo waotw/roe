@@ -1524,6 +1524,22 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     end
   end
 
+  # The signup form's upgrade button posts to /signup_and_checkout via
+  # formaction, which Turbo Drive ignores (it posts to the form action
+  # instead) — so the form must opt out of Turbo, or "upgrade" silently runs
+  # the free signup path and the page appears to just refresh.
+  test "signup form opts out of Turbo so the upgrade button's formaction is honoured" do
+    model = TestModel.new("")
+    model.stubs(:form_authenticity_token).returns("tok")
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
+
+    html = model.send(:render_signup_form, "Sign up free", "Become a paid member")
+
+    assert_includes html, 'data-turbo="false"', "signup form must opt out of Turbo"
+    assert_includes html, 'formaction="/signup_and_checkout"', "upgrade button keeps its formaction"
+    refute_includes html, "<%#", "no stray ERB comment should leak into the raw HTML"
+  end
+
   test "share button carries the stable .share hook + omits empty values" do
     html = TestModel.new("").send(:render_share_button, {}, {})
     assert_includes html, '<div class="share" data-controller="share">'
