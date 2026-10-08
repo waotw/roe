@@ -61,6 +61,10 @@ log_success() { echo -e "${GREEN}[✓]${NC} $1"; }
 # Read one KEY from a .conf — first match, everything after the first "=".
 _conf_get() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
 
+# The Stripe events `roe stripe` forwards by default — exactly the ones Roe's
+# webhook handler acts on (WebhooksController). Keep in sync with that handler.
+ROE_STRIPE_DEFAULT_EVENTS="checkout.session.completed,charge.refunded,charge.dispute.created,charge.dispute.closed"
+
 # The wordmark: solid blocks in red, shading in orange. Each line is
 # coloured as it goes, so the art below can be edited as plain text.
 banner() {
@@ -100,6 +104,7 @@ usage() {
     echo -e "  ${ROE_ORANGE}open${NC}        Open the site — home and admin — in your browser"
     echo -e "  ${ROE_ORANGE}home${NC}        Open just the home page"
     echo -e "  ${ROE_ORANGE}admin${NC}       Open just the admin page"
+    echo -e "  ${ROE_ORANGE}stripe${NC}      Forward Stripe test webhooks to a running site (local testing)"
     echo -e "  ${ROE_ORANGE}folder${NC}      Show the cd command for each site's folder"
     echo -e "  ${ROE_ORANGE}install${NC}     Install an optional tool Roe can use (libvips, …)"
     echo -e "  ${ROE_ORANGE}completion${NC}  Hit the tab key to auto-complete site names"
@@ -113,6 +118,7 @@ usage() {
     echo -e "  $ ${ROE_ORANGE}roe start roe-site-name${NC}"
     echo -e "  $ ${ROE_ORANGE}roe open${NC}"
     echo -e "  $ ${ROE_ORANGE}roe install libvips${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe stripe${NC}"
     echo -e "  $ ${ROE_ORANGE}roe stop --all${NC}"
     echo ""
     echo -e "${ROE_RED}${BOLD}NOTES${NC}"
@@ -120,6 +126,11 @@ usage() {
     echo "    you don't need to add a site name."
     echo "  • 'roe install' lists the optional tools; 'roe install <tool>'"
     echo "    installs one. The name there is a tool, not a site."
+    echo "  • 'roe stripe' needs the Stripe CLI (roe install stripe) and a"
+    echo "    running site; it forwards test webhooks so you can test checkout"
+    echo "    and upgrades locally. Ctrl-C stops it. By default it forwards the"
+    echo "    events Roe handles; use --events <a,b,c>, --all-snapshot or"
+    echo "    --all-thin to change that (e.g. roe stripe --events charge.refunded)."
     echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
     echo "  • To register a site, run './roe.sh register' inside the Roe folder."
     echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
@@ -352,6 +363,87 @@ cmd_admin() {
     open_url "$(url_for "$f")/admin"
 }
 
+# ── Stripe local webhook listener ─────────────────────────────────────────────
+#
+# `roe stripe [name]` forwards Stripe's test-mode webhook events to a running
+# site's local server, so the full checkout → upgrade flow can be tested
+# locally with no public URL. It's a thin, memorable wrapper over:
+#
+#   stripe listen --forward-to localhost:<port>/webhooks/stripe
+#
+# Resolves the site the same way open/status do (one site, or the single
+# running one, or an explicit name), reads its PORT from the registry, makes
+# sure the Stripe CLI is present (offers `roe install stripe` if not) and that
+# the user is logged in (runs `stripe login` first if not), then runs the
+# listener in the FOREGROUND — Ctrl-C stops it, exactly like `stripe listen`.
+
+# Is the Stripe CLI logged in? `stripe config --list` exits non-zero / prints
+# nothing useful before the first `stripe login`. Cheap and side-effect-free.
+stripe_logged_in() {
+    stripe config --list >/dev/null 2>&1 && stripe config --list 2>/dev/null | grep -q .
+}
+
+cmd_stripe() {
+    local f="$1" name port
+
+    # The Stripe CLI has to be on PATH. If it isn't, point at the one-liner
+    # that installs it through Roe's own managed-tools machinery.
+    if ! command -v stripe >/dev/null 2>&1; then
+        log_warning "The Stripe CLI isn't installed."
+        printf "  Install it now with ${CYAN}roe install stripe${NC}? [Y/n]: "
+        local reply; read -r reply
+        case "${reply:-y}" in
+            [Nn]*) log_info "Left it for you. Run 'roe install stripe' when ready."; return 0 ;;
+        esac
+        cmd_install stripe || return 1
+        # cmd_install may have printed a manual command (Linux) rather than
+        # installing; re-check before carrying on.
+        command -v stripe >/dev/null 2>&1 || {
+            log_error "Stripe CLI still isn't on PATH. Install it, then run 'roe stripe' again."
+            return 1
+        }
+    fi
+
+    name="$(basename "$f" .conf)"
+    require_running "$f" || return 1
+    port="$(_conf_get "$f" PORT)"
+    if [ -z "$port" ]; then
+        log_error "Couldn't read $name's port from the registry."
+        return 1
+    fi
+
+    # First run needs a browser authorisation. Do it up front so the listener
+    # doesn't start half-authenticated.
+    if ! stripe_logged_in; then
+        log_info "Not logged in to Stripe yet — opening authorisation in your browser."
+        stripe login || { log_error "Stripe login didn't complete. Run 'roe stripe' again once you're logged in."; return 1; }
+    fi
+
+    local target="localhost:${port}/webhooks/stripe"
+    echo -e "${BOLD}Forwarding Stripe webhooks → ${CYAN}${target}${NC}${BOLD} for ${name}${NC}"
+
+    # Newer Stripe CLIs refuse `stripe listen` without being told which events to
+    # forward. Default to exactly the events Roe's webhook handler acts on
+    # (checkout + refunds + disputes); callers can override with
+    # `roe stripe --events a,b,c` or `--all-snapshot` / `--all-thin`.
+    local events="${ROE_STRIPE_EVENTS:-$ROE_STRIPE_DEFAULT_EVENTS}"
+    local -a listen_args=(--forward-to "$target")
+    case "$events" in
+        --all-snapshot|--all-thin)
+            listen_args+=("$events")
+            echo -e "  ${DIM}Forwarding ${events#--} events.${NC}"
+            ;;
+        *)
+            listen_args+=(--events "$events")
+            echo -e "  ${DIM}Events: ${events}${NC}"
+            ;;
+    esac
+    echo -e "  ${DIM}Leave this running while you test. Press Ctrl-C to stop.${NC}"
+    echo ""
+    # Foreground, replacing this process so Ctrl-C goes straight to the listener.
+    exec stripe listen "${listen_args[@]}"
+}
+
 # folder: print the cd command for each site's folder. A child process can't
 # change the parent shell's working directory, so rather than try, we hand
 # over a copy-paste command. Paths are quoted because a Roe folder can sit at
@@ -440,7 +532,7 @@ default_name() {
         return 0
     fi
     case "$fn" in
-        cmd_stop|cmd_restart|cmd_status|cmd_open|cmd_home|cmd_admin)
+        cmd_stop|cmd_restart|cmd_status|cmd_open|cmd_home|cmd_admin|cmd_stripe)
             running="$(running_names)"
             if [ "$(printf '%s\n' "$running" | grep -c .)" -eq 1 ]; then
                 echo "$running"
@@ -608,7 +700,7 @@ EOF
 
 # The commands a bare `roe` accepts, one per line — the first word to complete.
 complete_commands() {
-    printf '%s\n' list start stop restart status open home admin folder install completion help
+    printf '%s\n' list start stop restart status open home admin stripe folder install completion help
 }
 
 # The candidates for the SECOND word, given the command being completed for.
@@ -617,7 +709,7 @@ complete_commands() {
 complete_names() {
     case "$1" in
         start|stop|restart) echo "--all" ;;
-        status|open|home|admin|folder) : ;;
+        status|open|home|admin|stripe|folder) : ;;
         install) complete_tools; return 0 ;;
         *) return 0 ;;   # list/completion/help take no argument
     esac
@@ -690,6 +782,29 @@ case "${1:-}" in
     open)            for_target cmd_open    "${2:-}" ;;
     home)            for_target cmd_home    "${2:-}" ;;
     admin)           for_target cmd_admin   "${2:-}" ;;
+    stripe)
+        shift
+        _stripe_site=""
+        export ROE_STRIPE_EVENTS=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --events)
+                    if [ -z "${2:-}" ]; then
+                        log_error "--events needs a comma-separated list, e.g. --events checkout.session.completed,charge.refunded"
+                        exit 1
+                    fi
+                    ROE_STRIPE_EVENTS="$2"; shift 2 ;;
+                --events=*)       ROE_STRIPE_EVENTS="${1#--events=}"; shift ;;
+                --all-snapshot|--all-thin) ROE_STRIPE_EVENTS="$1"; shift ;;
+                -*)
+                    log_error "Unknown flag for 'roe stripe': $1"
+                    echo "  Use --events <a,b,c>, --all-snapshot, or --all-thin." >&2
+                    exit 1 ;;
+                *)                _stripe_site="$1"; shift ;;
+            esac
+        done
+        for_target cmd_stripe "$_stripe_site"
+        ;;
     folder)          shift; cmd_folder "$@" ;;
     install)         cmd_install "${2:-}" ;;
     completion)      completion_script "${2:-}" ;;
