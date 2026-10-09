@@ -50,6 +50,34 @@
         </ul>
       <% end %>
 
+      <%# url_name (the post's URL slug). Not a "missing requirement" — it
+          auto-generates from the title when blank — but publish is the moment
+          the public URL becomes real, so we surface it here for review/edit.
+          Same sync pattern as the fields below: change->editor#syncModalField
+          writes metadata_fields[url_name] into the metadata editor (the source
+          of truth), and Save & Publish persists it. Leave blank to let Roe
+          derive it from the title. %>
+      <%
+        current_url_name = @post.metadata["url_name"].to_s.strip
+        title_for_slug   = @post.metadata["title"].to_s.strip
+        derived_slug     = title_for_slug.parameterize.presence
+      %>
+      <div class="bg-gray-50 border border-gray-300 p-6 mb-6">
+        <h3 class="font-semibold text-gray-900 mb-1">URL name</h3>
+        <p class="text-sm text-gray-700 mb-3">
+          The slug for this post's web address<% if derived_slug %>, e.g.
+            <code class="text-xs bg-white border border-gray-200 px-1 py-0.5"><%= "/posts/#{current_url_name.presence || derived_slug}" %></code><% end %>.
+          Leave blank to generate it from the title.
+        </p>
+        <input type="text"
+               name="metadata_fields[url_name]"
+               value="<%= current_url_name %>"
+               placeholder="<%= derived_slug || "auto-generated-from-title" %>"
+               autocomplete="off"
+               data-action="change->editor#syncModalField"
+               class="w-full font-mono text-sm p-2 border border-gray-300">
+      </div>
+
       <%# No form wrapper — Confirm injects these values into the main editor %>
       <%# form and submits that, so the post's content + metadata save in one %>
       <%# go (along with status: published). %>

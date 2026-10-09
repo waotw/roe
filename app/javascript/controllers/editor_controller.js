@@ -95,6 +95,10 @@ export default class extends Controller {
     "saveMessage",
     "leaveModal",
     "unpublishModal",
+    "redirectModal",
+    "redirectFrom",
+    "redirectTo",
+    "redirectFromField",
   ];
 
   static values = {
@@ -110,6 +114,9 @@ export default class extends Controller {
     knownFields: Array,
     defaultAuthor: String,
     highlightMedia: String,
+    originalUrlName: String,
+    filenameSlug: String,
+    published: Boolean,
   };
 
   connect() {
@@ -2214,6 +2221,16 @@ export default class extends Controller {
   // ========== FORM ACTIONS ==========
 
   save(event) {
+    // Guard: renaming a PUBLISHED post's slug changes a live URL. Intercept the
+    // submit BEFORE anything is written and let the user decide (redirect / keep
+    // old / cancel). _redirectDecision is set by the modal buttons so the
+    // re-submit they trigger passes straight through.
+    if (!this._redirectDecisionMade && this._publishedSlugChanged()) {
+      if (event && event.preventDefault) event.preventDefault();
+      this._openRedirectDecision();
+      return;
+    }
+
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
 
@@ -2596,6 +2613,111 @@ export default class extends Controller {
   _extractMetadataFieldName(rawName) {
     const match = (rawName || "").match(/^metadata_fields\[(.+)\]$/);
     return match ? match[1] : null;
+  }
+
+  // Dismiss the post-rename redirect offer (the "Skip" button). The modal is
+  // server-rendered from a one-shot flash, so removing the node is all that's
+  // needed — it won't reappear on the next load.
+  dismissRedirectModal(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    const modal = this.element.querySelector("[data-redirect-modal]");
+    if (modal) modal.remove();
+  }
+
+  // ----- Slug-change decision (pre-save) -----------------------------------
+  //
+  // When a PUBLISHED post's url_name is edited, save() intercepts the submit
+  // and routes through these so the user decides before anything is written.
+
+  // The post's EFFECTIVE url_name as it stands in the editor right now, mirroring
+  // the server's HasMetadata#url_name resolution: the url_name field if set,
+  // else the title parameterized, else the filename slug. This is what makes a
+  // blanked url_name (revert to title) or a title rename correctly register as a
+  // slug change — not just an edit to the url_name field itself.
+  _currentUrlName() {
+    const urlField = this.element.querySelector('[data-metadata-field="url_name"]');
+    const explicit = urlField ? urlField.value.trim() : this._urlNameFromYaml();
+    if (explicit) return explicit;
+
+    const titleField = this.element.querySelector('[data-metadata-field="title"]');
+    const title = titleField ? titleField.value.trim() : "";
+    if (title) return this._parameterize(title);
+
+    return this.filenameSlugValue || "";
+  }
+
+  // Read url_name from the raw metadata YAML field (fallback when there's no
+  // form-mode url_name input, e.g. the YAML view is active).
+  _urlNameFromYaml() {
+    const meta = this.element.querySelector('[name="metadata"]');
+    const m = meta && meta.value.match(/^\s*url_name:\s*(.+?)\s*$/m);
+    return m ? m[1].replace(/^["']|["']$/g, "").trim() : "";
+  }
+
+  // Match ActiveSupport's String#parameterize closely enough for slug comparison:
+  // lowercase, non-alphanumerics → single hyphens, trimmed. (Server remains the
+  // source of truth for the actual slug written; this only decides whether to
+  // prompt.)
+  _parameterize(str) {
+    return str
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  // True only when the post was ALREADY published (a first publish has no prior
+  // public URL to protect) and the slug actually changed from its saved value.
+  _publishedSlugChanged() {
+    if (!this.publishedValue) return false;
+    const original = (this.originalUrlNameValue || "").trim();
+    const current = this._currentUrlName();
+    return original !== "" && current !== "" && original !== current;
+  }
+
+  _openRedirectDecision() {
+    if (!this.hasRedirectModalTarget) return;
+    const from = `/posts/${this.originalUrlNameValue}`;
+    const to = `/posts/${this._currentUrlName()}`;
+    if (this.hasRedirectFromTarget) this.redirectFromTarget.textContent = from;
+    if (this.hasRedirectToTarget) this.redirectToTarget.textContent = to;
+    this.redirectModalTarget.classList.remove("hidden");
+    this.setScrollLock(true);
+  }
+
+  _closeRedirectDecision() {
+    if (this.hasRedirectModalTarget)
+      this.redirectModalTarget.classList.add("hidden");
+    this.setScrollLock(false);
+  }
+
+  // "Create redirect & save" — stash the old path in the hidden field so the
+  // server writes the 301 as part of this save, then submit.
+  createRedirectAndSave(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    if (this.hasRedirectFromFieldTarget)
+      this.redirectFromFieldTarget.value = `/posts/${this.originalUrlNameValue}`;
+    this._redirectDecisionMade = true;
+    this._closeRedirectDecision();
+    this.formTarget.requestSubmit();
+  }
+
+  // "Keep old URL" — revert the slug field to its saved value, then save. No
+  // redirect is written (the URL never changed).
+  keepOldUrlAndSave(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    this.applyMetadataField("url_name", this.originalUrlNameValue);
+    if (this.hasRedirectFromFieldTarget) this.redirectFromFieldTarget.value = "";
+    this._redirectDecisionMade = true;
+    this._closeRedirectDecision();
+    this.formTarget.requestSubmit();
+  }
+
+  // "Cancel (keep previous url)" — close the modal and save nothing. The editor
+  // stays open with the edited slug still in the field, so the user can decide
+  // again on the next save.
+  cancelRedirectDecision(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    this._closeRedirectDecision();
   }
 
   // The Unpublish button is a form submit. Intercept it, confirm via the styled

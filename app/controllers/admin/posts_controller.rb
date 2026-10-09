@@ -331,8 +331,7 @@ class Admin::PostsController < Admin::BaseController
       return
     end
 
-    # Capture pre-save state so we can detect a publishing transition
-    # (draft/unlisted → published) and queue any newsletter sends below.
+    # Capture pre-save publish state (newsletter transition detection below).
     was_published = @post.published?
 
     # Use the formatted YAML (includes GUID if added/restored)
@@ -352,6 +351,27 @@ class Admin::PostsController < Admin::BaseController
       flash[:notice] = "Post published"
     else
       flash[:notice] = "Post saved"
+    end
+
+    # The editor's pre-save slug-change modal stashes the OLD public path here
+    # when the user chose "Create redirect & save". Write the 301 now, as part
+    # of this save — no post-save prompt, no extra round-trip. Both the NEW slug
+    # and the published check read from the submitted metadata (authoritative
+    # and reload-independent): only a post being saved AS published has a public
+    # URL worth protecting.
+    redirect_from = params[:create_redirect_from].to_s.strip
+    saved_status  = metadata["status"].to_s.strip
+    if redirect_from.present? && saved_status == "published"
+      # Effective new slug, mirroring HasMetadata#url_name / #calculate_url_name:
+      # explicit url_name, else the title parameterized, else the filename. Using
+      # the submitted metadata keeps this correct even when url_name was blanked
+      # (a revert to the title-derived slug), independent of reload timing.
+      new_slug = metadata["url_name"].to_s.strip.presence ||
+                 metadata["title"].to_s.strip.presence&.parameterize ||
+                 File.basename(@post.file_path.to_s, ".md")
+      new_path = "/posts/#{new_slug}"
+      result = RedirectManager.add_301(from: redirect_from, to: new_path)
+      flash[:notice] = "#{flash[:notice]}. Redirect added: #{result.from} → #{result.to}." if result.written
     end
 
     redirect_to edit_admin_post_path(@post)
