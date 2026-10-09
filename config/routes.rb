@@ -364,6 +364,8 @@ Rails.application.routes.draw do
 
     get   "configs/custom_code/edit", to: "configs#edit_custom_code", as: "edit_custom_code_config"
     patch "configs/custom_code",      to: "configs#update_custom_code", as: "custom_code_config"
+    get   "configs/redirects/edit",   to: "configs#edit_redirects", as: "edit_redirects_config"
+    patch "configs/redirects",        to: "configs#update_redirects", as: "redirects_config"
 
     get "configs/fonts/edit", to: "configs#edit_fonts", as: "edit_fonts_config"
     patch "configs/fonts", to: "configs#update_fonts", as: "fonts_config"

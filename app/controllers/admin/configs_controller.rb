@@ -452,6 +452,14 @@ class Admin::ConfigsController < Admin::BaseController
       edit_path: admin_edit_security_config_path
     }
 
+    global_files << {
+      name: "redirects.yml",
+      path: "global/redirects.yml",
+      type: "redirects",
+      description: "301/302 URL redirects (auto-added when you rename a published slug)",
+      edit_path: admin_edit_redirects_config_path
+    }
+
     # Always show deploy.yml (ships with Roe)
     if File.exist?(SiteConfig::DEPLOY_FILE)
       global_files << {
@@ -721,6 +729,41 @@ class Admin::ConfigsController < Admin::BaseController
 
     flash[:notice] = "Custom code saved."
     redirect_to admin_edit_custom_code_config_path
+  end
+
+  # GET — editor for redirects.yml (the 301/302 rules SiteRedirectsMiddleware
+  # serves). Auto-created by the post slug-change flow, but also hand-editable
+  # here. Shows the parsed rules for reading plus the raw YAML for editing.
+  def edit_redirects
+    @redirects      = RedirectManager.rules
+    @config_content = File.exist?(SiteConfig::REDIRECTS_FILE) ? File.read(SiteConfig::REDIRECTS_FILE) : "redirects: {}\n"
+  end
+
+  # POST — validates and writes redirects.yml, then reloads the middleware so a
+  # change takes effect without a restart. Rejects invalid YAML (a broken file
+  # would silently drop every redirect) and anything that isn't a redirects map.
+  def update_redirects
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+    parsed  = YAML.safe_load(content, permitted_classes: [], aliases: false)
+
+    unless parsed.is_a?(Hash) && (parsed["redirects"].nil? || parsed["redirects"].is_a?(Hash))
+      @config_content = content
+      @redirects = RedirectManager.rules
+      flash.now[:alert] = "redirects.yml must be a `redirects:` map of \"from path\" => to."
+      return render(:edit_redirects, status: :unprocessable_entity)
+    end
+
+    FileUtils.mkdir_p(File.dirname(SiteConfig::REDIRECTS_FILE))
+    SiteFile.write(SiteConfig::REDIRECTS_FILE, content)
+    SiteRedirectsMiddleware.reload! if defined?(SiteRedirectsMiddleware)
+
+    flash[:notice] = "Redirects saved."
+    redirect_to admin_edit_redirects_config_path
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    @redirects = RedirectManager.rules
+    flash.now[:alert] = "Invalid YAML: #{e.message}"
+    render(:edit_redirects, status: :unprocessable_entity)
   end
 
   # Enable custom feeds by creating features/feeds.yml, seeded with one example

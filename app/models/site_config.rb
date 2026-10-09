@@ -12,6 +12,7 @@ class SiteConfig < ApplicationRecord
   DEPLOY_FILE = File.join(SITE_PATH, "deploy.yml")
   CONTENT_FILE = File.join(SITE_PATH, "content.yml")
   SECURITY_FILE = File.join(SITE_PATH, "security.yml")
+  REDIRECTS_FILE = File.join(SITE_PATH, "redirects.yml")
 
   # content.yml keys that used to live flat in site.yml. Lets `content`
   # read a pre-split install (before the boot migration moves them).
