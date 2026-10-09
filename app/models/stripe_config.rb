@@ -223,6 +223,100 @@ class StripeConfig < ApplicationRecord
     File.delete(TEST_CONFIG_PATH) if File.exist?(TEST_CONFIG_PATH)
   end
 
+  # Install a TEST secret key the same way the admin "Save Test Keys" flow does,
+  # for use by the `roe stripe` CLI (local dev has no key form by design). Writes
+  # the key into stripe.yml's test config, reloads it, verifies against Stripe,
+  # and — on success — syncs the product/price for test mode if that hasn't
+  # happened yet (admin does this on members-save / mode-switch, not on key-save,
+  # so we fold it in here to leave a fully usable test setup).
+  #
+  # Returns a status Hash the CLI can branch on; never raises:
+  #   { ok: true,  verified: true,  priced: true|false, price_synced: bool }
+  #   { ok: false, reason: :blank | :bad_format | :unverified | :error, message: }
+  # The key is accepted from the caller (read from STDIN by the CLI, never argv),
+  # and never logged.
+  def self.install_test_key!(raw_key)
+    key = raw_key.to_s.strip
+    return { ok: false, reason: :blank, message: "No key given." } if key.empty?
+
+    # Test keys only here — this is the local-dev path, and live keys are
+    # production/DB-only by design. rk_test_ (restricted, recommended) or
+    # sk_test_ (secret). Reject anything else before a pointless API call.
+    unless key.start_with?("rk_test_", "sk_test_")
+      return { ok: false, reason: :bad_format,
+               message: "That isn't a test key. It should start with rk_test_ (restricted, recommended) or sk_test_." }
+    end
+
+    cfg = test_config.merge("secret_key" => key)
+    save_test_config(cfg)
+    SiteConfig.sync_from_file("integrations/stripe") if defined?(SiteConfig)
+
+    sc = current
+    unless sc.verify!
+      return { ok: false, reason: :unverified,
+               message: "Stripe rejected the key. Check it's a test key with the permissions Roe needs (at least Webhook Endpoints: Write)." }
+    end
+
+    price_synced = sync_test_price_if_missing(sc)
+    { ok: true, verified: true, priced: sc.reload.price_id_test.present?, price_synced: price_synced }
+  rescue => e
+    Rails.logger.error "install_test_key! failed: #{e.message}"
+    { ok: false, reason: :error, message: "Something went wrong saving the key: #{e.message}" }
+  end
+
+  # Create the test-mode Price from members.yml the first time, mirroring the
+  # admin resync guard (connected, no existing price, payments enabled + priced).
+  # Returns true if a sync was attempted and left a price, false if skipped.
+  def self.sync_test_price_if_missing(sc = current)
+    return false unless sc.mode_test? && sc.connected?
+    return false if sc.current_price_id.present?
+
+    payments = (SiteConfig.feature("members", "payments") if defined?(SiteConfig))
+    return false unless payments && ActiveModel::Type::Boolean.new.cast(payments["enabled"])
+    return false if payments["price"].blank?
+
+    StripeProductManager.new.sync_from_config(payments)
+    sc.reload.current_price_id.present?
+  rescue => e
+    Rails.logger.error "sync_test_price_if_missing failed: #{e.message}"
+    false
+  end
+
+  # Remove the TEST key and its derived test-mode identifiers — the local-dev
+  # counterpart to the admin "Disconnect" button, but scoped to test only so it
+  # never touches live/production credentials. Clears the secret key from both
+  # stripe.yml and the DB column, drops the test product/price IDs and the test
+  # webhook signing secret, and clears verified_at (the active mode in dev is
+  # always test, so the connection is no longer verified once the key is gone).
+  # Used by `roe stripe remove`. Returns true if a key was present and removed,
+  # false if there was nothing to remove.
+  def self.remove_test_key!
+    sc = current
+    had_key = sc.secret_key_test.present?
+
+    # Strip the key (and any captured webhook secret) out of stripe.yml, keeping
+    # any other test config the file holds.
+    cfg = test_config.except("secret_key", "webhook_signing_secret")
+    if cfg.empty?
+      clear_test_config
+    else
+      save_test_config(cfg)
+    end
+    SiteConfig.sync_from_file("integrations/stripe") if defined?(SiteConfig)
+
+    sc.update!(
+      secret_key_test: nil,
+      webhook_signing_secret_test: nil,
+      product_id_test: nil,
+      price_id_test: nil,
+      verified_at: nil
+    )
+    had_key
+  rescue => e
+    Rails.logger.error "remove_test_key! failed: #{e.message}"
+    false
+  end
+
   # ── Decryption-failure tracking ──────────────────────────────────────────
 
   def decryption_errors

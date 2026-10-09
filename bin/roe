@@ -107,11 +107,15 @@ usage() {
     echo -e "  ${ROE_ORANGE}stripe${NC}      Forward Stripe test webhooks to a running site (local testing)"
     echo -e "  ${ROE_ORANGE}folder${NC}      Show the cd command for each site's folder"
     echo -e "  ${ROE_ORANGE}install${NC}     Install an optional tool Roe can use (libvips, …)"
-    echo -e "  ${ROE_ORANGE}completion${NC}  Hit the tab key to auto-complete site names"
+    echo -e "  ${ROE_ORANGE}completion${NC}  Check or set up tab-completion for your shell (--zsh / --bash)"
     echo ""
     echo -e "${ROE_RED}${BOLD}FLAGS${NC}"
-    echo -e "  ${ROE_ORANGE}--all${NC}    Apply start, stop or restart to every registered site"
-    echo -e "  ${ROE_ORANGE}-h${NC}      Show this help"
+    echo -e "  ${ROE_ORANGE}--all${NC}            Apply start, stop or restart to every registered site"
+    echo -e "  ${ROE_ORANGE}--zsh${NC} / ${ROE_ORANGE}--bash${NC}   Shell to check or set up completion for (roe completion)"
+    echo -e "  ${ROE_ORANGE}--events${NC}         Stripe events to forward, comma-separated (roe stripe)"
+    echo -e "  ${ROE_ORANGE}--all-snapshot${NC}   Forward all Stripe snapshot events (roe stripe)"
+    echo -e "  ${ROE_ORANGE}--all-thin${NC}       Forward all Stripe thin events (roe stripe)"
+    echo -e "  ${ROE_ORANGE}-h${NC}               Show this help"
     echo ""
     echo -e "${ROE_RED}${BOLD}EXAMPLES${NC}"
     echo -e "  $ ${ROE_ORANGE}roe list${NC}"
@@ -131,11 +135,12 @@ usage() {
     echo "    and upgrades locally. Ctrl-C stops it. By default it forwards the"
     echo "    events Roe handles; use --events <a,b,c>, --all-snapshot or"
     echo "    --all-thin to change that (e.g. roe stripe --events charge.refunded)."
+    echo "    'roe stripe remove' clears the local test key again."
     echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
     echo "  • To register a site, run './roe.sh register' inside the Roe folder."
     echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
     echo "  • Tab completion for commands and site names is set up when you register."
-    echo "    To add it by hand: eval \"\$(roe completion zsh)\" (or bash)."
+    echo "    To check or set it up by hand: roe completion --zsh (or --bash)."
     echo "  • Registry: $ROE_REGISTRY_DIR"
 }
 
@@ -383,6 +388,77 @@ stripe_logged_in() {
     stripe config --list >/dev/null 2>&1 && stripe config --list 2>/dev/null | grep -q .
 }
 
+# Ask a specific site's Rails whether its Stripe test config is ready to receive
+# forwarded webhooks. Prints one of:
+#   READY            — test secret key + price present; good to go
+#   NO_KEY           — no test key saved; the owner must paste one in admin first
+#   NO_PRICE         — key present but no price synced yet (rare; a save fixes it)
+#   UNKNOWN          — couldn't boot Rails to check (wrong Ruby, app error, …)
+# Advisory only: the caller warns but still launches, because the check booting
+# Rails is more fragile than the listener itself. $1 = the site's ROOT.
+stripe_preflight() {
+    local root="$1" rails out
+    rails="$root/current/bin/rails"
+    [ -x "$rails" ] || { echo "UNKNOWN"; return 0; }
+    out="$("$rails" runner '
+      sc = StripeConfig.current
+      if sc.secret_key_test.blank?
+        puts "NO_KEY"
+      elsif sc.price_id_test.blank?
+        puts "NO_PRICE"
+      else
+        puts "READY"
+      end
+    ' 2>/dev/null | tail -1)"
+    case "$out" in
+        READY|NO_KEY|NO_PRICE) echo "$out" ;;
+        *)                     echo "UNKNOWN" ;;
+    esac
+}
+
+# Prompt for a test key and install it through StripeConfig.install_test_key!,
+# which does exactly what the admin "Save Test Keys" flow does (write stripe.yml,
+# verify against Stripe, sync the test price). The key is piped to Rails on STDIN
+# so it never appears in argv / `ps`. $1 = site ROOT. Returns 0 if a verified key
+# is now in place, 1 otherwise.
+stripe_install_key() {
+    local root="$1" rails key out
+    rails="$root/current/bin/rails"
+    [ -x "$rails" ] || { log_error "Couldn't find Roe's Rails to save the key."; return 1; }
+
+    echo -e "  ${DIM}Create a restricted key in a Test sandbox: Stripe → Developers → API keys →"
+    echo -e "  Create restricted key. Roe needs Webhook Endpoints: Write (see admin for the full list).${NC}"
+    printf "  Paste your test key (rk_test_… or sk_test_…), or leave blank to skip: "
+    read -r key
+    [ -z "$key" ] && { echo ""; return 1; }
+
+    # Pipe the key in on STDIN; the runner reads one line. Never on argv.
+    out="$(printf '%s' "$key" | "$rails" runner '
+      r = StripeConfig.install_test_key!(STDIN.read)
+      if r[:ok]
+        puts r[:price_synced] ? "OK_PRICED" : (r[:priced] ? "OK" : "OK_NOPRICE")
+      else
+        puts "ERR\t#{r[:message]}"
+      end
+    ' 2>/dev/null | tail -1)"
+
+    case "$out" in
+        OK|OK_PRICED)
+            log_success "Key saved and verified with Stripe."
+            return 0 ;;
+        OK_NOPRICE)
+            log_success "Key saved and verified."
+            log_info "No test price yet — enable paid membership and set a price in admin, then save, to create it."
+            return 0 ;;
+        ERR*)
+            log_error "${out#ERR	}"
+            return 1 ;;
+        *)
+            log_error "Couldn't save the key (Rails didn't respond as expected)."
+            return 1 ;;
+    esac
+}
+
 cmd_stripe() {
     local f="$1" name port
 
@@ -411,6 +487,35 @@ cmd_stripe() {
         log_error "Couldn't read $name's port from the registry."
         return 1
     fi
+
+    # Pre-flight: does Roe have what it needs to turn a forwarded webhook into a
+    # real upgrade? The irreducible manual step is one test restricted key pasted
+    # in admin (Stripe has no API to mint a key for your own account, and the CLI
+    # proxies through its own session — it can't hand Roe one). Everything else
+    # Roe derives from that key. Advisory: if we can't boot Rails to check, or it
+    # reports a gap, we say so but still start the listener.
+    local root ready
+    root="$(_conf_get "$f" ROOT)"
+    ready="$(stripe_preflight "$root")"
+    case "$ready" in
+        NO_KEY)
+            log_warning "Roe has no test Stripe key yet, so forwarded webhooks won't upgrade anyone."
+            echo -e "  You can paste one here now (copied from Stripe), and Roe will save and verify it."
+            if stripe_install_key "$root"; then
+                : # key installed and verified — carry on to the listener
+            else
+                printf "  Start the listener anyway (webhooks won't upgrade until a key is added)? [y/N]: "
+                local go; read -r go
+                case "${go:-n}" in [Yy]*) : ;; *) log_info "Stopped. Run 'roe stripe' again when you have a key."; return 0 ;; esac
+            fi
+            ;;
+        NO_PRICE)
+            log_warning "Roe has a key but no synced price yet — save your Stripe settings once in admin to create it."
+            ;;
+        UNKNOWN)
+            log_info "Couldn't check Roe's Stripe setup (Rails didn't boot for the probe) — starting the listener anyway."
+            ;;
+    esac
 
     # First run needs a browser authorisation. Do it up front so the listener
     # doesn't start half-authenticated.
@@ -442,6 +547,32 @@ cmd_stripe() {
     echo ""
     # Foreground, replacing this process so Ctrl-C goes straight to the listener.
     exec stripe listen "${listen_args[@]}"
+}
+
+# `roe stripe remove [site]` — clear the local Stripe TEST key this install uses
+# (the counterpart to the paste in `roe stripe`). Test-only: it never touches
+# live/production credentials. Does not need the Stripe CLI or a running server;
+# it just talks to the site's own Rails.
+cmd_stripe_remove() {
+    local f="$1" name root rails out
+    name="$(basename "$f" .conf)"
+    root="$(_conf_get "$f" ROOT)"
+    rails="$root/current/bin/rails"
+    [ -x "$rails" ] || { log_error "Couldn't find Roe's Rails for $name to remove the key."; return 1; }
+
+    printf "  Remove the local Stripe test key for ${BOLD}${name}${NC}? [y/N]: "
+    local go; read -r go
+    case "${go:-n}" in [Yy]*) : ;; *) log_info "Left the key in place."; return 0 ;; esac
+
+    out="$("$rails" runner '
+      puts(StripeConfig.remove_test_key! ? "REMOVED" : "NONE")
+    ' 2>/dev/null | tail -1)"
+
+    case "$out" in
+        REMOVED) log_success "Local Stripe test key removed for $name." ;;
+        NONE)    log_info "There was no local test key to remove for $name." ;;
+        *)       log_error "Couldn't remove the key (Rails didn't respond as expected)."; return 1 ;;
+    esac
 }
 
 # folder: print the cd command for each site's folder. A child process can't
@@ -711,7 +842,8 @@ complete_names() {
         start|stop|restart) echo "--all" ;;
         status|open|home|admin|stripe|folder) : ;;
         install) complete_tools; return 0 ;;
-        *) return 0 ;;   # list/completion/help take no argument
+        completion) echo "--zsh --bash"; return 0 ;;
+        *) return 0 ;;   # list/help take no argument
     esac
     all_names
 }
@@ -727,6 +859,11 @@ complete_tools() {
 # Print a completion script for the named shell, for sourcing or eval:
 #   eval "$(roe completion zsh)"      # try it in this shell
 #   roe completion bash > file        # or save it and source from your rc
+#
+# This bare form prints the RAW script with no commentary — it's what roe.sh's
+# ensure_roe_completion redirects into ~/.roe/roe-completion.<shell>. Humans use
+# `roe completion --zsh` / `--bash` instead (cmd_completion below), which checks
+# whether completion is set up and offers to install it in plain language.
 completion_script() {
     case "${1:-}" in
         bash)
@@ -770,6 +907,101 @@ EOF
     esac
 }
 
+# Resolve the interactive rc file where the completion line lives, matching
+# roe.sh's _mise_write_target so status/install agree with what register wrote.
+# Echoes the path, or nothing on an unsupported shell.
+_completion_rc_file() {
+    case "$1" in
+        zsh)
+            local zdot=""
+            command -v zsh >/dev/null 2>&1 && \
+                zdot="$(env -u ZDOTDIR zsh -c 'print -r -- "${ZDOTDIR:-$HOME}"' 2>/dev/null)"
+            [ -n "$zdot" ] || zdot="${ZDOTDIR:-$HOME}"
+            echo "$zdot/.zshrc" ;;
+        bash) echo "$HOME/.bash_profile" ;;
+    esac
+}
+
+# Is the completion line present in the rc file? Matches the marker roe.sh writes.
+_completion_installed_in_rc() {
+    local rc="$1"
+    [ -n "$rc" ] && [ -f "$rc" ] && grep -qF 'tab completion for `roe`' "$rc" 2>/dev/null
+}
+
+# When the rc file is a symlink (dotfile managers like stow/chezmoi/yadm link
+# it into a tracked repo), writing through it lands in the real target while
+# preserving the link — so completion works fine, but the user wants to know
+# the actual file that changed, to commit it. Print a "REAL FILE" line only in
+# that case; stay quiet for the common plain-file setup. $1 = the rc path.
+_print_rc_real_target() {
+    local rc="$1" real
+    [ -L "$rc" ] || return 0
+    # readlink -f resolves the full chain on both GNU and modern macOS; fall
+    # back to a single-hop readlink if -f isn't supported.
+    real="$(readlink -f "$rc" 2>/dev/null || readlink "$rc" 2>/dev/null)"
+    [ -n "$real" ] && [ "$real" != "$rc" ] && \
+        echo -e "  REAL FILE: $real ${DIM}(symlinked — commit this in your dotfiles)${NC}"
+}
+
+# Human-facing: `roe completion --zsh` / `--bash`. Reports whether tab completion
+# is set up for that shell and, if not, offers to install it (writing the script
+# to ~/.roe and a single source-line into the rc file — the same thing register
+# does). Plain language, no raw script dumped at the user.
+cmd_completion() {
+    local shell_name="$1"
+    local comp_file="$ROE_HOME/roe-completion.$shell_name"
+    local rc; rc="$(_completion_rc_file "$shell_name")"
+
+    if [ -z "$rc" ]; then
+        log_error "Tab completion is only available for bash and zsh."
+        return 1
+    fi
+
+    # Already set up?
+    if _completion_installed_in_rc "$rc" && [ -f "$comp_file" ]; then
+        log_success "Tab completion for 'roe' is set up ($shell_name)."
+        echo -e "  SCRIPT: $comp_file"
+        echo -e "  LOADED FROM: $rc"
+        _print_rc_real_target "$rc"
+        echo -e "  ${DIM}Type 'roe ' and hit tab. If it's not working yet, open a new terminal.${NC}"
+        return 0
+    fi
+
+    log_warning "Tab completion for 'roe' isn't set up for $shell_name yet."
+    echo -e "  It lets you type 'roe ' and press tab to complete commands and site names."
+    echo -e "  Roe will:"
+    echo -e "    • write the completion script to ${CYAN}$comp_file${NC}"
+    echo -e "    • add one line to ${CYAN}$rc${NC} to load it"
+    printf "  Set it up now? [Y/n]: "
+    local reply; read -r reply
+    case "${reply:-y}" in
+        [Nn]*) log_info "Left it for now. Run 'roe completion --$shell_name' when you want it."; return 0 ;;
+    esac
+
+    # Write the script (reuse the raw emitter — one source of truth).
+    mkdir -p "$ROE_HOME"
+    if ! completion_script "$shell_name" > "$comp_file" 2>/dev/null; then
+        rm -f "$comp_file"
+        log_error "Couldn't write the completion script to $comp_file."
+        return 1
+    fi
+
+    # Add the source line once.
+    if ! _completion_installed_in_rc "$rc"; then
+        {
+            echo ''
+            echo '# Added by Roe — tab completion for `roe`'
+            echo "[ -f \"$comp_file\" ] && source \"$comp_file\""
+        } >> "$rc" || { log_error "Couldn't write to $rc."; return 1; }
+    fi
+
+    log_success "Tab completion set up for $shell_name."
+    echo -e "  SCRIPT: $comp_file"
+    echo -e "  LOADED FROM: $rc"
+    _print_rc_real_target "$rc"
+    echo -e "  ${DIM}Open a new terminal (or run: source \"$rc\") to start using it.${NC}"
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
@@ -784,30 +1016,55 @@ case "${1:-}" in
     admin)           for_target cmd_admin   "${2:-}" ;;
     stripe)
         shift
-        _stripe_site=""
-        export ROE_STRIPE_EVENTS=""
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                --events)
-                    if [ -z "${2:-}" ]; then
-                        log_error "--events needs a comma-separated list, e.g. --events checkout.session.completed,charge.refunded"
-                        exit 1
-                    fi
-                    ROE_STRIPE_EVENTS="$2"; shift 2 ;;
-                --events=*)       ROE_STRIPE_EVENTS="${1#--events=}"; shift ;;
-                --all-snapshot|--all-thin) ROE_STRIPE_EVENTS="$1"; shift ;;
-                -*)
-                    log_error "Unknown flag for 'roe stripe': $1"
-                    echo "  Use --events <a,b,c>, --all-snapshot, or --all-thin." >&2
-                    exit 1 ;;
-                *)                _stripe_site="$1"; shift ;;
-            esac
-        done
-        for_target cmd_stripe "$_stripe_site"
+        # Subcommand: `roe stripe remove [site]` clears the local test key.
+        case "${1:-}" in
+            remove|rm)
+                shift
+                for_target cmd_stripe_remove "${1:-}"
+                ;;
+            *)
+                _stripe_site=""
+                export ROE_STRIPE_EVENTS=""
+                while [ $# -gt 0 ]; do
+                    case "$1" in
+                        --events)
+                            if [ -z "${2:-}" ]; then
+                                log_error "--events needs a comma-separated list, e.g. --events checkout.session.completed,charge.refunded"
+                                exit 1
+                            fi
+                            ROE_STRIPE_EVENTS="$2"; shift 2 ;;
+                        --events=*)       ROE_STRIPE_EVENTS="${1#--events=}"; shift ;;
+                        --all-snapshot|--all-thin) ROE_STRIPE_EVENTS="$1"; shift ;;
+                        -*)
+                            log_error "Unknown flag for 'roe stripe': $1"
+                            echo "  Use --events <a,b,c>, --all-snapshot, or --all-thin." >&2
+                            exit 1 ;;
+                        *)                _stripe_site="$1"; shift ;;
+                    esac
+                done
+                for_target cmd_stripe "$_stripe_site"
+                ;;
+        esac
         ;;
     folder)          shift; cmd_folder "$@" ;;
     install)         cmd_install "${2:-}" ;;
-    completion)      completion_script "${2:-}" ;;
+    completion)
+        case "${2:-}" in
+            --zsh)  cmd_completion zsh ;;
+            --bash) cmd_completion bash ;;
+            # Bare `zsh`/`bash` still emit the raw script: roe.sh's
+            # ensure_roe_completion redirects this into ~/.roe, and older
+            # installs on this machine call it that way. Don't break them.
+            zsh|bash) completion_script "$2" ;;
+            "")
+                log_error "Which shell? Use: roe completion --zsh | roe completion --bash"
+                return 1 2>/dev/null || exit 1 ;;
+            *)
+                log_error "Unknown option for completion: $2"
+                echo "  Use: roe completion --zsh | roe completion --bash" >&2
+                exit 1 ;;
+        esac
+        ;;
     # Hidden helpers used by the completion script — not shown in help.
     __complete_commands) complete_commands ;;
     __complete_names)    complete_names "${2:-}" ;;
