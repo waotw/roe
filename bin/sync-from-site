@@ -9,6 +9,8 @@
 #   1. Docs — exact mirror. site/documentation/roe/ ↔ current/lib/.../roe/.
 #      --delete is on; anything you delete from /site disappears from the
 #      app on the next sync. New files added in /site are propagated.
+#      _versions.yml is the one exception: release:bump owns it (writes
+#      current/'s copy, then copies it to site/), so it's never synced.
 #
 #   1b. Shipped site files — before the copies below. Themes and site JS
 #      carry a header with a Version (yours) and a Fingerprint (this
@@ -66,7 +68,12 @@ cd "$ROE_ROOT"
 
 echo "→ Docs (exact mirror, --delete on):"
 echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/documentation/roe/"
-rsync -avc $DRY_RUN --delete \
+# _versions.yml is excluded: it isn't content, it's release metadata that
+# `bin/rails release:bump` writes in current/ (and copies to site/). Copying
+# site/'s copy over it put back stale versions after every bump — 0.3.0's
+# stamps were lost that way. An excluded file is also protected from
+# --delete, so current/'s copy stays put.
+rsync -avc $DRY_RUN --delete --exclude=_versions.yml \
   site/documentation/roe/ \
   current/lib/site_templates/minimum/documentation/roe/
 echo ""

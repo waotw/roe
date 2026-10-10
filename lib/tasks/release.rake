@@ -151,6 +151,15 @@ namespace :release do
     # Sort alphabetically for stable, diff-friendly output across runs.
     File.write(manifest_path, manifest.sort.to_h.to_yaml)
 
+    # The dev site's copy follows. This manifest is metadata Roe generates,
+    # not content — bin/sync-from-site never copies it from site/ (it would
+    # put back whatever versions site/ last had, which is how 0.3.0's stamps
+    # were lost) — so this is the one place it reaches site/.
+    site_manifest = File.join(RoeSitePaths::SITE_PATH, "documentation", "roe", "_versions.yml")
+    if Dir.exist?(File.dirname(site_manifest))
+      FileUtils.cp(manifest_path, site_manifest)
+    end
+
     puts ""
     puts "Docs manifest (#{relative(manifest_path, root)}):"
     puts "  ✓ #{updated} stamped at #{version}" if updated > 0
@@ -263,7 +272,14 @@ namespace :release do
   # bump stamps everything as a baseline.
   def touched_paths_since_last_tag(root)
     current = File.join(root, "current")
-    last_tag = `cd #{current.shellescape} && git describe --tags --abbrev=0 2>/dev/null`.strip
+    # The last *release*, not the last tag. Nightly tags (v0.4.0-nightly.8.3)
+    # don't run this task, so they never stamp anything — measuring from one
+    # would drop every change made between the release and that nightly.
+    # Version order, not `git describe`: a release tag on main needn't be an
+    # ancestor of the branch the bump runs on, and a two-dot diff compares
+    # trees, so ancestry doesn't matter.
+    last_tag = `cd #{current.shellescape} && git tag -l 'v[0-9]*' --sort=-v:refname 2>/dev/null`
+      .split("\n").map(&:strip).find { |tag| tag.match?(/\Av\d+\.\d+\.\d+\z/) }.to_s
 
     if last_tag.empty?
       puts "No prior git tag found — first release, stamping all candidate files."
