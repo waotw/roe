@@ -203,13 +203,65 @@
             No bottom padding on the row: the tabs have their own, so they reach
             the panel's top edge and can join it. The whole active-tab look
             (background, border) lives in application.css — see .editor-tab. %>
-        <div class="editor-tabs flex items-center gap-1 px-1.5 py-1 border-t border-x border-gray-300">
-          <%# Live / Source, first in the row. The text says which mode is on;
-              the button says what clicking it does: "Live mode [SOURCE]".
-              Hidden until the live editor has loaded, so the plain textarea
-              never shows a switch that does nothing. %>
+        <div class="editor-tabs flex items-center gap-1 px-1.5 py-1 border-t border-x border-gray-300 justify-between">
+          <%# Left: the tabs and the check's status. Its own flex row, so the
+              tabs, dot and summary line up the way they did as direct children
+              of the strip. %>
+          <div class="flex items-center gap-1">
+            <button type="button"
+                    data-action="click->editor#toggleTOC click->markdown-doctor#closePanel"
+                    class="editor-tab editor-tab-toc text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+              Table of Contents
+              <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
+            </button>
+
+            <%# Present only while there's something to read. Arriving and leaving
+                costs no vertical space — the table-of-contents tab sets the row's
+                height — so it can follow the writing without shoving the page
+                around. Nothing here opens on its own; that's always a click. %>
+            <button type="button"
+                    data-markdown-doctor-target="toggleRow"
+                    data-action="click->markdown-doctor#togglePanel click->editor#closeTOC"
+                    class="editor-tab editor-tab-markdown hidden text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+              Markdown Check
+              <%# Collapsed to start: the tab now arrives on its own when a check
+                  finds something, with the panel still closed. %>
+              <span data-markdown-doctor-target="arrow"
+                    class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
+            </button>
+
+
+            <%# Status. Green says the markdown is fine, amber that something's
+                worth a look — the same two colours the save dot uses, since it's
+                the same question asked about a different thing. Grey until the
+                first check answers, so a document with problems never flashes
+                green on the way in. The dot is decorative; the text beside it
+                carries the meaning, which is what a screen reader will read.
+
+                Both sit outside the panel so they stay legible with it closed —
+                which, for a clean document, is the only state there is.
+
+                Undo is here rather than in the Fixable section because a
+                successful Fix All empties that section, which is exactly when undo
+                is wanted. The fix only touches the textarea, so Ctrl+Z and "don't
+                save" already undo it; this just makes one click reversible in one. %>
+            <span data-markdown-doctor-target="dot" aria-hidden="true"
+                  class="inline-block w-2 h-2 rounded-full bg-gray-300 ml-1 shrink-0"></span>
+            <span data-markdown-doctor-target="summary" class="text-xs text-gray-500 ml-1.5"></span>
+            <button type="button"
+                    data-markdown-doctor-target="revertButton"
+                    data-action="click->markdown-doctor#revert"
+                    class="hidden uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
+              Undo Fix
+            </button>
+          </div>
+
+          <%# Right: Live / Source. The text says which mode is on; the button
+              says what clicking it does: "Live mode [SOURCE]". Hidden until the
+              live editor has loaded, so the plain textarea never shows a switch
+              that does nothing. %>
           <span data-markdown-editor-target="modeToggle"
-                class="hidden items-center gap-1.5 pr-2 mr-1 border-r border-gray-300 text-xs text-gray-600 text-nowrap">
+                class="hidden items-center gap-1.5 text-xs text-gray-600 text-nowrap">
             <span data-markdown-editor-target="modeState">Live mode</span>
             <button type="button"
                     data-markdown-editor-target="modeButton"
@@ -218,51 +270,6 @@
               <span data-markdown-editor-target="modeLabel">Source</span>
             </button>
           </span>
-          <button type="button"
-                  data-action="click->editor#toggleTOC click->markdown-doctor#closePanel"
-                  class="editor-tab editor-tab-toc text-xs text-gray-600 hover:text-gray-900 text-nowrap">
-            Table of Contents
-            <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
-          </button>
-
-          <%# Present only while there's something to read. Arriving and leaving
-              costs no vertical space — the table-of-contents tab sets the row's
-              height — so it can follow the writing without shoving the page
-              around. Nothing here opens on its own; that's always a click. %>
-          <button type="button"
-                  data-markdown-doctor-target="toggleRow"
-                  data-action="click->markdown-doctor#togglePanel click->editor#closeTOC"
-                  class="editor-tab editor-tab-markdown hidden text-xs text-gray-600 hover:text-gray-900 text-nowrap">
-            Markdown Check
-            <%# Collapsed to start: the tab now arrives on its own when a check
-                finds something, with the panel still closed. %>
-            <span data-markdown-doctor-target="arrow"
-                  class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
-          </button>
-
-          <%# Status. Green says the markdown is fine, amber that something's
-              worth a look — the same two colours the save dot uses, since it's
-              the same question asked about a different thing. Grey until the
-              first check answers, so a document with problems never flashes
-              green on the way in. The dot is decorative; the text beside it
-              carries the meaning, which is what a screen reader will read.
-
-              Both sit outside the panel so they stay legible with it closed —
-              which, for a clean document, is the only state there is.
-
-              Undo is here rather than in the Fixable section because a
-              successful Fix All empties that section, which is exactly when undo
-              is wanted. The fix only touches the textarea, so Ctrl+Z and "don't
-              save" already undo it; this just makes one click reversible in one. %>
-          <span data-markdown-doctor-target="dot" aria-hidden="true"
-                class="inline-block w-2 h-2 rounded-full bg-gray-300 ml-1 shrink-0"></span>
-          <span data-markdown-doctor-target="summary" class="text-xs text-gray-500 ml-1.5"></span>
-          <button type="button"
-                  data-markdown-doctor-target="revertButton"
-                  data-action="click->markdown-doctor#revert"
-                  class="hidden uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
-            Undo Fix
-          </button>
         </div>
 
         <%# Two sections, because the distinction is what the writer acts on:
