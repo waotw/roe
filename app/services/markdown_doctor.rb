@@ -18,6 +18,8 @@
 # DEPENDENCY-FREE ON PURPOSE. bin/roe-markdown-doctor requires this file
 # directly rather than booting Rails, so it must stay plain Ruby — no
 # ActiveSupport (`present?`, `blank?`) and nothing from the app.
+require "set"
+
 class MarkdownDoctor
   ISSUE_TYPES = {
     invalid_fence_length: "Invalid fence length",
@@ -34,7 +36,11 @@ class MarkdownDoctor
     over_indented_fence: "Fence indented far enough to become a code block",
     unindented_fence_in_list: "Unindented code fence breaking a list",
     under_indented_footnote: "Footnote continuation not indented enough",
-    list_indent_too_shallow: "List item indented but not enough to nest"
+    list_indent_too_shallow: "List item indented but not enough to nest",
+    unindented_footnote_line: "Footnote line not indented, so it leaves the note",
+    content_after_footnotes: "Text below the footnotes shows above them",
+    marker_across_lines: "Formatting that doesn't close on its own line",
+    broken_anchor_link: "Link to a heading that isn't on the page"
   }.freeze
 
   # Which issues Fix All is allowed to touch.
@@ -45,11 +51,18 @@ class MarkdownDoctor
   # document into a code block. Same for a mismatched closer — changing the
   # opener and changing the closer mean different things, and only the author
   # knows which was meant. Those stay as warnings.
+  #
+  # content_after_footnotes moves text to where it already renders, so the
+  # page doesn't change — the file just stops misleading. It's withheld
+  # (issue[:unsafe]) when the text below holds an unclosed fence, because
+  # moved above the notes, that fence would swallow them.
   FIXABLE_TYPES = %i[
     list_spacing
     unindented_blockquote_in_list
     absorbed_by_list
     under_indented_footnote
+    unindented_footnote_line
+    content_after_footnotes
   ].freeze
 
   def self.fixable?(type)
@@ -85,18 +98,29 @@ class MarkdownDoctor
   HEADING_RE = /^\s*\#{1,6}(\s|$)/
   SETEXT_UNDERLINE_RE = /^\s*(=+|-+)\s*$/
   HR_RE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/
+  # An in-page link: `[text](#anchor)` or `href="#anchor"`. The anchor is in
+  # group 1 or 2.
+  ANCHOR_LINK_RE = /\[[^\]]*\]\(#([^)\s]+)\)|href=["']#([^"']+)["']/
 
-  def self.diagnose(content)
-    new(content).diagnose
+  def self.diagnose(content, page_ids: nil)
+    new(content, page_ids: page_ids).diagnose
   end
 
   def self.diagnose_file(path)
     new(File.read(path)).diagnose
   end
 
-  def initialize(content)
+  # page_ids: the id of every element on the rendered page, for checking
+  # `[text](#anchor)` links against. Optional — the CLI runs without Rails and
+  # can't render, so it passes nothing and that check is skipped. The editor's
+  # endpoint renders the post and passes them in. They come from the real page
+  # rather than from re-deriving heading ids here: collection items, glossary
+  # terms and galleries make ids of their own, and a guess would call good
+  # links broken.
+  def initialize(content, page_ids: nil)
     @lines = content.to_s.lines
     @issues = []
+    @page_ids = page_ids
   end
 
   def diagnose
@@ -106,8 +130,13 @@ class MarkdownDoctor
     check_absorbed_blocks
     check_list_interruptions
     check_footnotes
+    check_footnote_placement
     check_indentation
-    @issues.each { |i| i[:fixable] = self.class.fixable?(i[:type]) }
+    check_markers_across_lines
+    check_anchor_links if @page_ids
+    @issues.each do |issue|
+      issue[:fixable] = self.class.fixable?(issue[:type]) && !issue.delete(:unsafe)
+    end
     @issues
   end
 
@@ -121,6 +150,18 @@ class MarkdownDoctor
     fixable = issues.select { |i| i[:fixable] }
     return [ @lines.join, [] ] if fixable.empty?
 
+    # Moving text above the footnotes shifts every line number below the
+    # notes, so it goes first and alone, and the rest is worked out afresh on
+    # the result — the line-by-line fixes then find the moved lines where they
+    # now are. After the move nothing is below the notes, so it can't recur;
+    # @moved is a guard all the same.
+    if !@moved && (move = fixable.find { |i| i[:type] == :content_after_footnotes })
+      next_pass = self.class.new(move_above_footnotes(move))
+      next_pass.instance_variable_set(:@moved, true)
+      moved, more = next_pass.fix
+      return [ moved, [ move, *more ] ]
+    end
+
     # Work back to front so earlier line numbers stay valid as lines shift.
     out = @lines.dup
     fixable.sort_by { |i| -i[:line] }.each do |issue|
@@ -132,8 +173,9 @@ class MarkdownDoctor
         # Both want the same thing: a blank line above. Insert rather than
         # replace so the line above is untouched.
         out.insert(idx, "\n")
-      when :unindented_blockquote_in_list
+      when :unindented_blockquote_in_list, :unindented_footnote_line
         # A `>` at column 0 escapes the list; four spaces keeps it in the item.
+        # The same four spaces keep a line in the footnote above it.
         out[idx] = "    " + out[idx]
       when :under_indented_footnote
         # Already indented, just not to four. Top it up rather than prepending,
@@ -150,6 +192,336 @@ class MarkdownDoctor
   end
 
   private
+
+  # Formatting that opens and doesn't close where it needs to, so the markers
+  # print as written. Tested against the renderer, not assumed:
+  #
+  #   ==highlight==   must open and close on one line. process_highlights
+  #                   works a line at a time, so `==` with its partner on the
+  #                   next line shows both `==` on the page. **bold**, _em_,
+  #                   ~~strike~~ and `code` are fine across a line break.
+  #
+  #   any of them     must close in the same paragraph. A blank line ends the
+  #                   paragraph, and `**` left open there prints as `**`.
+  #
+  # Warning only: where the closing marker was meant to go is the writer's call.
+  #
+  # Per paragraph: lines between blank lines, skipping code, headings, lists'
+  # markers and HTML. Inline code is removed first so `a==b` in backticks says
+  # nothing, and `\*` escapes don't count.
+  MARKERS = {
+    "**" => "bold", "__" => "bold", "~~" => "strikethrough", "==" => "highlight"
+  }.freeze
+
+  def check_markers_across_lines
+    paragraph = [] # [[line_num, text], ...]
+    flush = lambda do
+      check_paragraph_markers(paragraph)
+      paragraph = []
+    end
+
+    scan_lines do |line, line_num, inside_code_block|
+      # Code, fences and blank lines end a paragraph and aren't part of one.
+      if inside_code_block || line.match?(FENCE_RE) || line.strip.empty?
+        flush.call
+        next
+      end
+      # A heading is a paragraph of its own, as is the start of a list item or
+      # a footnote — each begins a new one.
+      flush.call if line.match?(HEADING_RE) || line.match?(LIST_RE) || line.match?(FOOTNOTE_DEF_RE)
+      paragraph << [ line_num, line ]
+      flush.call if line.match?(HEADING_RE)
+    end
+    flush.call
+  end
+
+  def check_paragraph_markers(paragraph)
+    return if paragraph.empty?
+
+    open = {} # marker => line it opened on
+    paragraph.each do |line_num, raw|
+      text = raw.gsub(INLINE_CODE_RE, "").gsub(/\\[*_~=]/, "").gsub(/<[^>]*>/, "")
+
+      MARKERS.each_key do |marker|
+        # Runs of exactly two: `===` (a setext underline, a comparison) and
+        # `****` aren't markers. Nor is one with a space on both sides —
+        # `2 ** 3`, `a == b` — which can neither open nor close formatting.
+        c = Regexp.escape(marker[0])
+        pattern = /(?<![#{c}])#{Regexp.escape(marker)}(?![#{c}])/
+        count = 0
+        text.scan(pattern) do
+          match = Regexp.last_match
+          spaced_before = match.pre_match.empty? || match.pre_match[-1].match?(/\s/)
+          spaced_after = match.post_match.empty? || match.post_match[0].match?(/\s/)
+          count += 1 unless spaced_before && spaced_after
+        end
+        count.times do
+          if open.key?(marker)
+            opened = open.delete(marker)
+            next unless marker == "==" && opened != line_num
+
+            @issues << {
+              type: :marker_across_lines,
+              line: opened,
+              message: "This ==highlight== closes on a later line — a highlight has to open and close on the same line, or both == show on the page"
+            }
+          else
+            open[marker] = line_num
+          end
+        end
+      end
+    end
+
+    open.each do |marker, line_num|
+      @issues << {
+        type: :marker_across_lines,
+        line: line_num,
+        message: "This #{marker} (#{MARKERS[marker]}) is never closed in its paragraph, so it shows as #{marker} on the page"
+      }
+    end
+  end
+
+  # `[text](#anchor)` links whose anchor isn't an id on the rendered page.
+  # Clicking one goes nowhere. Usually a heading that was renamed after the
+  # link was written. Links to other pages (`/about#team`) aren't checked —
+  # only this page is rendered. (ANCHOR_LINK_RE is with the other patterns.)
+  def check_anchor_links
+    known = @page_ids.to_set
+    scan_lines do |line, line_num, inside_code_block|
+      next if inside_code_block
+
+      line.gsub(INLINE_CODE_RE, "").scan(ANCHOR_LINK_RE).each do |md, html|
+        anchor = md || html
+        next if known.include?(anchor) || known.include?(decode_anchor(anchor))
+
+        @issues << {
+          type: :broken_anchor_link,
+          line: line_num,
+          message: "Nothing on this page has the id \"#{anchor}\", so this link goes nowhere#{anchor_suggestion(anchor, known)}"
+        }
+      end
+    end
+  end
+
+  # `#caf%C3%A9` in a link and `café` as the id are the same anchor.
+  def decode_anchor(anchor)
+    anchor.gsub(/%([0-9A-Fa-f]{2})/) { Regexp.last_match(1).hex.chr }.force_encoding("UTF-8")
+  rescue StandardError
+    anchor
+  end
+
+  # The nearest id, when one is close enough to be the one that was meant.
+  # Ids are words joined by dashes, so "close" is judged in words: every word
+  # of the link appears in the id, or the other way round (a heading that
+  # gained or lost a word — `just-text` and `just-text-example`), or the two
+  # are a typo apart. Anything looser suggests ids that happen to share
+  # letters, which is worse than no suggestion.
+  def anchor_suggestion(anchor, known)
+    return "" if known.empty?
+
+    words = anchor.split("-").reject(&:empty?)
+    by_words = known.select do |id|
+      id_words = id.split("-").reject(&:empty?)
+      next false if id_words.empty? || words.empty? || id_words == words
+
+      # One side's words all found in the other. A one-word side only counts
+      # against a one-word other side, or "aside" matches every link that
+      # mentions an aside.
+      fewer, more = words.length <= id_words.length ? [ words, id_words ] : [ id_words, words ]
+      next false if fewer.length == 1 && more.length > 1
+
+      (fewer - more).empty?
+    end
+    best = by_words.min_by { |id| (id.length - anchor.length).abs }
+    best ||= known.select { |id| edit_distance(anchor, id) <= [ 2, anchor.length / 5 ].max }
+                  .min_by { |id| edit_distance(anchor, id) }
+    best ? " — did you mean ##{best}?" : ""
+  end
+
+  def edit_distance(a, b)
+    return b.length if a.empty?
+    return a.length if b.empty?
+
+    previous = (0..b.length).to_a
+    a.each_char.with_index(1) do |ca, i|
+      current = [ i ]
+      b.each_char.with_index(1) do |cb, j|
+        current << [ previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (ca == cb ? 0 : 1) ].min
+      end
+      previous = current
+    end
+    previous.last
+  end
+
+  # Where a footnote's text ends up, against where it was written.
+  #
+  # kramdown renders every footnote at the very end of the page, whatever
+  # comes after it in the file. Two things follow from that, and neither shows
+  # while writing:
+  #
+  #   unindented_footnote_line — a line straight under a note, not indented:
+  #     it isn't part of the note. It renders in the body, far from the note
+  #     it was typed under. Fix: indent it four spaces.
+  #
+  #   content_after_footnotes — text below the last footnote: on the page it's
+  #     the end of the body, above every note. Fix: move it above the notes,
+  #     where it already shows. The page doesn't change; the file stops
+  #     disagreeing with it.
+  #
+  # Only text after the *last* definition counts, and only up to the next
+  # heading. Definitions written beside the paragraph that uses them are a
+  # style of their own, and the text between them is meant to be there; a new
+  # heading starts a new section on purpose.
+  def check_footnote_placement
+    lines = effective_lines
+    inside_code = false
+    code_len = nil
+    in_note = false      # inside a note's text: its definition and what follows
+    prev_blank = true
+    last_def_idx = nil
+    note_end_idx = nil   # last line belonging to the last note
+    note_lines = Set.new # every non-blank line that belongs to some note
+
+    lines.each_with_index do |line, idx|
+      fence = line.match(FENCE_RE)
+      blank = line.strip.empty?
+
+      unless inside_code
+        if line.match?(FOOTNOTE_DEF_RE) && line_indent(line) <= 3
+          in_note = true
+          last_def_idx = idx
+          note_end_idx = idx
+        elsif in_note
+          if blank
+            # Blank lines may sit between a note's paragraphs.
+          elsif line_indent(line) >= 1
+            # Four spaces is the note's text. One to three is aiming for it
+            # and missing — check_footnote_continuation reports that one.
+            note_end_idx = idx
+          elsif !prev_blank && lazy_note_line?(line)
+            # Straight under the note's text, no blank line, no indent.
+            @issues << {
+              type: :unindented_footnote_line,
+              line: effective_line_number(idx),
+              message: "This line is under a footnote but isn't indented, so it shows in the body — indent 4 spaces to keep it in the note"
+            }
+            note_lines << idx
+            note_end_idx = idx
+          else
+            in_note = false
+          end
+        end
+      end
+
+      note_lines << idx if in_note && !blank
+
+      prev_blank = blank
+      next unless fence
+
+      length = fence[1].length
+      if inside_code && length >= code_len
+        inside_code = false
+        code_len = nil
+      elsif !inside_code
+        inside_code = true
+        code_len = length
+      end
+    end
+
+    return unless note_end_idx
+
+    check_content_after_notes(lines, last_def_idx, note_end_idx, note_lines)
+  end
+
+  # Text a writer would mean to belong to the note above it. A heading or a
+  # fence straight under a note is more likely the start of something new, and
+  # indenting a fence could leave it unclosed inside the note.
+  def lazy_note_line?(line)
+    !line.match?(HEADING_RE) && !line.match?(FENCE_RE) && !line.match?(HR_RE)
+  end
+
+  def check_content_after_notes(lines, last_def_idx, note_end_idx, note_lines)
+    from = (note_end_idx + 1...lines.length).find { |i| !lines[i].strip.empty? }
+    return unless from
+
+    # Up to the next heading — one outside a code block — or the end.
+    to = lines.length - 1
+    inside_code = false
+    code_len = nil
+    (from...lines.length).each do |i|
+      line = lines[i]
+      if !inside_code && line.match?(HEADING_RE) && i > from
+        to = i - 1
+        break
+      end
+      fence = line.match(FENCE_RE)
+      next unless fence
+
+      length = fence[1].length
+      if inside_code && length >= code_len
+        inside_code = false
+      elsif !inside_code
+        inside_code = true
+        code_len = length
+      end
+    end
+    to -= 1 while to > from && lines[to].strip.empty?
+    return if lines[from].match?(HEADING_RE)
+
+    offset = @front_matter_lines || 0
+    @issues << {
+      type: :content_after_footnotes,
+      line: effective_line_number(from),
+      message: "This is below the footnotes in the file, but on the page it shows above them, at the end of the post",
+      move: { from: from + offset, to: to + offset, before: footnote_run_start(lines, last_def_idx, note_lines) + offset },
+      # Moved above the notes, an unclosed fence would swallow them.
+      unsafe: inside_code
+    }
+  end
+
+  # The first definition of the run of notes the last one belongs to: walk up
+  # over notes, their text and the blank lines between them, and stop at the
+  # first line of body text.
+  def footnote_run_start(lines, last_def_idx, note_lines)
+    start = last_def_idx
+    i = last_def_idx - 1
+    while i >= 0
+      line = lines[i]
+      if line.match?(FOOTNOTE_DEF_RE) && line_indent(line) <= 3
+        start = i
+      elsif !line.strip.empty? && !note_lines.include?(i)
+        break
+      end
+      i -= 1
+    end
+    start
+  end
+
+  # The text below the notes, moved to just above the first of them, with a
+  # blank line on each side. Trailing blank lines left at the end are tidied
+  # to one newline.
+  def move_above_footnotes(issue)
+    move = issue[:move]
+    out = @lines.dup
+    block = out[move[:from]..move[:to]]
+    block[-1] = "#{block[-1]}\n" unless block[-1].end_with?("\n")
+    # Take the blank lines after the text with it: they separated it from
+    # whatever follows (a heading, say), and the notes above are already
+    # separated by the blank line before the text.
+    last = move[:to]
+    last += 1 while last + 1 < out.length && out[last + 1].strip.empty? && last + 2 < out.length
+    out.slice!(move[:from]..last)
+
+    before = move[:before]
+    insert = block + [ "\n" ]
+    insert.unshift("\n") if before.positive? && !out[before - 1].strip.empty?
+    out.insert(before, *insert)
+
+    # The notes are now last; end the file on them, with one newline.
+    out.pop while out.length > 1 && out[-1].strip.empty?
+    out[-1] = "#{out[-1].chomp}\n"
+    out.join
+  end
 
   # Skip YAML front matter (--- ... ---) so we don't treat it as Markdown.
   def skip_front_matter!

@@ -64,6 +64,17 @@ class Admin::MarkdownControllerTest < ActionDispatch::IntegrationTest
     assert_empty json["issues"]
   end
 
+  # The link check reads ids from the rendered page, so an id that comes from
+  # a heading — not written in the markdown anywhere — still counts.
+  test "check reports a link to a heading that isn't on the page" do
+    content = "## Setup and install\n\nSee [setup](#setup-and-install) and [old](#setup).\n"
+    post admin_check_markdown_path, params: { content: content }
+
+    links = json["issues"].select { |i| i["type"] == "broken_anchor_link" }
+    assert_equal 1, links.size, "the heading's own id is found"
+    assert_includes links.first["message"], "\"setup\""
+  end
+
   test "the endpoints require an admin session" do
     delete session_path
 

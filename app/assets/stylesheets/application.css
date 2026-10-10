@@ -193,9 +193,19 @@ body {
   pointer-events: none;
 }
 
+/* The selection colour. Change it here; both rules below read it.
+   CodeMirror ships its own colours (grey when the editor isn't focused, lavender
+   when it is), and its focused rule is long enough to outrank a short one — it
+   won whenever the editor had focus, which is why the selection only looked
+   blue after clicking into another window. The focused rule below copies its
+   shape, plus .roe-md-editor, so it's always the stronger of the two. */
+.roe-md-editor {
+  --roe-md-selection: #bfdbfe; /* blue-200 */
+}
+
 .roe-md-editor .cm-selectionLayer .cm-selectionBackground,
-.roe-md-editor.cm-focused .cm-selectionLayer .cm-selectionBackground {
-  background: #bfdbfe; /* blue-200 */
+.roe-md-editor.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--roe-md-selection);
 }
 
 .roe-md-editor .cm-selectionMatch {
