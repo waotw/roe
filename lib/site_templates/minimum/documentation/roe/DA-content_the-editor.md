@@ -114,7 +114,7 @@ The <code>F<sup>1</sup></code> button creates a footnote:
 
 **Writing longer footnotes:** everything after the first line of a footnote has to be indented four spaces, or it falls out of the footnote and into the body of the post. Roe handles this for you: pressing enter inside a footnote adds the four spaces, and in the Live editor, text you paste into a footnote is indented too.
 
-**Leaving and coming back:** if you go to another page to find a quote, or save, while a footnote is open, `CLOSE FOOTNOTE` will still be there when you come back. It finds the footnote's reference wherever it is now, even if you've edited above it.
+**Leaving and coming back:** if you go to another page to find a quote, or save, while a footnote is open, `CLOSE FOOTNOTE` will still be there when you come back.
 
 ### [Roe-anji](/documentation/roe/roeanji) Buttons
 
