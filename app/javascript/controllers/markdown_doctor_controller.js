@@ -301,6 +301,13 @@ export default class extends Controller {
     const textarea = this.textarea;
     if (!textarea || Number.isNaN(line)) return;
 
+    // The live editor measures the line itself and keeps it clear of the
+    // toolbar; the estimate below is only right for the plain textarea.
+    if (textarea.roeEditor) {
+      textarea.roeEditor.goToLine(line, { select: true });
+      return;
+    }
+
     const lines = textarea.value.split("\n");
     const offset = lines
       .slice(0, line - 1)

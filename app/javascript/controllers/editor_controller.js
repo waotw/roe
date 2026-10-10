@@ -375,6 +375,10 @@ export default class extends Controller {
     // differs from it. Runs last so the banner mounts into a settled DOM.
     this.maybeOfferDraftRestore();
 
+    // A footnote that was open when this page was left (to find a quote, or
+    // by saving) gets its Close Footnote button back.
+    this.restoreOpenFootnote();
+
     // Add global keyboard shortcut handler
     this.globalKeydownHandler = this.handleKeydown.bind(this);
     document.addEventListener("keydown", this.globalKeydownHandler);
@@ -610,6 +614,8 @@ export default class extends Controller {
     discardBtn.addEventListener("click", () => {
       this.clearDraft();
       this.dismissDraftBanner();
+      // A note that only existed in the draft is gone with it.
+      this.restoreOpenFootnote();
     });
 
     actions.append(restoreBtn, discardBtn);
@@ -639,6 +645,9 @@ export default class extends Controller {
     // The restored buffer is unsaved by definition — keep the draft until the
     // user actually saves, so a second mishap is still covered.
     this.textareaTarget.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // A footnote open when the page was left may only exist in the draft.
+    this.restoreOpenFootnote();
   }
 
   dismissDraftBanner() {
@@ -1099,11 +1108,9 @@ export default class extends Controller {
 
   insertMark(event) {
     event.preventDefault();
-    this.wrapSelectionWithSavedPosition(
-      "<mark>",
-      "</mark>",
-      "highlighted text",
-    );
+    // ==text== renders as <mark> (HasMarkdownExtensions#process_highlights),
+    // and reads as plain text in the file. Existing <mark> tags still work.
+    this.wrapSelectionWithSavedPosition("==", "==", "highlighted text");
   }
 
   insertFootnote(event) {
@@ -1151,6 +1158,7 @@ export default class extends Controller {
     };
 
     this.showFootnoteDoneButton(positionAfterReference);
+    this.rememberOpenFootnote(nextNumber);
 
     // Defer the window scroll: the two execCommand calls above fired
     // input events that schedule rAF callbacks comparing against the
@@ -1171,6 +1179,20 @@ export default class extends Controller {
   // position-in-text to a pixel y-coordinate in the document and
   // scroll the window there.
   scrollCursorIntoView(position) {
+    // The live editor knows where every line really is — headings, images and
+    // collapsed blocks included — so it does the placing. The estimate below
+    // only holds for the plain textarea, where every line is the same height.
+    const liveEditor = this.textareaTarget.roeEditor;
+    if (liveEditor) {
+      // The scroll lock below compares against scrollBeforeInput, so it's
+      // moved to wherever the editor finally lands.
+      liveEditor.settle(position, {}, () => {
+        this.scrollBeforeInput = window.scrollY;
+      });
+      this.scrollBeforeInput = window.scrollY;
+      return;
+    }
+
     const textarea = this.textareaTarget;
     const style = window.getComputedStyle(textarea);
     const lineHeight =
@@ -1195,6 +1217,19 @@ export default class extends Controller {
   }
 
   handleFootnoteEnter(event) {
+    // The live editor answers "is the caret in a footnote?" from its syntax
+    // tree, which reads definitions the way kramdown does — named labels like
+    // `[^sink]:` as well as numbered ones, and blank lines between a note's
+    // paragraphs. The scan below is the plain textarea's version.
+    const liveEditor = this.textareaTarget.roeEditor;
+    if (liveEditor) {
+      const indent = liveEditor.footnoteContinuation();
+      if (indent === null) return false;
+      event.preventDefault();
+      document.execCommand("insertText", false, "\n" + indent);
+      return true;
+    }
+
     const cursorPos = this.textareaTarget.selectionStart;
     const content = this.textareaTarget.value;
     const beforeCursor = content.substring(0, cursorPos);
@@ -1272,7 +1307,14 @@ export default class extends Controller {
   }
 
   returnFromFootnote(returnPosition) {
-    let targetPosition = returnPosition;
+    // Back to just after the note's reference. Found by label in the current
+    // text rather than trusted from when the note was opened: the writer may
+    // have edited above the reference since, or saved and come back to a
+    // fresh page (see restoreOpenFootnote), and a stored position would
+    // be wrong in either case.
+    const number = this.pendingFootnote?.number ?? this.openFootnoteNumber;
+    let targetPosition = this.footnoteReferenceEnd(number) ?? returnPosition;
+    this.forgetOpenFootnote();
     const pending = this.pendingFootnote;
 
     // Cleanup pass: if the user pressed Done / Esc without adding any
@@ -1346,6 +1388,76 @@ export default class extends Controller {
       document.removeEventListener("keydown", this.footnoteDoneKeyHandler);
       this.footnoteDoneKeyHandler = null;
     }
+  }
+
+  // ── An open footnote survives leaving the page ──────────────────────────
+  // Writing a note often means going somewhere else for the quote: another
+  // tab, the media library, the site itself. Saving reloads the editor too.
+  // Any of those used to drop the Close Footnote button and the way back to
+  // the reference. Which note is open is kept in sessionStorage — per tab,
+  // per document, gone when the tab closes — and restored on load.
+
+  get openFootnoteKey() {
+    return `roe-open-footnote:${window.location.pathname}`;
+  }
+
+  rememberOpenFootnote(number) {
+    this.openFootnoteNumber = number;
+    try {
+      sessionStorage.setItem(this.openFootnoteKey, String(number));
+    } catch (_) {
+      // Private mode or full storage: the button just won't survive a reload.
+    }
+  }
+
+  forgetOpenFootnote() {
+    this.openFootnoteNumber = null;
+    try {
+      sessionStorage.removeItem(this.openFootnoteKey);
+    } catch (_) {}
+  }
+
+  // Just after the note's reference in the text — `[^3]` and not the `[^3]:`
+  // that starts its definition — or null when it's gone.
+  footnoteReferenceEnd(number) {
+    if (number == null) return null;
+    const content = this.textareaTarget.value;
+    const reference = `[^${number}]`;
+    let index = content.indexOf(reference);
+    while (index !== -1) {
+      const after = index + reference.length;
+      if (content[after] !== ":") return after;
+      index = content.indexOf(reference, after);
+    }
+    return null;
+  }
+
+  // On load: if a note was open when the page was left, and it's still there
+  // with its reference, bring back the button. The empty-note cleanup only
+  // runs for a note opened on this page — after a reload, nothing is deleted
+  // on the writer's behalf.
+  //
+  // A note opened and written in but never saved exists only in the local
+  // draft, so it isn't in the text yet on load. The marker is kept, not
+  // cleared, and checked again when the draft is restored (restoreDraft).
+  restoreOpenFootnote() {
+    let number = null;
+    try {
+      number = sessionStorage.getItem(this.openFootnoteKey);
+    } catch (_) {}
+    if (number == null) return;
+
+    const content = this.textareaTarget.value;
+    const returnPosition = this.footnoteReferenceEnd(number);
+    if (returnPosition == null || !content.includes(`[^${number}]:`)) {
+      // Waiting on a draft that may hold it; nothing else to do here.
+      if (this.draftBanner) return;
+      this.forgetOpenFootnote();
+      return;
+    }
+
+    this.openFootnoteNumber = number;
+    this.showFootnoteDoneButton(returnPosition);
   }
 
   insertUnorderedList(event) {
@@ -2050,8 +2162,13 @@ export default class extends Controller {
         .reduce((sum, line) => sum + line.length + 1, 0) +
       lines[lineIndex].length;
 
-    this.textareaTarget.setSelectionRange(charPosition, charPosition);
-    this.textareaTarget.focus();
+    if (this.textareaTarget.roeEditor) {
+      // Same placement as the markdown check's jump: measured, below the toolbar.
+      this.textareaTarget.roeEditor.goTo(charPosition);
+    } else {
+      this.textareaTarget.setSelectionRange(charPosition, charPosition);
+      this.textareaTarget.focus();
+    }
 
     // Fade TOC background after jumping
     if (

@@ -62,6 +62,9 @@ Rails.application.routes.draw do
     # is in the body (it hasn't been saved yet).
     post "markdown/check", to: "markdown#check", as: "check_markdown"
     post "markdown/fix",   to: "markdown#fix",   as: "fix_markdown"
+    # The live editor's block cards: which Roe-anji blocks would render a
+    # warning instead of themselves.
+    post "markdown/blocks", to: "markdown#blocks", as: "markdown_blocks"
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"

@@ -90,6 +90,7 @@ module HasMarkdownExtensions
     processed_content = process_buttons(processed_content, preview: preview)
     processed_content = process_image_captions(processed_content)
     processed_content = process_strikethrough(processed_content)
+    processed_content = process_highlights(processed_content)
     processed_content = escape_inline_pipes(processed_content)
 
     # Convert to HTML with Kramdown. hard_wrap only takes effect under the GFM
@@ -294,6 +295,7 @@ module HasMarkdownExtensions
     text = text.gsub(/\*\*(.+?)\*\*/) { "<strong>#{$1}</strong>" }
     text = text.gsub(/\*(.+?)\*/) { "<em>#{$1}</em>" }
     text = text.gsub(/~~(.+?)~~/) { "<s>#{$1}</s>" }
+    text = text.gsub(HIGHLIGHT_PATTERN) { "<mark>#{$1}</mark>" }
     text = text.gsub(/\[([^\]]+)\]\(([^)]+)\)/) do
       "<a href=\"#{CGI.escapeHTML($2)}\">#{$1}</a>"
     end
@@ -303,6 +305,33 @@ module HasMarkdownExtensions
   def process_strikethrough(markdown)
     # Convert ~~text~~ to <del>text</del> (which Kramdown preserves)
     markdown.gsub(/~~([^~]+)~~/, '<del>\1</del>')
+  end
+
+  # ==text== → <mark>text</mark>, the same element the toolbar's highlight
+  # button has always written, so the two spellings render identically.
+  #
+  # Matched the way the editor matches it (markdown_editor/syntax.js), so what
+  # the editor shows as highlighted is what renders. The pair has to hug its
+  # text — `a == b` is a comparison, not a highlight — and a run of three or
+  # more `=` is never a marker, so setext underlines stay headings.
+  HIGHLIGHT_PATTERN = /(?<![=\\])==(?=[^\s=])(.+?)(?<=[^\s=])==(?!=)/
+
+  # Inline code and HTML tags are skipped: `a==b && c==d` is code, and a tag's
+  # attributes (`href="?a==b"`) aren't prose. Highlighting inside either would
+  # break it. Fenced blocks are already placeholders by the time this runs.
+  # Matching a code span or tag first and handing it back unchanged keeps them
+  # from overlapping a highlight.
+  #
+  # markdown="span" asks kramdown to parse the markdown inside the tag —
+  # without it, raw HTML is opaque and `==**bold**==` would show its asterisks.
+  # kramdown removes the attribute, so the output is a plain <mark>.
+  def process_highlights(markdown)
+    return markdown unless markdown.include?("==")
+
+    markdown.gsub(/(`+).*?\1|<[^>\n]*>|#{HIGHLIGHT_PATTERN}/) do
+      text = Regexp.last_match(2)
+      text ? %(<mark markdown="span">#{text}</mark>) : Regexp.last_match(0)
+    end
   end
 
   def table_separator_line?(line)
@@ -3951,7 +3980,7 @@ module HasMarkdownExtensions
 
     hint_html = hint ? "<br><span style='color:#78350f'>#{dev_warning_text(hint)}</span>" : ""
     <<~HTML
-      <div style="border:2px dashed #f59e0b;padding:0.75rem 1rem;font-family:monospace;font-size:0.8rem;color:#92400e;background:#fffbeb;margin:0.5rem 0;">
+      <div data-roe-warning style="border:2px dashed #f59e0b;padding:0.75rem 1rem;font-family:monospace;font-size:0.8rem;color:#92400e;background:#fffbeb;margin:0.5rem 0;">
         <strong>⚠️ #{dev_warning_text(title)}</strong><br>
         #{dev_warning_text(message)}#{hint_html}
       </div>

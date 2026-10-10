@@ -249,6 +249,15 @@ class Admin::ConfigsController < Admin::BaseController
           type: :checkbox,
           label: "Heading links",
           hint: "Show a copy-link icon when hovering a heading on your public site (desktop only). Click it to copy a link straight to that section."
+        },
+        "editor.mode" => {
+          type: :select,
+          label: "Writing editor",
+          options: [ [ "Live (formatted as you write)", "live" ], [ "Source (plain markdown)", "source" ], [ "Plain textarea (the old editor)", "textarea" ] ],
+          # Matches the editor partial's fallback, so an unset setting shows
+          # the editor you actually get rather than an empty "Select...".
+          default: "textarea",
+          hint: "New Live editor with improved formatting. Use \"Plain textarea\" to turn the new editor off."
         }
       }
     },
