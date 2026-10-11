@@ -187,7 +187,15 @@
             <% end %>
             <%= link_to "Media", browse_admin_medium_index_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Layout", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-            <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%# The dot: a theme or site script has a newer version shipped.
+                They're only offered on the Themes page, so without it an
+                update could sit there unseen. %>
+            <div class="relative inline-flex items-center">
+              <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <% if shipped_file_updates.any? %>
+                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="<%= pluralize(shipped_file_updates.size, 'theme or script update') %> available"></span>
+              <% end %>
+            </div>
           </div>
 
           <%# Tools dropdown %>

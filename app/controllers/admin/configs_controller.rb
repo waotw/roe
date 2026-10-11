@@ -603,7 +603,9 @@ class Admin::ConfigsController < Admin::BaseController
       }
     end
 
-    if SiteFeature.store_enabled?
+    # Hidden, not deleted, with Snipcart off: the keys stay in the file so
+    # turning it back on picks up where it was.
+    if SiteFeature.snipcart_enabled?
       integration_files << {
         name: "snipcart.yml",
         path: "integrations/snipcart.yml",

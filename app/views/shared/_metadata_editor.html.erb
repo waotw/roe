@@ -126,7 +126,7 @@
   end
 %>
 <div id="metadata-container"
-     data-controller="metadata-editor<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' %>"
+     data-controller="metadata-editor<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' && SiteFeature.snipcart_enabled? %>"
      data-release-link-settings-path-value="<%= admin_edit_music_config_path %>"
      data-metadata-editor-known-fields-value="<%= known_fields_config.to_json %>"
      data-metadata-editor-default-author-value="<%= ERB::Util.html_escape(default_author) %>"

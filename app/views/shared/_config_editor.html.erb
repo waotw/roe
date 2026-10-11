@@ -431,6 +431,54 @@
                     </div>
                   </div>
 
+                  <!-- Collections Section — what a product collection's button
+                       does. Grouped products always link to their page (a
+                       variant has to be picked first), so this is for single
+                       products. -->
+                  <div class="config-section mb-8">
+                    <h3 class="text-base font-semibold text-gray-900 mb-3">Collections</h3>
+                    <div class="space-y-4 pl-4 border-l-2 border-gray-200">
+
+                      <%# Tied to Snipcart. Off: there's no cart, so the buttons
+                          can only go to the product page — shown ticked and
+                          locked, so the setting can't be changed for nothing.
+                          On: a real choice, cart by default. Turning Snipcart
+                          on resets it to the cart; see syncCollectionButtons. %>
+                      <% link_to_page = flattened_config['collection_buttons.link_to_product_page'].to_s == 'true' %>
+                      <% snipcart_off = flattened_config['snipcart.enabled'].to_s == 'false' %>
+                      <div class="config-field-row" data-collection-buttons-row>
+                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                          <input type="checkbox"
+                                 name="config_fields[collection_buttons][link_to_product_page]"
+                                 value="true"
+                                 class="w-4 h-4 disabled:opacity-50"
+                                 data-config-field="collection_buttons.link_to_product_page"
+                                 <%= 'checked' if link_to_page || snipcart_off %>
+                                 <%= 'disabled' if snipcart_off %>>
+                          <span>Link to product page</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">By default, a product collection's button adds the item to the cart. Turn this on and the buttons go to the product page instead.</p>
+                        <p class="text-xs text-gray-500 mt-1 <%= 'hidden' unless snipcart_off %>" data-collection-buttons-locked>
+                          <mark class="bg-blue-200 rounded-xs px-0.5">Always on without Snipcart.</mark>
+                        </p>
+                      </div>
+
+                      <div class="config-field-row">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                          Button Text
+                        </label>
+                        <input type="text"
+                               name="config_fields[collection_buttons][text]"
+                               value="<%= flattened_config['collection_buttons.text'] %>"
+                               placeholder="Add to Cart / View"
+                               class="w-48 font-mono text-sm px-2 py-1.5 border border-gray-300"
+                               data-config-field="collection_buttons.text">
+                        <p class="text-xs text-gray-500 mt-1">Leave blank for “Add to Cart”, or “View” when the button links to a product page.</p>
+                      </div>
+
+                    </div>
+                  </div>
+
                   <!-- Grouped Products Section -->
                   <div class="config-section mb-8">
                     <h3 class="text-base font-semibold text-gray-900 mb-3">Grouped Products</h3>
@@ -487,6 +535,23 @@
                   <div class="config-section mb-8">
                     <h3 class="text-base font-semibold text-gray-900 mb-3">Snipcart</h3>
                     <div class="space-y-4 pl-4 border-l-2 border-gray-200">
+
+                      <%# Off = a store that shows products and links elsewhere
+                          to buy them. Absent counts as on, so every store
+                          written before this setting existed keeps its cart. %>
+                      <% snipcart_on = flattened_config['snipcart.enabled'].to_s != 'false' %>
+                      <div class="config-field-row">
+                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                          <input type="checkbox"
+                                 name="config_fields[snipcart][enabled]"
+                                 value="true"
+                                 class="w-4 h-4"
+                                 data-config-field="snipcart.enabled"
+                                 <%= 'checked' if snipcart_on %>>
+                          <span>Use Snipcart</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">Toggle off to use Roe's Store features and product pages without Snipcart as a requirement. Manually add links to purchase products on your product pages.</p>
+                      </div>
 
                       <!-- Load Strategy -->
                       <div class="config-field-row">
@@ -2055,5 +2120,36 @@
     document.querySelectorAll('select[data-config-field]').forEach(field => {
       field.addEventListener('change', updateBooleanFieldIndicators);
     });
+  });
+
+  // ========== STORE: COLLECTION BUTTONS FOLLOW SNIPCART ==========
+  // Without Snipcart there's no cart, so collection buttons can only go to the
+  // product page: the box is ticked and locked. Turning Snipcart on unlocks it
+  // and unticks it — the cart is the default with Snipcart, and someone who
+  // wants product-page links can tick it again.
+  //
+  // A disabled box still has `checked`, and formToYaml reads every
+  // [data-config-field], so the locked state saves as `true`. That's right:
+  // it's what the buttons do.
+  function syncCollectionButtons(event) {
+    const snipcart = document.querySelector('[data-config-field="snipcart.enabled"]');
+    const link = document.querySelector('[data-config-field="collection_buttons.link_to_product_page"]');
+    const note = document.querySelector('[data-collection-buttons-locked]');
+    if (!snipcart || !link) return;
+
+    if (snipcart.checked) {
+      if (link.disabled && event) link.checked = false;
+      link.disabled = false;
+    } else {
+      link.checked = true;
+      link.disabled = true;
+    }
+    note?.classList.toggle('hidden', snipcart.checked);
+  }
+
+  document.addEventListener('turbo:load', function() {
+    const snipcart = document.querySelector('[data-config-field="snipcart.enabled"]');
+    if (!snipcart) return;
+    snipcart.addEventListener('change', syncCollectionButtons);
   });
 </script>

@@ -181,4 +181,46 @@ class ShippedFileInspectorTest < ActiveSupport::TestCase
   test "stamp! refuses a file with no header" do
     assert_equal :no_header, ShippedFileInspector.stamp!(write("x.js", "console.log(1)"))
   end
+
+  # ── pending_updates (nav dot, Updates page note) ─────────────────────
+
+  # A site folder holding a copy of every shipped file. `older` names the
+  # files to write one version behind; the rest match what ships.
+  def site_with(older: {})
+    root = File.join(@dir, "site")
+    ShippedFileInspector.shipped_files.each do |bundled|
+      rel  = bundled.sub("#{Rails.root}/", "")
+      dest = ShippedFileInspector.site_path_for(rel, root)
+      FileUtils.mkdir_p(File.dirname(dest))
+      content = File.read(bundled)
+      content = content.sub(/^(\s*Version:\s*).+$/) { "#{$1}#{older[File.basename(dest)]}" } if older.key?(File.basename(dest))
+      File.write(dest, content)
+    end
+    root
+  end
+
+  test "pending_updates is empty when every copy matches what ships" do
+    assert_empty ShippedFileInspector.pending_updates(site_root: site_with)
+  end
+
+  test "pending_updates lists each outdated theme and script, with both versions" do
+    root = site_with(older: { "gallery.js" => "0.0.1", "default.css" => "0.0.1" })
+    updates = ShippedFileInspector.pending_updates(site_root: root)
+
+    assert_equal %w[default.css gallery.js], updates.map { |u| u[:name] }.sort
+    gallery = updates.find { |u| u[:name] == "gallery.js" }
+    assert_equal :script, gallery[:kind]
+    assert_equal "0.0.1", gallery[:installed]
+    assert_equal ShippedFileInspector.parse_header(Rails.root.join("app/site_js/gallery.js").to_s).version, gallery[:bundled]
+    assert_equal :theme, updates.find { |u| u[:name] == "default.css" }[:kind]
+  end
+
+  test "pending_updates skips files the site doesn't have, or has made its own" do
+    root = site_with(older: { "gallery.js" => "0.0.1" })
+    File.delete(File.join(root, "theme", "default.css"))                    # not installed
+    gallery = File.join(root, "javascript", "gallery.js")
+    File.write(gallery, File.read(gallery).sub(/Roe Script:\s*\S+/, "Roe Script: my-gallery")) # renamed → custom
+
+    assert_empty ShippedFileInspector.pending_updates(site_root: root)
+  end
 end

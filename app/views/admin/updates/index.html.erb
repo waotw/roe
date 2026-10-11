@@ -53,6 +53,30 @@
     </div>
   <% end %>
 
+  <%# Themes and site scripts with a newer version than the site's copy. A
+      Roe update brings these in but never installs them — the site owns
+      its copies — so they're offered on the Themes page, and this says so
+      right after an update, where people look. COPY: placeholder. %>
+  <% if shipped_file_updates.any? %>
+    <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">
+        <%= pluralize(shipped_file_updates.size, "theme or script update") %> available
+      </h3>
+      <p class="text-sm text-amber-800 mb-2">
+        Roe ships newer versions of these files than your site has. Your copies are never replaced automatically, review and install them on the
+        <%= link_to "Themes page", admin_themes_path, class: "underline font-medium" %>.
+      </p>
+      <ul class="text-sm text-amber-800 list-disc ml-4">
+        <% shipped_file_updates.each do |u| %>
+          <li>
+            <code class="font-mono text-xs bg-amber-100 px-0.5"><%= u[:kind] == :theme ? "site/theme" : "site/javascript" %>/<%= u[:name] %></code>
+            v<%= u[:installed] %> → v<%= u[:bundled] %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
   <div class="mt-8 mb-8 py-3 border-t border-b px-4 border-gray-200 flex gap-2">
     <details class="<%= Rails.env.production? ? 'w-full' : 'flex-1' %> group">
       <summary class="text-sm font-semibold text-gray-900 cursor-pointer select-none flex items-center gap-2 list-none">
@@ -63,6 +87,7 @@
         <li>Updates include new features, bug fixes, and security patches</li>
         <li>Your content in the <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/</code> folder is preserved during updates</li>
         <li>Configuration files are not overwritten</li>
+        <li>Themes and site scripts (in <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/theme/</code> and <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/javascript/</code>) are never replaced. When an update brings a new version, a dot appears on Themes, and you can install from there. If you've edited a file, Roe keeps a copy of your version.</li>
         <li>If an update fails, the system will automatically roll back</li>
       </ul>
     </details>
@@ -94,7 +119,7 @@
       <h3 class="text-sm font-semibold text-gray-900 mb-1">Update channel</h3>
       <p class="text-xs text-gray-600">
         <% if @update_channel == "nightly" %>
-          You're on the <strong>Nightly</strong> channel — pre-release tags from Codeberg are visible below. Use only for testing the update flow; nightly builds may be unstable.
+          You're on the <strong>Nightly</strong> channel — pre-release tags are visible below. Use only for testing the update flow; nightly builds may be unstable.
         <% else %>
           You're on the <strong>Stable</strong> channel — only released versions show up. Switch to Nightly to test the update flow against pre-release tags.
         <% end %>
@@ -131,11 +156,11 @@
             Pre-release available: <code class="font-mono text-xs bg-purple-100 px-1 rounded">v<%= @update_info[:prerelease_version] %></code>
           </h3>
           <p class="text-sm text-purple-800 mb-2">
-            A <code class="font-mono text-xs bg-purple-100 px-1 rounded">-nightly</code> tag is available on Codeberg. This panel appears because you're on the <strong>Nightly</strong> release channel — switch to Stable for official releases.
+            A <code class="font-mono text-xs bg-purple-100 px-1 rounded">-nightly</code> tag is available. This panel appears because you're on the <strong>Nightly</strong> release channel — switch to Stable for official releases.
           </p>
           <% if @update_info[:prerelease_url].present? %>
             <p class="text-xs text-purple-700">
-              <a href="<%= @update_info[:prerelease_url] %>" target="_blank" rel="noopener" class="underline hover:text-purple-900">View release notes on Codeberg →</a>
+              <a href="<%= @update_info[:prerelease_url] %>" target="_blank" rel="noopener" class="underline hover:text-purple-900">View release notes on <%= forge_name(@update_info[:prerelease_url]) %> →</a>
             </p>
           <% end %>
         </div>
@@ -360,16 +385,16 @@
         </div>
 
         <% if @update_info[:release_notes].present? %>
+          <%# Markdown from the release on the forge, rendered and sanitized
+              (release_notes_html). Whole notes, in a panel that scrolls
+              past ~24rem so a long release doesn't push Update Now off
+              the screen. %>
           <div class="mt-4 p-4 bg-white border border-blue-200 rounded-xs">
             <h3 class="text-sm font-semibold text-gray-900 mb-2">Release Notes</h3>
-            <div class="prose prose-sm max-w-none text-gray-700">
-              <%= simple_format(@update_info[:release_notes]) %>
+            <div class="prose prose-sm max-w-none text-gray-700 max-h-96 overflow-y-auto prose-h1:text-lg prose-h2:text-base prose-h2:mt-5 prose-h3:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:bg-gray-100 prose-code:px-0.5 prose-code:rounded-xs prose-code:font-normal">
+              <%= release_notes_html(@update_info[:release_notes]) %>
             </div>
           </div>
-          <%= link_to "View full release notes on Codeberg →",
-                      @update_info[:release_url],
-                      target: "_blank",
-                      class: "text-sm text-blue-600 hover:text-blue-900 underline" %>
         <% end %>
 
         <div class="mt-6 pt-4 border-t border-blue-200">
@@ -394,9 +419,9 @@
                           class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs" %>
           <% end %>
 
-          <%= link_to "View full release notes on Codeberg →",
+          <%= link_to "View release on #{forge_name(@update_info[:release_url])} →",
                       @update_info[:release_url],
-                      target: "_blank",
+                      target: "_blank", rel: "noopener",
                       class: "text-sm text-blue-600 hover:text-blue-900 underline" %>
         </div>
       </div>

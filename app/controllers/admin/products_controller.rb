@@ -53,7 +53,7 @@ class Admin::ProductsController < Admin::BaseController
 
     title = title_param.presence || filename_to_title(filename)
     overrides = { "title" => title, "url_name" => filename }.merge(create_field_overrides("product"))
-    overrides["sku"] = suggested_sku(overrides) if overrides["sku"].blank?
+    overrides["sku"] = suggested_sku(overrides) if overrides["sku"].blank? && SiteFeature.snipcart_enabled?
 
     metadata, body = ContentTemplate.frontmatter_for("product", overrides)
 
@@ -323,7 +323,7 @@ class Admin::ProductsController < Admin::BaseController
     # Required fields that are already set — shown as read-only "✓" confirmation
     # bullets. The metadata editor is the source of truth, so the modal just
     # reflects it: present → confirm, missing → fill in.
-    @present_requirements = Product::REQUIRED_FIELDS
+    @present_requirements = Product.required_fields
       .select { |name| @product.metadata[name].to_s.strip.present? }
       .map { |name| { name: name, label: name.humanize, value: @product.metadata[name] } }
     @resource_label = "Product"

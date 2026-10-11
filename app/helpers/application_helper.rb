@@ -76,6 +76,13 @@ module ApplicationHelper
     Rails.cache.read(RoeUpdater::VersionChecker::UPDATE_AVAILABLE_KEY) == true
   end
 
+  # Themes and site scripts with a newer version shipped than the site has —
+  # see ShippedFileInspector.pending_updates. Memoized per request: the nav
+  # dot and the Updates page note can both ask on one render.
+  def shipped_file_updates
+    @shipped_file_updates ||= ShippedFileInspector.pending_updates
+  end
+
   # Returns a CSP nonce safe to embed in inline <script>/<style> tags,
   # or nil when CSP isn't active for this render. The nil case matters
   # for the static-site generator: ApplicationController.render builds
@@ -154,6 +161,7 @@ module ApplicationHelper
   def newsletters_enabled?        = SiteFeature.newsletters_enabled?
   def postmark_configured?        = SiteFeature.postmark_configured?
   def store_enabled?              = SiteFeature.store_enabled?
+  def snipcart_enabled?           = SiteFeature.snipcart_enabled?
   def integrations_to_enable?     = SiteFeature.integrations_to_enable?
   def stripe_configured?          = SiteFeature.stripe_configured?
   def snipcart_configured?        = SiteFeature.snipcart_configured?
@@ -171,8 +179,10 @@ module ApplicationHelper
   def email_live_unconfigured?     = SiteFeature.email_live_unconfigured?
   alias_method :newsletters_live_unconfigured?, :email_live_unconfigured?
 
+  # The cart icon and the Snipcart script ask this. Off with Snipcart turned
+  # off, whatever keys are still saved — there's no cart to show.
   def snipcart_connected?
-    store_enabled? && SnipcartConfig.current&.connected?
+    snipcart_enabled? && SnipcartConfig.current&.connected?
   end
 
   # Audience only matters when paid memberships are actually configured —
@@ -237,19 +247,10 @@ module ApplicationHelper
     content_tag(:nav, crumbs.join(" › ").html_safe, class: "breadcrumbs", 'aria-label': "Breadcrumb")
   end
 
+  # Only with Snipcart on: a store that links out to buy has no SKUs to collide.
   def duplicate_sku_warning
-    duplicates = Product.duplicate_skus
-    return nil if duplicates.empty?
+    return nil unless snipcart_enabled?
 
-    count = duplicates.values.flatten.count
-    {
-      message: "#{duplicates.keys.count} duplicate SKU(s) found affecting #{count} products",
-      path: duplicate_skus_admin_products_path,
-      severity: :error
-    }
-  end
-
-  def duplicate_sku_warning
     duplicates = Product.duplicate_skus
     return nil if duplicates.empty?
 

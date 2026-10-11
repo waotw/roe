@@ -2087,8 +2087,9 @@ module HasMarkdownExtensions
       output << '    <div class="grid-item-footer">'
 
       if is_grouped
-        # Show price based on config setting
-        prices = group_products.map { |p| p.price.to_f }.compact
+        # Show price based on config setting. Only variants that set a price:
+        # one that doesn't (a store linking out to buy needn't) isn't $0.00.
+        prices = group_products.select { |p| p.metadata["price"].to_s.strip.present? }.map { |p| p.price.to_f }
         if prices.any?
           formatted_price = case price_display_mode
           when "lowest"
@@ -2103,6 +2104,9 @@ module HasMarkdownExtensions
             end
           end
           output << %Q(      <span class="grid-item-price">#{formatted_price}</span>)
+        else
+          # Kept, empty, so the button stays at the right (see below).
+          output << %Q(      <span class="grid-item-price"></span>)
         end
 
         # Grouped products can't be added to the cart from the grid — the buyer
@@ -2112,14 +2116,26 @@ module HasMarkdownExtensions
         primary_for_link = find_primary_product(group_products) || display_product
         output << %Q(      <a href="#{item_path(primary_for_link)}" class="btn-primary btn-grid">#{label}</a>)
       else
-        # Single product - show individual price and Add to Cart
-        if display_product.respond_to?(:price)
-          price_formatted = "#{currency_symbol}#{sprintf('%.2f', display_product.price)}"
-          output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
+        # Single product: its price, then a button that either adds it to the
+        # cart or goes to its page — store.yml's collection_buttons, and
+        # always the page when Snipcart is off. collection_buttons.text names
+        # it either way.
+        #
+        # The price only when there is one. A store that links out to buy
+        # needn't set one, and "$0.00" on a book that costs money is wrong.
+        # The span stays, empty: the footer spreads price and button to
+        # opposite ends, and without it the button jumps to the left.
+        price_formatted = if display_product.respond_to?(:price) && display_product.metadata["price"].to_s.strip.present?
+          "#{currency_symbol}#{sprintf('%.2f', display_product.price)}"
         end
+        output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
 
-        # Add to Cart button (if product has SKU)
-        if display_product.respond_to?(:sku) && display_product.sku.present?
+        custom_text = SiteConfig.feature("store", "collection_buttons.text").to_s.strip.presence
+
+        if SiteFeature.collection_buttons_link_to_page?
+          label = ERB::Util.html_escape(custom_text || "View")
+          output << %Q(      <a href="#{item_path(display_product)}" class="btn-primary btn-grid">#{label}</a>)
+        elsif display_product.respond_to?(:sku) && display_product.sku.present?
           product_url = item_path(display_product)
           domain = SiteConfig.feature("store", "default_domain")
           validation_url = domain ? "https://#{domain}#{product_url}" : product_url
@@ -2130,18 +2146,18 @@ module HasMarkdownExtensions
           #
           # A digital product that can't deliver gets no button here either,
           # or a grid would remain a way to buy something the product page
-          # already refuses to sell.
+          # already refuses to sell. (Not `next`: that skipped closing this
+          # item's footer and card, leaving the grid's HTML unbalanced.)
           if display_product.respond_to?(:deliverable?) && !display_product.deliverable?
             output << %Q(      <span class="btn-grid is-unavailable">Not available</span>)
-            next
+          else
+            output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
+            output << %Q(              data-turbo="false")
+            display_product.snipcart_attributes(url: validation_url).each do |key, value|
+              output << %Q(              #{key}="#{ERB::Util.html_escape(value)}")
+            end
+            output << %Q(      >#{ERB::Util.html_escape(custom_text || "Add to Cart")}</button>)
           end
-
-          output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
-          output << %Q(              data-turbo="false")
-          display_product.snipcart_attributes(url: validation_url).each do |key, value|
-            output << %Q(              #{key}="#{ERB::Util.html_escape(value)}")
-          end
-          output << %Q(      >Add to Cart</button>)
         end
       end
 

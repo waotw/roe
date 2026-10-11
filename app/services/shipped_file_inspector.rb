@@ -171,6 +171,34 @@ class ShippedFileInspector
     a_parts <=> b_parts
   end
 
+  # ── Updates waiting in this site ───────────────────────────────────────
+
+  # Every installed theme and site script with a newer version shipped, as
+  # [{ kind: :theme|:script, name:, installed:, bundled: }]. For the dot on
+  # the Themes nav link and the note on the Updates page — the Themes page
+  # is where they're actually offered, and nobody visits it to check.
+  #
+  # Headers only (the first 2 KB of each file), no fingerprinting, so it's
+  # cheap enough for every admin page. Files not installed, custom, or
+  # ahead of the shipped copy aren't updates and aren't listed.
+  def self.pending_updates(site_root: RoeSitePaths::SITE_PATH)
+    shipped_files.sort.filter_map do |bundled|
+      rel       = bundled.sub("#{Rails.root}/", "")
+      installed = site_path_for(rel, site_root)
+      next unless status(bundled_path: bundled, installed_path: installed) == :tracked_outdated
+
+      {
+        kind:      rel.start_with?("app/themes/") ? :theme : :script,
+        name:      File.basename(installed),
+        installed: parse_header(installed)&.version,
+        bundled:   parse_header(bundled)&.version
+      }
+    end
+  rescue => e
+    Rails.logger.warn "[ShippedFileInspector] pending_updates skipped: #{e.class} #{e.message}"
+    []
+  end
+
   # ── Release-time stamping (bin/sync-from-site) ─────────────────────────
 
   # Every shipped file this applies to, as absolute paths under current/.
@@ -204,9 +232,16 @@ class ShippedFileInspector
       target = site_root ? site_path_for(rel, site_root) : path
       next unless File.exist?(target)
 
+      # Report the file you'd edit. Checked against a site, that's the copy
+      # in site/ (site/theme/x.css), not the app/themes/x.css it syncs to —
+      # naming the app copy sent people to bump the wrong file. `failed`
+      # still returns app paths: bin/sync-from-site builds its excludes from
+      # them.
+      shown = site_root ? File.join(File.basename(site_root), File.basename(File.dirname(target)), File.basename(target)) : rel
+
       header = parse_header(target)
       unless header
-        out.puts "    #{rel}: no header — add one (Roe Script/Theme, Version)"
+        out.puts "    #{shown}: no header — add one (Roe Script/Theme, Version)"
         failed << rel
         next
       end
@@ -217,15 +252,15 @@ class ShippedFileInspector
         old_fp      = fingerprint_of(committed)
         new_fp      = fingerprint_of(File.read(target))
         if old_header && old_fp != new_fp && old_header.version == header.version
-          out.puts "    #{rel}: body changed but Version is still #{header.version} — bump it"
+          out.puts "    #{shown}: body changed but Version is still #{header.version} — bump it"
           failed << rel
           next
         end
       end
 
       case stamp!(target)
-      when :stamped   then out.puts "    #{rel}: v#{header.version}, fingerprint stamped"
-      when :unchanged then out.puts "    #{rel}: v#{header.version}, up to date"
+      when :stamped   then out.puts "    #{shown}: v#{header.version}, fingerprint stamped"
+      when :unchanged then out.puts "    #{shown}: v#{header.version}, up to date"
       end
     end
     failed

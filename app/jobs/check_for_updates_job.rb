@@ -2,7 +2,7 @@ class CheckForUpdatesJob < ApplicationJob
   queue_as :default
 
   # Runs hourly via config/recurring.yml (development only).
-  # Checks Codeberg for the latest Roe release and writes a persistent
+  # Checks the release forge for the latest Roe release and writes a persistent
   # flag to Rails cache so the nav dot can read it without a network call.
   #
   # The flag has no TTL — it stays true until an update completes and

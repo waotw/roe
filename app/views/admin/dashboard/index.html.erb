@@ -179,8 +179,9 @@
   <% end %>
 
   <!-- ─── STORE / ORDERS ─── -->
-  <%# COPY — shop orders summary; links to the full Orders page (not in nav). %>
-  <% if SiteFeature.store_enabled? %>
+  <%# COPY — shop orders summary; links to the full Orders page (not in nav).
+      Snipcart's orders, so only when Snipcart is on. %>
+  <% if SiteFeature.snipcart_enabled? %>
     <div class="relative border-2 border-gray-800 mt-6" data-test="dashboard-orders">
       <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
         ── Store ──

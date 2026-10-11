@@ -10,9 +10,10 @@
 # Updates reach a site the same way theme updates do. Each shipped file
 # carries a header with its version and a fingerprint of its body;
 # ShippedFileInspector compares the site's copy to the shipped one, and the
-# Updates page offers the newer version — in one click when the copy is
-# untouched, with a diff and a download of the site's copy when it has been
-# edited. Nothing changes until someone chooses.
+# Themes page offers the newer version — in one click when the copy is
+# untouched, with a "keep my copy" option and a download of the site's copy
+# when it has been edited. A dot on the Themes nav link and a note on the
+# Updates page point there. Nothing changes until someone chooses.
 #
 # Resolution is site copy first, shipped source second, for the dynamic
 # controller and the static generator alike.

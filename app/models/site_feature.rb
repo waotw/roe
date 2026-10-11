@@ -25,6 +25,25 @@ module SiteFeature
     File.exist?(File.join(FEATURES_PATH, "store.yml"))
   end
 
+  # The store without a cart: products shown, and bought somewhere else (a
+  # book on Amazon, say). `snipcart.enabled: false` in store.yml. Absent
+  # counts as on, so a store written before this setting existed keeps its
+  # cart. Everything Snipcart — buttons, the cart, its settings and warnings,
+  # SKU and price being required — asks this rather than store_enabled?.
+  def snipcart_enabled?
+    store_enabled? && SiteConfig.feature("store", "snipcart.enabled").to_s != "false"
+  end
+
+  # Where a product collection's button goes for a single product: the cart,
+  # or the product page. Always the page without Snipcart — there's no cart.
+  # Booleans compared as strings: the form writes real booleans, a hand-edited
+  # file may quote them.
+  def collection_buttons_link_to_page?
+    return true unless snipcart_enabled?
+
+    SiteConfig.feature("store", "collection_buttons.link_to_product_page").to_s == "true"
+  end
+
   def podcast_enabled?
     File.exist?(File.join(FEATURES_PATH, "podcast.yml"))
   end
@@ -170,7 +189,7 @@ module SiteFeature
   end
 
   def snipcart_unconfigured?
-    store_enabled? && !snipcart_configured?
+    snipcart_enabled? && !snipcart_configured?
   end
 
   # ── Live-tier readiness (production only) ─────────────────────────────────

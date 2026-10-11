@@ -66,6 +66,19 @@ esac
 
 cd "$ROE_ROOT"
 
+# The orange from bin/roe (#e47e5d), for the not-synced warning. Off when
+# output isn't a terminal (piped to a file or a log), or NO_COLOR is set.
+ROE_ORANGE=''
+BOLD=''
+NC=''
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  case "${COLORTERM:-}" in
+    truecolor|24bit) ROE_ORANGE='\033[38;2;228;126;93m' ;;
+    *)               ROE_ORANGE='\033[38;5;173m' ;;
+  esac
+  BOLD='\033[1m'
+  NC='\033[0m'
+fi
 echo "→ Docs (exact mirror, --delete on):"
 echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/documentation/roe/"
 # _versions.yml is excluded: it isn't content, it's release metadata that
@@ -280,19 +293,25 @@ echo ""
 if [[ -n "$DRY_RUN" ]]; then
   echo "Dry run complete. Re-run without --dry-run to apply."
 elif [[ -n "$FAILED_FILES" ]]; then
-  echo "  ================================================================"
-  echo "  !!  FILE CHANGED BUT NO VERSION BUMP  —  NOT SYNCED"
-  echo "  ================================================================"
+  echo -e "  ${ROE_ORANGE}================================================================"
+  echo -e "  ${BOLD}!!  FILE CHANGED BUT NO VERSION BUMP  —  NOT SYNCED${NC}"
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
-    echo "      - $rel"
+    # Name the file you edit, in site/ — not the copy in current/ it would
+    # have been synced to. The bump goes in the site/ file.
+    case "$rel" in
+      app/themes/*)  echo "      - site/theme/$(basename "$rel")" ;;
+      app/site_js/*) echo "      - site/javascript/$(basename "$rel")" ;;
+      *)             echo "      - $rel" ;;
+    esac
   done <<< "$FAILED_FILES"
   echo ""
   echo "      Their bodies changed but Version: did not, so no site would"
   echo "      ever be offered the update. They were SKIPPED; everything"
-  echo "      else synced. Bump Version: in the header in site/ and run"
-  echo "      again to ship them."
-  echo "  ================================================================"
+  echo "      else synced. Bump Version: in the header of the site/ files"
+  echo "      above and run again to ship them."
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
   exit 1
 else
   echo "Done."
