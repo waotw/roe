@@ -154,53 +154,54 @@ rsync -avc $DRY_RUN --existing ${JS_EXCLUDES[@]+"${JS_EXCLUDES[@]}"} \
   current/app/site_js/
 echo ""
 
+# The two docs index pages. The site/pages/ source needs `---\n…\n---\n`
+# at the top to be a valid Page, but the bundled view in current/app/views/
+# renders only the markdown body — frontmatter would show as literal text
+# or confuse the markdown parser.
+#
+# Strip first, then compare the stripped body with the copy in current/.
+# This used to rsync the whole file and strip afterwards, so the source
+# (with frontmatter) never matched the destination (without): every dry
+# run listed both pages as changed, and every real run rewrote them to
+# the same bytes. Comparing after the strip means a page is only listed,
+# or copied, when its content really changed.
+#
+# awk state machine: on line 1, if it's `---`, enter frontmatter mode.
+# While in frontmatter mode, skip lines until the next `---` (close),
+# then exit. Print everything else. Robust to files that don't start
+# with `---` (no change), files without frontmatter (no change), and
+# `---` horizontal rules later in the body (preserved because in_fm is
+# already 0 by then).
+sync_index_page() {
+  local src="$1" dest="$2" stripped
+  stripped="$(mktemp "${TMPDIR:-/tmp}/sync-index.XXXXXX")"
+  awk '
+    NR == 1 && /^---$/ { in_fm = 1; next }
+    in_fm && /^---$/   { in_fm = 0; next }
+    !in_fm             { print }
+  ' "$src" > "$stripped"
+
+  if [[ -f "$dest" ]] && cmp -s "$stripped" "$dest"; then
+    echo "    up to date"
+  elif [[ -n "$DRY_RUN" ]]; then
+    echo "    would update $dest"
+  else
+    mv "$stripped" "$dest"
+    echo "    updated $dest (YAML frontmatter stripped)"
+    return 0
+  fi
+  rm -f "$stripped"
+}
+
 echo "→ Docs index page (single file copy + frontmatter strip):"
 echo "    site/pages/documentation.md  →  current/app/views/documentation/index.md"
-rsync -vc $DRY_RUN \
-  site/pages/documentation.md \
-  current/app/views/documentation/index.md
-
-# Strip YAML frontmatter from the destination. The /site/pages/
-# source needs `---\n…\n---\n` at the top to be a valid Page, but
-# the bundled view in /current/app/views/ renders only the markdown
-# body — frontmatter would either show as literal text or confuse
-# the markdown parser.
-#
-# awk state machine: on line 1, if it's `---`, enter frontmatter
-# mode. While in frontmatter mode, skip lines until the next `---`
-# (close), then exit. Print everything else. Robust to files that
-# don't start with `---` (no change), files without frontmatter (no
-# change), and `---` horizontal rules later in the body (preserved
-# because in_fm is already 0 by then).
-if [[ -z "$DRY_RUN" ]]; then
-  dest="current/app/views/documentation/index.md"
-  awk '
-    NR == 1 && /^---$/ { in_fm = 1; next }
-    in_fm && /^---$/   { in_fm = 0; next }
-    !in_fm             { print }
-  ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
-  echo "    (stripped YAML frontmatter from destination)"
-fi
+sync_index_page site/pages/documentation.md current/app/views/documentation/index.md
 echo ""
 
+# The page served at /documentation/roe.
 echo "→ Roe docs index page (single file copy + frontmatter strip):"
 echo "    site/pages/documentation-all.md  →  current/app/views/documentation/roe_index.md"
-rsync -vc $DRY_RUN \
-  site/pages/documentation-all.md \
-  current/app/views/documentation/roe_index.md
-
-# Same frontmatter strip as the /documentation index above: the /site
-# source is a Page (needs `---\n…\n---\n`), the bundled view renders the
-# markdown body only. This is the page served at /documentation/roe.
-if [[ -z "$DRY_RUN" ]]; then
-  dest="current/app/views/documentation/roe_index.md"
-  awk '
-    NR == 1 && /^---$/ { in_fm = 1; next }
-    in_fm && /^---$/   { in_fm = 0; next }
-    !in_fm             { print }
-  ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
-  echo "    (stripped YAML frontmatter from destination)"
-fi
+sync_index_page site/pages/documentation-all.md current/app/views/documentation/roe_index.md
 echo ""
 
 echo "→ Root launcher/docs (current/ is canonical → mirror to package root):"
