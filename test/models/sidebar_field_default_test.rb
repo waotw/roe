@@ -11,7 +11,7 @@ class SidebarFieldDefaultTest < ActiveSupport::TestCase
     @original = File.exist?(@path) ? File.binread(@path) : nil
   end
 
-  teardown { @original ? File.write(@path, @original) : FileUtils.rm_f(@path) }
+  teardown { @original ? File.binwrite(@path, @original) : FileUtils.rm_f(@path) }
 
   def write_sidebar(scope) = File.write(@path, "---\nscope: #{scope}\n---\n\nSidebar\n")
 

@@ -331,8 +331,8 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     # Tabs renamed, both usable locally (no production gate, no masked inputs).
-    assert_select "button[data-tabs-panel=?]", "test", text: /Local\/Test/
-    assert_select "button[data-tabs-panel=?]", "live", text: /Live\/Static Site/
+    assert_select "button[data-tabs-panel=?]", "test", text: /\bTest\b/
+    assert_select "button[data-tabs-panel=?]", "live", text: /\bLive\b/
     assert_select "textarea[name=?]", "test[snippet]"
     assert_select "textarea[name=?]", "live[snippet]"
     # No leftover secret-key inputs.

@@ -323,7 +323,7 @@ export default class extends Controller {
       <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}:
       </label>
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 max-w-[500px]">
         <div class="flex ${isCheckbox ? "items-center" : "items-start"} gap-2">
           ${inputHtml}
         </div>
@@ -990,7 +990,7 @@ export default class extends Controller {
       <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}${asterisk}:
       </label>
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 max-w-[500px]">
         <div class="flex ${isCheckbox ? "items-center" : "items-start"} gap-2">
           ${inputHtml}
         </div>

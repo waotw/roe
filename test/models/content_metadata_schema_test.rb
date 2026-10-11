@@ -9,6 +9,10 @@ require "test_helper"
 # reshaping POST_TYPES and rewriting editor JS), these tests pin them to each
 # other so drift fails a build instead of silently producing a dead field.
 class ContentMetadataSchemaTest < ActiveSupport::TestCase
+  # A store with a cart. The test site's store.yml comes and goes with other
+  # tests, and no store.yml reads as Snipcart off — so say which this is.
+  setup { SiteFeature.stubs(:snipcart_enabled?).returns(true) }
+
   def fields(type, metadata: {})
     ContentMetadataSchema.fields_for(type, metadata: metadata)
   end

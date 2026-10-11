@@ -1,7 +1,16 @@
 require "test_helper"
 
 class Admin::LayoutsMenuBuilderTest < ActionDispatch::IntegrationTest
-  setup { sign_in_as(users(:one)) }
+  # Another test can delete site/layout/. Recreate it, and take away the header
+  # this test writes: a header.md left behind outranks the navigation.md that
+  # other tests (search, say) write, so they'd read the wrong menu.
+  setup do
+    sign_in_as(users(:one))
+    FileUtils.mkdir_p(LayoutFiles.dir)
+    @header_existed = LayoutFiles.exist?("header")
+  end
+
+  teardown { FileUtils.rm_f(LayoutFiles.path("header")) unless @header_existed }
 
   test "the layout editor renders the navigation builder" do
     File.write(LayoutFiles.path("header"), "# Header\n") unless LayoutFiles.exist?("header")

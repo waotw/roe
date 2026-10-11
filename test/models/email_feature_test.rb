@@ -17,6 +17,9 @@ class EmailFeatureTest < ActiveSupport::TestCase
     # payments and the store, and an unstubbed call would raise.
     SiteConfig.stubs(:feature).returns(false)
     SiteConfig.stubs(:feature).with("members", "newsletter.enabled").returns(newsletter)
+    # Unset, as on most sites: email stays on. Only an explicit false turns it
+    # off (password sign-in), and the catch-all above would read as that.
+    SiteConfig.stubs(:feature).with("members", "auth.email_enabled").returns(nil)
     SiteFeature.stubs(:store_enabled?).returns(false)
   end
 

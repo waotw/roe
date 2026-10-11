@@ -58,15 +58,24 @@
           of truth), and Save & Publish persists it. Leave blank to let Roe
           derive it from the title. %>
       <%
-        current_url_name = @post.metadata["url_name"].to_s.strip
-        title_for_slug   = @post.metadata["title"].to_s.strip
+        # Posts, pages and products all render this modal, each with its own
+        # instance variable. Reading @post alone crashed it for the other two.
+        slug_item        = local_assigns[:item] || @post || @page || @product
+        current_url_name = slug_item.metadata["url_name"].to_s.strip
+        title_for_slug   = slug_item.metadata["title"].to_s.strip
         derived_slug     = title_for_slug.parameterize.presence
+        # The same prefixes as each model's public_url.
+        slug_prefix      = case slug_item
+                           when Product then "/store/"
+                           when Page    then "/"
+                           else              "/posts/"
+                           end
       %>
       <div class="bg-gray-50 border border-gray-300 p-6 mb-6">
         <h3 class="font-semibold text-gray-900 mb-1">URL name</h3>
         <p class="text-sm text-gray-700 mb-3">
-          The slug for this post's web address<% if derived_slug %>, e.g.
-            <code class="text-xs bg-white border border-gray-200 px-1 py-0.5"><%= "/posts/#{current_url_name.presence || derived_slug}" %></code><% end %>.
+          The slug for this <%= resource_label.downcase %>'s web address<% if derived_slug %>, e.g.
+            <code class="text-xs bg-white border border-gray-200 px-1 py-0.5"><%= "#{slug_prefix}#{current_url_name.presence || derived_slug}" %></code><% end %>.
           Leave blank to generate it from the title.
         </p>
         <input type="text"

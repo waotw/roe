@@ -1583,6 +1583,9 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   test "signup form opts out of Turbo so the upgrade button's formaction is honoured" do
     model = TestModel.new("")
     model.stubs(:form_authenticity_token).returns("tok")
+    # Catch-all first: the form also asks other members settings (password
+    # sign-in reads auth.email_enabled). Unset reads as the default.
+    SiteConfig.stubs(:feature).returns(nil)
     SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
 
     html = model.send(:render_signup_form, "Sign up free", "Become a paid member")

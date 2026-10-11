@@ -30,15 +30,21 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     )
   end
 
+  # The menu goes in whichever file the site reads for the header slot — an
+  # existing header.md outranks navigation.md (LayoutFiles), so writing
+  # navigation.md alone tested nothing when another test left a header behind.
   def write_nav(content)
-    dir = RoeSitePaths::SITE_LAYOUT_PATH
-    FileUtils.mkdir_p(dir)
-    File.write(File.join(dir, "navigation.md"), content)
+    FileUtils.mkdir_p(LayoutFiles.dir)
+    unless @nav_path # keep the first snapshot if a test writes the menu twice
+      @nav_path = LayoutFiles.path("header")
+      @nav_before = File.exist?(@nav_path) ? File.binread(@nav_path) : nil
+    end
+    File.write(@nav_path, content)
   end
 
   def teardown
-    nav = File.join(RoeSitePaths::SITE_LAYOUT_PATH, "navigation.md")
-    File.delete(nav) if File.exist?(nav)
+    return unless @nav_path
+    @nav_before ? File.binwrite(@nav_path, @nav_before) : FileUtils.rm_f(@nav_path)
   end
 
   def entries

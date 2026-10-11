@@ -8,6 +8,10 @@ require "test_helper"
 class Admin::PagesProductsNewFlowTest < ActionDispatch::IntegrationTest
   setup do
     sign_in_as(User.take)
+    # The SKU checks are for a store with a cart. Without the stub the answer
+    # depends on test order: the test site has no store.yml (Snipcart off)
+    # until saving a product with a category writes one (Snipcart on).
+    SiteFeature.stubs(:snipcart_enabled?).returns(true)
     @created = []
     %w[pages products].each { |d| FileUtils.mkdir_p(File.join(RoeSitePaths::SITE_PATH, d)) }
   end

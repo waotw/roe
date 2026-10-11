@@ -122,7 +122,7 @@ class Admin::LayoutsController < Admin::BaseController
     layout_dir = File.join(RoeSitePaths::SITE_PATH, "layout")
     unless File.directory?(layout_dir)
       flash[:alert] = "Layout directory is missing. Please create it manually at site/layout/"
-      redirect_to admin_dashboard_path
+      redirect_to admin_root_path
     end
   end
 
