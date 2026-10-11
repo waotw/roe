@@ -173,6 +173,28 @@
       When a new version is shippped, you'll see it here.
     </p>
 
+    <%# UPDATE ALL: every outdated script in one click. Edited copies are
+        kept beside the new version, as with "Update & keep my copy", so the
+        confirm only has to say so when there's an edited one. %>
+    <% outdated_scripts = @site_scripts.select { |s| s[:status] == :tracked_outdated } %>
+    <% if outdated_scripts.any? %>
+      <% edited_scripts = outdated_scripts.select { |s| s[:edited] } %>
+      <%
+        confirm = "Update #{outdated_scripts.size} #{'script'.pluralize(outdated_scripts.size)}: #{outdated_scripts.map { |s| s[:name] }.to_sentence}?"
+        if edited_scripts.any?
+          confirm += " You've changed #{edited_scripts.map { |s| s[:name] }.to_sentence}; Roe will save your " \
+                     "#{edited_scripts.one? ? 'version' : 'versions'} beside the new one first."
+        end
+      %>
+      <div class="flex justify-end mb-2">
+        <%= button_to "Update all",
+              update_all_scripts_admin_themes_path,
+              method: :post,
+              form: { data: { turbo_confirm: confirm } },
+              class: "uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs" %>
+      </div>
+    <% end %>
+
     <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
       <table class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">

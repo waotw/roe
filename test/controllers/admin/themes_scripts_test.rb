@@ -88,4 +88,49 @@ class Admin::ThemesScriptsTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_themes_path
     assert_not File.exist?(File.join(SITE, "evil.js"))
   end
+
+  # --- UPDATE ALL --------------------------------------------------------------
+
+  test "UPDATE ALL shows only when a script is outdated" do
+    SiteJavascript.shipped_names.each { |n| File.write(File.join(SITE, n), shipped(n)) }
+    get admin_themes_path
+    assert_select "form[action=?]", update_all_scripts_admin_themes_path, count: 0
+
+    install_old("search.js")
+    get admin_themes_path
+    assert_select "form[action=?]", update_all_scripts_admin_themes_path, count: 1
+  end
+
+  test "UPDATE ALL updates every outdated script, keeps edited copies, and leaves the rest" do
+    install_old("search.js")
+    install_old("gallery.js", edit: "my change")
+    custom = File.join(SITE, "footnotes.js")
+    File.write(custom, "// my own footnotes, no header\n")
+
+    get admin_themes_path
+    assert_includes response.body, "You&#39;ve changed gallery.js", "the confirm names the edited file"
+
+    post update_all_scripts_admin_themes_path
+    assert_redirected_to admin_themes_path
+
+    assert_equal shipped("search.js"), File.read(File.join(SITE, "search.js"))
+    assert_equal shipped("gallery.js"), File.read(File.join(SITE, "gallery.js"))
+    kept = File.join(SITE, "gallery-v0.0.1.js")
+    assert File.exist?(kept), "the edited copy is saved beside the new one"
+    assert_includes File.read(kept), "// my change"
+    assert_empty Dir.glob(File.join(SITE, "search-*.js")), "an untouched file gets no copy"
+    assert_equal "// my own footnotes, no header\n", File.read(custom), "a custom file is never touched"
+    assert_match(/gallery\.js and search\.js/, flash[:notice])
+    assert_match(/gallery-v0\.0\.1\.js/, flash[:notice])
+  end
+
+  test "UPDATE ALL with nothing outdated says so and writes nothing" do
+    File.write(File.join(SITE, "search.js"), shipped("search.js"))
+
+    post update_all_scripts_admin_themes_path
+
+    assert_redirected_to admin_themes_path
+    assert_equal "All site scripts are already up to date.", flash[:notice]
+    assert_equal [ "search.js" ], Dir.children(SITE)
+  end
 end

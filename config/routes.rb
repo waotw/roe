@@ -264,6 +264,7 @@ Rails.application.routes.draw do
       # shipped-file story, no editor. :id is the script's basename.
       collection do
         post "scripts/:id/update", to: "themes#update_script", as: :update_script
+        post "scripts/update_all", to: "themes#update_all_scripts", as: :update_all_scripts
         get  "scripts/:id/download", to: "themes#download_script", as: :download_script
       end
     end

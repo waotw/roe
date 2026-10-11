@@ -51,15 +51,7 @@ class Admin::ThemesController < Admin::BaseController
   def update_script
     name = File.basename(params[:id].to_s)
     name = "#{name}.js" unless name.end_with?(".js")
-    site_path = File.join(SiteJavascript.site_dir, name)
-    keep_as = nil
-
-    if params[:keep_copy].present? && File.exist?(site_path)
-      report = SiteJavascript.reports[name]
-      suffix = report&.installed&.version ? "v#{report.installed.version}" : Time.current.strftime("%Y-%m-%d")
-      keep_as = File.join(SiteJavascript.site_dir, "#{name.delete_suffix('.js')}-#{suffix}.js")
-      FileUtils.cp(site_path, keep_as)
-    end
+    keep_as = params[:keep_copy].present? ? keep_script_copy(name) : nil
 
     SiteJavascript.update!(name)
     flash[:notice] = "#{name} updated to the latest version." + (keep_as ? " Your previous copy is at site/javascript/#{File.basename(keep_as)}." : "")
@@ -68,6 +60,41 @@ class Admin::ThemesController < Admin::BaseController
   rescue => e
     flash[:error] = "Couldn't update #{name}: #{e.message}"
   ensure
+    redirect_to admin_themes_path
+  end
+
+  # UPDATE ALL: every script with a newer shipped version, in one click.
+  # An edited copy is always kept beside the new one first, as
+  # "Update & keep my copy" does for one file — clicking the button for all
+  # of them is no reason to lose someone's changes. Custom files, and ones
+  # already current or ahead, are left alone. One failure doesn't stop the
+  # rest; the message says which went through.
+  def update_all_scripts
+    updated = []
+    kept = []
+    failed = []
+
+    SiteJavascript.reports.each do |name, report|
+      next unless report.status == :tracked_outdated
+
+      begin
+        copy = report.edited ? keep_script_copy(name) : nil
+        SiteJavascript.update!(name)
+        updated << name
+        kept << File.basename(copy) if copy
+      rescue => e
+        failed << "#{name} (#{e.message})"
+      end
+    end
+
+    if updated.any?
+      message = "Updated #{updated.to_sentence}."
+      message += " Your previous #{kept.one? ? 'copy is' : 'copies are'} in site/javascript/: #{kept.to_sentence}." if kept.any?
+      flash[:notice] = message
+    elsif failed.empty?
+      flash[:notice] = "All site scripts are already up to date."
+    end
+    flash[:error] = "Couldn't update #{failed.to_sentence}." if failed.any?
     redirect_to admin_themes_path
   end
 
@@ -271,6 +298,20 @@ class Admin::ThemesController < Admin::BaseController
   end
 
   private
+
+  # Save the site's copy of a script beside it before an update replaces it:
+  # search.js → search-v1.0.0.js (or a date when there's no version).
+  # Returns the saved path, or nil when there was no site copy to keep.
+  def keep_script_copy(name)
+    site_path = File.join(SiteJavascript.site_dir, name)
+    return nil unless File.exist?(site_path)
+
+    report = SiteJavascript.reports[name]
+    suffix = report&.installed&.version ? "v#{report.installed.version}" : Time.current.strftime("%Y-%m-%d")
+    keep_as = File.join(SiteJavascript.site_dir, "#{name.delete_suffix('.js')}-#{suffix}.js")
+    FileUtils.cp(site_path, keep_as)
+    keep_as
+  end
 
   def list_available_themes
     themes = {}
