@@ -1,18 +1,13 @@
 class MediaDurationExtractor
-  # Extract duration from audio/video file
-  # Returns duration in HH:MM:SS format
+  # Length of an audio or video file as HH:MM:SS, read with ffprobe.
+  # nil when ffprobe isn't installed or can't read the file — the editor
+  # falls back to reading the length in the browser.
+  #
+  # (This used to call FFMPEG::Movie from the streamio-ffmpeg gem, which was
+  # never in the Gemfile, so it always failed quietly and returned nil.)
   def self.extract(file_path)
-    return nil unless File.exist?(file_path)
-
-    begin
-      movie = FFMPEG::Movie.new(file_path)
-      seconds = movie.duration.to_i
-
-      format_duration(seconds)
-    rescue => e
-      Rails.logger.error "Failed to extract duration from #{file_path}: #{e.message}"
-      nil
-    end
+    seconds = MediaProbe.call(file_path)&.duration
+    seconds ? format_duration(seconds.round) : nil
   end
 
   # Convert seconds to HH:MM:SS format

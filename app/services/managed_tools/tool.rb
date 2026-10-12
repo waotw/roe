@@ -26,6 +26,10 @@ module ManagedTools
     # Optional version string when installed (nil if unknown/not installed).
     def version = nil
 
+    # Optional extra line for the Dependencies page when the tool is only
+    # partly there (nil when there's nothing to add).
+    def note = nil
+
     # ── Install guidance (override #packages) ──────────────────────────
     # Map a package-manager symbol to the package name(s) it ships under,
     # e.g. { brew: "vips", apt: "libvips", dnf: "vips" }. A manager absent
@@ -48,6 +52,7 @@ module ManagedTools
         docs_url:        docs_url,
         installed:       present,
         version:         (present ? version : nil),
+        note:            (present ? nil : note),
         install_command: install_command(platform),
         platform_label:  platform.label,
         needs_sudo:      platform.needs_sudo?

@@ -92,5 +92,24 @@ module ManagedTools
       dirs += [ "/opt/homebrew/bin", "/usr/local/bin" ] if cmd == "brew"
       dirs.any? { |dir| !dir.to_s.empty? && File.executable?(File.join(dir, cmd)) }
     end
+
+    # Directories checked after PATH when looking for a tool Roe runs by full
+    # path (ffmpeg). A server started outside a login shell can have a PATH
+    # without Homebrew's bin dirs, and /usr/local/bin is where standalone
+    # macOS builds are usually dropped.
+    EXTRA_BIN_DIRS = [ "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin" ].freeze
+
+    # Full path to an executable named `cmd`, or nil. PATH first, then
+    # EXTRA_BIN_DIRS. A pure scan — never runs anything.
+    def self.find_executable(cmd)
+      dirs = ENV.fetch("PATH", "").split(File::PATH_SEPARATOR) + EXTRA_BIN_DIRS
+      dirs.each do |dir|
+        next if dir.to_s.empty?
+
+        path = File.join(dir, cmd)
+        return path if File.file?(path) && File.executable?(path)
+      end
+      nil
+    end
   end
 end
