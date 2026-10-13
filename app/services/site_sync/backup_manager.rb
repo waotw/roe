@@ -62,7 +62,7 @@ module SiteSync
         backup_dir = File.join(BACKUP_ROOT, timestamp)
 
         link_dest_arg = previous_snapshot ? "--link-dest=#{Shellwords.escape(previous_snapshot)}" : ""
-        excludes_arg  = RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" }.join(" ")
+        excludes_arg  = rsync_filter_arg
 
         FileUtils.mkdir_p(backup_dir)
 
@@ -155,7 +155,7 @@ module SiteSync
         # means the user just sees one chronological list.
         safety_path = create
 
-        excludes_arg = RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" }.join(" ")
+        excludes_arg = rsync_filter_arg
 
         # --delete so files removed since the backup actually disappear
         # on restore. Without it, restoring an "older" state would
@@ -165,7 +165,9 @@ module SiteSync
         # Excludes are passed again so we don't accidentally delete
         # /site/db, /site/.git, etc. on the restore side. The backup
         # doesn't contain those, so without the excludes rsync would
-        # treat them as "missing from source" and delete them.
+        # treat them as "missing from source" and delete them. The same
+        # goes for video web versions: snapshots leave them out, and this
+        # keeps restore from deleting the current ones.
         cmd = "rsync -aH --delete #{excludes_arg} " \
               "#{Shellwords.escape("#{snapshot_path}/")} " \
               "#{Shellwords.escape("#{RoeSitePaths::SITE_PATH}/")} 2>&1"
@@ -349,7 +351,7 @@ module SiteSync
 
       def write_snapshot_meta(snapshot_dir)
         meta = {
-          "fingerprint" => SiteSync::Ledger.fingerprint_for(snapshot_dir),
+          "fingerprint" => backup_fingerprint(snapshot_dir),
           "created_at"  => Time.now.utc.iso8601
         }
         File.write(File.join(snapshot_dir, SNAPSHOT_META_FILENAME), JSON.pretty_generate(meta))
@@ -368,11 +370,29 @@ module SiteSync
       # cadence. Bust on restore (controller does this).
       def current_site_fingerprint
         Rails.cache.fetch("site_sync:current_fingerprint", expires_in: 30.seconds) do
-          SiteSync::Ledger.fingerprint_for(RoeSitePaths::SITE_PATH)
+          backup_fingerprint(RoeSitePaths::SITE_PATH)
         end
       rescue => e
         Rails.logger.error "[SiteSync::BackupManager] fingerprint_for failed: #{e.message}"
         nil
+      end
+
+      # A directory's fingerprint as a snapshot sees it: the Ledger's walk,
+      # minus video web versions, which snapshots leave out. Used for both
+      # sides of the "active" comparison — a snapshot and /site — so /site
+      # having web versions the snapshot doesn't isn't read as a difference.
+      # Only BackupManager reads the cached "site_sync:current_fingerprint",
+      # so it can hold this backup-specific value.
+      def backup_fingerprint(dir)
+        manifest = SiteSync::Ledger.new(site_path: dir).current_manifest
+        SiteSync::Ledger.fingerprint_of(manifest.reject { |rel, _| SiteSync::BackupPolicy.video_web_version?(rel) })
+      end
+
+      # rsync's --exclude/--include arguments for create and restore. Order
+      # matters: rsync uses the first rule that matches a path, so the
+      # -video.json include has to come before the variants exclude.
+      def rsync_filter_arg
+        (RSYNC_EXCLUDES.map { |e| "--exclude=#{Shellwords.escape(e)}" } + SiteSync::BackupPolicy.rsync_filter_args).join(" ")
       end
 
       def resolve_snapshot_path(name)

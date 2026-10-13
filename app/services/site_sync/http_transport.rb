@@ -188,14 +188,22 @@ module SiteSync
         raise HttpTransportError, "cannot back up live: peer manifest unavailable" unless peer
 
         peer_files = peer["files"] || {}
-        wanted =
+        requested =
           if files
-            requested = Array(files).uniq
-            return nil if requested.empty?
-            requested & peer_files.keys # selective: only files that exist live
+            list = Array(files).uniq
+            return nil if list.empty?
+            list & peer_files.keys # selective: only files that exist live
           else
             peer_files.keys # full snapshot
           end
+
+        # No video web versions, and nothing over the size limit — see
+        # BackupPolicy. Downloading a 1.2 GB video in one request is what
+        # failed and stopped the sync.
+        wanted, too_large = BackupPolicy.partition_live_backup(requested, peer_files)
+        if too_large.any?
+          Rails.logger.warn "[SiteSync::HttpTransport] not backed up (over #{BackupPolicy::LIVE_BACKUP_MAX_BYTES / 1024 / 1024} MB): #{too_large.join(", ")}"
+        end
         return nil if wanted.empty?
 
         backup_dir, backup_root, timestamp = new_backup_dir

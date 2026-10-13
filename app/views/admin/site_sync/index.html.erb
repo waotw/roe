@@ -335,6 +335,7 @@
                     <div class="min-w-0">
                       <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
                       <p class="text-[11px] text-red-700">This file was deleted on <%= deleted_on %></p>
+                      <%= render "admin/site_sync/not_backed_up_note", conflict: c %>
                     </div>
                     <%# Keep defaults to the side that still has the file, so
                         clicking straight through never destroys anything. %>
@@ -371,6 +372,7 @@
                         <%= type_label %><%
                           %><% if c["newer"] == "local" %> · yours is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
                       </p>
+                      <%= render "admin/site_sync/not_backed_up_note", conflict: c %>
                     </div>
                     <div class="flex gap-3 shrink-0 text-xs">
                       <label class="flex items-center gap-1 cursor-pointer">

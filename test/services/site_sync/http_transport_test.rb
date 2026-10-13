@@ -245,5 +245,38 @@ module SiteSync
       assert_equal [ [ "posts/ba.md" ], [ "posts/bb.md" ], [ "posts/bc.md" ] ], calls
       %w[ba bb bc].each { |f| assert File.exist?(File.join(out, "posts/#{f}.md")), "#{f} in backup" }
     end
+
+    # A 1.2 GB video in one download failed every time and stopped the sync.
+    # Large files and video web versions are left out of live backups now;
+    # the rest of the backup still happens.
+    test "backup leaves out large files and video web versions" do
+      site_write("posts/keep.md", "K")
+      site_write("media/video/variants/clip-video.json", "{}")
+      peer_files = {
+        "posts/keep.md"                        => { "size" => 1, "mtime" => 1 },
+        "media/video/variants/clip-video.json" => { "size" => 2, "mtime" => 1 },
+        "media/video/variants/clip-720p.mp4"   => { "size" => 5, "mtime" => 1 },
+        "media/video/clip.mov"                 => { "size" => BackupPolicy::LIVE_BACKUP_MAX_BYTES + 1, "mtime" => 1 }
+      }
+      Exchange.stubs(:fetch_peer_manifest).returns({ "files" => peer_files })
+
+      requested = []
+      Exchange.stubs(:download_files).with { |paths| requested.concat(paths); true }.returns(
+        TarArchive.pack(root: SITE, paths: [ "posts/keep.md", "media/video/variants/clip-video.json" ])
+      )
+
+      out = HttpTransport.backup_live_to_local!(files: peer_files.keys)
+      @created << out if out
+
+      assert_equal %w[media/video/variants/clip-video.json posts/keep.md], requested.sort
+    end
+
+    test "backup of only large files downloads nothing and does not fail" do
+      peer_files = { "media/video/clip.mov" => { "size" => BackupPolicy::LIVE_BACKUP_MAX_BYTES + 1, "mtime" => 1 } }
+      Exchange.stubs(:fetch_peer_manifest).returns({ "files" => peer_files })
+      Exchange.expects(:download_files).never
+
+      assert_nil HttpTransport.backup_live_to_local!(files: peer_files.keys)
+    end
   end
 end

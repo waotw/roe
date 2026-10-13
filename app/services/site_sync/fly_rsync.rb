@@ -75,6 +75,12 @@ module SiteSync
     # since DBs have their own backup system.
     BACKUP_EXCLUDES = (COMMON_EXCLUDES + [
       "--exclude=db/"
+    ] + SiteSync::BackupPolicy.rsync_filter_args + [
+      # Video web versions out (their -video.json stays), and nothing over
+      # the live-backup size limit — the same rules as the HTTP transport,
+      # so what a sync says it backed up doesn't depend on the transport.
+      # rsync's "M" suffix is 1024-based, matching LIVE_BACKUP_MAX_BYTES.
+      "--max-size=#{SiteSync::BackupPolicy::LIVE_BACKUP_MAX_BYTES / 1024 / 1024}M"
     ]).freeze
 
     # When deleting many files via fly ssh console, batch them so

@@ -131,6 +131,26 @@ export default class extends Controller {
     form.submit();
   }
 
+  // One download per selected file, each from its own /media address, so
+  // nothing is zipped or copied on the server — a 1 GB video streams like
+  // any other file. Started a beat apart: browsers drop a burst of
+  // downloads started at the same instant.
+  downloadSelected() {
+    const selected = this.checkboxTargets.filter((cb) => cb.checked);
+    if (selected.length === 0) return;
+
+    selected.forEach((cb, i) => {
+      setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = cb.dataset.filePath.split("/").map(encodeURIComponent).join("/");
+        link.download = cb.dataset.filename || "";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }, i * 400);
+    });
+  }
+
   submitInsert() {
     const selectedCheckboxes = this.checkboxTargets.filter((cb) => cb.checked);
     if (selectedCheckboxes.length === 0) return;

@@ -21,6 +21,8 @@
   <input type="checkbox"
          data-media-bulk-select-target="checkbox"
          data-media-id="<%= media.id %>"
+         data-file-path="<%= media.file_path %>"
+         data-filename="<%= File.basename(media.file_path) %>"
          data-action="change->media-bulk-select#updateSelection"
          class="absolute top-3 left-3 w-5 h-5 cursor-pointer z-10 rounded border-gray-400"
          onclick="event.stopPropagation()">

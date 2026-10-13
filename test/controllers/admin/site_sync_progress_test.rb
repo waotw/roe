@@ -34,3 +34,37 @@ class Admin::SiteSyncProgressTest < ActionDispatch::IntegrationTest
     assert_match "width: 50%", response.body
   end
 end
+
+# The confirmation screen names files whose live copy is too large for the
+# backup a sync takes first, so the choice is made knowing there's no copy.
+class Admin::SiteSyncNotBackedUpTest < ActionDispatch::IntegrationTest
+  setup { sign_in_as(User.take) }
+  teardown { Rails.cache.delete(SiteSyncTransferJob::STATUS_CACHE_KEY) }
+
+  def paused_with(conflicts)
+    Rails.cache.write(SiteSyncTransferJob::STATUS_CACHE_KEY,
+      { state: :conflicts, kind: :sync, conflicts: conflicts }, expires_in: 1.hour)
+    get admin_site_sync_path
+  end
+
+  def deleted_here(path, live_size)
+    { "path" => path, "type" => "delete_edit", "local" => nil,
+      "peer" => { "size" => live_size, "mtime" => 1 }, "newer" => "live" }
+  end
+
+  test "a large file deleted here says live's copy won't be backed up" do
+    big = SiteSync::BackupPolicy::LIVE_BACKUP_MAX_BYTES + 1
+    paused_with([ deleted_here("media/video/clip.mov", big), deleted_here("posts/a.md", 100) ])
+
+    assert_response :success
+    assert_equal 1, response.body.scan("too large to back up before syncing").size
+    assert_match "download it from the live site", response.body
+  end
+
+  test "video web versions are not named — they're made again from the original" do
+    big = SiteSync::BackupPolicy::LIVE_BACKUP_MAX_BYTES + 1
+    paused_with([ deleted_here("media/video/variants/clip-1080p.mp4", big) ])
+
+    assert_no_match "too large to back up", response.body
+  end
+end
