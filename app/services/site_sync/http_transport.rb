@@ -61,16 +61,35 @@ module SiteSync
         total = changed.size
         on_progress&.call(completed: 0, total: total)
 
+        # Files too big for a batch go up on their own, in pieces
+        # (Exchange.upload_large_file) — one request that size dies at the
+        # live site's proxy or times out. They go first, before any batch:
+        # the last batch carries the deletions, and those must wait until
+        # every new file has landed. A large-only push still ends with the
+        # (possibly empty) last batch, which is what carries deletions.
+        large, small = changed.partition do |rel|
+          File.size?(File.join(RoeSitePaths::SITE_PATH, rel)).to_i > PUSH_BATCH_MAX_BYTES
+        end
+        done = 0
+        large.each do |rel|
+          begin
+            Exchange.upload_large_file(rel)
+          rescue Exchange::ChunkedUploadError => e
+            raise HttpTransportError, e.message
+          end
+          done += 1
+          on_progress&.call(completed: done, total: total)
+        end
+
         # Chunk into bounded batches. Deletions ride the LAST batch so the peer
         # only removes files after every new file has landed — a mid-push
         # failure leaves EXTRA files, never missing ones. Each batch retries
         # independently (transient network blips), peer writes are atomic, and
         # a fresh push recomputes its diff against the peer's current state — so
         # a re-run skips what already landed and converges without corruption.
-        batches = batch_paths(changed)
+        batches = batch_paths(small)
         batches << [] if batches.empty? # deletions-only push still needs a call
         last = batches.length - 1
-        done = 0
 
         batches.each_with_index do |paths, i|
           # Per-file size+mtime so the peer can restore mtimes after unpack.
@@ -80,7 +99,9 @@ module SiteSync
 
           Exchange.with_retries(label: "upload batch #{i + 1}/#{batches.length}") do
             result = Exchange.upload_files(archive_bytes: archive, manifest: manifest, deleted: del)
-            raise HttpTransportError, "upload to peer failed" if result.nil?
+            # The peer's actual answer (status and body) is in the log —
+            # Exchange.upload_files writes it there.
+            raise HttpTransportError, "upload to peer failed (see the log for the live site's answer)" if result.nil?
 
             # The peer reports what it actually removed, which is how a purge
             # stays silent when there was nothing left to remove.

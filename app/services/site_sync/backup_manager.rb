@@ -37,6 +37,7 @@ module SiteSync
       "/.git",                      # user's optional /site git repo
       "/.sync-state.json",          # the ledger
       "/.sync-backups",             # legacy/defensive
+      "/.sync-uploads",             # large files still arriving in pieces
       "/media/images/variants",     # generated files, can be rebuilt from originals
       "/" + SNAPSHOT_META_FILENAME, # never let this escape into /site
       ".DS_Store"                   # match anywhere

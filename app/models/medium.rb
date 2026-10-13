@@ -10,11 +10,16 @@ class Medium < ApplicationRecord
 
   before_save :normalize_media_type
   before_destroy :delete_variants, if: :image?
+  before_destroy :delete_video_variants, if: :video?
   # Production included: both deploy targets run Solid Queue inside Puma
   # (SOLID_QUEUE_IN_PUMA in the generated fly.toml and config/deploy.yml), so
   # the job actually runs there. Skipping it meant the first visitor to every
   # image was served the full-size original while the on-demand path caught up.
   after_create :queue_variant_generation, if: :image?
+  # Video web versions are made where ffmpeg is — normally the local
+  # install. queue! is a no-op without it (a live site serves what Site
+  # Sync brought).
+  after_create :queue_video_variants, if: :video?
 
   # Scope helpers for filtering
   scope :images, -> { where(media_type: "images") }
@@ -53,6 +58,11 @@ class Medium < ApplicationRecord
   # The path itself, or — for a variant — every path its source could have.
   # Built as an exact list rather than a LIKE, because filenames routinely
   # contain underscores and `_` is a single-character wildcard in SQL.
+  #
+  # Image variants end in a size (-small, -xl …) and keep an image
+  # extension. Video variants end in a rendition, poster or manifest suffix
+  # (-720p.mp4, -poster.jpg, -video.json) and their original can be any
+  # video format — so a members-only clip.mov protects clip-720p.mp4 too.
   def self.source_paths_for(web_path)
     path = web_path.to_s
     segments = path.split("/")
@@ -63,14 +73,23 @@ class Medium < ApplicationRecord
     dir = segments.join("/")
 
     base = File.basename(filename, ".*")
+    candidates = []
+
     sizes = ImageVariantGenerator::VARIANTS.keys.map(&:to_s)
-    source_base = base.sub(/-(#{Regexp.union(sizes)})\z/, "")
+    image_base = base.sub(/-(#{Regexp.union(sizes)})\z/, "")
+    if image_base != base
+      candidates += ImageVariantGenerator::IMAGE_EXTENSIONS.map { |ext| "#{dir}/#{image_base}#{ext}" }
+    end
 
-    # A file sitting in a variants directory that doesn't end in a known size
-    # isn't one of ours — judge it on its own path rather than guessing.
-    return [ path ] if source_base == base
+    video_base = base.sub(/-(#{Regexp.union(VideoVariantGenerator.variant_suffixes)})\z/, "")
+    if video_base != base
+      candidates += VideoVariantGenerator::VIDEO_EXTENSIONS.flat_map { |ext| [ "#{dir}/#{video_base}#{ext}", "#{dir}/#{video_base}#{ext.upcase}" ] }
+    end
 
-    ImageVariantGenerator::IMAGE_EXTENSIONS.map { |ext| "#{dir}/#{source_base}#{ext}" }
+    # A file sitting in a variants directory that doesn't end in a known
+    # suffix isn't one of ours — judge it on its own path rather than
+    # guessing.
+    candidates.empty? ? [ path ] : candidates.uniq
   end
 
   # Files referenced by BOTH paid and free content. These resolve to free —
@@ -173,6 +192,18 @@ class Medium < ApplicationRecord
     media_type == "images"
   end
 
+  def video?
+    media_type == "video"
+  end
+
+  # The video's web versions, as recorded in its manifest — nil when none
+  # have been made (or they belong to a since-replaced original).
+  def video_manifest
+    return nil unless video?
+
+    VideoVariantGenerator.current_manifest(file_path)
+  end
+
   def variants_ready?
     return false unless image?
     # Fast path: trust the column when it says complete. mark_complete_for
@@ -209,6 +240,12 @@ class Medium < ApplicationRecord
     ImageVariantGenerator.queue_baseline!(file_path)
   end
 
+  def queue_video_variants
+    VideoVariantGenerator.queue!(file_path)
+  rescue => e
+    Rails.logger.warn "[Medium] Couldn't queue video variants for #{file_path}: #{e.message}"
+  end
+
   # True once the upload-time baseline (ImageVariantGenerator
   # .baseline_variant_names — small + largest non-upscaled size) is on disk.
   # The admin grid serves that preview and gates on this rather than the
@@ -231,6 +268,12 @@ class Medium < ApplicationRecord
   end
 
   private
+
+  def delete_video_variants
+    VideoVariantGenerator.delete_variants(File.join(RoeSitePaths::SITE_PATH, file_path.sub(%r{^/}, "")))
+  rescue => e
+    Rails.logger.error "[Medium] Failed to delete video variants: #{e.message}"
+  end
 
   def delete_variants
     return unless image?

@@ -66,6 +66,55 @@ module SiteSync
       end
     end
 
+    # A video rendition is far bigger than a batch, and one request that size
+    # died on the way to the live site. Large files go on their own, in
+    # pieces, before the batches; deletions still wait for the last batch.
+    test "files over the batch limit go up in pieces, first, and deletions still come last" do
+      site_write("media/video/variants/big-720p.mp4", "B" * 300)
+      site_write("posts/small.md", "S")
+      stub_const(HttpTransport, :PUSH_BATCH_MAX_BYTES, 100)
+
+      order = []
+      Exchange.stubs(:upload_large_file).with { |rel, **| order << [ :large, rel ]; true }.returns(true)
+      Exchange.stubs(:upload_files).with do |archive_bytes:, deleted:, **|
+        order << [ :batch, TarArchive.unpack(archive_bytes, dest: Dir.mktmpdir.tap { |d| @created << d }), deleted ]
+        true
+      end.returns({ "ok" => true })
+
+      HttpTransport.push_local_to_live!(diff: { added: %w[media/video/variants/big-720p.mp4 posts/small.md], modified: [], deleted: [ "posts/old.md" ] })
+
+      assert_equal [ :large, "media/video/variants/big-720p.mp4" ], order.first
+      assert_equal [ :batch, [ "posts/small.md" ], [ "posts/old.md" ] ], order.last
+    end
+
+    test "a large file that can't be sent fails the push with the reason" do
+      site_write("media/video/variants/huge-720p.mp4", "H" * 300)
+      stub_const(HttpTransport, :PUSH_BATCH_MAX_BYTES, 100)
+      Exchange.stubs(:upload_large_file).raises(Exchange::ChunkedUploadError, "The live site can't receive large files yet — deploy this version of Roe to it, then sync again.")
+      Exchange.expects(:upload_files).never
+
+      error = assert_raises(HttpTransport::HttpTransportError) do
+        HttpTransport.push_local_to_live!(diff: { added: [ "media/video/variants/huge-720p.mp4" ], modified: [], deleted: [ "posts/keep.md" ] })
+      end
+      assert_match(/deploy this version/, error.message)
+    end
+
+    def stub_const(mod, name, value)
+      original = mod.const_get(name)
+      mod.send(:remove_const, name)
+      mod.const_set(name, value)
+      @restore_consts ||= []
+      @restore_consts << [ mod, name, original ]
+    end
+
+    def after_teardown
+      Array(@restore_consts).each do |mod, name, original|
+        mod.send(:remove_const, name)
+        mod.const_set(name, original)
+      end
+      super
+    end
+
     # ----------------------------------------------------------------- pull
 
     test "pull downloads changed files, restores mtimes, and deletes removed ones" do

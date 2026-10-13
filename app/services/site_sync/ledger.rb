@@ -13,7 +13,10 @@ module SiteSync
     #   - db/        managed by RoeUpdater::BackupManager (own backup system)
     #   - .git/      user's optional git repo for /site, not our concern
     #   - .sync-backups/ defensive — in case anyone parks site backups inside
-    EXCLUDED_DIRS = %w[db .git .sync-backups].freeze
+    #   - .sync-uploads/ large files arriving in pieces over HTTP Site Sync
+    #                   (Api::SiteSync::ChunkedUploadsController) — only the
+    #                   finished file belongs in /site's manifest
+    EXCLUDED_DIRS = %w[db .git .sync-backups .sync-uploads].freeze
 
     # Paths (nested) excluded as whole subtrees, matched as path
     # prefixes from /site's root:
