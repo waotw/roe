@@ -90,6 +90,22 @@ module RoeSitePaths
   rescue Errno::ENOENT
     File.expand_path(path)
   end
+
+  # Every file under `root` whose extension is one of `extensions`, in any
+  # case: `clip.MOV` and `photo.JPG` count, which is what phones and cameras
+  # name their files.
+  #
+  # Not `Dir.glob("**/*.{mov,mp4}")`: that pattern is case-sensitive wherever
+  # the disk is. On a Mac the disk ignores case, so it finds `clip.MOV`; on
+  # the Linux live site it doesn't. Content sync there then read the file as
+  # deleted, removed its media record, and deleting the record deleted the
+  # video's web versions — just after Site Sync had sent them.
+  def self.files_with_extensions(root, extensions)
+    wanted = extensions.map { |ext| ext.to_s.delete_prefix(".").downcase }.to_set
+    Dir.glob(File.join(root, "**", "*")).select do |path|
+      wanted.include?(File.extname(path).delete_prefix(".").downcase) && File.file?(path)
+    end
+  end
 end
 
 # One-time migration: credentials used to live under current/config/

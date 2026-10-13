@@ -141,12 +141,22 @@ class ContentSync
     "avi" => "video", "mkv" => "video"
   }.freeze
 
+  # The media files content sync keeps a record for. Every type above
+  # except heic/heif, which the media browser converts on upload.
+  SYNCED_MEDIA_EXTENSIONS = %w[
+    jpg jpeg png gif webp svg bmp
+    mp3 m4a wav ogg flac aac
+    mp4 webm ogv mov avi mkv
+  ].freeze
+
   MEDIA_INSERT_BATCH = 200
 
   def sync_media
     # Sync all media types (images, audio, video) - EXCLUDE variants folder
-    media_files = Dir.glob(File.join(RoeSitePaths::SITE_MEDIA_PATH, "**", "*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}"))
-                     .reject { |path| path.include?("/variants/") }
+    # Any case: a .MOV missed here reads as deleted, and removing its record
+    # deletes its video web versions.
+    media_files = RoeSitePaths.files_with_extensions(RoeSitePaths::SITE_MEDIA_PATH, SYNCED_MEDIA_EXTENSIONS)
+                              .reject { |path| path.include?("/variants/") }
 
     puts "\n🎬 Found #{media_files.count} media files"
 

@@ -231,8 +231,10 @@ class ImageVariantGenerator
       images_root = File.join(RoeSitePaths::SITE_PATH, "media", "images")
       return 0 unless Dir.exist?(images_root)
 
-      originals = Dir.glob(File.join(images_root, "**", "*.{jpg,jpeg,png,gif,webp,heic,heif}"))
-                     .reject { |p| variant_path?(p) }
+      # Any case — a photo.JPG missed here has its variants pruned on every
+      # sync on a Linux live site, then rebuilt on the next view.
+      originals = RoeSitePaths.files_with_extensions(images_root, IMAGE_EXTENSIONS)
+                              .reject { |p| variant_path?(p) }
       usage = MediaUsageIndex.fetch
 
       # The set of variant files worth keeping. An in-use image keeps the
@@ -280,8 +282,8 @@ class ImageVariantGenerator
     def queue_missing_variants
       return 0 unless available?
 
-      image_paths = Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media/images/**/*.{jpg,jpeg,png,gif,webp,heic,heif}"))
-                       .reject { |p| p.include?("/variants/") }
+      image_paths = RoeSitePaths.files_with_extensions(File.join(RoeSitePaths::SITE_PATH, "media", "images"), IMAGE_EXTENSIONS)
+                                .reject { |p| p.include?("/variants/") }
 
       queued_count = 0
       image_paths.each do |path|
