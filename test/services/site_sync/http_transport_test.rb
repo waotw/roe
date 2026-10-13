@@ -99,6 +99,33 @@ module SiteSync
       assert_match(/deploy this version/, error.message)
     end
 
+    # A push of one big video and a few small files used to report "0 of 5
+    # files" for the whole of the video's upload, which looked stuck. The
+    # transport now reports bytes as well, piece by piece for a large file.
+    test "push reports bytes as they go, including each piece of a large file" do
+      site_write("media/video/variants/big-720p.mp4", "B" * 300)
+      site_write("posts/small.md", "S" * 10)
+      stub_const(HttpTransport, :PUSH_BATCH_MAX_BYTES, 100)
+
+      Exchange.stubs(:upload_large_file).with do |_rel, on_bytes:, **|
+        on_bytes.call(100)
+        on_bytes.call(300)
+        true
+      end.returns(true)
+      Exchange.stubs(:upload_files).returns({ "ok" => true })
+
+      reports = []
+      HttpTransport.push_local_to_live!(
+        diff: { added: %w[media/video/variants/big-720p.mp4 posts/small.md], modified: [], deleted: [] },
+        on_progress: ->(**report) { reports << report }
+      )
+
+      assert_equal 310, reports.first[:bytes_total]
+      assert_equal [ 0, 100, 300, 300, 310 ], reports.map { |r| r[:bytes_done] }
+      assert_equal [ 0, 0, 0, 1, 2 ], reports.map { |r| r[:completed] }
+      assert reports.all? { |r| r[:total] == 2 }
+    end
+
     def stub_const(mod, name, value)
       original = mod.const_get(name)
       mod.send(:remove_const, name)

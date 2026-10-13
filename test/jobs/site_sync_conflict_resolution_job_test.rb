@@ -28,8 +28,8 @@ class SiteSyncConflictResolutionJobTest < ActiveSupport::TestCase
     pull_diff = nil
     transport = mock("transport")
     transport.stubs(:backup_live_to_local!)
-    transport.stubs(:push_local_to_live!).with { |diff:| push_diff = diff; true }
-    transport.stubs(:pull_live_to_local!).with { |diff:| pull_diff = diff; true }
+    transport.stubs(:push_local_to_live!).with { |diff:, **| push_diff = diff; true }
+    transport.stubs(:pull_live_to_local!).with { |diff:, **| pull_diff = diff; true }
     SiteSync.stubs(:transport).returns(transport)
 
     SiteSyncConflictResolutionJob.perform_now(resolutions, conflicts)
@@ -93,5 +93,34 @@ class SiteSyncConflictResolutionJobTest < ActiveSupport::TestCase
     assert_nil Rails.cache.read("site_sync:status"),
       "the status cached mid-job should have been cleared at the end"
     assert_nil Rails.cache.read("site_sync:current_fingerprint")
+  end
+
+  # The page shows a step and a progress bar from the status this job writes.
+  # It used to write only a step_label, which the status endpoint overwrites
+  # from `step` — so the page said "Starting…" for the whole of a ten-minute
+  # video push.
+  test "reports its step and the transport's progress while it pushes" do
+    conflicts   = [ { "path" => "media/video/clip.mp4", "type" => "delete_edit" } ]
+    resolutions = { "media/video/clip.mp4" => "local" }
+
+    seen = []
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.stubs(:push_local_to_live!).with do |on_progress:, **|
+      seen << Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY).dup
+      on_progress.call(completed: 0, total: 1, bytes_done: 500, bytes_total: 1000)
+      seen << Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY).dup
+      true
+    end
+    SiteSync.stubs(:transport).returns(transport)
+
+    SiteSyncConflictResolutionJob.perform_now(resolutions, conflicts)
+
+    before, during = seen
+    assert_equal :pushing_to_live, before[:step]
+    assert_equal :resolve, before[:kind]
+    assert SiteSyncTransferJob::STEPS.key?(before[:step]), "the page looks the label up from STEPS"
+    assert_equal({ completed: 0, total: 1, bytes_done: 500, bytes_total: 1000 }, during[:progress])
+    assert_equal :running, during[:state]
   end
 end

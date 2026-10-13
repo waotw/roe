@@ -59,7 +59,16 @@ module SiteSync
         deleted += purge
 
         total = changed.size
-        on_progress&.call(completed: 0, total: total)
+        # Bytes as well as files: one 1 GB video is one "file", so a file
+        # count alone sits at 0 of 5 for ten minutes and looks stuck.
+        sizes = changed.to_h { |rel| [ rel, File.size?(File.join(RoeSitePaths::SITE_PATH, rel)).to_i ] }
+        bytes_total = sizes.values.sum
+        bytes_done  = 0
+        done = 0
+        report = ->(bytes_now = bytes_done) {
+          on_progress&.call(completed: done, total: total, bytes_done: bytes_now, bytes_total: bytes_total)
+        }
+        report.call
 
         # Files too big for a batch go up on their own, in pieces
         # (Exchange.upload_large_file) — one request that size dies at the
@@ -67,18 +76,16 @@ module SiteSync
         # the last batch carries the deletions, and those must wait until
         # every new file has landed. A large-only push still ends with the
         # (possibly empty) last batch, which is what carries deletions.
-        large, small = changed.partition do |rel|
-          File.size?(File.join(RoeSitePaths::SITE_PATH, rel)).to_i > PUSH_BATCH_MAX_BYTES
-        end
-        done = 0
+        large, small = changed.partition { |rel| sizes[rel] > PUSH_BATCH_MAX_BYTES }
         large.each do |rel|
           begin
-            Exchange.upload_large_file(rel)
+            Exchange.upload_large_file(rel, on_bytes: ->(sent) { report.call(bytes_done + sent) })
           rescue Exchange::ChunkedUploadError => e
             raise HttpTransportError, e.message
           end
           done += 1
-          on_progress&.call(completed: done, total: total)
+          bytes_done += sizes[rel]
+          report.call
         end
 
         # Chunk into bounded batches. Deletions ride the LAST batch so the peer
@@ -112,7 +119,8 @@ module SiteSync
           end
 
           done += paths.size
-          on_progress&.call(completed: done, total: total)
+          bytes_done += paths.sum { |rel| sizes[rel].to_i }
+          report.call
         end
 
         # Match the rsync flow's post-push bookkeeping: rewrite the peer's
