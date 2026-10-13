@@ -1,0 +1,36 @@
+<%# The progress window opened after a video upload (video-progress Stimulus
+    controller). Terminal-style: the rows are plain text in a <pre>, drawn
+    with box characters by the controller. Closing it doesn't stop anything. %>
+<div data-controller="video-progress" data-media-upload-target="videoProgress"
+     data-action="video-progress:finished->media-upload#refreshNotices">
+  <dialog data-video-progress-target="dialog"
+          data-action="click->video-progress#backdrop"
+          class="p-0 bg-transparent backdrop:bg-black/50 max-w-[42rem] w-[calc(100%-2rem)] m-auto">
+    <div class="bg-[#0d1117] text-amber-300 font-mono text-sm border border-amber-700 rounded-xs shadow-2xl">
+      <div class="flex items-center justify-between px-3 py-1.5 border-b border-amber-800 bg-black/40">
+        <%# COPY: modal title %>
+        <span class="uppercase tracking-wide text-xs text-amber-400">
+          ▸ Optimizing <span data-video-progress-target="name" class="text-amber-200 normal-case"></span>
+        </span>
+        <button type="button" data-action="video-progress#close"
+                class="text-amber-500 hover:text-amber-200 text-base leading-none px-1" aria-label="Close">×</button>
+      </div>
+
+      <pre data-video-progress-target="rows" class="px-3 pt-3 pb-1 m-0 whitespace-pre overflow-x-auto leading-6 text-amber-300"></pre>
+      <pre data-video-progress-target="summary" class="px-3 pb-3 m-0 whitespace-pre-wrap text-amber-200"></pre>
+
+      <%# COPY: modal explanation %>
+      <div data-video-progress-target="footer" class="px-3 py-2 border-t border-amber-900 text-xs text-amber-500 leading-5 font-mono">
+        Video is being optimized. Feel free to close this window — optimization will continue in the background.
+        When it's finished, you'll see a notice on the Media Browser page.
+      </div>
+
+      <div class="flex justify-end px-3 py-2 border-t border-amber-900">
+        <button type="button" data-action="video-progress#close"
+                class="uppercase text-xs px-3 py-1 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded-xs font-mono">
+          Close
+        </button>
+      </div>
+    </div>
+  </dialog>
+</div>

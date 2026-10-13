@@ -30,10 +30,23 @@
                       form: { data: { turbo: false },
                               onsubmit: "return confirm('Reduce variants for unused images and delete variants for images that have been deleted? In-use variants and original images are untouched.');" },
                       class: "uppercase text-[.65rem] text-amber-700 px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
+        <%# Shown only when ffmpeg is installed and some videos have no web
+            versions yet (or failed last time). COPY: button label + confirm %>
+        <% if @videos_to_optimize.to_i.positive? %>
+          <%= button_to "OPTIMIZE VIDEOS (#{@videos_to_optimize})",
+                        optimize_videos_admin_medium_index_path,
+                        method: :post,
+                        form: { data: { turbo: false },
+                                onsubmit: "return confirm('Optimize #{@videos_to_optimize} #{'video'.pluralize(@videos_to_optimize)}? This runs in the background, one at a time, and can take a while for long videos.');" },
+                        class: "uppercase text-[.65rem] text-amber-700 px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
+        <% end %>
         <%= link_to "About variants ↗", "https://go-roe.com/documentation/roe/image-optimization", target: "_blank", class: "text-xs text-gray-400 hover:text-gray-600 underline" %>
       </div>
   </div>
   <%= render 'image_optimization' %>
+  <%# Refilled by media-upload#refreshNotices when a video finishes while
+      the page is open, so the notice appears without a refresh. %>
+  <div id="video-notices-slot"><%= render 'video_notices', notices: @video_notices || [] %></div>
 </div>
 
 <div data-controller="media-filter media-bulk-select"
@@ -254,5 +267,6 @@
     });
   }
 </script>
+<%= render 'video_progress_modal' %>
 </div>
 <%# /media-upload wrapper %>

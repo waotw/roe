@@ -37,6 +37,13 @@ export default class extends Controller {
         : null;
     if (!this.mediaEl) return;
 
+    // A video ships with the browser's own controls so it still plays
+    // without JavaScript. Once Roe's controls are wired up, hide the
+    // browser's — two sets of controls on one video is confusing.
+    if (this.hasVideoTarget && this.hasPlayButtonTarget) {
+      this.videoTarget.controls = false;
+    }
+
     this._boundTimeUpdate = this.onTimeUpdate.bind(this);
     this._boundDurationChange = this.onDurationChange.bind(this);
     this._boundEnded = this.onEnded.bind(this);

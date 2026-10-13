@@ -8,6 +8,7 @@ export default class extends Controller {
     "grid",
     "item",
     "emptyMessage",
+    "optimizing",
   ];
   static values = { mediaType: String };
 
@@ -25,10 +26,48 @@ export default class extends Controller {
       if (event.key === "Escape") this.closeModal();
     };
     document.addEventListener("keydown", this.onKeydown);
+
+    // Videos still being optimized show the same progress as the Media
+    // Browser card, refreshed while the picker is open.
+    this.watchOptimizing();
   }
 
   disconnect() {
     document.removeEventListener("keydown", this.onKeydown);
+    if (this.optimizingTimer) clearTimeout(this.optimizingTimer);
+    this.optimizingTimer = null;
+  }
+
+  // Refresh the thumbnail of every video that's still optimizing, every few
+  // seconds, until none are left or the picker closes. Only the thumbnail
+  // is swapped: the item's selection state and click handling stay as they
+  // are, so clicking still selects the video.
+  watchOptimizing() {
+    if (this.optimizingTimer) clearTimeout(this.optimizingTimer);
+    if (!this.hasOptimizingTarget) return;
+
+    this.optimizingTimer = setTimeout(async () => {
+      this.optimizingTimer = null;
+      await Promise.all(
+        this.optimizingTargets.map(async (slot) => {
+          try {
+            const r = await fetch(
+              `/admin/medium/${slot.dataset.mediaId}/video_status?thumbnail=1&height=h-24`,
+              { headers: { Accept: "application/json" } },
+            );
+            if (!r.ok) return;
+            const status = await r.json();
+            if (status.thumbnail_html) slot.innerHTML = status.thumbnail_html;
+            if (status.state !== "optimizing") {
+              slot.removeAttribute("data-media-picker-target");
+            }
+          } catch {
+            // try again next round
+          }
+        }),
+      );
+      if (this.element.isConnected) this.watchOptimizing();
+    }, 4000);
   }
 
   closeModal() {
@@ -79,6 +118,8 @@ export default class extends Controller {
           uploadedItems.push({
             path: data.path,
             filename: data.filename || file.name,
+            id: data.media_id,
+            optimizing: !!data.video_optimizing,
           });
         } else {
           console.error("Upload failed for", file.name, data.error);
@@ -136,6 +177,11 @@ export default class extends Controller {
         thumbnail = `<img src="${item.path}" alt="${basename}" class="w-full h-24 object-cover mb-1" loading="lazy">`;
       } else if (isAudio) {
         thumbnail = `<div class="w-full h-24 bg-gray-200 mb-1 flex items-center justify-center"><span class="text-3xl">🎵</span></div>`;
+      } else if (item.optimizing && item.id) {
+        // Same thumbnail as the Media Browser card; filled in and kept up
+        // to date by watchOptimizing. No progress window here — that's
+        // only on the Media Browser.
+        thumbnail = `<div class="mb-1" data-media-picker-target="optimizing" data-media-id="${item.id}"><div class="w-full h-24 bg-gray-900 flex items-center justify-center"><span class="text-3xl">🎬</span></div></div>`;
       } else {
         thumbnail = `<div class="w-full h-24 bg-gray-200 mb-1 flex items-center justify-center"><span class="text-3xl">🎬</span></div>`;
       }
@@ -173,6 +219,8 @@ export default class extends Controller {
     if (bulkSelectController) {
       bulkSelectController.updateToolbar();
     }
+
+    this.watchOptimizing();
   }
 
   showSpinner() {

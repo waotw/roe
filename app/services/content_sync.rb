@@ -24,6 +24,10 @@ class ContentSync
     return if Rails.env.test?
 
     ImageVariantGenerator.prune_all!
+    # Video renditions are never pruned for being unused (they're slow to
+    # make and can't be rebuilt on a live site); only those whose original
+    # is gone.
+    VideoVariantGenerator.prune_orphans!
   rescue => e
     Rails.logger.warn "[ContentSync] variant prune skipped: #{e.class} #{e.message}"
   end
@@ -167,6 +171,7 @@ class ContentSync
 
     new_records = []
     image_paths_for_queue = []
+    video_paths_for_queue = []
 
     media_files.each do |file_path|
       web_path = File.realpath(file_path).sub(real_site_path, "")
@@ -183,6 +188,7 @@ class ContentSync
         updated_at:  now
       }
       image_paths_for_queue << web_path if canonical == "images"
+      video_paths_for_queue << web_path if canonical == "video"
     rescue => e
       Rails.logger.error "[ContentSync] Failed to inspect #{file_path}: #{e.message}"
       puts "  ✗ Error: #{File.basename(file_path)} - #{e.message}"
@@ -211,6 +217,14 @@ class ContentSync
         image_count += 1 if ImageVariantGenerator.queue_baseline!(web_path)
       end
       puts "🖼️  Queued #{image_count} images for baseline variant" if image_count.positive?
+    end
+
+    # New videos (a file dropped into site/media/video, or one Site Sync
+    # brought in) get their web versions here, for the same reason. No-op
+    # where ffmpeg isn't installed.
+    if video_paths_for_queue.any?
+      video_count = video_paths_for_queue.count { |web_path| VideoVariantGenerator.queue!(web_path) }
+      puts "🎬 Queued #{video_count} videos for web versions" if video_count.positive?
     end
 
     puts "=" * 60

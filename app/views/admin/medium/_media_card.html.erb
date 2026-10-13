@@ -1,8 +1,8 @@
 <%# One media item in the browse grid. Locals: media, usages (array).
     Also rendered server-side after an upload (see MediumController#create) and
     injected at the top of the grid by the media-upload Stimulus controller. %>
-<% variants_pending = media.media_type == 'images' && ImageVariantGenerator.available? &&
-                      !media.baseline_ready? %>
+<% variants_pending = (media.media_type == 'images' && ImageVariantGenerator.available? && !media.baseline_ready?) ||
+                     (media.media_type == 'video' && VideoVariantGenerator.status_for(media)[:state] == 'optimizing') %>
 <div class="border border-gray-300 p-2 hover:bg-gray-50 group relative"
      data-media-filter-target="item"
      data-variants-pending="<%= variants_pending %>"
@@ -45,9 +45,11 @@
         <span class="text-4xl">🎵</span>
       </div>
     <% elsif media.media_type == 'video' %>
-      <div class="w-full h-32 bg-gray-200 mb-2 flex items-center justify-center">
-        <span class="text-4xl">🎬</span>
-      </div>
+      <%# Poster + progress while optimizing. Clicking it while optimizing
+          reopens the progress window (media-upload#openFromCard); the
+          media-upload controller polls the card and swaps it until it's
+          done (data-variants-pending). %>
+      <div class="mb-2" data-action="click->media-upload#openFromCard"><%= render "admin/medium/video_thumbnail", media: media, height: "h-32" %></div>
     <% end %>
 
     <!-- Filename -->

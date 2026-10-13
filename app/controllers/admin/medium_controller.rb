@@ -38,6 +38,14 @@ class Admin::MediumController < Admin::BaseController
     # Get distinct media types that exist
     @existing_types = Medium.distinct.pluck(:media_type).compact
 
+    # Videos whose web versions finished (or failed) since the notice was
+    # last dismissed.
+    @video_notices = VideoVariantGenerator.notice_media.map { |m| VideoVariantGenerator.status_for(m) }
+
+    # Count for the OPTIMIZE VIDEOS button — shown only when ffmpeg is here
+    # and something needs it.
+    @videos_to_optimize = VideoVariantGenerator.available? ? VideoVariantGenerator.needing_optimization.size : 0
+
     render layout: "admin"
   end
 
@@ -79,6 +87,11 @@ class Admin::MediumController < Admin::BaseController
             filename: File.basename(medium.file_path),
             path: medium.file_path,
             message: @conversion_notice,
+            # Tells the browse page to open the video progress window. Reload
+            # first: queue! (run from Medium's after_create) sets the status
+            # with update_all, which the in-memory record doesn't see — read
+            # stale, a just-queued video looked like "nothing happening".
+            video_optimizing: medium.video? && VideoVariantGenerator.status_for(medium.reload)[:state] == "optimizing",
             card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: [] })
           }
         rescue => e
@@ -145,7 +158,7 @@ class Admin::MediumController < Admin::BaseController
   # demand. Runs against the current environment's filesystem, so on prod
   # it prunes prod.
   def prune_variants
-    deleted = ImageVariantGenerator.prune_all!
+    deleted = ImageVariantGenerator.prune_all! + VideoVariantGenerator.prune_orphans!
     redirect_to browse_admin_medium_index_path,
                 notice: "Pruned #{deleted} variant #{'file'.pluralize(deleted)}. Unused images reduced to baseline; in-use kept (rebuilds on demand)."
   end
@@ -339,12 +352,65 @@ class Admin::MediumController < Admin::BaseController
     usages = MediaUsageIndex.fetch[medium.file_path] || []
     # "Pending" tracks the cheap baseline preview, not the whole ladder —
     # so the grid's poll stops as soon as the thumbnail is servable
-    # (the rest of the variants build on-demand at render).
-    pending = medium.image? && ImageVariantGenerator.available? && !medium.baseline_ready?
+    # (the rest of the variants build on-demand at render). For a video it
+    # means its web versions are still being made.
+    pending = if medium.video?
+      VideoVariantGenerator.status_for(medium)[:state] == "optimizing"
+    else
+      medium.image? && ImageVariantGenerator.available? && !medium.baseline_ready?
+    end
     render json: {
       pending: !!pending,
       card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: usages })
     }
+  end
+
+  # Progress of a video's web versions, polled by the upload modal and by
+  # the media card while it's optimizing. With ?thumbnail=1 it also returns
+  # the thumbnail HTML at the requested height, for the editor's media
+  # picker to swap in.
+  def video_status
+    medium = Medium.find(params[:id])
+    return head :not_found unless medium.video?
+
+    status = VideoVariantGenerator.status_for(medium)
+    if params[:thumbnail].present?
+      height = params[:height] == "h-24" ? "h-24" : "h-32"
+      status = status.merge(thumbnail_html: render_to_string(partial: "admin/medium/video_thumbnail", formats: [ :html ],
+                                                             locals: { media: medium, height: height, status: status }))
+    end
+    render json: status
+  end
+
+  # The Media Browser's "videos are ready" notice stays until this.
+  def dismiss_video_notices
+    VideoVariantGenerator.dismiss_notices!
+    redirect_to browse_admin_medium_index_path
+  end
+
+  # Just the notice, for the Media Browser to swap in when a video finishes
+  # while it's open. Empty when there's nothing to say.
+  def video_notices
+    notices = VideoVariantGenerator.notice_media.map { |m| VideoVariantGenerator.status_for(m) }
+    render partial: "admin/medium/video_notices", formats: [ :html ], locals: { notices: notices }
+  end
+
+  # OPTIMIZE VIDEOS: make web versions for every video that doesn't have
+  # them yet (added before ffmpeg was installed, brought in by Site Sync)
+  # or that failed last time. Runs in the background, one at a time.
+  def optimize_videos
+    unless VideoVariantGenerator.available?
+      return redirect_to browse_admin_medium_index_path, alert: "ffmpeg isn't installed. Install it from Tools → Images & Video."
+    end
+
+    count = VideoVariantGenerator.optimize_all!
+    # COPY: OPTIMIZE VIDEOS result
+    notice = if count.zero?
+      "Every video is already optimized."
+    else
+      "Optimizing #{count} #{'video'.pluralize(count)} in the background. You'll see a notice here when they're done."
+    end
+    redirect_to browse_admin_medium_index_path, notice: notice
   end
 
   private
@@ -377,14 +443,23 @@ class Admin::MediumController < Admin::BaseController
     sanitized_base = sanitize_media_filename(base_name)
     filename = "#{sanitized_base}#{extension_with_dot}"
 
-    # Check for duplicates
+    # Check for duplicates — a record or a file already there.
     counter = 1
-    while Medium.exists?(file_path: "/media/#{media_type}/#{filename}")
+    while Medium.exists?(file_path: "/media/#{media_type}/#{filename}") || folder_path.join(filename).exist?
       filename = "#{sanitized_base}-#{counter}#{extension_with_dot}"
       counter += 1
     end
 
     file_path = folder_path.join(filename)
+
+    # Written under a hidden working name first and renamed into place once
+    # complete. The file watcher (ContentWatcher) creates a Medium for any
+    # new file it sees in site/media; a large upload takes long enough to
+    # write that it used to see the half-written file and create the record
+    # first, so this upload's own create! then failed on the unique
+    # file_path. The working name doesn't match the watcher's extension
+    # pattern, and a rename is a single step.
+    working_path = folder_path.join(".#{filename}.uploading")
 
     if convert
       begin
@@ -393,23 +468,33 @@ class Admin::MediumController < Admin::BaseController
           .source(uploaded_file.tempfile.path)
           .convert("webp")
           .saver(quality: ImageVariantGenerator::WEBP_QUALITY)
-          .call(destination: file_path.to_s)
+          .call(destination: working_path.to_s)
       rescue => e
+        FileUtils.rm_f(working_path)
         Rails.logger.error "[Upload] #{original_ext} → webp failed: #{e.class} #{e.message}"
         raise "#{original_ext.upcase} images aren't well supported on the web, and this one couldn't be converted. Please upload a JPG, PNG, WebP, or GIF instead."
       end
       @conversion_notice = "Converted #{base_name}.#{original_ext} → #{filename} for better web support."
     else
-      File.open(file_path, "wb") { |file| file.write(uploaded_file.read) }
+      # Copied in chunks rather than read whole: a video upload can be over
+      # a gigabyte, and reading it into memory first doubled the work and
+      # the memory use.
+      begin
+        IO.copy_stream(uploaded_file.tempfile.path, working_path.to_s)
+      rescue
+        FileUtils.rm_f(working_path)
+        raise
+      end
     end
+    File.rename(working_path, file_path)
 
-    # Create database record
+    # Create database record. If the watcher still got there first (it
+    # watches for the rename), use its record rather than failing.
     relative_path = "/media/#{media_type}/#{filename}"
-    Medium.create!(
-      file_path: relative_path,
-      media_type: media_type,
-      uploaded_at: Time.current
-    )
+    Medium.create_or_find_by!(file_path: relative_path) do |medium|
+      medium.media_type = media_type
+      medium.uploaded_at = Time.current
+    end
   end
 
   def determine_media_type(extension)

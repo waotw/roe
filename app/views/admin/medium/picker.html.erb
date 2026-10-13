@@ -127,8 +127,9 @@
                 <span class="text-3xl">🎵</span>
               </div>
             <% elsif media.media_type == 'video' %>
-              <div class="w-full h-24 bg-gray-200 mb-1 flex items-center justify-center">
-                <span class="text-3xl">🎬</span>
+              <div class="mb-1"
+                   <% if VideoVariantGenerator.status_for(media)[:state] == "optimizing" %>data-media-picker-target="optimizing" data-media-id="<%= media.id %>"<% end %>>
+                <%= render "admin/medium/video_thumbnail", media: media, height: "h-24" %>
               </div>
             <% end %>
 

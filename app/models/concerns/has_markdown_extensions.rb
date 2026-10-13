@@ -143,6 +143,15 @@ module HasMarkdownExtensions
     # Process images to make them responsive
     html = process_responsive_images(html)
 
+    # A video embed on its own line came out of kramdown inside a <p>, and
+    # the player is a block (<div>): a <p> can't hold one, so browsers close
+    # the paragraph early and leave an empty one behind. Unwrap it.
+    html = html.gsub(%r{<p>\s*((?:<!--[^>]*-->\s*)?<div class="video-player-container.*?</div>\s*(?:<!--[^>]*-->\s*)?)</p>}m) do
+      inner = Regexp.last_match(1)
+      # Only when the <p> held nothing but the player.
+      inner.scan("<div").size == inner.scan("</div>").size ? inner : Regexp.last_match(0)
+    end
+
     # Keep content off ids that belong to injected third-party mount points.
     html = reserve_mount_ids(html)
 
@@ -188,11 +197,15 @@ module HasMarkdownExtensions
     %(<audio class="audio-embed" controls preload="metadata" src="#{escape_html(src)}"#{aria}>#{fallback}</audio>)
   end
 
+  # A video embedded in Markdown, ![label](/media/video/clip.mp4), gets the
+  # same player as a video post (shared/_video_player): web versions,
+  # poster, and Roe's controls. Rendered through the controller renderer
+  # because this runs inside the model, not a view.
   def render_video_embed(src, alt)
-    label = alt.to_s.strip
-    aria = label.empty? ? "" : %( aria-label="#{escape_html(label)}")
-    fallback = %(Your browser does not support the video element. <a href="#{escape_html(src)}">Download the video</a>.)
-    %(<video class="video-embed" controls preload="metadata" src="#{escape_html(src)}"#{aria}>#{fallback}</video>)
+    ApplicationController.renderer.render(
+      partial: "shared/video_player",
+      locals: { src: src, label: alt.to_s.strip, extra_class: "video-embed" }
+    ).to_s
   end
 
   def process_responsive_images(html)
@@ -1906,8 +1919,12 @@ module HasMarkdownExtensions
     video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
 
     if audio_src.blank? && video_src.present?
-      # Minimal native video for now; the full video transport is a follow-up.
-      return %Q(<div class="card-player card-player-video"><video class="player-video" controls preload="metadata" src="#{ERB::Util.html_escape(video_src)}"></video></div>)
+      # The shared site video player, the same as a video post's.
+      video = ApplicationController.renderer.render(
+        partial: "shared/video_player",
+        locals: { src: video_src, label: config[:title].to_s, extra_class: "player-video" }
+      )
+      return %Q(<div class="card-player card-player-video">#{video}</div>)
     end
 
     card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
