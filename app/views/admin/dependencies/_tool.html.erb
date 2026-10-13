@@ -1,0 +1,99 @@
+<%# One managed tool: name, installed badge, and — when it's missing — why
+    Roe wants it plus the install command for this machine. Shared by both
+    Tools pages (Images & Video, Developer Tools). Locals: tool (a status
+    hash from ManagedTools::Tool#status), recheck_path. %>
+<div class="border border-gray-200 rounded-lg p-4 bg-white">
+  <%# ── Header row: name + status badge ──────────────────────── %>
+  <div class="flex items-start justify-between gap-3">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">
+        <%= tool[:label] %>
+        <% if tool[:optional] %>
+          <span class="ml-1 text-xs font-normal text-gray-400">optional</span>
+        <% end %>
+      </h2>
+      <p class="text-sm text-gray-600 mt-0.5"><%= tool[:summary] %></p>
+    </div>
+
+    <% if tool[:installed] %>
+      <span class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+        <span>✓</span> Installed<%= " · #{tool[:version]}" if tool[:version].present? %>
+      </span>
+    <% else %>
+      <span class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+        <span>○</span> Not installed
+      </span>
+    <% end %>
+  </div>
+
+  <%# ── Install guidance (only when missing) ──────────────────── %>
+  <% unless tool[:installed] %>
+    <p class="text-xs text-gray-500 mt-2"><%= tool[:why] %></p>
+    <% if tool[:note].present? %>
+      <%# COPY: partial-install note comes from the tool's #note (e.g. ManagedTools::Ffmpeg) %>
+      <p class="text-xs text-amber-700 mt-1"><%= tool[:note] %></p>
+    <% end %>
+
+    <div class="mt-3">
+      <% methods = tool[:install_methods] || [] %>
+      <% if methods.any? { |m| m[:usable] } %>
+        <%# COPY: install guidance — `roe install` first, then what it will do %>
+        <p class="text-xs text-gray-500 mb-1">
+          To install on <%= tool[:system_label].presence || @platform.label %>, run this in the terminal:
+        </p>
+        <% roe_command = "roe install #{tool[:key]}" %>
+        <div class="flex items-stretch gap-2"
+             data-controller="clipboard"
+             data-clipboard-success-label-value="Copied">
+          <code class="flex-1 px-3 py-2 bg-gray-900 text-gray-100 rounded text-xs font-mono overflow-x-auto whitespace-nowrap"><%= roe_command %></code>
+          <button type="button"
+                  data-clipboard-target="trigger"
+                  data-action="click->clipboard#copy"
+                  data-clipboard-text-value="<%= roe_command %>"
+                  class="shrink-0 px-3 py-2 text-xs font-medium border border-gray-300 rounded hover:bg-gray-50">
+            Copy
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">
+          It picks the best way for this computer, and tries the next one if that doesn't work:
+        </p>
+        <ul class="mt-1 space-y-0.5">
+          <% methods.each do |m| %>
+            <li class="text-xs <%= m[:usable] ? 'text-gray-700' : 'text-gray-400' %>">
+              <%= m[:usable] ? "✓" : "✗" %>
+              <span class="font-medium"><%= m[:label] %></span><% if m[:command].present? && m[:usable] %>
+                — <code class="px-1 py-0.5 bg-gray-100 rounded font-mono"><%= m[:command] %></code><% end %><% if m[:usable] && m[:detail].present? %>
+                — <%= m[:detail] %><% end %><% if m[:reason].present? %>
+                <span class="block ml-4 <%= m[:usable] ? 'text-amber-700' : '' %>"><%= m[:reason] %></span><% end %>
+            </li>
+          <% end %>
+        </ul>
+        <% if tool[:needs_sudo] %>
+          <p class="text-xs text-gray-400 mt-1">You may be asked for your password (it uses <code>sudo</code>).</p>
+        <% end %>
+      <% else %>
+        <p class="text-xs text-gray-600">
+          Roe can't install <span class="font-medium"><%= tool[:label] %></span> on this computer by itself.
+          <% if (reason = methods.filter_map { |m| m[:reason] }.first) %><%= reason %><% end %>
+          Install it yourself, then re-check below.
+        </p>
+      <% end %>
+    </div>
+
+    <div class="mt-3 flex items-center gap-4">
+      <%= link_to "I've installed it — re-check", recheck_path,
+                  class: "text-xs font-medium px-3 py-2 border border-gray-900 bg-gray-900 text-white rounded hover:bg-gray-700" %>
+      <% if tool[:docs_url].present? %>
+        <%= link_to "Install guide ↗", tool[:docs_url], target: "_blank", rel: "noopener",
+                    class: "text-xs font-medium text-gray-500 hover:text-gray-900" %>
+      <% end %>
+    </div>
+  <% else %>
+    <% if tool[:docs_url].present? %>
+      <div class="mt-2">
+        <%= link_to "Documentation ↗", tool[:docs_url], target: "_blank", rel: "noopener",
+                    class: "text-xs font-medium text-gray-400 hover:text-gray-700" %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

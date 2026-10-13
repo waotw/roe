@@ -1,7 +1,8 @@
 <% s = @status.respond_to?(:with_indifferent_access) ? @status.with_indifferent_access : {} %>
 <% status_state = s[:state] %>
 <div class="max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold mb-2">Media Imports</h1>
+  <%= link_to "← Imports", admin_importers_path, class: "text-sm text-gray-500 hover:text-gray-700" %>
+  <h1 class="text-2xl font-bold mb-2 mt-1">Media Imports</h1>
   <p class="text-sm text-gray-500 mb-6">
     Downloads external images, audio, and video linked in your posts, pages, and
     products into your local media library, and rewrites the

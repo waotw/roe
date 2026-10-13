@@ -10,8 +10,8 @@ class ManagedToolsFfmpegTest < ActiveSupport::TestCase
   setup { @tool = ManagedTools::Ffmpeg.new }
 
   def stub_paths(ffmpeg:, ffprobe:)
-    ManagedTools::Platform.stubs(:find_executable).with("ffmpeg").returns(ffmpeg)
-    ManagedTools::Platform.stubs(:find_executable).with("ffprobe").returns(ffprobe)
+    @tool.stubs(:ffmpeg_path).returns(ffmpeg)
+    @tool.stubs(:ffprobe_path).returns(ffprobe)
   end
 
   test "is listed in the registry" do
@@ -59,12 +59,35 @@ class ManagedToolsFfmpegTest < ActiveSupport::TestCase
     assert_equal "N-121489-g7f7335ec43-tessus", @tool.version
   end
 
-  test "install command is the ffmpeg package on every manager" do
+  test "the package manager command is the ffmpeg package on every manager" do
     brew = ManagedTools::Platform.new(os: :macos, package_manager: :brew)
+    brew.stubs(:homebrew_bottle?).returns(true)
     apt  = ManagedTools::Platform.new(os: :linux, package_manager: :apt)
 
     assert_equal "brew install ffmpeg", @tool.install_command(brew)
     assert_match(/apt-get install -y ffmpeg\z/, @tool.install_command(apt))
+  end
+
+  test "a builder's web address is dropped from the version" do
+    stub_paths(ffmpeg: "/x/ffmpeg", ffprobe: "/x/ffprobe")
+    ManagedTools::Ffmpeg.stubs(:capture).returns([ "ffmpeg version 9.0.2-https://www.martin-riedl.de Copyright", OK.new(true) ])
+
+    assert_equal "9.0.2", @tool.version
+  end
+
+  test "ffmpeg and ffprobe are taken from the same folder when one has both" do
+    Dir.mktmpdir do |root|
+      lone = File.join(root, "lone")
+      pair = File.join(root, "pair")
+      [ [ lone, %w[ffmpeg] ], [ pair, %w[ffmpeg ffprobe] ] ].each do |dir, names|
+        FileUtils.mkdir_p(dir)
+        names.each { |n| File.write(File.join(dir, n), "#!/bin/sh\n").then { File.chmod(0o755, File.join(dir, n)) } }
+      end
+      ManagedTools::Platform.stubs(:search_dirs).returns([ lone, pair ])
+
+      assert_equal File.join(pair, "ffmpeg"), @tool.ffmpeg_path
+      assert_equal File.join(pair, "ffprobe"), @tool.ffprobe_path
+    end
   end
 
   test "capture kills a program that runs past its timeout" do

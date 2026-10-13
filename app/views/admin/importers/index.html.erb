@@ -1,0 +1,31 @@
+<% content_for :title, "Imports" %>
+<%# COPY: Imports page heading, intro, and each importer's title + description %>
+<% importers = [
+  { title: "Substack",
+    path: admin_imports_path,
+    text: "Upload your Substack export ZIP. Brings in posts, members and newsletter history, in steps you review." },
+  { title: "Feed",
+    path: admin_feed_imports_path,
+    text: "Paste an RSS or Atom feed URL, or an Apple Podcasts link. Episodes come in as podcast posts, everything else as articles." },
+  { title: "Files",
+    path: admin_file_imports_path,
+    text: "Upload a ZIP of markdown or HTML: a blog export, a static site, a folder of notes. Bundled images and media come with it." },
+  { title: "Media",
+    path: admin_media_imports_path,
+    text: "Download the external images, audio and video linked in your posts, pages and products into your media library, and update the links." }
+] %>
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold mb-2">Imports</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Bring content in from somewhere else. Everything comes in as drafts, and nothing is published until you review it.
+  </p>
+
+  <div class="grid sm:grid-cols-2 gap-4">
+    <% importers.each do |importer| %>
+      <%= link_to importer[:path], class: "block bg-white border border-gray-200 hover:border-gray-400 p-5" do %>
+        <h2 class="text-base font-semibold text-gray-900"><%= importer[:title] %> →</h2>
+        <p class="text-sm text-gray-600 mt-1"><%= importer[:text] %></p>
+      <% end %>
+    <% end %>
+  </div>
+</div>

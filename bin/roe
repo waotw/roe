@@ -709,22 +709,28 @@ for_target() {
 
 # ── Install optional tools ────────────────────────────────────────────────────
 #
-# Roe can use optional native tools (libvips, and later ffmpeg) that it doesn't
-# bundle. The knowledge of what each tool is called on this platform already
-# lives in Rails (ManagedTools), so `roe install` asks an install's Rails for
-# the list and the exact command rather than hardcoding package names here.
-# Any registered install will do — they share the same ManagedTools registry.
+# Roe can use optional native tools (libvips, ffmpeg) that it doesn't bundle.
+# The knowledge of what each tool is called on this platform already lives in
+# Rails (ManagedTools), so `roe install` asks Rails for the list and the exact
+# command rather than hardcoding package names here. Registered installs can
+# be on different Roe releases, and a tool only exists in the releases that
+# ship it — so every install is asked and the answers are merged.
 
-# Path to a bin/rails we can run ManagedTools through: the first registered
-# install whose folder still has one. Echoes the rails path, or fails.
-a_rails() {
-    local name f root
+# Every registered install's bin/rails, one per line — the install the
+# current directory is inside first, then the rest in registry order.
+all_rails() {
+    local name f root here="" rest=""
     for name in $(all_names); do
         f="$(conf_for "$name")"
         root="$(_conf_get "$f" ROOT)"
-        [ -x "$root/current/bin/rails" ] && { echo "$root/current/bin/rails"; return 0; }
+        [ -x "$root/current/bin/rails" ] || continue
+        case "$PWD/" in
+            "$root"/*) here="$root/current/bin/rails" ;;
+            *) rest="$rest$root/current/bin/rails"$'\n' ;;
+        esac
     done
-    return 1
+    [ -n "$here" ] && echo "$here"
+    printf '%s' "$rest"
 }
 
 # Ask Rails for the managed-tools table as tab-separated lines:
@@ -739,15 +745,35 @@ managed_tools_table() {
     ' 2>/dev/null
 }
 
+# The same table, merged across every registered install, so a tool shipped
+# in a newer Roe (ffmpeg) is offered even when the first-registered site is
+# on an older release. The installs are asked in parallel — each answer
+# boots Rails, about a second — and the first install to list a tool wins
+# (the one the current directory is inside, when there is one).
+all_tools_table() {
+    local dir rails i=0
+    dir="$(mktemp -d "${TMPDIR:-/tmp}/roe-tools.XXXXXX")" || return 1
+    while IFS= read -r rails; do
+        [ -n "$rails" ] || continue
+        managed_tools_table "$rails" > "$dir/$i" &
+        i=$((i + 1))
+    done <<EOF
+$(all_rails)
+EOF
+    wait
+    [ "$i" -gt 0 ] && for ((n = 0; n < i; n++)); do cat "$dir/$n"; done | awk -F'\t' 'NF && !seen[$1]++'
+    rm -rf "$dir"
+}
+
 cmd_install() {
-    local want="$1" rails table
-    rails="$(a_rails)" || {
+    local want="$1" table
+    if [ -z "$(all_rails)" ]; then
         log_error "No usable Roe install found to read the tool list from."
         echo "  Register a site first: ./roe.sh register inside a Roe folder." >&2
         return 1
-    }
+    fi
 
-    table="$(managed_tools_table "$rails")"
+    table="$(all_tools_table)"
     if [ -z "$table" ]; then
         log_error "Couldn't read the tool list from Roe."
         return 1
@@ -763,7 +789,7 @@ cmd_install() {
             if [ "$installed" = "yes" ]; then
                 printf "  %-12s ${GREEN}%-14s${NC} ${DIM}%s${NC}\n" "$key" "installed" "—"
             else
-                printf "  %-12s ${DIM}%-14s${NC} ${CYAN}%s${NC}\n" "$key" "not installed" "${command:-see docs}"
+                printf "  %-12s ${DIM}%-14s${NC} ${CYAN}%s${NC}\n" "$key" "not installed" "roe install $key"
             fi
         done <<EOF
 $table
@@ -773,52 +799,152 @@ EOF
         return 0
     fi
 
-    # A tool was named: find its row.
-    local key label installed command needs_sudo found=""
-    while IFS=$'\t' read -r key label installed command needs_sudo; do
-        [ "$key" = "$want" ] && { found=1; break; }
-    done <<EOF
-$table
-EOF
-
-    if [ -z "$found" ]; then
+    # A tool was named: ask the first install that knows it for every way
+    # it can go on this computer, best first.
+    local rails
+    rails="$(rails_for_tool "$want")" || {
         log_error "Roe doesn't manage a tool called '$want'."
         echo "  Run 'roe install' to see the ones it does." >&2
         return 1
+    }
+
+    local plan
+    plan="$(rails_task "$rails" "roe:tools:methods[$want]" 2>/dev/null)"
+    if [ -z "$plan" ]; then
+        log_error "Couldn't read the install options for '$want' from Roe."
+        return 1
     fi
 
+    local _kind key label installed version system
+    IFS=$'\t' read -r _kind key label installed version system <<EOF
+$(printf '%s\n' "$plan" | grep '^tool')
+EOF
     if [ "$installed" = "yes" ]; then
-        log_warning "$label is already installed."
+        log_success "$label is already installed${version:+ ($(_dash "$version"))}."
         return 0
     fi
 
-    if [ -z "$command" ]; then
-        log_error "Roe doesn't know how to install $label on this system."
+    echo -e "${BOLD}Install $label${NC}"
+    echo -e "  ${DIM}$(_dash "$system")${NC}"
+    echo ""
+
+    # Show every method: usable ones with what they give you, the rest with
+    # why they're skipped, so nobody wonders why Homebrew wasn't used.
+    local methods=() mkey mlabel usable command sudo restart reason detail
+    while IFS=$'\t' read -r _kind mkey mlabel usable command sudo restart reason detail; do
+        [ "$_kind" = "method" ] || continue
+        if [ "$usable" = "yes" ]; then
+            methods+=("$mkey"$'\t'"$mlabel"$'\t'"$command"$'\t'"$sudo"$'\t'"$restart"$'\t'"$detail"$'\t'"$reason")
+            printf "  ${GREEN}✓${NC} %-17s %s\n" "$mlabel" "$(_dash "$detail")"
+            [ "$reason" != "-" ] && echo -e "    ${DIM}${reason}${NC}"
+        else
+            printf "  ${DIM}✗ %-17s %s${NC}\n" "$mlabel" "$(_dash "$reason")"
+        fi
+    done <<EOF
+$plan
+EOF
+    echo ""
+
+    if [ "${#methods[@]}" -eq 0 ]; then
+        log_error "Roe can't install $label on this computer by itself."
         echo "  Install it yourself, then it'll be detected automatically." >&2
         return 1
     fi
 
-    # Never run the command silently — especially with sudo. Show exactly
-    # what will run and let the user confirm.
-    echo -e "${BOLD}Install $label${NC}"
-    echo -e "  This will run: ${CYAN}${command}${NC}"
-    [ "$needs_sudo" = "yes" ] && echo -e "  ${YELLOW}It uses sudo — you may be asked for your password.${NC}"
-    echo ""
-    printf "  Run it now? [Y/n]: "
-    read -r reply
-    case "${reply:-y}" in
-        [Nn]*) log_info "Left it for you to run when ready."; return 0 ;;
-    esac
+    # Offer each usable method in turn. A failure, or a method that "worked"
+    # but left the tool still missing, moves on to the next one.
+    local i entry first=1 reply
+    for ((i = 0; i < ${#methods[@]}; i++)); do
+        entry="${methods[$i]}"
+        IFS=$'\t' read -r mkey mlabel command sudo restart detail reason <<EOF
+$entry
+EOF
+        if [ -n "$first" ]; then
+            echo -e "  ${BOLD}Recommended: ${mlabel}${NC}"
+        else
+            echo ""
+            echo -e "  ${BOLD}Next option: ${mlabel}${NC}"
+        fi
+        first=""
+        if [ "$mkey" = "download" ]; then
+            echo -e "  Roe will download it: ${DIM}$(_dash "$detail")${NC}"
+        else
+            echo -e "  This will run: ${CYAN}${command}${NC}"
+        fi
+        [ "$sudo" = "yes" ] && echo -e "  ${YELLOW}It uses sudo — you may be asked for your password.${NC}"
+        printf "  Go ahead? [Y/n]: "
+        read -r reply
+        case "${reply:-y}" in
+            [Nn]*)
+                if [ $((i + 1)) -lt ${#methods[@]} ]; then continue; fi
+                log_info "Left it for you. Run 'roe install $want' when you're ready."
+                return 0 ;;
+        esac
+        echo ""
+
+        if install_with_method "$rails" "$want" "$mkey" "$command"; then
+            local check ok ver note
+            check="$(rails_task "$rails" "roe:tools:check[$want]" 2>/dev/null)"
+            IFS=$'\t' read -r ok ver note <<EOF
+$check
+EOF
+            if [ "$ok" = "yes" ]; then
+                echo ""
+                log_success "$label is installed${ver:+ ($(_dash "$ver"))}."
+                echo -e "  Roe will use it straight away — no restart needed."
+                return 0
+            fi
+            echo ""
+            log_warning "That finished, but Roe still can't find a working $label.${note:+ $(_dash "$note")}"
+        else
+            echo ""
+            log_warning "$mlabel didn't work."
+        fi
+    done
 
     echo ""
-    if eval "$command"; then
-        echo ""
-        log_success "$label installed. Roe will pick it up automatically."
-    else
-        echo ""
-        log_error "That didn't finish cleanly. You can run the command above by hand."
-        return 1
-    fi
+    log_error "None of the options installed $label."
+    echo "  You can install it yourself — Roe finds it automatically once it's on your PATH." >&2
+    return 1
+}
+
+# Run a rake task in an install. Rake looks for the Rakefile in the current
+# folder, so it runs from the app folder (unlike `rails runner`, which works
+# from anywhere) — in a subshell, so the caller's folder doesn't change.
+rails_task() {
+    local rails="$1"; shift
+    ( cd "$(dirname "$(dirname "$rails")")" && "$rails" "$@" )
+}
+
+# "-" is the placeholder the Rails tasks print for an empty field.
+_dash() { [ "$1" = "-" ] || printf '%s' "$1"; }
+
+# The first registered install (the one you're in, first) that can run the
+# install flow for the named tool: its Roe knows the tool and has the
+# roe:tools tasks. Sites on older releases may have neither yet.
+rails_for_tool() {
+    local want="$1" rails
+    while IFS= read -r rails; do
+        [ -n "$rails" ] || continue
+        [ -f "$(dirname "$(dirname "$rails")")/lib/tasks/tools.rake" ] || continue
+        if managed_tools_table "$rails" | cut -f1 | grep -qx "$want"; then
+            echo "$rails"
+            return 0
+        fi
+    done <<EOF
+$(all_rails)
+EOF
+    return 1
+}
+
+# Run one install method. Commands come from Roe's own ManagedTools code
+# (never from user input) and are shown to the user before this runs.
+install_with_method() {
+    local rails="$1" tool="$2" method="$3" command="$4"
+    case "$method" in
+        download) rails_task "$rails" "roe:tools:download[$tool]" >/dev/null ;;
+        *)        eval "$command" ;;
+    esac
 }
 
 # ── Shell completion ──────────────────────────────────────────────────────────
@@ -851,9 +977,7 @@ complete_names() {
 # Tool keys for `roe install <TAB>`, read from the live ManagedTools registry
 # (same source as the command itself). Silent if no install is reachable.
 complete_tools() {
-    local rails
-    rails="$(a_rails)" || return 0
-    managed_tools_table "$rails" | cut -f1
+    all_tools_table | cut -f1
 }
 
 # Print a completion script for the named shell, for sourcing or eval:

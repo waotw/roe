@@ -16,6 +16,7 @@ module ManagedTools
     def summary  = "Stripe's command-line tool (local webhook testing)"
     def why      = "Roe uses the Stripe CLI to forward test-mode webhooks to your local server so you can test checkout and upgrades without a public URL. Only needed for local development."
     def docs_url = "https://stripe.com/docs/stripe-cli"
+    def group    = :development
 
     # A binary on PATH, not a linked library — mirror Platform.command_available?
     # (pure PATH scan plus the Homebrew bin dirs a web-server PATH can miss).
@@ -39,12 +40,16 @@ module ManagedTools
     # Hand-written per platform: Homebrew needs Stripe's tap, and Linux needs
     # Stripe's custom repo added before `apt/yum install stripe` works — that's
     # multi-step, so we point at the docs rather than emit a command that fails.
-    # Returns nil on anything we can't give a one-line, correct command for, so
-    # the caller falls back to "see docs" guidance.
-    def install_command(platform = Platform.current)
-      return "brew install stripe/stripe-cli/stripe" if platform.macos? && platform.package_manager == :brew
-
-      nil
+    # No method is usable on anything we can't give a one-line, correct
+    # command for, so the caller falls back to "see docs" guidance.
+    def install_methods(platform = Platform.current)
+      if platform.macos? && platform.package_manager == :brew
+        [ InstallMethod.new(key: :package_manager, label: "Homebrew", command: "brew install stripe/stripe-cli/stripe",
+                            usable: true, sudo: false, restart: false) ]
+      else
+        [ InstallMethod.new(key: :package_manager, label: platform.manager_label, usable: false,
+                            reason: "The Stripe CLI needs Stripe's own package source added first. Follow Stripe's install guide.") ]
+      end
     end
   end
 end

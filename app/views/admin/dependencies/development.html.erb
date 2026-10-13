@@ -1,0 +1,20 @@
+<% content_for :editor_js, false %>
+<% content_for :title, "Developer Tools" %>
+<div class="px-4 sm:px-0">
+  <div class="mb-8">
+    <%# COPY: Developer Tools page heading and intro %>
+    <h1 class="text-3xl font-bold text-gray-900">Developer Tools</h1>
+    <p class="mt-2 text-sm text-gray-700">
+      Tools for testing your site on this computer. None of them are needed on your live site.
+    </p>
+    <p class="mt-1 text-xs text-gray-500">
+      Detected environment: <span class="font-medium text-gray-700"><%= @platform.label %></span>
+    </p>
+  </div>
+
+  <div class="space-y-4">
+    <% @tools.each do |tool| %>
+      <%= render "admin/dependencies/tool", tool: tool, recheck_path: admin_development_dependencies_path %>
+    <% end %>
+  </div>
+</div>

@@ -20,6 +20,8 @@ Rails.application.routes.draw do
       get "manifest",                   to: "exchange#manifest"
       post "download",                  to: "exchange#download"
       post "upload",                    to: "exchange#upload"
+      post "upload_chunk",              to: "chunked_uploads#chunk"
+      post "upload_finish",             to: "chunked_uploads#finish"
       post "database",                  to: "exchange#database"
       post "publish_members",           to: "imports#publish_members"
       post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"
@@ -53,9 +55,15 @@ Rails.application.routes.draw do
     get  "updates/git_status",        to: "updates#git_status",     as: "git_status"
     post "updates/channel",           to: "updates#update_channel", as: "update_channel"
 
-    # Dependencies — optional external tools (libvips, …): status + the
+    # Dependencies — optional external tools, on two Tools pages: Images &
+    # Video (libvips, ffmpeg) and Developer Tools (Stripe CLI). Status + the
     # OS-correct install command. Read-only; installs happen in a terminal.
-    get "dependencies", to: "dependencies#index", as: "dependencies"
+    get "dependencies",             to: "dependencies#index",       as: "dependencies"
+    get "dependencies/development", to: "dependencies#development", as: "development_dependencies"
+
+    # Imports — one page linking the four importers (Substack, feeds,
+    # files, media), each of which keeps its own routes below.
+    get "importers", to: "importers#index", as: "importers"
 
     # Markdown diagnostics for the editor. Shared by posts/pages/products/emails
     # — they all render shared/_editor. POST because the content being checked
@@ -173,11 +181,15 @@ Rails.application.routes.draw do
         post :queue_missing_variants
         post :prune_variants
         post :bulk_destroy
+        post :dismiss_video_notices
+        get :video_notices
+        post :optimize_videos
       end
       member do
         patch :rename
         post :regenerate_variants
         get :card
+        get :video_status
       end
     end
 
