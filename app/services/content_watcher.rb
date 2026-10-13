@@ -265,11 +265,12 @@ class ContentWatcher
       else
         puts "DEBUG: Creating new record..."
         extension = File.extname(absolute_file).delete_prefix(".")
-        medium = Medium.create!(
-          file_path: web_path,
-          media_type: extension,
-          uploaded_at: Time.current
-        )
+        # create_or_find_by: an admin upload creates its own record right
+        # after renaming the file into place, so the two can race.
+        medium = Medium.create_or_find_by!(file_path: web_path) do |m|
+          m.media_type = extension
+          m.uploaded_at = Time.current
+        end
         puts "\n   ✓ Media file added: #{File.basename(file)}\n"
 
         # Queue variant generation for images
