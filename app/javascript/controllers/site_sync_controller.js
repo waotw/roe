@@ -15,6 +15,7 @@ export default class extends Controller {
     "progress",
     "progressLabel",
     "progressBar",
+    "progressFile",
   ];
 
   connect() {
@@ -77,6 +78,12 @@ export default class extends Controller {
       this.progressLabelTarget.textContent = progressText(progress);
     }
 
+    // The large file in flight, if any — a long wait names what it's on.
+    if (this.hasProgressFileTarget) {
+      this.progressFileTarget.textContent = progress.current || "";
+      this.progressFileTarget.hidden = !progress.current;
+    }
+
     if (this.hasProgressBarTarget) {
       // By bytes when we have them: a sync of one large video and four
       // small files is one big file's worth of waiting, not five steps.
@@ -96,7 +103,7 @@ function progressText(progress) {
   const files = `${progress.completed} of ${progress.total} files`;
   if (!progress.bytes_total) return `${files} transferred`;
 
-  return `${files} · ${humanSize(progress.bytes_done)} of ${humanSize(progress.bytes_total)} sent`;
+  return `${files} · ${humanSize(progress.bytes_done)} of ${humanSize(progress.bytes_total)}`;
 }
 
 // Matches Rails' number_to_human_size defaults (three significant digits,

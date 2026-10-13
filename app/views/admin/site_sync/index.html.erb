@@ -269,8 +269,12 @@
                 and rewrites label + bar width as new polls arrive. %>
               <div class="mb-2" data-site-sync-target="progress" <%= "hidden" unless progress %>>
                 <p class="text-sm text-blue-900 font-mono mb-1" data-site-sync-target="progressLabel">
-                  <% if progress %><%= progress[:completed] %> of <%= progress[:total] %> files<% if progress[:bytes_total].to_i.positive? %> · <%= number_to_human_size(progress[:bytes_done]) %> of <%= number_to_human_size(progress[:bytes_total]) %> sent<% else %> transferred<% end %><% end %>
+                  <% if progress %><%= progress[:completed] %> of <%= progress[:total] %> files<% if progress[:bytes_total].to_i.positive? %> · <%= number_to_human_size(progress[:bytes_done]) %> of <%= number_to_human_size(progress[:bytes_total]) %><% else %> transferred<% end %><% end %>
                 </p>
+                <%# The large file in flight, during a push or a backup of one —
+                    a ten-minute wait should say what it's waiting on. %>
+                <p class="text-xs text-blue-800 font-mono mb-1 truncate"
+                   data-site-sync-target="progressFile" <%= "hidden" unless progress&.dig(:current) %>><%= progress&.dig(:current) %></p>
                 <div class="h-1.5 w-full max-w-sm bg-blue-100 rounded-full overflow-hidden">
                   <div class="h-full bg-blue-600 transition-all"
                      style="width: <%= progress_pct %>%;"
@@ -335,7 +339,6 @@
                     <div class="min-w-0">
                       <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
                       <p class="text-[11px] text-red-700">This file was deleted on <%= deleted_on %></p>
-                      <%= render "admin/site_sync/not_backed_up_note", conflict: c %>
                     </div>
                     <%# Keep defaults to the side that still has the file, so
                         clicking straight through never destroys anything. %>
@@ -372,7 +375,6 @@
                         <%= type_label %><%
                           %><% if c["newer"] == "local" %> · yours is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
                       </p>
-                      <%= render "admin/site_sync/not_backed_up_note", conflict: c %>
                     </div>
                     <div class="flex gap-3 shrink-0 text-xs">
                       <label class="flex items-center gap-1 cursor-pointer">

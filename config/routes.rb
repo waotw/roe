@@ -22,6 +22,8 @@ Rails.application.routes.draw do
       post "upload",                    to: "exchange#upload"
       post "upload_chunk",              to: "chunked_uploads#chunk"
       post "upload_finish",             to: "chunked_uploads#finish"
+      post "download_info",             to: "chunked_downloads#info"
+      post "download_chunk",            to: "chunked_downloads#chunk"
       post "database",                  to: "exchange#database"
       post "publish_members",           to: "imports#publish_members"
       post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"

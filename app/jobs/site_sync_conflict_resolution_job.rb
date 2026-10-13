@@ -158,9 +158,11 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   end
 
   def progress_proc
-    @progress_proc ||= ->(completed:, total:, bytes_done: nil, bytes_total: nil) {
+    @progress_proc ||= ->(completed:, total:, bytes_done: nil, bytes_total: nil, current: nil) {
       @progress = { completed: completed, total: total }
       @progress.merge!(bytes_done: bytes_done, bytes_total: bytes_total) if bytes_total.to_i.positive?
+      # The large file in flight, so a long wait names what it's waiting on.
+      @progress[:current] = current if current
       write_running_status
     }
   end

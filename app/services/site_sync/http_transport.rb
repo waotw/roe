@@ -65,8 +65,8 @@ module SiteSync
         bytes_total = sizes.values.sum
         bytes_done  = 0
         done = 0
-        report = ->(bytes_now = bytes_done) {
-          on_progress&.call(completed: done, total: total, bytes_done: bytes_now, bytes_total: bytes_total)
+        report = ->(bytes_now = bytes_done, current: nil) {
+          on_progress&.call(completed: done, total: total, bytes_done: bytes_now, bytes_total: bytes_total, current: current)
         }
         report.call
 
@@ -79,7 +79,7 @@ module SiteSync
         large, small = changed.partition { |rel| sizes[rel] > PUSH_BATCH_MAX_BYTES }
         large.each do |rel|
           begin
-            Exchange.upload_large_file(rel, on_bytes: ->(sent) { report.call(bytes_done + sent) })
+            Exchange.upload_large_file(rel, on_bytes: ->(sent) { report.call(bytes_done + sent, current: rel) })
           rescue Exchange::ChunkedUploadError => e
             raise HttpTransportError, e.message
           end
@@ -141,27 +141,15 @@ module SiteSync
         return if changed.empty? && deleted.empty?
 
         if changed.any?
-          on_progress&.call(completed: 0, total: changed.size)
-
           # Fetch peer mtimes up front so we can stamp them after unpack, and
           # size the download batches (the local copy may not exist yet).
           states = Exchange.fetch_peer_file_states(changed)
 
-          done = 0
-          batches = batch_by_size(changed) { |rel| states.dig(rel, "size") }
-          batches.each_with_index do |batch, i|
-            bytes = nil
-            Exchange.with_retries(label: "download batch #{i + 1}/#{batches.size}") do
-              bytes = Exchange.download_files(batch)
-              raise HttpTransportError, "download from peer failed" if bytes.nil?
-            end
-
-            written = TarArchive.unpack(bytes, dest: RoeSitePaths::SITE_PATH)
-            SiteWriter.restore_mtimes(root: RoeSitePaths::SITE_PATH, manifest: states.slice(*written))
-
-            done += written.size
-            on_progress&.call(completed: done, total: changed.size)
-          end
+          # Large files come in pieces and land via .sync-uploads/, on the
+          # same disk as /site and excluded from the Ledger and backups.
+          fetch_from_peer(changed, dest_root: RoeSitePaths::SITE_PATH, meta: states,
+                          staging_dir: File.join(RoeSitePaths::SITE_PATH, ".sync-uploads"),
+                          label: "download", on_progress: on_progress)
         end
 
         SiteWriter.delete_paths(root: RoeSitePaths::SITE_PATH, paths: deleted) if deleted.any?
@@ -197,13 +185,9 @@ module SiteSync
             peer_files.keys # full snapshot
           end
 
-        # No video web versions, and nothing over the size limit — see
-        # BackupPolicy. Downloading a 1.2 GB video in one request is what
-        # failed and stopped the sync.
-        wanted, too_large = BackupPolicy.partition_live_backup(requested, peer_files)
-        if too_large.any?
-          Rails.logger.warn "[SiteSync::HttpTransport] not backed up (over #{BackupPolicy::LIVE_BACKUP_MAX_BYTES / 1024 / 1024} MB): #{too_large.join(", ")}"
-        end
+        # Video web versions are made again from the original — see
+        # BackupPolicy. Everything else is backed up, large files included.
+        wanted = requested.reject { |rel| BackupPolicy.video_web_version?(rel) }
         return nil if wanted.empty?
 
         backup_dir, backup_root, timestamp = new_backup_dir
@@ -211,41 +195,82 @@ module SiteSync
         FileUtils.mkdir_p(backup_dir)
 
         to_download = []
-        linked = 0
         wanted.each do |rel|
           if previous && hardlink_reusable?(previous, rel, peer_files[rel])
             link_into(previous, backup_dir, rel)
-            linked += 1
           else
             to_download << rel
           end
         end
 
-        if to_download.any?
-          downloaded = 0
-          batches = batch_by_size(to_download) { |rel| peer_files.dig(rel, "size") }
-          batches.each_with_index do |batch, i|
-            bytes = nil
-            Exchange.with_retries(label: "backup download batch #{i + 1}/#{batches.size}") do
-              bytes = Exchange.download_files(batch)
-              raise HttpTransportError, "backup download from peer failed" if bytes.nil?
-            end
-
-            written = TarArchive.unpack(bytes, dest: backup_dir)
-            SiteWriter.restore_mtimes(root: backup_dir, manifest: peer_files.slice(*written))
-
-            downloaded += written.size
-            on_progress&.call(completed: linked + downloaded, total: wanted.size)
-          end
-        else
-          on_progress&.call(completed: linked, total: wanted.size)
-        end
+        # Linked files count as done from the start; only downloads move the
+        # bar. Large files come in pieces, staged beside the snapshots (same
+        # disk, so the finished file is moved into place, not copied).
+        fetch_from_peer(to_download, dest_root: backup_dir, meta: peer_files,
+                        staging_dir: File.join(backup_root, ".downloads"),
+                        label: "backup download", on_progress: on_progress,
+                        already_done: wanted.size - to_download.size)
 
         update_latest_symlink(backup_root, timestamp)
         backup_dir
       end
 
       private
+
+      # Download `paths` from the peer into `dest_root`, stamping each with
+      # the peer's modified time from `meta` ({ rel => { "size", "mtime" } }).
+      # Files over the batch limit come one at a time in pieces
+      # (Exchange.download_large_file) — the peer builds a batch in memory,
+      # and one large video was enough to take it down. The rest come in
+      # bounded batches as before. Progress counts files and bytes, piece by
+      # piece for a large file, so a long download is visibly moving.
+      def fetch_from_peer(paths, dest_root:, meta:, staging_dir:, label:, on_progress: nil, already_done: 0)
+        total       = paths.size + already_done
+        sizes       = paths.to_h { |rel| [ rel, meta.dig(rel, "size").to_i ] }
+        bytes_total = sizes.values.sum
+        bytes_done  = 0
+        done        = already_done
+        report = ->(bytes_now = bytes_done, current: nil) {
+          on_progress&.call(completed: done, total: total, bytes_done: bytes_now, bytes_total: bytes_total, current: current)
+        }
+        report.call
+        return if paths.empty?
+
+        large, small = paths.partition { |rel| sizes[rel] > PUSH_BATCH_MAX_BYTES }
+
+        large.each do |rel|
+          # Same guard TarArchive.unpack applies to every batch entry: stay
+          # inside dest_root, and never write an excluded path.
+          safe = TarArchive.safe_relative_path(rel, File.expand_path(dest_root))
+          raise HttpTransportError, "refusing to write #{rel}" if Ledger.excluded?(safe)
+
+          begin
+            Exchange.download_large_file(safe, dest: File.join(dest_root, safe), staging_dir: staging_dir,
+                                         on_bytes: ->(got) { report.call(bytes_done + got, current: safe) })
+          rescue Exchange::ChunkedUploadError => e
+            raise HttpTransportError, e.message
+          end
+          done += 1
+          bytes_done += sizes[rel]
+          report.call
+        end
+
+        batches = batch_by_size(small) { |rel| sizes[rel] }
+        batches.each_with_index do |batch, i|
+          bytes = nil
+          Exchange.with_retries(label: "#{label} batch #{i + 1}/#{batches.size}") do
+            bytes = Exchange.download_files(batch)
+            raise HttpTransportError, "#{label} from peer failed" if bytes.nil?
+          end
+
+          written = TarArchive.unpack(bytes, dest: dest_root)
+          SiteWriter.restore_mtimes(root: dest_root, manifest: meta.slice(*written))
+
+          done += written.size
+          bytes_done += batch.sum { |rel| sizes[rel] }
+          report.call
+        end
+      end
 
       # added + modified, de-duped and sorted — the set of files whose
       # bytes actually move (deletes are handled separately).
