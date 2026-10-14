@@ -72,16 +72,13 @@
         even though it sits above the nav. Static site row renders
         only when SSG is enabled (controller-gated). %>
     <%
-      live_drift_count = if @status[:state] == :local_drift
-                          # Collapsed counts (documentation/roe etc. count as
-                          # one) so an update's docs don't inflate the tally.
-                          (collapsed_sync_count(@status[:local][:modified]) +
-                           collapsed_sync_count(@status[:local][:added]) +
-                           collapsed_sync_count(@status[:local][:deleted]))
-                        else
-                          0
-                        end
-      live_in_error = @status[:state] == :error
+      # Same answer the "Changes to sync" panel below reads — see
+      # Admin::SiteSyncController#live_sync_overview. Collapsed counts
+      # (documentation/roe etc. count as one) so an update's docs don't
+      # inflate the tally.
+      live_drift_count = @live_sync[:state] == :pending ? [ @live_sync[:count], 1 ].max : 0
+      live_in_error    = @live_sync[:state] == :error
+      live_checking    = @live_sync[:state] == :checking
 
       static_visible       = @static_site_sync_config.present?
       static_protocol_zip  = static_visible && @static_site_sync_config.protocol_zip?
@@ -123,7 +120,19 @@
                     class="flex items-center gap-2 text-amber-900 hover:text-amber-700 cursor-pointer w-full">
               <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
               <span class="font-medium">Live site sync:</span>
-              <span><%= live_drift_count %> file<%= "s" unless live_drift_count == 1 %> changed</span>
+              <span><%= live_drift_count %> file<%= "s" unless live_drift_count == 1 %> to sync</span>
+              <span class="ml-auto text-xs">→</span>
+            </button>
+          <% elsif live_checking %>
+            <%# Live last reported before our most recent sync, so we can't
+                vouch either way yet. Not green: "in sync" is a claim. %>
+            <button type="button"
+                    data-action="click->tabs#show"
+                    data-tabs-panel="live-sync"
+                    class="flex items-center gap-2 text-gray-700 hover:text-gray-900 cursor-pointer w-full">
+              <span class="inline-block h-2 w-2 rounded-full bg-gray-400"></span>
+              <span class="font-medium">Live site sync:</span>
+              <span>checking with live…<% if @last_synced_at %> · last synced <%= time_ago_in_words(@last_synced_at) %> ago<% end %></span>
               <span class="ml-auto text-xs">→</span>
             </button>
           <% else %>
@@ -765,20 +774,17 @@
         <%= time_ago_in_words(@peer_state[:received_at]) %> ago.
       </p>
       <%
-        # One panel for both directions. Live changes come from the peer's
-        # drift payload; local changes from our own ledger diff. Either or
-        # both may be present — a single Sync reconciles it all.
-        live_changes  = @peer_drift ? (@peer_state && @peer_state[:drift]) : nil
-        local_changes = (@peer_reachable && @status[:state] == :local_drift) ? @status[:local] : nil
-        # Neither side reports drift but the fingerprints still differ:
-        # the ledgers diverged and a sync realigns them.
-        # out_of_sync? rather than !in_sync? — an unknown answer is not a
-        # divergence. The cached peer state can predate our last sync, and
-        # reading that as drift is what produced this warning after a sync
-        # that worked, with no files to show because there were none.
-        ledger_diverged = @peer_drift.blank? && local_changes.nil? &&
-                          @status[:state] == :clean && @sync_conclusion.out_of_sync?
-        has_changes = @peer_drift || local_changes.present? || ledger_diverged
+        # One panel for both directions, read from the same overview as the
+        # status line at the top of the page (live_sync_overview), so the
+        # two can't disagree. Either or both may be present — a single Sync
+        # reconciles it all.
+        live_changes  = @live_sync[:live]
+        local_changes = @peer_reachable ? @live_sync[:local] : nil
+        # Neither record shows a change but the files still differ. Only when
+        # Conclusion says out_of_sync — an unknown answer is not a divergence;
+        # the cached peer state can predate our last sync.
+        ledger_diverged = !@live_sync[:differs].nil?
+        has_changes = live_changes.present? || @peer_drift || local_changes.present? || ledger_diverged
 
         # While a sync is actively running, the status panel up top owns the
         # display — hide the changes/in-sync section so it doesn't contradict
@@ -863,7 +869,7 @@
               whichever side is newer, and asks if that would overwrite a
               newer copy (Reconciler.overwrites_newer?). %>
           <% if ledger_diverged %>
-            <% differing = Array(@sync_conclusion.agreement&.differing) %>
+            <% differing = Array(@live_sync[:differs]) %>
             <p class="text-sm text-amber-800 mb-1">
               ⚠️ <% if differing.any? %><%= pluralize(differing.size, "file") %> differ<%= "s" if differing.size == 1 %> from <%= SiteSync::Exchange.peer_label %><% else %>Content differs from <%= SiteSync::Exchange.peer_label %><% end %>,
               though neither side's sync record shows a change. Sync to bring them together — you'll be asked before a newer copy is replaced.
