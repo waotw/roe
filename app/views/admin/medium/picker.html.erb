@@ -59,6 +59,15 @@
                   class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">
             Add to Gallery
           </button>
+        <% elsif @picker_for == "card" %>
+          <%# Opened from a card builder field (the player's Audio or Video):
+              the file goes back into that field. One file — if several are
+              ticked, the first is used. COPY: button label %>
+          <button type="button"
+                  data-action="click->media-bulk-select#submitToCard"
+                  class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">
+            Use in Player
+          </button>
         <% else %>
           <button type="button"
                   data-action="click->media-bulk-select#submitInsert"

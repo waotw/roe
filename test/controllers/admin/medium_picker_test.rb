@@ -63,4 +63,17 @@ class Admin::MediumPickerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_no_match(/Add to Gallery.*?style="display: none;"/m, response.body)
   end
+
+  # Opened from the player card builder's Choose… button: the file goes back
+  # into that field, not into the document.
+  test "opened for a card field, it hands the file back to the card builder" do
+    %w[audio video].each do |type|
+      get picker_admin_medium_index_path(media_type: type, for: "card")
+
+      assert_response :success
+      assert_includes response.body, "Use in Player"
+      assert_includes response.body, "media-bulk-select#submitToCard"
+      assert_not_includes response.body, "Insert Selected", "nothing is written into the document from here"
+    end
+  end
 end

@@ -51,9 +51,15 @@ export default class extends Controller {
       document.addEventListener("selectionchange", this._refresh);
     }
     this.updateToggleButton();
+
+    // A file chosen in the media picker for one of this modal's fields (the
+    // player's Audio/Video "Choose…" buttons, see pickMedia).
+    this.onPickedForCard = (event) => this.fillPickedField(event.detail?.path);
+    this.element.addEventListener("media-picker:pick-for-card", this.onPickedForCard);
   }
 
   disconnect() {
+    this.element.removeEventListener("media-picker:pick-for-card", this.onPickedForCard);
     if (!this._refresh) return;
     ["keyup", "click", "select", "input", "focus"].forEach((ev) =>
       this.textarea?.removeEventListener(ev, this._refresh));
@@ -106,6 +112,35 @@ export default class extends Controller {
     if (menu) menu.classList.add("hidden");
 
     this.modalTarget.style.display = "flex";
+  }
+
+  // --- media picker ---------------------------------------------------------
+
+  // "Choose…" beside a media field (data-cb-pick="audio" | "video"). The
+  // picker opens over this modal — the editor owns it — and the file chosen
+  // comes back as media-picker:pick-for-card. This modal stays open
+  // underneath with everything typed so far.
+  pickMedia(event) {
+    event?.preventDefault();
+    const button = event.currentTarget;
+    this.pickingField = button.dataset.cbPickField;
+    this.element.dispatchEvent(
+      new CustomEvent("card-builder:pick-media", {
+        bubbles: true,
+        detail: { mediaType: button.dataset.cbPick },
+      }),
+    );
+  }
+
+  fillPickedField(path) {
+    const group = this.activeGroup();
+    const el = group?.querySelector(`[data-cb-field="${this.pickingField}"]`);
+    this.pickingField = null;
+    if (!el || !path) return;
+
+    el.value = path;
+    el.classList.remove("cb-empty");
+    this.clearError();
   }
 
   // --- caret detection ------------------------------------------------------

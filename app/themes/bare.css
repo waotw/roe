@@ -2462,6 +2462,12 @@ article .content,
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
+/* show_duration: true — the length under the player, set like its times. */
+.player-duration {
+  margin-top: var(--space-2);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
 
 .player-progress {
   position: relative;

@@ -12,7 +12,9 @@
 # Field shape mirrors CollectionBuilderSchema: key, type (:text / :textarea /
 # :select / :boolean), label, hint, and (for :select) options. Booleans are
 # tri-state (unset / true / false) so "use the engine default" stays distinct
-# from an explicit false. Only fields the author sets get written.
+# from an explicit false. Only fields the author sets get written. A :text
+# field with `pick: "audio"` / `"video"` gets a Choose… button that opens the
+# media picker for that kind.
 module CardBuilderSchema
   # Ordered for the type selector at the top of the modal.
   TYPES = [
@@ -94,16 +96,18 @@ module CardBuilderSchema
     ],
 
     "player" => [
-      { key: "audio", type: :text, label: "Audio",
+      { key: "audio", type: :text, label: "Audio", pick: "audio",
         hint: "Audio file to play. Leave blank to play the post's own audio." },
-      { key: "video", type: :text, label: "Video",
+      { key: "video", type: :text, label: "Video", pick: "video",
         hint: "A video file or YouTube link. Leave blank to play the post's own video. If both are set, audio plays." },
       { key: "title", type: :text, label: "Title",
         hint: "Defaults to the post's title." },
       { key: "image", type: :text, label: "Artwork",
         hint: "Audio only. Defaults to the post's image, then the release/podcast cover." },
       { key: "show_artwork", type: :boolean, label: "Show artwork",
-        hint: "Audio only. Show the artwork. On by default." }
+        hint: "Audio only. Show the artwork. On by default." },
+      { key: "show_duration", type: :boolean, label: "Show duration",
+        hint: "Show the length under the player, from the post's duration. Off by default." }
     ]
   }.freeze
 

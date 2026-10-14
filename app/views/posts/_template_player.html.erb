@@ -1,18 +1,15 @@
 <%# The player a media post's template puts at the top: the post's own
-    ```card type: player (HasMarkdownExtensions#template_player_card_html),
-    with the duration under it for video. Only rendered when
-    Post#show_template_player? — no card in the body, and content.yml's
-    players setting on.
+    ```card type: player (HasMarkdownExtensions#template_player_card_html).
+    Only rendered when Post#show_template_player? — no card in the body, and
+    content.yml's players setting on.
+
+    The duration isn't shown here: it's the card's `show_duration: true`,
+    off by default, so the automatic player and a card written into the body
+    look the same.
 
     The spacing is inline so it holds on every theme without an update:
     the card itself only has space above it, since in a post's body the
     paragraphs around it bring their own. %>
 <div class="post-player" style="margin-bottom: var(--space-6, 1.5rem);">
   <%= post.template_player_card_html %>
-
-  <% if local_assigns[:show_duration] && post.duration.present? %>
-    <div class="media-meta" style="margin-top: var(--space-2, 0.5rem);">
-      <span class="duration"><%= post.duration %></span>
-    </div>
-  <% end %>
 </div>

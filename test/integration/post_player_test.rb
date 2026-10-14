@@ -20,13 +20,13 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
 
   # ── video ──
 
-  test "a video post without a card in its body gets the player card at the top" do
+  test "a video post without a card in its body gets the player card at the top, without a duration" do
     post = media_post("video", video: "https://youtu.be/dQw4w9WgXcQ", duration: "00:03:33")
 
     get post_path(post.url_name)
     assert_equal 1, card_players
     assert_equal 1, iframes
-    assert_select ".media-meta .duration", "00:03:33"
+    assert_select ".duration", 0, "the duration is the card's show_duration, off by default"
   end
 
   test "a video post with its own card shows only that one" do
@@ -36,7 +36,29 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     assert_equal 1, card_players, "one player, not two"
     assert_equal 1, iframes
     assert_select ".post-content .card-player"
-    assert_select ".media-meta", 0, "the duration line belongs to the template's player"
+  end
+
+  # ── show_duration ──
+
+  test "show_duration: true shows the post's length under the player, trimmed of zero hours" do
+    card = "```card\ntype: player\nshow_duration: true\n```"
+    get post_path(media_post("video", video: "https://youtu.be/dQw4w9WgXcQ", duration: "00:03:33", content: card).url_name)
+    assert_select ".card-player .player-duration .duration", "3:33"
+
+    get post_path(media_post("audio", audio: "/media/audio/a.mp3", duration: "01:02:03", content: card).url_name)
+    assert_select ".card-player .player-duration .duration", "1:02:03"
+  end
+
+  test "show_duration with no length to show draws nothing" do
+    card = "```card\ntype: player\nshow_duration: true\n```"
+    get post_path(media_post("audio", audio: "/media/audio/a.mp3", content: card).url_name)
+    assert_select ".player-duration", 0
+  end
+
+  test "a card's own duration wins over the post's" do
+    card = "```card\ntype: player\naudio: /media/audio/other.mp3\nduration: 125\nshow_duration: true\n```"
+    get post_path(media_post("audio", audio: "/media/audio/a.mp3", duration: "00:30:00", content: card).url_name)
+    assert_select ".player-duration .duration", "2:05"
   end
 
   # ── audio and music ──

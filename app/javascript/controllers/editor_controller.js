@@ -250,6 +250,16 @@ export default class extends Controller {
       this.galleryPickHandler,
     );
 
+    // The card builder asks for one file for a field (the player's Audio or
+    // Video). Same arrangement: the editor opens the picker, and the card
+    // builder listens for media-picker:pick-for-card itself.
+    this.cardPickHandler = (event) =>
+      this.openMediaPickerFor(event.detail?.mediaType || "audio", "card");
+    this.element.addEventListener(
+      "card-builder:pick-media",
+      this.cardPickHandler,
+    );
+
     // Listen for media picker close events (e.g. Cancel button)
     this.mediaPickerCloseHandler = this.closeMediaPicker.bind(this);
     this.element.addEventListener(
@@ -760,6 +770,13 @@ export default class extends Controller {
       this.element.removeEventListener(
         "gallery-builder:pick-images",
         this.galleryPickHandler,
+      );
+    }
+
+    if (this.cardPickHandler) {
+      this.element.removeEventListener(
+        "card-builder:pick-media",
+        this.cardPickHandler,
       );
     }
 

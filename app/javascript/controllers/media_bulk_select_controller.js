@@ -193,6 +193,24 @@ export default class extends Controller {
     );
   }
 
+  // Opened from a card builder field (the player's Audio/Video): the one
+  // file chosen goes back into that field. Like submitGallery, the picker
+  // only hands over the path — the card builder owns the card.
+  submitToCard() {
+    const selected = this.checkboxTargets.find((cb) => cb.checked);
+    if (!selected) return;
+
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:pick-for-card", {
+        bubbles: true,
+        detail: { path: selected.dataset.filePath, filename: selected.dataset.filename },
+      }),
+    );
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:close", { bubbles: true }),
+    );
+  }
+
   selectAllVisible() {
     const visibleItems = this.element.querySelectorAll(
       '[data-media-filter-target="item"]:not([style*="display: none"])',

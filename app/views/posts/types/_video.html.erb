@@ -1,9 +1,9 @@
 <%# A video post. The player is the same ```card type: player an author can
     put in the body — supplied here only when the body has none, and when
     content.yml's players.video is on (Post#show_template_player?). One
-    player either way. The duration line goes with the supplied player. %>
+    player either way. %>
 <% if post.show_template_player? %>
-  <%= render "posts/template_player", post: post, show_duration: true %>
+  <%= render "posts/template_player", post: post %>
 <% end %>
 
 <div class="post-content">

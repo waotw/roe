@@ -1965,7 +1965,7 @@ module HasMarkdownExtensions
         partial: "shared/video_player",
         locals: { src: video_src, label: label, extra_class: "player-video" }
       )
-      return %Q(<div class="card-player card-player-video">#{video}</div>)
+      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}</div>)
     end
 
     card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
@@ -2017,8 +2017,39 @@ module HasMarkdownExtensions
             </div>
           </div>
         </div>
+        #{player_duration_html(config)}
       </div>
     HTML
+  end
+
+  # `show_duration: true` — the length, under the player, before anything
+  # plays. Off by default: the audio transport already counts up to the
+  # total once it loads. Read from the card's own `duration:`, else the
+  # post's (the editor fills that in, YouTube videos included). Nothing when
+  # there's no length to show.
+  def player_duration_html(config)
+    return "" unless config[:show_duration].to_s.strip.downcase == "true"
+
+    raw = config[:duration].presence || (respond_to?(:duration) ? duration.to_s.strip.presence : nil)
+    return "" if raw.blank?
+
+    %(<div class="player-duration"><span class="duration">#{ERB::Util.html_escape(format_player_duration(raw))}</span></div>)
+  end
+
+  # "00:03:33" → "3:33", "01:02:03" → "1:02:03", "213" (seconds) → "3:33".
+  # The stored form is HH:MM:SS; leading zero hours are noise on a page.
+  def format_player_duration(raw)
+    seconds =
+      if raw.to_s.include?(":")
+        raw.to_s.split(":").map(&:to_i).reverse.each_with_index.sum { |n, i| n * (60**i) }
+      else
+        raw.to_i
+      end
+    return raw.to_s if seconds <= 0
+
+    h, rem = seconds.divmod(3600)
+    m, s = rem.divmod(60)
+    h.positive? ? format("%d:%02d:%02d", h, m, s) : format("%d:%02d", m, s)
   end
 
   # A track/episode's number for the player row: track_number, then
@@ -2549,7 +2580,9 @@ module HasMarkdownExtensions
   # render_post_link (which product-link delegates to), `skus`/`variants` by
   # ProductButtonRenderer, and the collection three by the collection renderer.
   CARD_EXTRA_KEYS = {
-    "player"       => %w[video],
+    # `duration` overrides the post's for show_duration — rarely needed, so
+    # the builder leaves it out.
+    "player"       => %w[video duration],
     "post-link"    => %w[subtitle_from_record],
     "product-link" => %w[subtitle_from_record],
     # `link` is what `link_url` used to be called, and `link_text` is the label

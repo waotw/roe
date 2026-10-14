@@ -353,9 +353,10 @@
             id: "content-textarea" %>
   </div>
 
-  <!-- Media Picker Modal -->
+  <!-- Media Picker Modal. z-[60]: the card builder (z-50) opens it from its
+       Audio/Video "Choose…" buttons, so it has to sit above that modal. -->
   <div data-editor-target="mediaPickerModal"
-       class="fixed inset-0 z-50 items-center justify-center"
+       class="fixed inset-0 z-[60] items-center justify-center"
        style="display: none;">
     <!-- Backdrop: clicking this closes the modal -->
     <div class="absolute inset-0 bg-black/50"
