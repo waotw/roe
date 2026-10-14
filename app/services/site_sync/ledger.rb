@@ -96,15 +96,49 @@ module SiteSync
         end
 
         local     = new.current_manifest
-        confirmed = local.select { |path, _| peer_manifest.key?(path) }
-        dropped   = local.size - confirmed.size
+        previous  = recorded&.dig("files") || {}
+        confirmed = confirmed_entries(local, peer_manifest, previous)
+        dropped   = local.count { |path, _| !peer_manifest.key?(path) }
+        unagreed  = local.count { |path, entry| peer_manifest.key?(path) && !same_state?(entry, peer_manifest[path]) }
 
         if dropped.positive?
           Rails.logger.info "[SiteSync::Ledger] #{context}: #{dropped} local file(s) not on the peer — " \
                             "left out of the baseline so they stay a push, not a deletion"
         end
+        if unagreed.positive?
+          Rails.logger.info "[SiteSync::Ledger] #{context}: #{unagreed} file(s) differ from the peer's copy — " \
+                            "not recorded as agreed, so the next sync sees the difference"
+        end
 
         write_manifest!(confirmed)
+      end
+
+      # The baseline entries a write may record, given both sides' files and
+      # the baseline before it. A path both sides hold in the same state is
+      # agreed and recorded as that state. A path both hold but in different
+      # states isn't agreed — something changed on one side while the sync
+      # ran (a setting saved, a video's web version remade) — so it keeps its
+      # previous entry, or none. Recording either side's version there is
+      # what made the next sync read the OTHER side as the one that changed,
+      # and quietly overwrite the newer file with the older.
+      def confirmed_entries(local, peer, previous)
+        local.each_with_object({}) do |(path, entry), out|
+          theirs = peer[path]
+          next unless theirs
+
+          if same_state?(entry, theirs)
+            out[path] = entry
+          elsif previous[path]
+            out[path] = previous[path]
+          end
+        end
+      end
+
+      # Same size and modified time. Every transfer stamps the copy with the
+      # source's modified time (SiteWriter.restore_mtimes, the chunked
+      # endpoints), so a file both sides got from one sync matches exactly.
+      def same_state?(a, b)
+        a && b && a["size"].to_i == b["size"].to_i && a["mtime"].to_i == b["mtime"].to_i
       end
 
       # Compare two file-hashes, returning the file-level diff. Sorted

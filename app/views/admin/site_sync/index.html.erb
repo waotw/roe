@@ -857,10 +857,23 @@
           <% end %>
 
           <%# ── Ledger divergence recovery ── %>
+          <%# Neither side's record shows a change, yet the files differ — the
+              records disagree about these. PeerAgreement already worked out
+              which files, so name them: a sync treats each as changed on
+              whichever side is newer, and asks if that would overwrite a
+              newer copy (Reconciler.overwrites_newer?). %>
           <% if ledger_diverged %>
-            <p class="text-sm text-amber-800 mb-3">
-              ⚠️ Content differs from <%= SiteSync::Exchange.peer_label %>, but neither side reports drift — the ledgers diverged. A sync will realign them.
+            <% differing = Array(@sync_conclusion.agreement&.differing) %>
+            <p class="text-sm text-amber-800 mb-1">
+              ⚠️ <% if differing.any? %><%= pluralize(differing.size, "file") %> differ<%= "s" if differing.size == 1 %> from <%= SiteSync::Exchange.peer_label %><% else %>Content differs from <%= SiteSync::Exchange.peer_label %><% end %>,
+              though neither side's sync record shows a change. Sync to bring them together — you'll be asked before a newer copy is replaced.
             </p>
+            <% if differing.any? %>
+              <ul class="text-xs font-mono text-amber-800 space-y-1 ml-6 mb-3 max-h-48 overflow-y-auto">
+                <% differing.first(50).each do |path| %><li><%= path %></li><% end %>
+                <% if differing.size > 50 %><li>…and <%= differing.size - 50 %> more</li><% end %>
+              </ul>
+            <% end %>
           <% end %>
 
           <%# ── One action for everything above ── %>

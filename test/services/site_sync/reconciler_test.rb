@@ -144,5 +144,50 @@ module SiteSync
         FileUtils.remove_entry(dir)
       end
     end
+
+    # ------------------------------------------- a record that was wrong
+
+    # The real case: content.yml saved locally (147 bytes, Oct 13) while a
+    # sync ran, then recorded as agreed although live still had its 124-byte
+    # September copy. With the record matching local, live looked like the
+    # side that changed, and the sync pulled the older copy over the newer.
+    test "a pull that would replace a newer local copy with an older one asks instead" do
+      newer_local = e(147, 1_791_936_653)
+      older_live  = e(124, 1_788_888_473)
+      wrong_record = { "system/global/content.yml" => newer_local }
+
+      r = reconcile(baseline: wrong_record, local: wrong_record, peer: { "system/global/content.yml" => older_live })
+
+      assert_empty r.pull
+      assert_equal [ "system/global/content.yml" ], r.conflicts.map(&:path)
+      assert_equal :edit_edit, r.conflicts.first.type
+    end
+
+    test "a push that would replace a newer live copy with an older one asks instead" do
+      older_local = e(124, 100)
+      newer_live  = e(147, 200)
+
+      r = reconcile(baseline: { "a.yml" => newer_live }, local: { "a.yml" => older_local }, peer: { "a.yml" => newer_live })
+
+      assert_empty r.push
+      assert_equal [ "a.yml" ], r.conflicts.map(&:path)
+    end
+
+    # The normal direction — the changed side is the newer one — still syncs
+    # without asking. Over-asking is its own failure.
+    test "an ordinary newer change still syncs without asking" do
+      base = { "a.md" => e(1, 100) }
+
+      assert_equal [ "a.md" ], reconcile(baseline: base, local: { "a.md" => e(2, 200) }, peer: base).push
+      assert_equal [ "a.md" ], reconcile(baseline: base, local: base, peer: { "a.md" => e(2, 200) }).pull
+      assert_not reconcile(baseline: base, local: { "a.md" => e(2, 200) }, peer: base).any_conflicts?
+    end
+
+    test "deletions and new files are unaffected — there's no other copy to be newer" do
+      base = { "a.md" => e(1, 100) }
+
+      assert_equal [ "a.md" ], reconcile(baseline: base, local: {}, peer: base).push_delete
+      assert_equal [ "b.md" ], reconcile(baseline: base, local: base.merge("b.md" => e(1, 50)), peer: base).push
+    end
   end
 end

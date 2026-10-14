@@ -369,22 +369,17 @@ class SiteSyncTransferJob < ApplicationJob
   # can't confirm rather than guessing — an out-of-date baseline costs a
   # re-push, a wrong one costs the file.
   def write_confirmed_baseline!
-    local = SiteSync::Ledger.current
-    peer  = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
+    peer = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
 
     if peer.nil?
       Rails.logger.warn "[SiteSyncTransferJob #{@kind}] peer manifest unavailable — baseline left as-is"
       return
     end
 
-    confirmed = local.select { |path, _| peer.key?(path) }
-    unconfirmed = local.size - confirmed.size
-    if unconfirmed.positive?
-      Rails.logger.info "[SiteSyncTransferJob #{@kind}] #{unconfirmed} local file(s) not on the peer — " \
-                        "left out of the baseline so they stay a push, not a deletion"
-    end
-
-    SiteSync::Ledger.write_manifest!(confirmed)
+    # One rule for every baseline write — see Ledger.write_confirmed!. It also
+    # leaves out files both sides hold in different versions, which this copy
+    # of the rule used to record as agreed.
+    SiteSync::Ledger.write_confirmed!(peer, context: "#{@kind} baseline")
   rescue => e
     # Never fail a transfer that worked over a baseline refresh.
     Rails.logger.warn "[SiteSyncTransferJob #{@kind}] confirmed baseline skipped: #{e.class} #{e.message}"

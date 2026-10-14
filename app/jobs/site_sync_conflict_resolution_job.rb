@@ -92,22 +92,37 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   # this run actually transferred or deleted qualify; everything else keeps
   # whatever the last real sync recorded — including being absent, which is
   # what keeps a local-only file safely on the push side of the next reconcile.
+  #
+  # A settled path is recorded only if both sides now hold the same version
+  # (Ledger.same_state?). One changed again while this ran keeps its old
+  # entry, so the next sync sees that change instead of the record claiming
+  # agreement. Without live's file list there's no way to check, so nothing
+  # is recorded — stale drift is visible and recoverable; a wrong record isn't.
   def rebaseline!(plan)
     recorded = SiteSync::Ledger.recorded&.dig("files") || {}
     current  = SiteSync::Ledger.current
+    peer     = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
     settled  = plan.values.flatten.uniq
 
+    if peer.nil?
+      Rails.logger.warn "[SiteSyncConflictResolutionJob] peer manifest unavailable — baseline left as-is"
+      return
+    end
+
     baseline = recorded.dup
+    unagreed = 0
     settled.each do |path|
-      if current.key?(path)
+      if !current.key?(path) && !peer.key?(path)
+        baseline.delete(path)
+      elsif SiteSync::Ledger.same_state?(current[path], peer[path])
         baseline[path] = current[path]
       else
-        baseline.delete(path)
+        unagreed += 1
       end
     end
 
-    Rails.logger.info "[SiteSyncConflictResolutionJob] re-baselined #{settled.size} settled path(s); " \
-                      "#{(recorded.keys | current.keys).size - baseline.size} left out of the baseline"
+    Rails.logger.info "[SiteSyncConflictResolutionJob] re-baselined #{settled.size - unagreed} settled path(s); " \
+                      "#{unagreed} differ from the peer and keep their previous entry"
     SiteSync::Ledger.write_manifest!(baseline)
   end
 
