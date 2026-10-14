@@ -47,9 +47,15 @@ import {
   isolateHistory,
 } from "@codemirror/commands";
 import { syntaxHighlighting } from "@codemirror/language";
-import { search, searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+import {
+  search,
+  searchKeymap,
+  highlightSelectionMatches,
+  openSearchPanel,
+} from "@codemirror/search";
 import { markdown, roeHighlightStyle } from "markdown_editor/syntax";
 import { livePreview } from "markdown_editor/live_preview";
+import { linkStyles } from "markdown_editor/links";
 import { roeBlocks } from "markdown_editor/roe_blocks";
 import { footnotePaste, footnoteAt, footnoteContinuation } from "markdown_editor/footnotes";
 
@@ -72,8 +78,8 @@ function modeExtensions(mode, blocksUrl) {
   const attrs = EditorView.editorAttributes.of({
     class: `roe-md-editor roe-md-${mode}`,
   });
-  if (mode === "source") return [attrs];
-  return [attrs, livePreview, roeBlocks({ checkUrl: blocksUrl })];
+  if (mode === "source") return [attrs, linkStyles];
+  return [attrs, linkStyles, livePreview, roeBlocks({ checkUrl: blocksUrl })];
 }
 
 // ── document.execCommand ──────────────────────────────────────────────────
@@ -479,6 +485,15 @@ export class MarkdownEditor {
       changes: { from: start, to: endCur, insert: next.slice(start, endNext) },
       annotations: programmatic.of(true),
     });
+  }
+
+  // ── Find and replace ────────────────────────────────────────────────────
+
+  // The toolbar's FIND button: what ⌘F does. Opens the panel (or, if it's
+  // already open, puts the cursor back in its Find field), seeded with the
+  // selected text.
+  openFind() {
+    openSearchPanel(this.view);
   }
 
   // ── Modes ───────────────────────────────────────────────────────────────

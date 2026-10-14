@@ -207,7 +207,8 @@ export const roeHighlightStyle = HighlightStyle.define([
   { tag: highlightTag, class: "roe-md-mark" },
   { tag: asideTag, class: "roe-md-aside" },
   { tag: footnoteTag, class: "roe-md-fnref" },
-  { tag: tags.link, class: "roe-md-link" },
+  // No tags.link: the grammar calls every [bracket pair] a link, and most
+  // aren't. links.js colours only the ones kramdown will link.
   { tag: tags.url, class: "roe-md-url" },
   { tag: tags.monospace, class: "roe-md-code" },
   { tag: tags.quote, class: "roe-md-quote-text" },

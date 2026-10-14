@@ -17,6 +17,7 @@
 import { Decoration, ViewPlugin, WidgetType } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { ROE_BLOCK_KINDS, fenceKind, autoGalleryLines } from "markdown_editor/roe_blocks";
+import { isRealLink } from "markdown_editor/links";
 
 const hide = Decoration.replace({});
 const markText = Decoration.mark({ class: "roe-md-mark" });
@@ -48,13 +49,16 @@ class BulletWidget extends WidgetType {
 }
 
 class ImageWidget extends WidgetType {
-  constructor(src, alt) {
+  constructor(src, alt, caption = "") {
     super();
     this.src = src;
     this.alt = alt;
+    this.caption = caption;
   }
   eq(other) {
-    return other.src === this.src && other.alt === this.alt;
+    return (
+      other.src === this.src && other.alt === this.alt && other.caption === this.caption
+    );
   }
   toDOM() {
     const wrap = document.createElement("span");
@@ -66,10 +70,16 @@ class ImageWidget extends WidgetType {
     // A broken path shows as its alt text rather than a broken-image icon, so
     // the writer still sees which image the line points at.
     img.onerror = () => {
-      wrap.textContent = `🖼 ${this.alt || this.src}`;
+      img.replaceWith(`🖼 ${this.alt || this.src}`);
       wrap.classList.add("roe-md-image-missing");
     };
     wrap.appendChild(img);
+    if (this.caption) {
+      const caption = document.createElement("span");
+      caption.className = "roe-md-image-caption";
+      caption.textContent = this.caption;
+      wrap.appendChild(caption);
+    }
     return wrap;
   }
   // Clicks land in the editor, which moves the caret onto the image and so
@@ -80,6 +90,20 @@ class ImageWidget extends WidgetType {
 }
 
 const bullet = Decoration.replace({ widget: new BulletWidget() });
+const captionText = Decoration.mark({ class: "roe-md-caption" });
+
+// `(*caption*)` straight after an image, spaces or tabs allowed between. The
+// same rule as HasMarkdownExtensions#process_image_captions — no `*` inside,
+// never across a line break — so what looks like a caption here is one on
+// the page. Returns { from, to, text } or null.
+const CAPTION = /^[ \t]*\(\*([^*\n]+)\*\)/;
+function captionAfter(state, pos) {
+  const line = state.doc.lineAt(pos);
+  const match = CAPTION.exec(state.doc.sliceString(pos, line.to));
+  if (!match) return null;
+  const from = pos + match[0].indexOf("(");
+  return { from, to: pos + match[0].length, text: match[1].trim() };
+}
 
 // Does any selection range touch [from, to]? Inclusive at both ends, so the
 // caret sitting right after `**bold**` still counts as inside it.
@@ -124,11 +148,16 @@ function buildDecorations(view) {
   }
 
   for (const { from, to } of view.visibleRanges) {
+    // An image caption's `(*…*)` parses as emphasis; it's styled as a caption
+    // instead, so nothing inside it is touched. Set by the Image case below.
+    let skipFrom = -1;
+    let skipTo = -1;
     syntaxTree(state).iterate({
       from,
       to,
       enter(node) {
         const name = node.name;
+        if (node.from >= skipFrom && node.to <= skipTo) return false;
 
         // ── Roe-anji blocks: owned by roe_blocks.js ───────────────────
         if (name === "FencedCode") {
@@ -257,6 +286,9 @@ function buildDecorations(view) {
             return name !== "InlineCode";
 
           case "Link": {
+            // [text] with no definition behind it is just text in brackets —
+            // kramdown prints it as written, so the editor does too.
+            if (!isRealLink(state, node.node)) return;
             const marks = node.node.getChildren("LinkMark");
             const close = marks.find(
               (m) => state.doc.sliceString(m.from, m.to) === "]",
@@ -275,7 +307,16 @@ function buildDecorations(view) {
             // Inside an open automatic gallery: show the line as written, like
             // an open ```gallery, not as a column of inline images.
             if (galleryLines.has(state.doc.lineAt(node.from).number)) return false;
-            if (!active) {
+            // ![alt](src)(*caption*): the caption belongs to the image, so it
+            // shows under the picture and opens with it.
+            const caption = captionAfter(state, node.to);
+            const end = caption ? caption.to : node.to;
+            if (caption) {
+              decos.push(captionText.range(caption.from, caption.to));
+              skipFrom = node.to;
+              skipTo = caption.to;
+            }
+            if (!touches(ranges, node.from, end)) {
               const url = node.node.getChild("URL");
               const marks = node.node.getChildren("LinkMark");
               const close = marks.find(
@@ -285,10 +326,9 @@ function buildDecorations(view) {
                 const src = state.doc.sliceString(url.from, url.to);
                 const alt = state.doc.sliceString(node.from + 2, close.from);
                 decos.push(
-                  Decoration.replace({ widget: new ImageWidget(src, alt) }).range(
-                    node.from,
-                    node.to,
-                  ),
+                  Decoration.replace({
+                    widget: new ImageWidget(src, alt, caption?.text || ""),
+                  }).range(node.from, end),
                 );
               }
             }

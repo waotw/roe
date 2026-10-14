@@ -71,9 +71,54 @@ export default class extends Controller {
     if (hadFocus) textarea.focus();
 
     this.showModeToggle();
+    this.connectFindButton();
+    this.connectFindShortcut();
+  }
+
+  // ⌘F (Ctrl+F off the Mac) opens the editor's find and replace from anywhere
+  // on the page, not only with the cursor in the editor — otherwise it opens
+  // the browser's own find, which can't replace and doesn't see text inside
+  // collapsed blocks. Inside the editor and its find panel CodeMirror already
+  // handles the key and calls preventDefault, so this leaves those alone.
+  // Ctrl+F on a Mac is left alone too: there it moves the cursor one letter.
+  connectFindShortcut() {
+    const mac = /Mac|iP(hone|ad|od)/.test(navigator.platform);
+    this.onFindKey = (event) => {
+      if (event.defaultPrevented || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "f") return;
+      if (mac ? !event.metaKey || event.ctrlKey : !event.ctrlKey || event.metaKey) return;
+      if (!this.editor) return;
+      event.preventDefault();
+      this.editor.openFind();
+    };
+    document.addEventListener("keydown", this.onFindKey);
+  }
+
+  // FIND, at the right of the sticky drawer at the bottom of the window
+  // (shared/_editor_drawer). The drawer is outside this controller's element,
+  // so the button is found and wired by hand rather than through a target.
+  // One editor per page, so the first button is ours.
+  connectFindButton() {
+    this.findButton = document.querySelector("[data-roe-find-button]");
+    if (!this.findButton) return;
+    this.onFind = (event) => {
+      event.preventDefault();
+      this.editor?.openFind();
+    };
+    this.findButton.addEventListener("click", this.onFind);
+    this.findButton.classList.remove("hidden");
   }
 
   disconnect() {
+    if (this.onFindKey) {
+      document.removeEventListener("keydown", this.onFindKey);
+      this.onFindKey = null;
+    }
+    if (this.findButton) {
+      this.findButton.removeEventListener("click", this.onFind);
+      this.findButton.classList.add("hidden");
+      this.findButton = null;
+    }
     this.editor?.destroy();
     this.editor = null;
   }
