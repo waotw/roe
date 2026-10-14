@@ -262,6 +262,29 @@ class Admin::ConfigsController < Admin::BaseController
       }
     },
 
+    # COPY: Players section — label, field labels, hints
+    players: {
+      label: "Players",
+      fields: {
+        "players.video" => {
+          type: :checkbox,
+          label: "Show a player on video posts",
+          # Unset reads as on (Post.template_players_enabled?), so the box
+          # starts ticked on a site that's never saved this.
+          default: true,
+          hint: "Puts a video player at the top of every video post. A post with a player card in its body " \
+                "shows the player card instead. Turn off to place video yourself."
+        },
+        "players.audio" => {
+          type: :checkbox,
+          label: "Show a player on audio, music and podcast posts",
+          default: true,
+          hint: "Puts a player at the top of every audio, music and podcast post. A post with a player card in " \
+                "its body shows the player card instead. Turn off to place audio yourself."
+        }
+      }
+    },
+
     search: {
       label: "Search",
       fields: {

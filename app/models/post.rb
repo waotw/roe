@@ -287,6 +287,46 @@ class Post < ApplicationRecord
     post_type.in?([ "audio", "video" ]) && (audio.present? || video.present?)
   end
 
+  # ── The player at the top of a media post ────────────────────────────────
+  #
+  # Players are moving into Markdown: a ```card with `type: player` (and, for
+  # podcasts and releases, a `player` collection later). During the move,
+  # posts written before it still rely on the post type's template to show a
+  # player, so the template supplies one — unless the body already has its
+  # own, and only when content.yml's `players.video` / `players.audio` hasn't
+  # turned that off. One player either way, never two.
+
+  POST_TYPES_WITH_PLAYERS = %w[video audio music podcast].freeze
+
+  # A ```card block with `type: player` anywhere in the body.
+  PLAYER_CARD_RE = /^[ \t]*```card[ \t]*\r?\n(?:(?!^[ \t]*```).*\r?\n)*?[ \t]*type:[ \t]*["']?player["']?[ \t]*\r?$/
+
+  def player_card_in_body?
+    content.to_s.match?(PLAYER_CARD_RE)
+  end
+
+  # :video or :audio — what the template's player would play — or nil when
+  # this type has no player, or there's nothing for it to play. A podcast
+  # with a video plays the video, as its template always has.
+  def template_player_kind
+    return nil unless post_type.in?(POST_TYPES_WITH_PLAYERS)
+    return :video if video.to_s.strip.present? && post_type.in?(%w[video podcast])
+    return :audio if audio.to_s.strip.present? && post_type.in?(%w[audio music podcast])
+
+    nil
+  end
+
+  def show_template_player?
+    kind = template_player_kind
+    kind.present? && !player_card_in_body? && self.class.template_players_enabled?(kind)
+  end
+
+  # content.yml `players.video` / `players.audio`. Unset means on, so a site
+  # that never touches the setting looks the way it always has.
+  def self.template_players_enabled?(kind)
+    SiteConfig.content("players.#{kind}").to_s.strip.downcase != "false"
+  end
+
   # Additional post-specific scopes
   scope :by_type, ->(post_type) {
     where("json_extract(metadata, '$.post_type') = ?", post_type)

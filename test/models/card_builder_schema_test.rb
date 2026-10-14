@@ -13,7 +13,7 @@ class CardBuilderSchemaTest < ActiveSupport::TestCase
     "aside"        => %w[text image link_url link link_text],
     "post-link"    => %w[post style title subtitle show_subtitle excerpt show_excerpt url link_text author date image],
     "product-link" => %w[product style title description show_description url link_text image],
-    "player"       => %w[audio title image show_artwork]
+    "player"       => %w[audio video title image show_artwork]
   }.freeze
 
   test "types match the renderer's dispatch values" do

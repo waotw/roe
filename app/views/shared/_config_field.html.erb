@@ -6,9 +6,9 @@
   field_placeholder = field_config[:placeholder]
   field_depends_on = field_config[:depends_on]
   field_options = field_config[:options]
-  # Shown when nothing is stored yet. Only selects use this: they have a blank
-  # "Select..." option that otherwise makes an unset setting look switched off
-  # rather than sitting at its default.
+  # Shown when nothing is stored yet: a select's preselected option, or a
+  # checkbox's starting state. Without it an unset setting looks switched
+  # off rather than sitting at its default.
   field_default = field_config[:default]
   # A checkbox can map to arbitrary string values (e.g. stable/nightly)
   # instead of true/false via on_value / off_value.
@@ -29,7 +29,7 @@
              id="<%= field_id %>"
              name="config_fields[<%= field_name %>]"
              value="<%= checkbox_on %>"
-             <%= 'checked' if value.to_s == checkbox_on %>
+             <%= 'checked' if (value.nil? ? field_default.to_s : value.to_s) == checkbox_on %>
              class="h-4 w-4 border-gray-300 rounded"
              data-config-field="<%= field_name %>"
              <% if field_on_value %>data-on-value="<%= field_on_value %>"<% end %>

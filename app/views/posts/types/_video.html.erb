@@ -1,9 +1,9 @@
-<%= render "shared/video_player", src: post.video, label: post.title %>
-
-<% if post.duration.present? %>
-  <div class="media-meta">
-    <span class="duration"><%= post.duration %></span>
-  </div>
+<%# A video post. The player is the same ```card type: player an author can
+    put in the body — supplied here only when the body has none, and when
+    content.yml's players.video is on (Post#show_template_player?). One
+    player either way. The duration line goes with the supplied player. %>
+<% if post.show_template_player? %>
+  <%= render "posts/template_player", post: post, show_duration: true %>
 <% end %>
 
 <div class="post-content">

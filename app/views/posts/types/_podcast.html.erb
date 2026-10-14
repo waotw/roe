@@ -14,6 +14,12 @@
 <div class="podcast-episode">
 
   <% has_cover = post.metadata['image'].present? %>
+  <%# The full podcast player stays for now — chapters, ⏮ ⏭ episode buttons,
+      season/episode, captions — until a `player` collection can carry them.
+      Same rule as the other media posts: none here when the body has its
+      own ```card type: player, or content.yml's players setting is off
+      (Post#show_template_player?), so a page never shows two. %>
+  <% if post.show_template_player? %>
   <div class="podcast-hero <%= 'is-no-cover' unless has_cover %>">
     <% if has_cover %>
       <%# raw ResponsiveImageRenderer.render(post.metadata['image'], alt: post.title) %>
@@ -22,6 +28,7 @@
       <%= render 'posts/media_player', post: post, podcast_config: podcast_config, prev_episode: prev_episode, next_episode: next_episode %>
     </div>
   </div>
+  <% end %>
 
   <%# When the episode has both video (playing above) and audio, surface
       the audio file as a direct link so listeners who'd rather just

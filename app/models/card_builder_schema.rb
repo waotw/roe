@@ -95,13 +95,15 @@ module CardBuilderSchema
 
     "player" => [
       { key: "audio", type: :text, label: "Audio",
-        hint: "Audio file to play. Defaults to the post's own audio." },
+        hint: "Audio file to play. Leave blank to play the post's own audio." },
+      { key: "video", type: :text, label: "Video",
+        hint: "A video file or YouTube link. Leave blank to play the post's own video. If both are set, audio plays." },
       { key: "title", type: :text, label: "Title",
         hint: "Defaults to the post's title." },
       { key: "image", type: :text, label: "Artwork",
-        hint: "Defaults to the post's image, then the release/podcast cover." },
+        hint: "Audio only. Defaults to the post's image, then the release/podcast cover." },
       { key: "show_artwork", type: :boolean, label: "Show artwork",
-        hint: "Show the artwork. On by default." }
+        hint: "Audio only. Show the artwork. On by default." }
     ]
   }.freeze
 

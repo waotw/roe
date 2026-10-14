@@ -309,6 +309,15 @@ module HasMarkdownExtensions
     Digest::SHA1.hexdigest(parts.join("|"))
   end
 
+  # The player card a media post's template puts at the top when the body
+  # has no ```card type: player of its own (Post#show_template_player?). The
+  # same card, drawn with no options, so it plays the post's own audio or
+  # video, titled and with artwork from the post: what an author gets by
+  # adding the card themselves, which is where players are heading.
+  def template_player_card_html
+    render_player_card({ type: "player" }).html_safe
+  end
+
   private
 
   def render_code_block(code, language)
@@ -1948,10 +1957,13 @@ module HasMarkdownExtensions
     video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
 
     if audio_src.blank? && video_src.present?
-      # The shared site video player, the same as a video post's.
+      # The shared site video player, the same as a video post's. Named for
+      # screen readers by the card's title, else the post's, as the audio
+      # player below is.
+      label = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
       video = ApplicationController.renderer.render(
         partial: "shared/video_player",
-        locals: { src: video_src, label: config[:title].to_s, extra_class: "player-video" }
+        locals: { src: video_src, label: label, extra_class: "player-video" }
       )
       return %Q(<div class="card-player card-player-video">#{video}</div>)
     end

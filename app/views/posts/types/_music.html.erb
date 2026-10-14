@@ -1,0 +1,14 @@
+<%# A music track. Same as an audio post: the ```card type: player at the
+    top unless the body has its own (Post#show_template_player?). Until now
+    music had no template of its own and fell through to the article one,
+    so a track without the card in its body had no player at all.
+
+    A release's page will move to a `player` collection, with the track list
+    and next/previous; this covers a single track until then. %>
+<% if post.show_template_player? %>
+  <%= render "posts/template_player", post: post %>
+<% end %>
+
+<div class="post-content">
+  <%= render_post_content(post) %>
+</div>

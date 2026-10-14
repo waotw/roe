@@ -62,4 +62,18 @@ class ContentSettingsSelectTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "input[name='config_fields[search.all_pages]'][checked]"
   end
+
+  # The player switches are on unless turned off, so they show ticked before
+  # anyone has saved them, and unticked once saved as off.
+  test "the player switches start on, and show what was saved" do
+    write_content("soft_line_breaks: true\n")
+    get admin_edit_content_config_path
+    assert_select "input[type=checkbox][name='config_fields[players.video]'][checked]"
+    assert_select "input[type=checkbox][name='config_fields[players.audio]'][checked]"
+
+    write_content("players:\n  video: false\n  audio: true\n")
+    get admin_edit_content_config_path
+    assert_select "input[type=checkbox][name='config_fields[players.video]'][checked]", 0
+    assert_select "input[type=checkbox][name='config_fields[players.audio]'][checked]"
+  end
 end
