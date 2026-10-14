@@ -307,8 +307,24 @@ class Admin::MediumController < Admin::BaseController
       return
     end
 
-    # Convert /media/audio/file.mp3 to absolute path (as STRING)
-    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix("/")).to_s  # ← Add .to_s
+    # A YouTube link: there's no file to read, so ask YouTube.
+    if (embed = VideoEmbed.for(media_path))
+      seconds = embed.duration_seconds
+      if seconds
+        render json: { duration: MediaDurationExtractor.format_duration(seconds) }
+      else
+        render json: { error: "Couldn't get the length from #{embed.provider_name}" }, status: :unprocessable_entity
+      end
+      return
+    end
+
+    # A file of ours: only under site/media, like the exists check below.
+    unless media_path.start_with?("/media/") && !media_path.include?("..")
+      render json: { error: "Not a media file" }, status: :not_found
+      return
+    end
+
+    file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix("/")).to_s
 
     unless File.exist?(file_path)
       render json: { error: "File not found" }, status: :not_found

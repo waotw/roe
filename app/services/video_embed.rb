@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "cgi"
+require "net/http"
 require "uri"
 
 # A video hosted somewhere else, given by the link you'd copy from that
@@ -101,6 +102,31 @@ class VideoEmbed
   # hqdefault exists for every video; the sharper maxresdefault doesn't.
   def thumbnail_url = "https://i.ytimg.com/vi/#{id}/hqdefault.jpg"
 
+  # The video's length in whole seconds, or nil when it can't be found (a
+  # live stream, a private video, YouTube unreachable). Remembered for a
+  # week once found; a failure isn't, so the next try asks again.
+  #
+  # YouTube's oEmbed answer has no length, and its player API only works on
+  # a page the video's owner allows embedding from. The video's own page
+  # does carry it — `"lengthSeconds":"213"` in the data the page loads with
+  # — so that's read, the way a browser would see it.
+  def duration_seconds
+    key = "video_embed:duration:#{provider}:#{id}"
+    cached = Rails.cache.read(key)
+    return cached if cached
+
+    seconds = self.class.length_from_page(fetch_watch_page)
+    Rails.cache.write(key, seconds, expires_in: 7.days) if seconds
+    seconds
+  end
+
+  # The first "lengthSeconds" on the page is the video's own (later ones
+  # belong to suggested videos). Zero means a live stream: no length yet.
+  def self.length_from_page(html)
+    seconds = html.to_s[/"lengthSeconds":"(\d+)"/, 1].to_i
+    seconds.positive? ? seconds : nil
+  end
+
   # The player, for web pages. `label` names it for screen readers — the
   # post's title, or the alt text of a Markdown embed.
   #
@@ -137,6 +163,34 @@ class VideoEmbed
   end
 
   private
+
+  WATCH_PAGE_HEADERS = {
+    "User-Agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " \
+                    "(KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    "Accept-Language" => "en",
+    # Skips the EU cookie-consent page, which would otherwise come back
+    # instead of the video's page and has no length on it.
+    "Cookie" => "CONSENT=YES+1; SOCS=CAI"
+  }.freeze
+
+  # The video's YouTube page, or nil. Follows a couple of redirects and
+  # gives up quickly: this runs while someone waits in the editor.
+  def fetch_watch_page(url = "https://www.youtube.com/watch?v=#{id}", redirects: 3)
+    uri = URI.parse(url)
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
+                               open_timeout: 5, read_timeout: 8) do |http|
+      http.get(uri.request_uri, WATCH_PAGE_HEADERS)
+    end
+
+    case response
+    when Net::HTTPSuccess then response.body
+    when Net::HTTPRedirection
+      fetch_watch_page(URI.join(url, response["location"]).to_s, redirects: redirects - 1) if redirects.positive?
+    end
+  rescue StandardError => e
+    Rails.logger.warn "[VideoEmbed] #{provider} #{id}: couldn't read the video's page (#{e.class}: #{e.message})"
+    nil
+  end
 
   def h(value) = ERB::Util.html_escape(value.to_s)
 end

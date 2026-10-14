@@ -99,4 +99,43 @@ class VideoEmbedTest < ActiveSupport::TestCase
     assert_includes email, "https://i.ytimg.com/vi/#{ID}/hqdefault.jpg"
     assert_includes email, "▶ My talk"
   end
+
+  # ── Duration ────────────────────────────────────────────────────────────
+
+  # The data a watch page carries, cut down: the video's own length comes
+  # first, suggested videos' after it.
+  PAGE = %(var ytInitialPlayerResponse = {"videoDetails":{"videoId":"#{ID}","lengthSeconds":"213"}};
+           ... "compactVideoRenderer":{"lengthSeconds":"58"} ...).freeze
+
+  test "the length is the first lengthSeconds on the video's page" do
+    assert_equal 213, VideoEmbed.length_from_page(PAGE)
+  end
+
+  test "no length on the page, or a live stream's zero, is nil" do
+    assert_nil VideoEmbed.length_from_page("<html>consent page</html>")
+    assert_nil VideoEmbed.length_from_page(%("lengthSeconds":"0"))
+    assert_nil VideoEmbed.length_from_page(nil)
+  end
+
+  test "a length found is remembered; a failure is asked again next time" do
+    with_memory_cache do
+      embed = VideoEmbed.for("https://youtu.be/#{ID}")
+      embed.expects(:fetch_watch_page).once.returns(PAGE)
+      assert_equal 213, embed.duration_seconds
+      assert_equal 213, VideoEmbed.for("https://youtu.be/#{ID}").duration_seconds, "second ask comes from the cache"
+
+      other = VideoEmbed.for("https://youtu.be/abcdefghijk")
+      other.expects(:fetch_watch_page).twice.returns(nil)
+      assert_nil other.duration_seconds
+      assert_nil other.duration_seconds
+    end
+  end
+
+  def with_memory_cache
+    original = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    yield
+  ensure
+    Rails.cache = original
+  end
 end

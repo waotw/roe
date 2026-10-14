@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { mediaDuration } from "media_duration";
 
 // Connects to data-controller="metadata-editor"
 export default class extends Controller {
@@ -1502,42 +1503,10 @@ export default class extends Controller {
   }
 
   async fetchAndPopulateDuration(mediaPath) {
-    const extension = mediaPath.split(".").pop().toLowerCase();
-    const isAudio = ["mp3", "m4a", "wav", "ogg", "flac", "aac"].includes(
-      extension,
-    );
-    const isVideo = ["mp4", "webm", "ogv", "mov", "avi", "mkv"].includes(
-      extension,
-    );
-
-    if (!isAudio && !isVideo) {
-      console.warn("Not a supported audio/video file");
-      return;
-    }
-
     try {
-      // Create a temporary media element to load the file
-      const mediaElement = isAudio
-        ? new Audio()
-        : document.createElement("video");
-
-      // Wait for metadata to load
-      const duration = await new Promise((resolve, reject) => {
-        mediaElement.addEventListener("loadedmetadata", () => {
-          resolve(mediaElement.duration);
-        });
-
-        mediaElement.addEventListener("error", (e) => {
-          reject(new Error("Failed to load media file"));
-        });
-
-        // Set source and load
-        mediaElement.src = mediaPath;
-        mediaElement.load();
-      });
-
-      // Format duration as HH:MM:SS
-      const formatted = this.formatDuration(Math.floor(duration));
+      // A file is read in the browser; a YouTube link is looked up on the
+      // server (media_duration.js).
+      const formatted = await mediaDuration(mediaPath);
 
       // Mark as programmatic change to avoid triggering save warning
       this.isProgrammaticChange = true;
@@ -1560,7 +1529,9 @@ export default class extends Controller {
         this.isProgrammaticChange = false;
       }, 100);
     } catch (error) {
-      console.error("Error extracting duration:", error);
+      // Nothing to read (not a media file, or YouTube didn't say): leave
+      // the field for the writer to fill in.
+      console.warn("Couldn't get a duration:", error.message);
     }
   }
 

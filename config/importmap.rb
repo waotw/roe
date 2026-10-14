@@ -2,6 +2,7 @@
 
 pin "application"
 pin "clipboard", to: "clipboard.js", preload: true
+pin "media_duration", to: "media_duration.js"
 pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "delete_modal", to: "delete_modal.js", preload: true
 pin "theme_reset_modal", to: "theme_reset_modal.js", preload: true
