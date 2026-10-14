@@ -143,10 +143,13 @@ module HasMarkdownExtensions
     # Process images to make them responsive
     html = process_responsive_images(html)
 
+    # A YouTube link on a line of its own becomes the player.
+    html = embed_standalone_video_links(html)
+
     # A video embed on its own line came out of kramdown inside a <p>, and
     # the player is a block (<div>): a <p> can't hold one, so browsers close
     # the paragraph early and leave an empty one behind. Unwrap it.
-    html = html.gsub(%r{<p>\s*((?:<!--[^>]*-->\s*)?<div class="video-player-container.*?</div>\s*(?:<!--[^>]*-->\s*)?)</p>}m) do
+    html = html.gsub(%r{<p>\s*((?:<!--[^>]*-->\s*)?<div class="(?:video-player-container|video-external).*?</div>\s*(?:<!--[^>]*-->\s*)?)</p>}m) do
       inner = Regexp.last_match(1)
       # Only when the <p> held nothing but the player.
       inner.scan("<div").size == inner.scan("</div>").size ? inner : Regexp.last_match(0)
@@ -208,6 +211,29 @@ module HasMarkdownExtensions
     ).to_s
   end
 
+  # A YouTube video in the body. In a feed it's a thumbnail linking to the
+  # video: readers often strip iframes, and an empty gap reads as broken.
+  # Email gets the same treatment later, in NewsletterImageTransformer,
+  # from the player's data-video-url.
+  def render_external_video(embed, alt)
+    return embed.link_html(label: alt.to_s.strip).to_s if @rendering_feed
+
+    embed.iframe_html(label: alt.to_s.strip, extra_class: "video-embed").to_s
+  end
+
+  # A YouTube link alone on its line — pasted straight from the Share
+  # button — plays like `![](link)` does, the way most editors treat a
+  # pasted video link. Only when it's the whole paragraph: a link inside a
+  # sentence stays a link. Matches the bare text and the <a> that
+  # <link> or autolinking makes of it.
+  def embed_standalone_video_links(html)
+    html.gsub(%r{<p>\s*(?:<a href="([^"]+)">\s*\1\s*</a>|(https?://[^\s<]+))\s*</p>}) do
+      url = Regexp.last_match(1) || Regexp.last_match(2)
+      embed = VideoEmbed.for(url)
+      embed ? render_external_video(embed, "") : Regexp.last_match(0)
+    end
+  end
+
   def process_responsive_images(html)
     html.gsub(/<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/i) do
       match_str = $~.to_s
@@ -240,6 +266,9 @@ module HasMarkdownExtensions
       # native controls mean it works with no JS and is styleable via the
       # `audio`/`video` element selectors.
       ext = File.extname(src).downcase
+      if (embed = VideoEmbed.for(src))
+        next render_external_video(embed, alt)
+      end
       next render_audio_embed(src, alt) if AUDIO_EMBED_EXTENSIONS.include?(ext)
       next render_video_embed(src, alt) if VIDEO_EMBED_EXTENSIONS.include?(ext)
 

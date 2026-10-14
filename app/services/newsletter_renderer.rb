@@ -136,6 +136,7 @@ class NewsletterRenderer
                 <h1>#{post_title}</h1>
                 #{post_metadata_html}
                 #{post_header_image}
+                #{post_video_link}
 
                 <div class="post-content">
                   #{content_html}
@@ -189,6 +190,17 @@ class NewsletterRenderer
     # ResponsiveImageRenderer first to resolve the variant set.)
     picture = ResponsiveImageRenderer.render(post.image, alt: post_title)
     NewsletterImageTransformer.transform(picture, site_url: email_site_url)
+  end
+
+  # A video post whose video is on YouTube: its thumbnail, linking to the
+  # video, where the player sits on the web page. Email clients strip
+  # iframes, so the player itself can't go in. A video file of our own
+  # isn't sent either — email can't play it — so this is YouTube only.
+  def post_video_link
+    return "" unless post.respond_to?(:video)
+
+    embed = VideoEmbed.for(post.video)
+    embed ? embed.link_html(label: post_title).to_s : ""
   end
 
   # Email header (logo, etc)

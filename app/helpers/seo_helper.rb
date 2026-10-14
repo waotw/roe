@@ -90,6 +90,7 @@ module SeoHelper
       [
         seo_subject&.metadata&.dig("social_image").to_s.strip.presence,
         seo_subject&.metadata&.dig("image").to_s.strip.presence,
+        seo_video_thumbnail,
         social_image,
         SiteConfig.get("logo").to_s.strip.presence
       ]
@@ -156,6 +157,12 @@ module SeoHelper
 
   private
 
+  # A video post with a YouTube link and no image of its own shares with
+  # the video's thumbnail, rather than falling through to the site logo.
+  def seo_video_thumbnail
+    VideoEmbed.for(seo_subject&.metadata&.dig("video"))&.thumbnail_url
+  end
+
   def svg?(path)
     path.to_s.downcase.end_with?(".svg")
   end
@@ -175,6 +182,7 @@ module SeoHelper
       [
         seo_subject&.metadata&.dig("social_image").to_s.strip.presence,
         seo_subject&.metadata&.dig("image").to_s.strip.presence,
+        seo_video_thumbnail,
         social_image,
         SiteConfig.get("logo").to_s.strip.presence
       ]

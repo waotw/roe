@@ -17,7 +17,16 @@
                                     (omitted → no episode buttons at all)
 
     Without JavaScript the <video> keeps the browser's own controls, so it
-    still plays: the controller removes them once it has wired Roe's. %>
+    still plays: the controller removes them once it has wired Roe's.
+
+    A YouTube link (the Share button's youtu.be/… or any youtube.com watch,
+    Shorts or live link) plays in YouTube's own player instead — see
+    VideoEmbed. Same call sites, so a video post, a podcast's video and a
+    Markdown embed all take one. %>
+<% embed = VideoEmbed.for(src) %>
+<% if embed %>
+  <%= embed.iframe_html(label: local_assigns[:label], extra_class: local_assigns[:extra_class]) %>
+<% else %>
 <% label        = local_assigns[:label].presence %>
 <% extra_class  = local_assigns[:extra_class] %>
 <% episode_nav  = local_assigns.key?(:prev_episode) || local_assigns.key?(:next_episode) %>
@@ -88,3 +97,4 @@
     </div>
   </div>
 </div>
+<% end %>

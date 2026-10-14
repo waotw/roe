@@ -151,7 +151,8 @@
                   <td class="max-w-[16rem] py-1.5 pl-6 md:pl-4 pr-3 text-sm font-medium text-gray-900">
                     <div class="flex items-center gap-1.5">
                       <% media_url = post.metadata['audio'].presence || post.metadata['video'].presence %>
-                      <% if %w[podcast audio video].include?(post.metadata['post_type'].to_s) && post.metadata['duration'].to_s.strip.blank? && media_url.present? %>
+                      <%# A YouTube link can't be read by a <video> tag, so there's no duration to fetch. %>
+                      <% if %w[podcast audio video].include?(post.metadata['post_type'].to_s) && post.metadata['duration'].to_s.strip.blank? && media_url.present? && !VideoEmbed.embed?(media_url) %>
                         <span class="hidden" data-episode-durations-target="item"
                               data-media-url="<%= media_url %>"
                               data-kind="<%= post.metadata['video'].present? ? 'video' : 'audio' %>"

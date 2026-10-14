@@ -159,7 +159,8 @@ module ContentMetadataSchema
 
       # Media fields — required flag comes from Post::POST_TYPES for the current type
       "audio" => { type: :text, label: "audio", hint: "Example: /media/audio/audio-file.mp3", required: required_for_type.call("audio") },
-      "video" => { type: :text, label: "video", hint: "Example: /media/video/video-file.mp4", required: required_for_type.call("video") },
+      # COPY: video field hint
+      "video" => { type: :text, label: "video", hint: "Example: /media/video/video-file.mp4, or a YouTube link", required: required_for_type.call("video") },
       "duration" => {
         type: :text,
         label: "duration",

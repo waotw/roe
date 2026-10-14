@@ -42,6 +42,7 @@ class NewsletterImageTransformer
 
     doc = Nokogiri::HTML.fragment(@html)
     remove_galleries(doc)
+    replace_external_videos(doc)
     transform_standalone_pictures(doc)
     doc.to_html
   end
@@ -58,6 +59,22 @@ class NewsletterImageTransformer
   # untouched and still render.
   def remove_galleries(doc)
     doc.css("div.gallery").each(&:remove)
+  end
+
+  # A YouTube player (VideoEmbed) becomes its thumbnail linking to the
+  # video. Email clients strip iframes, so the player would leave a blank.
+  # Runs before the image pass, which then makes nothing of the thumbnail:
+  # it's already an absolute URL.
+  def replace_external_videos(doc)
+    doc.css("div.video-external[data-video-url]").each do |player|
+      embed = VideoEmbed.for(player["data-video-url"])
+      next player.remove unless embed
+
+      link = Nokogiri::HTML.fragment(embed.link_html(label: player["data-video-title"]).to_s)
+      # Already email-safe: keep the bare-<img> pass below from restyling it.
+      link.css("img").each { |img| img["data-email-done"] = "1" }
+      player.replace(link)
+    end
   end
 
   # Standalone images: collapse each <picture> (and its srcset) to one <img>

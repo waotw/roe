@@ -36,6 +36,29 @@ const HTML_LINE = lineClass("roe-md-htmlblock");
 const MARK_OPEN = /^<mark(\s[^>]*)?>$/i;
 const MARK_CLOSE = /^<\/mark\s*>$/i;
 
+// The video id in a YouTube link, or null. Kept in step with VideoEmbed's
+// YouTube entry (app/services/video_embed.rb): the same hosts and link
+// forms, so what previews as a video here plays as one on the page.
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
+  "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com",
+]);
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+export function youtubeId(src) {
+  let url;
+  try {
+    url = new URL(src);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(url.protocol) || !YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length === 1 && YOUTUBE_ID.test(parts[0])) return parts[0];
+  if (["embed", "shorts", "live", "v", "e"].includes(parts[0]) && YOUTUBE_ID.test(parts[1] || "")) return parts[1];
+  const v = url.searchParams.get("v");
+  return v && YOUTUBE_ID.test(v) ? v : null;
+}
+
 class BulletWidget extends WidgetType {
   eq() {
     return true;
@@ -64,7 +87,10 @@ class ImageWidget extends WidgetType {
     const wrap = document.createElement("span");
     wrap.className = "roe-md-image";
     const img = document.createElement("img");
-    img.src = this.src;
+    // A YouTube link plays on the page; here it shows as its thumbnail,
+    // since the link itself isn't an image and would only show as broken.
+    const video = youtubeId(this.src);
+    img.src = video ? `https://i.ytimg.com/vi/${video}/hqdefault.jpg` : this.src;
     img.alt = this.alt;
     img.loading = "lazy";
     // A broken path shows as its alt text rather than a broken-image icon, so
@@ -74,10 +100,11 @@ class ImageWidget extends WidgetType {
       wrap.classList.add("roe-md-image-missing");
     };
     wrap.appendChild(img);
-    if (this.caption) {
+    const captionText = video ? `▶ ${this.caption || this.alt || "YouTube video"}` : this.caption;
+    if (captionText) {
       const caption = document.createElement("span");
       caption.className = "roe-md-image-caption";
-      caption.textContent = this.caption;
+      caption.textContent = captionText;
       wrap.appendChild(caption);
     }
     return wrap;

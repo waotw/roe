@@ -77,8 +77,9 @@ class Post < ApplicationRecord
       metadata_fields: [
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to audio file (e.g., /media/audio/episode-1.mp3)" },
+        # COPY: video field hint (podcast)
         { name: "video", type: :text, label: "Video File",
-          hint: "Optional. Adds a video version of this episode (e.g., /media/video/episode-1.mp4). The site renders video when present; the RSS feed still uses the audio file." },
+          hint: "Optional. Adds a video version of this episode: a file (e.g., /media/video/episode-1.mp4) or a YouTube link. The site renders video when present; the RSS feed still uses the audio file." },
         { name: "duration", type: :text, required: true, label: "Duration",  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
         { name: "podcast", type: :select, label: "Podcast",
@@ -157,8 +158,9 @@ class Post < ApplicationRecord
       description: "Article with featured video player",
       icon: "🎬",
       metadata_fields: [
-        { name: "video", type: :text, required: true, label: "Video File",
-          hint: "Path to video file (e.g., /media/video/my-video.mp4)" },
+        # COPY: video field label + hint (video post)
+        { name: "video", type: :text, required: true, label: "Video",
+          hint: "A video file (e.g., /media/video/my-video.mp4) or a YouTube link from its Share button" },
         { name: "duration", type: :text, label: "Duration",
           hint: 'Optional, e.g., "12:34"' }
       ],
