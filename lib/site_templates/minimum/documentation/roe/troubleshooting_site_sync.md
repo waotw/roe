@@ -32,6 +32,18 @@ template: links
 - Check that the connection is healthy
 - Verify you typed `LIVE` correctly when confirming
 
+### "The live site can't send large files yet" or "can't receive large files yet"
+
+Files over 25 MB, such as videos, travel between your sites in pieces. Your live site is running an older version of Roe that can't do this yet.
+
+[Deploy](/documentation/guide-deploy) the version of Roe you have locally to your live site, then sync again. Nothing is lost in the meantime: the sync stops before changing anything.
+
+### "Files differ from Live site, though neither side's sync record shows a change"
+
+Both sites keep a record of the files they last agreed on. This message means some files are different on each site, but neither record shows them changing. Usually a file was edited while a long sync was running.
+
+The message lists the files. Click `SYNC WITH LIVE`. If syncing a file would replace a newer copy with an older one, Site Sync stops and asks which version to keep instead of choosing for you.
+
 ## Kamal
 
 ### `Permission denied (publickey)`

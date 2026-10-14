@@ -68,6 +68,16 @@ pack and unpack), `SiteWriter` (mtime restore, guarded deletes), `HttpTransport`
 `Ledger`, `Reconciler`, `Checker`, and the `POST /api/site_sync/{download,upload,file_hashes}`
 endpoints.
 
+Files over 25 MB (`HttpTransport::PUSH_BATCH_MAX_BYTES`) never go in a batch: a
+1.2 GB video in one request died at the proxy on the way up, and on the way down
+it took the live server's memory, since the batch tar is built in RAM. They move
+in 8 MB pieces instead — `upload_chunk`/`upload_finish`
+(`ChunkedUploadsController`) for push, `download_info`/`download_chunk`
+(`ChunkedDownloadsController`) for pull and backup. Both sides resume from what
+already arrived and check the finished file's SHA-256 before using it. Pieces
+wait in `site/.sync-uploads/` (excluded from the Ledger) or, for live backups,
+`backups/live/content/.downloads/`, and are cleared after two days.
+
 `sync_transport` defaults to `:http` when unset; rsync is now the explicit opt-out.
 `kamal_rsync` (rsync over plain SSH to any box) is already host-agnostic and stays.
 `fly_rsync` is Fly-coupled but built, and stays for now; generalising it is a
@@ -83,14 +93,40 @@ a key restore. That is by design.
 A conflict means both sides differ from the ledger's last-synced baseline. The
 MVP is block-and-resolve, not auto-merge: detect conflicts, stop the sync,
 resolve, then proceed. On a true conflict, always prompt — most-recent-wins is a
-one-click default in the UI, never silent. Comparison is in UTC, because mtime
-alone cannot be trusted across machines or after a copy.
+one-click default in the UI, never silent. Comparison is in UTC. A modified time
+on its own says nothing across machines — a file edited at the same moment on
+both can carry different times — but every transfer stamps the copy with the
+original's time, so a file one sync carried matches exactly on both sides.
+That's what the two rules below rely on.
 
 `Reconciler` does a three-way diff of baseline, local, and peer, classifying each
 path as push, push_delete, pull, pull_delete, converged, or a conflict
 (`EDIT_EDIT`, `EDIT_DELETE`, `DELETE_EDIT`). Content-hash confirmation downgrades
 an edit/edit pair with matching bytes to `converged`, so mtime skew does not
 produce a false conflict.
+
+**The baseline records only what both sides hold in the same state.**
+`Ledger.write_confirmed!` is the one place that writes it after a transfer; the
+transfer job, the resolution job and the live side's `refresh_ledger` all go
+through it (the resolution job checks its settled paths with
+`Ledger.same_state?`). A file missing on the peer stays out, so it reads as a
+push rather than a deletion. A file both sides hold in *different* states keeps
+its previous entry. That second rule came from a setting saved during a
+39-minute pull: the old code recorded the local version as agreed, the next sync
+read live's September copy as the change, and pulled it over the newer one. The
+symptom was "Content differs from Live site, but neither side reports drift",
+which a second sync "fixed" in the wrong direction.
+
+**A sync never replaces a newer copy with an older one unasked.**
+`Reconciler.overwrites_newer?` turns a one-way push or pull into a conflict when
+the copy being overwritten has a later mtime than the incoming one. A real
+change is never older than what it replaces, so this only fires when the
+baseline was wrong — it's the net under the rule above.
+
+The Site Sync page reads one answer, `Admin::SiteSyncController#live_sync_overview`,
+for both the status line at the top and the "Changes to sync" panel. The top line
+once read only the local ledger and said "in sync" while the panel listed files
+that differed from live.
 
 The UI is a single "Sync with live" button. A real conflict raises
 `ConflictsDetected` and the status becomes `:conflicts` with no overwrite and no

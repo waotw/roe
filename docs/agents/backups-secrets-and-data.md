@@ -125,7 +125,19 @@ Under the project root, via `SiteSync::BackupPaths`:
   `SiteSync::DatabaseBackup` on the pull side,
   `BackupManager.build_encrypted_db_bundle` on the production side.
 - `backups/live/content/` — pre-push safety snapshots of live content. Internal;
-  not surfaced in the UI.
+  not surfaced in the UI. Large files are fetched in pieces into
+  `backups/live/content/.downloads/` and moved into the snapshot once their
+  SHA-256 checks out.
+
+`SiteSync::BackupPolicy` decides what goes into both kinds of content backup:
+everything except video web versions (renditions and posters under
+`media/**/variants/`), which are made again from the original. Each video's
+`-video.json` stays in — it records the poster frame and the sizes chosen, which
+can't be rebuilt. Image variants were already excluded everywhere. Restore passes
+the same filter, so restoring a snapshot doesn't delete the current web versions.
+Large files are not skipped: an earlier version left out files over 25 MB, which
+meant a large video deleted through a sync had no copy anywhere. Chunked
+download replaced it.
 
 A boot migration in `config/application.rb` moves the legacy
 `site_backups/{local,production}` layout to `backups/{local,live/content}`. It is

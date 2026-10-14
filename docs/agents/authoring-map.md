@@ -99,6 +99,22 @@ use a separate detached-tag install.
 that was destroyed was uncommitted and local only, so nothing off the machine had
 it.
 
+### A media file with an uppercase extension vanishes on the live site
+
+**Symptom:** a video sent by Site Sync is gone from live straight afterwards, and
+the next sync lists its web versions as needing to go again.
+
+**Cause:** a pattern like `Dir.glob("**/*.{mov,mp4}")` matches by case. On a Mac
+it still finds `clip.MOV`, because APFS ignores case; on Linux it doesn't. The
+live site's content sync then took the file as deleted, removed its media record,
+and removing a video's record deletes its web versions.
+
+**Fix:** find media with `RoeSitePaths.files_with_extensions(root, extensions)`
+(`config/application.rb`), which matches any case. Never glob media by
+extension. Tests can't see this on a Mac;
+`test/services/media_extension_case_test.rb` simulates a case-sensitive disk and
+fails if the old pattern returns to the app code.
+
 ### Release tags need the `v` prefix
 
 `RoeUpdater::VersionChecker` ignores bare-numbered tags. Tags must look like

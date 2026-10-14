@@ -38,28 +38,6 @@ You can use the `+ Add Field` button to see a list of suggested fields as well a
 | cmd/ctrl–~    | Strikethrough    |
 | cmd/ctrl–k    | Link             |
 | cmd/ctrl-z    | Undo             |
-| cmd/ctrl–f    | Find and replace (Live editor only) |
-| cmd/ctrl–e    | Switch between Live and Source (Live editor only) |
-
-### The Live Editor (beta)
-
-Roe has a new editor that formats your writing as you go. **Bold** looks bold, links look like links, and headings are larger, but what you're editing is still plain Markdown from your files.
-
-It's off by default while it's being tested. Turn it on in [Settings → Content](/admin/configs/content/edit) under `Writing editor`:
-
-- `Live` — formatted as you write
-- `Source` — the same editor, showing plain Markdown
-- `Plain textarea` — the original editor
-
-**How Live works:** the Markdown is hidden until you need it. Put the cursor inside something, like a bold word or a link, and its Markdown appears so you can edit it. Move away and it's formatted again. Headings, quotes and lists work the same way, a line at a time.
-
-**Roe-anji blocks** — collections, cards, galleries, forms and buttons — show as coloured cards with their name and a short summary, so they're easy to spot in a long piece. Click a card, or arrow into it, to edit the block. If a block has an error, the card is replaced by the same warning you'd see in the preview.
-
-Single images with no line between them show as a gallery card with a dashed outline. That's how Roe will render them; see [Galleries: Simple Gallery](/documentation/roe/galleries#simple-gallery).
-
-**Live / Source:** the switch sits at the left of the `Table of Contents` row. It tells you which mode you're in and the button switches to the other mode. Roe remembers your choice in this browser.
-
-If you have any trouble with the new editor, set `Writing editor` back to `Plain textarea`. Your content is unaffected either way.
 
 ### Saving & Preview
 
@@ -91,14 +69,6 @@ Fixes are applied in the editor, not to the file — nothing is saved until you 
 
 The format buttons for `B`, `I` and <code><s>S</s></code> allow you to select text and then apply the needed Markdown to those elements.
 
-The `H` button highlights the selected text by wrapping it in `==`:
-
-```markdown
-This is ==the important part== of the sentence.
-```
-
-It renders as a highlight on your site. Older posts may use `<mark>the important part</mark>` instead; that still works exactly the same.
-
 The `1. LIST` and `• LIST` buttons will start an ordered or unordered list:
 
 - hit enter once to create the next item
@@ -108,13 +78,9 @@ The `🔗` button will wrap the selected text in Markdown link syntax and move t
 
 The <code>F<sup>1</sup></code> button creates a footnote:
 
-1. Put the cursor where you want the footnote added.
+1. Put the cursor where you want the foot note added.
 2. Click the button and it will bring you to the bottom of the editor to add your footnote text.
-3. Click `CLOSE FOOTNOTE` (or press `esc`) and it will bring you right back to where you inserted the footnote. If you closed it without writing anything, the empty footnote is removed.
-
-**Writing longer footnotes:** everything after the first line of a footnote has to be indented four spaces, or it falls out of the footnote and into the body of the post. Roe handles this for you: pressing enter inside a footnote adds the four spaces, and in the Live editor, text you paste into a footnote is indented too.
-
-**Leaving and coming back:** if you go to another page to find a quote, or save, while a footnote is open, `CLOSE FOOTNOTE` will still be there when you come back.
+3. Click `✓ DONE WITH FOOTNOTE` and it will bring you write back to where you inserted the footnote.
 
 ### [Roe-anji](/documentation/roe/roeanji) Buttons
 
