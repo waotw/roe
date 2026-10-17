@@ -9,6 +9,7 @@ export default class extends Controller {
     "form",
     "copyUrl",
     "galleryButton",
+    "playerButton",
   ];
 
   connect() {
@@ -34,6 +35,10 @@ export default class extends Controller {
       // never both apply.
       if (this.hasGalleryButtonTarget) {
         this.galleryButtonTarget.style.display = count > 1 ? "" : "none";
+      }
+      // A player plays one file.
+      if (this.hasPlayerButtonTarget) {
+        this.playerButtonTarget.style.display = count === 1 ? "" : "none";
       }
     } else {
       this.toolbarTarget.style.display = "none";
@@ -208,6 +213,25 @@ export default class extends Controller {
     );
     this.element.dispatchEvent(
       new CustomEvent("media-picker:close", { bubbles: true }),
+    );
+  }
+
+  // ADD PLAYER: the one audio or video file selected goes to the card
+  // builder, which opens as a new player card with it in the Audio or Video
+  // field. The picker closes first; the builder opens over the editor.
+  submitPlayer(event) {
+    const selected = this.checkboxTargets.find((cb) => cb.checked);
+    if (!selected) return;
+
+    const kind = event?.currentTarget?.dataset?.mediaKind === "video" ? "video" : "audio";
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:close", { bubbles: true }),
+    );
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:insert-player", {
+        bubbles: true,
+        detail: { kind, path: selected.dataset.filePath },
+      }),
     );
   }
 

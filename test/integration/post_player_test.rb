@@ -145,10 +145,52 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
   # ── recognising the card ──
 
   test "only a real player card in the body counts" do
-    assert Post.new(content: "```card\ntype: player\n```").player_card_in_body?
-    assert Post.new(content: "Text\n\n  ```card\n  title: A\n  type: \"player\"\n  ```").player_card_in_body?
-    assert_not Post.new(content: "```card\ntype: pullquote\ntext: type: player\n```").player_card_in_body?
-    assert_not Post.new(content: "type: player").player_card_in_body?
-    assert_not Post.new(content: "```collection\ntype: player\n```").player_card_in_body?
+    assert Post.new(content: "```card\ntype: player\n```").own_player_card_in_body?
+    assert Post.new(content: "Text\n\n  ```card\n  title: A\n  type: \"player\"\n  ```").own_player_card_in_body?
+    assert_not Post.new(content: "```card\ntype: pullquote\ntext: type: player\n```").own_player_card_in_body?
+    assert_not Post.new(content: "type: player").own_player_card_in_body?
+    assert_not Post.new(content: "```collection\ntype: player\n```").own_player_card_in_body?
+  end
+
+  # ── a card playing something else ──
+
+  test "a card playing some other file is extra: the post's own player stays" do
+    song = "Listen to this:\n\n```card\ntype: player\naudio: /media/audio/song.mp3\n```"
+
+    get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", duration: "00:30:00", content: song).url_name)
+    assert_select ".podcast-hero .audio-player", 1
+    assert_select ".post-content .card-player audio source[src='/media/audio/song.mp3']", minimum: 1
+
+    get post_path(media_post("audio", audio: "/media/audio/track.mp3", content: song).url_name)
+    assert_equal 2, card_players, "the post's track, and the song"
+
+    clip = "```card\ntype: player\nvideo: https://youtu.be/B8A7dGTX8a0\n```"
+    get post_path(media_post("video", video: "https://youtu.be/dQw4w9WgXcQ", content: clip).url_name)
+    assert_equal 2, iframes
+  end
+
+  test "a card naming the post's own file stands in for it, however it's written" do
+    post = Post.new(content: "", metadata: { "audio" => "/media/audio/My Show 01.mp3",
+                                              "video" => "https://youtu.be/dQw4w9WgXcQ?si=abc" })
+    own = ->(src) { post.content = "```card\ntype: player\naudio: #{src}\n```"; post.own_player_card_in_body? }
+
+    assert own.call("/media/audio/My Show 01.mp3")
+    assert own.call("\"/media/audio/My Show 01.mp3\"")
+    assert own.call("media/audio/My%20Show%2001.mp3")
+    assert own.call("/media/audio/My Show 01.mp3?v=2")
+    assert own.call("https://example.com/media/audio/My Show 01.mp3")
+    assert_not own.call("/media/audio/my show 01.mp3"), "a different name on a case-sensitive server"
+    assert_not own.call("/media/audio/song.mp3")
+
+    post.content = "```card\ntype: player\nvideo: https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10\n```"
+    assert post.own_player_card_in_body?, "the same YouTube video by another link"
+    post.content = "```card\ntype: player\nvideo: https://youtu.be/B8A7dGTX8a0\n```"
+    assert_not post.own_player_card_in_body?
+  end
+
+  test "one card for the post's own media is enough, even beside another" do
+    body = "```card\ntype: player\naudio: /media/audio/song.mp3\n```\n\n```card\ntype: player\n```"
+    get post_path(media_post("audio", audio: "/media/audio/track.mp3", content: body).url_name)
+    assert_equal 2, card_players, "the card standing in for the post, and the song — no third"
   end
 end

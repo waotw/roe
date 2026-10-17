@@ -74,6 +74,20 @@ class Admin::MediumPickerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "Use in Player"
       assert_includes response.body, "media-bulk-select#submitToCard"
       assert_not_includes response.body, "Insert Selected", "nothing is written into the document from here"
+      assert_not_includes response.body, "Add Player", "already on its way to a player"
     end
+  end
+
+  # Opened from MEDIA: one audio or video file can go to the player builder.
+  test "audio and video offer Add Player; images don't" do
+    %w[audio video].each do |type|
+      get picker_admin_medium_index_path(media_type: type)
+
+      assert_select "button[data-media-bulk-select-target=playerButton][data-media-kind=?][data-action='click->media-bulk-select#submitPlayer']",
+                    type, text: /Add Player/
+    end
+
+    get picker_admin_medium_index_path(media_type: "images")
+    assert_select "button[data-media-bulk-select-target=playerButton]", 0
   end
 end

@@ -294,15 +294,26 @@ class Post < ApplicationRecord
   # posts written before it still rely on the post type's template to show a
   # player, so the template supplies one — unless the body already has its
   # own, and only when content.yml's `players.video` / `players.audio` hasn't
-  # turned that off. One player either way, never two.
+  # turned that off. Never two players for the same episode or video.
+  #
+  # Only a card playing the post's *own* media stands in for the template's
+  # player: one with no `audio:`/`video:` (it falls back to the post's), or
+  # one naming the post's own file. A card playing something else — a song
+  # linked from a podcast's show notes — is extra, and the post's player stays.
 
   POST_TYPES_WITH_PLAYERS = %w[video audio music podcast].freeze
 
-  # A ```card block with `type: player` anywhere in the body.
-  PLAYER_CARD_RE = /^[ \t]*```card[ \t]*\r?\n(?:(?!^[ \t]*```).*\r?\n)*?[ \t]*type:[ \t]*["']?player["']?[ \t]*\r?$/
+  # Each ```card block in the body: its option lines, up to the closing fence.
+  CARD_BLOCK_RE = /^[ \t]*```card[ \t]*\r?\n((?:(?!^[ \t]*```).*\r?\n)*?)[ \t]*```/
 
-  def player_card_in_body?
-    content.to_s.match?(PLAYER_CARD_RE)
+  def own_player_card_in_body?
+    content.to_s.scan(CARD_BLOCK_RE).any? do |(block)|
+      config = parse_card_config(block)
+      next false unless unquote(config[:type]) == "player"
+
+      sources = [ config[:audio], config[:video] ].map { |s| unquote(s) }.reject(&:blank?)
+      sources.empty? || sources.any? { |src| own_media?(src) }
+    end
   end
 
   # :video or :audio — what the template's player would play — or nil when
@@ -318,7 +329,23 @@ class Post < ApplicationRecord
 
   def show_template_player?
     kind = template_player_kind
-    kind.present? && !player_card_in_body? && self.class.template_players_enabled?(kind)
+    kind.present? && !own_player_card_in_body? && self.class.template_players_enabled?(kind)
+  end
+
+  # Is `src` this post's own audio or video? The same file however it's
+  # written (with or without the leading slash, %20 for spaces, a ?query),
+  # or the same YouTube video whichever share link was copied.
+  def own_media?(src)
+    [ audio, video ].map { |s| s.to_s.strip }.reject(&:blank?).any? do |mine|
+      theirs_embed = VideoEmbed.for(src)
+      mine_embed = VideoEmbed.for(mine)
+      if theirs_embed || mine_embed
+        theirs_embed && mine_embed &&
+          theirs_embed.provider == mine_embed.provider && theirs_embed.id == mine_embed.id
+      else
+        comparable_media_path(src) == comparable_media_path(mine)
+      end
+    end
   end
 
   # content.yml `players.video` / `players.audio`. Unset means on, so a site
@@ -857,6 +884,21 @@ class Post < ApplicationRecord
   end
 
   private
+
+  # A card option without its quotes: `audio: "/media/a.mp3"` → /media/a.mp3.
+  def unquote(value)
+    value.to_s.strip.delete_prefix('"').delete_suffix('"').delete_prefix("'").delete_suffix("'").strip
+  end
+
+  # A local media path in one form for comparing: no query or fragment,
+  # spaces decoded, a single leading slash, and the site's own address
+  # dropped, so `media/a.mp3`, `/media/a.mp3` and `https://site/media/a.mp3`
+  # all match. Case is kept — Linux file names are case-sensitive.
+  def comparable_media_path(src)
+    path = src.to_s.strip.sub(/[?#].*\z/, "")
+    path = path.sub(%r{\Ahttps?://[^/]+}i, "") if path.match?(%r{\Ahttps?://[^/]+/media/}i)
+    "/#{CGI.unescape(path.tr('+', '%2B')).delete_prefix('/')}"
+  end
 
   def self.fix_guid_in_file(file_path)
     return false unless File.exist?(file_path)

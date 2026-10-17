@@ -56,10 +56,15 @@ export default class extends Controller {
     // player's Audio/Video "Choose…" buttons, see pickMedia).
     this.onPickedForCard = (event) => this.fillPickedField(event.detail?.path);
     this.element.addEventListener("media-picker:pick-for-card", this.onPickedForCard);
+
+    // ADD PLAYER in the media picker: a new player card with that file.
+    this.onInsertPlayer = (event) => this.openPlayerWith(event.detail || {});
+    this.element.addEventListener("media-picker:insert-player", this.onInsertPlayer);
   }
 
   disconnect() {
     this.element.removeEventListener("media-picker:pick-for-card", this.onPickedForCard);
+    this.element.removeEventListener("media-picker:insert-player", this.onInsertPlayer);
     if (!this._refresh) return;
     ["keyup", "click", "select", "input", "focus"].forEach((ev) =>
       this.textarea?.removeEventListener(ev, this._refresh));
@@ -141,6 +146,28 @@ export default class extends Controller {
     el.value = path;
     el.classList.remove("cb-empty");
     this.clearError();
+  }
+
+  // ADD PLAYER from the media picker: a fresh player card with the picked
+  // file in Audio or Video, the other emptied so the card plays this one.
+  // Opened, not inserted, so the rest (title, show_duration…) can be set
+  // first — the same as reaching it from Card ▼ → Player. Goes in where the
+  // cursor was; the picker never moves it.
+  openPlayerWith({ kind, path }) {
+    if (!path) return;
+    this.open({
+      preventDefault() {},
+      currentTarget: { dataset: { cardType: "player" } },
+    });
+
+    const group = this.activeGroup();
+    if (!group) return;
+    ["audio", "video"].forEach((key) => {
+      const el = group.querySelector(`[data-cb-field="${key}"]`);
+      if (!el) return;
+      el.value = key === kind ? path : "";
+      el.classList.toggle("cb-empty", !el.value);
+    });
   }
 
   // --- caret detection ------------------------------------------------------

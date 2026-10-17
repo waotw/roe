@@ -92,6 +92,19 @@
               Gallery
             </button>
           <% end %>
+          <%# Audio and video: one file → the player card builder, opened with
+              that file in its Audio or Video field. The builder writes the
+              card, as the gallery builder writes galleries. COPY: button label %>
+          <% if %w[audio video].include?(@media_type) %>
+            <button type="button"
+                    data-media-bulk-select-target="playerButton"
+                    data-action="click->media-bulk-select#submitPlayer"
+                    data-media-kind="<%= @media_type %>"
+                    style="display: none;"
+                    class="text-xs px-3 py-1 border border-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xs font-mono uppercase">
+              Add Player
+            </button>
+          <% end %>
         <% end %>
       </div>
     </div>
