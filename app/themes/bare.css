@@ -2424,6 +2424,15 @@ article .content,
   opacity: 1;
 }
 
+/* The browser's own audio bar: what a player shows until player.js loads
+   (a static host, a blocked script). Full width, so it sits where Roe's
+   controls will. */
+.player-native {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-0);
+}
+
 .player-transport {
   display: flex;
   align-items: center;

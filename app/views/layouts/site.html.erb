@@ -145,6 +145,10 @@
         work without it — a multiply-referenced note renders a return link per
         mention, and single-reference notes need nothing. %>
     <script src="/javascript/footnotes.js" nonce="<%= safe_csp_nonce %>" defer></script>
+    <%# Audio and video players. Each plays without it, in the browser's own
+        controls; this swaps in Roe's (the player card's TUI transport, the
+        podcast player, the video controls) and adopts a playlist. %>
+    <script src="/javascript/player.js" nonce="<%= safe_csp_nonce %>" defer></script>
     <%# Cart icon shows in both dynamic and static — Snipcart is entirely
         client-side so it works on static product pages. Member icon only
         appears in dynamic mode: signed in, current_member is forced to nil

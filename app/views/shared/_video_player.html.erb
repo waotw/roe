@@ -1,8 +1,8 @@
 <%# The site's video player: the <video> (web versions, poster and size from
     VideoRenderer) with Roe's own controls under it — progress bar,
-    play/pause, time, fullscreen — driven by the audio-player Stimulus
-    controller. Used everywhere a video appears in site content, so they all
-    look and behave the same:
+    play/pause, time, fullscreen — driven by site_js/player.js (served
+    from /javascript, so static exports have it too). Used everywhere a
+    video appears in site content, so they all look and behave the same:
 
       - a video post (posts/types/_video)
       - a video podcast (posts/_media_player, with episode buttons)
@@ -17,7 +17,8 @@
                                     (omitted → no episode buttons at all)
 
     Without JavaScript the <video> keeps the browser's own controls, so it
-    still plays: the controller removes them once it has wired Roe's.
+    still plays: site_js/player.js removes them and shows Roe's (hidden
+    until then, [data-player-ui]) once it has wired them up.
 
     A YouTube link (the Share button's youtu.be/… or any youtube.com watch,
     Shorts or live link) plays in YouTube's own player instead — see
@@ -36,28 +37,25 @@
     is one), not a 1 GB original. %>
 <% download     = VideoRenderer.plan(src).sources.first&.dig(:src) || src %>
 <div class="video-player-container <%= extra_class %>"
-     data-controller="audio-player"
-     data-audio-player-type-value="video"
-     data-audio-player-skip-seconds-value="15">
-  <% video_attrs = { "class" => "video-player-video", "data-audio-player-target" => "video", "controls" => true,
-                     "data-action" => "click->audio-player#togglePlay" } %>
+     data-player="video"
+     data-player-skip="15">
+  <% video_attrs = { "class" => "video-player-video", "data-player-part" => "media", "controls" => true } %>
   <% video_attrs["aria-label"] = label if label %>
   <%= VideoRenderer.tag(src, attrs: video_attrs,
         inner: %(Your browser doesn't support video playback. <a href="#{ERB::Util.html_escape(download)}">Download the video</a>.).html_safe) %>
 
-  <div class="video-controls">
+  <div class="video-controls" data-player-ui hidden>
     <div class="video-progress"
-         data-audio-player-target="progressBar"
-         data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub">
-      <div class="video-progress-fill" data-audio-player-target="progressFill"></div>
-      <div class="video-progress-handle" data-audio-player-target="progressHandle"></div>
+         data-player-part="progress"
+         role="slider" aria-label="Seek" tabindex="0">
+      <div class="video-progress-fill" data-player-part="fill"></div>
+      <div class="video-progress-handle" data-player-part="handle"></div>
     </div>
 
     <div class="video-controls-bar">
       <div class="video-controls-left">
         <button type="button" class="video-btn btn-play-pause"
-                data-action="click->audio-player#togglePlay"
-                data-audio-player-target="playButton"
+                data-player-part="play"
                 aria-label="Play">
           <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
@@ -83,12 +81,12 @@
 
       <div class="video-controls-right">
         <span class="video-time">
-          <span data-audio-player-target="currentTime">0:00</span>
+          <span data-player-part="current">0:00</span>
           <span class="video-time-separator">/</span>
-          <span data-audio-player-target="duration">0:00</span>
+          <span data-player-part="duration">0:00</span>
         </span>
         <button type="button" class="video-btn btn-fullscreen"
-                data-action="click->audio-player#toggleFullscreen"
+                data-player-part="fullscreen"
                 aria-label="Fullscreen">
           <svg class="icon-fullscreen" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
           <svg class="icon-fullscreen-exit" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>

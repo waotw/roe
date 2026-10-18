@@ -1,4 +1,16 @@
 module PostsHelper
+  # A position in an episode, as the player shows it: 75 → "1:15",
+  # 3723 → "1:02:03". Matches player.js's formatTime, so a chapter's time
+  # reads the same before and after the script loads.
+  def format_player_time(seconds)
+    total = seconds.to_f.floor
+    return "0:00" if total.negative?
+
+    hours, rest = total.divmod(3600)
+    minutes, secs = rest.divmod(60)
+    hours.positive? ? format("%d:%02d:%02d", hours, minutes, secs) : format("%d:%02d", minutes, secs)
+  end
+
   def format_duration(duration)
     # Handle both "HH:MM:SS" and seconds formats
     if duration.to_s.include?(":")

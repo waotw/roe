@@ -1949,9 +1949,11 @@ module HasMarkdownExtensions
   end
 
   # `card` with `type: player` — the transport. Plays an explicit `audio:` (or a
-  # bare `video:`), else the current post's audio/video. Reuses the audio-player
-  # Stimulus controller and the .collection-player TUI base. The list is a
-  # separate `playlist` collection; a later step lets this adopt one.
+  # bare `video:`), else the current post's audio/video. Progressive: it's
+  # rendered as the browser's own <audio controls> with Roe's transport hidden
+  # ([data-player-ui]), and site_js/player.js swaps them when it loads — so a
+  # static host, or a page where the script doesn't run, still plays. The list
+  # is a separate `playlist` collection the transport adopts.
   def render_player_card(config, preview: false)
     audio_src = config[:audio].presence || (respond_to?(:audio) ? audio.to_s.strip.presence : nil)
     video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
@@ -1988,32 +1990,36 @@ module HasMarkdownExtensions
     figure_html  =
       if show_artwork
         img = art.present? ?
-          %Q(<img class="player-cover" data-audio-player-target="artwork" src="#{ERB::Util.html_escape(art)}" alt="">) :
-          %Q(<img class="player-cover" data-audio-player-target="artwork" alt="" hidden>)
+          %Q(<img class="player-cover" data-player-part="artwork" src="#{ERB::Util.html_escape(art)}" alt="">) :
+          %Q(<img class="player-cover" data-player-part="artwork" alt="" hidden>)
         %Q(<figure class="player-figure">#{img}</figure>)
       else
         ""
       end
 
+    # The <audio> shows the browser's controls until player.js takes over;
+    # with nothing of its own to play (it's waiting to adopt a playlist) it
+    # starts hidden, since an empty browser bar plays nothing either.
+    native_hidden = audio_src.present? ? "" : " hidden"
     <<~HTML
-      <div class="card-player" data-controller="audio-player" data-audio-player-type-value="audio"#{member_upgrade_value} data-cover="#{ERB::Util.html_escape(cover)}">
-        <audio data-audio-player-target="audio" preload="metadata" hidden>#{sources_html}</audio>
+      <div class="card-player" data-player="audio" data-player-skip="15"#{member_upgrade_value} data-cover="#{ERB::Util.html_escape(cover)}">
         <div class="player-body">
           #{figure_html}
           <div class="player-main">
             <div class="player-now">
-              <span class="player-now-title" data-audio-player-target="title">#{title_html}</span>
-              <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener">[info]</a>
+              <span class="player-now-title" data-player-part="title">#{title_html}</span>
+              <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener" hidden>[info]</a>
             </div>
-            <div class="player-transport">
-              <button type="button" class="player-toggle" data-audio-player-target="playButton" data-action="click->audio-player#togglePlay" data-playing="false" aria-label="Play"></button>
-              <span class="player-time player-time-current" data-audio-player-target="currentTime">0:00</span>
-              <div class="player-progress" data-audio-player-target="progressBar" data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub" role="slider" aria-label="Seek" tabindex="0">
-                <div class="player-progress-fill" data-audio-player-target="progressFill"></div>
-                <div class="player-progress-handle" data-audio-player-target="progressHandle"></div>
+            <audio class="player-native" data-player-part="media" controls preload="metadata"#{native_hidden}>#{sources_html}</audio>
+            <div class="player-transport" data-player-ui hidden>
+              <button type="button" class="player-toggle" data-player-part="play" data-playing="false" aria-label="Play"></button>
+              <span class="player-time player-time-current" data-player-part="current">0:00</span>
+              <div class="player-progress" data-player-part="progress" role="slider" aria-label="Seek" tabindex="0">
+                <div class="player-progress-fill" data-player-part="fill"></div>
+                <div class="player-progress-handle" data-player-part="handle"></div>
               </div>
-              <span class="player-time player-time-duration" data-audio-player-target="duration">0:00</span>
-              <button type="button" class="player-speed" data-audio-player-target="speedButton" data-action="click->audio-player#cycleSpeed" aria-label="Playback speed">1×</button>
+              <span class="player-time player-time-duration" data-player-part="duration">0:00</span>
+              <button type="button" class="player-speed" data-player-part="speed" aria-label="Playback speed">1×</button>
             </div>
           </div>
         </div>
@@ -2382,7 +2388,7 @@ module HasMarkdownExtensions
     page = member_upgrade_page
     return "" unless page&.url_name.present?
 
-    %( data-audio-player-upgrade-url-value="/#{ERB::Util.html_escape(page.url_name)}")
+    %( data-player-upgrade-url="/#{ERB::Util.html_escape(page.url_name)}")
   end
 
   def member_upgrade_page

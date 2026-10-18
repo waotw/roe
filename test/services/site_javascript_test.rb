@@ -36,7 +36,7 @@ class SiteJavascriptTest < ActiveSupport::TestCase
 
   test "seed copies shipped files once and never touches an existing copy" do
     SiteJavascript.seed!
-    %w[search.js gallery.js checkout.js footnotes.js].each do |f|
+    %w[search.js gallery.js checkout.js footnotes.js player.js].each do |f|
       assert File.exist?(File.join(SITE, f)), "#{f} seeded"
     end
 

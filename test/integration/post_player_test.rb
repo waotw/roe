@@ -77,11 +77,12 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the bare browser audio bar is gone from audio posts" do
+  test "an audio post's browser bar is the player card's own, for player.js to replace" do
     post = media_post("audio", audio: "/media/audio/track.mp3")
 
     get post_path(post.url_name)
-    assert_select "audio[controls]", 0
+    assert_select "audio[controls]", 1
+    assert_select ".card-player audio[controls][data-player-part=media]", 1
   end
 
   # ── podcast ──

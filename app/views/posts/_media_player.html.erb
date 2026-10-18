@@ -7,22 +7,24 @@
 <%# carries the full podcast UI (chapters, episode nav); the video branch is %>
 <%# the simpler player. Full video-podcast support (chapters etc.) is future. %>
 <% if (post.post_type == 'audio' || (post.post_type == 'podcast' && post.video.blank?)) && post.audio.present? %>
-  <%
-    chapters_json = begin
-      chapters = post.metadata['chapters']
-      chapters.present? ? chapters.to_json : '[]'
-    rescue
-      '[]'
-    end
-  %>
+  <%# Progressive, like every Roe player: the browser's own <audio controls>
+      shows until site_js/player.js loads, which hides it and shows Roe's
+      controls ([data-player-ui], hidden until then). Chapters are rendered
+      here, so they read as a list of times without the script; with it,
+      each one seeks. %>
+  <% chapters = Array(post.metadata['chapters']).filter_map do |c|
+       next unless c.respond_to?(:[])
+       time = (c['time'] || c[:time]).to_f
+       title = (c['title'] || c[:title]).to_s
+       { time: time, title: title } if title.present?
+     end %>
   <div class="player audio-player"
-       data-controller="audio-player"
-       data-audio-player-type-value="audio"
-       data-audio-player-skip-seconds-value="15"
-       data-audio-player-chapters="<%= chapters_json %>">
-    <audio data-audio-player-target="audio"
-           preload="metadata"
-           style="display: none;">
+       data-player="audio"
+       data-player-skip="15">
+    <audio class="player-native"
+           data-player-part="media"
+           controls
+           preload="metadata">
       <source src="<%= post.audio %>" type="audio/mpeg">
       <source src="<%= post.audio %>" type="audio/mp4">
       <source src="<%= post.audio %>" type="audio/ogg">
@@ -40,15 +42,15 @@
         <img src="<%= image_variant_path(podcast_artwork, :small) %>"
              alt="<%= podcast_config['title'] %>"
              class="player-artwork"
-             data-audio-player-target="artwork">
+             data-player-part="artwork">
       <% elsif post.metadata['image'].present? %>
         <img src="<%= image_variant_path(post.metadata['image'], :small) %>"
              alt="<%= post.title %>"
              class="player-artwork"
-             data-audio-player-target="artwork">
+             data-player-part="artwork">
       <% end %>
       <div class="player-info">
-        <div class="player-title" data-audio-player-target="title"><%= post.title %></div>
+        <div class="player-title" data-player-part="title"><%= post.title %></div>
         <% if post.metadata['episode_number'].present? || post.metadata['season'].present? %>
           <div class="episode-meta">
             <% if post.metadata['season'].present? %>
@@ -59,20 +61,22 @@
             <% end %>
           </div>
         <% end %>
-        <div class="now-playing" data-audio-player-target="nowPlaying"></div>
+        <div class="now-playing" data-player-part="now"></div>
       </div>
     </div>
+    <%# Roe's controls: progress, times, buttons. Hidden until player.js. %>
+    <div class="player-ui" data-player-ui hidden>
     <%# Progress bar %>
     <div class="player-progress"
-         data-audio-player-target="progressBar"
-         data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub">
-      <div class="progress-fill" data-audio-player-target="progressFill"></div>
-      <div class="progress-handle" data-audio-player-target="progressHandle"></div>
+         data-player-part="progress"
+         role="slider" aria-label="Seek" tabindex="0">
+      <div class="progress-fill" data-player-part="fill"></div>
+      <div class="progress-handle" data-player-part="handle"></div>
     </div>
     <%# Time display %>
     <div class="player-time">
-      <span class="current-time" data-audio-player-target="currentTime">0:00</span>
-      <span class="duration" data-audio-player-target="duration">
+      <span class="current-time" data-player-part="current">0:00</span>
+      <span class="duration" data-player-part="duration">
         <% if post.duration.present? %>
           <%= format_duration(post.duration) %>
         <% else %>
@@ -103,7 +107,7 @@
       <div class="controls-center">
         <button type="button"
                 class="player-btn btn-skip"
-                data-action="click->audio-player#skipBack"
+                data-player-part="back"
                 aria-label="Skip back 15 seconds"
                 title="Skip back 15 seconds">
             <svg width="75" height="55" viewBox="0 0 75 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -111,9 +115,9 @@
             <path d="M7.88285 3.36364V15H5.42262V5.69886H5.35444L2.68967 7.36932V5.1875L5.57035 3.36364H7.88285ZM14.8985 15.1591C14.0954 15.1591 13.3795 15.0114 12.7507 14.7159C12.1257 14.4205 11.6295 14.0133 11.2621 13.4943C10.8947 12.9754 10.7034 12.3807 10.6882 11.7102H13.0746C13.1011 12.161 13.2905 12.5265 13.6428 12.8068C13.9951 13.0871 14.4136 13.2273 14.8985 13.2273C15.2848 13.2273 15.6257 13.142 15.9212 12.9716C16.2204 12.7973 16.4534 12.5568 16.6201 12.25C16.7905 11.9394 16.8757 11.5833 16.8757 11.1818C16.8757 10.7727 16.7886 10.4129 16.6144 10.1023C16.4439 9.79167 16.2072 9.54924 15.9042 9.375C15.6011 9.20076 15.2545 9.11174 14.8644 9.10795C14.5235 9.10795 14.192 9.17803 13.8701 9.31818C13.5519 9.45833 13.3038 9.64962 13.1257 9.89205L10.9382 9.5L11.4894 3.36364H18.603V5.375H13.5178L13.2167 8.28977H13.2848C13.4894 8.00189 13.7981 7.76326 14.211 7.57386C14.6239 7.38447 15.086 7.28977 15.5973 7.28977C16.2981 7.28977 16.9231 7.45455 17.4723 7.78409C18.0216 8.11364 18.4553 8.56629 18.7735 9.14205C19.0917 9.71402 19.2489 10.3731 19.2451 11.1193C19.2489 11.9034 19.067 12.6004 18.6996 13.2102C18.336 13.8163 17.8265 14.2936 17.1712 14.642C16.5197 14.9867 15.7621 15.1591 14.8985 15.1591Z" fill="currentColor"/>
             </svg>
         </button>
-        <button class="player-btn btn-play"
-                data-action="click->audio-player#togglePlay"
-          data-audio-player-target="playButton"
+        <button type="button"
+                class="player-btn btn-play"
+          data-player-part="play"
           data-playing="false"
           aria-label="Play">
           <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -125,7 +129,7 @@
         </button>
         <button type="button"
                 class="player-btn btn-skip"
-                data-action="click->audio-player#skipForward"
+                data-player-part="forward"
                 aria-label="Skip forward 15 seconds"
                 title="Skip forward 15 seconds">
             <svg width="75" height="55" viewBox="0 0 75 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -134,9 +138,9 @@
             </svg>
         </button>
       </div>
-      <button class="player-btn btn-speed"
-              data-action="click->audio-player#cycleSpeed"
-        data-audio-player-target="speedButton"
+      <button type="button"
+              class="player-btn btn-speed"
+        data-player-part="speed"
         aria-label="Playback speed: 1x">
         1×
       </button>
@@ -159,12 +163,18 @@
         <% end %>
       </div>
     </div>
-    <%# Chapters (only rendered if chapters data exists) %>
-    <% if post.metadata['chapters'].present? %>
+    </div>
+    <%# Chapters (only when the episode has them) %>
+    <% if chapters.any? %>
       <div class="player-chapters">
         <div class="chapters-heading">Chapters</div>
-        <ol class="chapter-list" data-audio-player-target="chapterList">
-          <%# Rendered by JS from data-audio-player-chapters attribute %>
+        <ol class="chapter-list">
+          <% chapters.each do |chapter| %>
+            <li class="chapter" data-player-chapter data-time="<%= chapter[:time] %>">
+              <span class="chapter-time"><%= format_player_time(chapter[:time]) %></span>
+              <span class="chapter-title"><%= chapter[:title] %></span>
+            </li>
+          <% end %>
         </ol>
       </div>
     <% end %>

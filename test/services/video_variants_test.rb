@@ -257,8 +257,9 @@ class VideoRendererTest < ActiveSupport::TestCase
     doc = Nokogiri::HTML.fragment(html)
     player = doc.at_css(".video-player-container.video-embed")
     assert player, "an embed gets the site video player"
-    assert_equal "audio-player", player["data-controller"]
-    assert player.at_css("[data-audio-player-target=playButton]"), "with Roe's controls"
+    assert_equal "video", player["data-player"]
+    assert player.at_css("[data-player-ui][hidden] [data-player-part=play]"), "with Roe's controls, shown by player.js"
+    assert player.at_css("video[controls][data-player-part=media]"), "and the browser's until then"
     assert_equal "/media/video/variants/all-poster.jpg", player.at_css("video")["poster"]
     assert_equal "A clip", player.at_css("video")["aria-label"]
     assert_includes player.at_css("video source")["src"], "all-720p.mp4"
@@ -268,7 +269,7 @@ class VideoRendererTest < ActiveSupport::TestCase
     card = post.send(:render_player_card, { video: web })
     assert_includes card, "all-720p.mp4"
     assert_includes card, "video-player-container player-video"
-    assert_includes card, 'data-controller="audio-player"'
+    assert_includes card, 'data-player="video"'
   end
 
   test "an embed written with %20 for spaces still finds its web versions" do
