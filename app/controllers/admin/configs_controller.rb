@@ -138,6 +138,22 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Confirm deletions over",
           placeholder: "0",
           hint: "Site Sync deletes files. If a file is deleted on your Live site and you sync the site, it will be deleted locally and vice-versa. This is a threshold for when you will be warned about file deletions. 0 means you'll be warned everytime. '5' means you'll be warned if 6 or more files will be deleted. Set to 'never' to turn off warnings."
+        },
+        # COPY: label, option labels and hint for the live video setting
+        "sync_live_video" => {
+          type: :select,
+          label: "Largest video on the live site",
+          options: [
+            [ "1080p — originals stay on this computer", "1080p" ],
+            [ "720p — only the smallest version goes live", "720p" ],
+            [ "Original — send every file", "original" ]
+          ],
+          # SiteSync::LiveVideo::DEFAULT. Without it an unset setting shows
+          # "Select...", which reads as off rather than as the default.
+          default: "1080p",
+          hint: "Your live site plays a video's web versions, never the original, so the original only takes up space there. " \
+                "This computer always keeps every file. A video without web versions yet sends its original, since that's all there is to play. " \
+                "Files this setting keeps here are removed from your live site on the next sync, without asking: you still have them."
         }
       }
     },

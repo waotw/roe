@@ -359,11 +359,17 @@ module SiteSync
         return nil unless response.is_a?(Net::HTTPSuccess)
 
         data = JSON.parse(response.body)
-        {
+        # First, so the filter below works from live's current answer.
+        SiteSync::LiveVideo.record_peer_ready!(data["keeps_videos_without_originals"])
+        # Live reports every file it has; a video original this computer
+        # keeps (LiveVideo) is dropped here so nothing downstream — the status
+        # check, the reconciler, the baseline write — counts it as a
+        # difference. The purge on the next push removes live's copy.
+        SiteSync::Ledger.comparable_peer_manifest({
           "files" => data["files"] || {},
           "fingerprint" => data["fingerprint"],
           "file_count" => data["file_count"]
-        }
+        })
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] fetch_peer_manifest failed: #{e.class} #{e.message}"
         nil

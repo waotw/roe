@@ -232,7 +232,11 @@ class SiteSyncTransferJob < ApplicationJob
     @original_diff = diff
     @to_live = diff
     if diff_empty?(diff)
-      Rails.logger.info "[SiteSyncTransferJob push] nothing safe to push"
+      if tidy_live?
+        tidy_live!
+      else
+        Rails.logger.info "[SiteSyncTransferJob push] nothing safe to push"
+      end
       return
     end
 
@@ -293,6 +297,9 @@ class SiteSyncTransferJob < ApplicationJob
       SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: push_diff, on_progress: progress_proc)
+    elsif tidy_live?
+      tidy_live!
+      @pushed = true # live's files changed, so its content is reconciled after
     end
 
     if @pulled
@@ -429,6 +436,8 @@ class SiteSyncTransferJob < ApplicationJob
   def reconcile_or_abort!
     peer = SiteSync::Exchange.fetch_peer_manifest
     raise PeerUnreachable if peer.nil?
+
+    @peer_manifest = peer
 
     baseline = SiteSync::Ledger.recorded&.dig("files") || {}
     result = SiteSync::Reconciler.reconcile(
@@ -692,6 +701,25 @@ class SiteSyncTransferJob < ApplicationJob
   rescue => e
     Rails.logger.warn "[SiteSyncTransferJob] peer_diff failed: #{e.class} #{e.message}"
     nil
+  end
+
+  # Live still holds video files the live-video setting keeps on this
+  # computer (SiteSync::LiveVideo), and there's nothing else to send. Every
+  # push carries their removal, but with nothing to push no push runs, so a
+  # site with no other changes would keep them on live indefinitely. Not a
+  # change anyone is asked about: each is a file this computer has, and the
+  # setting is the instruction.
+  def tidy_live?
+    Array(@peer_manifest&.dig("kept_here_on_peer")).any?
+  end
+
+  def tidy_live!
+    count = @peer_manifest["kept_here_on_peer"].size
+    Rails.logger.info "[SiteSyncTransferJob] removing #{count} video file(s) kept on this computer from live"
+    update_step(:pushing_to_live)
+    SiteSync.transport.push_local_to_live!(
+      diff: { modified: [], added: [], deleted: [] }, on_progress: progress_proc, tidy: true
+    )
   end
 
   def diff_empty?(diff)

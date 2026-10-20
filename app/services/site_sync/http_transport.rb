@@ -38,12 +38,15 @@ module SiteSync
     class << self
       # ─── Push (local → live) ──────────────────────────────────────
 
-      def push_local_to_live!(diff: nil, on_progress: nil)
+      # tidy: true pushes even with nothing in the diff, so the purge below
+      # still reaches live (SiteSyncTransferJob passes it when live holds
+      # video files this computer keeps).
+      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false)
         Rails.logger.info "[SiteSync::HttpTransport] push over HTTP → #{Exchange.peer_url}"
         diff ||= full_diff_for_push
         changed = changed_files(diff)
         deleted = Array(diff[:deleted])
-        return if changed.empty? && deleted.empty?
+        return if changed.empty? && deleted.empty? && !tidy
 
         # Roe's docs when the setting says local-only. Not part of the diff —
         # both sides exclude them from their manifests, so neither can see what
@@ -56,6 +59,13 @@ module SiteSync
         # Deliberately quiet — the docs ship with Roe, so this can't lose
         # anything, and the setting is the instruction.
         purge = Ledger.roe_docs_to_purge
+        # Video files the live-video setting keeps on this computer — the
+        # same reasoning: live can't be asked what it still has (they're out
+        # of scope on this side), every one is a file here, and the setting
+        # is the instruction. Never part of the diff, so never backed up from
+        # live first or listed as a deletion to confirm.
+        video_purge = LiveVideo.to_purge
+        purge += video_purge
         deleted += purge
 
         total = changed.size
@@ -113,8 +123,9 @@ module SiteSync
             # The peer reports what it actually removed, which is how a purge
             # stays silent when there was nothing left to remove.
             if i == last && purge.any? && (removed = result["deleted"].to_i) > 0
-              Rails.logger.info "[SiteSync::HttpTransport] removed #{removed} Roe documentation " \
-                                "file(s) from live (docs.roe: local)"
+              Rails.logger.info "[SiteSync::HttpTransport] live removed #{removed} file(s), counting any kept " \
+                                "on this computer (#{purge.size} asked: Roe's docs set to local, and video " \
+                                "files held back by sync_live_video: #{LiveVideo.choice})"
             end
           end
 

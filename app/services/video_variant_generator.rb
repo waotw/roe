@@ -181,7 +181,10 @@ class VideoVariantGenerator
     # ── Manifest ────────────────────────────────────────────────────────
 
     def read_manifest(source)
-      path = manifest_path(source)
+      read_manifest_file(manifest_path(source))
+    end
+
+    def read_manifest_file(path)
       return nil unless File.file?(path)
 
       JSON.parse(File.read(path))
@@ -191,13 +194,49 @@ class VideoVariantGenerator
 
     # The manifest, only if it was made from the original as it is now. A
     # replaced original (different size) makes the old renditions stale.
+    #
+    # On the live site the original may not be there at all: the live-video
+    # setting keeps originals on the computer you write on
+    # (SiteSync::LiveVideo). There the manifest is all there is to go on, and
+    # it's trusted — live never makes renditions, so it can't hold a stale
+    # set; whatever Site Sync brought is current.
     def current_manifest(source)
       manifest = read_manifest(source) or return nil
       source_abs = normalize_path(source)
-      return nil unless File.file?(source_abs)
+      return (stand_in_allowed? ? manifest : nil) unless File.file?(source_abs)
       return nil unless manifest.dig("source", "size") == File.size(source_abs)
 
       manifest
+    end
+
+    # Whether a missing original can be stood in for by its manifest. Only on
+    # the live site: on the computer you write on, a missing original means
+    # you deleted it, and its web versions should go with it.
+    def stand_in_allowed? = SiteSync::LiveVideo.live_side?
+
+    # Web paths (/media/video/clip.mov) of originals that aren't on this
+    # disk but whose web versions are — on the live site, the videos whose
+    # originals the live-video setting keeps on the writing computer. Each
+    # still counts as a video: its media record stays, a post that names it
+    # isn't missing media, and the player plays its web versions. Empty on
+    # the writing computer.
+    def stand_in_originals
+      return [] unless stand_in_allowed?
+
+      Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media", "**", "variants", "*#{MANIFEST_SUFFIX}")).filter_map do |path|
+        manifest = read_manifest_file(path) or next
+        web = manifest.dig("source", "path").to_s
+        next unless web.start_with?("/media/") && video_file?(web) && !variant_path?(web)
+
+        source = normalize_path(web)
+        # The manifest must sit in this original's own variants folder, so a
+        # hand-edited one can't vouch for a file somewhere else.
+        next unless File.expand_path(manifest_path(source)) == File.expand_path(path)
+        next if File.file?(source)
+        next if available_renditions(source).empty?
+
+        web
+      end
     end
 
     # Renditions in the manifest whose files are on disk, smallest first.
@@ -555,10 +594,13 @@ class VideoVariantGenerator
     # Remove variant files whose original is gone. Returns how many.
     def prune_orphans!
       deleted = 0
+      kept_elsewhere = stand_in_originals.to_set
       Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media", "**", "variants", "*#{MANIFEST_SUFFIX}")).each do |manifest|
         base = File.basename(manifest, MANIFEST_SUFFIX)
         dir = File.dirname(File.dirname(manifest))
         next if VIDEO_EXTENSIONS.any? { |ext| File.file?(File.join(dir, "#{base}#{ext}")) || File.file?(File.join(dir, "#{base}#{ext.upcase}")) }
+        # On live, an original kept on the writing computer isn't gone.
+        next if kept_elsewhere.include?(read_manifest_file(manifest)&.dig("source", "path"))
 
         all_variant_paths(File.join(dir, "#{base}.mp4")).each do |p|
           next unless File.file?(p)

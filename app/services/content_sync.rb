@@ -157,11 +157,17 @@ class ContentSync
     # deletes its video web versions.
     media_files = RoeSitePaths.files_with_extensions(RoeSitePaths::SITE_MEDIA_PATH, SYNCED_MEDIA_EXTENSIONS)
                               .reject { |path| path.include?("/variants/") }
+    # On live, videos whose originals the live-video setting keeps on the
+    # writing computer: only their web versions are here. Their records
+    # stay (and are made for a video that arrived this way), or removing
+    # the record would delete those web versions too. Empty on the writing
+    # computer, where a missing original means it was deleted.
+    kept_elsewhere = VideoVariantGenerator.stand_in_originals
 
     puts "\n🎬 Found #{media_files.count} media files"
 
     # Handle orphaned media
-    handle_orphaned_media(media_files)
+    handle_orphaned_media(media_files, also_present: kept_elsewhere)
 
     puts "=" * 60
 
@@ -202,6 +208,19 @@ class ContentSync
     rescue => e
       Rails.logger.error "[ContentSync] Failed to inspect #{file_path}: #{e.message}"
       puts "  ✗ Error: #{File.basename(file_path)} - #{e.message}"
+    end
+
+    kept_elsewhere.each do |web_path|
+      next if existing_paths.include?(web_path)
+
+      manifest = VideoVariantGenerator.manifest_path(web_path)
+      new_records << {
+        file_path:   web_path,
+        media_type:  "video",
+        uploaded_at: (File.mtime(manifest) rescue now),
+        created_at:  now,
+        updated_at:  now
+      }
     end
 
     inserted = 0
@@ -449,11 +468,11 @@ class ContentSync
     end
   end
 
-  def handle_orphaned_media(current_files)
+  def handle_orphaned_media(current_files, also_present: [])
     # Convert to web paths for comparison
     # Handle symlinks - resolve to real path before substitution
     real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, "") }
+    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, "") } + Array(also_present)
 
     orphans = Medium.where.not(file_path: current_web_paths)
 

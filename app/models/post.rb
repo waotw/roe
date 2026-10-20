@@ -771,7 +771,10 @@ class Post < ApplicationRecord
       files = Dir.glob(base.join("**/*"))
                  .select { |f| File.file?(f) }
                  .map { |f| "/media/" + Pathname.new(f).relative_path_from(base).to_s }
-      Set.new(files)
+      # On live, a video whose original is kept on the writing computer is
+      # still there to play (VideoVariantGenerator.stand_in_originals), so a
+      # post that names the original isn't missing media.
+      Set.new(files + VideoVariantGenerator.stand_in_originals)
     end
   end
 

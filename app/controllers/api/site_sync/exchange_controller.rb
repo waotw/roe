@@ -157,7 +157,11 @@ module Api
         render json: {
           files: current,
           fingerprint: fingerprint,
-          file_count: current.count
+          file_count: current.count,
+          # This Roe keeps a video alive from its web versions when the
+          # original is kept on the writing computer (SiteSync::LiveVideo).
+          # Until the writing computer hears this, it sends every original.
+          keeps_videos_without_originals: true
         }
       rescue => e
         Rails.logger.error "[Api::SiteSync::ExchangeController] manifest FAILED: #{e.class} #{e.message}"

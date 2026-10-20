@@ -79,10 +79,16 @@ module SiteSync
         #
         # Safe to be silent about only because these ship with Roe: they're
         # always on this computer, and turning the setting back on restores them.
-        if SiteSync::Ledger.roe_docs_excluded?
-          baseline = baseline.reject { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
-          local    = local.reject    { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
-          peer     = peer.reject     { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
+        #
+        # Video files the live-video setting keeps on this computer
+        # (SiteSync::LiveVideo) are out of scope the same way, and just as
+        # safe: each is a file this computer has. A copy live still holds
+        # isn't a pull, and the original's absence from our manifest isn't a
+        # deletion to confirm.
+        if SiteSync::Ledger.roe_docs_excluded? || SiteSync::LiveVideo.held_back_paths.any?
+          baseline = baseline.reject { |path, _| SiteSync::Ledger.out_of_scope?(path) }
+          local    = local.reject    { |path, _| SiteSync::Ledger.out_of_scope?(path) }
+          peer     = peer.reject     { |path, _| SiteSync::Ledger.out_of_scope?(path) }
         end
 
         push = []; push_delete = []; pull = []; pull_delete = []; conflicts = []; converged = []

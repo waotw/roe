@@ -155,9 +155,9 @@ module SiteSync
         # Dropped from both sides instead: out of scope is not deleted. Done
         # here rather than at each caller because diff is the shared primitive
         # — Checker's banner, and anything else asking what changed.
-        if roe_docs_excluded?
-          current_files  = current_files.reject  { |path, _| roe_docs_path?(path) }
-          recorded_files = recorded_files.reject { |path, _| roe_docs_path?(path) }
+        if roe_docs_excluded? || LiveVideo.held_back_paths.any?
+          current_files  = current_files.reject  { |path, _| out_of_scope?(path) }
+          recorded_files = recorded_files.reject { |path, _| out_of_scope?(path) }
         end
 
         added = current_files.keys - recorded_files.keys
@@ -207,8 +207,38 @@ module SiteSync
         return true if EXCLUDED_DIRS.include?(parts.first)
         return true if EXCLUDED_FILES.include?(parts.last)
         return true if roe_docs_excluded? && relative_path.start_with?(ROE_DOCS_PATH)
+        return true if LiveVideo.held_back?(relative_path)
 
         EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
+      end
+
+      # Kept on this computer by a setting, not protected: Roe's docs set to
+      # `local`, and video files the live-video setting keeps here
+      # (LiveVideo). Both are left out of every manifest, so a copy recorded
+      # in an older baseline, or one live still has, must be dropped from the
+      # comparison too — otherwise it reads as deleted. Out of scope is not
+      # deleted.
+      def out_of_scope?(relative_path)
+        (roe_docs_excluded? && roe_docs_path?(relative_path)) || LiveVideo.held_back?(relative_path)
+      end
+
+      # Drop out-of-scope paths from a peer's manifest (as returned by
+      # Exchange.fetch_peer_manifest), with its fingerprint recomputed to
+      # match. Live reports everything it has — that's how this side knows
+      # what to remove — but a held-back original it still holds isn't a
+      # difference.
+      def comparable_peer_manifest(peer)
+        return peer if peer.nil? || LiveVideo.held_back_paths.empty?
+
+        raw = peer["files"] || {}
+        files = raw.reject { |path, _| LiveVideo.held_back?(path) }
+        peer.merge(
+          "files" => files, "fingerprint" => fingerprint_of(files), "file_count" => files.size,
+          # The ones live still has and can drop. A sync with nothing else to
+          # send still removes these (SiteSyncTransferJob, `tidy:`), or a site
+          # with no other changes would keep them on live indefinitely.
+          "kept_here_on_peer" => LiveVideo.to_purge.select { |path| raw.key?(path) }
+        )
       end
 
       # Read once and held for the walk rather than per file — excluded? is
@@ -273,6 +303,7 @@ module SiteSync
       return {} unless Dir.exist?(@site_path)
 
       self.class.reset_roe_docs_cache!
+      LiveVideo.reset_cache!
 
       manifest = {}
       prefix = @site_path.end_with?("/") ? @site_path : "#{@site_path}/"
