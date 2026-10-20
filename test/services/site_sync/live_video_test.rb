@@ -417,4 +417,21 @@ class SiteSync::LiveVideoTest < ActiveSupport::TestCase
     end
     assert_nil VideoVariantGenerator.stand_in_file_for(web), "on this computer a missing original is a deleted one"
   end
+
+  # The media library's "File size" sort on live: what the video takes up
+  # there, not 0 bytes for the original it doesn't have.
+  test "on live a video without its original is sized by the files live holds for it" do
+    web = fake_variants("zz-lv-sz.mp4", renditions: %w[720p 1080p])
+    without_original(web)
+    source = File.join(RoeSitePaths::SITE_PATH, rel(web))
+    expected = VideoVariantGenerator.all_variant_paths(source).sum { |p| File.size?(p) || 0 }
+    assert expected.positive?
+
+    on_live { assert_equal expected, VideoVariantGenerator.stand_in_size_for(web) }
+    assert_nil VideoVariantGenerator.stand_in_size_for(web), "on this computer, unchanged"
+
+    medium = Medium.create!(file_path: web, media_type: "video")
+    html = on_live { ApplicationController.render(partial: "admin/medium/media_card", locals: { media: medium, usages: [] }) }
+    assert_includes html, %(data-file-size="#{expected}"), "the card the sort reads"
+  end
 end

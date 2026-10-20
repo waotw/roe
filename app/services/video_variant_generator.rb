@@ -234,6 +234,17 @@ class VideoVariantGenerator
       variant_path_for(source, smallest["name"])
     end
 
+    # What a video takes up on this disk when its original is kept on the
+    # writing computer: its web versions, poster and manifest. Nil otherwise
+    # (same rules as stand_in_file_for). The media library's "File size"
+    # sort uses it on live, where the original would otherwise count as 0
+    # bytes and the biggest videos sort as the smallest.
+    def stand_in_size_for(web_path)
+      stand_in_file_for(web_path) or return nil
+
+      all_variant_paths(normalize_path(web_path.to_s)).sum { |path| File.size?(path) || 0 }
+    end
+
     # Web paths (/media/video/clip.mov) of originals that aren't on this
     # disk but whose web versions are — on the live site, the videos whose
     # originals the live-video setting keeps on the writing computer. Each
