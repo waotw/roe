@@ -61,6 +61,46 @@ log_success() { echo -e "${GREEN}[✓]${NC} $1"; }
 # Read one KEY from a .conf — first match, everything after the first "=".
 _conf_get() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
 
+# Run one install's bin/rails with THAT install's Ruby, from its app folder.
+# The user's terminal may have no Ruby set up (macOS then finds its own old
+# system Ruby) or a different version, and Rails won't boot under either.
+# roe.sh pins the right one before it starts a server; this does the same
+# for the commands that ask Rails directly (install, stripe): mise first,
+# then rbenv, then rvm, each looked for where its installer puts it, so it
+# works from a terminal whose rc never activated them. In a subshell, so
+# nothing leaks into the rest of this command.
+#   run_rails "$root/current/bin/rails" runner '…'
+run_rails() {
+    local rails="$1"; shift
+    with_install_ruby "$(dirname "$(dirname "$rails")")" "$rails" "$@"
+}
+
+# The same, for any command: with_install_ruby <app dir> ruby -v
+with_install_ruby() {
+    local app="$1"; shift
+    (
+        cd "$app" || exit 1
+        if ! command -v mise >/dev/null 2>&1; then
+            for m in "$HOME/.local/bin/mise" /opt/homebrew/bin/mise /usr/local/bin/mise; do
+                [ -x "$m" ] && { PATH="$(dirname "$m"):$PATH"; break; }
+            done
+        fi
+        if [ -f .ruby-version ]; then
+            want="$(tr -d '[:space:]' < .ruby-version)"
+            if command -v mise >/dev/null 2>&1; then
+                eval "$(mise env -C "$app" 2>/dev/null)" 2>/dev/null || true
+            elif command -v rbenv >/dev/null 2>&1; then
+                PATH="$(rbenv root)/versions/$want/bin:$PATH"
+            elif command -v rvm >/dev/null 2>&1; then
+                # shellcheck disable=SC1090
+                source "$(rvm env "$want" --path 2>/dev/null)" 2>/dev/null || true
+            fi
+        fi
+        export PATH
+        exec "$@"
+    )
+}
+
 # The Stripe events `roe stripe` forwards by default — exactly the ones Roe's
 # webhook handler acts on (WebhooksController). Keep in sync with that handler.
 ROE_STRIPE_DEFAULT_EVENTS="checkout.session.completed,charge.refunded,charge.dispute.created,charge.dispute.closed"
@@ -400,7 +440,7 @@ stripe_preflight() {
     local root="$1" rails out
     rails="$root/current/bin/rails"
     [ -x "$rails" ] || { echo "UNKNOWN"; return 0; }
-    out="$("$rails" runner '
+    out="$(run_rails "$rails" runner '
       sc = StripeConfig.current
       if sc.secret_key_test.blank?
         puts "NO_KEY"
@@ -433,7 +473,7 @@ stripe_install_key() {
     [ -z "$key" ] && { echo ""; return 1; }
 
     # Pipe the key in on STDIN; the runner reads one line. Never on argv.
-    out="$(printf '%s' "$key" | "$rails" runner '
+    out="$(printf '%s' "$key" | run_rails "$rails" runner '
       r = StripeConfig.install_test_key!(STDIN.read)
       if r[:ok]
         puts r[:price_synced] ? "OK_PRICED" : (r[:priced] ? "OK" : "OK_NOPRICE")
@@ -564,7 +604,7 @@ cmd_stripe_remove() {
     local go; read -r go
     case "${go:-n}" in [Yy]*) : ;; *) log_info "Left the key in place."; return 0 ;; esac
 
-    out="$("$rails" runner '
+    out="$(run_rails "$rails" runner '
       puts(StripeConfig.remove_test_key! ? "REMOVED" : "NONE")
     ' 2>/dev/null | tail -1)"
 
@@ -737,7 +777,7 @@ all_rails() {
 #   key <TAB> label <TAB> installed(yes/no) <TAB> command <TAB> needs_sudo(yes/no)
 managed_tools_table() {
     local rails="$1"
-    "$rails" runner '
+    run_rails "$rails" runner '
       ManagedTools.statuses.each do |s|
         puts [s[:key], s[:label], (s[:installed] ? "yes" : "no"),
               s[:install_command].to_s, (s[:needs_sudo] ? "yes" : "no")].join("\t")
@@ -775,7 +815,24 @@ cmd_install() {
 
     table="$(all_tools_table)"
     if [ -z "$table" ]; then
+        # Every install failed to answer. Ask the first one again with its
+        # errors kept, so the message says why instead of just that it failed.
+        local first why
+        first="$(all_rails | head -1)"
+        why="$(run_rails "$first" runner 'ManagedTools.statuses' 2>&1 >/dev/null | grep -v '^\s*from ' | tail -3)"
+        local app need have
+        app="$(dirname "$(dirname "$first")")"
+        need="$(tr -d '[:space:]' < "$app/.ruby-version" 2>/dev/null)"
+        have="$(with_install_ruby "$app" ruby -e 'print RUBY_VERSION' 2>/dev/null)"
         log_error "Couldn't read the tool list from Roe."
+        echo "  INSTALL: $(dirname "$app")" >&2
+        if [ -n "$need" ] && [ "$have" != "$need" ]; then
+            # The usual cause, and bundler's own message about it is noise.
+            echo "  RUBY: this install needs Ruby $need, but found ${have:-none}." >&2
+        elif [ -n "$why" ]; then
+            printf '  ERROR: %s\n' "$why" | sed '2,$s/^/         /' >&2
+        fi
+        echo "  Starting the site once with 'roe start' sets up its Ruby and gems; then try again." >&2
         return 1
     fi
 
@@ -913,7 +970,7 @@ EOF
 # from anywhere) — in a subshell, so the caller's folder doesn't change.
 rails_task() {
     local rails="$1"; shift
-    ( cd "$(dirname "$(dirname "$rails")")" && "$rails" "$@" )
+    run_rails "$rails" "$@"
 }
 
 # "-" is the placeholder the Rails tasks print for an empty field.

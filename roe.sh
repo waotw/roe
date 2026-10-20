@@ -1541,6 +1541,22 @@ next_registry_port() {
     done
 }
 
+# Put a new copy of bin/roe at ~/.roe/bin/roe without writing over the old
+# one in place. This often runs from inside `roe restart`, while that very
+# file is still being read: bash reads a script from disk as it goes, so
+# overwriting it (cp keeps the same file) leaves the running command to carry
+# on reading the NEW file from the old position — junk errors, or part of a
+# line run as a command. Writing a fresh file beside it and renaming it into
+# place swaps which file the name points at; the running command keeps the
+# old one until it ends, and the next `roe` gets the new one.
+install_global_cli_file() {
+    local src="$1" dest="$ROE_BIN_DIR/roe" tmp
+    tmp="$ROE_BIN_DIR/.roe.new.$$"
+    cp "$src" "$tmp" && chmod +x "$tmp" && mv -f "$tmp" "$dest" && return 0
+    rm -f "$tmp"
+    return 1
+}
+
 # Copy current/bin/roe to ~/.roe/bin/roe. Every install ships the same
 # script, so whichever registered most recently wins — the file is
 # self-contained and only ever shells out to each install's own roe.sh,
@@ -1549,7 +1565,7 @@ install_global_cli() {
     local src="$APP_DIR/bin/roe"
     [ -f "$src" ] || { log_warning "bin/roe not found in this install; skipping the global command."; return 0; }
     mkdir -p "$ROE_BIN_DIR"
-    cp "$src" "$ROE_BIN_DIR/roe" && chmod +x "$ROE_BIN_DIR/roe"
+    install_global_cli_file "$src"
     log_success "Installed the global 'roe' command at $ROE_BIN_DIR/roe"
     ensure_roe_bin_on_path "$@"
     ensure_roe_completion
@@ -1602,7 +1618,7 @@ refresh_global_cli_if_stale() {
         return 0
     fi
     mkdir -p "$ROE_BIN_DIR"
-    cp "$src" "$ROE_BIN_DIR/roe" && chmod +x "$ROE_BIN_DIR/roe" || return 0
+    install_global_cli_file "$src" || return 0
     log_info "Updated the global 'roe' command from this install."
     # Refresh the completion file too (it's regenerated from the new binary),
     # and make sure PATH + rc lines exist — all idempotent, all silent when
