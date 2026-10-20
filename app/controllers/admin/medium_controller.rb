@@ -325,6 +325,9 @@ class Admin::MediumController < Admin::BaseController
     end
 
     file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix("/")).to_s
+    # On live, a video original kept on the writing computer: its web
+    # version is the same length.
+    file_path = VideoVariantGenerator.stand_in_file_for(media_path) || file_path unless File.exist?(file_path)
 
     unless File.exist?(file_path)
       render json: { error: "File not found" }, status: :not_found
@@ -357,7 +360,10 @@ class Admin::MediumController < Admin::BaseController
     end
 
     file_path = File.join(RoeSitePaths::SITE_PATH, media_path.delete_prefix("/")).to_s
-    render json: { exists: File.exist?(file_path), checked: true, path: media_path }
+    # On live, a video whose original the live-video setting keeps on the
+    # writing computer is there: it plays from its web versions.
+    exists = File.exist?(file_path) || VideoVariantGenerator.stand_in_file_for(media_path).present?
+    render json: { exists: exists, checked: true, path: media_path }
   end
 
   # Re-render a single media card so the browse page can live-update a card

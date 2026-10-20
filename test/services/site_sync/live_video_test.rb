@@ -401,4 +401,20 @@ class SiteSync::LiveVideoTest < ActiveSupport::TestCase
       assert File.file?(File.join(RoeSitePaths::SITE_PATH, "media/video/variants/zz-lv-y-720p.mp4"))
     end
   end
+
+  # The editor's checks on live ("File not found under site/media." under a
+  # video field; filling in a post's duration) ask for the original.
+  test "on live the editor finds a video whose original is elsewhere, by its web version" do
+    web = fake_variants("zz-lv-z.mp4", renditions: %w[720p 1080p])
+    without_original(web)
+
+    on_live do
+      assert_equal File.join(RoeSitePaths::SITE_PATH, "media/video/variants/zz-lv-z-720p.mp4"),
+        VideoVariantGenerator.stand_in_file_for(web), "the smallest: same length, quickest to read"
+      assert_nil VideoVariantGenerator.stand_in_file_for("/media/video/zz-lv-nothing.mp4")
+      assert_nil VideoVariantGenerator.stand_in_file_for("/media/video/variants/zz-lv-z-720p.mp4")
+      assert_nil VideoVariantGenerator.stand_in_file_for("/media/../zz-lv-z.mp4")
+    end
+    assert_nil VideoVariantGenerator.stand_in_file_for(web), "on this computer a missing original is a deleted one"
+  end
 end

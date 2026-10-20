@@ -42,4 +42,25 @@ class Admin::MediumDurationTest < ActionDispatch::IntegrationTest
     get duration_admin_medium_index_path(path: "system/global/site.yml")
     assert_response :not_found
   end
+
+  # On live the live-video setting keeps a video's original on the writing
+  # computer; its web versions are there, and the same length.
+  test "on live a video without its original is found, and timed by its web version" do
+    stand_in = File.join(RoeSitePaths::SITE_PATH, "media/video/variants/kept-elsewhere-720p.mp4")
+    VideoVariantGenerator.stubs(:stand_in_file_for).returns(nil)
+    VideoVariantGenerator.stubs(:stand_in_file_for).with("/media/video/kept-elsewhere.mp4").returns(stand_in)
+    File.stubs(:exist?).returns(false)
+    File.stubs(:exist?).with(stand_in).returns(true)
+    MediaDurationExtractor.expects(:extract).with(stand_in).returns("00:02:05")
+
+    get exists_admin_medium_index_path(path: "/media/video/kept-elsewhere.mp4")
+    assert_equal true, JSON.parse(response.body)["exists"], "no 'File not found under site/media.'"
+
+    get exists_admin_medium_index_path(path: "/media/video/gone.mp4")
+    assert_equal false, JSON.parse(response.body)["exists"]
+
+    get duration_admin_medium_index_path(path: "/media/video/kept-elsewhere.mp4")
+    assert_response :success
+    assert_equal "00:02:05", JSON.parse(response.body)["duration"]
+  end
 end

@@ -214,6 +214,26 @@ class VideoVariantGenerator
     # you deleted it, and its web versions should go with it.
     def stand_in_allowed? = SiteSync::LiveVideo.live_side?
 
+    # The file on disk that stands in for one original (/media/video/clip.mov)
+    # missing from it: its smallest web version. Nil if the original is
+    # here, isn't a video, or has no web versions — and always nil on the
+    # writing computer, where a missing original means it was deleted. For
+    # the editor's checks on live: "is this file there?" and "how long is it?"
+    # (the web versions are the same length).
+    def stand_in_file_for(web_path)
+      return nil unless stand_in_allowed?
+
+      web = web_path.to_s
+      return nil unless web.start_with?("/media/") && !web.include?("..")
+      return nil unless video_file?(web) && !variant_path?(web)
+
+      source = normalize_path(web)
+      return nil if File.file?(source)
+
+      smallest = available_renditions(source).first or return nil
+      variant_path_for(source, smallest["name"])
+    end
+
     # Web paths (/media/video/clip.mov) of originals that aren't on this
     # disk but whose web versions are — on the live site, the videos whose
     # originals the live-video setting keeps on the writing computer. Each
