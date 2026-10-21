@@ -1,0 +1,434 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# roe logs — what went wrong recently, short enough to paste into a message.
+#
+# Reads this install's log files and prints only what matters for working
+# out a problem: the version and Ruby in use, whether the server is up, any
+# page that failed, any background job that failed, anything Roe itself
+# logged as failing, and — when the server isn't running — the last lines
+# from its last start. Ordinary requests, database lines and asset rebuilds
+# are left out.
+#
+# Plain Ruby, no Rails, and written to run on an old Ruby too: the problem
+# being looked into may be that Rails won't boot, or that the wrong Ruby is
+# being found. The global `roe logs` (bin/roe) runs it with the install's
+# own Ruby and passes in the server state; it also works on its own:
+#
+#   bin/roe-logs            the last hour
+#   bin/roe-logs --2h       the last two hours
+#   bin/roe-logs --day      the last 24 hours
+#
+# It only reads. Email addresses, keys and tokens are blanked out, since the
+# output is meant to be pasted to someone else.
+
+require "time"
+
+module RoeLogs
+  WINDOWS = {
+    "--1h" => [ 3600, "the last hour" ],
+    "--2h" => [ 2 * 3600, "the last 2 hours" ],
+    "--day" => [ 24 * 3600, "the last 24 hours" ]
+  }.freeze
+
+  APP = File.expand_path("..", __dir__)
+  LOG_DIR = File.join(APP, "log")
+  RAILS_LOG = File.join(LOG_DIR, "development.log")
+  DAEMON_LOG = File.join(LOG_DIR, "roe-daemon.log")
+
+  # How far back to read before giving up on finding the window's start.
+  # A day of a busy site's log is well under this.
+  MAX_READ = 256 * 1024 * 1024
+  CHUNK = 4 * 1024 * 1024
+
+  MAX_GROUPS = 15
+  MAX_ALSO = 10
+  MAX_FRAMES = 3
+
+  # ── Reading ───────────────────────────────────────────────────────────
+
+  # The lines of a log from roughly `since` onward. Reads backwards from the
+  # end in growing chunks until a timestamp older than `since` turns up, so a
+  # 300 MB log costs a few MB. Reaching the start of the file means the window
+  # may reach into the rotated file (development.log.0), which is read first.
+  def self.lines_since(path, since)
+    return [] unless File.file?(path)
+
+    size = File.size(path)
+    want = CHUNK
+    data = nil
+    loop do
+      want = [ want, size, MAX_READ ].min
+      data = read_tail(path, want)
+      break if want >= size || want >= MAX_READ
+      break if (first = first_time_in(data)) && first < since
+
+      want *= 2
+    end
+
+    lines = data.lines
+    lines.shift if want < size # partial first line
+    if want >= size && File.file?("#{path}.0") && !(first_time_in(data) && first_time_in(data) < since)
+      lines = lines_since("#{path}.0", since) + lines
+    end
+    lines
+  end
+
+  def self.read_tail(path, bytes)
+    File.open(path, "rb") do |f|
+      f.seek(-bytes, IO::SEEK_END)
+      f.read.force_encoding(Encoding::UTF_8).scrub("?")
+    end
+  end
+
+  def self.first_time_in(data)
+    data.each_line { |line| t = time_in(line) and return t }
+    nil
+  end
+
+  # ── Times ─────────────────────────────────────────────────────────────
+
+  # The development log has no timestamp on each line. These lines carry
+  # one, and everything after them happened at about that time:
+  #   Started GET "/x" for 127.0.0.1 at 2026-10-20 17:00:00 -0500
+  #   Performing SomeJob (…) enqueued at 2026-10-20T22:00:00.12Z …
+  #   …solid_queue… '2026-10-20 22:00:00.123456' (the job queue's own
+  #   writes, stored in UTC)
+  STARTED_RE = /\AStarted (\w+) "([^"]*)" for \S+ at (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4})/
+  ENQUEUED_RE = /enqueued at (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z)/
+  QUEUE_TIME_RE = /'(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\.\d+'/
+
+  def self.time_in(raw)
+    line = strip_job_prefix(raw)
+    if (m = STARTED_RE.match(line))
+      Time.parse(m[3])
+    elsif (m = ENQUEUED_RE.match(line))
+      Time.parse(m[1])
+    elsif line.include?("solid_queue") && (m = QUEUE_TIME_RE.match(line))
+      Time.parse("#{m[1]} UTC")
+    end
+  rescue ArgumentError
+    nil
+  end
+
+  # "[ActiveJob] [SiteSyncTransferJob] [0dd60a8f-…] Error performing …"
+  JOB_PREFIX_RE = /\A\[ActiveJob\](?: \[[\w:]+\] \[[0-9a-f-]+\])? ?/
+
+  def self.strip_job_prefix(line)
+    line.sub(JOB_PREFIX_RE, "")
+  end
+
+  # ── Finding problems ──────────────────────────────────────────────────
+
+  Event = Struct.new(:kind, :time, :title, :error, :cause, :frames, :context, :count, :first_time, keyword_init: true)
+
+  EXCEPTION_RE = /\A([A-Z]\w*(?:::[A-Z]\w*)*) \((.*?)\)?:?\s*\z/
+  CAUSE_RE = /\ACaused by: ([A-Z]\w*(?:::[A-Z]\w*)*) \((.*?)\)?\s*\z/
+  FRAME_RE = %r{\A(?:app|config|lib|bin|db)/\S+:\d+}
+  JOB_ERROR_RE = /\AError performing (\S+) \(Job ID: [^)]*\) from \S+ in [\d.]+ms: ([A-Z]\w*(?:::[A-Z]\w*)*) \((.*?)\)?:?\s*\z/
+  DISCARDED_RE = /\ADiscarded (\S+) \(Job ID: [^)]*\) due to an? ([A-Z]\w*(?:::[A-Z]\w*)*) \((.*?)\)?\.?\s*\z/
+  COMPLETED_5XX_RE = /\ACompleted (5\d\d) ([A-Za-z ]+?) in /
+  # A line Roe's own code logged, tagged like "[ContentSync] …", saying
+  # something failed. Only tagged lines: untagged ones are database
+  # statements and request parameters, which mention "error" constantly.
+  TAGGED_RE = /\A\[([A-Z][\w:]*(?: [\w:]+)?)\] (.+)/
+  FAILURE_WORDS_RE = /\b(?:fail(?:s|ed|ure)?|errors?|couldn't|could not|refused|timed out|unreachable|aborted)\b/i
+
+  def self.scan(lines, since)
+    events = []
+    also = []
+    now_time = nil
+    request = nil
+    i = 0
+    while i < lines.size
+      raw = lines[i].chomp
+      line = strip_job_prefix(raw)
+      if (t = time_in(raw))
+        now_time = t
+      end
+      if (m = STARTED_RE.match(line))
+        request = "#{m[1]} #{m[2]}"
+      end
+      recent = now_time && now_time >= since
+
+      if recent && (m = COMPLETED_5XX_RE.match(line))
+        ex, cause, frames = exception_after(lines, i + 1)
+        events << Event.new(kind: :page, time: now_time, title: "Page failed (#{m[1]})",
+                            error: ex, cause: cause, frames: frames, context: request)
+      elsif recent && (m = JOB_ERROR_RE.match(line))
+        frames = frames_after(lines, i + 1)
+        events << Event.new(kind: :job, time: now_time, title: "Job failed: #{m[1]}",
+                            error: "#{m[2]}: #{m[3]}", frames: frames)
+      elsif recent && (m = DISCARDED_RE.match(line))
+        events << Event.new(kind: :job, time: now_time, title: "Job gave up: #{m[1]}",
+                            error: "#{m[2]}: #{m[3]}", frames: [])
+      elsif recent && (m = TAGGED_RE.match(line)) && line =~ FAILURE_WORDS_RE && line !~ /errors: \[\]/
+        also << Event.new(kind: :also, time: now_time, title: "[#{m[1]}]", error: m[2].strip)
+      end
+      i += 1
+    end
+    [ group(events), group(also) ]
+  end
+
+  # The exception Rails prints after "Completed 500": its class and message,
+  # what caused it, and the first few lines of Roe's code it went through.
+  def self.exception_after(lines, from)
+    ex = cause = nil
+    frames = []
+    lines[from, 80].to_a.each do |raw|
+      line = raw.chomp.strip
+      break if line.start_with?("Started ", "Information for cause")
+      if ex.nil? && (m = EXCEPTION_RE.match(line)) && !line.start_with?("Information for")
+        ex = "#{m[1]}: #{m[2]}"
+      elsif cause.nil? && (m = CAUSE_RE.match(line))
+        cause = "#{m[1]}: #{m[2]}"
+      elsif ex && line =~ FRAME_RE
+        frames << line unless frames.include?(line)
+        break if frames.size >= MAX_FRAMES
+      end
+    end
+    [ ex || "(no error message was logged)", cause, frames ]
+  end
+
+  def self.frames_after(lines, from)
+    frames = []
+    lines[from, 40].to_a.each do |raw|
+      line = raw.chomp.strip
+      next unless line =~ FRAME_RE
+
+      frames << line unless frames.include?(line)
+      break if frames.size >= MAX_FRAMES
+    end
+    frames
+  end
+
+  # The same error a hundred times is one entry: "×100 since 13:10".
+  def self.group(events)
+    groups = {}
+    events.each do |e|
+      key = [ e.kind, e.title, normalize(e.error), e.frames.to_a.first ]
+      if (g = groups[key])
+        g.count += 1
+        g.first_time = e.time if e.time < g.first_time
+        if e.time >= g.time
+          g.time = e.time
+          g.context = e.context
+        end
+      else
+        e.count = 1
+        e.first_time = e.time
+        groups[key] = e
+      end
+    end
+    groups.values.sort_by { |g| -g.time.to_f }
+  end
+
+  def self.normalize(text)
+    text.to_s.gsub(/\b[0-9a-f]{8,}(?:-[0-9a-f]{4,})*\b/i, "#").gsub(/\d+(?:\.\d+)?/, "N")
+  end
+
+  # ── The last start (log/roe-daemon.log) ───────────────────────────────
+
+  # roe.sh writes "==> Roe starting <time>" before each background start.
+  # Logs from before that marker existed fall back to Rails' own
+  # "=> Booting Puma", which has no time.
+  START_MARK_RE = /\A==> Roe starting (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4})/
+  BOOTED_RE = /Use Ctrl-C to stop|\* Listening on /
+  # Not useful for working out why a start failed: database statements,
+  # their source lines, Tailwind's rebuild chatter, blank lines.
+  NOISE_RE = /\A\s*(?:↳|(?:CACHE )?[\w:]+ (?:Load|Create|Update|Destroy|Exists\?|Count|Pluck|Upsert|Insert|Delete|Update All|Delete All|Insert All|Upsert All) \(|TRANSACTION \(|Rebuilding|Done in \d|≈ tailwindcss|\s*\z)/
+
+  def self.last_start
+    return nil unless File.file?(DAEMON_LOG)
+
+    data = read_tail(DAEMON_LOG, [ File.size(DAEMON_LOG), 8 * 1024 * 1024 ].min)
+    lines = data.lines.map(&:chomp)
+    at = nil
+    idx = lines.rindex { |l| l =~ START_MARK_RE }
+    if idx
+      at = (Time.parse(START_MARK_RE.match(lines[idx])[1]) rescue nil)
+    else
+      idx = lines.rindex { |l| l.start_with?("=> Booting Puma") }
+    end
+    return nil unless idx
+
+    region = lines[(idx + 1)..]
+    { at: at, booted: region.any? { |l| l =~ BOOTED_RE },
+      stopped_cleanly: region.any? { |l| l.strip == "Exiting" },
+      lines: region.reject { |l| l =~ NOISE_RE } }
+  end
+
+  # ── This install ──────────────────────────────────────────────────────
+
+  def self.version
+    v = nil
+    [ File.join(APP, "VERSION"), File.join(APP, "..", "VERSION") ].each do |path|
+      next unless File.file?(path)
+
+      v = File.read(path)[/^version:\s*['"]?([^'"\s]+)/, 1] and break
+    end
+    # A copy run from git (Roe's own development) doesn't rewrite VERSION;
+    # the tag it's on says more.
+    if File.directory?(File.join(APP, ".git"))
+      described = `git -C "#{APP}" describe --tags --always 2>/dev/null`.strip
+      if !described.empty? && described.delete_prefix("v") != v
+        v = v ? "#{v} (git #{described})" : "git #{described}"
+      end
+    end
+    v || "unknown"
+  rescue StandardError
+    v || "unknown"
+  end
+
+  def self.wanted_ruby
+    path = File.join(APP, ".ruby-version")
+    File.file?(path) ? File.read(path).strip.sub(/\Aruby-/, "") : nil
+  end
+
+  # ── Output ────────────────────────────────────────────────────────────
+
+  COLOR = $stdout.tty? && ENV["NO_COLOR"].to_s.empty?
+
+  def self.paint(text, code)
+    COLOR ? "\e[#{code}m#{text}\e[0m" : text
+  end
+
+  def self.head(text)
+    paint(text, "1;31")
+  end
+  def self.dim(text)
+    paint(text, "2")
+  end
+  def self.key(text)
+    paint(text, "1")
+  end
+
+  # Pasted into chats and issues, so nothing personal or secret goes out:
+  # email addresses, key-like strings, and the home folder's name.
+  def self.redact(text)
+    text.to_s
+        .gsub(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/, "[email]")
+        .gsub(/\b(?:sk|rk|pk|whsec)_(?:test|live)?_?[A-Za-z0-9]{8,}/, "[key]")
+        .gsub(/\b(Bearer\s+|Token\s+|(?:token|key|api_key|password|secret)=)[^\s&"',)]+/i) { "#{$1}[hidden]" }
+        .gsub(/\b[A-Za-z0-9_\-]{32,}\b/) { |s| s =~ /\d/ && s =~ /[A-Za-z]/ ? "[hidden]" : s }
+        .gsub(Dir.home, "~")
+  end
+
+  # The time, with the date when it isn't today (a day's window spans two).
+  def self.clock(time)
+    local = time.localtime
+    local.to_date == (ENV["ROE_LOGS_NOW"] ? Time.parse(ENV["ROE_LOGS_NOW"]) : Time.now).to_date ? local.strftime("%H:%M") : local.strftime("%b %-d %H:%M")
+  end
+
+  # Blanks first: a home folder or key cut short no longer looks like one.
+  def self.fit(text, width = 110)
+    text = redact(text).gsub(/\s+/, " ").strip
+    text.length > width ? "#{text[0, width - 1]}…" : text
+  end
+
+  def self.run(argv)
+    flag = argv.find { |a| a.start_with?("--") } || "--1h"
+    seconds, label = WINDOWS[flag]
+    unless seconds
+      warn "Unknown option: #{flag}. Use --2h or --day (the default is the last hour)."
+      return 1
+    end
+    since = (ENV["ROE_LOGS_NOW"] ? Time.parse(ENV["ROE_LOGS_NOW"]) : Time.now) - seconds # ROE_LOGS_NOW: for testing only
+
+    site = ENV["ROE_LOGS_SITE"].to_s
+    pid = ENV["ROE_LOGS_PID"].to_s
+    port = ENV["ROE_LOGS_PORT"].to_s
+    out = []
+    findings = []
+
+    start = last_start
+    want_ruby = wanted_ruby
+    ruby_line = RUBY_VERSION.dup
+    if want_ruby && want_ruby != RUBY_VERSION
+      ruby_line << " — this site needs #{want_ruby}"
+      findings << "The wrong Ruby is being found (#{RUBY_VERSION}, needs #{want_ruby}). Roe won't start with it."
+    end
+
+    server =
+      if !pid.empty?
+        s = "running#{port.empty? ? '' : " on port #{port}"}"
+        start && start[:at] ? "#{s} · started #{start[:at].localtime.strftime('%b %-d %H:%M')}" : s
+      elsif ENV.key?("ROE_LOGS_PID")
+        "not running"
+      else
+        "unknown (run 'roe logs' to check)"
+      end
+
+    out << head("ROE LOGS") + (site.empty? ? "" : " #{site}") + dim(" · #{label}")
+    out << "#{key('VERSION:')} #{version}"
+    out << "#{key('RUBY:')}    #{ruby_line}"
+    out << "#{key('SERVER:')}  #{server}"
+    out << "#{key('SYSTEM:')}  #{RUBY_PLATFORM}"
+    out << ""
+
+    findings.each { |f| out << "#{paint('!', '1;33')} #{f}" }
+    out << "" if findings.any?
+
+    errors, also = File.file?(RAILS_LOG) ? scan(lines_since(RAILS_LOG, since), since) : [ [], [] ]
+    # A job's failure is often logged by Roe too, in the same words; once is enough.
+    messages = errors.map { |e| e.error.to_s.split(": ", 2).last.to_s.strip }.reject(&:empty?)
+    also = also.reject { |e| messages.any? { |m| e.error.include?(m) } }
+
+    if errors.empty?
+      out << "#{head('ERRORS')}  none in #{label}"
+    else
+      out << "#{head('ERRORS')}  #{errors.size}#{errors.size > MAX_GROUPS ? " (showing #{MAX_GROUPS})" : ''}, newest first"
+      errors.first(MAX_GROUPS).each do |e|
+        at = clock(e.time)
+        pad = " " * (at.length + 4)
+        out << "  #{at}  #{key(e.title)}#{e.context ? dim("  #{e.context}") : ''}"
+        out << "#{pad}#{fit(e.error)}"
+        out << "#{pad}#{dim('caused by')} #{fit(e.cause)}" if e.cause && e.cause != e.error && !e.error.end_with?(e.cause.split(': ', 2).last.to_s)
+        e.frames.each { |f| out << "#{pad}#{dim(f)}" }
+        out << "#{pad}#{dim("×#{e.count} since #{clock(e.first_time)}")}" if e.count > 1
+      end
+    end
+
+    if also.any?
+      out << ""
+      out << "#{head('ALSO LOGGED')}  Roe noted these going wrong"
+      also.first(MAX_ALSO).each do |e|
+        count = e.count > 1 ? dim("  ×#{e.count}") : ""
+        out << "  #{clock(e.time)}  #{fit("#{e.title} #{e.error}", 100)}#{count}"
+      end
+    end
+
+    # The server isn't up: what its last start said is usually the answer.
+    if pid.empty? && start
+      out << ""
+      when_text = start[:at] ? " (#{start[:at].localtime.strftime('%b %-d %H:%M')})" : ""
+      if !start[:booted]
+        out << "#{head('LAST START')}#{when_text}  it didn't finish starting. The last lines:"
+        start[:lines].last(25).each { |l| out << "  #{fit(l, 160)}" }
+      elsif start[:stopped_cleanly]
+        out << "#{head('LAST START')}#{when_text}  it started, then was stopped."
+      else
+        out << "#{head('LAST START')}#{when_text}  it started, then stopped unexpectedly. The last lines:"
+        start[:lines].last(15).each { |l| out << "  #{fit(l, 160)}" }
+      end
+    end
+
+    unless File.file?(RAILS_LOG)
+      out << ""
+      out << dim("No log yet at #{RAILS_LOG}: this site may never have started.")
+    end
+
+    puts redact(out.join("\n"))
+    if $stdout.tty?
+      puts ""
+      puts dim("COPY: roe logs#{site.empty? ? '' : " #{site}"}#{flag == '--1h' ? '' : " #{flag}"} | #{copy_command}")
+    end
+    0
+  end
+
+  def self.copy_command
+    RUBY_PLATFORM.include?("darwin") ? "pbcopy" : "xclip -selection clipboard"
+  end
+end
+
+exit RoeLogs.run(ARGV) if $PROGRAM_NAME == __FILE__

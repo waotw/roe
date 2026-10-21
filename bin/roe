@@ -144,6 +144,7 @@ usage() {
     echo -e "  ${ROE_ORANGE}open${NC}        Open the site — home and admin — in your browser"
     echo -e "  ${ROE_ORANGE}home${NC}        Open just the home page"
     echo -e "  ${ROE_ORANGE}admin${NC}       Open just the admin page"
+    echo -e "  ${ROE_ORANGE}logs${NC}        Recent errors and failures, ready to copy and send"
     echo -e "  ${ROE_ORANGE}stripe${NC}      Forward Stripe test webhooks to a running site (local testing)"
     echo -e "  ${ROE_ORANGE}folder${NC}      Show the cd command for each site's folder"
     echo -e "  ${ROE_ORANGE}install${NC}     Install an optional tool Roe can use (libvips, …)"
@@ -155,6 +156,7 @@ usage() {
     echo -e "  ${ROE_ORANGE}--events${NC}         Stripe events to forward, comma-separated (roe stripe)"
     echo -e "  ${ROE_ORANGE}--all-snapshot${NC}   Forward all Stripe snapshot events (roe stripe)"
     echo -e "  ${ROE_ORANGE}--all-thin${NC}       Forward all Stripe thin events (roe stripe)"
+    echo -e "  ${ROE_ORANGE}--2h${NC} / ${ROE_ORANGE}--day${NC}     Look back two hours or a day instead of one hour (roe logs)"
     echo -e "  ${ROE_ORANGE}-h${NC}               Show this help"
     echo ""
     echo -e "${ROE_RED}${BOLD}EXAMPLES${NC}"
@@ -163,6 +165,7 @@ usage() {
     echo -e "  $ ${ROE_ORANGE}roe open${NC}"
     echo -e "  $ ${ROE_ORANGE}roe install libvips${NC}"
     echo -e "  $ ${ROE_ORANGE}roe stripe${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe logs --day | pbcopy${NC}"
     echo -e "  $ ${ROE_ORANGE}roe stop --all${NC}"
     echo ""
     echo -e "${ROE_RED}${BOLD}NOTES${NC}"
@@ -176,6 +179,9 @@ usage() {
     echo "    events Roe handles; use --events <a,b,c>, --all-snapshot or"
     echo "    --all-thin to change that (e.g. roe stripe --events charge.refunded)."
     echo "    'roe stripe remove' clears the local test key again."
+    echo "  • 'roe logs' shows only what went wrong in the last hour: failed pages,"
+    echo "    failed background jobs, and why the server didn't start, if it didn't."
+    echo "    Email addresses and keys are blanked out, so it's safe to send on."
     echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
     echo "  • To register a site, run './roe.sh register' inside the Roe folder."
     echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
@@ -1014,7 +1020,7 @@ install_with_method() {
 
 # The commands a bare `roe` accepts, one per line — the first word to complete.
 complete_commands() {
-    printf '%s\n' list start stop restart status open home admin stripe folder install completion help
+    printf '%s\n' list start stop restart status open home admin logs stripe folder install completion help
 }
 
 # The candidates for the SECOND word, given the command being completed for.
@@ -1023,6 +1029,7 @@ complete_commands() {
 complete_names() {
     case "$1" in
         start|stop|restart) echo "--all" ;;
+        logs) echo "--2h --day" ;;
         status|open|home|admin|stripe|folder) : ;;
         install) complete_tools; return 0 ;;
         completion) echo "--zsh --bash"; return 0 ;;
@@ -1183,6 +1190,34 @@ cmd_completion() {
     echo -e "  ${DIM}Open a new terminal (or run: source \"$rc\") to start using it.${NC}"
 }
 
+# ── Logs ──────────────────────────────────────────────────────────────────────
+#
+# A short report of what went wrong recently, to paste into a message: the
+# install's bin/roe-logs reads its log files and prints only failures. Plain
+# Ruby run with the install's own Ruby, not Rails, so it still works when
+# Rails won't boot — usually the reason someone runs it. The server state
+# comes from here, where the process checks already live.
+
+cmd_logs() {
+    local f="$1" name root app pid="" port=""
+    name="$(basename "$f" .conf)"
+    root="$(_conf_get "$f" ROOT)"
+    app="$root/current"
+    [ -d "$app" ] || app="$root"
+    if [ ! -f "$app/bin/roe-logs" ]; then
+        log_error "$name is on a Roe without 'roe logs'. Update it from Admin → Updates."
+        echo -e "  LOG: ${DIM}$app/log/development.log${NC}" >&2
+        return 1
+    fi
+    if pid="$(server_pid_for "$root")"; then
+        port="$(port_for_pid "$pid")"
+    else
+        pid=""
+    fi
+    ROE_LOGS_SITE="$name" ROE_LOGS_PID="$pid" ROE_LOGS_PORT="$port" \
+        with_install_ruby "$app" ruby "$app/bin/roe-logs" ${ROE_LOGS_WINDOW:+"$ROE_LOGS_WINDOW"}
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
@@ -1228,6 +1263,22 @@ case "${1:-}" in
         esac
         ;;
     folder)          shift; cmd_folder "$@" ;;
+    logs|log)
+        shift
+        _logs_site=""
+        ROE_LOGS_WINDOW=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --2h|--day) ROE_LOGS_WINDOW="$1"; shift ;;
+                -*)
+                    log_error "Unknown flag for 'roe logs': $1"
+                    echo "  Use --2h or --day. Without one it shows the last hour." >&2
+                    exit 1 ;;
+                *) _logs_site="$1"; shift ;;
+            esac
+        done
+        for_target cmd_logs "$_logs_site"
+        ;;
     install)         cmd_install "${2:-}" ;;
     completion)
         case "${2:-}" in

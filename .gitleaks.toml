@@ -19,6 +19,10 @@ regexes = [
   # Stripe webhook test fixtures (test/**)
   '''whsec_live_456''',
 
+  # Made-up Stripe-style key the `roe logs` tests check is blanked out
+  # (test/bin/roe_logs_test.rb). Invented for the test, belongs to no account.
+  '''sk_test_51AbCdEfGhIjKl''',
+
   # Snipcart TEST-mode PUBLIC api key example in docs/16-products-store.md.
   # Snipcart's api_key is public by design (loaded client-side); test mode.
   # Both forms below are the same key (raw UUID + base64), as documented.

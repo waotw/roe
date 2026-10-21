@@ -1796,7 +1796,9 @@ cmd_unregister() {
 # a far better failure than killing another site's watcher.
 kill_tailwind_watchers() {
     local pids pid cmd killed=0
-    pids=$(pgrep -f "tailwindcss:watch" 2>/dev/null || true)
+    # The `rails tailwindcss:watch` starter and the tailwindcss program it
+    # runs: ending the starter leaves the program behind, one more each run.
+    pids=$(pgrep -u "$(id -u)" -f "tailwindcss:watch|tailwindcss -i " 2>/dev/null || true)
     [ -z "$pids" ] && return 0
 
     for pid in $pids; do
@@ -1898,7 +1900,153 @@ server_pids_for_this_install() {
     fi
     pids="$pids
 $(ps -axo pid=,command= 2>/dev/null | awk -v dir="[$APP_DIR]" 'index($0, "puma") && index($0, dir) { print $1 }')"
+    # And by folder: a server started before the tag existed, whose pidfile
+    # an update moved into current.backup/ along with its code.
+    for pid in $(pgrep -u "$(id -u)" -f '^puma ' 2>/dev/null); do
+        [ "$(roe_process_kind "$pid")" = "server" ] && pids="$pids
+$pid"
+    done
     printf '%s\n' "$pids" | grep -E '^[0-9]+$' | sort -un
+}
+
+# ── This install's own processes ──────────────────────────────────────
+#
+# Roe only ever stops what it can show is its own: a process run by this
+# user, working from inside this install's folder, and one of the kinds Roe
+# starts — a Puma server or a Solid Queue job process. Working from inside
+# the folder covers current/ and also current.backup/ and current.broken-*,
+# where an update moves the old code: a process keeps its folder through a
+# rename, and the system reports the new name. Another Rails app or another
+# Roe site works from its own folder, so it never matches; nor does a shell,
+# an editor or a `rails console` that happens to be in this one, since
+# they're none of those kinds.
+
+# The real path of this install, so a symlinked folder still compares
+# equal to what the system reports for a process.
+ROE_ROOT_REAL="$(cd "$ROE_ROOT" 2>/dev/null && pwd -P || printf '%s' "$ROE_ROOT")"
+
+# The folder a process is working from, or nothing if it can't be read.
+pid_cwd() {
+    if [ -e "/proc/$1/cwd" ]; then
+        readlink "/proc/$1/cwd" 2>/dev/null
+        return 0
+    fi
+    command -v lsof >/dev/null 2>&1 || return 0
+    lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1
+}
+
+# Prints "server" or "jobs" when a PID is one of this install's processes;
+# fails for anything else. See the note above for what counts.
+roe_process_kind() {
+    local pid="$1" cmd uid cwd kind
+    cmd="$(ps -o command= -p "$pid" 2>/dev/null)" || return 1
+    case "$cmd" in
+        "puma "*|*"/puma "*)                              kind="server" ;;
+        "solid-queue-"*|*"/bin/jobs"*|*"solid_queue:start"*) kind="jobs" ;;
+        # A video encode a job started (VideoVariantGenerator.run_ffmpeg
+        # writes into tmp/video_variants/). ffmpeg keeps encoding when the
+        # job that started it is ended, so it's stopped along with the jobs.
+        *ffmpeg*"/tmp/video_variants/"*)                  kind="encode" ;;
+        *) return 1 ;;
+    esac
+    uid="$(ps -o uid= -p "$pid" 2>/dev/null | tr -d ' ')"
+    [ "$uid" = "$(id -u)" ] || return 1
+    cwd="$(pid_cwd "$pid")"
+    [ -n "$cwd" ] || return 1
+    # The trailing slash keeps /Code/roe from matching /Code/roe-blog.
+    case "$cwd/" in
+        "$ROE_ROOT_REAL"/*) echo "$kind"; return 0 ;;
+    esac
+    return 1
+}
+
+# A Solid Queue process of this user's whose working folder has been
+# deleted — left by an app that was moved or removed. Only ever reported,
+# never stopped: nothing on it shows whose it was.
+orphaned_job_process() {
+    local pid="$1" cmd uid
+    cmd="$(ps -o command= -p "$pid" 2>/dev/null)" || return 1
+    case "$cmd" in "solid-queue-"*) ;; *) return 1 ;; esac
+    uid="$(ps -o uid= -p "$pid" 2>/dev/null | tr -d ' ')"
+    [ "$uid" = "$(id -u)" ] || return 1
+    [ -z "$(pid_cwd "$pid")" ] || [ ! -d "$(pid_cwd "$pid")" ]
+}
+
+# Every background-job process of this install, one PID per line —
+# supervisors first, so stopping them doesn't race their own workers, then
+# workers, then any video encode they started.
+job_pids_for_this_install() {
+    local pid kind supervisors="" others="" encodes=""
+    for pid in $(pgrep -u "$(id -u)" -f 'solid-queue-|bin/jobs|solid_queue:start|tmp/video_variants/' 2>/dev/null); do
+        kind="$(roe_process_kind "$pid")" || continue
+        case "$kind" in
+            encode) encodes="$encodes $pid"; continue ;;
+            jobs) ;;
+            *) continue ;;
+        esac
+        case "$(ps -o command= -p "$pid" 2>/dev/null)" in
+            *supervisor*|*bin/jobs*|*solid_queue:start*) supervisors="$supervisors $pid" ;;
+            *) others="$others $pid" ;;
+        esac
+    done
+    for pid in $supervisors $others $encodes; do echo "$pid"; done
+}
+
+# Stop processes: ask each to finish, give them up to 10 seconds, then end
+# any still running. Asking isn't always enough — a job process whose
+# server has gone can ignore it indefinitely, and keep the port it was
+# handed. Prints one line per process.
+#   stop_processes "Rails server" 123 456
+stop_processes() {
+    local label="$1" pid i alive
+    shift
+    [ $# -gt 0 ] || return 0
+    for pid in "$@"; do kill "$pid" 2>/dev/null || true; done
+    for i in $(seq 1 20); do
+        alive=""
+        for pid in "$@"; do ps -p "$pid" >/dev/null 2>&1 && alive="$alive $pid"; done
+        [ -z "$alive" ] && break
+        sleep 0.5
+    done
+    for pid in "$@"; do
+        if ps -p "$pid" >/dev/null 2>&1; then
+            kill -9 "$pid" 2>/dev/null || true
+            log_warning "$label didn't stop when asked, so it was ended (PID: $pid)"
+        else
+            log_success "$label stopped (PID: $pid)"
+        fi
+    done
+}
+
+# The background jobs (video encoding, image versions, the hourly Site Sync
+# and update checks) as their own program, not inside the server. Inside
+# the server, the job processes it started were handed its open port, and
+# one left behind by an ended server kept that port — the site wouldn't
+# load at its address, and the next start moved to another port. Output
+# goes to the background log, where `roe logs` reads startup failures.
+start_jobs() {
+    nohup "$APP_DIR/bin/jobs" >> "$APP_DIR/log/roe-daemon.log" 2>&1 &
+    echo "$!" > "$APP_DIR/tmp/pids/jobs.pid"
+}
+
+# Stop this install's background jobs: the jobs program first (it takes its
+# workers with it), then anything still running — workers it couldn't stop,
+# a video encode, or job processes an earlier run left behind.
+stop_jobs() {
+    local pids pid supervisors=""
+    pids="$(job_pids_for_this_install)"
+    for pid in $pids; do
+        case "$(ps -o command= -p "$pid" 2>/dev/null)" in
+            *supervisor*|*bin/jobs*|*solid_queue:start*) supervisors="$supervisors $pid" ;;
+        esac
+    done
+    # shellcheck disable=SC2086
+    [ -n "$supervisors" ] && stop_processes "Background jobs" $supervisors
+    pids="$(job_pids_for_this_install)"
+    # shellcheck disable=SC2086
+    [ -n "$pids" ] && stop_processes "Leftover background-job process" $pids
+    rm -f "$APP_DIR/tmp/pids/jobs.pid"
+    return 0
 }
 
 # Echo the first TCP port the given PID is listening on. Used so the
@@ -1953,6 +2101,21 @@ find_free_port() {
 resolve_port_collision() {
     port_in_use "$PORT" || return 0    # Port is free, nothing to do.
 
+    # This site's own leftover — a server or a background-job process from
+    # an earlier run (see roe_process_kind) — is stopped, not stepped round.
+    local holder kind what
+    holder=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    if [ -n "$holder" ] && kind="$(roe_process_kind "$holder")"; then
+        what="server"
+        [ "$kind" = "jobs" ] && what="background-job process"
+        log_warning "Port $PORT is held by a $what left from an earlier run of this site. Stopping it…"
+        stop_processes "Leftover $what" "$holder"
+        if ! port_in_use "$PORT"; then
+            log_info "Port $PORT is free again."
+            return 0
+        fi
+    fi
+
     if port_owned_by_this_install "$PORT"; then
         log_warning "This install is already serving port $PORT. Restarting it…"
         kill_pid_on_port "$PORT"
@@ -1963,6 +2126,12 @@ resolve_port_collision() {
         log_warning "Port $PORT didn't free up. Looking for an alternate."
     elif is_roe_on_port "$PORT"; then
         log_warning "A different Roe install is serving port $PORT — leaving it running. Looking for an alternate port."
+    elif [ -n "$holder" ] && orphaned_job_process "$holder"; then
+        # Can't be shown to be this site's, so it isn't stopped — but it
+        # isn't a mystery app either, and the person can end it.
+        log_warning "Port $PORT is held by a background-job process whose folder no longer exists (PID: $holder)."
+        echo "    It was left by a Roe or Rails app that was moved or deleted, so Roe can't tell whose it is"
+        echo "    and leaves it alone. To end it: kill -9 $holder"
     else
         log_warning "Port $PORT is in use by another app (not Roe). Looking for an alternate port."
     fi
@@ -1976,7 +2145,7 @@ resolve_port_collision() {
         # new port while Puma still bound the old one and died with
         # EADDRINUSE.
         export PORT="$new_port"
-        log_info "Using port $PORT instead of $original_port."
+        log_warning "Roe will use port $PORT this time, not $original_port. Its address is http://${ROE_HOST:-localhost}:$PORT"
     else
         log_error "Couldn't find a free port near $original_port. Free up a port, or set PORT=<n> ./roe.sh start to choose one yourself."
         exit 1
@@ -2041,9 +2210,28 @@ cmd_start() {
     fi
     rm -f "$APP_DIR/tmp/pids/server.pid"
 
+    # No server is running, so any background-job process of this site's is
+    # left from an earlier run. It would run jobs alongside the new ones, and
+    # one started inside an older server can be holding the site's port.
+    local leftover_jobs
+    leftover_jobs="$(job_pids_for_this_install)"
+    if [ -n "$leftover_jobs" ]; then
+        log_warning "Found background-job processes left from an earlier run of this site. Stopping them…"
+        # shellcheck disable=SC2086
+        stop_processes "Leftover background jobs" $leftover_jobs
+        rm -f "$APP_DIR/tmp/pids/jobs.pid"
+    fi
+
     cd "$APP_DIR"
-    export SOLID_QUEUE_IN_PUMA=1
     export RAILS_ENV="${RAILS_ENV:-development}"
+    # On this computer the jobs run as their own program (start_jobs), so
+    # they can't hold the server's port. Elsewhere — a server started this
+    # way with no one to restart the pieces — they stay inside it.
+    if [ "$RAILS_ENV" = "development" ]; then
+        unset SOLID_QUEUE_IN_PUMA
+    else
+        export SOLID_QUEUE_IN_PUMA=1
+    fi
 
     # Exported so the child `bin/rails server` → Puma actually sees it; see
     # the note in resolve_port_collision. Precedence: an explicit PORT=<n>
@@ -2112,10 +2300,16 @@ cmd_start() {
         echo "$TAILWIND_PID" > "$APP_DIR/tmp/pids/tailwind.pid"
         log_info "Tailwind watcher running (PID: $TAILWIND_PID)"
 
+        start_jobs
+        log_info "Background jobs running (PID: $(cat "$APP_DIR/tmp/pids/jobs.pid"))"
+
         cleanup() {
             log_info "Stopping Tailwind CSS watcher..."
             kill "$TAILWIND_PID" 2>/dev/null || true
             rm -f "$APP_DIR/tmp/pids/tailwind.pid"
+            # The tailwindcss program the watcher started outlives it.
+            kill_tailwind_watchers
+            stop_jobs
         }
         trap cleanup EXIT INT TERM
 
@@ -2175,8 +2369,15 @@ start_daemon() {
     local log_file="$APP_DIR/log/roe-daemon.log"
     mkdir -p "$APP_DIR/log" "$APP_DIR/tmp/pids"
 
+    # Marks where this start's output begins, with the time: Rails' own
+    # boot lines have none. bin/roe-logs (roe logs) reads back to the last
+    # one to show why a start failed.
+    printf '\n==> Roe starting %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')" >> "$log_file"
+
     nohup "$APP_DIR/bin/rails" "tailwindcss:watch[always]" >> "$log_file" 2>&1 &
     echo "$!" > "$APP_DIR/tmp/pids/tailwind.pid"
+
+    start_jobs
 
     # Puma's own -d/--daemon was removed in Puma 5, so we detach it
     # ourselves. `rails server` sets PIDFILE to tmp/pids/server.pid by
@@ -2211,6 +2412,8 @@ start_daemon() {
 
     log_error "Roe didn't come up on port $PORT. The last lines of the log:"
     tail -n 20 "$log_file" 2>/dev/null | sed 's/^/    /'
+    # Nothing to do jobs for without a server.
+    stop_jobs >/dev/null
     return 1
 }
 
@@ -2222,26 +2425,20 @@ cmd_stop() {
     # Stop every Rails server for this install — see
     # server_pids_for_this_install for why the pidfile alone is not
     # trusted. Wait for each to exit so a restart can rebind the port.
-    local pids pid i
+    local pids
     pids="$(server_pids_for_this_install)"
     if [ -n "$pids" ]; then
-        for pid in $pids; do
-            kill "$pid" 2>/dev/null || continue
-            for i in 1 2 3 4 5 6 7 8 9 10; do
-                ps -p "$pid" >/dev/null 2>&1 || break
-                sleep 0.5
-            done
-            if ps -p "$pid" >/dev/null 2>&1; then
-                kill -9 "$pid" 2>/dev/null || true
-                log_warning "Rails server did not exit in time; killed (PID: $pid)"
-            else
-                log_success "Rails server stopped (PID: $pid)"
-            fi
-        done
+        # shellcheck disable=SC2086
+        stop_processes "Rails server" $pids
     else
         log_warning "Rails server is not running"
     fi
     rm -f "$APP_DIR/tmp/pids/server.pid"
+
+    # The background jobs: the program start_jobs runs, plus any job process
+    # an earlier run left behind (older servers ran the jobs inside
+    # themselves, and an ended server didn't always take them with it).
+    stop_jobs
 
     # Stop Tailwind watcher (pid file)
     if [ -f "$APP_DIR/tmp/pids/tailwind.pid" ]; then
@@ -2341,6 +2538,29 @@ cmd_status() {
         else
             log_warning "Tailwind PID file exists but watcher not running (stale)"
         fi
+    fi
+
+    # Background jobs: their own program now, or inside an older server.
+    # Running properly means a supervisor is there; workers or a scheduler
+    # on their own are what's left after the supervisor was ended — they
+    # look busy but nothing picks the work up.
+    local job_pids job_sup=""
+    job_pids="$(job_pids_for_this_install | tr '\n' ' ' | sed 's/ *$//')"
+    for status_pid in $job_pids; do
+        case "$(ps -o command= -p "$status_pid" 2>/dev/null)" in
+            *supervisor*|*bin/jobs*|*solid_queue:start*) job_sup="$status_pid" ;;
+        esac
+    done
+    if [ -n "$job_pids" ] && [ -z "$status_pids" ]; then
+        log_warning "Background-job processes are running with no server (PID: $job_pids)."
+        echo "    They're left from an earlier run and can hold the site's port. 'roe restart' clears them."
+    elif [ -n "$job_pids" ] && [ -z "$job_sup" ]; then
+        log_warning "Only part of the background jobs is running (PID: $job_pids), so jobs won't be done."
+        echo "    'roe restart' starts them properly."
+    elif [ -n "$job_pids" ]; then
+        log_success "Background jobs running (PID: $job_pids)"
+    elif [ -n "$status_pids" ]; then
+        log_warning "Background jobs aren't running: videos won't be encoded and Site Sync won't check in. Restart to start them."
     fi
 
     # Requirements
