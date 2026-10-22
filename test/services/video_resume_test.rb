@@ -177,10 +177,101 @@ class VideoResumeTest < ActiveSupport::TestCase
 
   test "Optimize Videos and the start check both hand back a gone process's jobs first" do
     VVG.expects(:release_jobs_of_gone_processes!).twice.returns(0)
+    VVG.expects(:release_stuck_transcodes!).twice.returns(0)
     VVG.stubs(:needing_optimization).returns([])
     VVG.stubs(:interrupted).returns([])
 
     VVG.optimize_all!
     VVG.resume_interrupted!
+  end
+
+  # ── waiting for a lock nobody holds ──
+  #
+  # What roe_site was left with: the 720p finished, the jobs program was
+  # stopped as Solid Queue handed the lock to the 1080p, and only the
+  # lock's return was saved. The 1080p stayed waiting for its own expiry,
+  # hours away, with the lock free and nothing encoding.
+
+  LOCK = "TranscodeVideoJob/video-transcode"
+
+  # Enqueued the real way, so Solid Queue does its own lock bookkeeping:
+  # the first takes the lock and is ready, the next waits behind it.
+  def enqueue_transcode(web, name)
+    SolidQueue::Job.enqueue(TranscodeVideoJob.new(web, name, false))
+    SolidQueue::Job.where(class_name: "TranscodeVideoJob").order(:id).last
+  end
+
+  # The 720p done, its finish recorded — but of the hand-off that should
+  # come with it, only `lock_returned` (or nothing) was saved.
+  def finish_without_handing_on(job, lock_returned:)
+    job.ready_execution&.destroy!
+    job.update!(finished_at: Time.current)
+    SolidQueue::Semaphore.where(key: LOCK).update_all(value: 1) if lock_returned
+  end
+
+  def with_solid_queue
+    VVG.unstub(:solid_queue?)
+    ActiveJob::Base.stubs(:queue_adapter).returns(ActiveJob::QueueAdapters::SolidQueueAdapter.new)
+    SolidQueue::Semaphore.delete_all
+    SolidQueue::BlockedExecution.delete_all
+    yield
+  ensure
+    SolidQueue::Process.delete_all
+    SolidQueue::Semaphore.delete_all
+    SolidQueue::BlockedExecution.delete_all
+  end
+
+  test "a transcode waiting for a free lock with nothing encoding is released, and runs" do
+    with_solid_queue do
+      first = enqueue_transcode("/media/video/zz-resume-s.mp4", "720p")
+      job = enqueue_transcode("/media/video/zz-resume-s.mp4", "1080p")
+      assert job.blocked_execution, "Solid Queue made it wait behind the 720p"
+      finish_without_handing_on(first, lock_returned: true)
+
+      assert VVG.stuck_transcodes?
+      assert_not_includes VVG.videos_with_jobs, "/media/video/zz-resume-s.mp4", "stuck isn't under way"
+
+      assert_equal 1, VVG.release_stuck_transcodes!
+      job.reload
+      assert job.ready_execution, "ready to run"
+      assert_nil job.blocked_execution
+      assert_equal 0, SolidQueue::Semaphore.find_by(key: LOCK).value, "and it holds the lock, as usual"
+      assert_not VVG.stuck_transcodes?
+    end
+  end
+
+  test "the same when the lock was never given back but nothing holds it" do
+    with_solid_queue do
+      first = enqueue_transcode("/media/video/zz-resume-t.mp4", "720p")
+      job = enqueue_transcode("/media/video/zz-resume-t.mp4", "1080p")
+      finish_without_handing_on(first, lock_returned: false)
+
+      assert_equal 1, VVG.release_stuck_transcodes!
+      assert job.reload.ready_execution
+    end
+  end
+
+  test "a transcode waiting behind one that's encoding is just waiting" do
+    with_solid_queue do
+      running = enqueue_transcode("/media/video/zz-resume-u.mp4", "720p")
+      waiting = enqueue_transcode("/media/video/zz-resume-u.mp4", "1080p")
+      claim(running, job_process(pid: ::Process.pid))
+
+      assert_not VVG.stuck_transcodes?
+      assert_equal 0, VVG.release_stuck_transcodes!
+      assert waiting.reload.blocked_execution, "left in line"
+      assert_includes VVG.videos_with_jobs, "/media/video/zz-resume-u.mp4"
+    end
+  end
+
+  test "a transcode waiting behind one that's ready to run is just waiting" do
+    with_solid_queue do
+      enqueue_transcode("/media/video/zz-resume-v.mp4", "720p") # ready: it has the lock
+      waiting = enqueue_transcode("/media/video/zz-resume-v.mp4", "1080p")
+
+      assert_not VVG.stuck_transcodes?
+      assert_equal 0, VVG.release_stuck_transcodes!
+      assert waiting.reload.blocked_execution
+    end
   end
 end

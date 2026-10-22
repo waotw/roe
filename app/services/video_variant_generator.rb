@@ -362,15 +362,19 @@ class VideoVariantGenerator
     #     a process that was ended mid-encode, and counting it kept the
     #     video "optimizing" for good;
     #   - one still claimed by a process that's gone, before Solid Queue
-    #     has noticed (up to five minutes). See release_jobs_of_gone_processes!.
+    #     has noticed (up to five minutes). See release_jobs_of_gone_processes!;
+    #   - one waiting for the one-at-a-time lock when nothing holds it. See
+    #     stuck_transcodes?.
     def videos_with_jobs
       return Set.new unless solid_queue?
 
+      stuck = stuck_transcodes?
       SolidQueue::Job.where(class_name: "TranscodeVideoJob", finished_at: nil)
                      .where.missing(:failed_execution)
-                     .includes(claimed_execution: :process).filter_map do |job|
+                     .includes(:blocked_execution, claimed_execution: :process).filter_map do |job|
         claim = job.claimed_execution
         next if claim && (claim.process.nil? || gone_process?(claim.process))
+        next if stuck && job.blocked_execution
 
         Array(job.arguments.is_a?(Hash) ? job.arguments["arguments"] : nil).first
       end.to_set
@@ -414,6 +418,51 @@ class VideoVariantGenerator
       0
     end
 
+    # Transcodes waiting for the one-at-a-time lock while nothing holds it.
+    # When a transcode finishes, Solid Queue gives the lock back and moves
+    # the next waiting one to ready in the same step. If the jobs program is
+    # stopped during that step, the give-back can land while the move
+    # doesn't — and every later give-back finds the lock already free, so
+    # it never moves the waiting one either. Solid Queue's own safety net
+    # only frees a waiting job once its wait expires, which for a transcode
+    # is hours (TranscodeVideoJob's concurrency duration). With no transcode
+    # running or ready, nothing can be holding the lock, so a waiting one is
+    # stuck, not waiting.
+    def stuck_transcodes?
+      return false unless solid_queue?
+
+      transcodes = ->(model) { model.joins(:job).where(solid_queue_jobs: { class_name: "TranscodeVideoJob" }) }
+      return false unless transcodes.(SolidQueue::BlockedExecution).exists?
+      return false if transcodes.(SolidQueue::ReadyExecution).exists?
+
+      transcodes.(SolidQueue::ClaimedExecution).includes(:process).none? do |claim|
+        claim.process && !gone_process?(claim.process)
+      end
+    rescue => e
+      Rails.logger.debug { "[VideoVariants] stuck check failed: #{e.message}" }
+      false
+    end
+
+    # Free stuck transcodes (see stuck_transcodes?): reset the lock nobody
+    # holds and let Solid Queue release the next waiting one, which takes
+    # the lock as usual. Returns how many were released.
+    def release_stuck_transcodes!
+      return 0 unless stuck_transcodes?
+
+      keys = SolidQueue::BlockedExecution.joins(:job)
+                                         .where(solid_queue_jobs: { class_name: "TranscodeVideoJob" })
+                                         .distinct.pluck(:concurrency_key)
+      keys.count do |key|
+        SolidQueue::Semaphore.where(key: key).delete_all
+        released = SolidQueue::BlockedExecution.release_one(key)
+        Rails.logger.info "[VideoVariants] Released a transcode stuck waiting for a lock nobody held (#{key})" if released
+        released
+      end
+    rescue => e
+      Rails.logger.warn "[VideoVariants] couldn't release stuck transcodes: #{e.class} #{e.message}"
+      0
+    end
+
     # How many times resume_interrupted! restarts one video before calling
     # it failed. A crash on every attempt would otherwise re-run a long
     # encode at every start.
@@ -432,8 +481,9 @@ class VideoVariantGenerator
       end
     end
 
-    # Queue interrupted videos again. Runs as the jobs program starts (roe
-    # start, roe restart — config/initializers/video_variants.rb). What's
+    # Free stuck transcodes, then queue interrupted videos again. Runs as the
+    # jobs program starts (roe start, roe restart —
+    # config/initializers/video_variants.rb). What's
     # already made is skipped, so only the missing versions are encoded.
     # After MAX_RESUMES it's marked failed instead, so the Media Browser
     # says what happened and OPTIMIZE VIDEOS offers it. Returns how many
@@ -442,6 +492,7 @@ class VideoVariantGenerator
       return 0 unless available? && solid_queue?
 
       release_jobs_of_gone_processes!
+      release_stuck_transcodes!
       interrupted.count do |medium|
         web = medium.file_path
         attempts = Rails.cache.increment(resume_key(web), 1, expires_in: 1.day).to_i
@@ -468,9 +519,11 @@ class VideoVariantGenerator
       return 0 unless available?
 
       # Jobs of a jobs program that was ended mid-encode still hold the
-      # one-at-a-time lock until Solid Queue notices; let them go first so
-      # what's queued here starts straight away, not in up to five minutes.
+      # one-at-a-time lock until Solid Queue notices, and a stop at the wrong
+      # moment can leave a transcode waiting for a lock nobody holds; clear
+      # both first, so what's queued here starts straight away.
       release_jobs_of_gone_processes!
+      release_stuck_transcodes!
       needing_optimization.count do |medium|
         web = medium.file_path
         Rails.cache.delete(error_key(web))
