@@ -105,6 +105,36 @@ class VideoResumeTest < ActiveSupport::TestCase
     assert_match "stopped part-way 2 times", VVG.last_error(web)
   end
 
+  # What a user's install was left with: the jobs program was ended
+  # outright during the 1080p, so the job never cleared its progress. The
+  # 72% it died at stayed for a day, counted as work under way, and neither
+  # a restart nor Optimize Videos picked the video up.
+  test "progress left by an encode that's gone doesn't keep a video busy" do
+    web = stopped_partway("zz-resume-p.mp4")
+    VVG.stubs(:videos_with_jobs).returns(Set.new)
+    VVG.write_progress(web, "1080p", 72)
+
+    assert_not_includes VVG.interrupted.map(&:file_path), web, "fresh: an encode is reporting"
+
+    travel (VVG::PROGRESS_STALE_AFTER + 1.minute) do
+      assert_nil VVG.live_progress(web)
+      assert_includes VVG.interrupted.map(&:file_path), web
+      assert_includes VVG.needing_optimization.map(&:file_path), web
+      step = VVG.status_for(Medium.find_by(file_path: web))[:steps].find { |s| s[:name] == "1080p" }
+      assert_equal "waiting", step[:state], "not frozen at 72%"
+      assert_enqueued_with(job: TranscodeVideoJob, args: [ web, "1080p", false ]) { VVG.resume_interrupted! }
+    end
+  end
+
+  test "progress written before entries carried a time counts as left over" do
+    web = stopped_partway("zz-resume-q.mp4")
+    VVG.stubs(:videos_with_jobs).returns(Set.new)
+    @cache.write(VVG.progress_key(web), { "step" => "1080p", "percent" => 72 })
+
+    assert_nil VVG.live_progress(web)
+    assert_includes VVG.interrupted.map(&:file_path), web
+  end
+
   test "nothing happens where videos aren't made" do
     stopped_partway("zz-resume-h.mp4")
     VVG.stubs(:videos_with_jobs).returns(Set.new)

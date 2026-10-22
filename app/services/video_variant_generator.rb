@@ -93,6 +93,10 @@ class VideoVariantGenerator
   # arriving.
   SETTLE_SECONDS = 2
 
+  # How long a progress entry counts as an encode still reporting. See
+  # "Progress" below.
+  PROGRESS_STALE_AFTER = 5.minutes
+
   class << self
     # ── Can we make renditions here? ────────────────────────────────────
 
@@ -367,7 +371,7 @@ class VideoVariantGenerator
           # marker counts too. (With it, the marker is no evidence: it
           # outlives a job that was ended part-way by up to six hours.)
           !busy.include?(medium.file_path) &&
-            Rails.cache.read(progress_key(medium.file_path)).nil? &&
+            live_progress(medium.file_path).nil? &&
             (solid_queue? || !Rails.cache.exist?(queue_cache_key(medium.file_path)))
         else false
         end
@@ -508,7 +512,7 @@ class VideoVariantGenerator
       Medium.video.originals_only.where(variants_status: %w[queued processing]).select do |medium|
         web = medium.file_path
         File.file?(normalize_path(web)) && !complete?(web) &&
-          !busy.include?(web) && Rails.cache.read(progress_key(web)).nil?
+          !busy.include?(web) && live_progress(web).nil?
       end
     end
 
@@ -707,15 +711,35 @@ class VideoVariantGenerator
 
     # ── Progress ────────────────────────────────────────────────────────
     #
-    # While a file is being made, the job writes {step, percent} to the
+    # While a file is being made, the job writes {step, percent, at} to the
     # cache (Solid Cache: shared by the worker and the web process). The
     # upload modal and the media card read it through status_for.
+    #
+    # Only the job clears it, when it ends. A jobs program killed outright
+    # mid-encode (a crash, or roe stop's last resort) never gets that far,
+    # and the entry outlived it by a day: the video showed the percentage
+    # it died at, and counted as being worked on, so neither a restart nor
+    # OPTIMIZE VIDEOS picked it up. So an entry counts only while it's
+    # fresh. An encode refreshes it about once a second; the poster step
+    # writes it once but can't run past two minutes (PROGRESS_STALE_AFTER).
 
     def progress_key(web_path) = "video_progress:#{web_path}"
     def error_key(web_path) = "video_error:#{web_path}"
 
     def write_progress(web_path, step, percent)
-      Rails.cache.write(progress_key(web_path), { "step" => step, "percent" => percent.to_i.clamp(0, 100) }, expires_in: 1.day)
+      entry = { "step" => step, "percent" => percent.to_i.clamp(0, 100), "at" => Time.current.to_i }
+      Rails.cache.write(progress_key(web_path), entry, expires_in: 1.day)
+    end
+
+    # The progress being reported for a video now, or nil. An entry not
+    # refreshed within PROGRESS_STALE_AFTER — or written before entries
+    # carried a time — was left by an encode that's gone.
+    def live_progress(web_path)
+      entry = Rails.cache.read(progress_key(web_path))
+      return nil unless entry.is_a?(Hash) && entry["at"]
+      return nil if Time.current.to_i - entry["at"].to_i > PROGRESS_STALE_AFTER
+
+      entry
     end
 
     def clear_progress(web_path) = Rails.cache.delete(progress_key(web_path))
@@ -730,7 +754,7 @@ class VideoVariantGenerator
       web = medium.file_path
       source = normalize_path(web)
       manifest = on_disk(current_manifest(source), source)
-      live = Rails.cache.read(progress_key(web))
+      live = live_progress(web)
       status = medium.variants_status
 
       # The database status is the authority on whether work is under way:
@@ -861,10 +885,12 @@ class VideoVariantGenerator
       last = 0.0
       reporter = lambda do |seconds|
         now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        next if now - last < 1 || duration <= 0
+        next if now - last < 1
 
+        # Written even when the length is unknown, so the entry stays fresh
+        # (see PROGRESS_STALE_AFTER) for as long as ffmpeg is working.
         last = now
-        write_progress(web, name, seconds / duration * 100)
+        write_progress(web, name, duration.positive? ? seconds / duration * 100 : 0)
       end
       run_ffmpeg(encode_args(source, name, probe), output: out, timeout: timeout_for(probe), on_progress: reporter)
 
