@@ -271,6 +271,25 @@ class VideoVariantGenerator
       end
     end
 
+    # The manifest with only what's on disk: renditions and the poster whose
+    # files have gone (deleted by hand, or lost) are dropped. The manifest
+    # is a record of what was made, and a deleted file left in it read as
+    # done — the progress window and the card skipped it while it was being
+    # made again, and the first job to finish marked the video ready.
+    def on_disk(manifest, source)
+      return nil unless manifest
+
+      kept = manifest.deep_dup
+      kept["renditions"] = Array(kept["renditions"]).select do |r|
+        RENDITIONS.key?(r["name"]) && File.file?(variant_path_for(source, r["name"]))
+      end
+      if kept["poster"].present? && !File.file?(variant_path_for(source, POSTER))
+        kept["poster"] = nil
+        kept.delete("poster_at")
+      end
+      kept
+    end
+
     # Renditions in the manifest whose files are on disk, smallest first.
     def available_renditions(source)
       manifest = current_manifest(source) or return []
@@ -420,19 +439,31 @@ class VideoVariantGenerator
 
     # Transcodes waiting for the one-at-a-time lock while nothing holds it.
     # When a transcode finishes, Solid Queue gives the lock back and moves
-    # the next waiting one to ready in the same step. If the jobs program is
-    # stopped during that step, the give-back can land while the move
-    # doesn't — and every later give-back finds the lock already free, so
-    # it never moves the waiting one either. Solid Queue's own safety net
-    # only frees a waiting job once its wait expires, which for a transcode
-    # is hours (TranscodeVideoJob's concurrency duration). With no transcode
-    # running or ready, nothing can be holding the lock, so a waiting one is
-    # stuck, not waiting.
+    # the next waiting one to ready — in two separate saves. If the jobs
+    # program is shutting down just then, the give-back is saved and the
+    # move rolled back. Every later give-back finds the lock already free,
+    # so it never moves the waiting one either, and Solid Queue's own safety
+    # net only frees a waiting job once its wait expires, which for a
+    # transcode is hours (TranscodeVideoJob's concurrency duration).
+    #
+    # Stuck, then, when a transcode is waiting and either:
+    #   - the lock is free. Solid Queue passes a free lock on at once, so a
+    #     waiting job beside one means the hand-off was lost. This is true
+    #     even with another transcode ready to run: a job put back in the
+    #     queue as the jobs program stopped (it gives running jobs five
+    #     seconds) runs again without taking the lock;
+    #   - or the lock is taken but nothing is running or ready to hold it.
+    # Releasing one that wasn't stuck after all is harmless: the transcode
+    # lock in generate keeps two from encoding at once.
     def stuck_transcodes?
       return false unless solid_queue?
 
       transcodes = ->(model) { model.joins(:job).where(solid_queue_jobs: { class_name: "TranscodeVideoJob" }) }
-      return false unless transcodes.(SolidQueue::BlockedExecution).exists?
+      waiting = transcodes.(SolidQueue::BlockedExecution)
+      return false unless waiting.exists?
+
+      keys = waiting.distinct.pluck(:concurrency_key)
+      return true if SolidQueue::Semaphore.where(key: keys).where("value > 0").exists?
       return false if transcodes.(SolidQueue::ReadyExecution).exists?
 
       transcodes.(SolidQueue::ClaimedExecution).includes(:process).none? do |claim|
@@ -455,7 +486,7 @@ class VideoVariantGenerator
       keys.count do |key|
         SolidQueue::Semaphore.where(key: key).delete_all
         released = SolidQueue::BlockedExecution.release_one(key)
-        Rails.logger.info "[VideoVariants] Released a transcode stuck waiting for a lock nobody held (#{key})" if released
+        Rails.logger.info "[VideoVariants] Released a transcode stuck waiting for the one-at-a-time lock (#{key})" if released
         released
       end
     rescue => e
@@ -698,7 +729,7 @@ class VideoVariantGenerator
     def status_for(medium)
       web = medium.file_path
       source = normalize_path(web)
-      manifest = current_manifest(source)
+      manifest = on_disk(current_manifest(source), source)
       live = Rails.cache.read(progress_key(web))
       status = medium.variants_status
 
@@ -1034,7 +1065,9 @@ class VideoVariantGenerator
 
       File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock|
         lock.flock(File::LOCK_EX)
-        merged = merge_step(current_manifest(source), manifest, name)
+        # What's on disk, not just what was once recorded: a version deleted
+        # since it was made is still to do, so the video isn't complete yet.
+        merged = on_disk(merge_step(current_manifest(source), manifest, name), source)
         made = merged["renditions"].map { |r| r["name"] } | Array(merged["skipped"])
         merged["wanted"] = wanted
         merged["complete"] = merged["poster"].present? && (wanted - made).empty?

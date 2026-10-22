@@ -55,6 +55,7 @@ class TranscodeVideoJobRetryTest < ActiveJob::TestCase
     assert_includes VideoVariantGenerator.current_manifest(source)["renditions"].map { |r| r["name"] }, "720p"
 
     # ...then the slow job finishes with its stale copy.
+    File.binwrite(VideoVariantGenerator.variant_path_for(source, "1080p"), "v")
     slow_copy["renditions"] << { "name" => "1080p", "path" => "/media/video/variants/race-1080p.mp4", "size" => 1 }
     VideoVariantGenerator.send(:finish, source, slow_copy, %w[720p 1080p], "1080p")
 

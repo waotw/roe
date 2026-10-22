@@ -274,4 +274,23 @@ class VideoResumeTest < ActiveSupport::TestCase
       assert waiting.reload.blocked_execution
     end
   end
+
+  # What a restart mid-720p left on this computer: Solid Queue gave the
+  # running 720p five seconds, put it back in the queue, and as the encode
+  # ended the lock was given back but the 1080p's move to ready rolled
+  # back. The 720p, ready again, ran without the lock — so a check that
+  # took "a transcode is ready" to mean "the lock is held" saw nothing
+  # wrong, and the 1080p waited for hours.
+  test "a free lock with a transcode waiting is stuck, even with another ready to run" do
+    with_solid_queue do
+      enqueue_transcode("/media/video/zz-resume-w.mp4", "720p")
+      waiting = enqueue_transcode("/media/video/zz-resume-w.mp4", "1080p")
+      SolidQueue::Semaphore.where(key: LOCK).update_all(value: 1) # given back; hand-off lost
+
+      assert VVG.stuck_transcodes?
+      assert_equal 1, VVG.release_stuck_transcodes!
+      assert waiting.reload.ready_execution
+      assert_equal 0, SolidQueue::Semaphore.find_by(key: LOCK).value
+    end
+  end
 end

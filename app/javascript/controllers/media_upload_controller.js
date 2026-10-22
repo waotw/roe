@@ -188,6 +188,12 @@ export default class extends Controller {
   // card each time, and stop once the server reports it's no longer
   // pending. Image variants usually finish within a second or two; video
   // takes minutes, so video cards poll slower and for as long as it takes.
+  //
+  // A request that fails — Roe restarting (roe restart, an update), the
+  // computer waking from sleep — is tried again a little later rather than
+  // ending the watch. Ending it left the card showing the percentage it had
+  // reached until the page was reloaded, while the progress window, which
+  // already tried again, carried on.
   watchVariants(card) {
     if (!card || card.dataset.variantsPending !== "true") return;
     const id = card.dataset.mediaId;
@@ -197,6 +203,11 @@ export default class extends Controller {
     const maxAttempts = video ? Infinity : 8;
 
     let attempts = 0;
+    const retry = () => {
+      if (attempts < maxAttempts && document.contains(this.element)) {
+        setTimeout(poll, interval * 2);
+      }
+    };
     const poll = () => {
       attempts += 1;
       fetch(`/admin/medium/${id}/card`, {
@@ -204,7 +215,7 @@ export default class extends Controller {
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
-          if (!data) return;
+          if (!data) return retry();
           const current = this.gridTarget.querySelector(
             `[data-media-id="${id}"]`,
           );
@@ -229,7 +240,7 @@ export default class extends Controller {
             this.refreshNotices();
           }
         })
-        .catch(() => {});
+        .catch(retry);
     };
     setTimeout(poll, interval);
   }
