@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "socket"
 
 # VideoVariantGenerator — makes small, fast-starting web versions of an
 # uploaded video with ffmpeg: a 720p and (when the source is big enough) a
@@ -342,11 +343,13 @@ class VideoVariantGenerator
         case status_for(medium)[:state]
         when "failed", "none" then true
         when "optimizing"
-          # Busy if Solid Queue has a job for it, it's reporting progress, or
-          # it was queued within the last few hours (the dedup marker).
+          # Busy if Solid Queue has a job for it or it's reporting progress.
+          # Without Solid Queue there's no way to ask, so a recent queue
+          # marker counts too. (With it, the marker is no evidence: it
+          # outlives a job that was ended part-way by up to six hours.)
           !busy.include?(medium.file_path) &&
             Rails.cache.read(progress_key(medium.file_path)).nil? &&
-            !Rails.cache.exist?(queue_cache_key(medium.file_path))
+            (solid_queue? || !Rails.cache.exist?(queue_cache_key(medium.file_path)))
         else false
         end
       end
@@ -354,16 +357,108 @@ class VideoVariantGenerator
 
     # Web paths with a transcode job waiting or running. Asks Solid Queue
     # directly; empty (so nothing counts as busy) with any other adapter.
+    # Two kinds of job don't count, because they'll never run again:
+    #   - one Solid Queue marked failed. That's what happens to the jobs of
+    #     a process that was ended mid-encode, and counting it kept the
+    #     video "optimizing" for good;
+    #   - one still claimed by a process that's gone, before Solid Queue
+    #     has noticed (up to five minutes). See release_jobs_of_gone_processes!.
     def videos_with_jobs
-      return Set.new unless defined?(SolidQueue::Job) && ActiveJob::Base.queue_adapter.is_a?(ActiveJob::QueueAdapters::SolidQueueAdapter)
+      return Set.new unless solid_queue?
 
-      SolidQueue::Job.where(class_name: "TranscodeVideoJob", finished_at: nil).filter_map do |job|
+      SolidQueue::Job.where(class_name: "TranscodeVideoJob", finished_at: nil)
+                     .where.missing(:failed_execution)
+                     .includes(claimed_execution: :process).filter_map do |job|
+        claim = job.claimed_execution
+        next if claim && (claim.process.nil? || gone_process?(claim.process))
+
         Array(job.arguments.is_a?(Hash) ? job.arguments["arguments"] : nil).first
       end.to_set
     rescue => e
       Rails.logger.debug { "[VideoVariants] job check failed: #{e.message}" }
       Set.new
     end
+
+    def solid_queue?
+      defined?(SolidQueue::Job) && ActiveJob::Base.queue_adapter.is_a?(ActiveJob::QueueAdapters::SolidQueueAdapter)
+    end
+
+    # A Solid Queue process recorded on this computer whose PID isn't
+    # running. Only ever this computer's: another machine's can't be seen.
+    # A PID the system has since given to something else reads as running,
+    # which only means its jobs are left for Solid Queue to deal with.
+    def gone_process?(process)
+      return false unless process.hostname == Socket.gethostname
+
+      ::Process.kill(0, process.pid)
+      false
+    rescue Errno::ESRCH
+      true
+    rescue Errno::EPERM
+      false
+    end
+
+    # Hand the jobs of this computer's gone job processes back to Solid
+    # Queue now, rather than in up to five minutes: their claimed jobs are
+    # marked failed and the one-at-a-time transcode lock passes on, so a
+    # video queued again starts straight away. Solid Queue's own clean-up,
+    # just sooner; it only changes records in this site's job database.
+    def release_jobs_of_gone_processes!
+      return 0 unless solid_queue?
+
+      gone = SolidQueue::Process.where(hostname: Socket.gethostname).select { |p| gone_process?(p) }
+      gone.each(&:prune)
+      gone.size
+    rescue => e
+      Rails.logger.warn "[VideoVariants] couldn't release jobs of stopped processes: #{e.class} #{e.message}"
+      0
+    end
+
+    # How many times resume_interrupted! restarts one video before calling
+    # it failed. A crash on every attempt would otherwise re-run a long
+    # encode at every start.
+    MAX_RESUMES = 2
+
+    # Videos whose web versions stopped part-way with nothing left to finish
+    # them: marked queued or processing, not complete, and with no transcode
+    # job waiting or running and no progress being reported. The usual cause
+    # is the jobs program being ended mid-encode.
+    def interrupted
+      busy = videos_with_jobs
+      Medium.video.originals_only.where(variants_status: %w[queued processing]).select do |medium|
+        web = medium.file_path
+        File.file?(normalize_path(web)) && !complete?(web) &&
+          !busy.include?(web) && Rails.cache.read(progress_key(web)).nil?
+      end
+    end
+
+    # Queue interrupted videos again. Runs as the jobs program starts (roe
+    # start, roe restart — config/initializers/video_variants.rb). What's
+    # already made is skipped, so only the missing versions are encoded.
+    # After MAX_RESUMES it's marked failed instead, so the Media Browser
+    # says what happened and OPTIMIZE VIDEOS offers it. Returns how many
+    # were queued.
+    def resume_interrupted!
+      return 0 unless available? && solid_queue?
+
+      release_jobs_of_gone_processes!
+      interrupted.count do |medium|
+        web = medium.file_path
+        attempts = Rails.cache.increment(resume_key(web), 1, expires_in: 1.day).to_i
+        if attempts > MAX_RESUMES
+          record_failure(web, "Its web versions stopped part-way #{MAX_RESUMES} times. Use OPTIMIZE VIDEOS to try again.")
+          Rails.cache.delete(resume_key(web))
+          dequeue(web)
+          next false
+        end
+
+        Rails.logger.info "[VideoVariants] Resuming #{web}: stopped part-way with nothing left to finish it"
+        dequeue(web)
+        queue!(web)
+      end
+    end
+
+    def resume_key(web_path) = "video_variants_resumed:#{web_path}"
 
     # The Media Browser's OPTIMIZE VIDEOS button: queue everything
     # needing_optimization lists. A failed video is retried — its error and
@@ -372,6 +467,10 @@ class VideoVariantGenerator
     def optimize_all!
       return 0 unless available?
 
+      # Jobs of a jobs program that was ended mid-encode still hold the
+      # one-at-a-time lock until Solid Queue notices; let them go first so
+      # what's queued here starts straight away, not in up to five minutes.
+      release_jobs_of_gone_processes!
       needing_optimization.count do |medium|
         web = medium.file_path
         Rails.cache.delete(error_key(web))
