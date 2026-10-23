@@ -30,18 +30,6 @@
   </div>
   <% end %>
 
-  <%# When the episode has both video (playing above) and audio, surface
-      the audio file as a direct link so listeners who'd rather just
-      hear it can grab the audio without going through the RSS feed
-      or switching apps. Only renders when both media types exist —
-      audio-only episodes already render the audio player as the
-      primary, so the link would be redundant there. %>
-  <% if post.video.present? && post.audio.present? %>
-    <p class="podcast-audio-fallback">
-      Audio available: <a href="<%= post.audio %>">here</a>
-    </p>
-  <% end %>
-
   <div class="post-content">
     <%= render_post_content(post) %>
   </div>

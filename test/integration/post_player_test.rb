@@ -99,6 +99,23 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     assert_equal 1, card_players
   end
 
+  # A podcast with both video and audio used to print "Audio available:
+  # here" under the video. It ignored the player rules above, so it stayed
+  # even under the body's own player card. To offer the audio, the post
+  # links it.
+  test "a podcast with video and audio adds no audio link of its own" do
+    both = { video: "/media/video/ep.mp4", audio: "/media/audio/ep.mp3", duration: "00:30:00" }
+
+    get post_path(media_post("podcast", **both).url_name)
+    assert_select ".podcast-hero", 1
+    assert_select ".podcast-audio-fallback", 0
+    assert_no_match "Audio available", response.body
+
+    get post_path(media_post("podcast", **both, content: "#{CARD}\n\nNotes.").url_name)
+    assert_select ".podcast-audio-fallback", 0
+    assert_no_match "Audio available", response.body
+  end
+
   # ── nothing to play, other types ──
 
   test "a media post with nothing to play shows no player" do
