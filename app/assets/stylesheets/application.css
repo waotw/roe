@@ -128,6 +128,16 @@ body {
   width: calc(var(--metadata-label-width, 8rem) + 1rem);
 }
 
+/* + Add Field, beside the Metadata toggle. Shown only while the form is
+   open: not when the section is closed, and not in RAW, where a field added
+   to the hidden form would be thrown away when the form is rebuilt from the
+   YAML. Read from the classes metadata_editor_controller already toggles, so
+   the controller needs no change. */
+#metadata-container:has([data-metadata-editor-target="content"].hidden) [data-metadata-add-field],
+#metadata-container:has([data-metadata-editor-target="formView"].hidden) [data-metadata-add-field] {
+  display: none;
+}
+
 /* ======== MARKDOWN EDITOR ========
    The live editor (app/javascript/markdown_editor) in place of the content
    textarea. The editor carries roe-md-live or roe-md-source; the markdown
