@@ -17,9 +17,11 @@ module Admin
     def index
       @members = Member.order(created_at: :desc)
 
-      # Filter by tier/status if params present
+      # Filter by tier if present. Status is filtered in the browser
+      # (members_filter_controller.js), which also keeps it in the address
+      # as ?status=. Filtering it here too meant a refreshed page held only
+      # that status, and switching the dropdown had nothing else to show.
       @members = @members.where(tier: params[:tier]) if params[:tier].present?
-      @members = @members.where(status: params[:status]) if params[:status].present?
 
       # Search by email/name
       if params[:search].present?

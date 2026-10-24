@@ -101,6 +101,8 @@ export default class extends Controller {
 
     if (this.hasCountTarget) this.countTarget.textContent = visibleCount;
 
+    this.highlightActiveFilters();
+
     // Tell the bulk-select controller the visible set changed, so it can drop
     // now-hidden rows from the selection and refresh its "select all visible"
     // count. Both controllers live on the same root element.
@@ -132,6 +134,23 @@ export default class extends Controller {
     });
 
     rows.forEach((row) => this.tbodyTarget.appendChild(row));
+  }
+
+  // Yellow on a status dropdown that's filtering, so a narrowed list is never
+  // mistaken for the whole one. The page drew it only on load, so it
+  // didn't follow the dropdown.
+  highlightActiveFilters() {
+    const mark = (select, value) => {
+      const on = Boolean(value) && value !== "all";
+      select.classList.toggle("bg-yellow-200", on);
+      select.classList.toggle("border-yellow-500", on);
+    };
+    if (this.hasStatusFilterTarget) {
+      mark(this.statusFilterTarget, this.currentStatus);
+    }
+    if (this.hasNewsletterStatusFilterTarget) {
+      mark(this.newsletterStatusFilterTarget, this.currentNewsletterStatus);
+    }
   }
 
   updateURL(params) {
