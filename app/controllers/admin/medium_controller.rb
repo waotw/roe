@@ -381,6 +381,12 @@ class Admin::MediumController < Admin::BaseController
     else
       medium.image? && ImageVariantGenerator.available? && !medium.baseline_ready?
     end
+    # A preview that's still missing gets queued now. Nothing else goes back
+    # for one that was never made — animated GIFs added before their thumb
+    # counted as their preview never got a job, and stayed pending (and
+    # polled) for good. queue! skips anything queued in the last few hours,
+    # so polling this can't flood the queue.
+    ImageVariantGenerator.queue_baseline!(medium.file_path) if pending && medium.image?
     render json: {
       pending: !!pending,
       card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: usages })

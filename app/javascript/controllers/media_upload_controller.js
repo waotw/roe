@@ -127,15 +127,19 @@ export default class extends Controller {
 
   // Re-run the media-filter controller so a card injected or swapped after
   // load (upload result, variant-poll refresh) obeys the active tab, search,
-  // and audience filters instead of showing everywhere. media-filter shares
-  // this controller's element, so find it there.
+  // and audience filters instead of showing everywhere. media-filter sits on
+  // an element INSIDE this one (browse.html.erb: media-upload wraps the
+  // header and the grid), so look for it there. Asking for it on
+  // this.element found nothing, and every swapped card showed under every
+  // tab: a used GIF under Unused, images under Video and Audio.
   reapplyFilters() {
     const app = this.application;
     if (!app) return;
-    const filter = app.getControllerForElementAndIdentifier(
-      this.element,
-      "media-filter",
-    );
+    const host = this.element.matches('[data-controller~="media-filter"]')
+      ? this.element
+      : this.element.querySelector('[data-controller~="media-filter"]');
+    if (!host) return;
+    const filter = app.getControllerForElementAndIdentifier(host, "media-filter");
     if (filter && typeof filter.applyFilters === "function") {
       filter.applyFilters();
     }
