@@ -263,6 +263,25 @@ export default class extends Controller {
   // Programmatic version — called internally without a click event
   // toggleMenu=false skips closing the add-field dropdown (it isn't open)
   _addKnownFieldByName(fieldName, initialValue = null, toggleMenu = false) {
+    // Already a row for it: use that row rather than add a second. Two rows
+    // with one name write whichever comes last. A row hidden by the post
+    // type is shown again.
+    const existing = this.fieldsContainerTarget.querySelector(
+      `.metadata-field-row[data-field-name="${fieldName}"]`,
+    );
+    if (existing) {
+      existing.style.display = "";
+      existing.classList.remove("hidden");
+      this.removedFields.delete(fieldName);
+      this.addFieldMenuTarget
+        .querySelector(`[data-available-field="${fieldName}"]`)
+        ?.remove();
+      if (toggleMenu) this.toggleAddFieldMenu();
+      existing.querySelector("[data-metadata-field]")?.focus();
+      this._notifyMetadataChange();
+      return;
+    }
+
     const config = this.knownFieldsValue[fieldName];
     // A checkbox centres against its label, and the label drops the top
     // padding that exists to line up with text — matching the ERB. Hardcoding
@@ -953,6 +972,36 @@ export default class extends Controller {
         this.addCustomFieldToForm(key, fields[key]);
       }
     });
+
+    this.syncWithRebuiltRows();
+  }
+
+  // After the rows are rebuilt from YAML (Restore, back from RAW, or a post
+  // type adding its fields), make + Add Field match them, as adding and
+  // removing a field by hand already does. A rebuild left the menu as it
+  // was, so a restored url_name was still offered and adding it made a
+  // second row.
+  syncWithRebuiltRows() {
+    // A row hidden because the post type doesn't use it isn't saved
+    // (formToYaml skips it), so it counts as absent and stays in the menu.
+    const present = new Set(
+      Array.from(
+        this.fieldsContainerTarget.querySelectorAll(".metadata-field-row"),
+      )
+        .filter((row) => row.style.display !== "none")
+        .map((row) => row.dataset.fieldName),
+    );
+    Object.entries(this.knownFieldsValue).forEach(([name, config]) => {
+      if (present.has(name)) {
+        this.addFieldMenuTarget
+          .querySelector(`[data-available-field="${name}"]`)
+          ?.remove();
+      } else if (config.available !== false) {
+        // Same rule as the server's menu: a known field not in the file, and
+        // not one kept out of the menu (show_sidebar without a sidebar).
+        this.restoreFieldToMenu(name);
+      }
+    });
   }
 
   addKnownFieldToForm(fieldName, value) {
@@ -1238,6 +1287,10 @@ export default class extends Controller {
       // Trigger population from podcast config
       this.handlePodcastChange({ target: podcastField });
     }
+
+    // The type's fields were added and hidden above without touching
+    // + Add Field, so a podcast's duration was offered beside its own row.
+    this.syncWithRebuiltRows();
   }
 
   // ========== CHANGE NOTIFICATION ==========
@@ -1593,8 +1646,10 @@ export default class extends Controller {
     const videoField = this.element.querySelector(
       '[data-metadata-field="video"]',
     );
-    const durationRow = this.element.querySelector(
-      '[data-field-name="duration"]',
+    // Scoped to rows: the + Add Field buttons carry data-field-name too, and
+    // the menu sits above the rows, so a bare lookup found the button.
+    const durationRow = this.fieldsContainerTarget.querySelector(
+      '.metadata-field-row[data-field-name="duration"]',
     );
 
     const hasMedia =
