@@ -174,7 +174,7 @@ export default class extends Controller {
           "hover:border-gray-300",
           "hover:text-gray-700",
         );
-        tab.classList.add("bg-blue-200", "border-blue-500", "text-blue-500");
+        tab.classList.add("bg-blue-100", "border-blue-600", "text-blue-600");
       } else {
         tab.classList.add(
           "border-transparent",
@@ -182,7 +182,7 @@ export default class extends Controller {
           "hover:border-gray-300",
           "hover:text-gray-700",
         );
-        tab.classList.remove("bg-blue-200", "border-blue-500", "text-blue-500");
+        tab.classList.remove("bg-blue-100", "border-blue-600", "text-blue-600");
       }
     });
   }
