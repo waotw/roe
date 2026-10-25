@@ -31,11 +31,15 @@ const LOCKED = ["bg-gray-200", "text-gray-600"];
 // How long a pause in typing before the length is read.
 const PAUSE_MS = 400;
 const BLANK = "00:00:00";
+// The spinner the video optimizing window uses (video_progress_controller.js).
+const SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+const SPIN_MS = 120;
 
 export default class extends Controller {
   connect() {
     this.auto = autoDurationOn();
     this.fields = new WeakMap();
+    this.spinning = new Set();
 
     this.decorate();
     this.observer = new MutationObserver(() => this.decorate());
@@ -51,6 +55,8 @@ export default class extends Controller {
 
   disconnect() {
     this.observer?.disconnect();
+    this.spinning?.forEach((state) => clearInterval(state.spin));
+    this.spinning?.clear();
     if (this.onSourceInput) {
       this.element.removeEventListener("input", this.onSourceInput);
     }
@@ -75,7 +81,7 @@ export default class extends Controller {
     note.className =
       "flex-shrink-0 self-center whitespace-nowrap text-xs uppercase text-gray-500";
     note.dataset.durationDetectNote = "";
-    input.insertAdjacentElement("afterend", note);
+    this.placeBeside(input, note);
 
     const state = {
       note,
@@ -129,16 +135,19 @@ export default class extends Controller {
     // meanwhile mustn't write a made-up length.
     input.value = "";
     input.placeholder = BLANK;
-    // COPY: duration — reading
-    this.lock(input, "Reading…");
+    this.reading(input);
     state.timer = setTimeout(() => this.read(input, path), PAUSE_MS);
   }
 
   async read(input, path, { quiet = false } = {}) {
     const state = this.fields.get(input);
     const seq = ++state.seq;
-    // COPY: duration — set by Roe
-    this.lock(input, quiet ? "Set by Roe" : "Reading…");
+    if (quiet) {
+      // COPY: duration — set by Roe
+      this.lock(input, "Set by Roe");
+    } else {
+      this.reading(input);
+    }
 
     try {
       const length = await detectDuration(path);
@@ -172,7 +181,7 @@ export default class extends Controller {
     // COPY: duration — tooltip while Roe keeps it
     input.title =
       "Roe sets this from the file. Turn it off in Content → Global → Automatically add audio and video duration.";
-    if (state) state.note.textContent = text;
+    if (state) this.showNote(state, text);
   }
 
   unlock(input, text) {
@@ -181,9 +190,40 @@ export default class extends Controller {
     input.classList.remove(...LOCKED);
     input.removeAttribute("title");
     if (state) {
-      state.note.textContent = text;
+      this.showNote(state, text);
       state.note.classList.toggle("normal-case", Boolean(text));
     }
+  }
+
+  // Locked, with the spinner the video optimizing window uses
+  // (video_progress_controller.js) and READING, in amber, until the read
+  // finishes and showNote replaces it.
+  reading(input) {
+    this.lock(input, "");
+    const state = this.fields.get(input);
+    if (!state || state.spin) return;
+
+    state.note.classList.remove("text-gray-500");
+    state.note.classList.add("text-amber-600");
+    let frame = 0;
+    const draw = () => {
+      // COPY: duration — reading
+      state.note.textContent = `${SPINNER[frame++ % SPINNER.length]} Reading`;
+    };
+    draw();
+    state.spin = setInterval(draw, SPIN_MS);
+    this.spinning.add(state);
+  }
+
+  showNote(state, text) {
+    if (state.spin) {
+      clearInterval(state.spin);
+      state.spin = null;
+      this.spinning.delete(state);
+      state.note.classList.remove("text-amber-600");
+      state.note.classList.add("text-gray-500");
+    }
+    state.note.textContent = text;
   }
 
   // The duration fields a changed media field feeds: in the publish modal,
@@ -245,7 +285,7 @@ export default class extends Controller {
     note.className = "hidden text-xs text-gray-600";
 
     wrap.append(button, note);
-    input.insertAdjacentElement("afterend", wrap);
+    this.placeBeside(input, wrap);
   }
 
   async add(input, button, note) {
@@ -288,6 +328,25 @@ export default class extends Controller {
   }
 
   // ── Both ──────────────────────────────────────────────────────────────
+
+  // Put the note or button right after the field. On the form every input
+  // sits in a 500px-wide box holding a flex line (_metadata_editor.html.erb);
+  // the row the form adds when it reads a length itself (addDurationField)
+  // leaves its input bare, so it stretched across the page — give it the
+  // same box. In the publish modal the note goes under the field.
+  placeBeside(input, element) {
+    const row = input.closest(".metadata-field-row");
+    if (row && input.parentElement === row) {
+      const box = document.createElement("div");
+      box.className = "flex-1 min-w-0 max-w-[500px]";
+      const line = document.createElement("div");
+      line.className = "flex items-center gap-2";
+      input.replaceWith(box);
+      box.appendChild(line);
+      line.appendChild(input);
+    }
+    input.insertAdjacentElement("afterend", element);
+  }
 
   // The publish modal pairs a duration with its own media field; the
   // metadata form has the post's audio and video fields, audio first.
