@@ -107,7 +107,7 @@
           %>
           <div class="bg-gray-50 border border-gray-300 p-6"
                <% if is_media %>
-                 data-controller="media-field"
+                 data-controller="media-field<%= ' duration-detect' if has_paired_duration %>"
                  data-media-field-kind-value="<%= kind %>"
                <% end %>>
             <h3 class="font-semibold text-gray-900 mb-3">

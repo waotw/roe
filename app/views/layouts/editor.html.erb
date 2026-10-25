@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%# Content → Global auto duration, for media_duration.js. %>
+    <meta name="roe-auto-duration" content="<%= SiteConfig.auto_duration? ? 'on' : 'off' %>">
     <%# The editor loads as a normal Turbo page (snapshot swap, no full reload)
         so navigation is smooth. Unsaved work is protected by local draft
         recovery in editor_controller.js — edits autosave to localStorage and

@@ -151,6 +151,14 @@ class SiteConfig < ApplicationRecord
     nil
   end
 
+  # content.yml `auto_duration` (Content → Global, "Automatically add audio
+  # and video duration"). Unset means on. On, Roe sets a post's duration to
+  # its file's length on every save; off, the field is the writer's, with
+  # ADD DURATION to read it once.
+  def self.auto_duration?
+    content("auto_duration").to_s.strip.downcase != "false"
+  end
+
   # Get default config (cards, collections)
   def self.default(type, key)
     current("defaults/#{type}")&.config&.[](key.to_s)

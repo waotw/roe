@@ -266,6 +266,14 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Heading links",
           hint: "Show a copy-link icon when hovering a heading on your public site (desktop only). Click it to copy a link straight to that section."
         },
+        # COPY: auto duration setting — label and hint
+        "auto_duration" => {
+          type: :checkbox,
+          label: "Automatically add audio and video duration",
+          # Unset reads as on (SiteConfig.auto_duration?).
+          default: true,
+          hint: "Let Roe handle the duration settings for audio and video files"
+        },
         "editor.mode" => {
           type: :select,
           label: "Writing editor",

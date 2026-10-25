@@ -161,11 +161,15 @@ module ContentMetadataSchema
       "audio" => { type: :text, label: "audio", hint: "Example: /media/audio/audio-file.mp3", required: required_for_type.call("audio") },
       # COPY: video field hint
       "video" => { type: :text, label: "video", hint: "Example: /media/video/video-file.mp4, or a YouTube link", required: required_for_type.call("video") },
+      # Editable either way: with auto duration on, Roe replaces it on save
+      # only when it can read the file's length, so a length it can't read
+      # can still be typed in. Off, ADD DURATION sits beside it
+      # (duration_detect_controller.js).
       "duration" => {
         type: :text,
         label: "duration",
-        hint: "Auto-calculated from media file",
-        readonly: true,
+        # COPY: duration field placeholder (auto on / off)
+        hint: SiteConfig.auto_duration? ? "Set from the file on save" : "HH:MM:SS",
         required: required_for_type.call("duration")
       },
       "captions" => { type: :text, label: "captions", hint: "Path to captions file" },

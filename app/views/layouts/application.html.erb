@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%# Content → Global auto duration, for media_duration.js. %>
+    <meta name="roe-auto-duration" content="<%= SiteConfig.auto_duration? ? 'on' : 'off' %>">
     <% if SiteConfig.get('favicon').present? %>
       <link rel="icon" type="image/x-icon" href="<%= config_image_path(SiteConfig.get('favicon')) %>">
     <% end %>

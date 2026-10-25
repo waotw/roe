@@ -458,6 +458,7 @@ GEM
     unicode_utils (1.4.0)
     uri (1.1.1)
     useragent (0.16.11)
+    wahwah (1.6.7)
     web-console (4.3.0)
       actionview (>= 8.0.0)
       bindex (>= 0.4.0)
@@ -537,6 +538,7 @@ DEPENDENCIES
   tty-spinner (~> 0.9)
   turbo-rails (~> 2.0)
   tzinfo-data
+  wahwah (~> 1.6)
   web-console
   webrick (~> 1.9)
 
