@@ -78,7 +78,10 @@ class Post < ApplicationRecord
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to audio file (e.g., /media/audio/episode-1.mp3)" },
         # COPY: video field hint (podcast)
-        { name: "video", type: :text, label: "Video File",
+        # auto_add: false — shown when the post has a video, otherwise
+        # offered in + Add Field rather than added to every podcast
+        # (metadata_editor_controller#updateFieldVisibility).
+        { name: "video", type: :text, label: "Video File", auto_add: false,
           hint: "Optional. Adds a video version of this episode: a file (e.g., /media/video/episode-1.mp4) or a YouTube link. The site renders video when present; the RSS feed still uses the audio file." },
         { name: "duration", type: :text, required: true, label: "Duration",  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },

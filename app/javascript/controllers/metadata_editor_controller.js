@@ -1236,11 +1236,31 @@ export default class extends Controller {
       }
     });
 
-    // Add missing type-specific fields
+    // Add missing type-specific fields — except ones the type only offers
+    // (auto_add: false in Post::POST_TYPES, e.g. a podcast's video): those
+    // stay in + Add Field until the post has a value for them.
+    const offeredOnly = new Set(
+      (this.postTypesValue?.[postType]?.metadata_fields || [])
+        .filter((field) => field.auto_add === false)
+        .map((field) => field.name),
+    );
     typeSpecificFields.forEach((fieldName) => {
       const existingRow = this.fieldsContainerTarget.querySelector(
         `.metadata-field-row[data-field-name="${fieldName}"]`,
       );
+
+      if (!existingRow && offeredOnly.has(fieldName)) return;
+
+      // An empty one left by the old auto-add (most podcasts have
+      // video: ""): off the form and back into + Add Field. Not marked
+      // removed, so a save leaves the file's value exactly as it was.
+      if (existingRow && offeredOnly.has(fieldName)) {
+        const input = existingRow.querySelector("[data-metadata-field]");
+        if (input && !input.value.trim() && document.activeElement !== input) {
+          existingRow.remove();
+          return;
+        }
+      }
 
       if (!existingRow && this.knownFieldsValue[fieldName]) {
         // Field doesn't exist - add it with default value if applicable
