@@ -1,0 +1,95 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Has the ContentWatcher missed a change? Run by `roe status` while the
+# server is up; prints nothing and exits 0 when all is well or there's no
+# way to tell.
+#
+# The watcher can stop hearing about changes without stopping — after the
+# disk it watches is unmounted and remounted, its helper keeps running and
+# simply gets no more events. So rather than ask whether it's running, this
+# looks at what it should have seen. The watcher touches
+# tmp/content_watcher.seen when it starts and on every change it's told
+# about (ContentWatcher.mark_seen). A content file changed after that, and
+# more than a few seconds ago, is a change it never heard about.
+#
+# When it finds one it prints the detail lines and exits 1; roe.sh prints
+# the warning and offers the restart. It only reads.
+#
+#   bin/roe-watch-check <site dir>
+#
+# Plain Ruby, no Rails, like bin/roe-logs.
+
+require "find"
+
+module RoeWatchCheck
+  APP = File.expand_path("..", __dir__)
+  SEEN_FILE = File.join(APP, "tmp", "content_watcher.seen")
+
+  # The folders ContentWatcher::WATCH_PATHS watches. Keep the two in step
+  # (test/bin/roe_watch_check_test.rb checks they match).
+  WATCHED = %w[posts pages documentation products system media layout theme].freeze
+
+  # A save the watcher is still handling isn't a missed one.
+  GRACE_SECONDS = 10
+
+  # Files the watcher never hears about, so they mustn't count: generated
+  # image and video versions (ContentWatcher ignores variants/), and the
+  # hidden, temporary and editor swap files the listen gem ignores. Hidden
+  # files are skipped wholesale — a slightly wider net than listen's, which
+  # can only mean a missed change goes unreported, never a false alarm.
+  SKIP_DIRS = %w[variants].freeze
+  SKIP_FILE = /(\A\.|\A#.*#\z|~\z|\.(tmp|swp|swx|swpx|kate-swp)\z|\A4913\z)/
+
+  SHOWN = 3
+
+  module_function
+
+  def run(site_dir)
+    return 0 unless site_dir && File.directory?(site_dir) && File.file?(SEEN_FILE)
+
+    seen_at = File.mtime(SEEN_FILE)
+    cutoff = Time.now - GRACE_SECONDS
+    missed = missed_files(site_dir, seen_at, cutoff)
+    return 0 if missed.empty?
+
+    missed.sort_by! { |_, mtime| -mtime.to_f }
+    shown = missed.first(SHOWN).map { |path, mtime| "#{path} (#{at(mtime)})" }
+    more = missed.size > SHOWN ? ", and #{missed.size - SHOWN} more" : ""
+
+    puts "    Changed since: #{shown.join(', ')}#{more}"
+    puts "    Last change it picked up: #{at(seen_at)}"
+    1
+  end
+
+  def missed_files(site_dir, seen_at, cutoff)
+    found = []
+    WATCHED.each do |folder|
+      root = File.join(site_dir, folder)
+      next unless File.directory?(root)
+
+      Find.find(root) do |path|
+        name = File.basename(path)
+        if File.directory?(path)
+          Find.prune if path != root && (name.start_with?(".") || SKIP_DIRS.include?(name))
+          next
+        end
+        next if name.match?(SKIP_FILE)
+
+        mtime = File.mtime(path)
+        found << [ path.delete_prefix("#{site_dir}/"), mtime ] if mtime > seen_at && mtime < cutoff
+      rescue SystemCallError
+        next # gone or unreadable mid-walk
+      end
+    end
+    found
+  end
+
+  # "10:03" today, "Oct 25 11:29" before.
+  def at(time)
+    time.to_date == Time.now.to_date ? time.strftime("%H:%M") : time.strftime("%b %-d %H:%M")
+  end
+end
+
+require "date"
+exit RoeWatchCheck.run(ARGV[0]) if $PROGRAM_NAME == __FILE__

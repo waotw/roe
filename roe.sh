@@ -2586,6 +2586,43 @@ cmd_status() {
             *)      log_success "On the Linux filesystem" ;;
         esac
     fi
+
+    # Last, so a restart's output comes after the rest of the status.
+    if [ -n "$status_pids" ]; then check_content_watcher; fi
+}
+
+# The ContentWatcher can stop hearing about file changes while still
+# running — after the disk it watches is remounted, for one — so saves stop
+# reaching the site with nothing said. bin/roe-watch-check looks for a
+# content file changed since the watcher last heard anything; this only
+# speaks up when it finds one. A restart loads every file again, so it also
+# picks up whatever was missed.
+check_content_watcher() {
+    [ -f "$APP_DIR/bin/roe-watch-check" ] || return 0
+    check_ruby > /dev/null 2>&1 || return 0
+
+    local detail
+    detail="$(cd "$APP_DIR" && ruby "$APP_DIR/bin/roe-watch-check" "$SITE_DIR" 2>/dev/null)" && return 0
+    [ -n "$detail" ] || return 0
+
+    echo ""
+    log_warning "The ContentWatcher appears to have stopped picking up changes."
+    echo "$detail"
+
+    # Only ask when someone can answer: piped or scripted, a prompt would
+    # wait forever.
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+        echo "    Restart Roe to load them: roe restart${ROE_NAME:+ $ROE_NAME}"
+        return 0
+    fi
+
+    local answer=""
+    printf "    Restart Roe to load them? [y/N] "
+    read -r answer || answer=""
+    case "$answer" in
+        y|Y|yes|YES|Yes) echo ""; cmd_restart ;;
+        *) echo "    Left as is. To restart later: roe restart${ROE_NAME:+ $ROE_NAME}" ;;
+    esac
 }
 
 # ── Update command ────────────────────────────────────────────────────────────

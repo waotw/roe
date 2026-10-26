@@ -57,14 +57,33 @@ class ContentWatcher
     end
 
     listener.start
+    mark_seen
     puts "👀 Watching #{paths.join(', ')} for changes (ignoring variants)..."
 
     listener
   end
 
+  # An empty file whose date says when the watcher last heard anything: set
+  # when it starts and on every change it's told about. `roe status`
+  # (bin/roe-watch-check) compares the content files against it — a file
+  # changed after this date, and not just now, is one the watcher missed.
+  # The watcher can stop hearing changes without stopping (a disk remounted
+  # under it, for one), so this is the only reliable sign. Lives in tmp/,
+  # which isn't watched, so touching it can't wake the watcher.
+  SEEN_FILE = Rails.root.join("tmp", Rails.env.test? ? "content_watcher-test.seen" : "content_watcher.seen")
+
+  def self.mark_seen
+    FileUtils.mkdir_p(File.dirname(SEEN_FILE))
+    FileUtils.touch(SEEN_FILE)
+  rescue SystemCallError => e
+    Rails.logger.warn("ContentWatcher couldn't update #{SEEN_FILE}: #{e.message}")
+  end
+
   private
 
   def self.handle_changes(modified, added, removed)
+    # First, before anything that can fail: hearing the change is what counts.
+    mark_seen
     puts "\n🔔 File changes detected:"
     puts "  Added: #{added.inspect}"
     puts "  Modified: #{modified.inspect}"
