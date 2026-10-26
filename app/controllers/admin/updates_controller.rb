@@ -82,6 +82,9 @@ class Admin::UpdatesController < Admin::BaseController
     @deploy_target_label = @deploy_target == "kamal" ? "Kamal" : "Fly.io"
     @deploy_server_desc  = deploy_server_description(@deploy_config, @deploy_target, @default_app_name)
     @deploy_confirm_msg  = deploy_confirmation_message(@deploy_target, @deploy_server_desc, @deploy_config, @default_app_name)
+
+    # A note above Deploy while videos are being optimized. Never blocks it.
+    @videos_optimizing   = Rails.env.production? ? [] : VideoVariantGenerator.optimizing_now
   end
 
   def check

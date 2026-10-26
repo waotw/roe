@@ -378,6 +378,17 @@ class VideoVariantGenerator
       end
     end
 
+    # Videos being optimized right now: a transcode queued or running, or
+    # fresh progress reported (the same signs the Media page reads). For the
+    # deploy page's note — building Roe and running ffmpeg on one computer
+    # slows both.
+    def optimizing_now
+      busy = videos_with_jobs
+      Medium.video.originals_only.select do |medium|
+        busy.include?(medium.file_path) || live_progress(medium.file_path).present?
+      end
+    end
+
     # Web paths with a transcode job waiting or running. Asks Solid Queue
     # directly; empty (so nothing counts as busy) with any other adapter.
     # Two kinds of job don't count, because they'll never run again:

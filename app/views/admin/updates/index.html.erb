@@ -569,6 +569,28 @@
               <%= link_to "See install instructions →", admin_edit_deploy_config_path, class: "underline" %>
             </p>
           <% else %>
+            <% if @videos_optimizing.any? %>
+              <%# A note, not a stop: Deploy stays available. %>
+              <% names = @videos_optimizing.map { |m| File.basename(m.file_path) } %>
+              <div class="mb-3 bg-amber-50 border border-amber-200 rounded-xs p-3 text-sm text-amber-800"
+                   data-deploy-video-note>
+                <%# COPY: deploy note while videos are being optimized %>
+                <p class="font-semibold text-amber-900">
+                  <%= names.size == 1 ? "A video is" : "#{names.size} videos are" %> being optimized:
+                  <span class="font-mono font-normal"><%= names.first(3).join(", ") %><%= " and #{names.size - 3} more" if names.size > 3 %></span>
+                </p>
+                <p class="mt-1">
+                  <% if @deploy_target == 'kamal' %>
+                    It's best to wait until that's done. Kamal builds Roe on this computer, so a deploy now
+                    competes with the video for it: both run slower, and a deploy that shows nothing for 10 minutes is stopped.
+                  <% else %>
+                    Deploying now is fine, since Fly builds in the cloud. The video's web versions reach your live site
+                    through Site Sync once they're made, not with this deploy.
+                  <% end %>
+                  <%= link_to "See progress in Media →", admin_medium_index_path, class: "underline hover:text-amber-900" %>
+                </p>
+              </div>
+            <% end %>
             <button type="button"
                     data-action="click->updates#checkBeforeDeploy"
                     data-deploy-url="<%= admin_start_deploy_path %>"
@@ -579,7 +601,7 @@
             <p class="mt-2 text-xs text-gray-500">
               Deploys the current build on disk.
               <% if @deploy_target == 'kamal' %>
-                Kamal builds on the remote server — expect 5–10 minutes.
+                Kamal builds on this computer, then sends it to your server — expect 5–10 minutes.
               <% else %>
                 Fly builds in the cloud — typically 2–5 minutes.
               <% end %>
