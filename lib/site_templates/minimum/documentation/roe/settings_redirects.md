@@ -23,26 +23,35 @@ A redirect sends visitors from one URL to another, so a link that used to work k
 Two examples of why this is useful:
 
 - **You moved to Roe from somewhere else on the same domain.** For example, Substack publishes posts with this pattern `/p/my-post` and Roe publishes them like this `/posts/my-post`. Importing rewrites the links inside your content, but it can't reach the links pointing to your site from outside — search results, other people's sites, newsletters you've already sent.
-- **You renamed something.** Changing a post's `url_name` is routine in Roe, and it quietly breaks every existing link to that page.
+- **You renamed something.** Changing a `url_name` is easy in Roe, and it quietly breaks every existing link to that post, page or product.
 
 The Redirects page shows your current redirects in a table, with the file itself below it for editing. Roe reads them from one file, `site/system/global/redirects.yml`, which syncs between your local and live sites like the rest of your content.
 
 ## Roe can add them for you
 
-When you rename something that's already published — change its `url_name`, or its title — the old address stops working. So when you save that change, Roe offers to create the redirect for you, from the old URL to the new one. Accept it and the redirect is written to `redirects.yml` automatically.
+The `url_name` for a post, page or product is set by:
 
-If you later change the address again, Roe keeps the chain tidy: every old URL points straight at the current one, in a single hop. And if you change it back to what it was, Roe clears the redirect it no longer needs.
+- the `title`. Roe creates the `url_name` from the `title` automatically.
+- the `url_name` in the metadata (this always wins)
+
+When the `url_name` is changed for any `published` post, page or product, Roe will give you these options:
+
+- `SAVE NEW URL & REDIRECT` — use the new address and forward the old one so existing links keep working.
+- `SAVE WITH OLD URL` — keep the previously saved address (undo just the rename) and save your other edits.
+- `CANCEL` — don't save anything; go back to the editor.
+
+If you later change the address again, Roe keeps the redirects tidy: every old URL points straight at the current one, in a single hop. And if you change it back to the original `url_name`, Roe clears the redirect as it's no longer needed.
 
 ## Creating one by hand
 
-You can also add, change, or remove redirects yourself on this page. The previous path goes on the left (before the `:`) and the destination path goes on the right.
+You can also add, change, or remove redirects yourself on this page: [Settings → Redirects](/admin/configs/redirects/edit). The previous path goes on the left (before the `:`) and the destination path goes on the right.
 
 ```yaml
 redirects:
-  /old-about: /about
+  /old-about: /new-about
 ```
 
-If someone visits your site and goes to `/old-about`, Roe will give them `/about`. You can also send them to a different URL entirely: `/old-about: https://my-new-about-page-website.com`
+If someone visits your site and goes to `/old-about`, Roe will give them `/new-about`. You can also send them to a different URL entirely: `/old-about: https://my-new-about-page-website.com`
 
 If two rules match a previous path, the first match in the file will be used. Best practice is to put specific rules above wildcard rules. For example:
 
@@ -63,7 +72,7 @@ redirects:
   /p/*: /posts
 ```
 
-In the above example `/p/welcome` goes to `/posts/welcome`, `/p/2024/summer` goes to `/posts/2024/summer`, and `/p` on its own goes to `/posts`. Write the destination without a trailing `/` as above.
+In the above example `/p/welcome` goes to `/posts/welcome`, `/p/2024/summer` goes to `/posts/2024/summer`, and `/p` on its own goes to `/posts`. ==Note:== Write the destination without a trailing `/` as above.
 
 ## Choosing the response
 
@@ -92,13 +101,13 @@ Roe will ignore **a rule that points at itself**, such as `/blog/*` sending ever
 
 ## If the file won't save
 
-Roe checks the file is valid before saving. If there's a typo in the YAML, it keeps your existing redirects in place and shows you the error, rather than saving a broken file that would drop every redirect at once.
+Roe checks the file is valid before saving. If there's a typo in the YAML, it keeps your existing redirects in place and shows you the error to avoid saving a broken file and breaking the other redirects.
 
 ## A full example
 
 ```yaml
 redirects:
-  /old-about: /about
+  /old-about: /new-about
   /shop: /store
   /p/*: /posts
   /newsletter/*: /posts
