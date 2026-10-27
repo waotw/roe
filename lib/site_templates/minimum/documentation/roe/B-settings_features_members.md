@@ -27,6 +27,17 @@ template: links
   - if signed-in it links to their account page.
 - When `unchecked`, the member icon will only show up for signed-in members. 
 
+## Sign-in method (email on/off)
+
+| Setting | Description |
+|---------|-------------|
+| `Member email: Email enabled` | `checked` (default): members sign in with an emailed magic link. <br>`unchecked`: members sign in with an email address and a password instead, and Roe sends no member email. |
+
+**Notes:**
+
+- With email **on**, members sign in with a magic link and you'll need [Postmark](/documentation/roe/postmark) set up so the link can be sent.
+- With email **off**, members set a password at signup and get recovery codes; there are no sign-in emails, confirmations, or newsletters. See [Members → How Members Sign In](/documentation/roe/members#how-members-sign-in).
+
 ## Payments
 
 | Setting | Type | Description |
@@ -48,6 +59,8 @@ template: links
 |---------|------|-------------|
 | `enabled` | Boolean | Enable newsletter broadcasts via Postmark |
 
+**Note:** Newsletters need email. They're unavailable when member email is turned off.
+
 ## Paid Content
 
 | Setting | Type | Description |
@@ -58,6 +71,6 @@ template: links
 
 - All settings live in `site/system/features/members.yml`
 - Payments require Stripe integration configured in [Admin → Settings Integrations](/admin/configs/payments/edit)
-- Newsletters require Postmark integration configured in [Admin → Settings Integrations](/admin/configs/newsletters/edit)
+- Newsletters and emails require Postmark integration configured in [Admin → Settings Integrations](/admin/configs/newsletters/edit)
 - The `price` is synced to Stripe as a product/price when you save the members config
 - `donation_amounts` only appears when mode is `donations` or `both`

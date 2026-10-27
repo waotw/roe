@@ -12,6 +12,7 @@ Your Global Content Settings has options for content and search. Edit them in th
 
 - `Respect single line breaks` — Markdown normally needs two trailing spaces or a blank line to start a new line. Turn this on to treat every single line break as a line break.
 - `Heading links` — Show a copy-link icon when hovering a heading on your public site (desktop only). Click it to copy a link straight to that section.
+- `Writing editor` — Set the editor style you prefer. `Live` formats your writing as you go, `Source` is the same editor showing plain Markdown, and `Plain textarea` is the original editor. The Live editor is in beta, so `Plain textarea` is the default for now. More here: [The Editor](/documentation/roe/the-editor)
 
 ## Search
 
