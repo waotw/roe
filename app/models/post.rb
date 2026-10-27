@@ -25,8 +25,10 @@ class Post < ApplicationRecord
   # Public URL for the post on the live site (matches the `:post` route
   # in config/routes.rb → `posts/:url_name`).
   def public_url
-    "/posts/#{url_name}"
+    self.class.public_url_for(url_name)
   end
+
+  def self.public_url_for(slug) = "/posts/#{slug}"
 
   # Every post type, and everything that makes one. This hash is the only place
   # a type is defined — to add one, add an entry here:

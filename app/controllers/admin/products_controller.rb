@@ -1,6 +1,7 @@
 class Admin::ProductsController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
+  include RenameRedirect
 
   def bulk_model = Product
   def bulk_index_path = admin_products_path
@@ -132,6 +133,7 @@ class Admin::ProductsController < Admin::BaseController
 
     # Capture pre-save state to detect a publishing transition for flash text.
     was_published = @product.status == "published"
+    old_address = rename_redirect_source(@product)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
@@ -140,6 +142,7 @@ class Admin::ProductsController < Admin::BaseController
     @product.reload
 
     flash[:notice] = (!was_published && @product.status == "published") ? "Product published" : "Product saved"
+    add_rename_redirect(Product, old_address, metadata, @product.file_path)
     redirect_to edit_admin_product_path(@product)
   end
 

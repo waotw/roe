@@ -4,15 +4,17 @@
       • Create redirect & save — save the rename and write a 301 (old → new)
       • Keep old URL           — revert the slug field, then save (no redirect)
       • Cancel                 — close, save nothing
-    Hidden until the editor reveals it and fills in the from/to paths. %>
+    Hidden until the editor reveals it and fills in the from/to paths.
+    Shared by the post, page and product editors; `noun` names which. %>
+<% noun = local_assigns.fetch(:noun, "post") %>
 <div id="redirect-decision-modal"
      data-editor-target="redirectModal"
      class="hidden fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50">
   <div class="bg-white border-2 border-gray-900 p-8 max-w-lg mx-auto">
-    <h2 class="text-2xl font-bold text-gray-900 mb-4">You changed this post's URL</h2>
+    <h2 class="text-2xl font-bold text-gray-900 mb-4">You changed this <%= noun %>'s URL</h2>
 
     <p class="text-gray-700 mb-4">
-      This post is published, so anyone who linked to the old address will hit a
+      This <%= noun %> is published, so anyone who linked to the old address will hit a
       dead page unless you forward it.
     </p>
 
@@ -24,7 +26,7 @@
     <p class="text-sm text-gray-600 mb-6">
       <%# Names the OTHER side of Site Sync: editing on local syncs to live, and
           editing on the live site syncs back to local. %>
-      A redirect will be added to <span class="font-mono">Settings → Global → redirects.yml</span>
+      A redirect will be added to <span class="font-mono">Settings → Redirects</span>
       and syncs to your <%= Rails.env.production? ? "local" : "live" %> site.
     </p>
 

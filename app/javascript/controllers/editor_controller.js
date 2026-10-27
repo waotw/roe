@@ -117,6 +117,9 @@ export default class extends Controller {
     originalUrlName: String,
     filenameSlug: String,
     published: Boolean,
+    // Where this kind of content lives: "/posts/", "/" for pages, "/store/"
+    // for products. Used only by the slug-change redirect modal.
+    publicPathPrefix: { type: String, default: "/posts/" },
   };
 
   connect() {
@@ -2801,17 +2804,27 @@ export default class extends Controller {
 
   // True only when the post was ALREADY published (a first publish has no prior
   // public URL to protect) and the slug actually changed from its saved value.
+  // The home page is left out: its address is "/", which is never redirected.
   _publishedSlugChanged() {
     if (!this.publishedValue) return false;
     const original = (this.originalUrlNameValue || "").trim();
     const current = this._currentUrlName();
+    if (original !== "" && this._publicPath(original) === "/") return false;
     return original !== "" && current !== "" && original !== current;
+  }
+
+  // The public address for a slug, mirroring each model's public_url_for
+  // (a page called "home" is the site's front page).
+  _publicPath(slug) {
+    const prefix = this.publicPathPrefixValue;
+    if (prefix === "/" && slug === "home") return "/";
+    return `${prefix}${slug}`;
   }
 
   _openRedirectDecision() {
     if (!this.hasRedirectModalTarget) return;
-    const from = `/posts/${this.originalUrlNameValue}`;
-    const to = `/posts/${this._currentUrlName()}`;
+    const from = this._publicPath(this.originalUrlNameValue);
+    const to = this._publicPath(this._currentUrlName());
     if (this.hasRedirectFromTarget) this.redirectFromTarget.textContent = from;
     if (this.hasRedirectToTarget) this.redirectToTarget.textContent = to;
     this.redirectModalTarget.classList.remove("hidden");
@@ -2829,7 +2842,7 @@ export default class extends Controller {
   createRedirectAndSave(event) {
     if (event && event.preventDefault) event.preventDefault();
     if (this.hasRedirectFromFieldTarget)
-      this.redirectFromFieldTarget.value = `/posts/${this.originalUrlNameValue}`;
+      this.redirectFromFieldTarget.value = this._publicPath(this.originalUrlNameValue);
     this._redirectDecisionMade = true;
     this._closeRedirectDecision();
     this.formTarget.requestSubmit();

@@ -120,8 +120,10 @@ class Product < ApplicationRecord
 
   # URL helpers
   def public_url
-    "/store/#{url_name}"
+    self.class.public_url_for(url_name)
   end
+
+  def self.public_url_for(slug) = "/store/#{slug}"
 
   # Snipcart data attributes
   # A downloadable product rather than something posted. The toggle is what

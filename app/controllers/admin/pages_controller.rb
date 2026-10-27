@@ -1,6 +1,7 @@
 class Admin::PagesController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
+  include RenameRedirect
 
   def bulk_model = Page
   def bulk_index_path = admin_pages_path
@@ -171,6 +172,7 @@ class Admin::PagesController < Admin::BaseController
 
     # Capture pre-save state to detect a publishing transition for flash text.
     was_published = @page.published?
+    old_address = rename_redirect_source(@page)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@page.file_path, full_content)
@@ -179,6 +181,7 @@ class Admin::PagesController < Admin::BaseController
     @page.reload
 
     flash[:notice] = (!was_published && @page.published?) ? "Page published" : "Page saved"
+    add_rename_redirect(Page, old_address, metadata, @page.file_path)
 
     redirect_to edit_admin_page_path(@page)
   end
