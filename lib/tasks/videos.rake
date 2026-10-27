@@ -37,7 +37,7 @@ namespace :videos do
       if manifest.nil?
         puts "  ○ #{rel}  #{human.(File.size(path))}  — no web versions yet"
       else
-        parts = Array(manifest["renditions"]).map { |r| "#{r['name']} #{human.(r['size'])}" }
+        parts = Array(manifest[VideoVariantGenerator::MANIFEST_LIST]).map { |r| "#{r['name']} #{human.(r['size'])}" }
         parts << "original is served (already web-ready)" if parts.empty? && manifest["skipped"].present?
         mark = manifest["complete"] ? "✓" : "…"
         puts "  #{mark} #{rel}  #{human.(File.size(path))} → #{parts.join(', ')}"

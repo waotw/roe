@@ -71,14 +71,14 @@ class VideoRemadeVersionTest < ActiveSupport::TestCase
     assert_equal "processing", Medium.find_by(file_path: @web).variants_status
     assert_equal "optimizing", status[:state], "the card keeps watching"
     assert_not VVG.read_manifest(@source)["complete"]
-    assert_equal [ "720p" ], VVG.read_manifest(@source)["renditions"].map { |r| r["name"] }
+    assert_equal [ "720p" ], VVG.read_manifest(@source)["variants"].map { |r| r["name"] }
   end
 
   test "once the 1080p is made again it's ready" do
     Medium.where(file_path: @web).update_all(variants_status: "processing")
     File.binwrite(VVG.variant_path_for(@source, "1080p"), "v")
     mine = VVG.current_manifest(@source)
-    mine["renditions"] << { "name" => "1080p", "path" => "/media/video/variants/zz-remade-1080p.mp4", "size" => 1 }
+    mine["variants"] << { "name" => "1080p", "path" => "/media/video/variants/zz-remade-1080p.mp4", "size" => 1 }
 
     VVG.send(:finish, @source, mine, %w[720p 1080p], "1080p")
 

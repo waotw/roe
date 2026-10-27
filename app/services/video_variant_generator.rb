@@ -59,6 +59,11 @@ class VideoVariantGenerator
   POSTER_MIN_BRIGHTNESS = 24
   POSTER_TRIES = 4
   MANIFEST_SUFFIX = "-video.json"
+
+  # The manifest's key for its list of web versions (see upgrade_manifest).
+  # "renditions" is the name manifests had before 0.4.0, still read.
+  MANIFEST_LIST = "variants"
+  LEGACY_MANIFEST_LIST = "renditions"
   VIDEO_EXTENSIONS = %w[.mp4 .m4v .mov .webm .mkv .avi .ogv].freeze
 
   # Containers browsers play directly. An original in one of these, already
@@ -192,9 +197,31 @@ class VideoVariantGenerator
     def read_manifest_file(path)
       return nil unless File.file?(path)
 
-      JSON.parse(File.read(path))
+      upgrade_manifest(JSON.parse(File.read(path)))
     rescue JSON::ParserError, SystemCallError
       nil
+    end
+
+    # The manifest's list of web versions is called "variants", the word Roe
+    # uses for these files everywhere else (the variants/ folder, the docs).
+    # Manifests written before 0.4.0 called it "renditions"; read those as if
+    # they said "variants", so they keep working without being rewritten. The
+    # next time Roe writes one, it's saved under the new name.
+    def upgrade_manifest(manifest)
+      return manifest unless manifest.is_a?(Hash) && manifest.key?(LEGACY_MANIFEST_LIST)
+
+      legacy = manifest.delete(LEGACY_MANIFEST_LIST)
+      manifest[MANIFEST_LIST] ||= legacy
+      manifest
+    end
+
+    # The manifest as it's saved: the list under both names. A live site
+    # still on a 0.4.0 nightly only knows "renditions", and with originals
+    # kept on this computer (SiteSync::LiveVideo) the variants are all it has
+    # to play — so until every live site reads "variants", write both. Stop
+    # writing "renditions" after 0.5.0; reading it stays.
+    def for_file(manifest)
+      manifest.merge(LEGACY_MANIFEST_LIST => manifest[MANIFEST_LIST])
     end
 
     # The manifest, only if it was made from the original as it is now. A
@@ -284,7 +311,7 @@ class VideoVariantGenerator
       return nil unless manifest
 
       kept = manifest.deep_dup
-      kept["renditions"] = Array(kept["renditions"]).select do |r|
+      kept[MANIFEST_LIST] = Array(kept[MANIFEST_LIST]).select do |r|
         RENDITIONS.key?(r["name"]) && File.file?(variant_path_for(source, r["name"]))
       end
       if kept["poster"].present? && !File.file?(variant_path_for(source, POSTER))
@@ -297,7 +324,7 @@ class VideoVariantGenerator
     # Renditions in the manifest whose files are on disk, smallest first.
     def available_renditions(source)
       manifest = current_manifest(source) or return []
-      Array(manifest["renditions"]).select do |r|
+      Array(manifest[MANIFEST_LIST]).select do |r|
         RENDITIONS.key?(r["name"]) && File.file?(variant_path_for(source, r["name"]))
       end.sort_by { |r| RENDITIONS.keys.index(r["name"]) }
     end
@@ -311,7 +338,7 @@ class VideoVariantGenerator
       return false unless manifest["complete"] == true
       return false if manifest["poster"].present? && !File.file?(variant_path_for(source, POSTER))
 
-      Array(manifest["renditions"]).all? do |r|
+      Array(manifest[MANIFEST_LIST]).all? do |r|
         RENDITIONS.key?(r["name"]) && File.file?(variant_path_for(source, r["name"]))
       end
     end
@@ -793,7 +820,7 @@ class VideoVariantGenerator
           "none"
         end
 
-      made = manifest ? Array(manifest["renditions"]).map { |r| r["name"] } : []
+      made = manifest ? Array(manifest[MANIFEST_LIST]).map { |r| r["name"] } : []
       skipped = manifest ? Array(manifest["skipped"]) : []
       wanted = manifest&.dig("wanted") || RENDITIONS.keys
 
@@ -823,7 +850,7 @@ class VideoVariantGenerator
         poster: (manifest["poster"] if manifest&.dig("poster") && File.file?(variant_path_for(source, POSTER))),
         source: manifest&.dig("source")&.slice("width", "height", "duration", "size") ||
                 { "size" => (File.size(source) if File.file?(source)) },
-        outputs: manifest ? Array(manifest["renditions"]).map { |r| r.slice("name", "size", "width", "height") } : [],
+        outputs: manifest ? Array(manifest[MANIFEST_LIST]).map { |r| r.slice("name", "size", "width", "height") } : [],
         served_as_original: manifest.present? && made.empty? && skipped.any?,
         error: (last_error(web) if state == "failed"),
         notice: status.in?(NOTICE_STATUSES)
@@ -879,7 +906,7 @@ class VideoVariantGenerator
           "width" => probe.width, "height" => probe.height,
           "duration" => probe.duration&.round(2), "codec" => probe.video_codec, "hdr" => probe.hdr?
         },
-        "renditions" => [],
+        MANIFEST_LIST => [],
         "poster" => nil,
         "complete" => false
       }
@@ -887,7 +914,7 @@ class VideoVariantGenerator
 
     def make_rendition(source, name, probe, manifest, force:)
       out = variant_path_for(source, name)
-      return nil if !force && File.file?(out) && manifest["renditions"].any? { |r| r["name"] == name }
+      return nil if !force && File.file?(out) && manifest[MANIFEST_LIST].any? { |r| r["name"] == name }
 
       ensure_disk_space!(source, out)
       web = web_path_for(source)
@@ -910,14 +937,14 @@ class VideoVariantGenerator
         # version" would be about the same size or bigger. Serve the
         # original instead of keeping a near-copy.
         File.delete(out)
-        manifest["renditions"].reject! { |r| r["name"] == name }
+        manifest[MANIFEST_LIST].reject! { |r| r["name"] == name }
         manifest["skipped"] = (Array(manifest["skipped"]) | [ name ])
         return nil
       end
 
       made = MediaProbe.call(out)
-      manifest["renditions"].reject! { |r| r["name"] == name }
-      manifest["renditions"] << {
+      manifest[MANIFEST_LIST].reject! { |r| r["name"] == name }
+      manifest[MANIFEST_LIST] << {
         "name" => name, "path" => web_path_for(out), "size" => File.size(out),
         "width" => made&.width, "height" => made&.height
       }
@@ -1105,11 +1132,11 @@ class VideoVariantGenerator
         # What's on disk, not just what was once recorded: a version deleted
         # since it was made is still to do, so the video isn't complete yet.
         merged = on_disk(merge_step(current_manifest(source), manifest, name), source)
-        made = merged["renditions"].map { |r| r["name"] } | Array(merged["skipped"])
+        made = merged[MANIFEST_LIST].map { |r| r["name"] } | Array(merged["skipped"])
         merged["wanted"] = wanted
         merged["complete"] = merged["poster"].present? && (wanted - made).empty?
         merged["generated_at"] = Time.current.iso8601
-        File.write(path, JSON.pretty_generate(merged) + "\n")
+        File.write(path, JSON.pretty_generate(for_file(merged)) + "\n")
         manifest.replace(merged)
       end
 
@@ -1138,9 +1165,9 @@ class VideoVariantGenerator
       if name == POSTER
         %w[poster poster_at].each { |k| merged[k] = mine[k] if mine.key?(k) }
       else
-        merged["renditions"] = Array(merged["renditions"]).reject { |r| r["name"] == name } +
-                               Array(mine["renditions"]).select { |r| r["name"] == name }
-        merged["renditions"].sort_by! { |r| RENDITIONS.keys.index(r["name"]) || 99 }
+        merged[MANIFEST_LIST] = Array(merged[MANIFEST_LIST]).reject { |r| r["name"] == name } +
+                               Array(mine[MANIFEST_LIST]).select { |r| r["name"] == name }
+        merged[MANIFEST_LIST].sort_by! { |r| RENDITIONS.keys.index(r["name"]) || 99 }
         skipped = Array(merged["skipped"]) - [ name ]
         skipped << name if Array(mine["skipped"]).include?(name)
         merged["skipped"] = skipped if skipped.any? || merged.key?("skipped")

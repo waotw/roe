@@ -49,7 +49,9 @@ module VideoTestHelpers
   end
 
   # A manifest written by hand, as Site Sync would bring it to a live site.
-  def fake_variants(name, renditions: %w[720p], poster: true, size: nil)
+  # `key:` names its list of web versions: "variants" as Roe writes it, or
+  # "renditions" as manifests before 0.4.0 did.
+  def fake_variants(name, renditions: %w[720p], poster: true, size: nil, key: VideoVariantGenerator::MANIFEST_LIST)
     source = File.join(VIDEO_DIR, name)
     File.binwrite(source, "x" * 1000) unless File.exist?(source)
     @made << name
@@ -62,7 +64,7 @@ module VideoTestHelpers
     File.binwrite(VideoVariantGenerator.variant_path_for(source, "poster"), "p") if poster
     manifest = {
       "source" => { "path" => "/media/video/#{name}", "size" => size || File.size(source) },
-      "renditions" => entries,
+      key => entries,
       "poster" => (poster ? "/media/video/variants/#{base}-poster.jpg" : nil),
       "complete" => true
     }

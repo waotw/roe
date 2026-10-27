@@ -43,7 +43,11 @@ class VideoVariantGeneratorTest < ActiveSupport::TestCase
 
     manifest = VideoVariantGenerator.current_manifest(web)
     assert manifest["complete"]
-    assert_equal %w[720p], manifest["renditions"].map { |r| r["name"] }
+    assert_equal %w[720p], manifest["variants"].map { |r| r["name"] }
+
+    written = JSON.parse(File.read(VideoVariantGenerator.manifest_path(VideoVariantGenerator.normalize_path(web))))
+    assert_equal %w[720p], written["variants"].map { |r| r["name"] }, "Roe writes the list as \"variants\""
+    assert_equal written["variants"], written["renditions"], "and under the old name too, for a live site on an older nightly"
 
     out = VideoVariantGenerator.variant_path_for(VideoVariantGenerator.normalize_path(web), "720p")
     probe = MediaProbe.call(out)
@@ -82,7 +86,7 @@ class VideoVariantGeneratorTest < ActiveSupport::TestCase
 
     manifest = VideoVariantGenerator.current_manifest(web)
     assert manifest["complete"]
-    assert_equal [], manifest["renditions"]
+    assert_equal [], manifest["variants"]
     assert_equal %w[720p], manifest["skipped"]
     assert_equal [ web ], VideoRenderer.plan(web).sources.map { |s| s[:src] }
   end

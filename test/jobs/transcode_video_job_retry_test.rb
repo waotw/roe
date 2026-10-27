@@ -52,14 +52,14 @@ class TranscodeVideoJobRetryTest < ActiveJob::TestCase
     slow_copy = VideoVariantGenerator.current_manifest(source).deep_dup
     # ...the fast job makes 720p and records it...
     VideoVariantGenerator.generate(web, "720p")
-    assert_includes VideoVariantGenerator.current_manifest(source)["renditions"].map { |r| r["name"] }, "720p"
+    assert_includes VideoVariantGenerator.current_manifest(source)["variants"].map { |r| r["name"] }, "720p"
 
     # ...then the slow job finishes with its stale copy.
     File.binwrite(VideoVariantGenerator.variant_path_for(source, "1080p"), "v")
-    slow_copy["renditions"] << { "name" => "1080p", "path" => "/media/video/variants/race-1080p.mp4", "size" => 1 }
+    slow_copy["variants"] << { "name" => "1080p", "path" => "/media/video/variants/race-1080p.mp4", "size" => 1 }
     VideoVariantGenerator.send(:finish, source, slow_copy, %w[720p 1080p], "1080p")
 
-    names = VideoVariantGenerator.current_manifest(source)["renditions"].map { |r| r["name"] }
+    names = VideoVariantGenerator.current_manifest(source)["variants"].map { |r| r["name"] }
     assert_equal %w[720p 1080p], names
     assert VideoVariantGenerator.current_manifest(source)["poster"].present?
   end
