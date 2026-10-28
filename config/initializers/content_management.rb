@@ -77,7 +77,7 @@ if should_run
         # silently never started once payments were enabled.
         begin
           members_yml = SiteConfig::FEATURES_PATH.join("members.yml")
-          members_config = File.exist?(members_yml) ? (YAML.load_file(members_yml) rescue nil) : nil
+          members_config = File.exist?(members_yml) ? (SiteFile.read_yaml(members_yml) rescue nil) : nil
           payments_config = members_config&.dig("payments")
           if payments_config&.dig("enabled") && StripeConfig.current.connected? && StripeConfig.current.current_price_id.blank?
             puts "\n💳 Stripe price_id missing — syncing product/price from members.yml..."

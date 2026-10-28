@@ -19,7 +19,7 @@ class PageGenerator
     site_yml_path = File.join(RoeSitePaths::SITE_PATH, "system", "global", "site.yml")
     return unless File.exist?(site_yml_path)
 
-    config = YAML.load_file(site_yml_path) || {}
+    config = SiteFile.read_yaml(site_yml_path) || {}
     return if config["theme"].present?
 
     config["theme"] = "default"

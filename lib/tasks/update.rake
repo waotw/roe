@@ -128,7 +128,7 @@ class UpdatePreflightChecker
 
   def check_version_readable
     return unless File.exist?(version_path)
-    config = YAML.load_file(version_path) || {}
+    config = SiteFile.read_yaml(version_path) || {}
     version = config["version"] || config[:version]
     if version
       puts "  ✓ Current version: #{version}"

@@ -119,7 +119,7 @@ class DeployConfigGenerator
       raise GenerationError, "deploy.yml not found at #{SiteConfig::DEPLOY_FILE}"
     end
 
-    YAML.load_file(SiteConfig::DEPLOY_FILE) || {}
+    SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
   rescue Psych::SyntaxError => e
     raise GenerationError, "deploy.yml has invalid YAML: #{e.message}"
   end

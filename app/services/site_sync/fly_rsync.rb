@@ -295,7 +295,7 @@ module SiteSync
         return ENV["FLY_APP_NAME"] if ENV["FLY_APP_NAME"].present?
 
         if File.exist?(SiteConfig::DEPLOY_FILE)
-          config = YAML.load_file(SiteConfig::DEPLOY_FILE) || {}
+          config = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
           name = config["app_name"].to_s.strip
           return name if name.present?
         end

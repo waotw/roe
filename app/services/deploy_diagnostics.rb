@@ -250,7 +250,7 @@ class DeployDiagnostics
     return nil if status.blank?
 
     config = begin
-      YAML.load_file(SiteConfig::DEPLOY_FILE) || {}
+      SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     rescue StandardError
       {}
     end

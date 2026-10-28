@@ -104,7 +104,7 @@ module RoeUpdater
         version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
         return "0.0.0" unless File.exist?(version_file)
 
-        config = YAML.load_file(version_file)
+        config = SiteFile.read_yaml(version_file) || {}
         config["version"] || "0.0.0"
       rescue => e
         Rails.logger.error "Failed to load version file: #{e.message}"

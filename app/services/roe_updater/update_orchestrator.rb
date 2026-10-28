@@ -543,7 +543,7 @@ module RoeUpdater
           File.join(RoeSitePaths::ROE_ROOT, "VERSION"),
           File.join(RoeSitePaths::ROE_ROOT, "current", "VERSION")
         ].each do |path|
-          existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+          existing = SiteFile.read_yaml(path) || {}
           File.write(path, existing.merge(data).to_yaml)
           log("✓ Wrote VERSION file: #{path.sub(RoeSitePaths::ROE_ROOT, '')} → #{@version}")
         end

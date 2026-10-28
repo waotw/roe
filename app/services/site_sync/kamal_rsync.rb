@@ -265,7 +265,7 @@ module SiteSync
           unless File.exist?(path)
             raise KamalRsyncError, "config/deploy.yml not found — Kamal deploy isn't configured."
           end
-          YAML.load_file(path)
+          SiteFile.read_yaml(path)
         end
       end
 

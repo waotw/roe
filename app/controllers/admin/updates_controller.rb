@@ -71,7 +71,7 @@ class Admin::UpdatesController < Admin::BaseController
     # Deploy section
     @deploy_status       = DeployWatchdog.status
     @last_deploy_time    = load_last_deploy_time
-    @deploy_config       = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    @deploy_config       = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     @deploy_issues       = deploy_prerequisites(@deploy_config)
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
@@ -205,7 +205,7 @@ class Admin::UpdatesController < Admin::BaseController
       return
     end
 
-    config  = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    config  = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     issues  = deploy_prerequisites(config)
 
     if issues.any?
@@ -262,7 +262,7 @@ class Admin::UpdatesController < Admin::BaseController
       return
     end
 
-    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    config = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     issues = deploy_prerequisites(config)
 
     if issues.any?
@@ -363,7 +363,7 @@ class Admin::UpdatesController < Admin::BaseController
     end
 
     site_path = SiteConfig::SITE_FILE
-    config = File.exist?(site_path) ? (YAML.load_file(site_path) || {}) : {}
+    config = SiteFile.read_yaml(site_path) || {}
     config["update_channel"] = new_channel
     File.write(site_path, YAML.dump(config))
     SiteConfig.sync_from_file("site")

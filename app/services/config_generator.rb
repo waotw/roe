@@ -84,10 +84,10 @@ class ConfigGenerator
     security_file = SiteConfig::SECURITY_FILE
     return unless File.exist?(site_file)
 
-    site = YAML.load_file(site_file) || {}
+    site = SiteFile.read_yaml(site_file) || {}
     return unless site.key?("ai_crawlers")
 
-    security = (File.exist?(security_file) ? YAML.load_file(security_file) : {}) || {}
+    security = SiteFile.read_yaml(security_file) || {}
     security["ai_crawlers"] = site.delete("ai_crawlers")
 
     write_config_yaml(security_file, security)
@@ -104,11 +104,11 @@ class ConfigGenerator
     content_file = SiteConfig::CONTENT_FILE
     return unless File.exist?(site_file)
 
-    site = YAML.load_file(site_file) || {}
+    site = SiteFile.read_yaml(site_file) || {}
     stale = CONTENT_MIGRATION_MAP.keys.select { |k| site.key?(k) }
     return if stale.empty?
 
-    content = (File.exist?(content_file) ? YAML.load_file(content_file) : {}) || {}
+    content = SiteFile.read_yaml(content_file) || {}
     stale.each do |old_key|
       *parents, leaf = CONTENT_MIGRATION_MAP[old_key]
       target = parents.reduce(content) { |h, k| h[k] ||= {} }

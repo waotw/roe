@@ -20,7 +20,10 @@ Rails.application.configure do
   # which causes Rails 8's HostAuthorization middleware to misfire.
   _dev_config_path = File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml")
   if File.exist?(_dev_config_path)
-    dev_config = YAML.load_file(_dev_config_path)
+    # Not YAML.load_file: bootsnap caches it on (mtime, size), so an edit
+    # that kept the file's length could be read as the old contents. Roe's
+    # SiteFile.read_yaml isn't loadable yet this early in boot.
+    dev_config = YAML.load(File.read(_dev_config_path), filename: _dev_config_path)
     allowed_hosts = Array(dev_config&.dig("allowed_hosts")).map(&:to_s).select(&:present?)
     config.hosts |= allowed_hosts unless allowed_hosts.empty?
   end

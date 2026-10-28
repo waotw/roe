@@ -73,7 +73,7 @@ class EmailRenderer
     email_yml = File.join(RoeSitePaths::SITE_PATH, "theme", "email.yml")
 
     if File.exist?(email_yml)
-      YAML.load_file(email_yml).symbolize_keys
+      SiteFile.read_yaml(email_yml).symbolize_keys
     else
       default_email_styles
     end
