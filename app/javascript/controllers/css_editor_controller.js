@@ -5,6 +5,7 @@ export default class extends Controller {
   static values = {
     themeName: String,
     previewId: String,
+    highlight: String,
   };
 
   connect() {
@@ -107,6 +108,27 @@ export default class extends Controller {
 
     // Set height
     this.editor.setSize(null, "70vh");
+
+    if (this.highlightValue) this.highlightReference(this.highlightValue);
+  }
+
+  // Arriving from a media file's "Used in" link (?highlight=/media/...): put
+  // the cursor on where the file is used, selected, and scroll to it. A
+  // mention in a comment is skipped — the Media page doesn't count those as
+  // uses, so landing on one would point at the wrong place.
+  highlightReference(path) {
+    const text = this.editor.getValue();
+    const code = text.replace(/\/\*[\s\S]*?\*\//g, (comment) => " ".repeat(comment.length));
+    let at = code.indexOf(path);
+    if (at === -1) at = text.indexOf(path);
+    if (at === -1) return;
+
+    const from = this.editor.posFromIndex(at);
+    const to = this.editor.posFromIndex(at + path.length);
+    this.editor.focus();
+    this.editor.setSelection(from, to);
+    this.editor.scrollIntoView({ from, to }, Math.round(this.editor.getScrollInfo().clientHeight / 3));
+    this.editorContainerTarget.scrollIntoView({ block: "center" });
   }
 
   handleKeyboard(e) {

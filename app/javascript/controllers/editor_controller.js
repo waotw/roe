@@ -3019,70 +3019,107 @@ export default class extends Controller {
     }
   }
 
-  highlightMediaReference() {
+  // Arriving from a media file's "Used in" link (?highlight=/media/...): show
+  // where this file is used. In the text, the path is selected and scrolled
+  // to; in the metadata, the panel is opened and the field holding it is
+  // selected.
+  async highlightMediaReference() {
     const mediaPath = this.highlightMediaValue;
-    const content = this.textareaTarget.value;
+    const position = this.textareaTarget.value.indexOf(mediaPath);
 
-    // First, try to find it in content
-    let position = content.indexOf(mediaPath);
-
-    if (position !== -1) {
-      // Found in content - highlight there
-      this.textareaTarget.setSelectionRange(position, position);
-      this.textareaTarget.focus();
-      this.textareaTarget.style.caretColor = "red";
-
-      const resetCursor = () => {
-        this.textareaTarget.style.caretColor = "";
-      };
-
-      this.textareaTarget.addEventListener("click", resetCursor, {
-        once: true,
-      });
-      this.textareaTarget.addEventListener("keydown", resetCursor, {
-        once: true,
-      });
-
+    if (position === -1) {
+      this._highlightInMetadata(mediaPath);
       return;
     }
 
-    // Not in content - check metadata fields
-    const metadataFields = [
-      "image",
-      "audio",
-      "video",
-      "thumbnail",
-      "cover",
-      "poster",
-    ];
-
-    for (const fieldName of metadataFields) {
-      const input = document.querySelector(
-        `input[name="metadata[${fieldName}]"], input[id*="${fieldName}"]`,
-      );
-
-      if (input && input.value === mediaPath) {
-        // Found in metadata field - highlight the input
-        input.focus();
-        input.select();
-        input.style.caretColor = "red";
-        input.style.borderColor = "red";
-
-        const resetInput = () => {
-          input.style.caretColor = "";
-          input.style.borderColor = "";
-        };
-
-        input.addEventListener("click", resetInput, { once: true });
-        input.addEventListener("keydown", resetInput, { once: true });
-        input.addEventListener("blur", resetInput, { once: true });
-
-        // Scroll the input into view
-        input.scrollIntoView({ behavior: "smooth", block: "center" });
-
-        return;
-      }
+    // The live editor loads after this controller. Its goTo measures every
+    // line and keeps the spot clear of the toolbar — the textarea it stands
+    // in for is hidden, so scrolling to that can't work.
+    const liveEditor = await this._liveEditorWhenReady();
+    if (liveEditor) {
+      liveEditor.goTo(position, position + mediaPath.length);
+      this._settleAgainWhileLoading(liveEditor, position);
+      return;
     }
+
+    this.textareaTarget.setSelectionRange(position, position + mediaPath.length);
+    this.textareaTarget.focus();
+  }
+
+  // The page keeps changing height after the first jump: images further up
+  // finish loading (big ones take seconds), and the block holding the path
+  // (a gallery, a card) opens up once the caret is inside it. So each time
+  // the editor's height changes, place it again — for a few seconds, and
+  // only until the writer scrolls, clicks or types, which means they've
+  // taken over.
+  _settleAgainWhileLoading(liveEditor, position, forMs = 5000) {
+    const events = ["wheel", "mousedown", "keydown", "touchstart"];
+    let observer = null;
+    const finish = () => {
+      observer?.disconnect();
+      events.forEach((type) => window.removeEventListener(type, finish));
+    };
+    events.forEach((type) => window.addEventListener(type, finish, { once: true, passive: true }));
+
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => liveEditor.settle(position));
+      observer.observe(liveEditor.view.contentDOM);
+    }
+    setTimeout(finish, forMs);
+  }
+
+  // The live editor, once it has loaded; null when this page uses the plain
+  // textarea (editor.mode: textarea) or it doesn't arrive.
+  _liveEditorWhenReady(timeoutMs = 4000) {
+    const textarea = this.textareaTarget;
+    const host = textarea.closest('[data-controller~="markdown-editor"]');
+    if (!host || host.dataset.markdownEditorModeValue === "textarea") {
+      return Promise.resolve(textarea.roeEditor || null);
+    }
+
+    return new Promise((resolve) => {
+      const started = performance.now();
+      const check = () => {
+        if (textarea.roeEditor) return resolve(textarea.roeEditor);
+        if (performance.now() - started > timeoutMs) return resolve(null);
+        setTimeout(check, 50);
+      };
+      check();
+    });
+  }
+
+  // The path is in the metadata, not the text: open the panel if it's
+  // closed, then select the field (or the RAW YAML) that holds it.
+  _highlightInMetadata(mediaPath) {
+    const panel = document.querySelector('[data-controller~="metadata-editor"]');
+    if (!panel) return;
+
+    const content = panel.querySelector('[data-metadata-editor-target="content"]');
+    if (content && content.classList.contains("hidden")) {
+      panel
+        .querySelector('[data-action~="click->metadata-editor#toggleMetadataSection"]')
+        ?.click();
+    }
+
+    const yamlView = panel.querySelector('[data-metadata-editor-target="yamlView"]');
+    const yamlOpen = yamlView && !yamlView.classList.contains("hidden");
+    const field = yamlOpen
+      ? panel.querySelector('[data-metadata-editor-target="yamlTextarea"]')
+      : [...panel.querySelectorAll("[data-metadata-field]")].find((el) =>
+          (el.value || "").includes(mediaPath),
+        );
+    if (!field) return;
+
+    const at = (field.value || "").indexOf(mediaPath);
+    if (at === -1) return;
+
+    field.scrollIntoView({ behavior: "instant", block: "center" });
+    field.focus({ preventScroll: true });
+    if (typeof field.setSelectionRange === "function") {
+      field.setSelectionRange(at, at + mediaPath.length);
+    }
+    field.style.borderColor = "red";
+    field.addEventListener("blur", () => (field.style.borderColor = ""), { once: true });
   }
 
   // ========== TEST EMAIL METHODS ==========
