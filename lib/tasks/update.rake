@@ -32,17 +32,12 @@ class UpdatePreflightChecker
     check_external_tool("rsync",   "rsync --version | head -1")
 
     section "Roe paths"
-    check("ROE_ROOT resolves",            -> { Dir.exist?(RoeSitePaths::ROE_ROOT) },         RoeSitePaths::ROE_ROOT)
-    check("SITE_PATH resolves",           -> { Dir.exist?(RoeSitePaths::SITE_PATH) },        RoeSitePaths::SITE_PATH)
-    check("VERSION file at ROE_ROOT",     -> { File.exist?(version_path) },                  version_path)
-    check_version_readable
+    check_roe_paths
 
     section "Staging directory"
-    check("staging/ exists",              -> { Dir.exist?(staging_path) },                    staging_path)
-    check("staging/ is empty (Bug 3)",    -> { Dir.exist?(staging_path) && Dir.empty?(staging_path) },
-          "non-empty staging/ would block validate_prerequisites — clean it up before testing")
+    check_staging
 
-    section "Codeberg connectivity"
+    section "Update mirrors"
     check_mirrors_reachable
     check_update_check
 
@@ -53,18 +48,51 @@ class UpdatePreflightChecker
     check_sqlite_backup_roundtrip
 
     section "Bug fixes present in source"
+    check_bug_fixes_present
+
+    section "Root file sync sources"
+    check_root_sync_sources
+
+    summary
+  end
+
+  # The checks below need no network and change nothing, so the test suite
+  # runs them too (test/tasks/update_preflight_test.rb) — a fix that moves
+  # breaks a test instead of quietly turning the preflight red.
+
+  def check_roe_paths
+    check("ROE_ROOT resolves",            -> { Dir.exist?(RoeSitePaths::ROE_ROOT) },         RoeSitePaths::ROE_ROOT)
+    check("SITE_PATH resolves",           -> { Dir.exist?(RoeSitePaths::SITE_PATH) },        RoeSitePaths::SITE_PATH)
+    check("VERSION file at ROE_ROOT",     -> { File.exist?(version_path) },                  version_path)
+    check_version_readable
+  end
+
+  # staging/ only exists while an update runs — Downloader creates it and a
+  # finished or rolled-back update removes it. Absent is the normal state.
+  # Only leftover content blocks an update (validate_prerequisites).
+  def check_staging
+    check("staging/ is absent or empty (Bug 3)",
+          -> { !Dir.exist?(staging_path) || Dir.empty?(staging_path) },
+          staging_path,
+          on_fail: "#{staging_path} has leftover content, which blocks the next update — " \
+                   "an update is running, or one crashed; clean it up before updating")
+  end
+
+  def check_bug_fixes_present
     check_source_contains("Bug 1 (SITE_PATH ENV override)",
       "current/config/application.rb",
-      "ENV['ROE_SITE_PATH']")
-    check_source_contains("Bug 2 (migrations from staging)",
-      "current/app/services/roe_updater/update_orchestrator.rb",
-      "staging_app = File.join(RoeSitePaths::ROE_ROOT, 'staging')")
+      /ENV\[["']ROE_SITE_PATH["']\]/)
+    check_source_contains("Bug 2 (migrations tested from staging)",
+      "current/app/services/roe_updater/migration_tester.rb",
+      /staging_app_path = File\.join\(RoeSitePaths::ROE_ROOT, ["']staging["']\)/)
     check_source_contains("Bug 3 (validate accepts empty staging)",
       "current/app/services/roe_updater/update_orchestrator.rb",
       "Dir.empty?(staging)")
-    check_source_contains("Bug 4 (writes VERSION to root)",
-      "current/app/services/roe_updater/update_orchestrator.rb",
-      "write_root_version_file")
+    check("Bug 4 (writes VERSION to root)",
+          -> { RoeUpdater::UpdateOrchestrator.respond_to?(:write_version_files, true) &&
+               source("current/app/services/roe_updater/update_orchestrator.rb")
+                 .match?(/File\.join\(RoeSitePaths::ROE_ROOT, ["']VERSION["']\)/) },
+          on_fail: "expected write_version_files to write ROE_ROOT/VERSION")
     check_source_contains("Bug 5 (restart skipped in dev)",
       "current/app/services/roe_updater/update_orchestrator.rb",
       "unless Rails.env.production?")
@@ -74,17 +102,16 @@ class UpdatePreflightChecker
     check_source_contains("Bug 7 (mock gated by ENV)",
       "current/app/services/roe_updater/version_checker.rb",
       "ROE_MOCK_UPDATE")
-    check_source_contains("sync_root_files step",
-      "current/app/services/roe_updater/update_orchestrator.rb",
-      "sync_root_files")
+    check("sync_root_files step",
+          -> { RoeUpdater::UpdateOrchestrator::STEPS.any? { |s| s[:name] == "syncing_root_files" } },
+          on_fail: "expected a syncing_root_files step in UpdateOrchestrator::STEPS")
+  end
 
-    section "Root file sync sources"
+  def check_root_sync_sources
     RoeUpdater::UpdateOrchestrator::ROOT_SYNC_FILES.each do |fname|
       source = File.join(RoeSitePaths::ROE_ROOT, "current", fname)
       check("current/#{fname} exists (source for sync)", -> { File.exist?(source) }, source)
     end
-
-    summary
   end
 
   private
@@ -94,12 +121,15 @@ class UpdatePreflightChecker
     puts "── #{label} #{'─' * (60 - label.length)}"
   end
 
-  def check(label, predicate, detail = nil)
+  # detail is shown either way; on_fail replaces it when the check fails,
+  # for a message that only makes sense as a problem.
+  def check(label, predicate, detail = nil, on_fail: nil)
     ok = predicate.call
     if ok
       puts "  ✓ #{label}#{detail ? "  (#{detail})" : ""}"
     else
-      puts "  ✗ #{label}#{detail ? "  → #{detail}" : ""}"
+      shown = on_fail || detail
+      puts "  ✗ #{label}#{shown ? "  → #{shown}" : ""}"
       @failures << label
     end
   rescue => e
@@ -222,17 +252,24 @@ class UpdatePreflightChecker
     end
   end
 
+  # needle is a String (exact text) or a Regexp (for code where quote style
+  # or spacing may vary — an exact string went stale on a ' → " change).
   def check_source_contains(label, relative_path, needle)
-    full = File.join(RoeSitePaths::ROE_ROOT, relative_path)
-    if !File.exist?(full)
+    text = source(relative_path)
+    if text.nil?
       puts "  ✗ #{label}  → #{relative_path} missing"
       @failures << label
-    elsif File.read(full).include?(needle)
+    elsif needle.is_a?(Regexp) ? text.match?(needle) : text.include?(needle)
       puts "  ✓ #{label}"
     else
-      puts "  ✗ #{label}  → expected `#{needle}` in #{relative_path}"
+      puts "  ✗ #{label}  → expected `#{needle.is_a?(Regexp) ? needle.source : needle}` in #{relative_path}"
       @failures << label
     end
+  end
+
+  def source(relative_path)
+    full = File.join(RoeSitePaths::ROE_ROOT, relative_path)
+    File.exist?(full) ? File.read(full) : nil
   end
 
   def summary
