@@ -132,13 +132,24 @@ class Admin::ThemesController < Admin::BaseController
 
     File.write(theme_file, params[:content])
 
-    flash[:notice] = "#{theme_name.capitalize} theme updated successfully"
-    redirect_to edit_admin_theme_path(theme_name)
+    respond_to do |format|
+      # The CSS editor saves in the background and stays where it is.
+      format.json { render json: { saved: true } }
+      format.html do
+        flash[:notice] = "#{theme_name.capitalize} theme updated successfully"
+        redirect_to edit_admin_theme_path(theme_name)
+      end
+    end
   rescue => e
-    flash[:error] = "Failed to update theme: #{e.message}"
-    @theme_name = theme_name
-    @theme_content = params[:content]
-    render :edit
+    respond_to do |format|
+      format.json { render json: { error: e.message }, status: :unprocessable_entity }
+      format.html do
+        flash[:error] = "Failed to update theme: #{e.message}"
+        @theme_name = theme_name
+        @theme_content = params[:content]
+        render :edit
+      end
+    end
   end
 
   def activate

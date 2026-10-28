@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["textarea", "unsavedIndicator", "editorContainer"];
+  static targets = ["textarea", "unsavedIndicator", "editorContainer", "saveStatus"];
   static values = {
     themeName: String,
     previewId: String,
@@ -92,15 +92,8 @@ export default class extends Controller {
 
     // Sync changes to textarea
     this.editor.on('change', () => {
-      const newContent = this.editor.getValue();
-      this.textareaTarget.value = newContent;
-      this.hasUnsavedChanges = newContent !== this.originalContent;
-      
-      if (this.hasUnsavedChanges) {
-        this.unsavedIndicatorTarget.classList.remove("hidden");
-      } else {
-        this.unsavedIndicatorTarget.classList.add("hidden");
-      }
+      this.textareaTarget.value = this.editor.getValue();
+      this.refreshUnsavedIndicator();
 
       // Push the edit to the live preview tab (debounced), before save.
       this.schedulePreviewUpdate();
@@ -147,22 +140,69 @@ export default class extends Controller {
     }
   }
 
-  save(e) {
+  // Saves in the background: the page doesn't reload, so the cursor, the
+  // scroll position and undo history all stay where they were. A Save
+  // pressed while one is still going runs once that one finishes.
+  async save(e) {
     if (e) e.preventDefault();
-
-    // Sync CodeMirror content to textarea before saving
-    if (this.editor) {
-      this.textareaTarget.value = this.editor.getValue();
+    if (this.saving) {
+      this.saveAgain = true;
+      return;
     }
 
+    const content = this.editor ? this.editor.getValue() : this.textareaTarget.value;
+    this.textareaTarget.value = content;
     const form = document.getElementById("theme-form");
-    this.hasUnsavedChanges = false;
-    this.unsavedIndicatorTarget.classList.add("hidden");
 
-    // Save scroll position
-    sessionStorage.setItem("cssEditorScrollPosition", window.scrollY);
+    this.saving = true;
+    this.showSaveStatus("Saving…", "text-gray-500");
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      const result = response.headers.get("Content-Type")?.includes("application/json")
+        ? await response.json()
+        : null;
 
-    form.requestSubmit();
+      if (response.ok && result?.saved) {
+        this.originalContent = content;
+        this.refreshUnsavedIndicator();
+        this.showSaveStatus("✓ Saved", "text-green-700", 2000);
+        this.broadcastRefresh();
+      } else if (result?.error) {
+        this.showSaveStatus(`Not saved: ${result.error}`, "text-red-700");
+      } else {
+        // Not JSON back: usually the sign-in page, after the session ran out.
+        this.showSaveStatus("Not saved — you may have been signed out. Sign in in another tab, then save again.", "text-red-700");
+      }
+    } catch (error) {
+      this.showSaveStatus("Not saved — Roe couldn't be reached. Your changes are still here; save again.", "text-red-700");
+    } finally {
+      this.saving = false;
+    }
+
+    if (this.saveAgain) {
+      this.saveAgain = false;
+      this.save();
+    }
+  }
+
+  refreshUnsavedIndicator() {
+    const current = this.editor ? this.editor.getValue() : this.textareaTarget.value;
+    this.hasUnsavedChanges = current !== this.originalContent;
+    this.unsavedIndicatorTarget.classList.toggle("hidden", !this.hasUnsavedChanges);
+  }
+
+  showSaveStatus(text, colorClass, hideAfterMs = null) {
+    if (!this.hasSaveStatusTarget) return;
+    const el = this.saveStatusTarget;
+    clearTimeout(this.saveStatusTimer);
+    el.textContent = text;
+    el.className = colorClass;
+    if (hideAfterMs) this.saveStatusTimer = setTimeout(() => (el.textContent = ""), hideAfterMs);
   }
 
   // Debounced live push of the current CSS to the open preview tab, so it
