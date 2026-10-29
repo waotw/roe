@@ -54,15 +54,15 @@ breathing_room = lambda do |lines = 5|
   $stdout.flush
 end
 
-# Yes/no helper. tty-prompt's own `yes?` always renders its suffix in
-# parens with the default answer capitalized — `(Y/n)` — and won't let
-# you blank it out. We want a plain lowercase `[y/n]` everywhere, so we
-# build it on `ask`: full control of the label, still accepts
-# y/yes/n/no, and `default:` decides what a bare Enter means.
+# Yes/no helper. tty-prompt's own `yes?` renders its suffix in parens —
+# `(Y/n)` — which doesn't match the rest of Roe's prompts. So it's built on
+# `ask`: the label is `[Y/n]` or `[y/N]` — the capital letter is what a
+# bare Enter means, the same as everywhere else in roe.sh and bin/roe —
+# and it still accepts y/yes/n/no.
 yes_no = lambda do |message, default: true|
   loop do
     breathing_room.call
-    answer = prompt.ask("#{message} [y/n]") { |q| q.modify :strip, :down }
+    answer = prompt.ask("#{message} #{default ? '[Y/n]' : '[y/N]'}") { |q| q.modify :strip, :down }
     answer = (default ? "y" : "n") if answer.to_s.empty?
     return true  if %w[y yes].include?(answer)
     return false if %w[n no].include?(answer)
@@ -121,13 +121,13 @@ if method == :random
   # clear: true wipes the line afterwards so the green summary box that
   # follows starts clean.
   spinner = TTY::Spinner.new(
-    "[:spinner] Generating super secure password…",
+    "[:spinner] Forging super secure password…",
     format: :dots,
     clear: true,
     output: $stdout
   )
   spinner.auto_spin
-  sleep 1.2
+  sleep 1.5
   password = SecureRandom.alphanumeric(16)
   spinner.stop
 

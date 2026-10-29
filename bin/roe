@@ -399,6 +399,7 @@ cmd_open() {
     require_running "$f" || return 1
     url="$(url_for "$f")"
     open_url "$url"
+    sleep 1   # let the home page open first, so the admin ends up in front
     open_url "$url/admin"
 }
 

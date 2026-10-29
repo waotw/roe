@@ -284,6 +284,7 @@ _on_exit() {
 trap _on_exit EXIT
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; _logfile_append "[INFO] $1"; }
+log_next()    { echo -e "${BLUE}[→]${NC} $1"; _logfile_append "[NEXT] $1"; }
 log_success() { echo -e "${GREEN}[✓]${NC} $1"; _logfile_append "[OK]   $1"; }
 log_warning() { echo -e "${YELLOW}[!]${NC} $1"; _logfile_append "[WARN] $1"; }
 log_error()   { echo -e "${RED}[✗]${NC} $1"; _logfile_append "[FAIL] $1"; }
@@ -405,9 +406,9 @@ ensure_macos_build_tools() {
     echo -e "  ${DIM}This will take around ~5–10 min depending on your download speed…${NC}"
     echo ""
     breathing_room
-    read -rp "  [y] install Command Line Tools   [q] quit Roe installation: " REPLY
+    read -rp "  Install the Command Line Tools now? [Y/n]: " REPLY
     case "${REPLY:-y}" in
-        [Qq]*)
+        [NnQq]*)
             echo -e "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
             exit 0
             ;;
@@ -1185,9 +1186,9 @@ cmd_check() {
             echo -e "  I'll install mise (a small version manager) and Ruby ${required_ruby} for you — no extra steps."
             echo ""
             breathing_room
-            read -rp "  Install now? [y/q]: " REPLY
+            read -rp "  Install now? [Y/n]: " REPLY
             case "${REPLY:-y}" in
-                [Qq]*)
+                [NnQq]*)
                     echo "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
                     exit 0
                     ;;
@@ -1400,21 +1401,20 @@ offer_registration_after_setup() {
     echo -e "    Name:     ${CYAN}${ROE_NAME}${NC}"
     echo -e "    Address:  ${CYAN}http://${ROE_HOST}:${ROE_PORT}${NC}"
     echo ""
-    if [ -n "${ROE_PATH_ADDED:-}" ]; then
-        echo -e "  ${DIM}Open a new Terminal window first."
-    fi
-    echo -e "  ${BOLD}Run these from any folder${NC}"
-    echo -e "    ${CYAN}roe start${NC}"
-    echo -e "    ${CYAN}roe stop${NC}"
-    echo -e "    ${CYAN}roe open${NC}"
-    echo -e "    ${CYAN}roe${NC} for help"
+    echo -e "  You can now use the roe commands in your terminal:"
+    echo -e "    ${ROE_ORANGE}roe start${NC}"
+    echo -e "    ${ROE_ORANGE}roe stop${NC}"
+    echo -e "    ${ROE_ORANGE}roe open${NC}"
+    echo -e "    ${ROE_ORANGE}roe${NC} for help"
     echo ""
     breathing_room
     read -rp "Start Roe and open your site in the browser? [Y/n]: " REPLY
     echo ""
     case "${REPLY:-y}" in
         [Nn]*)
-            echo -e "  ${BOLD}You're ready.${NC} Start it with ${CYAN}roe start${NC} whenever you like."
+            echo -e "  ${BOLD}You're ready.${NC} Start it with ${ROE_ORANGE}roe start${NC} whenever you like."
+            echo ""
+            next_terminal_hint
             return 0
             ;;
     esac
@@ -1427,6 +1427,7 @@ offer_registration_after_setup() {
     local site_url="http://${ROE_HOST}:${PORT:-$ROE_PORT}"
     echo ""
     if _open_url "$site_url" 2>/dev/null; then
+        sleep 1   # let the home page open first, so the admin ends up in front
         _open_url "$site_url/admin" 2>/dev/null
         log_success "Opened your site and its admin in the browser:"
     else
@@ -1434,6 +1435,20 @@ offer_registration_after_setup() {
     fi
     echo -e "    ${CYAN}${site_url}${NC}"
     echo -e "    ${CYAN}${site_url}/admin${NC}"
+    echo ""
+    next_terminal_hint
+}
+
+# The last line of the install: what to do now. This window's shell
+# started before the roe command was added to the startup file, so when
+# that just happened, roe only works in a NEW window — the step people
+# missed when it sat in the middle of the summary.
+next_terminal_hint() {
+    if [ -n "${ROE_PATH_ADDED:-}" ]; then
+        log_next "Open a new terminal window and type ${ROE_ORANGE}roe status${NC} or ${ROE_ORANGE}roe${NC} to see a full list of commands."
+    else
+        log_next "Type ${ROE_ORANGE}roe status${NC} or ${ROE_ORANGE}roe${NC} to see a full list of commands."
+    fi
 }
 
 # ── setup-rbenv command ───────────────────────────────────────────────────────
@@ -2324,7 +2339,7 @@ cmd_start() {
         echo "  [q] Quit without starting"
         echo ""
         breathing_room
-        read -rp "  Choice [y/s/q]: " REPLY
+        read -rp "  Choice [Y/s/q]: " REPLY
         echo ""
 
         # Default (empty input) = launch browser. Anything starting with

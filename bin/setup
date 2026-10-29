@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 require "fileutils"
+require "io/console"
 require "open3"
 require "tmpdir"
 
@@ -8,6 +9,36 @@ ROE_ROOT = File.basename(APP_ROOT) == "current" ? File.expand_path("..", APP_ROO
 
 def system!(*args)
   system(*args, exception: true)
+end
+
+# ── Progress line width ─────────────────────────────────────────────────
+# A progress line is redrawn in place: \r back to the start of the row,
+# clear it, print the new one. That only works while the line fits on ONE
+# row. Wider than the window, it wraps, \r only reaches the start of the
+# last row, and every update leaves the earlier rows behind — a stack of
+# lines instead of one bar. A new Terminal window is 80 columns, and a
+# Bundler line is long, so the activity text is cut to whatever room the
+# window has, measured on every redraw (the window can be resized).
+def terminal_columns
+  cols = IO.console&.winsize&.last.to_i
+  cols.positive? ? cols : 80
+rescue StandardError
+  80
+end
+
+# The "  ·  activity" tail for a progress line, cut to fit beside `head`
+# (ANSI colour codes take no room on screen). Empty when there's no room
+# worth using.
+def progress_tail(head, activity, dim: "\e[2m", reset: "\e[0m")
+  return "" if activity.nil? || activity.to_s.strip.empty?
+
+  shown = head.gsub(/\e\[[0-9;]*m/, "").length
+  room  = terminal_columns - shown - 5 - 1 # 5 for "  ·  ", 1 so the cursor never wraps
+  return "" if room < 8
+
+  clean = activity.to_s.gsub(/\e\[[0-9;]*m/, "").strip
+  clean = "#{clean[0, room - 1]}…" if clean.length > room
+  "#{dim}  ·  #{clean}#{reset}"
 end
 
 # ── Brand colours ───────────────────────────────────────────────────────
@@ -104,7 +135,7 @@ class SetupTUI
     return unless @tty
     frac = @total.zero? ? 0.0 : @done.to_f / @total
     line = "  [#{bar(frac)}] #{(frac * 100).round.to_s.rjust(3)}%  #{@pastel.bold(@label)}"
-    line += @pastel.dim("  ·  #{truncate(activity)}") if activity && !activity.empty?
+    line += progress_tail(line, activity)
     @out.print("\r\e[K#{line}")
     @out.flush
   end
@@ -129,11 +160,6 @@ class SetupTUI
     @out.puts(File.read(@log_path)) rescue nil
     @out.puts
     @out.puts @pastel.dim("Full log saved to: #{@log_path}")
-  end
-
-  def truncate(str, max = 48)
-    clean = str.to_s.gsub(/\e\[[0-9;]*m/, "").strip
-    clean.length > max ? "#{clean[0, max - 1]}…" : clean
   end
 end
 
@@ -233,7 +259,7 @@ class BootstrapProgress
     return unless @tty
     f = fraction
     line = "  [#{bar(f)}] #{(f * 100).round.to_s.rjust(3)}%  #{B}#{@label}#{X}"
-    line += "  #{D}·  #{truncate(activity)}#{X}" if activity && !activity.empty?
+    line += progress_tail(line, activity, dim: D, reset: X)
     @out.print("\r\e[K#{line}")
     @out.flush
   end
@@ -260,11 +286,6 @@ class BootstrapProgress
     @out.puts(File.read(@log_path)) rescue nil
     @out.puts
     @out.puts "#{D}Full log saved to: #{@log_path}#{X}"
-  end
-
-  def truncate(str, max = 48)
-    clean = str.to_s.gsub(/\e\[[0-9;]*m/, "").strip
-    clean.length > max ? "#{clean[0, max - 1]}…" : clean
   end
 end
 
