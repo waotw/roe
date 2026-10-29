@@ -1,0 +1,18 @@
+<%# The image registry refused the username or token. %>
+<p>
+  Kamal sends the built image to a registry, and your server downloads it from
+  there. The registry refused the username or access token Roe used — tokens
+  expire, and they're usually limited to certain permissions.
+</p>
+
+<ol>
+  <li>Check the registry username and token in Settings → Deploy.</li>
+  <li>The token needs permission to write (push) images, not only read them.</li>
+  <li>If it's expired, make a new one at your registry and paste it into Settings → Deploy.</li>
+  <li>Then deploy again.</li>
+</ol>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

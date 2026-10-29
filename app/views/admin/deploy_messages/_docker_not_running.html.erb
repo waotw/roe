@@ -1,0 +1,15 @@
+<%# Before a deploy (Docker isn't answering) or read off its log. %>
+<p>
+  Roe builds your site's image with Docker before sending it to your server.
+  Docker has to be running on this computer for a deploy to work.
+</p>
+
+<ol>
+  <li>Open Docker Desktop and wait for it to finish starting.</li>
+  <li><%= context == :settings ? "Then reload this page." : "Then deploy again." %></li>
+</ol>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

@@ -40,7 +40,9 @@ class DeployWatchdogTest < ActiveSupport::TestCase
 
     assert_equal :failed, status[:state]
     assert status[:abandoned]
-    assert_match "quit or restarted", status[:error]
+    assert_equal "Roe stopped before this deploy finished.", status[:error]
+    assert_equal [ "deploy_interrupted" ], DeployDiagnostics.messages_for(status).map { |m| m[:key] },
+                 "the page explains it and says what to do next"
     assert_equal :failed, Rails.cache.read(KEY)[:state], "the correction is persisted, not just returned"
   end
 

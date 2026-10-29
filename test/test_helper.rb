@@ -5,6 +5,7 @@ require "mocha/minitest"
 require_relative "test_helpers/session_test_helper"
 require_relative "test_helpers/markdown_fixture"
 require_relative "test_helpers/block_warning_helper"
+require_relative "test_helpers/deploy_message_helper"
 require "factory_bot"
 
 FactoryBot.find_definitions

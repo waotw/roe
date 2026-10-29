@@ -1,0 +1,19 @@
+<%# The address was found, but nothing accepted the connection. %>
+<p>
+  Roe found the server's address, but nothing there accepted the connection.
+  The server may be off, still starting up, or blocking SSH at its firewall.
+</p>
+
+<ol>
+  <li>Check the server is running in your host's dashboard.</li>
+  <li>Check that port 22 (SSH) is open to your address.</li>
+  <li>Try connecting by hand. The same error means it isn't Roe:</li>
+</ol>
+<pre>ssh <%= user %>@<%= host %></pre>
+
+<p>Then deploy again.</p>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

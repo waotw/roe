@@ -18,17 +18,17 @@
 # plain failure: `fly deploy` produces no output and never returns, so the
 # deploy page sits there with an empty log and no way back.
 class DeployPreflight
+  # `key` names the message to show — its wording is in
+  # app/views/admin/deploy_messages/_<key>.html.erb and its title in
+  # DeployMessages. The title is kept here too because the deploy log and the
+  # short error line are written before any page is.
+  #
   # `blocking` distinguishes what stops a deploy from what's merely worth
   # saying. Nothing advisory exists yet; the field is here so that adding one
   # later doesn't mean adding a new way to refuse deploys by accident.
-  #
-  # `key` names an issue whose message is written as a view instead of here:
-  # the page renders admin/shared/_<key>.html.erb in place of explanation and
-  # steps, so it can be edited and styled like any other page. Such an issue
-  # still carries its title, which the deploy log and error line use.
-  Issue = Struct.new(:key, :title, :explanation, :steps, :blocking, keyword_init: true)
-
-  FLY_SIGNED_OUT_TITLE = "You're not signed in to Fly"
+  Issue = Struct.new(:key, :blocking, keyword_init: true) do
+    def title = DeployMessages.title(key)
+  end
 
   # Docker Desktop takes a while to come up, so a short timeout would report a
   # starting daemon as a stopped one.
@@ -36,15 +36,6 @@ class DeployPreflight
 
   # `fly auth whoami` is a network round trip to Fly's API.
   FLY_TIMEOUT = 20
-
-  # Relative, not go-roe.com. The documentation ships with every install, so
-  # this works offline and always matches the version running — and when the
-  # diagnosis is "we can't reach the network", an external link is the one most
-  # likely to fail too. Anchors are set explicitly in the doc so rewording a
-  # heading can't break them.
-  DOCS_UNREACHABLE =
-    'More steps: <a href="/documentation/roe/troubleshoot-deployment#fly-unreachable" ' \
-    'target="_blank" rel="noopener">Troubleshooting → Deployment</a>'
 
   # flyctl couldn't reach Fly at all, rather than reaching it and being told no.
   # `EOF` is the one a user actually hit: the connection closed before Fly
@@ -81,17 +72,7 @@ class DeployPreflight
   def docker_issue
     return nil if docker_running?
 
-    # Same wording whether we catch this beforehand or read it off a failed
-    # log, so it's written once, in DeployDiagnostics with every other deploy
-    # message. Two copies would drift, and the two paths are the same problem.
-    message = DeployDiagnostics::DOCKER_DOWN
-
-    Issue.new(
-      title:       message[:title],
-      explanation: message[:explanation],
-      steps:       message[:steps],
-      blocking:    true
-    )
+    Issue.new(key: "docker_not_running", blocking: true)
   end
 
   # No CLI, nothing to deploy with. Separate from the auth check because the
@@ -101,17 +82,7 @@ class DeployPreflight
   def fly_cli_issue
     return nil if fly_cli?
 
-    Issue.new(
-      title: "The Fly command-line tool isn't installed",
-      explanation:
-        "Roe deploys to Fly by running <code>fly</code> on this computer, so it has to be " \
-        "installed here.",
-      steps: [
-        "Install it: <code>brew install flyctl</code> (macOS), or see fly.io/docs/flyctl/install",
-        "Then reload this page."
-      ],
-      blocking: true
-    )
+    Issue.new(key: "fly_cli_missing", blocking: true)
   end
 
   # An expired Fly session is the reason this check exists.
@@ -120,40 +91,16 @@ class DeployPreflight
   # the deploy page sits with an empty log, no progress and no failure, and
   # there's nothing to read that would tell you why. Catching it here turns a
   # hang into a sentence.
+  #
+  # Reaching Fly failed outright is told apart from being signed out: telling
+  # someone to sign in would send them to a command that fails the same way —
+  # the login and the check use the same connection.
   def fly_auth_issue
     case fly_auth_state
     when :ok          then nil
-    when :unreachable then fly_unreachable_issue
-    else                   fly_signed_out_issue
+    when :unreachable then Issue.new(key: "fly_unreachable", blocking: true)
+    else                   Issue.new(key: "fly_signed_out", blocking: true)
     end
-  end
-
-  # Reaching Fly failed outright. Telling someone to sign in here would send
-  # them to a command that fails the same way — the login and the check use the
-  # same API. So the advice is about the connection, not the account.
-  def fly_unreachable_issue
-    Issue.new(
-      title: "Roe couldn't reach Fly",
-      explanation:
-        "The <code>fly</code> command couldn't get an answer from Fly's API, so there's no " \
-        "way to tell whether you're signed in. Signing in again would fail the same way — " \
-        "it's the same connection.",
-      steps: [
-        "Try again in a minute — this is often momentary.",
-        "Check <a href=\"https://status.fly.io\" target=\"_blank\" rel=\"noopener\">status.fly.io</a> for an outage.",
-        "If you're on a VPN or a work network, try without it — both commonly block this.",
-        "Confirm it directly: <code>fly auth whoami</code>. The same error means it isn't Roe.",
-        DOCS_UNREACHABLE
-      ],
-      blocking: true
-    )
-  end
-
-  # The message — explanation, steps, the command to copy — is written in
-  # app/views/admin/shared/_fly_signed_out.html.erb, shared with the warning
-  # on Settings → Deploy, so it's edited in one place.
-  def fly_signed_out_issue
-    Issue.new(key: "fly_signed_out", title: FLY_SIGNED_OUT_TITLE, steps: [], blocking: true)
   end
 
   def fly_cli? = run("which", "fly", timeout: 5)

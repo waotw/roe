@@ -12,6 +12,8 @@ require "tmpdir"
 # DeployWatchdog can't reach this one — it asks Solid Queue whether the job is
 # alive, and a hung job is very much alive. The timeout has to be here.
 class DeployStallTimeoutTest < ActiveJob::TestCase
+  include DeployMessageHelper
+
   setup do
     @job = PerformDeployJob.new
     Rails.cache.delete(PerformDeployJob::STATUS_CACHE_KEY)
@@ -95,21 +97,26 @@ class DeployStallTimeoutTest < ActiveJob::TestCase
     @job.stubs(:term_grace).returns(0.2)
     @job.send(:run_with_streaming, "sh -c 'echo go; sleep 30'", target: "kamal", version_tag: "v0")
 
-    assert_match "kamal lock release", Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)[:error]
+    status = Rails.cache.read(PerformDeployJob::STATUS_CACHE_KEY)
+    shown  = DeployDiagnostics.messages_for(status).sole
+
+    assert_equal "deploy_stalled", shown[:key]
+    assert_includes deploy_message_text(shown[:key], **shown[:locals]), "kamal lock release"
   end
 
   test "the leftover warning matches the target" do
-    assert_match "fly machine leases clear", DeployWatchdog.cleanup_hint("fly")
-    assert_match "kamal lock release", DeployWatchdog.cleanup_hint("kamal")
-    assert_nil DeployWatchdog.cleanup_hint("something-else")
+    assert_includes deploy_message_text("deploy_stalled", target: "fly"), "fly machine leases clear"
+    assert_includes deploy_message_text("deploy_stalled", target: "kamal"), "kamal lock release"
+    assert_includes deploy_message_text("deploy_interrupted", target: "fly"), "fly machine leases clear"
+    assert_includes deploy_message_text("deploy_interrupted", target: "kamal"), "kamal lock release"
   end
 
   # Kamal's own wording, from Kamal::Cli::Base#raise_if_locked.
   test "a stale deploy lock is explained rather than shown raw" do
     diagnosis = DeployDiagnostics.for("Deploy lock already in place!\nDeploy lock found. Run 'kamal lock help' for more information")
 
-    assert_equal "A previous deploy is still holding the lock", diagnosis[:title]
-    assert_match "kamal lock release", diagnosis[:steps].join(" ")
+    assert_equal "A previous deploy is still holding the lock", diagnosis.title
+    assert_includes deploy_message_text(diagnosis.key), "kamal lock release"
   end
 
   # Every other signature matches what the failing command printed. A stall
@@ -117,7 +124,7 @@ class DeployStallTimeoutTest < ActiveJob::TestCase
   test "the panel explains a stall rather than showing an empty log" do
     diagnosis = DeployDiagnostics.for("some output\n[#{PerformDeployJob::STALL_MARKER}] no output for 10 minutes")
 
-    assert_equal "The deploy stopped responding", diagnosis[:title]
-    assert_match "safe to deploy again", diagnosis[:steps].join(" ")
+    assert_equal "The deploy stopped responding", diagnosis.title
+    assert_includes deploy_message_text(diagnosis.key), "safe to deploy again"
   end
 end

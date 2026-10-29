@@ -6,15 +6,12 @@ require "test_helper"
 # output and never returns, so the deploy page sits with an empty log, no
 # progress and no way back. There's nothing to read that would say why.
 class FlyPreflightTest < ActiveSupport::TestCase
+  include DeployMessageHelper
+
   def preflight = @preflight ||= DeployPreflight.new
 
-  # What the page shows for an issue: its partial when it has one (the
-  # signed-out message is written as a view), otherwise its steps.
-  def shown(issue)
-    return issue.steps.join(" ") unless issue.key
-
-    ApplicationController.render(partial: "admin/shared/#{issue.key}", locals: { context: :deploy })
-  end
+  # What the page shows for an issue that stopped a deploy.
+  def shown(issue) = deploy_message_html(issue.key, context: :before)
 
   test "a signed-in Fly install has nothing to report" do
     preflight.stubs(:fly_cli?).returns(true)
@@ -43,7 +40,7 @@ class FlyPreflightTest < ActiveSupport::TestCase
     issue = preflight.issues("fly").sole
 
     assert_match(/isn't installed/i, issue.title)
-    assert_match(/brew install flyctl/, issue.steps.join(" "))
+    assert_match(/brew install flyctl/, shown(issue))
   end
 
   test "the Fly checks don't run for a Kamal deploy" do
@@ -85,9 +82,9 @@ class FlyPreflightTest < ActiveSupport::TestCase
     issue = with_whoami('Error: Post "https://api.fly.io/api/v1/cli_sessions": EOF').issues("fly").sole
 
     assert_match(/couldn't reach Fly/i, issue.title)
-    assert_no_match(/fly auth login/, issue.steps.join(" "),
+    assert_no_match(/fly auth login/, shown(issue),
       "that's the command that just failed — it would loop them")
-    assert_match(/status\.fly\.io/, issue.steps.join(" "))
+    assert_match(/status\.fly\.io/, shown(issue))
   end
 
   test "a timeout counts as unreachable" do
@@ -118,8 +115,10 @@ class FlyPreflightTest < ActiveSupport::TestCase
   test "Fly's own wording is recognised in a log" do
     d = DeployDiagnostics.for("Error: failed retrieving current user: ... You must be authenticated to view this.")
 
-    assert_equal "Your Fly session has expired", d.title
-    assert_match(/fly auth login/, d.steps.join(" "))
+    assert_equal "fly_signed_out", d.key
+    text = deploy_message_text(d.key, context: :during)
+    assert_match(/fly auth login/, text)
+    assert_match(/partway through/, text, "mid-deploy, not \"you never signed in\"")
   end
 
   # A generic /authenticat/ match would also catch this and, sitting above it,
@@ -144,8 +143,7 @@ class FlyPreflightTest < ActiveSupport::TestCase
   # fail too.
 
   test "the unreachable message links into the troubleshooting docs" do
-    steps = with_whoami('Error: Post "https://api.fly.io/api/v1/cli_sessions": EOF')
-              .issues("fly").sole.steps.join(" ")
+    steps = shown(with_whoami('Error: Post "https://api.fly.io/api/v1/cli_sessions": EOF').issues("fly").sole)
 
     assert_match %r{/documentation/roe/troubleshoot-deployment\#fly-unreachable}, steps
     assert_no_match(/go-roe\.com/, steps, "an external link is exactly what may not load here")
@@ -168,16 +166,14 @@ class FlyPreflightTest < ActiveSupport::TestCase
     assert_match(/\{:\s*#fly-signed-out\s*\}/, body)
   end
 
-  # Steps are rendered through sanitize; without `a` in the allowed tags the
-  # link is silently stripped and the step reads as bare text.
-  test "the deploy panel lets links through" do
+  # A preflight saved by an older Roe keeps its wording, rendered through
+  # sanitize; without `a` in the allowed tags its link would be stripped.
+  test "the deploy panel lets links through in saved wording" do
     panel = File.read(Rails.root.join("app", "views", "admin", "updates", "_deploy_active.html.erb"))
-    # Whole lines: a character-class scan stops at the `%` in `%w[...]` and
-    # captures nothing useful.
     sanitizers = panel.lines.select { |l| l.include?("sanitize step") }
 
     assert sanitizers.any?, "couldn't find the step sanitizer"
-    sanitizers.each { |s| assert_match(/tags:.*\ba\b/, s, "links would be stripped: #{s}") }
+    sanitizers.each { |line| assert_match(/tags:.*\ba\b/, line, "links would be stripped: #{line}") }
   end
 
   test "the deploy job preflights whichever target is deploying" do

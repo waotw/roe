@@ -77,7 +77,7 @@ class PerformDeployJob < ApplicationJob
         finished_at:  Time.current,
         log:          blockers.map { |b| "[preflight] #{b.title}" }.join("\n"),
         error:        blockers.map(&:title).join(". ") + ".",
-        preflight:    blockers.map { |b| { key: b.key, title: b.title, explanation: b.explanation, steps: b.steps } }
+        preflight:    blockers.map { |b| { key: b.key, title: b.title } }
       )
       return
     end
@@ -561,11 +561,10 @@ class PerformDeployJob < ApplicationJob
         log:          log,
         completed_at: Time.current,
         error:        if stalled
-          [ "The deploy stopped responding — no output for #{minutes} minutes, " \
-            "so Roe stopped it (#{STALL_MARKER}).",
-            # Stopping mid-deploy leaves the same residue as Roe quitting
-            # mid-deploy, so it gets the same warning.
-            DeployWatchdog.cleanup_hint(target) ].compact.join(" ")
+          # What to do next — including clearing a lock or lease the stall
+          # may have left — is in admin/deploy_messages/_deploy_stalled.
+          "The deploy stopped responding — no output for #{minutes} minutes, " \
+          "so Roe stopped it (#{STALL_MARKER})."
                       else
           "Deploy command exited with a non-zero status. See log for details."
                       end

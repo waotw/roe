@@ -1,0 +1,19 @@
+<%# Kamal's deploy lock was still held by an earlier deploy. %>
+<p>
+  Kamal takes a lock on the server while it deploys and releases it when it
+  finishes. A deploy that was interrupted — stopped for going quiet, or ended
+  when Roe quit — never released it, so this deploy can't start. Nothing is
+  wrong with the server or with this deploy; the lock is left over.
+</p>
+
+<ol>
+  <li>Check who holds it: <code>kamal lock status</code></li>
+  <li>If you didn't interrupt anything, make sure a deploy isn't running somewhere else before you release it.</li>
+  <li>Release it: <code>kamal lock release</code></li>
+  <li>Then deploy again. It picks up from wherever the interrupted one got to.</li>
+</ol>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

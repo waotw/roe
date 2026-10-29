@@ -1,0 +1,17 @@
+<%# A failed deploy Roe has no specific message for. %>
+<p>
+  The deploy failed, but not in a way Roe knows how to explain. The log below
+  has everything the deploy printed — the reason is usually in the last few lines.
+</p>
+
+<ol>
+  <li>Read the end of the log below. A line with &ldquo;error&rdquo; or &ldquo;failed&rdquo; in it is usually the one that matters.</li>
+  <li>Deploy again — some failures are momentary, like a slow network or a registry that didn't answer.</li>
+  <li>If it fails the same way twice, Roe offers <strong>Retry without cache</strong>, which builds everything from scratch.</li>
+  <li>Still stuck? Search the troubleshooting page for the error, or copy the last few lines of the log into a search.</li>
+</ol>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

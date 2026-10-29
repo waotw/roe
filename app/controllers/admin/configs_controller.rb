@@ -1544,7 +1544,8 @@ class Admin::ConfigsController < Admin::BaseController
     # Only asked when the CLI exists and Fly is the target: it's a network round
     # trip to Fly's API, and asking without a `fly` binary would report "not
     # signed in", sending someone to log in to a tool they haven't installed.
-    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
+    # The message to show — signed out, or Fly couldn't be reached — or nil.
+    @fly_auth_message    = DeployPreflight.new.fly_auth_issue&.key if @fly_cli_available && fly_target?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     # Local SSH keys for the kamal.ssh picker. Kamal supports an array
@@ -1636,7 +1637,8 @@ class Admin::ConfigsController < Admin::BaseController
     # Only asked when the CLI exists and Fly is the target: it's a network round
     # trip to Fly's API, and asking without a `fly` binary would report "not
     # signed in", sending someone to log in to a tool they haven't installed.
-    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
+    # The message to show — signed out, or Fly couldn't be reached — or nil.
+    @fly_auth_message    = DeployPreflight.new.fly_auth_issue&.key if @fly_cli_available && fly_target?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     render :edit_deploy, status: :unprocessable_entity

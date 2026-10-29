@@ -15,7 +15,7 @@ class DeployPreflightOrderTest < ActiveSupport::TestCase
   teardown { Rails.cache.delete(KEY) }
 
   def signed_out
-    DeployPreflight.new.send(:fly_signed_out_issue)
+    DeployPreflight::Issue.new(key: "fly_signed_out", blocking: true)
   end
 
   test "a signed-out Fly deploy stops at the sign-in check, before touching git or Fly" do
@@ -33,7 +33,7 @@ class DeployPreflightOrderTest < ActiveSupport::TestCase
     assert_equal :failed, status[:state]
     assert_includes status[:error], "You're not signed in to Fly"
     assert_equal [ "fly_signed_out" ], status[:preflight].map { |b| b[:key] },
-                 "the page renders the sign-in steps from admin/shared/_fly_signed_out"
+                 "the page renders the sign-in steps from admin/deploy_messages/_fly_signed_out"
   end
 
   test "a failure while preparing the deploy is shown on the page, not left for the watchdog" do

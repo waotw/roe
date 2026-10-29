@@ -1,0 +1,45 @@
+<%#
+  The box every deploy message is drawn in. The wording is in the file named
+  after the message, next to this one — edit that, not this.
+
+  A message file is plain HTML: <p> for explanation, <ol> for steps, <pre> for
+  a command to copy, <code> inside a sentence, <a> for a link. This box styles
+  all of them, so a message file needs no classes. Restyle every message here.
+
+  Render it with the message's name:
+    render "admin/deploy_messages/message", key: "fly_signed_out", context: :before
+
+  Locals:
+    key      — the message, e.g. "docker_not_running" (titles: DeployMessages)
+    context  — where it's shown, which a message can use to change a line:
+                 :settings  Settings → Deploy, as a warning before deploying
+                 :before    a deploy Roe stopped before it started
+                 :during    a deploy that failed partway through
+    hidden   — start hidden (Settings hides Fly messages while Kamal is chosen)
+    id       — an id for the box (Settings toggles its warnings by id)
+    host, user, ssh_key, target — this site's deploy details, for commands
+               you can copy as they are; placeholders when they're unknown
+%>
+<% context  = local_assigns.fetch(:context, :during).to_sym %>
+<% settings = context == :settings %>
+<% details  = {
+     context: context,
+     host:    local_assigns[:host].presence    || "your-server.com",
+     user:    local_assigns[:user].presence    || "root",
+     ssh_key: local_assigns[:ssh_key].presence || "~/.ssh/your_deploy_key",
+     target:  local_assigns[:target].to_s.presence || "kamal"
+   } %>
+
+<div <%= tag.attributes(id: local_assigns[:id]) %>
+     data-deploy-message="<%= key %>"
+     class="<%= settings ? 'mb-4 border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 [&_h3]:text-sm [&_h3]:text-amber-900 [&_code]:bg-amber-100 [&_pre]:border-amber-200'
+                         : 'mb-3 bg-white border border-red-300 rounded-xs p-3 text-xs text-gray-700 font-sans [&_h3]:text-xs [&_h3]:uppercase [&_h3]:font-mono [&_h3]:text-red-900 [&_code]:bg-gray-100 [&_pre]:border-gray-200' %>
+            [&_p]:mb-3 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:space-y-1
+            [&_code]:font-mono [&_code]:text-xs [&_code]:px-0.5
+            [&_pre]:font-mono [&_pre]:text-xs [&_pre]:bg-white [&_pre]:border [&_pre]:p-3 [&_pre]:mb-3 [&_pre]:whitespace-pre-wrap [&_pre]:select-all
+            [&_pre_code]:bg-transparent [&_pre_code]:p-0
+            [&_a]:underline [&>:last-child]:mb-0
+            <%= 'hidden' if local_assigns[:hidden] %>">
+  <h3 class="font-semibold mb-1"><%= DeployMessages.title(key) %></h3>
+  <%= render "admin/deploy_messages/#{key}", **details %>
+</div>
