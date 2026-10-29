@@ -56,6 +56,62 @@ class PerformDeployJob < ApplicationJob
     # still there.
     return unless claim_deploy!(version_tag)
 
+    # Fail before anything else, not four minutes into a build.
+    #
+    # Kamal reports a missing local Docker as whatever it failed to reach next,
+    # which reads as a problem with the server rather than this computer. Fly
+    # is worse: with an expired session `fly deploy` produces no output and
+    # never returns, so the page sits with an empty log and no way back.
+    #
+    # This has to come FIRST. The steps below already talk to Fly (the secrets
+    # sync runs `fly secrets list`), so with a signed-out session they failed
+    # before this check was reached, and the page never got the "sign in to
+    # Fly" message. Running first also means a deploy that can't start doesn't
+    # auto-commit the working tree.
+    if (blockers = DeployPreflight.new.blockers(target)).any?
+      Rails.logger.warn "[PerformDeployJob] Preflight failed: #{blockers.map(&:title).join('; ')}"
+      write_status(
+        state:        :failed,
+        target:       target,
+        version_tag:  version_tag,
+        finished_at:  Time.current,
+        log:          blockers.map { |b| "[preflight] #{b.title}" }.join("\n"),
+        error:        blockers.map(&:title).join(". ") + ".",
+        preflight:    blockers.map { |b| { title: b.title, explanation: b.explanation, steps: b.steps } }
+      )
+      return
+    end
+
+    prepare_deploy(target, version_tag, admin_user_id: admin_user_id, reset_cache: reset_cache)
+
+    cmd = build_command(target, version_tag, reset_cache: reset_cache)
+    Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag}#{reset_cache ? ', cache reset requested' : ''})"
+
+    # When a cache reset was requested for Kamal, pass a fresh timestamp
+    # via KAMAL_CACHE_BUST so the generated deploy.yml's
+    # `args: CACHE_BUST: <%= ENV["KAMAL_CACHE_BUST"] || "stable" %>`
+    # resolves to a never-seen value. That value flows into the Docker
+    # build as a build-arg, which invalidates the cache point we put
+    # just before `COPY . .` in the Dockerfile — forcing the build
+    # context layer to be re-read from scratch instead of being pulled
+    # back stale from --cache-from registry.
+    extra_env = (reset_cache && target == "kamal") ? { "KAMAL_CACHE_BUST" => Time.current.to_i.to_s } : {}
+
+    run_with_streaming(cmd, target: target, version_tag: version_tag, env: extra_env)
+  end
+
+  private
+
+  # Everything between the preflight and the deploy command: stage VERSION,
+  # auto-commit, and push secrets and bootstrap data to the target.
+  #
+  # Any of these can fail — the Fly secrets sync, for one, asks Fly for its
+  # secret list and stops when the session has expired. Such a failure used
+  # to escape the job without touching the deploy status, so the page went on
+  # showing "running" until the watchdog found no job behind it and reported
+  # a generic "Roe stopped before this deploy finished". The real message was
+  # only in the job queue. Record it on the deploy, where the page shows it.
+  def prepare_deploy(target, version_tag, admin_user_id:, reset_cache:)
     # Stage VERSION FIRST. Kamal builds from the git tree, not the raw
     # working directory — anything not committed is silently absent
     # from the build context. If we auto-commit BEFORE staging VERSION
@@ -116,45 +172,18 @@ class PerformDeployJob < ApplicationJob
       # an empty payload).
       sync_kamal_bootstrap_data(admin_user_id: admin_user_id) if admin_user_id.present?
     end
-
-    # Fail before the build, not four minutes into it.
-    #
-    # Kamal reports a missing local Docker as whatever it failed to reach next,
-    # which reads as a problem with the server rather than this computer. Fly
-    # is worse: with an expired session `fly deploy` produces no output and
-    # never returns, so the page sits with an empty log and no way back. Both
-    # are cheaper to catch here than to diagnose from a stuck screen.
-    if (blockers = DeployPreflight.new.blockers(target)).any?
-      Rails.logger.warn "[PerformDeployJob] Preflight failed: #{blockers.map(&:title).join('; ')}"
-      write_status(
-        state:        :failed,
-        target:       target,
-        version_tag:  version_tag,
-        finished_at:  Time.current,
-        log:          blockers.map { |b| "[preflight] #{b.title}" }.join("\n"),
-        error:        blockers.map(&:title).join(". ") + ".",
-        preflight:    blockers.map { |b| { title: b.title, explanation: b.explanation, steps: b.steps } }
-      )
-      return
-    end
-
-    cmd = build_command(target, version_tag, reset_cache: reset_cache)
-    Rails.logger.info "[PerformDeployJob] Starting #{target} deploy (version: #{version_tag}#{reset_cache ? ', cache reset requested' : ''})"
-
-    # When a cache reset was requested for Kamal, pass a fresh timestamp
-    # via KAMAL_CACHE_BUST so the generated deploy.yml's
-    # `args: CACHE_BUST: <%= ENV["KAMAL_CACHE_BUST"] || "stable" %>`
-    # resolves to a never-seen value. That value flows into the Docker
-    # build as a build-arg, which invalidates the cache point we put
-    # just before `COPY . .` in the Dockerfile — forcing the build
-    # context layer to be re-read from scratch instead of being pulled
-    # back stale from --cache-from registry.
-    extra_env = (reset_cache && target == "kamal") ? { "KAMAL_CACHE_BUST" => Time.current.to_i.to_s } : {}
-
-    run_with_streaming(cmd, target: target, version_tag: version_tag, env: extra_env)
+  rescue => e
+    Rails.logger.error "[PerformDeployJob] Preparing the deploy failed: #{e.class}: #{e.message}"
+    write_status(
+      state:        :failed,
+      target:       target,
+      version_tag:  version_tag,
+      log:          "[error] #{e.message}",
+      completed_at: Time.current,
+      error:        e.message
+    )
+    raise
   end
-
-  private
 
   # True when this job is the deploy the page is currently showing, and hasn't
   # already had a go.
