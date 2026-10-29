@@ -1026,6 +1026,28 @@ check_ruby() {
 check_git()     { command_exists git; }
 check_sqlite()  { command_exists sqlite3; }
 check_libvips() { command_exists vips; }
+
+# Finds a program the way Roe's Images & Video page does
+# (ManagedTools::Platform.search_dirs): Roe's own download folder first,
+# then PATH, the usual bin folders, then mise's shims. A plain
+# `command -v` would miss the download in ~/.roe/tools, which isn't on PATH.
+_find_tool_program() {
+    local tool="$1" name="$2" dir
+    local tools_dir="${ROE_TOOLS_DIR:-${ROE_HOME:-$HOME/.roe}/tools}"
+    local mise_shims="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
+    for dir in "$tools_dir/$tool"/*/; do
+        [ -x "${dir}${name}" ] && [ -f "${dir}${name}" ] && return 0
+    done
+    command_exists "$name" && return 0
+    for dir in /opt/homebrew/bin /usr/local/bin /usr/bin "$mise_shims"; do
+        [ -x "$dir/$name" ] && [ -f "$dir/$name" ] && return 0
+    done
+    return 1
+}
+
+# Video needs both: ffmpeg to encode, ffprobe to read a video's size and
+# length. A standalone ffmpeg download sometimes comes without ffprobe.
+check_ffmpeg()  { _find_tool_program ffmpeg ffmpeg && _find_tool_program ffmpeg ffprobe; }
 check_bundler() { cd "$APP_DIR" && command_exists bundle; }
 
 # ── Usage ─────────────────────────────────────────────────────────────────────
@@ -1098,9 +1120,16 @@ print_requirements_summary() {
 cmd_check() {
     start_install_log check
     use_brand_colors
+    # Start on a clean screen so the logo and the intro below it are all in
+    # view, not scrolled off the top of a small window. Then a short pause
+    # after the logo, so it lands before the checks start printing.
+    if [ -t 1 ]; then
+        printf '\033[H\033[2J'
+    fi
     echo ""
     banner
     echo ""
+    [ -t 1 ] && sleep 0.5
     brand_box "Requirements Check"
     log_step "Checking your system for required dependencies."
     echo ""
@@ -1248,13 +1277,19 @@ cmd_check() {
         brand_box "Roe Setup"
         log_step "Run the Roe setup"
         echo -e ""
-        echo -e "This will create a site, database, everything you need for a Roe site."
+        echo -e "This will:"
+        echo -e "• create your site/ folder"
+        echo -e "• create all the necessary files and folders"
+        echo -e "• forge your encryption keys"
+        echo -e "• set up your database"
+        echo -e "• create your admin"
         echo -e ""
-        echo -e "  You can do this at any time with this command: ${CYAN}./roe.sh setup${NC}"
+        echo -e "    You can do this at any time with this command: ${CYAN}./roe.sh setup${NC}"
+        echo -e "    ${DIM}It will not overwrite any existing files or folders you've created${NC}"
         echo ""
         breathing_room
-        read -rp "Run setup now? [y/n]: " REPLY
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        read -rp "Run setup now? [Y/n]: " REPLY
+        if [[ ! $REPLY =~ ^[Nn] ]]; then
             # cmd_setup reuses this log (nesting guard) and marks the
             # whole run OK only once the app boots cleanly.
             cmd_setup
@@ -1389,7 +1424,16 @@ offer_registration_after_setup() {
     # returns once the port answers, so there is no need to wait again
     # before opening the browser.
     ROE_CLI=1 cmd_start --daemon || return 1
-    _open_url "http://${ROE_HOST}:${PORT:-$ROE_PORT}" 2>/dev/null
+    local site_url="http://${ROE_HOST}:${PORT:-$ROE_PORT}"
+    echo ""
+    if _open_url "$site_url" 2>/dev/null; then
+        _open_url "$site_url/admin" 2>/dev/null
+        log_success "Opened your site and its admin in the browser:"
+    else
+        log_info "Roe is running. Open these in your browser:"
+    fi
+    echo -e "    ${CYAN}${site_url}${NC}"
+    echo -e "    ${CYAN}${site_url}/admin${NC}"
 }
 
 # ── setup-rbenv command ───────────────────────────────────────────────────────
@@ -1476,6 +1520,17 @@ _hosts_line() { printf '127.0.0.1\t%s\t# roe:%s' "$1" "$2"; }
 
 hosts_has_entry() { grep -qE "^[^#]*[[:space:]]$1([[:space:]]|\$)" /etc/hosts 2>/dev/null; }
 
+# sudo's own prompt is a bare "Password:", which reads like the Roe admin
+# password the install has just shown. Say whose password it is. (WSL never
+# gets here — it can't write the hosts file the browser reads.)
+sudo_password_prompt() {
+    if is_macos; then
+        printf '🔒 Your Mac login password: '
+    else
+        printf '🔒 Your Linux account password: '
+    fi
+}
+
 # Add "127.0.0.1 <host>" to /etc/hosts. Needs sudo once per install —
 # we say so before asking. On WSL the browser lives on the Windows side
 # and reads Windows' own hosts file, which we can't write from here, so
@@ -1502,7 +1557,7 @@ add_hosts_entry() {
         echo -e "  ${DIM}(macOS/Linux will ask for your password — that's sudo, for this one edit.)${NC}"
         echo ""
     fi
-    if printf '%s\n' "$(_hosts_line "$host" "$name")" | sudo tee -a /etc/hosts >/dev/null; then
+    if printf '%s\n' "$(_hosts_line "$host" "$name")" | sudo -p "$(sudo_password_prompt)" tee -a /etc/hosts >/dev/null; then
         log_success "Added $host to /etc/hosts"
     else
         log_warning "Couldn't write /etc/hosts. Add this line yourself:"
@@ -1514,7 +1569,7 @@ remove_hosts_entry() {
     local name="$1"
     is_wsl && return 0
     grep -q "# roe:${name}\$" /etc/hosts 2>/dev/null || return 0
-    if sudo sed -i.bak "/# roe:${name}\$/d" /etc/hosts 2>/dev/null; then
+    if sudo -p "$(sudo_password_prompt)" sed -i.bak "/# roe:${name}\$/d" /etc/hosts 2>/dev/null; then
         sudo rm -f /etc/hosts.bak 2>/dev/null || true
         log_success "Removed the /etc/hosts line for $name"
     else
@@ -2347,6 +2402,9 @@ _open_url() {
         # Fallback when wslu isn't installed. explorer.exe exits
         # non-zero even when it works, hence the `|| true`.
         explorer.exe "$1" >/dev/null 2>&1 || true
+    else
+        # Nothing to open a browser with (a server, a bare container).
+        return 1
     fi
 }
 
@@ -2576,6 +2634,13 @@ cmd_status() {
     check_bundler && log_success "Bundler"                         || log_error "Bundler not found"
     check_sqlite  && log_success "SQLite3"                         || log_error "SQLite3 not found"
     check_libvips && log_success "libvips (optional)" || log_warning "libvips not installed (optional)"
+    if check_ffmpeg; then
+        log_success "ffmpeg (optional)"
+    elif _find_tool_program ffmpeg ffmpeg; then
+        log_warning "ffmpeg found, but ffprobe is missing (optional — both are needed for video)"
+    else
+        log_warning "ffmpeg not installed (optional)"
+    fi
 
     # Confirm the Windows setup is the supported one, so a user who followed
     # the docs gets told it worked rather than nothing at all.

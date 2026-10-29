@@ -184,7 +184,7 @@ if user.save
     puts
     recovery_codes.each { |code| puts "   #{roe_red}#{code}\e[0m" }
     puts
-    puts pastel.dim("Use one at /recovery/new (the link is on the sign-in page).")
+    puts pastel.dim("Use them at /recovery/new (the link to \"Use a recovery code\" is on the admin sign-in page).")
   elsif existing_user
     remaining = user.recovery_codes.unconsumed.count
     puts pastel.dim("Existing recovery codes left untouched (#{remaining} still usable).")

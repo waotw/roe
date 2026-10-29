@@ -741,7 +741,7 @@ for_target() {
                 "$fn" "$(conf_for "$name")"
                 return $?
             fi
-            log_error "Which site? Give a name, or --all."
+            log_error "To see details add a name, or --all."
             echo "" >&2
             cmd_list >&2
             return 1
@@ -858,7 +858,7 @@ cmd_install() {
 $table
 EOF
         echo ""
-        echo -e "  Install one with: ${CYAN}roe install <tool>${NC}"
+        echo -e "  Install tool with: ${CYAN}roe install <tool>${NC}"
         return 0
     fi
 
