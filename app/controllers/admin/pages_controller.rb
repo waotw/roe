@@ -180,7 +180,8 @@ class Admin::PagesController < Admin::BaseController
     ContentSync.sync_file(@page.file_path)
     @page.reload
 
-    flash[:notice] = (!was_published && @page.published?) ? "Page published" : "Page saved"
+    # A plain save says nothing — the editor's dot shows "changes saved".
+    flash[:notice] = "Page published" if !was_published && @page.published?
     add_rename_redirect(Page, old_address, metadata, @page.file_path)
 
     redirect_to edit_admin_page_path(@page)

@@ -44,6 +44,11 @@ module RenameRedirect
     return if new_address == old_address
 
     result = RedirectManager.add_301(from: old_address, to: new_address)
-    flash[:notice] = "#{flash[:notice]}. Redirect added: #{result.from} → #{result.to}." if result.written
+    return unless result.written
+
+    # A plain save sets no notice of its own, so this can be the whole message
+    # — or follow one, like "Page published".
+    added = "Redirect added: #{result.from} → #{result.to}."
+    flash[:notice] = flash[:notice].present? ? "#{flash[:notice]}. #{added}" : added
   end
 end

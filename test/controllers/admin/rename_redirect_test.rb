@@ -54,7 +54,26 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to edit_admin_page_path(page)
     assert_equal "/about-us", RedirectManager.rules["/about"]["to"]
-    assert_match "Redirect added: /about → /about-us", flash[:notice]
+    assert_equal "Redirect added: /about → /about-us.", flash[:notice],
+                 "a plain save has no notice of its own, so this is the whole message"
+  end
+
+  # The editor's green dot already says "changes saved"; a notice repeating it
+  # was noise. Publishing is still announced — the dot doesn't know about it.
+  test "a plain save leaves no notice, publishing still announces itself" do
+    sign_in_as(@admin)
+    page = page_with("plain", status: "draft")
+
+    patch admin_page_path(page), params: { metadata: "title: About Us\nstatus: draft\nurl_name: plain\n", content: "Edited." }
+    assert_nil flash[:notice]
+
+    patch admin_page_path(page), params: { metadata: "title: About Us\nstatus: published\nurl_name: plain\n", content: "Edited." }
+    assert_equal "Page published", flash[:notice]
+    follow_redirect! # shows it, so it doesn't carry into the next request
+
+    product = product_with("plain-poster")
+    patch admin_product_path(product), params: { metadata: "title: Poster\nstatus: published\nprice: 10\nurl_name: plain-poster\n", content: "Edited." }
+    assert_nil flash[:notice]
   end
 
   test "renaming a published product writes a 301 under /store" do

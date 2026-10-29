@@ -74,7 +74,8 @@ class Admin::ProductsController < Admin::BaseController
     product = Product.find_by(file_path: relative_path)
 
     if product
-      redirect_to edit_admin_product_path(product), notice: "Product created"
+      # No "created" notice: you land in the new product's editor, which says so.
+      redirect_to edit_admin_product_path(product)
     else
       flash[:error] = "Product file created but failed to sync to database"
       redirect_to admin_products_path
@@ -141,7 +142,8 @@ class Admin::ProductsController < Admin::BaseController
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     @product.reload
 
-    flash[:notice] = (!was_published && @product.status == "published") ? "Product published" : "Product saved"
+    # A plain save says nothing — the editor's dot shows "changes saved".
+    flash[:notice] = "Product published" if !was_published && @product.status == "published"
     add_rename_redirect(Product, old_address, metadata, @product.file_path)
     redirect_to edit_admin_product_path(@product)
   end

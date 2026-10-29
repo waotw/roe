@@ -248,7 +248,8 @@ class Admin::PostsController < Admin::BaseController
     post = Post.find_by(file_path: RoeSitePaths.normalize(file_path))
 
     if post
-      redirect_to edit_admin_post_path(post), notice: "Post created", flash: { new_post: true }
+      # No "created" notice: you land in the new post's editor, which says so.
+      redirect_to edit_admin_post_path(post), flash: { new_post: true }
     else
       flash[:error] = "Post file created but failed to sync to database"
       redirect_to admin_posts_path
@@ -349,14 +350,15 @@ class Admin::PostsController < Admin::BaseController
 
     # If this save published the post (transitioned from non-published)
     # and it's marked for newsletter delivery, queue the broadcast.
+    # A plain save says nothing: the editor's dot already shows "changes
+    # saved". Publishing (and sending a newsletter) is worth a word — the dot
+    # doesn't know a save made the post live.
     just_published = !was_published && @post.published?
     if just_published && should_send_newsletter?(@post)
       QueueNewsletterBatchesJob.perform_later(@post.id)
       flash[:notice] = "Post published. Newsletter is being sent in the background."
     elsif just_published
       flash[:notice] = "Post published"
-    else
-      flash[:notice] = "Post saved"
     end
 
     # "Save new URL & redirect" in the editor's slug-change modal: write the
