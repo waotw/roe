@@ -1401,7 +1401,7 @@ offer_registration_after_setup() {
     echo -e "    Name:     ${CYAN}${ROE_NAME}${NC}"
     echo -e "    Address:  ${CYAN}http://${ROE_HOST}:${ROE_PORT}${NC}"
     echo ""
-    echo -e "  You can now use the roe commands in your terminal:"
+    echo -e "  You can now use the ${ROE_ORANGE}roe${NC} command(s) anywhere in your terminal:"
     echo -e "    ${ROE_ORANGE}roe start${NC}"
     echo -e "    ${ROE_ORANGE}roe stop${NC}"
     echo -e "    ${ROE_ORANGE}roe open${NC}"
@@ -1439,16 +1439,12 @@ offer_registration_after_setup() {
     next_terminal_hint
 }
 
-# The last line of the install: what to do now. This window's shell
-# started before the roe command was added to the startup file, so when
-# that just happened, roe only works in a NEW window — the step people
-# missed when it sat in the middle of the summary.
+# The last line of the install: what to do now. This window's shell may
+# have started before the roe command was added to the startup file, so a
+# new window is the one place roe is sure to work — the step people missed
+# when it sat in the middle of the summary.
 next_terminal_hint() {
-    if [ -n "${ROE_PATH_ADDED:-}" ]; then
-        log_next "Open a new terminal window and type ${ROE_ORANGE}roe status${NC} or ${ROE_ORANGE}roe${NC} to see a full list of commands."
-    else
-        log_next "Type ${ROE_ORANGE}roe status${NC} or ${ROE_ORANGE}roe${NC} to see a full list of commands."
-    fi
+    log_next "Open a new terminal window, type ${ROE_ORANGE}roe status${NC} to see the status of your site or ${ROE_ORANGE}roe${NC} to see a full list of commands."
 }
 
 # ── setup-rbenv command ───────────────────────────────────────────────────────
