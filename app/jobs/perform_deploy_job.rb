@@ -77,7 +77,7 @@ class PerformDeployJob < ApplicationJob
         finished_at:  Time.current,
         log:          blockers.map { |b| "[preflight] #{b.title}" }.join("\n"),
         error:        blockers.map(&:title).join(". ") + ".",
-        preflight:    blockers.map { |b| { title: b.title, explanation: b.explanation, steps: b.steps } }
+        preflight:    blockers.map { |b| { key: b.key, title: b.title, explanation: b.explanation, steps: b.steps } }
       )
       return
     end

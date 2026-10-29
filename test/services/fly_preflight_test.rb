@@ -8,6 +8,14 @@ require "test_helper"
 class FlyPreflightTest < ActiveSupport::TestCase
   def preflight = @preflight ||= DeployPreflight.new
 
+  # What the page shows for an issue: its partial when it has one (the
+  # signed-out message is written as a view), otherwise its steps.
+  def shown(issue)
+    return issue.steps.join(" ") unless issue.key
+
+    ApplicationController.render(partial: "admin/shared/#{issue.key}", locals: { context: :deploy })
+  end
+
   test "a signed-in Fly install has nothing to report" do
     preflight.stubs(:fly_cli?).returns(true)
     preflight.stubs(:fly_auth_state).returns(:ok)
@@ -23,7 +31,7 @@ class FlyPreflightTest < ActiveSupport::TestCase
 
     assert_match(/not signed in to Fly/i, issue.title)
     assert issue.blocking, "a hang is not something to warn about and continue past"
-    assert_match(/fly auth login/, issue.steps.join(" "))
+    assert_match(/fly auth login/, shown(issue))
   end
 
   # Asking `fly auth whoami` without a `fly` binary reports "not signed in",
@@ -98,7 +106,7 @@ class FlyPreflightTest < ActiveSupport::TestCase
               .issues("fly").sole
 
     assert_match(/not signed in/i, issue.title)
-    assert_match(/fly auth login/, issue.steps.join(" "))
+    assert_match(/fly auth login/, shown(issue))
   end
 
   test "a working session reports nothing either way" do
@@ -144,7 +152,7 @@ class FlyPreflightTest < ActiveSupport::TestCase
   end
 
   test "the signed-out message links to its own section" do
-    steps = with_whoami("You must be authenticated to view this").issues("fly").sole.steps.join(" ")
+    steps = shown(with_whoami("You must be authenticated to view this").issues("fly").sole)
 
     assert_match %r{/documentation/roe/troubleshoot-deployment\#fly-signed-out}, steps
   end

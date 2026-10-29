@@ -21,7 +21,14 @@ class DeployPreflight
   # `blocking` distinguishes what stops a deploy from what's merely worth
   # saying. Nothing advisory exists yet; the field is here so that adding one
   # later doesn't mean adding a new way to refuse deploys by accident.
-  Issue = Struct.new(:title, :explanation, :steps, :blocking, keyword_init: true)
+  #
+  # `key` names an issue whose message is written as a view instead of here:
+  # the page renders admin/shared/_<key>.html.erb in place of explanation and
+  # steps, so it can be edited and styled like any other page. Such an issue
+  # still carries its title, which the deploy log and error line use.
+  Issue = Struct.new(:key, :title, :explanation, :steps, :blocking, keyword_init: true)
+
+  FLY_SIGNED_OUT_TITLE = "You're not signed in to Fly"
 
   # Docker Desktop takes a while to come up, so a short timeout would report a
   # starting daemon as a stopped one.
@@ -37,9 +44,6 @@ class DeployPreflight
   # heading can't break them.
   DOCS_UNREACHABLE =
     'More steps: <a href="/documentation/roe/troubleshoot-deployment#fly-unreachable" ' \
-    'target="_blank" rel="noopener">Troubleshooting → Deployment</a>'
-  DOCS_SIGNED_OUT =
-    'More detail: <a href="/documentation/roe/troubleshoot-deployment#fly-signed-out" ' \
     'target="_blank" rel="noopener">Troubleshooting → Deployment</a>'
 
   # flyctl couldn't reach Fly at all, rather than reaching it and being told no.
@@ -145,22 +149,11 @@ class DeployPreflight
     )
   end
 
+  # The message — explanation, steps, the command to copy — is written in
+  # app/views/admin/shared/_fly_signed_out.html.erb, shared with the warning
+  # on Settings → Deploy, so it's edited in one place.
   def fly_signed_out_issue
-    Issue.new(
-      title: "You're not signed in to Fly",
-      explanation:
-        "Your Fly session has expired or was never started. Deploying without one hangs " \
-        "with no output rather than failing, so Roe stops here instead.",
-      steps: [
-        "Open a terminal — any folder will do.",
-        "Run <code>fly auth login</code>. It opens your browser.",
-        "Sign in to Fly. You'll see “Your CLI is connected now. Feel free to close this tab.”",
-        "Back in the terminal you'll see <code>successfully logged in as …</code>",
-        "Then deploy again.",
-        DOCS_SIGNED_OUT
-      ],
-      blocking: true
-    )
+    Issue.new(key: "fly_signed_out", title: FLY_SIGNED_OUT_TITLE, steps: [], blocking: true)
   end
 
   def fly_cli? = run("which", "fly", timeout: 5)

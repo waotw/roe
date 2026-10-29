@@ -32,8 +32,8 @@ class DeployPreflightOrderTest < ActiveSupport::TestCase
     status = Rails.cache.read(KEY)
     assert_equal :failed, status[:state]
     assert_includes status[:error], "You're not signed in to Fly"
-    assert status[:preflight].any? { |b| b[:steps].join.include?("fly auth login") },
-           "the page gets the steps, not just a title"
+    assert_equal [ "fly_signed_out" ], status[:preflight].map { |b| b[:key] },
+                 "the page renders the sign-in steps from admin/shared/_fly_signed_out"
   end
 
   test "a failure while preparing the deploy is shown on the page, not left for the watchdog" do
