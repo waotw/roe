@@ -2,6 +2,7 @@ class Admin::ProductsController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
   include RenameRedirect
+  include EditorSave
 
   def bulk_model = Product
   def bulk_index_path = admin_products_path
@@ -111,6 +112,10 @@ class Admin::ProductsController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # As the editor sent it, before Roe tidies it — so a background save
+      # can tell whether the file now says something the panel doesn't.
+      submitted = metadata.deep_dup
+
       # Handle tags
       if metadata["tags"].is_a?(String)
         if metadata["tags"].strip.empty? || metadata["tags"] == "[]"
@@ -128,12 +133,13 @@ class Admin::ProductsController < Admin::BaseController
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
-      redirect_to edit_admin_product_path(@product)
+      finish_editor_save_with_warning(edit_admin_product_path(@product))
       return
     end
 
     # Capture pre-save state to detect a publishing transition for flash text.
     was_published = @product.status == "published"
+    status_before = @product.status
     old_address = rename_redirect_source(@product)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
@@ -145,7 +151,8 @@ class Admin::ProductsController < Admin::BaseController
     # A plain save says nothing — the editor's dot shows "changes saved".
     flash[:notice] = "Product published" if !was_published && @product.status == "published"
     add_rename_redirect(Product, old_address, metadata, @product.file_path)
-    redirect_to edit_admin_product_path(@product)
+    finish_editor_save(record: @product, resource_type: "product", edit_path: edit_admin_product_path(@product),
+                       file_path: File.join(RoeSitePaths::SITE_PATH, @product.file_path), submitted: submitted, status_before: status_before)
   end
 
   def show

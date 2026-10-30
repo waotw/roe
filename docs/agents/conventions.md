@@ -92,8 +92,13 @@ form, media validation, audio duration extraction), and small changes cascade.
 new, isolated controller or partial that composes with what's there. Propose the
 smallest additive change before writing it. When unsure, ask.
 
-Also relevant: `layouts/editor.html.erb` sets `turbo-visit-control: reload` so
-the unsaved-changes guard fires on navigation. Do not remove that meta tag.
+Also relevant: the editor is a normal Turbo page. `layouts/editor.html.erb` once
+set `turbo-visit-control: reload` so the unsaved-changes guard fired on
+navigation; local draft recovery replaced that (`6e7858e`), so don't add it
+back. Posts, pages and products save in the background
+(`editor_background_save.js` + the `EditorSave` concern) and keep the writer's
+place; a save that publishes, changes status or needs a notice still loads the
+page.
 
 ---
 

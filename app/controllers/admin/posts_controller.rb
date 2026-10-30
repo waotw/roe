@@ -2,6 +2,7 @@ class Admin::PostsController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
   include RenameRedirect
+  include EditorSave
 
   # Bulk-action wiring (see BulkContentActions).
   def bulk_model = Post
@@ -308,6 +309,10 @@ class Admin::PostsController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # As the editor sent it, before Roe tidies it — so a background save
+      # can tell whether the file now says something the panel doesn't.
+      submitted = metadata.deep_dup
+
       # Remove the error flag if it exists (YAML is now fixed)
       metadata.delete("_yaml_parse_error")
 
@@ -333,12 +338,13 @@ class Admin::PostsController < Admin::BaseController
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@post.file_path, full_content)
-      redirect_to edit_admin_post_path(@post)
+      finish_editor_save_with_warning(edit_admin_post_path(@post))
       return
     end
 
     # Capture pre-save publish state (newsletter transition detection below).
     was_published = @post.published?
+    status_before = @post.status
     old_address = rename_redirect_source(@post)
 
     # Use the formatted YAML (includes GUID if added/restored)
@@ -365,7 +371,8 @@ class Admin::PostsController < Admin::BaseController
     # 301 as part of this save (RenameRedirect).
     add_rename_redirect(Post, old_address, metadata, @post.file_path)
 
-    redirect_to edit_admin_post_path(@post)
+    finish_editor_save(record: @post, resource_type: "post", edit_path: edit_admin_post_path(@post),
+                       file_path: @post.file_path, submitted: submitted, status_before: status_before)
   end
 
   # Copy a post's file verbatim into a numbered sibling — same directory, an

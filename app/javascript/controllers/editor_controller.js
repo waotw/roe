@@ -1,5 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
 import { copyToClipboard } from "clipboard";
+import {
+  wantsBackgroundSave,
+  backgroundSave,
+} from "controllers/editor_background_save";
 
 // Import EditorState directly
 if (!window.EditorState || !window.EditorState.saveElement) {
@@ -832,6 +836,9 @@ export default class extends Controller {
         : "";
     this.saveMessageTargets.forEach((el) => {
       el.textContent = message;
+      // A failed background save shows its reason in red until the next edit.
+      el.classList.remove("text-red-700");
+      el.removeAttribute("title");
     });
   }
 
@@ -2368,6 +2375,23 @@ export default class extends Controller {
       return;
     }
 
+    // Posts, pages and products save in the background and keep the writer's
+    // place — cursor, scroll, undo. See editor_background_save.js; a save that
+    // publishes or needs a notice still loads the page, via _prepareForReload.
+    if (event && event.preventDefault && wantsBackgroundSave(this, event)) {
+      event.preventDefault();
+      backgroundSave(this);
+      return;
+    }
+
+    this._prepareForReload();
+  }
+
+  // Everything a save that reloads the page needs first: keep the place to
+  // restore after the reload, mark "changes saved", drop the draft and the
+  // leave-page guard. The ordinary form submit (emails) runs this before it
+  // goes; a background save runs it when the server asks for a reload.
+  _prepareForReload() {
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
 
