@@ -390,16 +390,55 @@ def step_branch
   mark_done("branch")
 end
 
+# Brings local main level with roe/main without checking it out. Three
+# shapes are fine: the same commit; local main ahead (commits made on main
+# and not pushed yet — they go out with this release); roe/main ahead
+# (fast-forwarded here). Only the two having split apart needs you.
+# (`git fetch roe main:main` can't be used: git refuses it when local main
+# is the one ahead.)
+def main_up_to_date?
+  _out, fetched = capture("git", "fetch", "--quiet", REMOTE, "main")
+  unless fetched
+    bad("Couldn't fetch main from #{REMOTE}. Are you online?")
+    return false
+  end
+
+  local  = git("rev-parse", "main")
+  remote = git("rev-parse", "#{REMOTE}/main")
+  return true if local == remote
+
+  if git("merge-base", "--is-ancestor", "#{REMOTE}/main", "main")
+    ahead = git("rev-list", "--count", "#{REMOTE}/main..main")
+    dim("Local main is #{ahead} commit(s) ahead of #{REMOTE}/main; they go out with this release.")
+    return true
+  end
+
+  if git("merge-base", "--is-ancestor", "main", "#{REMOTE}/main")
+    unless git("update-ref", "refs/heads/main", remote, local)
+      bad("Couldn't move main up to #{REMOTE}/main.")
+      return false
+    end
+    ok("Brought main up to date with #{REMOTE}/main")
+    return true
+  end
+
+  # COPY
+  bad("main and #{REMOTE}/main have split apart.")
+  say "Only on your main:"
+  list(git_lines("log", "--format=%h %s", "#{REMOTE}/main..main"))
+  say "Only on #{REMOTE}/main:"
+  list(git_lines("log", "--format=%h %s", "main..#{REMOTE}/main"))
+  say "Sort out main by hand (for example #{orange("git switch main && git pull --rebase #{REMOTE} main")}),"
+  say "switch back to development, then check again."
+  false
+end
+
 # A fix made straight on main (a hotfix, a docs link) would otherwise reach
 # the release only at the merge into main, unchecked — and for a line both
 # sides didn't touch, main's version wins. Merged in here, the sync then
 # puts site/'s copy of any doc back and every check sees the result.
 def step_main_in
-  _out, fetched = capture("git", "fetch", "--quiet", REMOTE, "main:main")
-  unless fetched
-    bad("Couldn't bring main up to date with #{REMOTE}/main (has local main moved on its own?).")
-    return pause
-  end
+  return pause unless main_up_to_date?
 
   only_on_main = git_lines("log", "--format=%h %s", "development..main")
   if only_on_main.empty?
@@ -832,11 +871,7 @@ def tag_stable
       quit!
     end
 
-    _out, fetched = capture("git", "fetch", "--quiet", REMOTE, "main:main")
-    unless fetched
-      bad("Couldn't bring main up to date with #{REMOTE}/main (has local main moved on its own?).")
-      return pause
-    end
+    return pause unless main_up_to_date?
 
     unless git("merge-base", "--is-ancestor", "development", "main")
       out, merged = capture("git", "merge-tree", "--write-tree", "main", "development")
