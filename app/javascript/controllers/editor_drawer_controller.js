@@ -63,5 +63,12 @@ export default class extends Controller {
   apply(open) {
     this.element.classList.toggle("translate-y-full", !open);
     sessionStorage.setItem(this.stateKey, open ? "1" : "0");
+    // How much of the window's bottom edge the drawer covers. The live
+    // editor's find-and-replace panel docks to the bottom of the window and
+    // reads this to sit just above the drawer instead of underneath it.
+    document.documentElement.style.setProperty(
+      "--roe-editor-drawer-height",
+      open ? `${this.element.offsetHeight}px` : "0px",
+    );
   }
 }

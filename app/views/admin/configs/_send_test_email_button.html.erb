@@ -1,0 +1,35 @@
+<%#
+  Proves Postmark will accept the site's From address, which the Verify button
+  doesn't: that checks the server token, and a working token with an
+  unverified Sender Signature still fails every send.
+
+  There's no way to ask Postmark without sending — listing Sender Signatures
+  needs an Account API token and Roe holds only a Server token — so a success
+  really does deliver a message. Hence a button, not something that fires on
+  every save.
+
+  A link with turbo_method rather than button_to: this sits inside the keys
+  form, and button_to would nest a <form> in a <form>, which browsers discard.
+  Same pattern as the deploy page's registry-token removal.
+
+  Shown disabled rather than hidden before there's a connection, so it's clear
+  the step exists and what has to happen first.
+%>
+<% if @config_type == "newsletters" %>
+  <% if integration_record&.connected? %>
+    <%# Test keys usually mean a sandbox server, which records a message and
+        never delivers it — so naming Postmark keeps the button from promising
+        an inbox. Only a hint: which server it really is comes back in the
+        response, and the flash says what actually happened. %>
+    <%= link_to integration_record.live_mode? ? "Send test email" : "Send test email to Postmark",
+                admin_send_test_email_newsletters_config_path,
+                data: { turbo_method: :post },
+                class: "inline-flex items-center uppercase text-xs px-1.5 py-1 border border-gray-800 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs cursor-pointer no-underline text-gray-900" %>
+  <% else %>
+    <span data-test-email-disabled
+          title="Save and connect your Postmark server token first"
+          class="inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-300 bg-gray-50 text-gray-400 font-mono rounded-xs cursor-not-allowed select-none">
+      Send test email
+    </span>
+  <% end %>
+<% end %>

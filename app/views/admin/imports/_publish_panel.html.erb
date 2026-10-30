@@ -43,7 +43,8 @@
       </div>
       <div class="text-sm text-green-800 font-mono">
         Members: <%= counts["members_inserted"] %> inserted,
-                 <%= counts["members_skipped"] %> already on live<br>
+                 <%= counts["members_updated"] %> updated,
+                 <%= counts["members_skipped"] %> left alone<br>
         Deliveries: <%= counts["sends_inserted"] %> inserted,
                     <%= counts["sends_skipped"] %> already on live
         <% if counts["sends_no_post"].to_i > 0 %>
@@ -53,6 +54,39 @@
           , <%= counts["sends_no_member"] %> with no matching member on live
         <% end %>
       </div>
+      <%
+        # What the publish deliberately didn't apply. Grouped by reason because
+        # the owner does something different with each — a lapsed subscriber is
+        # a decision to make, a deleted account isn't.
+        follow_up = (published["follow_up"] || {}).reject { |_, v| Array(v).empty? }
+        follow_up_copy = {
+          "lapsed_paid"  => "had a paid subscription that lapsed before this import. Their access on live was left as it is — to grant them paid access, do it in Members.",
+          "has_activity" => "have signed up, paid, or changed something on live since the last import, so this import left them untouched.",
+          "deleted"      => "deleted their account. Nothing was changed or re-created for them.",
+          "not_imported" => "already existed on live and didn't come from an import, so this import left them untouched."
+        }
+      %>
+      <% if follow_up.any? %>
+        <div class="mt-3 pt-3 border-t border-green-200">
+          <div class="text-sm font-medium text-green-900 mb-2">Worth a look</div>
+          <% follow_up.each do |reason, emails| %>
+            <details class="mb-2">
+              <summary class="text-sm text-green-800 cursor-pointer">
+                <strong><%= emails.size %></strong>
+                <%= follow_up_copy[reason] || "were not applied (#{reason})." %>
+              </summary>
+              <ul class="mt-1 ml-4 text-xs font-mono text-green-700 max-h-48 overflow-y-auto">
+                <% emails.first(500).each do |email| %>
+                  <li><%= email %></li>
+                <% end %>
+              </ul>
+              <% if emails.size > 500 %>
+                <div class="ml-4 text-xs text-green-700">…and <%= emails.size - 500 %> more.</div>
+              <% end %>
+            </details>
+          <% end %>
+        </div>
+      <% end %>
       <% if published["errors"].present? %>
         <details class="mt-3 text-xs">
           <summary class="cursor-pointer text-green-700">
@@ -129,7 +163,7 @@
         Once it's deployed and configured, you can publish imports here.
       </p>
       <%= link_to "Deployment documentation →",
-                  "/documentation/roe/deployment",
+                  "/documentation/roe/guide-deploy",
                   class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
     </div>
 
@@ -163,7 +197,7 @@
                             method: :post,
                             class: "inline-flex items-center uppercase text-sm px-1.5 py-0.5 border border-gray-700 bg-gray-100 hover:bg-gray-200 font-mono rounded-xs" %>
             </div>
-            <% if peer_fp.blank? %>
+            <% if conclusion.peer_fingerprint.blank? %>
               <p class="text-xs text-gray-500 mt-1">
                 (Haven't heard from the live site yet — refresh peer state or open Site Sync.)
               </p>

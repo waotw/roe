@@ -1,0 +1,23 @@
+<%# Shown on Settings → Deploy, and before a deploy Roe stopped because `fly`
+    isn't installed. %>
+<p>
+  Roe deploys to Fly by running the <code>fly</code> command on this computer,
+  so it has to be installed here. Install it with either of these:
+</p>
+
+<p>macOS, with Homebrew (recommended):</p>
+<pre>brew install flyctl</pre>
+
+<p>macOS or Linux, with Fly's installer:</p>
+<pre>curl -L https://fly.io/install.sh | sh</pre>
+
+<p>Then sign in to Fly:</p>
+<pre>fly auth login</pre>
+
+<p><%= context == :settings ? "Then reload this page." : "Then deploy again." %></p>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#fly-command-not-found" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+  · Fly's own guide: <a href="https://fly.io/docs/flyctl/install/" target="_blank" rel="noopener">fly.io/docs/flyctl/install</a>
+</p>

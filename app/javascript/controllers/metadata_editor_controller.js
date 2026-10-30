@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { mediaDuration } from "media_duration";
 
 // Connects to data-controller="metadata-editor"
 export default class extends Controller {
@@ -25,6 +26,8 @@ export default class extends Controller {
     "fieldsContainer",
     "addFieldMenu",
     "finalInput",
+    "removeButtonTemplate",
+    "removeSpacerTemplate",
   ];
 
   coreFieldNames = [
@@ -77,6 +80,17 @@ export default class extends Controller {
       }
     });
 
+    // Rebuild the visible fields when the editor restores a local draft — the
+    // draft carries raw YAML, so re-run the same parse the initial load uses.
+    this.metadataRestoredHandler = (e) => {
+      const yaml = e.detail?.metadata ?? "";
+      this.yamlToForm(yaml);
+    };
+    document.addEventListener(
+      "editor:metadata-restored",
+      this.metadataRestoredHandler,
+    );
+
     // Initialization complete - now start tracking changes
     // Use setTimeout to ensure all initial DOM updates are complete
     setTimeout(() => {
@@ -101,6 +115,12 @@ export default class extends Controller {
       document.removeEventListener(
         "publish-modal:confirmed",
         this.boundPublishConfirm,
+      );
+    }
+    if (this.metadataRestoredHandler) {
+      document.removeEventListener(
+        "editor:metadata-restored",
+        this.metadataRestoredHandler,
       );
     }
   }
@@ -245,6 +265,25 @@ export default class extends Controller {
   // Programmatic version — called internally without a click event
   // toggleMenu=false skips closing the add-field dropdown (it isn't open)
   _addKnownFieldByName(fieldName, initialValue = null, toggleMenu = false) {
+    // Already a row for it: use that row rather than add a second. Two rows
+    // with one name write whichever comes last. A row hidden by the post
+    // type is shown again.
+    const existing = this.fieldsContainerTarget.querySelector(
+      `.metadata-field-row[data-field-name="${fieldName}"]`,
+    );
+    if (existing) {
+      existing.style.display = "";
+      existing.classList.remove("hidden");
+      this.removedFields.delete(fieldName);
+      this.addFieldMenuTarget
+        .querySelector(`[data-available-field="${fieldName}"]`)
+        ?.remove();
+      if (toggleMenu) this.toggleAddFieldMenu();
+      existing.querySelector("[data-metadata-field]")?.focus();
+      this._notifyMetadataChange();
+      return;
+    }
+
     const config = this.knownFieldsValue[fieldName];
     // A checkbox centres against its label, and the label drops the top
     // padding that exists to line up with text — matching the ERB. Hardcoding
@@ -285,13 +324,7 @@ export default class extends Controller {
     const inputHtml = this.buildInputHtml(fieldName, config, defaultValue);
 
     // Conditionally add delete button (not for required fields)
-    const deleteButton = config.required
-      ? '<div class="w-6 flex-shrink-0"></div>'
-      : `<button type="button"
-                 data-action="click->metadata-editor#removeMetadataField"
-                 class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-          ×
-        </button>`;
+    const deleteButton = this.removeButtonHtml(config.required);
 
     // Field and note share one column, mirroring the ERB partial — the note
     // then lines up with the field without anything having to reproduce the
@@ -306,7 +339,7 @@ export default class extends Controller {
       <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}:
       </label>
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 max-w-[500px]">
         <div class="flex ${isCheckbox ? "items-center" : "items-start"} gap-2">
           ${inputHtml}
         </div>
@@ -356,6 +389,24 @@ export default class extends Controller {
       this.setupGroupListener();
     }
 
+    // The listener from connect() bound to the image input that existed at
+    // load; an image field added from the menu needs its own, or picking
+    // an image never surfaces image_in_header until a save re-renders.
+    if (fieldName === "image") {
+      this.setupImageInHeaderListener();
+    }
+
+    // digital_product_controller adds file_guid when the digital box is
+    // ticked, but it listens for input/change — and a field added from the
+    // menu arrives ticked without either firing, so the GUID row didn't
+    // show until the next click anywhere in the editor. Fire the event it's
+    // waiting for so both rows land together, with the link and warning.
+    if (fieldName === "digital") {
+      row
+        .querySelector('[data-metadata-field="digital"]')
+        ?.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
     this._notifyMetadataChange();
 
     // Focus the input only when triggered by user action
@@ -382,11 +433,7 @@ export default class extends Controller {
              placeholder="value"
              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
              data-custom-value>
-      <button type="button"
-              data-action="click->metadata-editor#removeMetadataField"
-              class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-        ×
-      </button>
+      ${this.removeButtonHtml()}
     `;
 
     container.appendChild(row);
@@ -428,6 +475,14 @@ export default class extends Controller {
     }
 
     row.remove();
+
+    // image_in_header only means something with an image. Removing the
+    // image takes it with it (unless it was saved that way, which
+    // updateImageInHeaderVisibility already respects).
+    if (fieldName === "image") {
+      this.updateImageInHeaderVisibility("");
+    }
+
     this._notifyMetadataChange();
   }
 
@@ -488,6 +543,17 @@ export default class extends Controller {
   }
 
   // ========== HELPER METHODS ==========
+
+  // The × that removes a field, or (required) an invisible copy holding its
+  // place. Written once, in shared/_metadata_remove_button, and cloned from
+  // the <template>s _metadata_editor renders — so rows built here look like
+  // rows drawn on page load.
+  removeButtonHtml(required = false) {
+    const template = required
+      ? this.hasRemoveSpacerTemplateTarget && this.removeSpacerTemplateTarget
+      : this.hasRemoveButtonTemplateTarget && this.removeButtonTemplateTarget;
+    return template ? template.innerHTML.trim() : "";
+  }
 
   isFieldRequired(fieldName) {
     // Check base config first
@@ -909,6 +975,36 @@ export default class extends Controller {
         this.addCustomFieldToForm(key, fields[key]);
       }
     });
+
+    this.syncWithRebuiltRows();
+  }
+
+  // After the rows are rebuilt from YAML (Restore, back from RAW, or a post
+  // type adding its fields), make + Add Field match them, as adding and
+  // removing a field by hand already does. A rebuild left the menu as it
+  // was, so a restored url_name was still offered and adding it made a
+  // second row.
+  syncWithRebuiltRows() {
+    // A row hidden because the post type doesn't use it isn't saved
+    // (formToYaml skips it), so it counts as absent and stays in the menu.
+    const present = new Set(
+      Array.from(
+        this.fieldsContainerTarget.querySelectorAll(".metadata-field-row"),
+      )
+        .filter((row) => row.style.display !== "none")
+        .map((row) => row.dataset.fieldName),
+    );
+    Object.entries(this.knownFieldsValue).forEach(([name, config]) => {
+      if (present.has(name)) {
+        this.addFieldMenuTarget
+          .querySelector(`[data-available-field="${name}"]`)
+          ?.remove();
+      } else if (config.available !== false) {
+        // Same rule as the server's menu: a known field not in the file, and
+        // not one kept out of the menu (show_sidebar without a sidebar).
+        this.restoreFieldToMenu(name);
+      }
+    });
   }
 
   addKnownFieldToForm(fieldName, value) {
@@ -934,20 +1030,14 @@ export default class extends Controller {
       : "";
 
     // Define delete button (must be BEFORE row.innerHTML)
-    const deleteButton = isRequired
-      ? '<div class="w-6 flex-shrink-0"></div>'
-      : `<button type="button"
-                 data-action="click->metadata-editor#removeMetadataField"
-                 class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-          ×
-        </button>`;
+    const deleteButton = this.removeButtonHtml(isRequired);
 
     // Now use all the variables
     row.innerHTML = `
       <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}${asterisk}:
       </label>
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 max-w-[500px]">
         <div class="flex ${isCheckbox ? "items-center" : "items-start"} gap-2">
           ${inputHtml}
         </div>
@@ -988,11 +1078,7 @@ export default class extends Controller {
              placeholder="value"
              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
              data-custom-value>
-      <button type="button"
-              data-action="click->metadata-editor#removeMetadataField"
-              class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-        ×
-      </button>
+      ${this.removeButtonHtml()}
     `;
 
     container.appendChild(row);
@@ -1143,11 +1229,31 @@ export default class extends Controller {
       }
     });
 
-    // Add missing type-specific fields
+    // Add missing type-specific fields — except ones the type only offers
+    // (auto_add: false in Post::POST_TYPES, e.g. a podcast's video): those
+    // stay in + Add Field until the post has a value for them.
+    const offeredOnly = new Set(
+      (this.postTypesValue?.[postType]?.metadata_fields || [])
+        .filter((field) => field.auto_add === false)
+        .map((field) => field.name),
+    );
     typeSpecificFields.forEach((fieldName) => {
       const existingRow = this.fieldsContainerTarget.querySelector(
         `.metadata-field-row[data-field-name="${fieldName}"]`,
       );
+
+      if (!existingRow && offeredOnly.has(fieldName)) return;
+
+      // An empty one left by the old auto-add (most podcasts have
+      // video: ""): off the form and back into + Add Field. Not marked
+      // removed, so a save leaves the file's value exactly as it was.
+      if (existingRow && offeredOnly.has(fieldName)) {
+        const input = existingRow.querySelector("[data-metadata-field]");
+        if (input && !input.value.trim() && document.activeElement !== input) {
+          existingRow.remove();
+          return;
+        }
+      }
 
       if (!existingRow && this.knownFieldsValue[fieldName]) {
         // Field doesn't exist - add it with default value if applicable
@@ -1194,6 +1300,10 @@ export default class extends Controller {
       // Trigger population from podcast config
       this.handlePodcastChange({ target: podcastField });
     }
+
+    // The type's fields were added and hidden above without touching
+    // + Add Field, so a podcast's duration was offered beside its own row.
+    this.syncWithRebuiltRows();
   }
 
   // ========== CHANGE NOTIFICATION ==========
@@ -1459,42 +1569,10 @@ export default class extends Controller {
   }
 
   async fetchAndPopulateDuration(mediaPath) {
-    const extension = mediaPath.split(".").pop().toLowerCase();
-    const isAudio = ["mp3", "m4a", "wav", "ogg", "flac", "aac"].includes(
-      extension,
-    );
-    const isVideo = ["mp4", "webm", "ogv", "mov", "avi", "mkv"].includes(
-      extension,
-    );
-
-    if (!isAudio && !isVideo) {
-      console.warn("Not a supported audio/video file");
-      return;
-    }
-
     try {
-      // Create a temporary media element to load the file
-      const mediaElement = isAudio
-        ? new Audio()
-        : document.createElement("video");
-
-      // Wait for metadata to load
-      const duration = await new Promise((resolve, reject) => {
-        mediaElement.addEventListener("loadedmetadata", () => {
-          resolve(mediaElement.duration);
-        });
-
-        mediaElement.addEventListener("error", (e) => {
-          reject(new Error("Failed to load media file"));
-        });
-
-        // Set source and load
-        mediaElement.src = mediaPath;
-        mediaElement.load();
-      });
-
-      // Format duration as HH:MM:SS
-      const formatted = this.formatDuration(Math.floor(duration));
+      // A file is read in the browser; a YouTube link is looked up on the
+      // server (media_duration.js).
+      const formatted = await mediaDuration(mediaPath);
 
       // Mark as programmatic change to avoid triggering save warning
       this.isProgrammaticChange = true;
@@ -1517,7 +1595,9 @@ export default class extends Controller {
         this.isProgrammaticChange = false;
       }, 100);
     } catch (error) {
-      console.error("Error extracting duration:", error);
+      // Nothing to read (not a media file, or YouTube didn't say): leave
+      // the field for the writer to fill in.
+      console.warn("Couldn't get a duration:", error.message);
     }
   }
 
@@ -1553,7 +1633,7 @@ export default class extends Controller {
                data-metadata-field="duration"
                placeholder="${config.hint || ""}"
                readonly>
-        <div class="w-6 flex-shrink-0"></div>
+        ${this.removeButtonHtml(true)}
       `;
 
     // Insert in correct position
@@ -1579,8 +1659,10 @@ export default class extends Controller {
     const videoField = this.element.querySelector(
       '[data-metadata-field="video"]',
     );
-    const durationRow = this.element.querySelector(
-      '[data-field-name="duration"]',
+    // Scoped to rows: the + Add Field buttons carry data-field-name too, and
+    // the menu sits above the rows, so a bare lookup found the button.
+    const durationRow = this.fieldsContainerTarget.querySelector(
+      '.metadata-field-row[data-field-name="duration"]',
     );
 
     const hasMedia =

@@ -85,6 +85,31 @@
                         unconfigured
                       </span>
                     <% end %>
+                    <% if file[:live_unconfigured] %>
+                      <%# Production-only: the active mode may be fine, but live
+                          keys aren't set, so the site can't take real money /
+                          send real email yet. Separate tag so the message is
+                          exact rather than a generic "unconfigured". %>
+                      <span data-live-unconfigured class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        live mode not set up
+                      </span>
+                    <% end %>
+                    <% if file[:pending_approval] %>
+                      <%# Postmark account pending approval (412) caught on a real
+                          send. Distinct from unconfigured — keys work, but the
+                          account can only reach same-domain recipients yet. %>
+                      <span data-pending-approval class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        account not approved
+                      </span>
+                    <% end %>
+                    <% if file[:no_sender] %>
+                      <%# Separate from "unconfigured": a connected Postmark
+                          with no address to send from is still broken, and
+                          both can be true at once. %>
+                      <span data-no-sender class="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium bg-amber-100 text-amber-600 border border-amber-500">
+                        no email address
+                      </span>
+                    <% end %>
                     <%= link_to icon_svg("edit", class: "w-[1.3rem] h-[1.3rem]"), file[:edit_path],
                           class: "inline-flex text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
                   </div>

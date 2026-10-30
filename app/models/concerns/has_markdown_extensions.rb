@@ -90,6 +90,7 @@ module HasMarkdownExtensions
     processed_content = process_buttons(processed_content, preview: preview)
     processed_content = process_image_captions(processed_content)
     processed_content = process_strikethrough(processed_content)
+    processed_content = process_highlights(processed_content)
     processed_content = escape_inline_pipes(processed_content)
 
     # Convert to HTML with Kramdown. hard_wrap only takes effect under the GFM
@@ -142,6 +143,18 @@ module HasMarkdownExtensions
     # Process images to make them responsive
     html = process_responsive_images(html)
 
+    # A YouTube link on a line of its own becomes the player.
+    html = embed_standalone_video_links(html)
+
+    # A video embed on its own line came out of kramdown inside a <p>, and
+    # the player is a block (<div>): a <p> can't hold one, so browsers close
+    # the paragraph early and leave an empty one behind. Unwrap it.
+    html = html.gsub(%r{<p>\s*((?:<!--[^>]*-->\s*)?<div class="(?:video-player-container|video-external).*?</div>\s*(?:<!--[^>]*-->\s*)?)</p>}m) do
+      inner = Regexp.last_match(1)
+      # Only when the <p> held nothing but the player.
+      inner.scan("<div").size == inner.scan("</div>").size ? inner : Regexp.last_match(0)
+    end
+
     # Keep content off ids that belong to injected third-party mount points.
     html = reserve_mount_ids(html)
 
@@ -187,11 +200,38 @@ module HasMarkdownExtensions
     %(<audio class="audio-embed" controls preload="metadata" src="#{escape_html(src)}"#{aria}>#{fallback}</audio>)
   end
 
+  # A video embedded in Markdown, ![label](/media/video/clip.mp4), gets the
+  # same player as a video post (shared/_video_player): web versions,
+  # poster, and Roe's controls. Rendered through the controller renderer
+  # because this runs inside the model, not a view.
   def render_video_embed(src, alt)
-    label = alt.to_s.strip
-    aria = label.empty? ? "" : %( aria-label="#{escape_html(label)}")
-    fallback = %(Your browser does not support the video element. <a href="#{escape_html(src)}">Download the video</a>.)
-    %(<video class="video-embed" controls preload="metadata" src="#{escape_html(src)}"#{aria}>#{fallback}</video>)
+    ApplicationController.renderer.render(
+      partial: "shared/video_player",
+      locals: { src: src, label: alt.to_s.strip, extra_class: "video-embed" }
+    ).to_s
+  end
+
+  # A YouTube video in the body. In a feed it's a thumbnail linking to the
+  # video: readers often strip iframes, and an empty gap reads as broken.
+  # Email gets the same treatment later, in NewsletterImageTransformer,
+  # from the player's data-video-url.
+  def render_external_video(embed, alt)
+    return embed.link_html(label: alt.to_s.strip).to_s if @rendering_feed
+
+    embed.iframe_html(label: alt.to_s.strip, extra_class: "video-embed").to_s
+  end
+
+  # A YouTube link alone on its line — pasted straight from the Share
+  # button — plays like `![](link)` does, the way most editors treat a
+  # pasted video link. Only when it's the whole paragraph: a link inside a
+  # sentence stays a link. Matches the bare text and the <a> that
+  # <link> or autolinking makes of it.
+  def embed_standalone_video_links(html)
+    html.gsub(%r{<p>\s*(?:<a href="([^"]+)">\s*\1\s*</a>|(https?://[^\s<]+))\s*</p>}) do
+      url = Regexp.last_match(1) || Regexp.last_match(2)
+      embed = VideoEmbed.for(url)
+      embed ? render_external_video(embed, "") : Regexp.last_match(0)
+    end
   end
 
   def process_responsive_images(html)
@@ -226,6 +266,9 @@ module HasMarkdownExtensions
       # native controls mean it works with no JS and is styleable via the
       # `audio`/`video` element selectors.
       ext = File.extname(src).downcase
+      if (embed = VideoEmbed.for(src))
+        next render_external_video(embed, alt)
+      end
       next render_audio_embed(src, alt) if AUDIO_EMBED_EXTENSIONS.include?(ext)
       next render_video_embed(src, alt) if VIDEO_EMBED_EXTENSIONS.include?(ext)
 
@@ -266,6 +309,15 @@ module HasMarkdownExtensions
     Digest::SHA1.hexdigest(parts.join("|"))
   end
 
+  # The player card a media post's template puts at the top when the body
+  # has no ```card type: player of its own (Post#show_template_player?). The
+  # same card, drawn with no options, so it plays the post's own audio or
+  # video, titled and with artwork from the post: what an author gets by
+  # adding the card themselves, which is where players are heading.
+  def template_player_card_html
+    render_player_card({ type: "player" }).html_safe
+  end
+
   private
 
   def render_code_block(code, language)
@@ -294,6 +346,7 @@ module HasMarkdownExtensions
     text = text.gsub(/\*\*(.+?)\*\*/) { "<strong>#{$1}</strong>" }
     text = text.gsub(/\*(.+?)\*/) { "<em>#{$1}</em>" }
     text = text.gsub(/~~(.+?)~~/) { "<s>#{$1}</s>" }
+    text = text.gsub(HIGHLIGHT_PATTERN) { "<mark>#{$1}</mark>" }
     text = text.gsub(/\[([^\]]+)\]\(([^)]+)\)/) do
       "<a href=\"#{CGI.escapeHTML($2)}\">#{$1}</a>"
     end
@@ -303,6 +356,33 @@ module HasMarkdownExtensions
   def process_strikethrough(markdown)
     # Convert ~~text~~ to <del>text</del> (which Kramdown preserves)
     markdown.gsub(/~~([^~]+)~~/, '<del>\1</del>')
+  end
+
+  # ==text== → <mark>text</mark>, the same element the toolbar's highlight
+  # button has always written, so the two spellings render identically.
+  #
+  # Matched the way the editor matches it (markdown_editor/syntax.js), so what
+  # the editor shows as highlighted is what renders. The pair has to hug its
+  # text — `a == b` is a comparison, not a highlight — and a run of three or
+  # more `=` is never a marker, so setext underlines stay headings.
+  HIGHLIGHT_PATTERN = /(?<![=\\])==(?=[^\s=])(.+?)(?<=[^\s=])==(?!=)/
+
+  # Inline code and HTML tags are skipped: `a==b && c==d` is code, and a tag's
+  # attributes (`href="?a==b"`) aren't prose. Highlighting inside either would
+  # break it. Fenced blocks are already placeholders by the time this runs.
+  # Matching a code span or tag first and handing it back unchanged keeps them
+  # from overlapping a highlight.
+  #
+  # markdown="span" asks kramdown to parse the markdown inside the tag —
+  # without it, raw HTML is opaque and `==**bold**==` would show its asterisks.
+  # kramdown removes the attribute, so the output is a plain <mark>.
+  def process_highlights(markdown)
+    return markdown unless markdown.include?("==")
+
+    markdown.gsub(/(`+).*?\1|<[^>\n]*>|#{HIGHLIGHT_PATTERN}/) do
+      text = Regexp.last_match(2)
+      text ? %(<mark markdown="span">#{text}</mark>) : Regexp.last_match(0)
+    end
   end
 
   def table_separator_line?(line)
@@ -1332,35 +1412,73 @@ module HasMarkdownExtensions
     CollectionQuery.sort_keyword?(value)
   end
 
-  # A menu's membership: its `order:` url_name list (those items, in that order)
+  # A literal link in a menu's `order:` list — `[RSS](/feed.xml)` or an
+  # outside URL — standing in for a page. Quacks enough like one for
+  # render_menu: a title and a path, nothing else.
+  MenuLink = Struct.new(:title, :path, keyword_init: true) do
+    def url_name = nil
+  end
+
+  # `[text](target)` — markdown link syntax, matched whole.
+  MENU_LINK_RE = /\A\[([^\]]*)\]\(([^)\s]+)\)\z/
+
+  # Split a menu's `order:` on commas, but not on commas inside a
+  # markdown link's brackets or parentheses, so `[Hi, there](/x)` stays
+  # one entry.
+  def split_menu_order(order_list)
+    entries, buf, depth = [], +"", 0
+    order_list.to_s.each_char do |ch|
+      case ch
+      when "[", "(" then depth += 1
+      when "]", ")" then depth -= 1 if depth.positive?
+      end
+      if ch == "," && depth.zero?
+        entries << buf.strip
+        buf = +""
+      else
+        buf << ch
+      end
+    end
+    entries << buf.strip
+    entries.reject(&:empty?)
+  end
+
+  # A menu's membership: its `order:` list (those items, in that order)
   # unioned with anything tagged `collection: <name>` — a page joins by being
   # listed OR by carrying that collection name. Listed items lead, in list
-  # order; tagged-but-unlisted items follow, alphabetically. Unresolved
-  # url_names are skipped (logged in development so a typo is easy to spot).
-  # Reached only when at least one of order/collection is present — an empty
-  # menu is caught earlier with a notice.
+  # order; tagged-but-unlisted items follow, alphabetically. An `order:` entry
+  # is a url_name or an inline markdown link (a feed, an outside site), so a
+  # nav can hold both in one list. Unresolved url_names are skipped (logged
+  # in development so a typo is easy to spot). Reached only when at least one
+  # of order/collection is present — an empty menu is caught earlier.
   def curate_menu(items, order_list, label)
     all      = items.to_a
     has_list = order_list.present? && !sort_keyword?(order_list)
 
     listed = []
     if has_list
-      wanted   = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
       by_slug  = all.index_by { |item| item.url_name.to_s.downcase }
-      resolved = wanted.map { |slug| by_slug[slug] }
+      missing  = []
 
-      if Rails.env.development?
-        missing = wanted.zip(resolved).reject { |_, item| item }.map(&:first)
-        Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}") if missing.any?
+      # Each entry is a page's url_name or, in the same position, an inline
+      # markdown link — a feed, an outside site, anything that isn't a page.
+      listed = split_menu_order(order_list).filter_map do |entry|
+        if (m = MENU_LINK_RE.match(entry))
+          MenuLink.new(title: m[1].strip, path: m[2])
+        else
+          by_slug[entry.downcase] || (missing << entry; nil)
+        end
       end
 
-      listed = resolved.compact
+      if Rails.env.development? && missing.any?
+        Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}")
+      end
     end
 
     tagged = []
     if label.present?
       wanted_names = normalize_collection_names(label)
-      listed_slugs = listed.map { |item| item.url_name.to_s.downcase }
+      listed_slugs = listed.filter_map { |item| item.url_name&.to_s&.downcase }
       tagged = all.select { |item| item.respond_to?(:collection_names) && (item.collection_names & wanted_names).any? }
                   .reject { |item| listed_slugs.include?(item.url_name.to_s.downcase) }
                   .sort_by { |item| item.title.to_s.downcase }
@@ -1701,10 +1819,24 @@ module HasMarkdownExtensions
 
     lis = items.map do |item|
       title = ERB::Util.html_escape(item.title.presence || "Untitled")
-      %Q(  <li class="collection-menu-item"><a href="#{item_path(item)}">#{title}</a></li>)
+      href  = item.is_a?(MenuLink) ? ERB::Util.html_escape(item.path) : item_path(item)
+      %Q(  <li class="collection-menu-item"><a href="#{href}">#{title}</a></li>)
     end.join("\n")
 
-    list = %Q(<ul class="collection-menu collection-menu-#{style}">\n#{lis}\n</ul>)
+    # `show_active:` explicitly overrides the file-level highlight default for
+    # this menu's links (LayoutHelper#add_active_nav_class reads the attribute).
+    # Emitted only when set, so an unspecified menu just follows its file's
+    # default — header on, footer/sidebar off. Anything but a clear false reads
+    # as true, matching how the rest of the block options treat truthiness.
+    active_attr =
+      if config.key?(:show_active) && config[:show_active].to_s.strip.present?
+        on = !%w[false no 0 off].include?(config[:show_active].to_s.strip.downcase)
+        %Q( data-show-active="#{on}")
+      else
+        ""
+      end
+
+    list = %Q(<ul class="collection-menu collection-menu-#{style}"#{active_attr}>\n#{lis}\n</ul>)
 
     # In a layout file (header/footer/sidebar) a menu IS site navigation — wrap
     # it in a <nav> landmark. In a page body it's a content list, so leave the
@@ -1817,16 +1949,25 @@ module HasMarkdownExtensions
   end
 
   # `card` with `type: player` — the transport. Plays an explicit `audio:` (or a
-  # bare `video:`), else the current post's audio/video. Reuses the audio-player
-  # Stimulus controller and the .collection-player TUI base. The list is a
-  # separate `playlist` collection; a later step lets this adopt one.
+  # bare `video:`), else the current post's audio/video. Progressive: it's
+  # rendered as the browser's own <audio controls> with Roe's transport hidden
+  # ([data-player-ui]), and site_js/player.js swaps them when it loads — so a
+  # static host, or a page where the script doesn't run, still plays. The list
+  # is a separate `playlist` collection the transport adopts.
   def render_player_card(config, preview: false)
     audio_src = config[:audio].presence || (respond_to?(:audio) ? audio.to_s.strip.presence : nil)
     video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
 
     if audio_src.blank? && video_src.present?
-      # Minimal native video for now; the full video transport is a follow-up.
-      return %Q(<div class="card-player card-player-video"><video class="player-video" controls preload="metadata" src="#{ERB::Util.html_escape(video_src)}"></video></div>)
+      # The shared site video player, the same as a video post's. Named for
+      # screen readers by the card's title, else the post's, as the audio
+      # player below is.
+      label = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
+      video = ApplicationController.renderer.render(
+        partial: "shared/video_player",
+        locals: { src: video_src, label: label, extra_class: "player-video" }
+      )
+      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}</div>)
     end
 
     card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
@@ -1849,37 +1990,72 @@ module HasMarkdownExtensions
     figure_html  =
       if show_artwork
         img = art.present? ?
-          %Q(<img class="player-cover" data-audio-player-target="artwork" src="#{ERB::Util.html_escape(art)}" alt="">) :
-          %Q(<img class="player-cover" data-audio-player-target="artwork" alt="" hidden>)
+          %Q(<img class="player-cover" data-player-part="artwork" src="#{ERB::Util.html_escape(art)}" alt="">) :
+          %Q(<img class="player-cover" data-player-part="artwork" alt="" hidden>)
         %Q(<figure class="player-figure">#{img}</figure>)
       else
         ""
       end
 
+    # The <audio> shows the browser's controls until player.js takes over;
+    # with nothing of its own to play (it's waiting to adopt a playlist) it
+    # starts hidden, since an empty browser bar plays nothing either.
+    native_hidden = audio_src.present? ? "" : " hidden"
     <<~HTML
-      <div class="card-player" data-controller="audio-player" data-audio-player-type-value="audio"#{member_upgrade_value} data-cover="#{ERB::Util.html_escape(cover)}">
-        <audio data-audio-player-target="audio" preload="metadata" hidden>#{sources_html}</audio>
+      <div class="card-player" data-player="audio" data-player-skip="15"#{member_upgrade_value} data-cover="#{ERB::Util.html_escape(cover)}">
         <div class="player-body">
           #{figure_html}
           <div class="player-main">
             <div class="player-now">
-              <span class="player-now-title" data-audio-player-target="title">#{title_html}</span>
-              <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener">[info]</a>
+              <span class="player-now-title" data-player-part="title">#{title_html}</span>
+              <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener" hidden>[info]</a>
             </div>
-            <div class="player-transport">
-              <button type="button" class="player-toggle" data-audio-player-target="playButton" data-action="click->audio-player#togglePlay" data-playing="false" aria-label="Play"></button>
-              <span class="player-time player-time-current" data-audio-player-target="currentTime">0:00</span>
-              <div class="player-progress" data-audio-player-target="progressBar" data-action="mousedown->audio-player#startScrub touchstart->audio-player#startScrub" role="slider" aria-label="Seek" tabindex="0">
-                <div class="player-progress-fill" data-audio-player-target="progressFill"></div>
-                <div class="player-progress-handle" data-audio-player-target="progressHandle"></div>
+            <audio class="player-native" data-player-part="media" controls preload="metadata"#{native_hidden}>#{sources_html}</audio>
+            <div class="player-transport" data-player-ui hidden>
+              <button type="button" class="player-toggle" data-player-part="play" data-playing="false" aria-label="Play"></button>
+              <span class="player-time player-time-current" data-player-part="current">0:00</span>
+              <div class="player-progress" data-player-part="progress" role="slider" aria-label="Seek" tabindex="0">
+                <div class="player-progress-fill" data-player-part="fill"></div>
+                <div class="player-progress-handle" data-player-part="handle"></div>
               </div>
-              <span class="player-time player-time-duration" data-audio-player-target="duration">0:00</span>
-              <button type="button" class="player-speed" data-audio-player-target="speedButton" data-action="click->audio-player#cycleSpeed" aria-label="Playback speed">1×</button>
+              <span class="player-time player-time-duration" data-player-part="duration">0:00</span>
+              <button type="button" class="player-speed" data-player-part="speed" aria-label="Playback speed">1×</button>
             </div>
           </div>
         </div>
+        #{player_duration_html(config)}
       </div>
     HTML
+  end
+
+  # `show_duration: true` — the length, under the player, before anything
+  # plays. Off by default: the audio transport already counts up to the
+  # total once it loads. Read from the card's own `duration:`, else the
+  # post's (the editor fills that in, YouTube videos included). Nothing when
+  # there's no length to show.
+  def player_duration_html(config)
+    return "" unless config[:show_duration].to_s.strip.downcase == "true"
+
+    raw = config[:duration].presence || (respond_to?(:duration) ? duration.to_s.strip.presence : nil)
+    return "" if raw.blank?
+
+    %(<div class="player-duration"><span class="duration">#{ERB::Util.html_escape(format_player_duration(raw))}</span></div>)
+  end
+
+  # "00:03:33" → "3:33", "01:02:03" → "1:02:03", "213" (seconds) → "3:33".
+  # The stored form is HH:MM:SS; leading zero hours are noise on a page.
+  def format_player_duration(raw)
+    seconds =
+      if raw.to_s.include?(":")
+        raw.to_s.split(":").map(&:to_i).reverse.each_with_index.sum { |n, i| n * (60**i) }
+      else
+        raw.to_i
+      end
+    return raw.to_s if seconds <= 0
+
+    h, rem = seconds.divmod(3600)
+    m, s = rem.divmod(60)
+    h.positive? ? format("%d:%02d:%02d", h, m, s) : format("%d:%02d", m, s)
   end
 
   # A track/episode's number for the player row: track_number, then
@@ -2006,8 +2182,9 @@ module HasMarkdownExtensions
       output << '    <div class="grid-item-footer">'
 
       if is_grouped
-        # Show price based on config setting
-        prices = group_products.map { |p| p.price.to_f }.compact
+        # Show price based on config setting. Only variants that set a price:
+        # one that doesn't (a store linking out to buy needn't) isn't $0.00.
+        prices = group_products.select { |p| p.metadata["price"].to_s.strip.present? }.map { |p| p.price.to_f }
         if prices.any?
           formatted_price = case price_display_mode
           when "lowest"
@@ -2022,6 +2199,9 @@ module HasMarkdownExtensions
             end
           end
           output << %Q(      <span class="grid-item-price">#{formatted_price}</span>)
+        else
+          # Kept, empty, so the button stays at the right (see below).
+          output << %Q(      <span class="grid-item-price"></span>)
         end
 
         # Grouped products can't be added to the cart from the grid — the buyer
@@ -2031,14 +2211,26 @@ module HasMarkdownExtensions
         primary_for_link = find_primary_product(group_products) || display_product
         output << %Q(      <a href="#{item_path(primary_for_link)}" class="btn-primary btn-grid">#{label}</a>)
       else
-        # Single product - show individual price and Add to Cart
-        if display_product.respond_to?(:price)
-          price_formatted = "#{currency_symbol}#{sprintf('%.2f', display_product.price)}"
-          output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
+        # Single product: its price, then a button that either adds it to the
+        # cart or goes to its page — store.yml's collection_buttons, and
+        # always the page when Snipcart is off. collection_buttons.text names
+        # it either way.
+        #
+        # The price only when there is one. A store that links out to buy
+        # needn't set one, and "$0.00" on a book that costs money is wrong.
+        # The span stays, empty: the footer spreads price and button to
+        # opposite ends, and without it the button jumps to the left.
+        price_formatted = if display_product.respond_to?(:price) && display_product.metadata["price"].to_s.strip.present?
+          "#{currency_symbol}#{sprintf('%.2f', display_product.price)}"
         end
+        output << %Q(      <span class="grid-item-price">#{price_formatted}</span>)
 
-        # Add to Cart button (if product has SKU)
-        if display_product.respond_to?(:sku) && display_product.sku.present?
+        custom_text = SiteConfig.feature("store", "collection_buttons.text").to_s.strip.presence
+
+        if SiteFeature.collection_buttons_link_to_page?
+          label = ERB::Util.html_escape(custom_text || "View")
+          output << %Q(      <a href="#{item_path(display_product)}" class="btn-primary btn-grid">#{label}</a>)
+        elsif display_product.respond_to?(:sku) && display_product.sku.present?
           product_url = item_path(display_product)
           domain = SiteConfig.feature("store", "default_domain")
           validation_url = domain ? "https://#{domain}#{product_url}" : product_url
@@ -2049,18 +2241,18 @@ module HasMarkdownExtensions
           #
           # A digital product that can't deliver gets no button here either,
           # or a grid would remain a way to buy something the product page
-          # already refuses to sell.
+          # already refuses to sell. (Not `next`: that skipped closing this
+          # item's footer and card, leaving the grid's HTML unbalanced.)
           if display_product.respond_to?(:deliverable?) && !display_product.deliverable?
             output << %Q(      <span class="btn-grid is-unavailable">Not available</span>)
-            next
+          else
+            output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
+            output << %Q(              data-turbo="false")
+            display_product.snipcart_attributes(url: validation_url).each do |key, value|
+              output << %Q(              #{key}="#{ERB::Util.html_escape(value)}")
+            end
+            output << %Q(      >#{ERB::Util.html_escape(custom_text || "Add to Cart")}</button>)
           end
-
-          output << %Q(      <button class="snipcart-add-item btn-primary btn-grid")
-          output << %Q(              data-turbo="false")
-          display_product.snipcart_attributes(url: validation_url).each do |key, value|
-            output << %Q(              #{key}="#{ERB::Util.html_escape(value)}")
-          end
-          output << %Q(      >Add to Cart</button>)
         end
       end
 
@@ -2196,7 +2388,7 @@ module HasMarkdownExtensions
     page = member_upgrade_page
     return "" unless page&.url_name.present?
 
-    %( data-audio-player-upgrade-url-value="/#{ERB::Util.html_escape(page.url_name)}")
+    %( data-player-upgrade-url="/#{ERB::Util.html_escape(page.url_name)}")
   end
 
   def member_upgrade_page
@@ -2394,7 +2586,9 @@ module HasMarkdownExtensions
   # render_post_link (which product-link delegates to), `skus`/`variants` by
   # ProductButtonRenderer, and the collection three by the collection renderer.
   CARD_EXTRA_KEYS = {
-    "player"       => %w[video],
+    # `duration` overrides the post's for show_duration — rarely needed, so
+    # the builder leaves it out.
+    "player"       => %w[video duration],
     "post-link"    => %w[subtitle_from_record],
     "product-link" => %w[subtitle_from_record],
     # `link` is what `link_url` used to be called, and `link_text` is the label
@@ -2405,7 +2599,10 @@ module HasMarkdownExtensions
     "aside"        => %w[link link_text]
   }.freeze
   ACTION_EXTRA_KEYS = { "product" => %w[skus variants] }.freeze
-  COLLECTION_EXTRA_KEYS = %w[part scope search].freeze
+  # `show_active` toggles the current-page `active` class on a menu (see
+  # render_menu / LayoutHelper#add_active_nav_class). It's a layout-only
+  # option with no builder field, so it lives here rather than in the schema.
+  COLLECTION_EXTRA_KEYS = %w[part scope search show_active].freeze
 
   # Every option Roe understands, grouped by the block it belongs to. Built from
   # the same schemas that drive the builder modals, so there's no second
@@ -3141,6 +3338,8 @@ module HasMarkdownExtensions
       render_signup_form(button_text, upgrade_text)
     when "signin"
       render_signin_form(button_text)
+    when "recovery"
+      render_recovery_form(button_text)
     when "checkout"
       member_text = config["member-button-text"] || config["member_button_text"] || button_text
       non_member_text = config["non-member-button-text"] || config["non_member_button_text"]
@@ -3216,6 +3415,7 @@ module HasMarkdownExtensions
     {
       "signup" => "Sign Up",
       "signin" => "Sign In",
+      "recovery" => "Reset Password",
       "checkout" => "Upgrade",
       "donate" => "Donate"
     }[form_type] || "Submit"
@@ -3426,8 +3626,27 @@ module HasMarkdownExtensions
     name_value = member ? CGI.escape_html(member.name.to_s) : ""
     email_value = member ? CGI.escape_html(member.email.to_s) : ""
 
+    # Password mode (email off): the member sets a password at signup, since
+    # there's no magic link and no email to send a set-password link to.
+    password_field = if SiteFeature.member_passwords_enabled?
+      <<~HTML
+        <div class="form-field">
+          <label for="member_password">Password</label>
+          <input type="password" name="member[password]" id="member_password" required>
+        </div>
+      HTML
+    else
+      ""
+    end
+
+    # data-turbo="false" on the form: the upgrade button uses
+    # formaction="/signup_and_checkout" to post somewhere other than the form's
+    # own action. Turbo Drive ignores a secondary button's formaction and posts
+    # to the form action regardless, so with Turbo on, "upgrade" silently ran
+    # the free /signup path and the page just re-rendered. A native submit
+    # honors formaction.
     <<~HTML
-      <form action="/signup" method="post">
+      <form action="/signup" method="post" data-turbo="false">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
 
         #{error_html}
@@ -3441,6 +3660,8 @@ module HasMarkdownExtensions
           <label for="member_email">Email</label>
           <input type="email" name="member[email]" id="member_email" value="#{email_value}" required>
         </div>
+
+        #{password_field}
 
         <button type="submit" class="btn-outline">#{button_text}</button>
         #{upgrade_button}
@@ -3460,6 +3681,31 @@ module HasMarkdownExtensions
       HTML
     end
 
+    # Password mode (email off): a magic link can't be sent, so sign-in is
+    # email + password. The button text default only fits the magic-link case,
+    # so swap it when the caller left it at the default.
+    if SiteFeature.member_passwords_enabled?
+      pw_button = button_text == "Send Magic Link" ? "Sign In" : button_text
+      return <<~HTML
+        <form action="/signin" method="post">
+          <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+
+          <div class="form-field">
+            <label for="member_email">Email</label>
+            <input type="email" name="member[email]" id="member_email" required>
+          </div>
+
+          <div class="form-field">
+            <label for="member_password">Password</label>
+            <input type="password" name="member[password]" id="member_password" required>
+          </div>
+
+          <button type="submit" class="btn-outline">#{CGI.escape_html(pw_button)}</button>
+          <p class="signin-recovery-link"><a href="/recover-account">Forgot your password?</a></p>
+        </form>
+      HTML
+    end
+
     <<~HTML
       <form action="/signin" method="post">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
@@ -3470,6 +3716,49 @@ module HasMarkdownExtensions
         </div>
 
         <button type="submit" class="btn-outline">#{button_text}</button>
+      </form>
+    HTML
+  end
+
+  # Password reset via a recovery code, for an email-off site. Only renders in
+  # password mode — with email on, there's nothing to recover this way (members
+  # reset by magic link). Posts to /recover-account (Members::RecoveryController).
+  def render_recovery_form(button_text = "Reset Password")
+    return "" unless SiteFeature.member_passwords_enabled?
+
+    if @rendering_static
+      return <<~HTML
+        <div class="recovery-link-block">
+          <a href="/recover-account" class="btn-primary">#{CGI.escape_html(button_text)}</a>
+        </div>
+      HTML
+    end
+
+    <<~HTML
+      <form action="/recover-account" method="post">
+        <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
+
+        <div class="form-field">
+          <label for="recovery_email">Email</label>
+          <input type="email" name="email" id="recovery_email" required>
+        </div>
+
+        <div class="form-field">
+          <label for="recovery_code">Recovery code</label>
+          <input type="text" name="recovery_code" id="recovery_code" required>
+        </div>
+
+        <div class="form-field">
+          <label for="recovery_password">New password</label>
+          <input type="password" name="password" id="recovery_password" required>
+        </div>
+
+        <div class="form-field">
+          <label for="recovery_password_confirmation">Confirm new password</label>
+          <input type="password" name="password_confirmation" id="recovery_password_confirmation" required>
+        </div>
+
+        <button type="submit" class="btn-outline">#{CGI.escape_html(button_text)}</button>
       </form>
     HTML
   end
@@ -3804,7 +4093,7 @@ module HasMarkdownExtensions
 
     hint_html = hint ? "<br><span style='color:#78350f'>#{dev_warning_text(hint)}</span>" : ""
     <<~HTML
-      <div style="border:2px dashed #f59e0b;padding:0.75rem 1rem;font-family:monospace;font-size:0.8rem;color:#92400e;background:#fffbeb;margin:0.5rem 0;">
+      <div data-roe-warning style="border:2px dashed #f59e0b;padding:0.75rem 1rem;font-family:monospace;font-size:0.8rem;color:#92400e;background:#fffbeb;margin:0.5rem 0;">
         <strong>⚠️ #{dev_warning_text(title)}</strong><br>
         #{dev_warning_text(message)}#{hint_html}
       </div>

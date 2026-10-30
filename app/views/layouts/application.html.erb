@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%# Content → Global auto duration, for media_duration.js. %>
+    <meta name="roe-auto-duration" content="<%= SiteConfig.auto_duration? ? 'on' : 'off' %>">
     <% if SiteConfig.get('favicon').present? %>
       <link rel="icon" type="image/x-icon" href="<%= config_image_path(SiteConfig.get('favicon')) %>">
     <% end %>
@@ -157,12 +159,12 @@
                 Settings
                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
               </button>
-              <% if any_integration_unconfigured? %>
-                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some integrations need configuration"></span>
+              <% if settings_need_attention? %>
+                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="Some settings need attention"></span>
               <% end %>
               <div data-dropdown-target="menu" class="hidden absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
-                <% if any_integration_unconfigured? %>
-                  <%= link_to admin_configs_path, class: "flex items-center justify-between px-4 py-2 text-sm text-amber-700 hover:bg-gray-100", title: "Some integrations need configuration" do %>
+                <% if settings_need_attention? %>
+                  <%= link_to admin_configs_path, class: "flex items-center justify-between px-4 py-2 text-sm text-amber-700 hover:bg-gray-100", title: "Some settings need attention" do %>
                     Roe
                     <span class="w-1.5 h-1.5 bg-amber-500 rounded-full" aria-hidden="true"></span>
                   <% end %>
@@ -172,7 +174,7 @@
                 <%= link_to "Account", admin_account_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
               </div>
             </div>
-            <a href="https://go-roe.com/documentation" class="text-sm font-medium text-gray-500 hover:text-gray-900">Docs</a>
+            <a href="/documentation/roe" class="text-sm font-medium text-gray-500 hover:text-gray-900">Docs</a>
             <%= button_to "Logout", session_path, method: :delete, class: "text-sm font-medium text-gray-500 hover:text-gray-900", form: { style: "display: inline;" } %>
           </div>
         </div>
@@ -187,7 +189,15 @@
             <% end %>
             <%= link_to "Media", browse_admin_medium_index_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
             <%= link_to "Layout", admin_layouts_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
-            <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+            <%# The dot: a theme or site script has a newer version shipped.
+                They're only offered on the Themes page, so without it an
+                update could sit there unseen. %>
+            <div class="relative inline-flex items-center">
+              <%= link_to "Themes", admin_themes_path, class: "text-sm font-medium text-gray-500 hover:text-gray-900" %>
+              <% if shipped_file_updates.any? %>
+                <span class="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-amber-500 rounded-full" title="<%= pluralize(shipped_file_updates.size, 'theme or script update') %> available"></span>
+              <% end %>
+            </div>
           </div>
 
           <%# Tools dropdown %>
@@ -203,11 +213,9 @@
                 <%# icon_svg('tools', class: 'w-4.5 h-4.5 text-gray-500 hover:text-gray-900') %>🛠️
               </button>
               <div data-dropdown-target="menu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg z-50">
-                <%= link_to "Feed Imports", admin_feed_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
-                <%= link_to "File Imports", admin_file_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
-                <%= link_to "Media Imports", admin_media_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
-                <%= link_to "Substack Imports", admin_imports_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
-                <%= link_to "Images", admin_dependencies_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+                <%= link_to "Imports", admin_importers_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+                <%= link_to "Images & Video", admin_dependencies_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
+                <%= link_to "Developer Tools", admin_development_dependencies_path, class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" %>
               </div>
             </div>
           </div>

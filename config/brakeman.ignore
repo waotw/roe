@@ -2501,7 +2501,179 @@
         915
       ],
       "note": "No model involved: the permitted hash is filtered to stripped strings and written to the music YAML config. Admin-only, and the same file has a raw YAML editor anyway."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "2e71bef4f7bae8eeaeee14cbef6815ecdce6e65862846c3d6859812ba607f429",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/site_sync/backup_manager.rb",
+      "line": 175,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::BackupManager",
+        "method": "self.restore"
+      },
+      "user_input": "rsync_filter_arg",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": "False positive. Same as the backup rsync: snapshot_path, SITE_PATH and the excludes are each passed through Shellwords.escape, and snapshot_path comes from resolve_snapshot_path, which refuses names outside BACKUP_ROOT."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "57df705f2cbe8df17ce6facdcb134fd1482f261dadd53bef9e53dca61b7f7433",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/api/site_sync/chunked_uploads_controller.rb",
+      "line": 63,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.rm_f(part_path(params[:upload_id].to_s))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::SiteSync::ChunkedUploadsController",
+        "method": "chunk"
+      },
+      "user_input": "params[:upload_id].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "False positive. upload_id must match UPLOAD_ID (/\\A\\h{32}\\z/) before part_path is built, so it can't contain a path separator or '..'."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "79a0c4b96be8803167438be12051e888b4b71672d0c9a0e9159fb070d8c892d8",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/api/site_sync/chunked_uploads_controller.rb",
+      "line": 59,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.open(part_path(params[:upload_id].to_s), \"ab\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::SiteSync::ChunkedUploadsController",
+        "method": "chunk"
+      },
+      "user_input": "params[:upload_id].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "False positive. upload_id must match UPLOAD_ID (/\\A\\h{32}\\z/) before part_path is built, so it can't contain a path separator or '..'."
+    },
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "998ce2a3ae9da3023ebe292a8d333d0e8c9cc908cafbdd5b432e640a34d55538",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/site_sync/backup_manager.rb",
+      "line": 77,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "`#{}`",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "SiteSync::BackupManager",
+        "method": "self.create"
+      },
+      "user_input": "rsync_filter_arg",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": "False positive. Every value in the rsync command is passed through Shellwords.escape: the source and destination paths, --link-dest (previous_snapshot), and the excludes (rsync_filter_arg escapes RSYNC_EXCLUDES and BackupPolicy.rsync_filter_args). Nothing from a request reaches it."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "9a222e92c990a2b34eb605796d370c66b6837fe9072a4e35da73acd11891ef95",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/themes_controller.rb",
+      "line": 112,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(File.join(SiteJavascript.site_dir, (File.basename(params[:id].to_s) or \"#{File.basename(params[:id].to_s)}.js\")), :type => \"application/octet-stream\", :disposition => \"attachment\", :filename => ((File.basename(params[:id].to_s) or \"#{File.basename(params[:id].to_s)}.js\")))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ThemesController",
+        "method": "download_script"
+      },
+      "user_input": "params[:id].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "False positive. The file name must be in SiteJavascript.shipped_names (an allowlist of the site JS files Roe ships) before send_file runs, and the action is admin-only."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "a0eea4ff8b1fd658829798c0f73f819e933694f814438a9a4a8d63362ecbf3cf",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/api/site_sync/chunked_uploads_controller.rb",
+      "line": 49,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "FileUtils.mkdir_p(File.dirname(part_path(params[:upload_id].to_s)))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::SiteSync::ChunkedUploadsController",
+        "method": "chunk"
+      },
+      "user_input": "params[:upload_id].to_s",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "False positive. upload_id must match UPLOAD_ID (/\\A\\h{32}\\z/, 32 hex characters) before part_path is built, so it can't contain a path separator or '..'."
+    },
+    {
+      "warning_type": "Cross-Site Scripting",
+      "warning_code": 4,
+      "fingerprint": "b9211b75fc5a9833c5993c695ba52b3968c6c861e145df254f6c37d403410ac6",
+      "check_name": "LinkToHref",
+      "message": "Potentially unsafe model attribute in `link_to` href",
+      "file": "app/views/admin/orders/show.html.erb",
+      "line": 30,
+      "link": "https://brakemanscanner.org/docs/warning_types/link_to_href",
+      "code": "link_to(((Unresolved Model).new.name or (Unresolved Model).new.sku), (Unresolved Model).new.url, :target => \"_blank\", :rel => \"noopener\", :class => \"text-blue-600 hover:text-blue-800 hover:underline\")",
+      "render_path": [
+        {
+          "type": "controller",
+          "class": "Admin::OrdersController",
+          "method": "show",
+          "line": 15,
+          "file": "app/controllers/admin/orders_controller.rb",
+          "rendered": {
+            "name": "admin/orders/show",
+            "file": "app/views/admin/orders/show.html.erb"
+          }
+        }
+      ],
+      "location": {
+        "type": "template",
+        "template": "admin/orders/show"
+      },
+      "user_input": "(Unresolved Model).new.url",
+      "confidence": "Weak",
+      "cwe_id": [
+        79
+      ],
+      "note": "Handled in the model. item.url comes from Snipcart's payload, so SnipcartOrder#items keeps it only when it matches LINKABLE_URL (http(s):// or a same-site path, not // or /\\); anything else, javascript: included, becomes nil and the view shows plain text. Tested in test/models/snipcart_order_test.rb and test/controllers/admin/orders_controller_test.rb. Brakeman can't see the model, so it still flags the view."
     }
   ],
-  "brakeman_version": "8.0.6"
+  "brakeman_version": "8.1.0"
 }

@@ -1,3 +1,15 @@
+/* ============== ROE SCRIPT ================
+   Roe Script: gallery
+   Version: 1.1
+   Fingerprint: 8ff28983
+   Bundled with: Roe v0.4.0
+
+   This file was installed from Roe. Leave this comment in place
+   and Admin → Updates will tell you when a newer version ships.
+   Edit anything below it freely — Roe can tell, and will never
+   overwrite your changes without asking.
+   ========================================== */
+
 // Roe gallery enhancements — progressive only.
 //
 // Galleries work without this file: click-to-zoom is pure CSS (:target),
@@ -30,6 +42,22 @@
 
   // ── Carousel: prev/next + dots ───────────────────────────────────────
   function enhanceCarousel(carousel) {
+    // Once per carousel. With Turbo, coming back to a page shows the copy it
+    // kept — nav included — and this file runs again on it, so without the
+    // mark every return added another nav. A copy kept with its nav but
+    // without the listeners behind it (Turbo keeps HTML, not handlers) has
+    // that dead nav removed and a working one built in its place.
+    if (
+      carousel.dataset.galleryEnhanced === "true" &&
+      carousel._galleryEnhanced
+    )
+      return;
+    carousel.querySelectorAll(":scope > .gallery-nav").forEach(function (old) {
+      old.remove();
+    });
+    carousel.dataset.galleryEnhanced = "true";
+    carousel._galleryEnhanced = true;
+
     var track = carousel.querySelector(".gallery-track");
     if (!track) return;
     var items = Array.prototype.slice.call(
@@ -150,6 +178,8 @@
   // nothing else to do, so a click anywhere on the overlay (the image or the
   // dark area) closes it. Without JS, × and Esc still close it.
   function enhanceZoom(zoom) {
+    if (zoom._galleryZoom) return; // once per element, as above
+    zoom._galleryZoom = true;
     zoom.addEventListener("click", function () {
       if (typeof zoom.hidePopover === "function") zoom.hidePopover();
     });
@@ -167,4 +197,8 @@
   } else {
     init();
   }
+  // Turbo page changes (on the dynamic site) don't fire DOMContentLoaded.
+  // Harmless on a static site, where it never fires. Both paths are safe to
+  // run twice — see the once-per-carousel check above.
+  document.addEventListener("turbo:load", init);
 })();

@@ -38,7 +38,21 @@ module Authentication
     end
 
     def after_authentication_url
-      session.delete(:return_to_after_authenticating) || root_url
+      # Return the admin to the page they were trying to reach before we bounced
+      # them to sign in (saved server-side in request_authentication, so it's
+      # always this host's own URL — not a user-supplied param). Guard on
+      # same-origin anyway as defense in depth, and fall back to the dashboard.
+      target = session.delete(:return_to_after_authenticating)
+      return admin_root_url if target.blank?
+
+      begin
+        uri = URI.parse(target)
+        same_host = uri.host.nil? || uri.host == request.host
+        return target if same_host && (uri.path.blank? || uri.path.start_with?("/"))
+      rescue URI::InvalidURIError
+        # fall through
+      end
+      admin_root_url
     end
 
     def start_new_session_for(user)

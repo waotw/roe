@@ -116,10 +116,25 @@
                           class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>"><%= value %></textarea>
 
               <% else %>
-                <input type="text" data-cb-field="<%= key %>" data-cb-default="<%= value %>"
-                       value="<%= value %>"
-                       data-action="input->card-builder#fieldChanged"
-                       class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">
+                <%# A media field gets a "Choose…" button that opens the media
+                    picker for that kind and fills the field with the file
+                    picked (card_builder#pickMedia). Typing a path or a
+                    YouTube link still works. %>
+                <% pick = field[:pick] %>
+                <div class="<%= 'flex gap-2' if pick %>">
+                  <input type="text" data-cb-field="<%= key %>" data-cb-default="<%= value %>"
+                         value="<%= value %>"
+                         data-action="input->card-builder#fieldChanged"
+                         class="cb-input w-full font-mono text-sm p-2 border border-gray-300 <%= 'cb-empty' if value.blank? %>">
+                  <% if pick %>
+                    <%# COPY: Choose button %>
+                    <button type="button"
+                            data-action="click->card-builder#pickMedia"
+                            data-cb-pick="<%= pick %>"
+                            data-cb-pick-field="<%= key %>"
+                            class="shrink-0 uppercase text-xs px-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Choose…</button>
+                  <% end %>
+                </div>
               <% end %>
 
               <% if field[:hint] %>
@@ -137,6 +152,7 @@
         <button type="button" data-action="click->card-builder#cancel"
                 class="uppercase text-xs px-3 py-1 border border-gray-400 bg-white hover:bg-gray-100 font-mono rounded-xs">Cancel</button>
         <button type="button" data-action="click->card-builder#insert"
+                data-card-builder-target="insertButton"
                 class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs">Insert</button>
       </div>
     </div>

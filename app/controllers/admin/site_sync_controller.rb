@@ -55,6 +55,7 @@ class Admin::SiteSyncController < Admin::BaseController
     # Persists across cache expiry (unlike the transient transfer status),
     # so the always-on status line can show "last synced …".
     @last_synced_at = @sync_conclusion.last_synced_at
+    @live_sync      = live_sync_overview
 
     # Live config for the form (token + peer_url). first_or_create!
     # auto-generates a token on first access, so the form always has
@@ -537,6 +538,38 @@ class Admin::SiteSyncController < Admin::BaseController
   end
 
   private
+
+  # The one answer to "is there anything to sync with live?" for this page.
+  # The overview line at the top and the "Changes to sync" panel both read
+  # it. They used to work it out separately: the top line looked only at
+  # this side's record, so it said "in sync" while the panel listed files
+  # that differed from live.
+  #
+  #   state:   :error | :pending | :checking | :in_sync
+  #   local:   this side's changes since the last sync, or nil
+  #   live:    live's changes since the last sync, or nil
+  #   differs: files that differ although neither record shows a change
+  #            (nil unless that's the case; [] when they couldn't be listed)
+  #   count:   files to sync, as the panel lists them
+  def live_sync_overview
+    return { state: :error, count: 0 } if @status[:state] == :error
+
+    local = @status[:state] == :local_drift ? @status[:local] : nil
+    live  = @peer_drift ? (@peer_state&.dig(:drift) || {}) : nil
+    differs = (Array(@sync_conclusion.agreement&.differing) if local.nil? && live.nil? && @sync_conclusion.out_of_sync?)
+
+    paths = [ local, live ].compact.flat_map { |c| Array(c[:modified]) + Array(c[:added]) + Array(c[:deleted]) }
+    paths += Array(differs)
+    count = helpers.collapsed_sync_count(paths.uniq)
+
+    state =
+      if local || live || differs then :pending
+      elsif @sync_conclusion.undecided? then :checking
+      else :in_sync
+      end
+
+    { state: state, local: local, live: live, differs: differs, count: count }
+  end
 
   def transfer_in_progress?
     Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)&.dig(:state) == :running

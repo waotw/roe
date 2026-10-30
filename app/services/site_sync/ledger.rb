@@ -13,7 +13,10 @@ module SiteSync
     #   - db/        managed by RoeUpdater::BackupManager (own backup system)
     #   - .git/      user's optional git repo for /site, not our concern
     #   - .sync-backups/ defensive — in case anyone parks site backups inside
-    EXCLUDED_DIRS = %w[db .git .sync-backups].freeze
+    #   - .sync-uploads/ large files arriving in pieces over HTTP Site Sync
+    #                   (Api::SiteSync::ChunkedUploadsController) — only the
+    #                   finished file belongs in /site's manifest
+    EXCLUDED_DIRS = %w[db .git .sync-backups .sync-uploads].freeze
 
     # Paths (nested) excluded as whole subtrees, matched as path
     # prefixes from /site's root:
@@ -93,15 +96,49 @@ module SiteSync
         end
 
         local     = new.current_manifest
-        confirmed = local.select { |path, _| peer_manifest.key?(path) }
-        dropped   = local.size - confirmed.size
+        previous  = recorded&.dig("files") || {}
+        confirmed = confirmed_entries(local, peer_manifest, previous)
+        dropped   = local.count { |path, _| !peer_manifest.key?(path) }
+        unagreed  = local.count { |path, entry| peer_manifest.key?(path) && !same_state?(entry, peer_manifest[path]) }
 
         if dropped.positive?
           Rails.logger.info "[SiteSync::Ledger] #{context}: #{dropped} local file(s) not on the peer — " \
                             "left out of the baseline so they stay a push, not a deletion"
         end
+        if unagreed.positive?
+          Rails.logger.info "[SiteSync::Ledger] #{context}: #{unagreed} file(s) differ from the peer's copy — " \
+                            "not recorded as agreed, so the next sync sees the difference"
+        end
 
         write_manifest!(confirmed)
+      end
+
+      # The baseline entries a write may record, given both sides' files and
+      # the baseline before it. A path both sides hold in the same state is
+      # agreed and recorded as that state. A path both hold but in different
+      # states isn't agreed — something changed on one side while the sync
+      # ran (a setting saved, a video's web version remade) — so it keeps its
+      # previous entry, or none. Recording either side's version there is
+      # what made the next sync read the OTHER side as the one that changed,
+      # and quietly overwrite the newer file with the older.
+      def confirmed_entries(local, peer, previous)
+        local.each_with_object({}) do |(path, entry), out|
+          theirs = peer[path]
+          next unless theirs
+
+          if same_state?(entry, theirs)
+            out[path] = entry
+          elsif previous[path]
+            out[path] = previous[path]
+          end
+        end
+      end
+
+      # Same size and modified time. Every transfer stamps the copy with the
+      # source's modified time (SiteWriter.restore_mtimes, the chunked
+      # endpoints), so a file both sides got from one sync matches exactly.
+      def same_state?(a, b)
+        a && b && a["size"].to_i == b["size"].to_i && a["mtime"].to_i == b["mtime"].to_i
       end
 
       # Compare two file-hashes, returning the file-level diff. Sorted
@@ -118,9 +155,9 @@ module SiteSync
         # Dropped from both sides instead: out of scope is not deleted. Done
         # here rather than at each caller because diff is the shared primitive
         # — Checker's banner, and anything else asking what changed.
-        if roe_docs_excluded?
-          current_files  = current_files.reject  { |path, _| roe_docs_path?(path) }
-          recorded_files = recorded_files.reject { |path, _| roe_docs_path?(path) }
+        if roe_docs_excluded? || LiveVideo.held_back_paths.any?
+          current_files  = current_files.reject  { |path, _| out_of_scope?(path) }
+          recorded_files = recorded_files.reject { |path, _| out_of_scope?(path) }
         end
 
         added = current_files.keys - recorded_files.keys
@@ -170,8 +207,38 @@ module SiteSync
         return true if EXCLUDED_DIRS.include?(parts.first)
         return true if EXCLUDED_FILES.include?(parts.last)
         return true if roe_docs_excluded? && relative_path.start_with?(ROE_DOCS_PATH)
+        return true if LiveVideo.held_back?(relative_path)
 
         EXCLUDED_PATHS.any? { |p| relative_path == p || relative_path.start_with?("#{p}/") }
+      end
+
+      # Kept on this computer by a setting, not protected: Roe's docs set to
+      # `local`, and video files the live-video setting keeps here
+      # (LiveVideo). Both are left out of every manifest, so a copy recorded
+      # in an older baseline, or one live still has, must be dropped from the
+      # comparison too — otherwise it reads as deleted. Out of scope is not
+      # deleted.
+      def out_of_scope?(relative_path)
+        (roe_docs_excluded? && roe_docs_path?(relative_path)) || LiveVideo.held_back?(relative_path)
+      end
+
+      # Drop out-of-scope paths from a peer's manifest (as returned by
+      # Exchange.fetch_peer_manifest), with its fingerprint recomputed to
+      # match. Live reports everything it has — that's how this side knows
+      # what to remove — but a held-back original it still holds isn't a
+      # difference.
+      def comparable_peer_manifest(peer)
+        return peer if peer.nil? || LiveVideo.held_back_paths.empty?
+
+        raw = peer["files"] || {}
+        files = raw.reject { |path, _| LiveVideo.held_back?(path) }
+        peer.merge(
+          "files" => files, "fingerprint" => fingerprint_of(files), "file_count" => files.size,
+          # The ones live still has and can drop. A sync with nothing else to
+          # send still removes these (SiteSyncTransferJob, `tidy:`), or a site
+          # with no other changes would keep them on live indefinitely.
+          "kept_here_on_peer" => LiveVideo.to_purge.select { |path| raw.key?(path) }
+        )
       end
 
       # Read once and held for the walk rather than per file — excluded? is
@@ -236,6 +303,7 @@ module SiteSync
       return {} unless Dir.exist?(@site_path)
 
       self.class.reset_roe_docs_cache!
+      LiveVideo.reset_cache!
 
       manifest = {}
       prefix = @site_path.end_with?("/") ? @site_path : "#{@site_path}/"

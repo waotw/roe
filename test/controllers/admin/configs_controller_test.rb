@@ -125,6 +125,66 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert StripeConfig.current.mode_test?
   end
 
+  # Writes a members.yml whose mode-agnostic amount drives the per-mode Stripe
+  # price. The fixture ensure_feature_file leaves price unset on purpose.
+  def write_members_price(price, enabled: true)
+    path = SiteConfig::FEATURES_PATH.join("members.yml")
+    File.write(path, <<~YAML)
+      payments:
+        enabled: #{enabled}
+        price: #{price}
+      newsletter:
+        enabled: true
+    YAML
+    SiteConfig.sync_from_file("features/members")
+    SiteConfig.reload!("features/members")
+  end
+
+  test "update_payments_mode regenerates the new mode's price from members.yml when it has none" do
+    write_members_price("5.00")
+    stripe = StripeConfig.current
+    stripe.update!(secret_key_live: "sk_live_123", verified_at: Time.current)
+    stripe.stubs(:current_price_id).returns(nil) # live price not created yet
+    StripeConfig.stubs(:current).returns(stripe)
+
+    # The owner set the amount; switching to live should create the live price
+    # silently, with no extra flash beyond the mode-change notice. (YAML parses
+    # the bare number as a Float — StripeProductManager#parse_price handles it.)
+    StripeProductManager.any_instance.expects(:sync_from_config)
+                        .with(has_entry("price", 5.0)).returns(true)
+
+    patch admin_mode_payments_config_path, params: { mode: "live" }
+
+    assert stripe.reload.mode_live?
+    assert_equal "Payments mode set to Live", flash[:notice]
+  end
+
+  test "update_payments_mode does not regenerate a price that already exists (never orphans a working one)" do
+    write_members_price("5.00")
+    stripe = StripeConfig.current
+    stripe.update!(secret_key_live: "sk_live_123", verified_at: Time.current)
+    stripe.stubs(:current_price_id).returns("price_live_existing")
+    StripeConfig.stubs(:current).returns(stripe)
+
+    StripeProductManager.any_instance.expects(:sync_from_config).never
+
+    patch admin_mode_payments_config_path, params: { mode: "live" }
+    assert stripe.reload.mode_live?
+  end
+
+  test "update_payments_mode skips price regeneration when no amount is set in members.yml" do
+    write_members_price("", enabled: true)
+    stripe = StripeConfig.current
+    stripe.update!(secret_key_live: "sk_live_123", verified_at: Time.current)
+    stripe.stubs(:current_price_id).returns(nil)
+    StripeConfig.stubs(:current).returns(stripe)
+
+    StripeProductManager.any_instance.expects(:sync_from_config).never
+
+    patch admin_mode_payments_config_path, params: { mode: "live" }
+    assert stripe.reload.mode_live?
+  end
+
   test "disconnect_payments clears all keys" do
     stripe = StripeConfig.current
     stripe.update!(
@@ -154,7 +214,7 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     stripe = StripeConfig.current
     stripe.update!(publishable_key_test: "pk_test_123", secret_key_test: "sk_test_123")
 
-    Stripe::Balance.expects(:retrieve).returns(OpenStruct.new(object: "balance"))
+    Stripe::WebhookEndpoint.expects(:list).returns(OpenStruct.new(data: []))
 
     post admin_verify_payments_config_path
 
@@ -167,10 +227,13 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
   # ── Newsletters (Postmark) ───────────────────────────────────────────────
 
-  test "edit_newsletters renders the integration form" do
+  test "edit_newsletters renders the read-only Postmark UI" do
     get admin_edit_newsletters_config_path
     assert_response :success
-    assert_select "form[action=?]", admin_newsletters_config_path
+    # Read-only: a test panel + webhook status, and NO manual key-input form.
+    assert_select "[data-test=postmark-test-test]"
+    assert_select "[data-test=postmark-webhook-status]"
+    assert_select "form[action=?]", admin_newsletters_config_path, count: 0
   end
 
   test "update_newsletters writes test token to YAML and syncs" do
@@ -258,6 +321,9 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     get admin_edit_snipcart_integration_config_path
     assert_response :success
     assert_select "form[action=?]", admin_snipcart_integration_config_path
+    # Status checklist + webhook URL section, matching the other integrations.
+    assert_select "[data-test=snipcart-status]"
+    assert_select "[data-test=snipcart-webhook-section]"
   end
 
   test "edit_snipcart renders snippet-only tabs that work locally" do
@@ -265,8 +331,8 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     # Tabs renamed, both usable locally (no production gate, no masked inputs).
-    assert_select "button[data-tabs-panel=?]", "test", text: /Local\/Test/
-    assert_select "button[data-tabs-panel=?]", "live", text: /Live\/Static Site/
+    assert_select "button[data-tabs-panel=?]", "test", text: /\bTest\b/
+    assert_select "button[data-tabs-panel=?]", "live", text: /\bLive\b/
     assert_select "textarea[name=?]", "test[snippet]"
     assert_select "textarea[name=?]", "live[snippet]"
     # No leftover secret-key inputs.

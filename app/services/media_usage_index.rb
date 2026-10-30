@@ -36,13 +36,18 @@ class MediaUsageIndex
   # parens, or whitespace in markdown/HTML/YAML don't get captured.
   MEDIA_PATH = %r{/media/[\w./\-]+}
 
+  # A /media/ path inside a stylesheet's url(), quoted or not. A quoted path
+  # can hold spaces.
+  CSS_URL = /url\(\s*["']?(\/media\/[^"')]+?)["']?\s*\)/i
+
   # Compact per-source labels shown next to each backlink.
   KIND_LABELS = {
     "post" => "post",
     "page" => "page",
     "documentation" => "doc",
     "product" => "prod.",
-    "config" => "config"
+    "config" => "config",
+    "theme" => "theme"
   }.freeze
 
   # DB-backed content types to scan. Each is an ActiveRecord model exposing
@@ -93,6 +98,7 @@ class MediaUsageIndex
 
     scan_content_sources(index)
     scan_config_sources(index) if self.class.config_backlinks_enabled?
+    scan_theme_sources(index)
 
     # Freeze into a plain hash so callers get [] for misses without mutating.
     index.default = [].freeze
@@ -136,6 +142,37 @@ class MediaUsageIndex
         index[path] << { kind: "config", type: KIND_LABELS["config"], label: label, url: with_focus(base, field_key), global: true, paid: false }
       end
     end
+  end
+
+  # Theme stylesheets (site/theme/*.css): a background image or font under
+  # /media/ is in use even though no post mentions it. Every theme counts,
+  # not just the active one — switching back to a theme shouldn't find its
+  # images deleted as "unused". The link opens the CSS editor at the line.
+  def scan_theme_sources(index)
+    Dir.glob(File.join(RoeSitePaths::SITE_PATH, "theme", "*.css")).sort.each do |file|
+      name = File.basename(file, ".css")
+      css = File.read(file) rescue next
+      paths = paths_in_css(css)
+      next if paths.empty?
+
+      url = resolve_url(:edit_admin_theme_path, name)
+      paths.each do |path|
+        index[path] << { kind: "theme", type: KIND_LABELS["theme"], label: "#{name}.css", url: with_highlight(url, path), global: true, paid: false }
+      end
+    end
+  end
+
+  # Media paths in a stylesheet. Comments are dropped first: a /media/ path
+  # in a comment is an example, not a use. url() may quote its path, and a
+  # quoted one can hold spaces.
+  def paths_in_css(css)
+    code = css.to_s.gsub(%r{/\*.*?\*/}m, "")
+    paths = code.scan(CSS_URL).flatten.map(&:strip)
+    # Anything else that names a /media/ path (an @import, a custom property
+    # holding a bare path). Taken from what's left once the url()s are out,
+    # so a quoted path with a space isn't also found cut short at the space.
+    paths.concat code.gsub(CSS_URL, "").scan(MEDIA_PATH)
+    paths.uniq
   end
 
   # Media paths in free-text content (a post/page body). Paths appear inside

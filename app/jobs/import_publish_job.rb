@@ -32,11 +32,12 @@ class ImportPublishJob < ApplicationJob
     @import     = Import.find(import_id)
     @started_at = Time.current
     @counts = {
-      members_inserted: 0, members_skipped: 0,
+      members_inserted: 0, members_updated: 0, members_skipped: 0,
       sends_inserted:   0, sends_skipped:   0,
       sends_no_post:    0, sends_no_member: 0
     }
     @errors = []
+    @follow_up = {}
 
     update_step(:starting)
 
@@ -49,6 +50,7 @@ class ImportPublishJob < ApplicationJob
       started_at:   @started_at,
       completed_at: completed_at,
       counts:       @counts,
+      follow_up:    @follow_up,
       errors:       @errors.first(50)
     )
 
@@ -61,6 +63,7 @@ class ImportPublishJob < ApplicationJob
       "published_to_live" => {
         "at"     => completed_at.iso8601,
         "counts" => @counts.transform_keys(&:to_s),
+        "follow_up" => @follow_up,
         "errors" => @errors.first(50)
       }
     )
@@ -93,8 +96,17 @@ class ImportPublishJob < ApplicationJob
       raise "publish_members batch failed (network/auth/peer error)" unless result
 
       @counts[:members_inserted] += result["inserted"].to_i
+      @counts[:members_updated]  += result["updated"].to_i
       @counts[:members_skipped]  += result["skipped"].to_i
       @errors.concat(Array(result["errors"]))
+
+      # Emails the peer wouldn't apply, grouped by why. The owner finishes
+      # these by hand, so they're kept per-reason rather than pooled into a
+      # count — "12 skipped" tells nobody which 12, or what to do about them.
+      (result["follow_up"] || {}).each do |reason, emails|
+        next if Array(emails).empty?
+        (@follow_up[reason] ||= []).concat(Array(emails))
+      end
 
       update_step(:publishing_members)
     end

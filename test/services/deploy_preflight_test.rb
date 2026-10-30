@@ -6,6 +6,8 @@ require "test_helper"
 # stopped local Docker surfaces as "Permission denied (publickey)" against the
 # deploy server, which reads as a problem with the server and isn't.
 class DeployPreflightTest < ActiveSupport::TestCase
+  include DeployMessageHelper
+
   test "nothing to report when Docker is up" do
     preflight = DeployPreflight.new
     preflight.stubs(:docker_running?).returns(true)
@@ -23,17 +25,12 @@ class DeployPreflightTest < ActiveSupport::TestCase
   end
 
   # The same problem reached two ways — caught beforehand, or read off a failed
-  # log — has to read the same either way. It was duplicated in both files and
-  # only stayed in step by luck.
+  # log — has to read the same either way: both name the one message file.
   test "the wording comes from the one place deploy messages live" do
     preflight = DeployPreflight.new
     preflight.stubs(:docker_running?).returns(false)
-    issue = preflight.docker_issue
-    from_log = DeployDiagnostics.for("Cannot connect to the Docker daemon")
 
-    assert_equal from_log.title, issue.title
-    assert_equal from_log.explanation, issue.explanation
-    assert_equal from_log.steps, issue.steps
+    assert_equal DeployDiagnostics.for("Cannot connect to the Docker daemon").key, preflight.docker_issue.key
   end
 
   test "a stopped Docker is reported in terms of this computer, not the server" do
@@ -43,8 +40,8 @@ class DeployPreflightTest < ActiveSupport::TestCase
     issue = preflight.docker_issue
 
     assert_match(/Docker isn't running/, issue.title)
-    assert_match(/this computer/, issue.title + issue.explanation)
-    assert issue.steps.any?
+    assert_match(/this computer/, deploy_message_text(issue.key, context: :before))
+    assert_match(/Docker Desktop/, deploy_message_text(issue.key, context: :before))
   end
 
   # A check that hangs is worse than one that fails.

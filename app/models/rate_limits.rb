@@ -35,7 +35,12 @@ class RateLimits
     "magic_link" => { "to" => 5,  "within" => 15, "by" => :email },
     "signup"     => { "to" => 20, "within" => 60, "by" => :ip },
     "checkout"   => { "to" => 20, "within" => 60, "by" => :ip },
-    "token"      => { "to" => 30, "within" => 60, "by" => :ip }
+    "token"      => { "to" => 30, "within" => 60, "by" => :ip },
+    # Recovery-code password reset (email-off sites). Keyed by IP — a guess is
+    # cheap and there's nothing narrower to use before the member is known — and
+    # set high enough that a member working through their saved codes won't hit
+    # it.
+    "recovery"   => { "to" => 30, "within" => 60, "by" => :ip }
   }.freeze
 
   # Deliberately absent: the search index. It's one URL holding the public

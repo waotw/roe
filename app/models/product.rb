@@ -21,6 +21,16 @@ class Product < ApplicationRecord
   # to flag published products that are missing critical info.
   REQUIRED_FIELDS = %w[title category price sku image].freeze
 
+  # What a cart needs and a store that links out to buy doesn't: Snipcart
+  # identifies an item by its SKU and charges its price. With Snipcart off a
+  # product is shown and linked, so neither is required — both still work
+  # when set (the price shows; the SKU still finds the product in a button).
+  SNIPCART_FIELDS = %w[price sku].freeze
+
+  def self.required_fields
+    SiteFeature.snipcart_enabled? ? REQUIRED_FIELDS : REQUIRED_FIELDS - SNIPCART_FIELDS
+  end
+
   # Metadata fields that point at files under site/media/...
   MEDIA_FIELDS = %w[image].freeze
 
@@ -110,8 +120,10 @@ class Product < ApplicationRecord
 
   # URL helpers
   def public_url
-    "/store/#{url_name}"
+    self.class.public_url_for(url_name)
   end
+
+  def self.public_url_for(slug) = "/store/#{slug}"
 
   # Snipcart data attributes
   # A downloadable product rather than something posted. The toggle is what
@@ -364,9 +376,9 @@ class Product < ApplicationRecord
                        .group_by(&:sku)
   end
 
-  # Returns the names of REQUIRED_FIELDS that are blank on this product.
+  # Returns the names of the required fields that are blank on this product.
   def missing_required_fields
-    REQUIRED_FIELDS.reject { |name| metadata[name].to_s.strip.present? }
+    self.class.required_fields.reject { |name| metadata[name].to_s.strip.present? }
   end
 
   # Returns [{ field:, path:, exists: }] for every media field this
@@ -398,8 +410,11 @@ class Product < ApplicationRecord
   end
 
   # Guardless version of needs_attention? — used to gate bulk publish on drafts.
+  # Delivery is a Snipcart question (can it send the file it sold?), so it
+  # only counts with Snipcart on.
   def publish_warnings?
-    missing_required_fields.any? || missing_media_refs.any? || !deliverable?
+    missing_required_fields.any? || missing_media_refs.any? ||
+      (SiteFeature.snipcart_enabled? && !deliverable?)
   end
 
   # The ProductGroup this product belongs to (2+ products sharing a `group:`

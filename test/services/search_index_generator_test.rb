@@ -30,15 +30,21 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     )
   end
 
+  # The menu goes in whichever file the site reads for the header slot — an
+  # existing header.md outranks navigation.md (LayoutFiles), so writing
+  # navigation.md alone tested nothing when another test left a header behind.
   def write_nav(content)
-    dir = RoeSitePaths::SITE_LAYOUT_PATH
-    FileUtils.mkdir_p(dir)
-    File.write(File.join(dir, "navigation.md"), content)
+    FileUtils.mkdir_p(LayoutFiles.dir)
+    unless @nav_path # keep the first snapshot if a test writes the menu twice
+      @nav_path = LayoutFiles.path("header")
+      @nav_before = File.exist?(@nav_path) ? File.binread(@nav_path) : nil
+    end
+    File.write(@nav_path, content)
   end
 
   def teardown
-    nav = File.join(RoeSitePaths::SITE_LAYOUT_PATH, "navigation.md")
-    File.delete(nav) if File.exist?(nav)
+    return unless @nav_path
+    @nav_before ? File.binwrite(@nav_path, @nav_before) : FileUtils.rm_f(@nav_path)
   end
 
   def entries
@@ -154,6 +160,150 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     assert e, "expected paid teaser indexed"
     assert_equal true, e[:paid]
     refute_includes e[:text].to_s, "secret paid body"
+  end
+
+  # --- paywall split ---------------------------------------------------------
+
+  PAYWALLED = "Free intro everyone may read.\n\n```form for: paid_content\nUpgrade now!\n```\n\nSecret paid body below the wall."
+  PAYWALLED_MULTILINE = "Free intro everyone may read.\n\n```form\nfor: paid_content\nbutton: Upgrade\n```\n\nSecret paid body below the wall."
+
+  test "public index carries a paid post's text above the paywall but nothing below" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "Walled", audience: "paid", body: PAYWALLED)
+
+    e = entry_titled("Walled")
+    assert_includes e[:text], "Free intro everyone may read"
+    refute_includes e[:text], "Secret paid body"
+    refute_includes e[:text], "Upgrade now"
+  end
+
+  test "paywall with for: paid_content on its own line splits the same way" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "Walled Two", audience: "paid", body: PAYWALLED_MULTILINE)
+
+    e = entry_titled("Walled Two")
+    assert_includes e[:text], "Free intro everyone may read"
+    refute_includes e[:text], "Secret paid body"
+  end
+
+  test "a paid post with no paywall is fully gated, so only its excerpt is public" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "No Wall", audience: "paid", body: "Every word here is paid.")
+
+    refute_includes entry_titled("No Wall")[:text], "Every word here is paid"
+  end
+
+  # --- paid audience (members' index) ---------------------------------------
+
+  def paid_entries
+    SearchIndexGenerator.build(audience: :paid)[:entries]
+  end
+
+  test "paid index carries a paid post's full text, including below the paywall" do
+    SiteConfig.stubs(:feature).returns(nil)
+    make_post(title: "Walled", audience: "paid", body: PAYWALLED)
+
+    e = paid_entries.find { |x| x[:title] == "Walled" }
+    assert e, "paid post should be in the paid index"
+    assert_includes e[:text], "Secret paid body below the wall"
+    assert_equal true, e[:paid]
+  end
+
+  test "paid index includes paid posts even when show_paid_content is off" do
+    SiteConfig.stubs(:feature).returns(nil)
+    make_post(title: "Hidden Teaser", audience: "paid", body: "secret paid body")
+
+    assert_nil entry_titled("Hidden Teaser"), "public index excludes it"
+    assert paid_entries.find { |x| x[:title] == "Hidden Teaser" }, "paid index includes it"
+  end
+
+  test "paid index still excludes drafts and only_paid" do
+    SiteConfig.stubs(:feature).returns(nil)
+    make_post(title: "Draft Paid", audience: "paid", status: "draft")
+    make_post(title: "Only Paid", audience: "only_paid")
+
+    titles = paid_entries.map { |x| x[:title] }
+    refute_includes titles, "Draft Paid"
+    refute_includes titles, "Only Paid"
+  end
+
+  test "rejects an unknown audience" do
+    assert_raises(ArgumentError) { SearchIndexGenerator.build(audience: :admin) }
+  end
+
+  # --- long posts: prose prefix + vocabulary ---------------------------------
+
+  # ~9,000 characters of filler, then one distinctive word near the end.
+  LONG_BODY = ((("The quick brown fox jumps over the lazy dog. " * 200) +
+               "Finally we reach the word zymurgy and the year 1987 here.")).freeze
+
+  test "a word deep in a long post is searchable" do
+    make_post(title: "Long Read", body: LONG_BODY)
+    e = entry_titled("Long Read")
+
+    assert e[:text].length > SearchIndexGenerator::PROSE_LIMIT, "should carry more than the prose prefix"
+    assert_includes e[:text], "zymurgy"
+    assert_includes e[:text], "1987"
+  end
+
+  test "the first 2,000 characters stay as running prose so phrases still match" do
+    make_post(title: "Long Read", body: LONG_BODY)
+    assert_includes entry_titled("Long Read")[:text], "quick brown fox jumps over the lazy dog"
+  end
+
+  test "the vocabulary drops stopwords and repeats, and stays bounded" do
+    make_post(title: "Long Read", body: LONG_BODY)
+    text = entry_titled("Long Read")[:text]
+    vocab = text[SearchIndexGenerator::PROSE_LIMIT..].to_s.split
+
+    assert_not_includes vocab, "the"
+    assert_not_includes vocab, "over"
+    assert_equal vocab.uniq.size, vocab.size, "no repeated terms in the vocabulary"
+    assert text.length <= SearchIndexGenerator::TEXT_LIMIT
+    # The 9,000-character body folds to a handful of distinct terms.
+    assert vocab.size < 20, "expected a small vocabulary, got #{vocab.size}"
+  end
+
+  test "a short post is unchanged: prose only, no vocabulary tail" do
+    make_post(title: "Short", body: "Just a few words about zymurgy.")
+    e = entry_titled("Short")
+    assert_equal "Short Just a few words about zymurgy.", e[:text]
+  end
+
+  # --- headings ------------------------------------------------------------
+
+  HEADED = "Intro text.\n\n## Where the Money Goes\n\nBody.\n\n### A *styled* heading ##\n\n```\n# not a heading\n```\n\nMore."
+
+  test "headings are indexed whole, as prose, without markup or code" do
+    make_post(title: "Headed", body: HEADED)
+    h = entry_titled("Headed")[:headings]
+
+    assert_includes h, "Where the Money Goes"
+    assert_includes h, "A styled heading"
+    assert_not_includes h, "not a heading"
+    assert_not_includes h, "*"
+  end
+
+  test "a post with no headings has no headings key" do
+    make_post(title: "Plain", body: "No headings here.")
+    assert_nil entry_titled("Plain")[:headings]
+  end
+
+  test "public index carries only the headings above a paid post's paywall" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "Walled Headings", audience: "paid",
+      body: "## Free Heading\n\nintro\n\n```form for: paid_content\nUpgrade\n```\n\n## Secret Heading\n\npaid")
+
+    pub  = entry_titled("Walled Headings")[:headings]
+    paid = paid_entries.find { |x| x[:title] == "Walled Headings" }[:headings]
+
+    assert_includes pub, "Free Heading"
+    assert_not_includes pub, "Secret Heading"
+    assert_includes paid, "Secret Heading"
   end
 
   test "indexes products (which lack HasAudience) as public" do

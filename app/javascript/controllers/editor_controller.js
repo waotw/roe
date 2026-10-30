@@ -1,4 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
+import {
+  wantsBackgroundSave,
+  backgroundSave,
+} from "controllers/editor_background_save";
 
 // Import EditorState directly
 if (!window.EditorState || !window.EditorState.saveElement) {
@@ -94,6 +99,10 @@ export default class extends Controller {
     "saveMessage",
     "leaveModal",
     "unpublishModal",
+    "redirectModal",
+    "redirectFrom",
+    "redirectTo",
+    "redirectFromField",
   ];
 
   static values = {
@@ -109,6 +118,12 @@ export default class extends Controller {
     knownFields: Array,
     defaultAuthor: String,
     highlightMedia: String,
+    originalUrlName: String,
+    filenameSlug: String,
+    published: Boolean,
+    // Where this kind of content lives: "/posts/", "/" for pages, "/store/"
+    // for products. Used only by the slug-change redirect modal.
+    publicPathPrefix: { type: String, default: "/posts/" },
   };
 
   connect() {
@@ -173,10 +188,12 @@ export default class extends Controller {
     this.textareaTarget.addEventListener("input", () => {
       this.updateSaveState();
       this.schedulePreviewUpdate();
+      this.scheduleDraftSave();
     });
     this.metadataPreviewHandler = () => {
       this.updateSaveState();
       this.schedulePreviewUpdate();
+      this.scheduleDraftSave();
     };
     document.addEventListener("metadata:changed", this.metadataPreviewHandler);
 
@@ -206,6 +223,15 @@ export default class extends Controller {
       ? this.metadataTarget.value
       : "";
 
+    // ── Local draft recovery ──────────────────────────────────────────────
+    // Autosave edits to localStorage so an accidental navigation, reload, tab
+    // close, or crash can't lose unsaved work. This is what lets the editor be
+    // a normal Turbo page (no full-reload flicker) rather than relying on the
+    // full-reload beforeunload guard to protect changes. Set up before the
+    // input listeners below wire autosave; runs the restore prompt at the end
+    // of connect() once the DOM is settled.
+    this.setupDraftRecovery();
+
     // Setup broadcast channel for preview
     const previewId = `${this.resourceTypeValue}-${this.resourceIdValue}`;
     this.previewChannel = new BroadcastChannel(`preview-${previewId}`);
@@ -229,6 +255,16 @@ export default class extends Controller {
     this.element.addEventListener(
       "gallery-builder:pick-images",
       this.galleryPickHandler,
+    );
+
+    // The card builder asks for one file for a field (the player's Audio or
+    // Video). Same arrangement: the editor opens the picker, and the card
+    // builder listens for media-picker:pick-for-card itself.
+    this.cardPickHandler = (event) =>
+      this.openMediaPickerFor(event.detail?.mediaType || "audio", "card");
+    this.element.addEventListener(
+      "card-builder:pick-media",
+      this.cardPickHandler,
     );
 
     // Listen for media picker close events (e.g. Cancel button)
@@ -352,6 +388,14 @@ export default class extends Controller {
     // CHECK BUTTON ON INITIAL LOAD
     this.checkInitialButtonState();
 
+    // Offer to restore a locally-saved draft if one is newer than the file and
+    // differs from it. Runs last so the banner mounts into a settled DOM.
+    this.maybeOfferDraftRestore();
+
+    // A footnote that was open when this page was left (to find a quote, or
+    // by saving) gets its Close Footnote button back.
+    this.restoreOpenFootnote();
+
     // Add global keyboard shortcut handler
     this.globalKeydownHandler = this.handleKeydown.bind(this);
     document.addEventListener("keydown", this.globalKeydownHandler);
@@ -435,6 +479,214 @@ export default class extends Controller {
     }
   }
 
+  // ── Local draft recovery ────────────────────────────────────────────────
+  // Autosaves the in-progress content + metadata to localStorage so unsaved
+  // work survives an accidental navigation, reload, tab close, or crash. This
+  // is the safety net that lets the editor be a normal Turbo page instead of a
+  // full-reload document: even without the browser's Back/Forward beforeunload
+  // prompt, nothing is lost — the next visit offers to restore.
+
+  setupDraftRecovery() {
+    // Scoped per resource so two tabs editing different posts don't collide.
+    this.draftKey = `roe:editor-draft:${this.resourceTypeValue}:${this.resourceIdValue}`;
+
+    // A cheap fingerprint of the file as loaded. Stored with the draft so a
+    // later visit can tell whether the file changed underneath the draft
+    // (another admin session, a git pull, Site Sync) — see maybeOfferDraftRestore.
+    this.draftBaseline = this.fingerprint(
+      this.originalContent,
+      this.originalMetadata,
+    );
+  }
+
+  // Non-cryptographic string hash (djb2-ish). We only need change detection,
+  // not security — this avoids pulling in a hashing lib and works offline.
+  fingerprint(content, metadata) {
+    const str = `${content}\u0000${metadata || ""}`;
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash * 33) ^ str.charCodeAt(i);
+    }
+    // >>> 0 coerces to unsigned; base36 keeps it short.
+    return (hash >>> 0).toString(36) + ":" + str.length.toString(36);
+  }
+
+  currentMetadataValue() {
+    return this.hasMetadataTarget ? this.metadataTarget.value : "";
+  }
+
+  // Debounced — fired from the same input/metadata:changed listeners as the
+  // preview update, so it costs one localStorage write ~1s after typing stops.
+  scheduleDraftSave() {
+    clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = setTimeout(() => this.saveDraft(), 1000);
+  }
+
+  saveDraft() {
+    if (this.isSaving) return;
+    // Only persist a draft while the editor is actually dirty. A clean editor
+    // has nothing worth restoring, and this keeps a stale draft from lingering
+    // after an external change reverts the buffer to match the file.
+    if (!this.isDirty()) {
+      this.clearDraft();
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        this.draftKey,
+        JSON.stringify({
+          content: this.textareaTarget.value,
+          metadata: this.currentMetadataValue(),
+          baseline: this.draftBaseline,
+          savedAt: Date.now(),
+        }),
+      );
+    } catch (e) {
+      // Quota / privacy mode — draft recovery is best-effort, never fatal.
+      console.warn("[editor] could not autosave draft:", e);
+    }
+  }
+
+  clearDraft() {
+    clearTimeout(this.draftSaveTimer);
+    try {
+      localStorage.removeItem(this.draftKey);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  readDraft() {
+    try {
+      const raw = localStorage.getItem(this.draftKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  maybeOfferDraftRestore() {
+    const draft = this.readDraft();
+    if (!draft) return;
+
+    // If the draft matches the file as loaded, there's nothing to restore
+    // (e.g. saved elsewhere, or an empty edit). Drop it and move on.
+    const draftPrint = this.fingerprint(draft.content, draft.metadata);
+    const filePrint = this.fingerprint(
+      this.originalContent,
+      this.originalMetadata,
+    );
+    if (draftPrint === filePrint) {
+      this.clearDraft();
+      return;
+    }
+
+    // Staleness: the file the draft was based on differs from the file now on
+    // disk. Restoring would discard whatever changed the file. Warn, don't block.
+    const stale = draft.baseline && draft.baseline !== filePrint;
+
+    this.renderDraftBanner(draft, stale);
+  }
+
+  renderDraftBanner(draft, stale) {
+    // Remove any prior banner (guards against double-connect).
+    this.dismissDraftBanner();
+
+    const when = this.formatDraftAge(draft.savedAt);
+    const banner = document.createElement("div");
+    banner.dataset.editorDraftBanner = "true";
+    banner.setAttribute("role", "alert");
+    banner.className =
+      "mb-4 flex items-start justify-between gap-4 rounded-xs border px-4 py-3 text-sm " +
+      (stale
+        ? "border-amber-300 bg-amber-50 text-amber-900"
+        : "border-blue-300 bg-blue-50 text-blue-900");
+
+    const message = document.createElement("div");
+    // COPY: draft recovery banner
+    message.innerHTML = stale
+      ? `<strong>Unsaved changes (${when}).</strong><br>` +
+        `Heads up — this file was changed multiple times. (editing the file directly, site sync). ` +
+        `Restoring will replace what you have below with your unsaved changes. ` +
+        `Discarding will keep what you have below right now.`
+      : `<strong>Unsaved changes (${when}).</strong><br>` +
+        `Restore unsaved changes or discard to keep the saved version.`;
+
+    const actions = document.createElement("div");
+    actions.className = "flex shrink-0 gap-2";
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className =
+      "uppercase font-mono rounded-xs bg-blue-600 px-3 py-1.5 font-medium text-white hover:bg-blue-700";
+    restoreBtn.textContent = "Restore"; // COPY
+    restoreBtn.addEventListener("click", () => this.restoreDraft(draft));
+
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className =
+      "uppercase font-mono rounded-xs border border-current px-3 py-1.5 font-medium hover:bg-black/5";
+    discardBtn.textContent = "Discard"; // COPY
+    discardBtn.addEventListener("click", () => {
+      this.clearDraft();
+      this.dismissDraftBanner();
+      // A note that only existed in the draft is gone with it.
+      this.restoreOpenFootnote();
+    });
+
+    actions.append(restoreBtn, discardBtn);
+    banner.append(message, actions);
+
+    // Mount at the top of the editor's element so it's the first thing seen.
+    this.element.prepend(banner);
+    this.draftBanner = banner;
+  }
+
+  restoreDraft(draft) {
+    this.textareaTarget.value = draft.content;
+
+    if (this.hasMetadataTarget) {
+      this.metadataTarget.value = draft.metadata || "";
+      // Let the metadata editor rebuild its fields from the restored YAML.
+      document.dispatchEvent(
+        new CustomEvent("editor:metadata-restored", {
+          detail: { metadata: draft.metadata || "" },
+        }),
+      );
+    }
+
+    this.dismissDraftBanner();
+    this.updateSaveState();
+    this.schedulePreviewUpdate();
+    // The restored buffer is unsaved by definition — keep the draft until the
+    // user actually saves, so a second mishap is still covered.
+    this.textareaTarget.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // A footnote open when the page was left may only exist in the draft.
+    this.restoreOpenFootnote();
+  }
+
+  dismissDraftBanner() {
+    const existing = this.element.querySelector(
+      '[data-editor-draft-banner="true"]',
+    );
+    if (existing) existing.remove();
+    this.draftBanner = null;
+  }
+
+  formatDraftAge(savedAt) {
+    if (!savedAt) return "a moment ago";
+    const secs = Math.round((Date.now() - savedAt) / 1000);
+    if (secs < 60) return "just now";
+    const mins = Math.round(secs / 60);
+    if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+    const days = Math.round(hrs / 24);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+
   disconnect() {
     // Remove global keyboard handler
     document.removeEventListener("keydown", this.globalKeydownHandler);
@@ -464,6 +716,7 @@ export default class extends Controller {
       );
     }
     clearTimeout(this.previewUpdateTimer);
+    clearTimeout(this.draftSaveTimer);
 
     // Close broadcast channel
     if (this.previewChannel) {
@@ -527,6 +780,13 @@ export default class extends Controller {
       );
     }
 
+    if (this.cardPickHandler) {
+      this.element.removeEventListener(
+        "card-builder:pick-media",
+        this.cardPickHandler,
+      );
+    }
+
     // Remove media picker close handler
     if (this.mediaPickerCloseHandler) {
       this.element.removeEventListener(
@@ -576,6 +836,9 @@ export default class extends Controller {
         : "";
     this.saveMessageTargets.forEach((el) => {
       el.textContent = message;
+      // A failed background save shows its reason in red until the next edit.
+      el.classList.remove("text-red-700");
+      el.removeAttribute("title");
     });
   }
 
@@ -872,11 +1135,9 @@ export default class extends Controller {
 
   insertMark(event) {
     event.preventDefault();
-    this.wrapSelectionWithSavedPosition(
-      "<mark>",
-      "</mark>",
-      "highlighted text",
-    );
+    // ==text== renders as <mark> (HasMarkdownExtensions#process_highlights),
+    // and reads as plain text in the file. Existing <mark> tags still work.
+    this.wrapSelectionWithSavedPosition("==", "==", "highlighted text");
   }
 
   insertFootnote(event) {
@@ -924,6 +1185,7 @@ export default class extends Controller {
     };
 
     this.showFootnoteDoneButton(positionAfterReference);
+    this.rememberOpenFootnote(nextNumber);
 
     // Defer the window scroll: the two execCommand calls above fired
     // input events that schedule rAF callbacks comparing against the
@@ -944,6 +1206,20 @@ export default class extends Controller {
   // position-in-text to a pixel y-coordinate in the document and
   // scroll the window there.
   scrollCursorIntoView(position) {
+    // The live editor knows where every line really is — headings, images and
+    // collapsed blocks included — so it does the placing. The estimate below
+    // only holds for the plain textarea, where every line is the same height.
+    const liveEditor = this.textareaTarget.roeEditor;
+    if (liveEditor) {
+      // The scroll lock below compares against scrollBeforeInput, so it's
+      // moved to wherever the editor finally lands.
+      liveEditor.settle(position, {}, () => {
+        this.scrollBeforeInput = window.scrollY;
+      });
+      this.scrollBeforeInput = window.scrollY;
+      return;
+    }
+
     const textarea = this.textareaTarget;
     const style = window.getComputedStyle(textarea);
     const lineHeight =
@@ -968,6 +1244,19 @@ export default class extends Controller {
   }
 
   handleFootnoteEnter(event) {
+    // The live editor answers "is the caret in a footnote?" from its syntax
+    // tree, which reads definitions the way kramdown does — named labels like
+    // `[^sink]:` as well as numbered ones, and blank lines between a note's
+    // paragraphs. The scan below is the plain textarea's version.
+    const liveEditor = this.textareaTarget.roeEditor;
+    if (liveEditor) {
+      const indent = liveEditor.footnoteContinuation();
+      if (indent === null) return false;
+      event.preventDefault();
+      document.execCommand("insertText", false, "\n" + indent);
+      return true;
+    }
+
     const cursorPos = this.textareaTarget.selectionStart;
     const content = this.textareaTarget.value;
     const beforeCursor = content.substring(0, cursorPos);
@@ -1045,7 +1334,14 @@ export default class extends Controller {
   }
 
   returnFromFootnote(returnPosition) {
-    let targetPosition = returnPosition;
+    // Back to just after the note's reference. Found by label in the current
+    // text rather than trusted from when the note was opened: the writer may
+    // have edited above the reference since, or saved and come back to a
+    // fresh page (see restoreOpenFootnote), and a stored position would
+    // be wrong in either case.
+    const number = this.pendingFootnote?.number ?? this.openFootnoteNumber;
+    let targetPosition = this.footnoteReferenceEnd(number) ?? returnPosition;
+    this.forgetOpenFootnote();
     const pending = this.pendingFootnote;
 
     // Cleanup pass: if the user pressed Done / Esc without adding any
@@ -1119,6 +1415,76 @@ export default class extends Controller {
       document.removeEventListener("keydown", this.footnoteDoneKeyHandler);
       this.footnoteDoneKeyHandler = null;
     }
+  }
+
+  // ── An open footnote survives leaving the page ──────────────────────────
+  // Writing a note often means going somewhere else for the quote: another
+  // tab, the media library, the site itself. Saving reloads the editor too.
+  // Any of those used to drop the Close Footnote button and the way back to
+  // the reference. Which note is open is kept in sessionStorage — per tab,
+  // per document, gone when the tab closes — and restored on load.
+
+  get openFootnoteKey() {
+    return `roe-open-footnote:${window.location.pathname}`;
+  }
+
+  rememberOpenFootnote(number) {
+    this.openFootnoteNumber = number;
+    try {
+      sessionStorage.setItem(this.openFootnoteKey, String(number));
+    } catch (_) {
+      // Private mode or full storage: the button just won't survive a reload.
+    }
+  }
+
+  forgetOpenFootnote() {
+    this.openFootnoteNumber = null;
+    try {
+      sessionStorage.removeItem(this.openFootnoteKey);
+    } catch (_) {}
+  }
+
+  // Just after the note's reference in the text — `[^3]` and not the `[^3]:`
+  // that starts its definition — or null when it's gone.
+  footnoteReferenceEnd(number) {
+    if (number == null) return null;
+    const content = this.textareaTarget.value;
+    const reference = `[^${number}]`;
+    let index = content.indexOf(reference);
+    while (index !== -1) {
+      const after = index + reference.length;
+      if (content[after] !== ":") return after;
+      index = content.indexOf(reference, after);
+    }
+    return null;
+  }
+
+  // On load: if a note was open when the page was left, and it's still there
+  // with its reference, bring back the button. The empty-note cleanup only
+  // runs for a note opened on this page — after a reload, nothing is deleted
+  // on the writer's behalf.
+  //
+  // A note opened and written in but never saved exists only in the local
+  // draft, so it isn't in the text yet on load. The marker is kept, not
+  // cleared, and checked again when the draft is restored (restoreDraft).
+  restoreOpenFootnote() {
+    let number = null;
+    try {
+      number = sessionStorage.getItem(this.openFootnoteKey);
+    } catch (_) {}
+    if (number == null) return;
+
+    const content = this.textareaTarget.value;
+    const returnPosition = this.footnoteReferenceEnd(number);
+    if (returnPosition == null || !content.includes(`[^${number}]:`)) {
+      // Waiting on a draft that may hold it; nothing else to do here.
+      if (this.draftBanner) return;
+      this.forgetOpenFootnote();
+      return;
+    }
+
+    this.openFootnoteNumber = number;
+    this.showFootnoteDoneButton(returnPosition);
   }
 
   insertUnorderedList(event) {
@@ -1823,8 +2189,13 @@ export default class extends Controller {
         .reduce((sum, line) => sum + line.length + 1, 0) +
       lines[lineIndex].length;
 
-    this.textareaTarget.setSelectionRange(charPosition, charPosition);
-    this.textareaTarget.focus();
+    if (this.textareaTarget.roeEditor) {
+      // Same placement as the markdown check's jump: measured, below the toolbar.
+      this.textareaTarget.roeEditor.goTo(charPosition);
+    } else {
+      this.textareaTarget.setSelectionRange(charPosition, charPosition);
+      this.textareaTarget.focus();
+    }
 
     // Fade TOC background after jumping
     if (
@@ -1855,7 +2226,7 @@ export default class extends Controller {
     const postId = this.resourceIdValue;
     const fullUrl = `${window.location.origin}/p/${postId}#${slug}`;
 
-    navigator.clipboard.writeText(fullUrl).then(() => {
+    copyToClipboard(fullUrl).then(() => {
       // Save original classes
       const originalClasses = button.className;
       const originalText = button.textContent;
@@ -1994,6 +2365,33 @@ export default class extends Controller {
   // ========== FORM ACTIONS ==========
 
   save(event) {
+    // Guard: renaming a PUBLISHED post's slug changes a live URL. Intercept the
+    // submit BEFORE anything is written and let the user decide (redirect / keep
+    // old / cancel). _redirectDecision is set by the modal buttons so the
+    // re-submit they trigger passes straight through.
+    if (!this._redirectDecisionMade && this._publishedSlugChanged()) {
+      if (event && event.preventDefault) event.preventDefault();
+      this._openRedirectDecision();
+      return;
+    }
+
+    // Posts, pages and products save in the background and keep the writer's
+    // place — cursor, scroll, undo. See editor_background_save.js; a save that
+    // publishes or needs a notice still loads the page, via _prepareForReload.
+    if (event && event.preventDefault && wantsBackgroundSave(this, event)) {
+      event.preventDefault();
+      backgroundSave(this);
+      return;
+    }
+
+    this._prepareForReload();
+  }
+
+  // Everything a save that reloads the page needs first: keep the place to
+  // restore after the reload, mark "changes saved", drop the draft and the
+  // leave-page guard. The ordinary form submit (emails) runs this before it
+  // goes; a background save runs it when the server asks for a reload.
+  _prepareForReload() {
     // Mark that we're saving to skip dirty checks
     this.isSaving = true;
 
@@ -2023,6 +2421,10 @@ export default class extends Controller {
     if (metadataField) {
       this.originalMetadata = metadataField.value;
     }
+
+    // The file is about to become the source of truth — drop the local draft so
+    // the next load doesn't offer to "restore" what we just saved.
+    this.clearDraft();
 
     // Remove beforeunload handler
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
@@ -2374,6 +2776,121 @@ export default class extends Controller {
     return match ? match[1] : null;
   }
 
+  // Dismiss the post-rename redirect offer (the "Skip" button). The modal is
+  // server-rendered from a one-shot flash, so removing the node is all that's
+  // needed — it won't reappear on the next load.
+  dismissRedirectModal(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    const modal = this.element.querySelector("[data-redirect-modal]");
+    if (modal) modal.remove();
+  }
+
+  // ----- Slug-change decision (pre-save) -----------------------------------
+  //
+  // When a PUBLISHED post's url_name is edited, save() intercepts the submit
+  // and routes through these so the user decides before anything is written.
+
+  // The post's EFFECTIVE url_name as it stands in the editor right now, mirroring
+  // the server's HasMetadata#url_name resolution: the url_name field if set,
+  // else the title parameterized, else the filename slug. This is what makes a
+  // blanked url_name (revert to title) or a title rename correctly register as a
+  // slug change — not just an edit to the url_name field itself.
+  _currentUrlName() {
+    const urlField = this.element.querySelector('[data-metadata-field="url_name"]');
+    const explicit = urlField ? urlField.value.trim() : this._urlNameFromYaml();
+    if (explicit) return explicit;
+
+    const titleField = this.element.querySelector('[data-metadata-field="title"]');
+    const title = titleField ? titleField.value.trim() : "";
+    if (title) return this._parameterize(title);
+
+    return this.filenameSlugValue || "";
+  }
+
+  // Read url_name from the raw metadata YAML field (fallback when there's no
+  // form-mode url_name input, e.g. the YAML view is active).
+  _urlNameFromYaml() {
+    const meta = this.element.querySelector('[name="metadata"]');
+    const m = meta && meta.value.match(/^\s*url_name:\s*(.+?)\s*$/m);
+    return m ? m[1].replace(/^["']|["']$/g, "").trim() : "";
+  }
+
+  // Match ActiveSupport's String#parameterize closely enough for slug comparison:
+  // lowercase, non-alphanumerics → single hyphens, trimmed. (Server remains the
+  // source of truth for the actual slug written; this only decides whether to
+  // prompt.)
+  _parameterize(str) {
+    return str
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  // True only when the post was ALREADY published (a first publish has no prior
+  // public URL to protect) and the slug actually changed from its saved value.
+  // The home page is left out: its address is "/", which is never redirected.
+  _publishedSlugChanged() {
+    if (!this.publishedValue) return false;
+    const original = (this.originalUrlNameValue || "").trim();
+    const current = this._currentUrlName();
+    if (original !== "" && this._publicPath(original) === "/") return false;
+    return original !== "" && current !== "" && original !== current;
+  }
+
+  // The public address for a slug, mirroring each model's public_url_for
+  // (a page called "home" is the site's front page).
+  _publicPath(slug) {
+    const prefix = this.publicPathPrefixValue;
+    if (prefix === "/" && slug === "home") return "/";
+    return `${prefix}${slug}`;
+  }
+
+  _openRedirectDecision() {
+    if (!this.hasRedirectModalTarget) return;
+    const from = this._publicPath(this.originalUrlNameValue);
+    const to = this._publicPath(this._currentUrlName());
+    if (this.hasRedirectFromTarget) this.redirectFromTarget.textContent = from;
+    if (this.hasRedirectToTarget) this.redirectToTarget.textContent = to;
+    this.redirectModalTarget.classList.remove("hidden");
+    this.setScrollLock(true);
+  }
+
+  _closeRedirectDecision() {
+    if (this.hasRedirectModalTarget)
+      this.redirectModalTarget.classList.add("hidden");
+    this.setScrollLock(false);
+  }
+
+  // "Create redirect & save" — stash the old path in the hidden field so the
+  // server writes the 301 as part of this save, then submit.
+  createRedirectAndSave(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    if (this.hasRedirectFromFieldTarget)
+      this.redirectFromFieldTarget.value = this._publicPath(this.originalUrlNameValue);
+    this._redirectDecisionMade = true;
+    this._closeRedirectDecision();
+    this.formTarget.requestSubmit();
+  }
+
+  // "Keep old URL" — revert the slug field to its saved value, then save. No
+  // redirect is written (the URL never changed).
+  keepOldUrlAndSave(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    this.applyMetadataField("url_name", this.originalUrlNameValue);
+    if (this.hasRedirectFromFieldTarget) this.redirectFromFieldTarget.value = "";
+    this._redirectDecisionMade = true;
+    this._closeRedirectDecision();
+    this.formTarget.requestSubmit();
+  }
+
+  // "Cancel (keep previous url)" — close the modal and save nothing. The editor
+  // stays open with the edited slug still in the field, so the user can decide
+  // again on the next save.
+  cancelRedirectDecision(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    this._closeRedirectDecision();
+  }
+
   // The Unpublish button is a form submit. Intercept it, confirm via the styled
   // modal, and submit the stashed form on "Unpublish". confirmedUnpublish lets
   // the re-issued submit through.
@@ -2526,70 +3043,107 @@ export default class extends Controller {
     }
   }
 
-  highlightMediaReference() {
+  // Arriving from a media file's "Used in" link (?highlight=/media/...): show
+  // where this file is used. In the text, the path is selected and scrolled
+  // to; in the metadata, the panel is opened and the field holding it is
+  // selected.
+  async highlightMediaReference() {
     const mediaPath = this.highlightMediaValue;
-    const content = this.textareaTarget.value;
+    const position = this.textareaTarget.value.indexOf(mediaPath);
 
-    // First, try to find it in content
-    let position = content.indexOf(mediaPath);
-
-    if (position !== -1) {
-      // Found in content - highlight there
-      this.textareaTarget.setSelectionRange(position, position);
-      this.textareaTarget.focus();
-      this.textareaTarget.style.caretColor = "red";
-
-      const resetCursor = () => {
-        this.textareaTarget.style.caretColor = "";
-      };
-
-      this.textareaTarget.addEventListener("click", resetCursor, {
-        once: true,
-      });
-      this.textareaTarget.addEventListener("keydown", resetCursor, {
-        once: true,
-      });
-
+    if (position === -1) {
+      this._highlightInMetadata(mediaPath);
       return;
     }
 
-    // Not in content - check metadata fields
-    const metadataFields = [
-      "image",
-      "audio",
-      "video",
-      "thumbnail",
-      "cover",
-      "poster",
-    ];
-
-    for (const fieldName of metadataFields) {
-      const input = document.querySelector(
-        `input[name="metadata[${fieldName}]"], input[id*="${fieldName}"]`,
-      );
-
-      if (input && input.value === mediaPath) {
-        // Found in metadata field - highlight the input
-        input.focus();
-        input.select();
-        input.style.caretColor = "red";
-        input.style.borderColor = "red";
-
-        const resetInput = () => {
-          input.style.caretColor = "";
-          input.style.borderColor = "";
-        };
-
-        input.addEventListener("click", resetInput, { once: true });
-        input.addEventListener("keydown", resetInput, { once: true });
-        input.addEventListener("blur", resetInput, { once: true });
-
-        // Scroll the input into view
-        input.scrollIntoView({ behavior: "smooth", block: "center" });
-
-        return;
-      }
+    // The live editor loads after this controller. Its goTo measures every
+    // line and keeps the spot clear of the toolbar — the textarea it stands
+    // in for is hidden, so scrolling to that can't work.
+    const liveEditor = await this._liveEditorWhenReady();
+    if (liveEditor) {
+      liveEditor.goTo(position, position + mediaPath.length);
+      this._settleAgainWhileLoading(liveEditor, position);
+      return;
     }
+
+    this.textareaTarget.setSelectionRange(position, position + mediaPath.length);
+    this.textareaTarget.focus();
+  }
+
+  // The page keeps changing height after the first jump: images further up
+  // finish loading (big ones take seconds), and the block holding the path
+  // (a gallery, a card) opens up once the caret is inside it. So each time
+  // the editor's height changes, place it again — for a few seconds, and
+  // only until the writer scrolls, clicks or types, which means they've
+  // taken over.
+  _settleAgainWhileLoading(liveEditor, position, forMs = 5000) {
+    const events = ["wheel", "mousedown", "keydown", "touchstart"];
+    let observer = null;
+    const finish = () => {
+      observer?.disconnect();
+      events.forEach((type) => window.removeEventListener(type, finish));
+    };
+    events.forEach((type) => window.addEventListener(type, finish, { once: true, passive: true }));
+
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => liveEditor.settle(position));
+      observer.observe(liveEditor.view.contentDOM);
+    }
+    setTimeout(finish, forMs);
+  }
+
+  // The live editor, once it has loaded; null when this page uses the plain
+  // textarea (editor.mode: textarea) or it doesn't arrive.
+  _liveEditorWhenReady(timeoutMs = 4000) {
+    const textarea = this.textareaTarget;
+    const host = textarea.closest('[data-controller~="markdown-editor"]');
+    if (!host || host.dataset.markdownEditorModeValue === "textarea") {
+      return Promise.resolve(textarea.roeEditor || null);
+    }
+
+    return new Promise((resolve) => {
+      const started = performance.now();
+      const check = () => {
+        if (textarea.roeEditor) return resolve(textarea.roeEditor);
+        if (performance.now() - started > timeoutMs) return resolve(null);
+        setTimeout(check, 50);
+      };
+      check();
+    });
+  }
+
+  // The path is in the metadata, not the text: open the panel if it's
+  // closed, then select the field (or the RAW YAML) that holds it.
+  _highlightInMetadata(mediaPath) {
+    const panel = document.querySelector('[data-controller~="metadata-editor"]');
+    if (!panel) return;
+
+    const content = panel.querySelector('[data-metadata-editor-target="content"]');
+    if (content && content.classList.contains("hidden")) {
+      panel
+        .querySelector('[data-action~="click->metadata-editor#toggleMetadataSection"]')
+        ?.click();
+    }
+
+    const yamlView = panel.querySelector('[data-metadata-editor-target="yamlView"]');
+    const yamlOpen = yamlView && !yamlView.classList.contains("hidden");
+    const field = yamlOpen
+      ? panel.querySelector('[data-metadata-editor-target="yamlTextarea"]')
+      : [...panel.querySelectorAll("[data-metadata-field]")].find((el) =>
+          (el.value || "").includes(mediaPath),
+        );
+    if (!field) return;
+
+    const at = (field.value || "").indexOf(mediaPath);
+    if (at === -1) return;
+
+    field.scrollIntoView({ behavior: "instant", block: "center" });
+    field.focus({ preventScroll: true });
+    if (typeof field.setSelectionRange === "function") {
+      field.setSelectionRange(at, at + mediaPath.length);
+    }
+    field.style.borderColor = "red";
+    field.addEventListener("blur", () => (field.style.borderColor = ""), { once: true });
   }
 
   // ========== TEST EMAIL METHODS ==========

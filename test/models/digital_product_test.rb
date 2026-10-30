@@ -7,6 +7,10 @@ require "test_helper"
 # so the only thing Roe can do is carry it to every button and make a missing
 # one obvious before a buyer hits it.
 class DigitalProductTest < ActiveSupport::TestCase
+  # A store with a cart. The test site's store.yml comes and goes with other
+  # tests, and no store.yml reads as Snipcart off — so say which this is.
+  setup { SiteFeature.stubs(:snipcart_enabled?).returns(true) }
+
   GUID = "7235bd18-1745-488e-bdbb-dc4f424c1ca1"
 
   def product(extra = {})

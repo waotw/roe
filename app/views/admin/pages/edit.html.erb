@@ -49,7 +49,16 @@
        data-editor-page-link-template-value="<%= SiteConfig.default('cards', 'page_link_button_template') %>"
        data-editor-pullquote-template-value="<%= SiteConfig.default('cards', 'pullquote_button_template') %>"
        data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
-       data-editor-currency-symbol-value="<%= store_currency_symbol %>">
+       data-editor-currency-symbol-value="<%= store_currency_symbol %>"
+       data-editor-original-url-name-value="<%= @page.url_name %>"
+       data-editor-filename-slug-value="<%= File.basename(@page.file_path.to_s, '.md') %>"
+       data-editor-published-value="<%= @page.published? %>"
+       data-editor-public-path-prefix-value="/">
+
+    <%# Set by the editor when the user picks "Save new URL & redirect" in the
+        slug-change modal; PagesController#update writes the 301 (RenameRedirect). %>
+    <input type="hidden" name="create_redirect_from" value=""
+           form="page-form" data-editor-target="redirectFromField">
 
     <%= render 'shared/editor_actions', resource: @page, resource_type: 'page' %>
 
@@ -66,6 +75,9 @@
 
     <%= render 'shared/editor_drawer', resource: @page, resource_type: 'page' %>
     <%= render 'shared/leave_modal' %>
+
+    <%# Slug-change decision modal for a published page (see editor#save). %>
+    <%= render 'admin/posts/redirect_modal', noun: "page" %>
 
   </div>
   <!-- End Stimulus controller -->

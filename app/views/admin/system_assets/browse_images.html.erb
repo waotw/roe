@@ -103,7 +103,7 @@
   }
 
   function copyFilename(event, filename) {
-    navigator.clipboard.writeText(filename).then(() => {
+    window.copyToClipboard(filename).then(() => {
       const btn = event.target;
       const originalText = btn.textContent;
       btn.textContent = 'Copied!';

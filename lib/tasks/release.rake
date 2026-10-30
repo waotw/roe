@@ -56,6 +56,7 @@ namespace :release do
     bump_version_files(root, version, today)
     bump_docs_manifest(root, version, touched)
     bump_theme_headers(root, version, touched)
+    regenerate_schemas(root)
 
     puts ""
     puts "Done. Review with `git diff`, then:"
@@ -150,6 +151,15 @@ namespace :release do
     # Sort alphabetically for stable, diff-friendly output across runs.
     File.write(manifest_path, manifest.sort.to_h.to_yaml)
 
+    # The dev site's copy follows. This manifest is metadata Roe generates,
+    # not content — bin/sync-from-site never copies it from site/ (it would
+    # put back whatever versions site/ last had, which is how 0.3.0's stamps
+    # were lost) — so this is the one place it reaches site/.
+    site_manifest = File.join(RoeSitePaths::SITE_PATH, "documentation", "roe", "_versions.yml")
+    if Dir.exist?(File.dirname(site_manifest))
+      FileUtils.cp(manifest_path, site_manifest)
+    end
+
     puts ""
     puts "Docs manifest (#{relative(manifest_path, root)}):"
     puts "  ✓ #{updated} stamped at #{version}" if updated > 0
@@ -186,7 +196,10 @@ namespace :release do
       # Replace `Bundled with: Roe vX.Y.Z` preserving the leading
       # whitespace + comment indentation that's standard in theme
       # headers. Case-insensitive on "Roe" defensively.
-      new_content = content.sub(/^(\s*Bundled with:\s*Roe\s+v)[\d.]+/i) do
+      # \d+(\.\d+)* rather than [\d.]+, which also ate a sentence's full
+      # stop ("Roe v0.4.0." → "Roe v0.4.0"), so every bump and the next
+      # sync-from-site fought over it.
+      new_content = content.sub(/^(\s*Bundled with:\s*Roe\s+v)\d+(?:\.\d+)*/i) do
         "#{Regexp.last_match(1)}#{version}"
       end
 
@@ -206,6 +219,52 @@ namespace :release do
     puts "  · #{no_line} touched but no `Bundled with:` line (skipped)" if no_line > 0
   end
 
+  # Regenerate the committed schema dumps so a release ships them in the exact
+  # state a user's first `db:migrate` produces — otherwise they show up as
+  # "modified" in the user's working tree right after updating (this is why
+  # db/cable_schema.rb has perennially shown as uncommitted: in development
+  # `cable` shares the primary database file, so a migrate re-dumps the full
+  # primary schema into cable_schema.rb but the committed copy carried a stale
+  # `version:` stamp, leaving a one-line diff on every install).
+  #
+  # Uses `db:schema:dump` (development), which is READ-ONLY on your data: it
+  # only re-emits db/*_schema.rb from the current database. It assumes the dev
+  # DB is already migrated — the normal state while developing. If migrations
+  # are pending, run `bin/rails db:migrate` first, then re-run the bump.
+  def regenerate_schemas(root)
+    current = File.join(root, "current")
+
+    puts ""
+    puts "Schema dumps:"
+
+    output = nil
+    ok = false
+    Bundler.with_original_env do
+      cmd = "cd #{current.shellescape} && RAILS_ENV=development bin/rails db:schema:dump 2>&1"
+      output = `#{cmd}`
+      ok = $?.success?
+    end
+
+    unless ok
+      puts "  ! db:schema:dump failed — regenerate manually before tagging:"
+      output.to_s.each_line { |l| puts "    #{l.chomp}" }
+      return
+    end
+
+    # Report which of the tracked schema files actually changed, so they stand
+    # out in the diff the maintainer is about to review and commit.
+    changed = Dir.chdir(current) do
+      `git diff --name-only -- db/schema.rb db/cable_schema.rb db/cache_schema.rb db/queue_schema.rb 2>/dev/null`
+        .split("\n").map(&:strip).reject(&:empty?)
+    end
+
+    if changed.any?
+      changed.each { |p| puts "  ✓ regenerated #{p}" }
+    else
+      puts "  · already up to date"
+    end
+  end
+
   # Returns the set of absolute paths under current/ that have been
   # touched (committed OR uncommitted) since the most recent git tag.
   # Used by the smart-bump logic so a release only stamps the new Roe
@@ -216,7 +275,14 @@ namespace :release do
   # bump stamps everything as a baseline.
   def touched_paths_since_last_tag(root)
     current = File.join(root, "current")
-    last_tag = `cd #{current.shellescape} && git describe --tags --abbrev=0 2>/dev/null`.strip
+    # The last *release*, not the last tag. Nightly tags (v0.4.0-nightly.8.3)
+    # don't run this task, so they never stamp anything — measuring from one
+    # would drop every change made between the release and that nightly.
+    # Version order, not `git describe`: a release tag on main needn't be an
+    # ancestor of the branch the bump runs on, and a two-dot diff compares
+    # trees, so ancestry doesn't matter.
+    last_tag = `cd #{current.shellescape} && git tag -l 'v[0-9]*' --sort=-v:refname 2>/dev/null`
+      .split("\n").map(&:strip).find { |tag| tag.match?(/\Av\d+\.\d+\.\d+\z/) }.to_s
 
     if last_tag.empty?
       puts "No prior git tag found — first release, stamping all candidate files."

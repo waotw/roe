@@ -49,16 +49,14 @@ class ProductButtonRenderer
     # Build variant list
     text = config["text"] || "Add to Cart"
     style = config["style"] || "primary"
-    currency = get_currency_symbol
 
     items = products.map do |product|
       variant_name = product.variant || product.title
-      price = "#{currency}#{sprintf('%.2f', product.price)}"
-      button = render_button(product, text, style, 1)
+      button = render_button(product, text, style, 1, in_variant_list: true)
 
       "<li class=\"product-variant-item\">" \
       "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span> " \
-      "<span class=\"variant-price\">#{price}</span> " \
+      "#{variant_price_html(product)}" \
       "#{button}" \
       "</li>"
     end
@@ -86,7 +84,10 @@ class ProductButtonRenderer
   end
 
   def find_product(sku)
-    Product.find_by("metadata->>'sku' = ?", sku)
+    Product.find_by("metadata->>'sku' = ?", sku) ||
+      # Without Snipcart a product needn't have a SKU, so the block can name it
+      # the way a product-link card does: by url_name.
+      Product.all.find { |p| p.url_name == sku.to_s }
   end
 
   def render_single_product(product)
@@ -136,10 +137,23 @@ class ProductButtonRenderer
     # data-item-price for Snipcart, but nothing renders it. Shown by default
     # (a shopper expects a price next to a buy button); `show_price: false`
     # turns it off. Variant lists print their own, so this is the single case.
-    return button if falsy?(config["show_price"])
+    # Not shown when the product sets no price — without Snipcart it needn't,
+    # and "$0.00" would be wrong.
+    return button if falsy?(config["show_price"]) || !price_set?(product)
 
     price = "#{get_currency_symbol}#{sprintf('%.2f', product.price)}"
     "<span class=\"product-price\">#{ERB::Util.html_escape(price)}</span> #{button}"
+  end
+
+  def price_set?(product)
+    product.metadata["price"].to_s.strip.present?
+  end
+
+  # A variant's price cell. Always there, even empty: a variant list lays its
+  # rows out on a grid, three cells each, and a missing one shifts the rest.
+  def variant_price_html(product)
+    price = price_set?(product) ? "#{get_currency_symbol}#{sprintf('%.2f', product.price)}" : ""
+    "<span class=\"variant-price\">#{price}</span> "
   end
 
   # Block values arrive as real booleans from YAML or as strings from the
@@ -152,16 +166,14 @@ class ProductButtonRenderer
     # Build variant list
     text = config["text"] || "Add to Cart"
     style = config["style"] || "primary"
-    currency = get_currency_symbol
 
     items = products.map do |product|
       variant_name = product.respond_to?(:variant) && product.variant.present? ? product.variant : product.title
-      price = "#{currency}#{sprintf('%.2f', product.price)}"
-      button = render_button(product, text, style, 1)
+      button = render_button(product, text, style, 1, in_variant_list: true)
 
       "<li class=\"product-variant-item\">" \
       "<span class=\"variant-name\">#{ERB::Util.html_escape(variant_name)}</span> " \
-      "<span class=\"variant-price\">#{price}</span> " \
+      "#{variant_price_html(product)}" \
       "#{button}" \
       "</li>"
     end
@@ -184,7 +196,26 @@ class ProductButtonRenderer
 
   private
 
-  def render_button(product, text, style, quantity)
+  def render_button(product, text, style, quantity, in_variant_list: false)
+    # Without Snipcart there's no cart to add to. A button elsewhere (a post
+    # pointing at a book) becomes a link to the product's page, where its
+    # store links live. On the product's own page it would only link to
+    # itself, so nothing renders.
+    unless SiteFeature.snipcart_enabled?
+      # In a variant list every row is three cells — name, price, button — on
+      # a grid, so a row with no button shifts everything after it. The
+      # product you're already on gets a marker in that cell instead.
+      if context[:current_product]&.id == product.id
+        return in_variant_list ? %(<span class="variant-current"></span>) : ""
+      end
+
+      # A template's "Add to Cart" (the default product template writes it)
+      # is the wrong label on a link; it falls back to "View" like the rest.
+      label = config["text"].to_s.strip
+      label = "View" if label.empty? || label.casecmp?("add to cart")
+      return %(<a href="#{ERB::Util.html_escape(product.public_url)}" class="btn-#{ERB::Util.html_escape(style)}">#{ERB::Util.html_escape(label)}</a>)
+    end
+
     # No button for a digital product that can't deliver — see
     # Product#deliverable?. A missing GUID is the dangerous case: Snipcart
     # accepts the order and has nothing to send.

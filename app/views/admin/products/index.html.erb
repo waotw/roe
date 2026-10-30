@@ -45,7 +45,7 @@
                          data-updated="<%= ProductGroup.rank(row) %>"
                          data-search="<%= members.map { |m| "#{m.title} #{m.sku}" }.join(' ').downcase %>">
                     <tr>
-                      <td colspan="5" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-blue-400 font-mono bg-blue-50">
+                      <td colspan="5" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide bg-slate-300 font-mono text-slate-800">
                         Group: <%= row.name %>
                         <% if row.warnings.any? %>
                           <span class="inline-block text-base text-amber-600 font-semibold font-sans leading-0"

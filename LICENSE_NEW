@@ -1,0 +1,63 @@
+# Roe License
+
+Based on the O'Saasy License. Draft — not yet in effect.
+
+Copyright © 2026 We Are On The Web LLC.
+
+The current version of this license is at [go-roe.com/license](https://go-roe.com/license). The license that applies to a release is the one included with it.
+
+## In plain language
+
+This summary is here to help. It isn't part of the license; the text under "License" is.
+
+- Roe is free for everyone, for any kind of site — personal, business, store, members, anything.
+- You can change it, share it, and build and sell websites with it, including for clients.
+- You can't sell Roe itself, under any name, or offer it to the public as a hosted Roe service.
+- The Roe name and logo aren't included. Say your site is "built with Roe"; don't name your own product Roe.
+- It comes with no warranty. Back up your work.
+
+If Roe is useful to you, please consider supporting it at [go-roe.com](https://go-roe.com). It's how Roe stays free.
+
+## License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+1. **Notice.** The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. This notice does not need to appear on websites made with the Software, or in the content of those websites.
+
+2. **Restrictions.** No licensee or downstream recipient may, whether or not the Licensor offers a similar product or service at the time:
+
+    (a) offer the Software, or any modified or derivative version of it, to third parties as a hosted, managed, or software-as-a-service product or cloud service where the primary value of the service is the functionality of the Software itself; or
+
+    (b) sell, license for a fee, or otherwise charge for the Software, or any modified or derivative version of it, as a product in its own right, under any name.
+
+3. **What the restrictions do not cover.** Nothing in condition 2 restricts anyone from:
+
+    - building, hosting, maintaining, or selling websites made with the Software, including for clients, and including hosting a client's website as part of building or looking after it;
+    - selling themes, scripts, templates, plugins, or other add-ons for the Software;
+    - charging for setup, design, development, consulting, training, or support;
+    - providing services the Software connects to, such as email, payments, storage, or backups;
+    - sharing the Software, or modified versions of it, free of charge under this license.
+
+4. **Names and logos.** This license does not grant permission to use the Roe name, the Roe logo, or the names or logos of We Are On The Web LLC, except to truthfully describe that a website or add-on is made with or for the Software.
+
+5. **Your content.** Content you create with the Software — your writing, media, settings, and the websites built from them — is yours. This license does not apply to it.
+
+6. **Contributions.** Unless agreed otherwise in writing, anything you submit for inclusion in the Software (code, documentation, or other material) is provided under this license, and you also grant the Licensor a perpetual, worldwide, royalty-free right to use, modify, distribute, and relicense your contribution as part of the Software. You keep the copyright in your contribution, and you confirm you have the right to submit it.
+
+7. **Ending and restoring this license.** If you breach condition 2 or 4, your rights under this license end. They are restored if you stop the breach within 30 days of receiving written notice of it from the Licensor, the first time this happens. Recipients who received the Software from you keep their rights as long as they comply.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Definitions
+
+- "Licensor" means We Are On The Web LLC.
+- "Software" means Roe, including its source code, documentation, and the themes and scripts it ships, and any version of it the Licensor publishes.
+- "You" and "licensee" mean anyone who obtains or uses a copy of the Software.
+
+## Governing law
+
+This license is governed by the laws of [STATE], United States, without regard to its conflict-of-law rules.
+
+## Questions
+
+For anything this license doesn't answer, or if you're not sure whether something is allowed, ask: [roe@weareontheweb.com](mailto:roe@weareontheweb.com)

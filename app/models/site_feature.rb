@@ -25,6 +25,25 @@ module SiteFeature
     File.exist?(File.join(FEATURES_PATH, "store.yml"))
   end
 
+  # The store without a cart: products shown, and bought somewhere else (a
+  # book on Amazon, say). `snipcart.enabled: false` in store.yml. Absent
+  # counts as on, so a store written before this setting existed keeps its
+  # cart. Everything Snipcart — buttons, the cart, its settings and warnings,
+  # SKU and price being required — asks this rather than store_enabled?.
+  def snipcart_enabled?
+    store_enabled? && SiteConfig.feature("store", "snipcart.enabled").to_s != "false"
+  end
+
+  # Where a product collection's button goes for a single product: the cart,
+  # or the product page. Always the page without Snipcart — there's no cart.
+  # Booleans compared as strings: the form writes real booleans, a hand-edited
+  # file may quote them.
+  def collection_buttons_link_to_page?
+    return true unless snipcart_enabled?
+
+    SiteConfig.feature("store", "collection_buttons.link_to_product_page").to_s == "true"
+  end
+
   def podcast_enabled?
     File.exist?(File.join(FEATURES_PATH, "podcast.yml"))
   end
@@ -43,16 +62,24 @@ module SiteFeature
     SiteConfig.feature("members", "payments.enabled") == true
   end
 
-  # Email is required by members, not optional alongside them: a magic link IS
-  # the sign-in mechanism, so a members site with no way to send one has no way
-  # to let anyone in. Enabled with members, never separately.
+  # Email for members. Was hardcoded to members_enabled? because a magic link
+  # was the only sign-in. Now members can run password-only with no email at
+  # all, so this reads auth.email_enabled from members.yml.
   #
-  # This used to hang off newsletter.enabled, which meant a site running free
-  # members with newsletters off never had postmark.yml generated and never saw
-  # the setting in Settings — so every sign-in email fell through to a fallback
-  # mailer that reports success and delivers nothing.
+  # Defaults to ON when the key is absent: a members.yml written before this
+  # setting existed was, by definition, a magic-link site that needs email —
+  # so a missing key must mean "email on", never off, or an upgrade would lock
+  # every existing member out. Only an explicit `false` turns it off.
   def email_feature_enabled?
-    members_enabled?
+    return false unless members_enabled?
+    SiteConfig.feature("members", "auth.email_enabled") != false
+  end
+
+  # Password sign-in is the mode exactly when email is off: with no way to send
+  # a magic link, a password is the only way in. Self-enforcing — there's no
+  # separate auth-mode toggle to contradict the email setting.
+  def member_passwords_enabled?
+    members_enabled? && !email_feature_enabled?
   end
 
   # Newsletters enabled = members enabled AND newsletter.enabled in members.yml.
@@ -121,7 +148,22 @@ module SiteFeature
   # Returns true if ANY enabled integration needs attention for current mode.
 
   def any_integration_unconfigured?
-    payments_unconfigured? || email_unconfigured? || snipcart_unconfigured?
+    payments_unconfigured? || email_unconfigured? || snipcart_unconfigured? ||
+      payments_live_unconfigured? || email_live_unconfigured?
+  end
+
+  # What the admin nav dot asks. Broader than the integrations: a site with no
+  # author_email can't send anything, and that setting lives in site.yml rather
+  # than in any integration — so folding it into any_integration_unconfigured?
+  # would make that name mean something it doesn't.
+  def settings_need_attention?
+    any_integration_unconfigured? || sender_unconfigured? || postmark_pending_approval?
+  end
+
+  # Postmark refused a real send because the account isn't approved yet (412).
+  # A deliverability blocker the operator should see, even though keys verify.
+  def postmark_pending_approval?
+    email_feature_enabled? && PostmarkConfig.current.account_pending_approval?
   end
 
   def payments_unconfigured?
@@ -135,8 +177,45 @@ module SiteFeature
   end
   alias_method :newsletters_unconfigured?, :email_unconfigured?
 
+  # No address to send FROM, which is a different problem from Postmark not
+  # being set up — and they can be true separately. A connected Postmark with
+  # no author_email is still broken, and badging that "unconfigured" would
+  # send someone off to configure something already configured.
+  #
+  # See SiteSender: there's no stand-in address, because Postmark rejects any
+  # From it hasn't verified.
+  def sender_unconfigured?
+    members_enabled? && !SiteSender.configured?
+  end
+
   def snipcart_unconfigured?
-    store_enabled? && !snipcart_configured?
+    snipcart_enabled? && !snipcart_configured?
+  end
+
+  # ── Live-tier readiness (production only) ─────────────────────────────────
+  #
+  # The active-mode checks above answer "is the site broken right now?". These
+  # answer a different, production-only question: "can this site take REAL money
+  # / send REAL email yet?" — which requires the LIVE keys, regardless of which
+  # mode is currently active.
+  #
+  # A deployed store sitting in test mode with test keys reads as "configured"
+  # by the active-mode checks, yet cannot charge a real card. That's the false
+  # all-clear this closes. Locally these are always false: live keys can't be
+  # saved outside production and setup is meant for the live site, so nagging
+  # about live locally is noise nobody can act on.
+  #
+  # Asymmetry by design: live-not-ready nags; test-not-ready (when live IS
+  # ready) does not — test is an optional convenience, not a requirement.
+
+  def payments_live_unconfigured?
+    return false unless Rails.env.production?
+    payments_feature_enabled? && !StripeConfig.current.live_mode_ready?
+  end
+
+  def email_live_unconfigured?
+    return false unless Rails.env.production?
+    email_feature_enabled? && !PostmarkConfig.current.live_mode_ready?
   end
 
   # ── Payments mode / memberships / donations ─────────────────────────────

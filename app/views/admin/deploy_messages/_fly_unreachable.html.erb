@@ -1,0 +1,22 @@
+<%# Shown on Settings → Deploy, before a deploy Roe stopped, and when Fly
+    stopped answering partway through a deploy. %>
+<p>
+  The <code>fly</code> command couldn't get an answer from Fly's API<%= context == :during ? "." : ", so there's no way to tell whether you're signed in." %>
+  This isn't an account problem — signing in again uses the same connection
+  and would fail the same way.
+</p>
+
+<ol>
+  <li>Try again in a minute — this is often momentary.</li>
+  <li>Check <a href="https://status.fly.io" target="_blank" rel="noopener">status.fly.io</a> for an outage.</li>
+  <li>If you're on a VPN or a work network, try without it — both commonly block this.</li>
+  <li>Confirm it directly with the command below. The same error means it isn't Roe.</li>
+  <li><%= context == :settings ? "Then reload this page." : "Then deploy again." %></li>
+</ol>
+
+<pre>fly auth whoami</pre>
+
+<p>
+  More steps:
+  <a href="/documentation/roe/troubleshoot-deployment#fly-unreachable" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

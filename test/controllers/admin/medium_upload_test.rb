@@ -65,4 +65,45 @@ class Admin::MediumUploadTest < ActionDispatch::IntegrationTest
     assert_no_match(/libvips|vips/i, data["error"])
     assert_equal 0, Medium.count
   end
+
+  # The file watcher creates a Medium for any new file it sees in
+  # site/media. A large upload used to be written straight to its final
+  # name, so the watcher could create the record mid-write and this
+  # upload's own create! failed: "UNIQUE constraint failed: media.file_path".
+  test "upload survives the file watcher creating the same record first" do
+    VideoVariantGenerator.stubs(:available?).returns(false)
+    FileUtils.mkdir_p(File.join(RoeSitePaths::SITE_PATH, "media", "video"))
+    final = File.join(RoeSitePaths::SITE_PATH, "media", "video", "mu-race.mp4")
+
+    seen_final_name_mid_write = false
+    IO.singleton_class.prepend(Module.new do
+      define_method(:copy_stream) do |src, dst, *rest|
+        seen_final_name_mid_write ||= File.exist?(final)
+        # The watcher reacting while the upload is still being written:
+        Medium.create!(file_path: "/media/video/mu-race.mp4", media_type: "video", uploaded_at: Time.current) if dst.to_s.include?("mu-race")
+        super(src, dst, *rest)
+      end
+    end)
+
+    data = upload("mu-race.mp4", "video/mp4", "v" * 2048)
+
+    assert data["success"], data.inspect
+    assert_not seen_final_name_mid_write, "a half-written upload must not sit under its final name"
+    assert_equal 1, Medium.where(file_path: "/media/video/mu-race.mp4").count
+    assert_equal 2048, File.size(final)
+    assert_empty Dir.glob(File.join(RoeSitePaths::SITE_PATH, "media", "video", ".*.uploading"))
+  end
+
+  test "a file already on disk with no record isn't overwritten" do
+    VideoVariantGenerator.stubs(:available?).returns(false)
+    dir = File.join(RoeSitePaths::SITE_PATH, "media", "video")
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "mu-kept.mp4"), "old")
+
+    data = upload("mu-kept.mp4", "video/mp4", "new")
+
+    assert data["success"], data.inspect
+    assert_equal "/media/video/mu-kept-1.mp4", data["path"]
+    assert_equal "old", File.read(File.join(dir, "mu-kept.mp4"))
+  end
 end

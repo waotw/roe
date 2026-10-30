@@ -105,7 +105,22 @@ nested and isn't — it renders as a flat, renumbered sibling.
   1. this was meant to be nested under the first item
 2. second item
 
-## 9. Single backtick alone on a line
+## 9. Footnote line that lost its indent — FIXABLE
+
+A line typed straight under a note, without the four spaces, isn't part of the
+note. It renders in the body instead.
+
+Referencing the lazy note[^lazy] so it isn't reported as unused.
+
+[^lazy]: The first line of this note is fine,
+but this one isn't indented, so it leaves the note.
+
+## 10. Highlight split across a line — NEEDS ATTENTION
+
+A highlight has to open and close on the same line. This one ==starts here
+and ends on the next line==, so both sets of `==` show on the page.
+
+## 11. Single backtick alone on a line
 
 A lone backtick isn't a fence — three or more are needed.
 

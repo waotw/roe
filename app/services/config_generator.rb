@@ -16,6 +16,12 @@ class ConfigGenerator
   def self.generate_newsletters;  new.generate_newsletters_config;   end
   def self.generate_snipcart;     new.generate_snipcart_config;      end
 
+  # Reinstall missing files for any enabled feature (skip-if-exists), so a
+  # template added in a new Roe version reaches sites that enabled the feature
+  # before it shipped. Runs on boot. Never overwrites: the loader skips any file
+  # already in /site, so hand-edits and settings (members.yml etc.) are safe.
+  def self.ensure_enabled_feature_files; new.ensure_enabled_feature_files; end
+
   def self.generate_store_defaults(currency: "usd", default_domain: "", product_categories: [])
     new.generate_store_defaults(
       currency:           currency,
@@ -78,10 +84,10 @@ class ConfigGenerator
     security_file = SiteConfig::SECURITY_FILE
     return unless File.exist?(site_file)
 
-    site = YAML.load_file(site_file) || {}
+    site = SiteFile.read_yaml(site_file) || {}
     return unless site.key?("ai_crawlers")
 
-    security = (File.exist?(security_file) ? YAML.load_file(security_file) : {}) || {}
+    security = SiteFile.read_yaml(security_file) || {}
     security["ai_crawlers"] = site.delete("ai_crawlers")
 
     write_config_yaml(security_file, security)
@@ -98,11 +104,11 @@ class ConfigGenerator
     content_file = SiteConfig::CONTENT_FILE
     return unless File.exist?(site_file)
 
-    site = YAML.load_file(site_file) || {}
+    site = SiteFile.read_yaml(site_file) || {}
     stale = CONTENT_MIGRATION_MAP.keys.select { |k| site.key?(k) }
     return if stale.empty?
 
-    content = (File.exist?(content_file) ? YAML.load_file(content_file) : {}) || {}
+    content = SiteFile.read_yaml(content_file) || {}
     stale.each do |old_key|
       *parents, leaf = CONTENT_MIGRATION_MAP[old_key]
       target = parents.reduce(content) { |h, k| h[k] ||= {} }
@@ -132,7 +138,7 @@ class ConfigGenerator
   #      already written it, so the existence check trips and it's
   #      skipped — no double write, no overwrite.
   #   3. Conditional integration drop-ins (Stripe / Postmark).
-  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", newsletter_enabled: false)
+  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", email_enabled: true, newsletter_enabled: false)
     overwrite_from_template(
       folder:   "features/members",
       template: "system/features/members.yml.erb",
@@ -140,6 +146,7 @@ class ConfigGenerator
       locals: {
         payments_enabled:   payments_enabled,
         payment_price:      payment_price,
+        email_enabled:      email_enabled,
         newsletter_enabled: newsletter_enabled,
         show_paid_content:  show_paid_content
       },
@@ -148,7 +155,32 @@ class ConfigGenerator
     install_folder("features/members")
 
     generate_payments_config    if payments_enabled
-    generate_newsletters_config if newsletter_enabled
+    # Postmark backs both the magic-link sign-in and the newsletter, so it's
+    # generated whenever EMAIL is on — not only for newsletters. With email off
+    # there's no mailer to configure (members sign in by password).
+    generate_newsletters_config if email_enabled
+  end
+
+  # For each enabled feature (its <feature>.yml exists), reinstall the feature's
+  # template folder skip-if-exists. This is how a NEW file in a feature bundle —
+  # e.g. emails/invite.md added in a later version — reaches a site that enabled
+  # the feature before that file existed. members.yml and every hand-edited file
+  # already in /site are skipped by the loader, so nothing is overwritten. Boot
+  # calls this; it's a cheap no-op once every file is present. PUBLIC: the
+  # self.ensure_enabled_feature_files class wrapper calls it via new.
+  FEATURE_FOLDERS = {
+    "members.yml" => "features/members",
+    "store.yml"   => "features/store",
+    "podcast.yml" => "features/podcast",
+    "music.yml"   => "features/music"
+  }.freeze
+
+  def ensure_enabled_feature_files
+    FEATURE_FOLDERS.each do |yml, folder|
+      next unless File.exist?(File.join(FEATURES_PATH, yml))
+      next unless SiteTemplates::Loader::TEMPLATES_ROOT.join(folder).directory?
+      install_folder(folder)
+    end
   end
 
   # Store. Same pattern as members: overwrite store.yml with the

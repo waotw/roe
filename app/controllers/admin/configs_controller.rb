@@ -1,4 +1,8 @@
 class Admin::ConfigsController < Admin::BaseController
+  # webhook_url (dev/prod callback base) lives in a view helper; the Postmark
+  # account setup needs it controller-side to hand Postmark a reachable URL.
+  include WebhookUrlHelper
+
   # A config save may add/remove a /media/ reference (e.g. the site logo),
   # so any non-GET config action busts the media-usage backlink cache.
   after_action :invalidate_media_usage_index
@@ -134,6 +138,22 @@ class Admin::ConfigsController < Admin::BaseController
           label: "Confirm deletions over",
           placeholder: "0",
           hint: "Site Sync deletes files. If a file is deleted on your Live site and you sync the site, it will be deleted locally and vice-versa. This is a threshold for when you will be warned about file deletions. 0 means you'll be warned everytime. '5' means you'll be warned if 6 or more files will be deleted. Set to 'never' to turn off warnings."
+        },
+        # COPY: label, option labels and hint for the live video setting
+        "sync_live_video" => {
+          type: :select,
+          label: "Largest video on the live site",
+          options: [
+            [ "1080p — originals stay on this computer", "1080p" ],
+            [ "720p — only the smallest version goes live", "720p" ],
+            [ "Original — send every file", "original" ]
+          ],
+          # SiteSync::LiveVideo::DEFAULT. Without it an unset setting shows
+          # "Select...", which reads as off rather than as the default.
+          default: "1080p",
+          hint: "Your live site plays a video's web versions, never the original, so the original only takes up space there. " \
+                "This computer always keeps every file. A video without web versions yet sends its original, since that's all there is to play. " \
+                "Files this setting keeps here are removed from your live site on the next sync, without asking: you still have them."
         }
       }
     },
@@ -245,6 +265,46 @@ class Admin::ConfigsController < Admin::BaseController
           type: :checkbox,
           label: "Heading links",
           hint: "Show a copy-link icon when hovering a heading on your public site (desktop only). Click it to copy a link straight to that section."
+        },
+        # COPY: auto duration setting — label and hint
+        "auto_duration" => {
+          type: :checkbox,
+          label: "Automatically add audio and video duration",
+          # Unset reads as on (SiteConfig.auto_duration?).
+          default: true,
+          hint: "Let Roe handle the duration settings for audio and video files"
+        },
+        "editor.mode" => {
+          type: :select,
+          label: "Writing editor",
+          options: [ [ "Live (formatted as you write)", "live" ], [ "Source (plain markdown)", "source" ], [ "Plain textarea (the old editor)", "textarea" ] ],
+          # Matches the editor partial's fallback, so an unset setting shows
+          # the editor you actually get rather than an empty "Select...".
+          default: "textarea",
+          hint: "New Live editor with improved formatting. Use \"Plain textarea\" to turn the new editor off."
+        }
+      }
+    },
+
+    # COPY: Players section — label, field labels, hints
+    players: {
+      label: "Players",
+      fields: {
+        "players.video" => {
+          type: :checkbox,
+          label: "Show a player on video posts",
+          # Unset reads as on (Post.template_players_enabled?), so the box
+          # starts ticked on a site that's never saved this.
+          default: true,
+          hint: "Puts a video player at the top of every video post. A post with a player card in its body " \
+                "shows the player card instead. Turn off to place video yourself."
+        },
+        "players.audio" => {
+          type: :checkbox,
+          label: "Show a player on audio, music and podcast posts",
+          default: true,
+          hint: "Puts a player at the top of every audio, music and podcast post. A post with a player card in " \
+                "its body shows the player card instead. Turn off to place audio yourself."
         }
       }
     },
@@ -325,17 +385,15 @@ class Admin::ConfigsController < Admin::BaseController
     test_keys: {
       label: "Stripe Test Keys",
       fields: {
-        "publishable_key" => { type: :text,     label: "Publishable Key (Test)", hint: "Starts with pk_test_" },
-        "secret_key"      => { type: :password, label: "Secret Key (Test)",      hint: "Starts with sk_test_" },
-        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Test)", hint: "Starts with whsec_" }
+        "secret_key"      => { type: :password, label: "Restricted Key (Test)",  hint: "Starts with rk_test_ (or sk_test_). Create it with the permissions listed in Stripe Setup above." },
+        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Test)", hint: "Starts with whsec_. Roe fills this in for you automatically — only paste it here if you set the webhook up manually." }
       }
     },
     live_keys: {
       label: "Stripe Live Keys",
       fields: {
-        "publishable_key" => { type: :text,     label: "Publishable Key (Live)", hint: "Starts with pk_live_" },
-        "secret_key"      => { type: :password, label: "Secret Key (Live)",      hint: "Starts with sk_live_" },
-        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Live)", hint: "Starts with whsec_" }
+        "secret_key"      => { type: :password, label: "Restricted Key (Live)",  hint: "Starts with rk_live_ (or sk_live_). Create it with the permissions listed in Stripe Setup above." },
+        "webhook_signing_secret" => { type: :password, label: "Webhook Signing Secret (Live)", hint: "Starts with whsec_. Roe fills this in for you automatically — only paste it here if you set the webhook up manually." }
       }
     }
   }.freeze
@@ -416,7 +474,8 @@ class Admin::ConfigsController < Admin::BaseController
         path: "global/site.yml",
         type: "site",
         description: "Site title, URL, author info, and branding",
-        edit_path: admin_edit_site_config_path
+        edit_path: admin_edit_site_config_path,
+        no_sender: SiteFeature.sender_unconfigured?
       },
       {
         name: "content.yml",
@@ -447,6 +506,14 @@ class Admin::ConfigsController < Admin::BaseController
       type: "security",
       description: "rate limits for sign-in, sign-up and tokens",
       edit_path: admin_edit_security_config_path
+    }
+
+    global_files << {
+      name: "redirects.yml",
+      path: "global/redirects.yml",
+      type: "redirects",
+      description: "301/302 URL redirects (auto-added when you rename a published slug)",
+      edit_path: admin_edit_redirects_config_path
     }
 
     # Always show deploy.yml (ships with Roe)
@@ -563,7 +630,8 @@ class Admin::ConfigsController < Admin::BaseController
         path: "integrations/stripe.yml",
         description: "Stripe test keys",
         edit_path: admin_edit_payments_config_path,
-        unconfigured: SiteFeature.payments_unconfigured?
+        unconfigured: SiteFeature.payments_unconfigured?,
+        live_unconfigured: SiteFeature.payments_live_unconfigured?
       }
     end
 
@@ -574,13 +642,17 @@ class Admin::ConfigsController < Admin::BaseController
       integration_files << {
         name: "postmark.yml",
         path: "integrations/postmark.yml",
-        description: "Email delivery — sign-in links, confirmations, newsletters",
+        description: "(email) test keys",
         edit_path: admin_edit_newsletters_config_path,
-        unconfigured: SiteFeature.email_unconfigured?
+        unconfigured: SiteFeature.email_unconfigured?,
+        live_unconfigured: SiteFeature.email_live_unconfigured?,
+        pending_approval: PostmarkConfig.current.account_pending_approval?
       }
     end
 
-    if SiteFeature.store_enabled?
+    # Hidden, not deleted, with Snipcart off: the keys stay in the file so
+    # turning it back on picks up where it was.
+    if SiteFeature.snipcart_enabled?
       integration_files << {
         name: "snipcart.yml",
         path: "integrations/snipcart.yml",
@@ -715,6 +787,41 @@ class Admin::ConfigsController < Admin::BaseController
 
     flash[:notice] = "Custom code saved."
     redirect_to admin_edit_custom_code_config_path
+  end
+
+  # GET — editor for redirects.yml (the 301/302 rules SiteRedirectsMiddleware
+  # serves). Auto-created by the post slug-change flow, but also hand-editable
+  # here. Shows the parsed rules for reading plus the raw YAML for editing.
+  def edit_redirects
+    @redirects      = RedirectManager.rules
+    @config_content = File.exist?(SiteConfig::REDIRECTS_FILE) ? File.read(SiteConfig::REDIRECTS_FILE) : "redirects: {}\n"
+  end
+
+  # POST — validates and writes redirects.yml, then reloads the middleware so a
+  # change takes effect without a restart. Rejects invalid YAML (a broken file
+  # would silently drop every redirect) and anything that isn't a redirects map.
+  def update_redirects
+    content = params[:content].to_s.gsub(/\r\n/, "\n")
+    parsed  = YAML.safe_load(content, permitted_classes: [], aliases: false)
+
+    unless parsed.is_a?(Hash) && (parsed["redirects"].nil? || parsed["redirects"].is_a?(Hash))
+      @config_content = content
+      @redirects = RedirectManager.rules
+      flash.now[:alert] = "redirects.yml must be a `redirects:` map of \"from path\" => to."
+      return render(:edit_redirects, status: :unprocessable_entity)
+    end
+
+    FileUtils.mkdir_p(File.dirname(SiteConfig::REDIRECTS_FILE))
+    SiteFile.write(SiteConfig::REDIRECTS_FILE, content)
+    SiteRedirectsMiddleware.reload! if defined?(SiteRedirectsMiddleware)
+
+    flash[:notice] = "Redirects saved."
+    redirect_to admin_edit_redirects_config_path
+  rescue Psych::SyntaxError => e
+    @config_content = content
+    @redirects = RedirectManager.rules
+    flash.now[:alert] = "Invalid YAML: #{e.message}"
+    render(:edit_redirects, status: :unprocessable_entity)
   end
 
   # Enable custom feeds by creating features/feeds.yml, seeded with one example
@@ -1201,7 +1308,7 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path, alert: "Podcast configuration doesn't exist." and return
     end
 
-    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    config = SiteFile.read_yaml(file_path, permitted_classes: [ Date, Time ]) || {}
     unless config.is_a?(Hash) && config.key?(key)
       redirect_to admin_edit_podcast_config_path, alert: "Podcast '#{key}' not found." and return
     end
@@ -1242,7 +1349,7 @@ class Admin::ConfigsController < Admin::BaseController
       redirect_to admin_configs_path, alert: "Enable podcasts before adding a show." and return
     end
 
-    config = YAML.load_file(file_path, permitted_classes: [ Date, Time ]) || {}
+    config = SiteFile.read_yaml(file_path, permitted_classes: [ Date, Time ]) || {}
     config = {} unless config.is_a?(Hash)
 
     base = "new-podcast"
@@ -1279,7 +1386,44 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_members
+    # Turning email OFF on a live members site is a one-way door for how members
+    # sign in — magic links stop, passwords start. Intercept and make the owner
+    # choose explicitly (switch to passwords, or turn members off) rather than
+    # flipping silently and locking existing members out. Only when email is
+    # actually going on -> off AND there are members who'd be affected.
+    if members_email_turning_off?(params[:content]) && Member.active.exists?
+      @config_type = "members"
+      @config_content = params[:content]
+      @affected_member_count = Member.active.count
+      # 422, not 200: the form submits via Turbo, which only replaces the page
+      # on a redirect or a non-2xx render. A 200 here would be silently
+      # discarded and the owner would never see the confirmation screen.
+      render :confirm_email_off, status: :unprocessable_entity and return
+    end
+
     update_config("features/members", SiteConfig::FEATURES_PATH.join("members.yml"))
+  end
+
+  # The owner confirmed, on the confirm screen, to switch to passwords. This is
+  # now a SILENT switch — it does NOT email anyone. Inviting members (sending
+  # them sign-in details) is a separate, explicit step the owner does from the
+  # Members admin WHILE email still works, before coming here. Auto-emailing
+  # here was wrong: imported-but-not-yet-launched members (e.g. 100 from
+  # Substack) are `active` by default, so it would blast sign-in emails to
+  # people who've never used the site. The confirm screen requires the owner to
+  # acknowledge they've already invited anyone who needs to sign in.
+  def confirm_members_passwords
+    unless params[:acknowledge_invited] == "1"
+      redirect_to admin_edit_members_config_path and return
+    end
+
+    content = params[:content].to_s
+    SiteFile.write(SiteConfig::FEATURES_PATH.join("members.yml"), content)
+    SiteConfig.sync_from_file("features/members")
+    Rails.cache.clear
+
+    flash[:notice] = "Email is off. Members now sign in with a password."
+    redirect_to admin_edit_members_config_path
   end
 
   def new_members_setup
@@ -1295,12 +1439,16 @@ class Admin::ConfigsController < Admin::BaseController
     show_paid = params[:show_paid_content] == "true"
     payments_enabled = params[:payments_enabled] == "true"
     payment_price = params[:payment_price].presence || "0.00"
-    newsletter_enabled = params[:newsletter_enabled] == "true"
+    email_enabled = params[:email_enabled] != "false"
+    # Newsletter needs email to send — can't broadcast with no mailer. If email
+    # is off, newsletter is forced off regardless of what the form said.
+    newsletter_enabled = email_enabled && params[:newsletter_enabled] == "true"
 
     ConfigGenerator.new.generate_members_defaults(
       show_paid_content: show_paid,
       payments_enabled: payments_enabled,
       payment_price: payment_price,
+      email_enabled: email_enabled,
       newsletter_enabled: newsletter_enabled
     )
     SiteConfig.sync_from_file("defaults/members")
@@ -1389,14 +1537,15 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def edit_deploy
-    @config_hash         = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    @config_hash         = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     @deploy_secrets      = DeploySecrets.current
     @master_key_present  = DeployConfigGenerator.master_key_present?
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     # Only asked when the CLI exists and Fly is the target: it's a network round
     # trip to Fly's API, and asking without a `fly` binary would report "not
     # signed in", sending someone to log in to a tool they haven't installed.
-    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
+    # The message to show — signed out, or Fly couldn't be reached — or nil.
+    @fly_auth_message    = DeployPreflight.new.fly_auth_issue&.key if @fly_cli_available && fly_target?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     # Local SSH keys for the kamal.ssh picker. Kamal supports an array
@@ -1488,7 +1637,8 @@ class Admin::ConfigsController < Admin::BaseController
     # Only asked when the CLI exists and Fly is the target: it's a network round
     # trip to Fly's API, and asking without a `fly` binary would report "not
     # signed in", sending someone to log in to a tool they haven't installed.
-    @fly_signed_in       = @fly_cli_available && fly_target? ? DeployPreflight.new.fly_authenticated? : true
+    # The message to show — signed out, or Fly couldn't be reached — or nil.
+    @fly_auth_message    = DeployPreflight.new.fly_auth_issue&.key if @fly_cli_available && fly_target?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
     @site_size_bytes     = site_size_bytes
     render :edit_deploy, status: :unprocessable_entity
@@ -1613,7 +1763,7 @@ class Admin::ConfigsController < Admin::BaseController
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "stripe.yml")
     test_data = params[:test] || {}
 
-    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing = SiteFile.read_yaml(path) || {}
     existing["test"] ||= {}
     # Skip masked placeholder values — user didn't change those fields
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
@@ -1626,7 +1776,11 @@ class Admin::ConfigsController < Admin::BaseController
     StripeConfig.save_test_config(existing["test"])
     stripe.verify!
 
-    flash[:notice] = "Stripe configuration saved"
+    # Fold webhook setup into the save: once the key verifies and a public URL
+    # exists, create/refresh the endpoint and capture its signing secret — no
+    # separate button. Skipped silently when there's no reachable URL (the
+    # common local case; the webhook activates on the live site).
+    flash[:notice] = "Stripe configuration saved#{auto_setup_stripe_webhook(stripe)}"
     redirect_to admin_edit_payments_config_path(tab: "test")
   end
 
@@ -1640,6 +1794,68 @@ class Admin::ConfigsController < Admin::BaseController
     }
   end
 
+  # Create (or refresh) the Stripe webhook endpoint Roe needs and capture its
+  # signing secret automatically — the one credential that otherwise has to be
+  # hand-copied from the dashboard. Uses the current mode's secret key.
+  #
+  # Runs for whichever mode is active: test-mode setup works locally when a
+  # dev_host/tunnel gives a reachable webhook URL; live-mode setup is
+  # production-only (same reason as live keys) and needs a deployed site.
+  def setup_payments_webhook
+    stripe = StripeConfig.current
+
+    if stripe.mode_live? && !Rails.env.production?
+      flash[:alert] = "Live webhooks are only set up in production."
+      redirect_to admin_edit_payments_config_path(tab: stripe.mode) and return
+    end
+
+    url = webhook_url("/webhooks/stripe")
+    if url.blank?
+      flash[:alert] = "No public webhook URL yet. Deploy your site (or set a dev tunnel host) first."
+      redirect_to admin_edit_payments_config_path(tab: stripe.mode) and return
+    end
+
+    if stripe.current_secret_key.blank?
+      flash[:alert] = "Add your Stripe #{stripe.mode} secret key first, then set up the webhook."
+      redirect_to admin_edit_payments_config_path(tab: stripe.mode) and return
+    end
+
+    result = StripeWebhookSetup.new(stripe.current_secret_key).ensure_endpoint(url)
+    stripe.store_webhook_signing_secret!(result[:signing_secret])
+    stripe.verify!
+
+    flash[:notice] = result[:recreated] ?
+      "Stripe webhook refreshed and its signing secret saved." :
+      "Stripe webhook created and its signing secret saved."
+    redirect_to admin_edit_payments_config_path(tab: stripe.mode)
+  rescue StripeWebhookSetup::Error => e
+    flash[:alert] = "Stripe webhook setup failed: #{e.message}"
+    redirect_to admin_edit_payments_config_path(tab: StripeConfig.current.mode)
+  end
+
+  # Fold webhook creation into the key-save flow. Returns a short suffix for the
+  # save flash (" · webhook connected." etc.), or "" when there's nothing to do.
+  # Never raises into the save — a webhook failure must not lose the saved key.
+  #
+  # Skips silently (no public URL) in the common local case, where the webhook
+  # activates on the deployed site. Live-mode setup stays production-only.
+  def auto_setup_stripe_webhook(stripe)
+    return "" if stripe.current_secret_key.blank?
+    return "" unless stripe.verified_at.present? # bad key → don't try
+    return "" if stripe.mode_live? && !Rails.env.production?
+
+    url = webhook_url("/webhooks/stripe")
+    return "" if url.blank? # no reachable URL (local without a tunnel)
+
+    result = StripeWebhookSetup.new(stripe.current_secret_key).ensure_endpoint(url)
+    stripe.store_webhook_signing_secret!(result[:signing_secret])
+    stripe.verify!
+    result[:recreated] ? " · webhook refreshed." : " · webhook connected."
+  rescue StripeWebhookSetup::Error => e
+    Rails.logger.warn "Stripe webhook auto-setup failed: #{e.message}"
+    " · but the webhook couldn't be set up: #{e.message}"
+  end
+
   def update_payments_live
     unless Rails.env.production?
       flash[:notice] = "Live keys are only saved in production."
@@ -1647,11 +1863,11 @@ class Admin::ConfigsController < Admin::BaseController
     end
 
     stripe = StripeConfig.current
-    apply_live_keys(stripe, params[:live] || {}, %w[publishable_key secret_key webhook_signing_secret])
+    apply_live_keys(stripe, params[:live] || {}, %w[secret_key webhook_signing_secret])
 
     if stripe.save
       stripe.verify!
-      flash[:notice] = "Stripe live keys saved"
+      flash[:notice] = "Stripe live keys saved#{auto_setup_stripe_webhook(stripe)}"
     else
       flash[:error] = "Failed to save Stripe live keys"
     end
@@ -1660,9 +1876,36 @@ class Admin::ConfigsController < Admin::BaseController
 
   def update_payments_mode
     update_integration_mode(StripeConfig.current, "Payments")
+    # The membership amount lives in members.yml and is mode-agnostic, but each
+    # Stripe mode needs its OWN Price object built from that amount (a test price
+    # is invalid against a live key and vice-versa). Generate the now-active
+    # mode's price if it doesn't have one yet, so checkout works right after the
+    # switch. The owner already set the amount, so this is the expected behaviour
+    # — no flash. If it can't run (keys unverified, amount blank) the Integration
+    # Status "price" row says what to do.
+    resync_payments_price_for_current_mode
     # Reopen the tab matching the now-active mode (the tabs controller reads
     # ?tab= on load). Falls back to the current mode if the switch was rejected.
     redirect_to admin_edit_payments_config_path(tab: StripeConfig.current.mode)
+  end
+
+  # Generate the current Stripe mode's Price from the members.yml amount, but
+  # only when that mode has none yet — Stripe::Price.create makes a NEW object
+  # every call, so regenerating an existing, working price would just orphan it.
+  # A price-amount CHANGE is handled separately by the members-config save path.
+  def resync_payments_price_for_current_mode
+    stripe = StripeConfig.current
+    return unless stripe.connected?
+    return if stripe.current_price_id.present?
+
+    payments = SiteConfig.feature("members", "payments")
+    return unless payments && ActiveModel::Type::Boolean.new.cast(payments["enabled"])
+    return if payments["price"].blank?
+
+    StripeProductManager.new.sync_from_config(payments)
+  rescue StandardError => e
+    Rails.logger.error "Payments price resync on mode switch failed: #{e.message}"
+    nil
   end
 
   def disconnect_payments
@@ -1692,7 +1935,7 @@ class Admin::ConfigsController < Admin::BaseController
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
     test_data = params[:test] || {}
 
-    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing = SiteFile.read_yaml(path) || {}
     existing["test"] ||= {}
     test_data.each { |k, v| existing["test"][k] = v if v.present? && v != "•" * 16 }
 
@@ -1714,6 +1957,56 @@ class Admin::ConfigsController < Admin::BaseController
       verified_at: success ? postmark.verified_at.iso8601 : nil,
       error:       success ? nil : "Could not connect to Postmark. Check your server token."
     }
+  end
+
+  # Proves the From address is one Postmark will accept, by sending a real
+  # message to the signed-in admin. verify_newsletters only checks the token;
+  # a working token with an unverified Sender Signature still fails every send.
+  #
+  # A success genuinely delivers an email — there's no way to ask Postmark
+  # without sending — so this is a button rather than something that fires on
+  # every token save.
+  def send_test_email_newsletters
+    to = Current.user&.email_address
+
+    if to.blank?
+      flash[:alert] = "Your account has no email address, so there's nowhere to send a test."
+      redirect_to admin_edit_newsletters_config_path and return
+    end
+
+    # Which server to test. The read-only Test/Live panels each test THEIR own
+    # server, so honour an explicit ?server=test|live; default to active mode.
+    config = PostmarkConfig.current
+    requested = params[:server].to_s
+    token = case requested
+    when "live" then config.live_server_token
+    when "test" then config.test_server_token
+    else             config.server_token
+    end
+
+    result = config.verify_sender!(to: to, server_token: token)
+
+    # Whether anything was actually delivered is a property of the Postmark
+    # server, not of the environment — a sandbox server accepts a message and
+    # records it in Activity without sending it. Asked here rather than stored,
+    # because it's one call on a button press and nothing else needs it.
+    sandbox = PostmarkService.test_connection(token)
+                             .dig(:server, "DeliveryType").to_s.casecmp("sandbox").zero? rescue false
+
+    if result[:success] && sandbox
+      # Nothing was delivered, and saying "sent" here is what sends someone
+      # hunting through an inbox that will never receive it.
+      flash[:notice] = "Postmark received the email from #{SiteSender.address} and recorded it " \
+                       "in Activity. This server is in sandbox mode, no emails are sent. " \
+                       "Your email address is confirmed by Postmark."
+    elsif result[:success]
+      flash[:notice] = "Test email sent to #{to} from #{SiteSender.address}. " \
+                       "If an email arrives, Postmark is working and your email is verified."
+    else
+      flash[:alert] = result[:error].to_s.presence || "Postmark refused the message."
+    end
+
+    redirect_to admin_edit_newsletters_config_path(tab: requested.presence || config.mode)
   end
 
   def update_newsletters_live
@@ -1751,6 +2044,133 @@ class Admin::ConfigsController < Admin::BaseController
     redirect_to admin_edit_newsletters_config_path
   end
 
+  # ── Postmark account-API setup ─────────────────────────────────────────────
+  #
+  # "Have Roe set up your Postmark integration." Paste one Account API token;
+  # Roe creates the sandbox + live servers, reads back their Server tokens,
+  # points the webhook at Roe, and reads the account's Sender Signature state.
+  # The account token is kept (encrypted) only in production; local uses it in
+  # this request and discards it. See PostmarkConfig#store_account_token? and
+  # PostmarkAccountSetup.
+
+  # Step 1: validate the token by listing servers, so the view can decide
+  # whether to offer a reuse choice (non-default servers exist) or go straight
+  # to "create them for me". Returns JSON for the Stimulus flow. Nothing is
+  # created or stored here.
+  def postmark_account_setup_preview
+    token = params[:account_token].to_s.strip
+    if token.blank?
+      render json: { ok: false, error: "Enter your Postmark Account API token." } and return
+    end
+
+    setup   = PostmarkAccountSetup.new(token)
+    servers = setup.list_servers
+    # Only non-default servers are worth offering for reuse; the stock
+    # "My First Server" is left alone.
+    reusable = servers.reject { |s| s[:default] }
+
+    render json: {
+      ok: true,
+      reusable: reusable.map { |s| s.slice(:id, :name, :delivery_type) },
+      signatures: setup.sender_signatures
+    }
+  rescue PostmarkAccountSetup::Error => e
+    render json: { ok: false, error: e.message }
+  end
+
+  # Step 2: do the work. Create/reuse the servers, store the tokens per the
+  # env rules, ensure the webhook, and (in an environment that can receive one)
+  # fire the probe send that closes the webhook-verification loop.
+  def postmark_account_setup_run
+    token = params[:account_token].to_s.strip
+    if token.blank?
+      flash[:alert] = "Enter your Postmark Account API token."
+      redirect_to admin_edit_newsletters_config_path and return
+    end
+
+    setup   = PostmarkAccountSetup.new(token)
+    postmark = PostmarkConfig.current
+    site    = SiteConfig.get("title").presence || "Roe"
+
+    sandbox = setup.ensure_server(kind: :sandbox, name: "#{site} - Sandbox",
+                                  reuse_id: params[:sandbox_reuse_id].presence)
+    # Sandbox token is not sensitive (records without delivering) and belongs in
+    # the plaintext test file, which Site Sync carries — so both installs
+    # converge on the same value.
+    save_postmark_sandbox_token(sandbox.token)
+
+    # The live server is created everywhere (so it exists and is webhook-ready),
+    # but its token can only be STORED where live keys are allowed — production.
+    # Locally the live token is read and discarded; Path B (send-to-peer) will
+    # take over that delivery later.
+    live = setup.ensure_server(kind: :live, name: "#{site} - Production",
+                               reuse_id: params[:live_reuse_id].presence)
+    if PostmarkConfig.store_account_token?
+      # Production runs live: store the live token AND switch the singleton to
+      # live mode, so PostmarkConfig#server_token actually returns it. Without
+      # the mode flip the model falls back to the sandbox token, and every send
+      # — including the webhook probe below — goes through a server that records
+      # but never delivers, so the Delivery webhook never fires and verification
+      # can't complete. (The owner can still switch to Test mode afterwards to
+      # exercise the sandbox.)
+      postmark.update!(server_token: live.token, mode: :live)
+      postmark.store_account_token!(token) # prod keeps it for the standing signature check
+    end
+
+    # Set up the webhook on BOTH servers — each Postmark server has its own
+    # webhooks, and Roe's endpoint (one URL, per-install token) is the same for
+    # both. Postmark verifies the endpoint on create, so this needs a publicly
+    # reachable URL: in production that's the live domain; locally it's nil
+    # unless a dev tunnel host is set, so the webhook step is skipped and its
+    # status ignored (the copy says so). This is what fixes "no webhooks were
+    # created" — previously only one server was wired up.
+    url = webhook_url("/webhooks/postmark/#{postmark.ensure_webhook_token!}")
+    sandbox_hook = setup.ensure_webhook(sandbox.token, url)
+    live_hook    = setup.ensure_webhook(live.token, url)
+
+    postmark.verify!
+
+    # Verify the webhooks the moment they're set up (production, where the live
+    # token is stored). Postmark's own check — POSTs a test of each event type
+    # to our endpoint, synchronous, no email — so a fresh setup lands on "all
+    # webhooks verified" with no extra click. Local can't (sandbox/no live URL).
+    verify = PostmarkConfig.store_account_token? ? postmark.verify_webhooks!(url) : nil
+
+    flash[:notice] = postmark_setup_summary(
+      sandbox:, live:, hook: (PostmarkConfig.store_account_token? ? live_hook : sandbox_hook),
+      verify:, kept: PostmarkConfig.store_account_token?
+    )
+    redirect_to admin_edit_newsletters_config_path(tab: postmark.mode)
+  rescue PostmarkAccountSetup::Error => e
+    flash[:alert] = "Postmark setup failed: #{e.message}"
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  # On-demand webhook re-check (the RE-CHECK button). Asks Postmark to test our
+  # endpoint for every registered webhook (POST /webhooks/{id}/verify) — each
+  # event type, synchronous, no email — and stamps the result. Redirects back
+  # with a one-line summary; the status row shows the outcome.
+  def postmark_verify_webhooks
+    postmark = PostmarkConfig.current
+    url = webhook_url("/webhooks/postmark/#{postmark.webhook_token}")
+    result = postmark.verify_webhooks!(url)
+
+    flash[:notice] = if result[:ok]
+      "All webhooks verified — Postmark can reach your site."
+    else
+      "Webhooks not verified#{result[:error] ? ": #{result[:error]}" : ''}. Sign into Postmark to resolve."
+    end
+    redirect_to admin_edit_newsletters_config_path
+  end
+
+  # Production Danger Zone: drop the stored account token. Setup still works
+  # (re-enter it), but the standing pre-emptive signature check goes quiet.
+  def remove_postmark_account_token
+    PostmarkConfig.current.remove_account_token!
+    flash[:notice] = "Account API token removed. Roe kept your server tokens."
+    redirect_to admin_edit_newsletters_config_path
+  end
+
   def edit_snipcart
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     unless File.exist?(path)
@@ -1769,7 +2189,7 @@ class Admin::ConfigsController < Admin::BaseController
     path = File.join(SiteConfig::INTEGRATIONS_PATH, "snipcart.yml")
     test_data = params[:test] || {}
 
-    existing = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
+    existing = SiteFile.read_yaml(path) || {}
     existing["test"] ||= {}
     # The snippet is public and shown in full (never masked), so save it
     # verbatim — a blank submission means "clear it," not "leave unchanged."
@@ -1983,6 +2403,40 @@ class Admin::ConfigsController < Admin::BaseController
     end
   end
 
+  # Write the sandbox server token into the plaintext test file (postmark.yml),
+  # the same place a hand-entered test token lives. Merges so nothing else in
+  # the file is lost, then re-syncs SiteConfig and the model's cached copy.
+  def save_postmark_sandbox_token(server_token)
+    return if server_token.blank?
+
+    path = File.join(SiteConfig::INTEGRATIONS_PATH, "postmark.yml")
+    existing = SiteFile.read_yaml(path) || {}
+    existing["test"] ||= {}
+    existing["test"]["server_token"] = server_token
+    write_yaml(path, existing)
+    SiteConfig.sync_from_file("integrations/postmark")
+    PostmarkConfig.save_test_config(existing["test"])
+  end
+
+  # One flash line summarising what the account-setup run did, honestly split
+  # by environment: production stores the live token and can verify the webhook
+  # end-to-end; local sets up the sandbox and reports that live finishes on the
+  # deployed site.
+  def postmark_setup_summary(sandbox:, live:, hook:, verify:, kept:)
+    parts = []
+    parts << (sandbox.created ? "Created your sandbox server" : "Using #{sandbox.name} for sandbox")
+    if kept
+      parts << (live.created ? "created your live server" : "using #{live.name} for live")
+      parts << (hook[:ok] ? "connected the delivery webhook" : "couldn't set up the webhook (#{hook[:error]})")
+      if verify
+        parts << (verify[:ok] ? "verified your webhooks" : "webhooks not verified — use RE-CHECK or sign into Postmark")
+      end
+    else
+      parts << "your live server is ready, but live keys can only be saved on your deployed site — run this again there to finish"
+    end
+    parts.join(". ") + "."
+  end
+
   # Update the active mode (test/live) on an integration record and
   # set a flash. Caller handles the redirect.
   def update_integration_mode(record, label)
@@ -2112,23 +2566,38 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   # Settings that read as on/off rather than as a choice between two things.
-  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon" ].freeze
+  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon", "auth.email_enabled", "newsletter.enabled", "payments.enabled", "everyone.show_paid_content" ].freeze
 
-  # Display defaults for a members.yml written before this section existed.
-  # Merged ahead of the file's own keys so the section renders first, and only
-  # for keys the file doesn't already set — saving the form writes it back, so
-  # this seeds the setting once rather than on every load.
+  # Whether the submitted members.yml turns email from on -> off, compared to
+  # the current on-disk state via the same rule SiteFeature uses (absent key =
+  # on). Drives the confirm-email-off interception in update_members.
+  def members_email_turning_off?(content)
+    return false unless SiteFeature.email_feature_enabled? # currently on?
+    pending = begin
+      YAML.safe_load(content.to_s, permitted_classes: [ Date, Time, Symbol ], aliases: true)
+    rescue Psych::Exception
+      nil
+    end
+    return false unless pending.is_a?(Hash)
+    pending.dig("auth", "email_enabled") == false
+  end
+
+  # Display defaults for a members.yml written before a section existed. Merged
+  # ahead of the file's own keys so the section renders, and only for keys the
+  # file doesn't already set — saving the form writes it back, so this seeds
+  # the setting once rather than on every load.
   def with_members_display_defaults(config)
     display = { "always_show_member_icon" => false }.merge(config["display"] || {})
-    { "display" => display }.merge(config)
+    # Seed auth.email_enabled so the Email checkbox always renders. Default true
+    # for a members.yml written before this setting existed — it was a
+    # magic-link site, so email is on (matches SiteFeature#email_feature_enabled?).
+    auth = { "email_enabled" => true }.merge(config["auth"] || {})
+    { "display" => display, "auth" => auth }.merge(config)
   end
 
   def build_field_options_for_members
     {
-      "payments.enabled" => [ "false", "true" ],
-      "payments.mode" => [ "memberships", "donations", "both" ],
-      "newsletter.enabled" => [ "false", "true" ],
-      "everyone.show_paid_content" => [ "true", "false" ]
+      "payments.mode" => [ "memberships", "donations", "both" ]
     }
   end
 
@@ -2157,7 +2626,7 @@ class Admin::ConfigsController < Admin::BaseController
 
   # The saved target, so the Fly session check only runs on a Fly site.
   def fly_target?
-    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    config = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     (config["target"].presence || "kamal").to_s == "fly"
   rescue StandardError
     false
@@ -2170,10 +2639,11 @@ class Admin::ConfigsController < Admin::BaseController
 
     {
       "payments.enabled" => "Turn on the payments system (requires connection to your Stripe account). Then choose what you want to offer in the mode field below.",
-      "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both flows.",
+      "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both options.",
       "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",
       "payments.donation_amounts" => "Preset donation amounts in #{currency} (only used when mode is donations or both, e.g., [5, 10, 20, 50])",
-      "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Postmark account & configuration)",
+      "auth.email_enabled" => "Use email for members (requires Postmark, about $20/month). On: members sign in with an emailed link and get account emails. Off: members sign in with a password and no email service is needed. **Must be on to send a newsletter.**",
+      "newsletter.enabled" => "Enable newsletter sending via Postmark (requires Email, above, to be enabled)",
       "everyone.show_paid_content" => "Show paid post links to public visitors and free members. They will see a lock icon next to paid content and be encouraged to upgrade to view it.",
       "display.always_show_member_icon" => "Keep the account icon in the site header for everyone, not just signed-in members. Signed out, it links to your sign-in page. Leave this off and the icon appears only once someone signs in."
     }
@@ -2185,7 +2655,7 @@ class Admin::ConfigsController < Admin::BaseController
     # Load old config to compare (only for site config)
     old_config = nil
     if type == "site" && File.exist?(file_path)
-      old_config = YAML.load_file(file_path) rescue {}
+      old_config = SiteFile.read_yaml(file_path) || {} rescue {}
     end
 
     # Validate YAML syntax. safe_load (not load) so pasted config can't

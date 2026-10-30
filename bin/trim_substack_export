@@ -3,21 +3,75 @@
 require 'csv'
 require 'fileutils'
 require 'optparse'
+require 'time'
 
 # Configuration
-IMPORT_DIR = File.expand_path('~/Downloads/6T7ziioST9qpys_DDx5Cpg')
-OUTPUT_DIR = File.expand_path('~/Downloads/ee-test-export')
+IMPORT_DIR = File.expand_path(ENV['SUBSTACK_EXPORT'] || '~/Downloads/P4MPjfCCR1q-9K81hwOokA')
+OUTPUT_DIR = File.expand_path(ENV['SUBSTACK_TRIMMED'] || '~/Downloads/ee-test-export')
 NUM_SUBSCRIBERS = 100
 NUM_POSTS = 20
 
+
+# Substack's own export varies its header case between exports, so read both
+# spellings the way MembersImporter does.
+def field(row, *names) = names.filter_map { |n| row[n] }.first.to_s
+def plan_of(row)       = field(row, 'plan', 'Plan').downcase.strip
+def flag?(row, *names) = field(row, *names).downcase == 'true'
+def email_of(row)      = field(row, 'email', 'Email', 'EMAIL').downcase.strip
+
+# Mirrors MembersImporter#subscription_effective?. A paid plan that has lapsed
+# imports as FREE, which is the case the never-downgrade rule exists for — so a
+# sample without one can't exercise it.
+def effective?(row)
+  return true if flag?(row, 'active_subscription', 'Active Subscription')
+
+  expiry = field(row, 'expiry', 'Expiry')
+  return false if expiry.empty?
+
+  begin
+    Time.parse(expiry) > Time.now
+  rescue ArgumentError
+    false
+  end
+end
+
+PAID_PLANS = %w[lifetime yearly monthly quarterly semiannually ios_app].freeze
+
+# The buckets Roe branches on when deciding a tier — not the raw plan strings.
+# determine_tier groups several plans together, and effectiveness can override
+# any of them, so sampling by plan alone misses the interesting rows.
+#
+# A row lands in the first bucket that claims it.
+PLAN_BUCKETS = {
+  'lifetime'     => ->(r) { plan_of(r) == 'lifetime' && effective?(r) },
+  'annual'       => ->(r) { plan_of(r) == 'yearly' && effective?(r) },
+  'lapsed'       => ->(r) { PAID_PLANS.include?(plan_of(r)) && !effective?(r) },
+  'monthly'      => ->(r) { plan_of(r) == 'monthly' && effective?(r) },
+  'other_paid'   => ->(r) { %w[quarterly semiannually ios_app].include?(plan_of(r)) && effective?(r) },
+  'comp'         => ->(r) { %w[comp other].include?(plan_of(r)) },
+  'unsubscribed' => ->(r) { flag?(r, 'email_disabled', 'Email Disabled') },
+  'free'         => ->(r) { plan_of(r).empty? }
+}.freeze
+
 # CLI flags
-options = { ensure_podcasts: 0 }
+options = { ensure_podcasts: 0, per_plan: 5, plans: nil }
 OptionParser.new do |opts|
   opts.banner = "Usage: trim_substack_export [options]"
   opts.on("--ensure-podcasts N", Integer,
           "Force at least N podcast posts into the sample (default: 0). " \
           "Useful for testing the RSS-feed enrichment path.") do |n|
     options[:ensure_podcasts] = n
+  end
+  opts.on("--plans LIST", Array,
+          "Only sample subscribers from these buckets, comma separated. " \
+          "One of: #{PLAN_BUCKETS.keys.join(', ')}. " \
+          "Default: an assortment covering all of them.") do |list|
+    options[:plans] = list
+  end
+  opts.on("--per-plan N", Integer,
+          "How many subscribers to take from each bucket before filling the " \
+          "rest at random (default: 5).") do |n|
+    options[:per_plan] = n
   end
 end.parse!
 
@@ -42,15 +96,51 @@ puts "\n1. Processing #{email_list_filename}..."
 # Read and sample random subscribers
 email_list = CSV.read(email_list_file, headers: true)
 total_subscribers = email_list.count
-kept_emails = email_list.entries.sample(NUM_SUBSCRIBERS)
-kept_email_addresses = kept_emails.map { |row| row['email'] }.compact.to_set
+# Take a few from each bucket first so every tier decision Roe can make is
+# represented, then fill the remaining slots at random. A purely random sample
+# of a mostly-free list will usually contain no lifetime members at all, and a
+# run that can't reach a branch looks identical to one that reached it and
+# found nothing wrong.
+wanted_buckets = options[:plans] || PLAN_BUCKETS.keys
+unknown = wanted_buckets - PLAN_BUCKETS.keys
+unless unknown.empty?
+  puts "❌ Unknown plan bucket(s): #{unknown.join(', ')}"
+  puts "   Available: #{PLAN_BUCKETS.keys.join(', ')}"
+  exit 1
+end
+
+claimed = {}
+email_list.entries.each do |row|
+  bucket = PLAN_BUCKETS.find { |_, match| match.call(row) }&.first
+  (claimed[bucket] ||= []) << row if bucket
+end
+
+forced = wanted_buckets.flat_map { |b| (claimed[b] || []).sample(options[:per_plan]) }.uniq
+
+if options[:plans]
+  # Focusing on specific buckets: don't dilute the sample with everything else.
+  kept_emails = forced.first(NUM_SUBSCRIBERS)
+else
+  remaining = [ NUM_SUBSCRIBERS - forced.size, 0 ].max
+  kept_emails = forced + (email_list.entries - forced).sample(remaining)
+end
+
+kept_email_addresses = kept_emails.map { |row| email_of(row) }.reject(&:empty?).to_set
+
+puts "  Subscribers by what Roe would do with them:"
+wanted_buckets.each do |bucket|
+  took = kept_emails.count { |r| PLAN_BUCKETS[bucket].call(r) }
+  available = (claimed[bucket] || []).size
+  flag = available.zero? ? "  ⚠️  none in this export — that path won't be tested" : ""
+  puts format("    %-13s %3d of %-5d%s", bucket, took, available, flag)
+end
 
 # Write sampled email list
 CSV.open("#{OUTPUT_DIR}/#{email_list_filename}", 'w') do |csv|
   csv << email_list.headers
   kept_emails.each { |row| csv << row }
 end
-puts "  Kept #{kept_email_addresses.count} of #{total_subscribers} subscribers (random sample)"
+puts "  Kept #{kept_email_addresses.count} of #{total_subscribers} subscribers"
 
 # 2. Read posts.csv and sample posts
 puts "\n2. Processing posts.csv..."
@@ -179,7 +269,7 @@ puts "  Created: #{zip_filename} (#{file_size} MB)"
 
 puts "\n✅ Done! Trimmed export ready at: #{zip_filename}"
 puts "\nSummary:"
-puts "  - #{kept_email_addresses.count} subscribers (random)"
+puts "  - #{kept_email_addresses.count} subscribers (#{options[:plans] ? options[:plans].join(', ') : 'assorted plans'})"
 puts "  - #{kept_posts.count} posts (random)"
 puts "  - #{copied_count} HTML files"
 puts "  - #{delivery_count} delivery CSVs (#{delivery_rows_kept} rows)"

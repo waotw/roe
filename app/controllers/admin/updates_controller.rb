@@ -64,11 +64,14 @@ class Admin::UpdatesController < Admin::BaseController
       @restart_pending  = boot_time && @last_update.completed_at >= boot_time
       @restart_complete = boot_time && @last_update.completed_at <  boot_time
     end
+    # A registered install restarts with one command from any terminal;
+    # an unregistered one still needs the foreground ./roe.sh dance.
+    @restart_command = RoeRegistry.restart_command
 
     # Deploy section
     @deploy_status       = DeployWatchdog.status
     @last_deploy_time    = load_last_deploy_time
-    @deploy_config       = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    @deploy_config       = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     @deploy_issues       = deploy_prerequisites(@deploy_config)
     @fly_cli_available   = DeployConfigGenerator.fly_cli_available?
     @kamal_cli_available = DeployConfigGenerator.kamal_cli_available?
@@ -79,6 +82,9 @@ class Admin::UpdatesController < Admin::BaseController
     @deploy_target_label = @deploy_target == "kamal" ? "Kamal" : "Fly.io"
     @deploy_server_desc  = deploy_server_description(@deploy_config, @deploy_target, @default_app_name)
     @deploy_confirm_msg  = deploy_confirmation_message(@deploy_target, @deploy_server_desc, @deploy_config, @default_app_name)
+
+    # A note above Deploy while videos are being optimized. Never blocks it.
+    @videos_optimizing   = Rails.env.production? ? [] : VideoVariantGenerator.optimizing_now
   end
 
   def check
@@ -199,7 +205,7 @@ class Admin::UpdatesController < Admin::BaseController
       return
     end
 
-    config  = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    config  = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     issues  = deploy_prerequisites(config)
 
     if issues.any?
@@ -256,7 +262,7 @@ class Admin::UpdatesController < Admin::BaseController
       return
     end
 
-    config = File.exist?(SiteConfig::DEPLOY_FILE) ? (YAML.load_file(SiteConfig::DEPLOY_FILE) || {}) : {}
+    config = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
     issues = deploy_prerequisites(config)
 
     if issues.any?
@@ -321,8 +327,12 @@ class Admin::UpdatesController < Admin::BaseController
 
     # Use Open3 with an array so spaces in Rails.root don't break the shell command.
     require "open3"
+    # NB: split on newlines WITHOUT a leading String#strip — porcelain pads the
+    # status with a leading space for worktree-only changes (" M path"), and
+    # strip would eat the first line's leading space, shifting that one path by a
+    # character (turning "VERSION" into "ERSION"). Drop blank lines individually.
     output, = Open3.capture2("git", "-C", Rails.root.to_s, "status", "--porcelain")
-    lines = output.strip.split("\n").reject(&:empty?)
+    lines = output.split("\n").reject { |l| l.strip.empty? }
 
     changed = lines.map do |line|
       code     = line[0..1].strip
@@ -353,7 +363,7 @@ class Admin::UpdatesController < Admin::BaseController
     end
 
     site_path = SiteConfig::SITE_FILE
-    config = File.exist?(site_path) ? (YAML.load_file(site_path) || {}) : {}
+    config = SiteFile.read_yaml(site_path) || {}
     config["update_channel"] = new_channel
     File.write(site_path, YAML.dump(config))
     SiteConfig.sync_from_file("site")

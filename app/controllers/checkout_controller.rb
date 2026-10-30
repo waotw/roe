@@ -11,8 +11,8 @@ class CheckoutController < ApplicationController
 
     # Get Stripe config
     stripe_config = StripeConfig.current
-    unless stripe_config.connected? && stripe_config.price_id.present?
-      redirect_to root_path, alert: "Payments not available"
+    unless stripe_config.connected? && stripe_config.current_price_id.present?
+      redirect_to root_path, alert: "There was an issue with the upgrade system. Please contact the site owner."
       return
     end
 
@@ -22,7 +22,7 @@ class CheckoutController < ApplicationController
         customer_email: current_member.email,
         mode: "payment",
         line_items: [ {
-          price: stripe_config.price_id,
+          price: stripe_config.current_price_id,
           quantity: 1
         } ],
         success_url: checkout_payment_processing_url + "?session_id={CHECKOUT_SESSION_ID}",

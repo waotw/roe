@@ -20,10 +20,22 @@ Rails.application.configure do
   # which causes Rails 8's HostAuthorization middleware to misfire.
   _dev_config_path = File.join(RoeSitePaths::SITE_PATH, "system", "global", "development.yml")
   if File.exist?(_dev_config_path)
-    dev_config = YAML.load_file(_dev_config_path)
+    # Not YAML.load_file: bootsnap caches it on (mtime, size), so an edit
+    # that kept the file's length could be read as the old contents. Roe's
+    # SiteFile.read_yaml isn't loadable yet this early in boot.
+    dev_config = YAML.load(File.read(_dev_config_path), filename: _dev_config_path)
     allowed_hosts = Array(dev_config&.dig("allowed_hosts")).map(&:to_s).select(&:present?)
     config.hosts |= allowed_hosts unless allowed_hosts.empty?
   end
+
+  # Registered installs are reached at <name>.roe (see roe.sh
+  # register). Allow the whole suffix so every registered site passes Host
+  # Authorization without each one editing development.yml.
+  #
+  # No \A or \z here: HostAuthorization wraps each regexp as
+  # /\A<regexp>(:\d+)?\z/ so the port is allowed. Our own \z would sit
+  # before the optional port and reject every "name.roe:3001" Host header.
+  config.hosts |= [ /[a-z0-9-]+\.roe/ ]
 
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.
@@ -52,7 +64,35 @@ Rails.application.configure do
   # Set localhost to be used by links generated in mailer templates.
   config.action_mailer.delivery_method = :letter_opener
   config.action_mailer.perform_deliveries = true
-  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
+  # Mailer links must point at THIS install. Member sign-in is magic-link
+  # based, so a wrong host or port sends someone to a different site's login
+  # once more than one install runs locally — a real breakage, not cosmetic.
+  #
+  # Read site.yml directly rather than through SiteConfig: this runs during
+  # boot, before the database is connected and before autoloading app code
+  # is safe. Host prefers ROE_HOST (set by roe.sh for a registered install,
+  # its <name>.roe hostname), then site.yml; port prefers the port the
+  # server actually bound (roe.sh exports PORT) and falls back to site.yml's.
+  config.action_mailer.default_url_options = begin
+    site_yml = File.join(RoeSitePaths::SITE_SYSTEM_PATH, "global", "site.yml")
+    raw      = File.exist?(site_yml) ? YAML.safe_load_file(site_yml, aliases: true) : nil
+    bare     = (raw.is_a?(Hash) ? raw["url"].to_s : "").sub(%r{\Ahttps?://}, "").sub(%r{/.*\z}, "")
+    host, _, configured_port = bare.partition(":")
+    host = ENV["ROE_HOST"] if ENV["ROE_HOST"].present?
+
+    port = if ENV["PORT"].to_i.positive?
+      ENV["PORT"].to_i
+    elsif configured_port.present?
+      configured_port.to_i
+    else
+      3000
+    end
+
+    { host: host.presence || "localhost", port: port }
+  rescue StandardError => e
+    warn "[Roe] couldn't read site.yml for mailer URLs (#{e.class}: #{e.message}); using localhost"
+    { host: "localhost", port: 3000 }
+  end
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log

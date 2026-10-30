@@ -1,0 +1,64 @@
+<%# Slug-change decision modal — shown by editor#save BEFORE the form submits,
+    when a PUBLISHED post's url_name was edited. Nothing has been saved yet, so
+    all three choices are honest:
+      • Create redirect & save — save the rename and write a 301 (old → new)
+      • Keep old URL           — revert the slug field, then save (no redirect)
+      • Cancel                 — close, save nothing
+    Hidden until the editor reveals it and fills in the from/to paths.
+    Shared by the post, page and product editors; `noun` names which. %>
+<% noun = local_assigns.fetch(:noun, "post") %>
+<div id="redirect-decision-modal"
+     data-editor-target="redirectModal"
+     class="hidden fixed inset-0 bg-amber-700/35 flex items-center justify-center z-50">
+  <div class="bg-white border-2 border-gray-900 p-8 max-w-lg mx-auto">
+    <h2 class="text-2xl font-bold text-gray-900 mb-4">You changed this <%= noun %>'s URL</h2>
+
+    <p class="text-gray-700 mb-4">
+      This <%= noun %> is published, so anyone who linked to the old address will hit a
+      dead page unless you forward it.
+    </p>
+
+    <div class="bg-gray-50 border border-gray-300 p-4 mb-4 text-sm font-mono space-y-1">
+      <div><span class="text-gray-500">old&nbsp;</span><span data-editor-target="redirectFrom"></span></div>
+      <div><span class="text-gray-500">new&nbsp;</span><span data-editor-target="redirectTo"></span></div>
+    </div>
+
+    <p class="text-sm text-gray-600 mb-6">
+      <%# Names the OTHER side of Site Sync: editing on local syncs to live, and
+          editing on the live site syncs back to local. %>
+      A redirect will be added to <span class="font-mono">Settings → Redirects</span>
+      and syncs to your <%= Rails.env.production? ? "local" : "live" %> site.
+    </p>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <%# Cancel sits apart on the left: nothing is saved, back to the editor. %>
+      <button type="button"
+              data-action="click->editor#cancelRedirectDecision"
+              class="uppercase text-sm px-4 py-2 border border-gray-800 bg-white hover:bg-gray-100 font-mono rounded-xs cursor-pointer text-nowrap">
+        Cancel<span class="hidden sm:inline"> — keep editing</span>
+      </button>
+
+      <%# The two ways to SAVE, grouped on the right. Both commit your edits; they
+          differ only in what happens to the URL. %>
+      <div class="flex items-center gap-3">
+        <button type="button"
+                data-action="click->editor#keepOldUrlAndSave"
+                class="uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-100 font-mono rounded-xs cursor-pointer text-nowrap">
+          Save with old URL
+        </button>
+        <button type="button"
+                data-action="click->editor#createRedirectAndSave"
+                class="uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer text-nowrap">
+          Save new URL &amp; redirect
+        </button>
+      </div>
+    </div>
+
+    <%# Plain-language legend so the three choices can't be confused. %>
+    <ul class="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-500 space-y-1">
+      <li><span class="font-semibold text-gray-700">Save new URL &amp; redirect</span> — use the new address and forward the old one so existing links keep working.</li>
+      <li><span class="font-semibold text-gray-700">Save with old URL</span> — keep the previously saved address (undo just the rename) and save your other edits.</li>
+      <li><span class="font-semibold text-gray-700">Cancel</span> — don't save anything; go back to the editor.</li>
+    </ul>
+  </div>
+</div>

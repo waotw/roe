@@ -104,7 +104,7 @@ module RoeUpdater
         version_file = File.join(RoeSitePaths::ROE_ROOT, "VERSION")
         return "0.0.0" unless File.exist?(version_file)
 
-        config = YAML.load_file(version_file)
+        config = SiteFile.read_yaml(version_file) || {}
         config["version"] || "0.0.0"
       rescue => e
         Rails.logger.error "Failed to load version file: #{e.message}"
@@ -118,7 +118,7 @@ module RoeUpdater
         return mock_release if Rails.env.test?
         return mock_release if ENV["ROE_MOCK_UPDATE"].present?
 
-        Rails.logger.info "[VersionChecker] Checking for updates from Codeberg"
+        Rails.logger.info "[VersionChecker] Checking for updates"
 
         # Try git tags with HTTPS -> SSH fallback
         git_result = fetch_via_git_tags
@@ -127,7 +127,7 @@ module RoeUpdater
           return git_result
         end
 
-        Rails.logger.error "[VersionChecker] Failed to fetch version from Codeberg"
+        Rails.logger.error "[VersionChecker] Failed to fetch version from any mirror"
         nil
       rescue => e
         Rails.logger.error "[VersionChecker] Failed to fetch latest version: #{e.class} - #{e.message}"
@@ -197,7 +197,7 @@ module RoeUpdater
       def parse_git_tags_output(tags_output)
         # Capture both forms of each tag:
         #   original — what git knows, including the required `v` prefix
-        #              (used for Codeberg API calls, release URLs, and
+        #              (used for forge API calls, release URLs, and
         #              for the Downloader's `git clone --branch vX.Y.Z`)
         #   stripped — the bare version (used for VERSION-file comparison
         #              and the value the rest of Roe stores/displays)
@@ -277,8 +277,8 @@ module RoeUpdater
         version_str.to_s.include?("-")
       end
 
-      # Fetch release metadata for a given tag from the Codeberg (Gitea)
-      # API. Returns a hash with :name, :body, :html_url, :published_at —
+      # Fetch release metadata for a given tag from the forge's API
+      # (GitHub, or Forgejo/Gitea for older mirrors). Returns a hash with :name, :body, :html_url, :published_at —
       # or nil if the release doesn't exist (e.g., tag was pushed without
       # creating a release object) or the request failed for any reason.
       def fetch_release_metadata(tag)
@@ -327,42 +327,27 @@ module RoeUpdater
         nil
       end
 
-      # Compose the release-notes preview the admin Updates page shows.
-      # Sourced from the release title (if any) + as much of the body
-      # as fits in a panel-friendly preview length. Falls back to a
-      # generic message when nothing is available — covers the "git
-      # tag without a Codeberg release" case.
+      # The release notes the Updates page shows: the release title, then
+      # the body, as markdown — the view renders it (release_notes_html).
+      # Falls back to a plain line when the tag has no release object.
       #
-      # Truncates at ~600 chars on a word boundary so the panel doesn't
-      # blow up to fill the page on long release notes — the view
-      # already shows a "View full release notes on Codeberg →" link
-      # below, so anyone who wants the full thing follows it.
-      #
-      # Light markdown cleanup: strips leading `#` from heading lines
-      # so `## What's new in 0.0.11` reads as `What's new in 0.0.11`
-      # in the panel. Other markers (bullets `-`, emphasis `**`, code
-      # `` ` ``) are left in place — they're tolerable in a plain-text
-      # preview and stripping them aggressively risks mangling content
-      # that uses them legitimately (e.g. a flag name with hyphens).
+      # Kept whole. It used to be cut at ~600 characters and have its
+      # heading markers stripped, for a plain-text preview; cut markdown can
+      # end inside a list or a code fence, and rendered notes can scroll in
+      # their panel instead.
       def build_summary(name, body)
         title = name.to_s.strip.presence
-        body_text = clean_markdown_headings(body.to_s.strip)
+        body_text = body.to_s.strip.gsub("\r\n", "\n")
 
         parts = []
-        parts << title if title
+        # A body that opens with its own heading (`# Roe 0.3.0`) already
+        # names the release; the title above it would say it twice.
+        parts << "**#{title}**" if title && !body_text.start_with?("#")
         parts << body_text if body_text.present?
 
-        return "View the changelog and commit history on Codeberg." if parts.empty?
+        return "No release notes were published for this version." if parts.empty?
 
-        full = parts.join("\n\n")
-        full.length > 600 ? full.truncate(600, separator: " ", omission: "…") : full
-      end
-
-      # Strip leading ATX heading markers (`#`, `##`, `###`, …) from
-      # each line. Preserves indentation, list markers, and inline
-      # emphasis — only the line-leading `#`s are removed.
-      def clean_markdown_headings(text)
-        text.lines.map { |line| line.sub(/\A#+\s*/, "") }.join
+        parts.join("\n\n")
       end
 
 
@@ -429,7 +414,7 @@ module RoeUpdater
         {
           version: "0.2.0",
           url: RoeUpdater::Forge.release_page_url("v0.2.0"),
-          notes: "## What's New\n\n- Feature A\n- Feature B\n- Bug fixes\n\nView full changelog on Codeberg.",
+          notes: "## What's New\n\n- Feature A\n- Feature B\n- Bug fixes\n\nSee the full changelog on the release page.",
           published_at: Time.now.iso8601
         }
       end

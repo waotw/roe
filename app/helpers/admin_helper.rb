@@ -40,6 +40,34 @@ module AdminHelper
     sanitize(html, tags: HINT_TAGS, attributes: HINT_ATTRIBUTES)
   end
 
+  # Release notes on the Updates page. They're written in markdown on the
+  # forge (GitHub), and they come from the network, so they're sanitized to
+  # text formatting and links — no images, scripts, styles or raw HTML that
+  # could reach an admin page. Links open in a new tab, away from the update.
+  RELEASE_NOTES_TAGS = %w[
+    p br hr h1 h2 h3 h4 h5 h6 strong em b i del code pre blockquote
+    ul ol li a table thead tbody tr th td
+  ].freeze
+
+  def release_notes_html(markdown)
+    return "" if markdown.blank?
+
+    html = Kramdown::Document.new(markdown.to_s, input: "GFM", hard_wrap: false).to_html
+    html = sanitize(html, tags: RELEASE_NOTES_TAGS, attributes: %w[href title])
+    html.gsub("<a href=", %(<a target="_blank" rel="noopener" href=)).html_safe
+  end
+
+  # "GitHub" for a github.com URL, and so on — for "View release notes on …"
+  # links, which used to say Codeberg whatever the URL was.
+  FORGE_NAMES = { "github.com" => "GitHub", "codeberg.org" => "Codeberg" }.freeze
+
+  def forge_name(url)
+    host = URI.parse(url.to_s).host.to_s.delete_prefix("www.")
+    FORGE_NAMES.fetch(host, host.presence || "the release page")
+  rescue URI::InvalidURIError
+    "the release page"
+  end
+
   def useful_links
     links = {}
 
@@ -113,6 +141,18 @@ module AdminHelper
     member_links
   end
 
+  # Mode-aware Stripe Dashboard deep link to a single payment, keyed by its
+  # payment-intent id (what MemberPayments exposes as `reference`). From that
+  # page the owner can view the hosted receipt, resend the receipt email, and
+  # issue a refund — so it covers both needs without an API call here. nil for
+  # a blank reference (an imported payment with no intent on record).
+  def stripe_payment_url(payment_intent_id)
+    return nil if payment_intent_id.blank?
+
+    base = StripeConfig.current.mode_test? ? "https://dashboard.stripe.com/test" : "https://dashboard.stripe.com"
+    "#{base}/payments/#{payment_intent_id}"
+  end
+
   private
 
   # MemberPages owns this question — it checks a declared page_type and the form
@@ -121,6 +161,6 @@ module AdminHelper
 
   def stripe_membership_ready?
     stripe_config = StripeConfig.current
-    stripe_config.connected? && stripe_config.price_id.present?
+    stripe_config.connected? && stripe_config.current_price_id.present?
   end
 end

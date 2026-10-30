@@ -41,6 +41,11 @@ module SiteSync
     # than fail a legitimate sync.
     TRANSFER_TIMEOUT_SECONDS = 300
 
+    # Large files go up in pieces this size (upload_large_file).
+    CHUNK_BYTES = 8 * 1024 * 1024
+
+    class ChunkedUploadError < StandardError; end
+
     # Cap for the per-category drift file list we ship in the
     # exchange payload. A pathological case (e.g. a fresh push that
     # touched every file) could otherwise produce a multi-MB JSON
@@ -81,7 +86,13 @@ module SiteSync
             deploy_target: SiteSync.deploy_target&.to_s,
             # Rails-app dir relative to the Roe folder ("current" for the
             # versioned layout; nil when the app IS the Roe folder).
-            rails_subdir:  (RoeSitePaths::RAILS_APP_ROOT == RoeSitePaths::ROE_ROOT ? nil : File.basename(RoeSitePaths::RAILS_APP_ROOT))
+            rails_subdir:  (RoeSitePaths::RAILS_APP_ROOT == RoeSitePaths::ROE_ROOT ? nil : File.basename(RoeSitePaths::RAILS_APP_ROOT)),
+            # Whether this side encrypts and ships its database each sync.
+            # The fact only, so the other side's Site Backups page can show
+            # the real state of the live site instead of its own (empty)
+            # passphrase. See SyncConfig#peer_backup_encryption for why
+            # this is a string.
+            backup_encryption: (SyncConfig.current.backup_passphrase_set? ? "on" : "off")
           }
         }
 
@@ -348,11 +359,17 @@ module SiteSync
         return nil unless response.is_a?(Net::HTTPSuccess)
 
         data = JSON.parse(response.body)
-        {
+        # First, so the filter below works from live's current answer.
+        SiteSync::LiveVideo.record_peer_ready!(data["keeps_videos_without_originals"])
+        # Live reports every file it has; a video original this computer
+        # keeps (LiveVideo) is dropped here so nothing downstream — the status
+        # check, the reconciler, the baseline write — counts it as a
+        # difference. The purge on the next push removes live's copy.
+        SiteSync::Ledger.comparable_peer_manifest({
           "files" => data["files"] || {},
           "fingerprint" => data["fingerprint"],
           "file_count" => data["file_count"]
-        }
+        })
       rescue => e
         Rails.logger.warn "[SiteSync::Exchange] fetch_peer_manifest failed: #{e.class} #{e.message}"
         nil
@@ -404,6 +421,201 @@ module SiteSync
         nil
       end
 
+      # Send one large file in pieces (Api::SiteSync::ChunkedUploadsController),
+      # for files too big to go in a single upload request. Resumes where a
+      # previous attempt stopped. on_bytes, when given, is called with the
+      # bytes sent so far. Raises ChunkedUploadError with a plain-words
+      # message on failure; returns true.
+      def upload_large_file(rel, root: RoeSitePaths::SITE_PATH, on_bytes: nil)
+        raise ChunkedUploadError, "Site Sync isn't set up to reach the live site." unless can_call_peer?
+
+        full = File.join(root, rel)
+        size = File.size(full)
+        mtime = File.mtime(full).to_i
+        sha = Digest::SHA256.file(full).hexdigest
+        id = Digest::SHA256.hexdigest([ rel, size, mtime, sha ].join("\0"))[0, 32]
+
+        base = URI.parse(peer_url)
+        http = Net::HTTP.new(base.host, base.port)
+        http.use_ssl       = (base.scheme == "https")
+        http.open_timeout  = HTTP_TIMEOUT_SECONDS
+        http.read_timeout  = 120
+        http.write_timeout = 120
+
+        http.start do |conn|
+          offset = 0
+          File.open(full, "rb") do |file|
+            while offset < size
+              file.seek(offset)
+              piece = file.read(CHUNK_BYTES)
+              response = with_chunk_retries(rel) do
+                post_chunk(conn, base, id: id, offset: offset, size: size, bytes: piece)
+              end
+
+              case response
+              when Net::HTTPSuccess, Net::HTTPConflict
+                # 409: the peer already has a different amount (an earlier
+                # run got further, or a retry crossed a reply) — carry on
+                # from whatever it reports.
+                offset = JSON.parse(response.body).fetch("received").to_i
+              when Net::HTTPNotFound
+                raise ChunkedUploadError, "The live site can't receive large files yet — deploy this version of Roe to it, then sync again."
+              else
+                raise ChunkedUploadError, "The live site refused part of #{rel} (HTTP #{response.code} #{response.message})."
+              end
+              on_bytes&.call(offset)
+            end
+          end
+
+          finish = Net::HTTP::Post.new(URI.join(base, "/api/site_sync/upload_finish").request_uri)
+          finish["Authorization"] = "Bearer #{token}"
+          finish["Content-Type"]  = "application/json"
+          finish.body = { upload_id: id, path: rel, size: size, sha256: sha, mtime: mtime }.to_json
+          response = conn.request(finish)
+          unless response.is_a?(Net::HTTPSuccess)
+            raise ChunkedUploadError, "The live site couldn't put #{rel} together (HTTP #{response.code}: #{response.body.to_s[0, 200].squish})."
+          end
+        end
+        true
+      rescue JSON::ParserError, KeyError
+        raise ChunkedUploadError, "The live site gave an unexpected answer while receiving #{rel}."
+      rescue SocketError, Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout, OpenSSL::SSL::SSLError => e
+        raise ChunkedUploadError, "Lost the connection to the live site while sending #{rel} (#{e.class.name.demodulize}). Sync again to pick up where it stopped."
+      end
+
+      # Fetch one large file from the peer in pieces
+      # (Api::SiteSync::ChunkedDownloadsController), for files too big for a
+      # single download request — the peer builds that one in memory, and a
+      # 1.2 GB video took it down. Writes the finished file to `dest` with
+      # the peer's modified time.
+      #
+      # Pieces collect in `staging_dir`, named from the file's path, size,
+      # modified time and checksum, so running again after a failure picks up
+      # where it stopped; a file that changed on live in the meantime starts
+      # over. Nothing is written to `dest` until the whole file is here and
+      # its SHA-256 matches. on_bytes, when given, is called with the bytes
+      # received so far. Raises ChunkedUploadError with a plain-words
+      # message; returns { "size", "mtime" }.
+      def download_large_file(rel, dest:, staging_dir:, on_bytes: nil)
+        raise ChunkedUploadError, "Site Sync isn't set up to reach the live site." unless can_call_peer?
+
+        base = URI.parse(peer_url)
+        http = Net::HTTP.new(base.host, base.port)
+        http.use_ssl       = (base.scheme == "https")
+        http.open_timeout  = HTTP_TIMEOUT_SECONDS
+        # The info call reads the whole file for its checksum: a minute or
+        # so for a large video on a small server.
+        http.read_timeout  = 300
+        http.write_timeout = 120
+
+        http.start do |conn|
+          info = with_chunk_retries(rel) { post_json(conn, base, "/api/site_sync/download_info", path: rel) }
+          unless info.is_a?(Net::HTTPSuccess)
+            raise ChunkedUploadError, "The live site can't send large files yet — deploy this version of Roe to it, then sync again." if missing_endpoint?(info)
+            raise ChunkedUploadError, "The live site couldn't send #{rel} (HTTP #{info.code}: #{info.body.to_s[0, 200].squish})."
+          end
+
+          meta  = JSON.parse(info.body)
+          size  = meta.fetch("size").to_i
+          mtime = meta.fetch("mtime").to_i
+          sha   = meta.fetch("sha256").to_s
+          id    = Digest::SHA256.hexdigest([ rel, size, mtime, sha ].join("\0"))[0, 32]
+
+          FileUtils.mkdir_p(staging_dir)
+          sweep_stale_downloads!(staging_dir)
+          part = File.join(staging_dir, "#{id}.download")
+          FileUtils.rm_f(part) if File.exist?(part) && File.size(part) > size
+
+          File.open(part, "ab") do |file|
+            offset = file.size
+            on_bytes&.call(offset)
+            while offset < size
+              response = with_chunk_retries(rel) do
+                post_json(conn, base, "/api/site_sync/download_chunk", path: rel, offset: offset, length: [ CHUNK_BYTES, size - offset ].min)
+              end
+              unless response.is_a?(Net::HTTPSuccess)
+                raise ChunkedUploadError, "The live site refused part of #{rel} (HTTP #{response.code} #{response.message})."
+              end
+
+              bytes = response.body.to_s
+              raise ChunkedUploadError, "The live site sent an empty piece of #{rel}. Sync again to pick up where it stopped." if bytes.empty?
+
+              file.write(bytes)
+              file.flush
+              offset += bytes.bytesize
+              on_bytes&.call(offset)
+            end
+          end
+
+          unless File.size(part) == size && Digest::SHA256.file(part).hexdigest == sha
+            FileUtils.rm_f(part) # corrupt, or the file changed on live: start again next time
+            raise ChunkedUploadError, "#{rel} didn't arrive intact (it may have changed on the live site while downloading). Sync again to fetch it fresh."
+          end
+
+          FileUtils.mkdir_p(File.dirname(dest))
+          FileUtils.mv(part, dest, force: true) # a rename when on the same disk
+          File.utime(Time.at(mtime), Time.at(mtime), dest)
+          { "size" => size, "mtime" => mtime }
+        end
+      rescue JSON::ParserError, KeyError
+        raise ChunkedUploadError, "The live site gave an unexpected answer while sending #{rel}."
+      rescue SocketError, Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout, OpenSSL::SSL::SSLError => e
+        raise ChunkedUploadError, "Lost the connection to the live site while fetching #{rel} (#{e.class.name.demodulize}). Sync again to pick up where it stopped."
+      end
+
+      def post_json(conn, base, path, payload)
+        request = Net::HTTP::Post.new(URI.join(base, path).request_uri)
+        request["Authorization"] = "Bearer #{token}"
+        request["Content-Type"]  = "application/json"
+        request.body = payload.to_json
+        conn.request(request)
+      end
+
+      # Half-fetched files from a sync that was never run again, after the
+      # same two days the live side gives half-sent uploads.
+      def sweep_stale_downloads!(dir)
+        Dir.glob(File.join(dir, "*.download")).each do |f|
+          File.delete(f) if File.mtime(f) < 2.days.ago
+        rescue SystemCallError
+          nil
+        end
+      end
+
+      # A live site on an older Roe has no such route: Rails answers 404
+      # with a page, not the JSON our own "no such file" 404 carries.
+      def missing_endpoint?(response)
+        response.is_a?(Net::HTTPNotFound) && !response["Content-Type"].to_s.include?("json")
+      end
+
+      # One piece of a large file. Returns the HTTP response.
+      def post_chunk(conn, base, id:, offset:, size:, bytes:)
+        query = URI.encode_www_form(upload_id: id, offset: offset, size: size)
+        request = Net::HTTP::Post.new("#{URI.join(base, '/api/site_sync/upload_chunk').request_uri}?#{query}")
+        request["Authorization"]  = "Bearer #{token}"
+        request["Content-Type"]   = "application/octet-stream"
+        request.body = bytes
+        conn.request(request)
+      end
+
+      # A piece that hits a network blip, or a 5xx from the proxy, is tried
+      # again a few times before the whole upload is given up.
+      def with_chunk_retries(rel, attempts: 4)
+        tries = 0
+        begin
+          tries += 1
+          response = yield
+          raise Net::ReadTimeout if response.is_a?(Net::HTTPServerError) && tries < attempts
+
+          response
+        rescue Errno::ECONNRESET, Errno::EPIPE, Net::ReadTimeout, Net::WriteTimeout => e
+          raise if tries >= attempts
+
+          Rails.logger.warn "[SiteSync::Exchange] #{rel}: piece failed (#{e.class.name.demodulize}); retrying in #{tries}s"
+          sleep tries
+          retry
+        end
+      end
+
       # Upload a batch of changed /site files to the peer as a multipart
       # POST: the gzip'd tar (`archive`), a JSON per-file manifest
       # (`manifest`, so the peer can restore mtimes), and a JSON list of
@@ -437,7 +649,13 @@ module SiteSync
         )
 
         response = http.request(request)
-        return nil unless response.is_a?(Net::HTTPSuccess)
+        unless response.is_a?(Net::HTTPSuccess)
+          # Say what the peer (or the proxy in front of it) actually said —
+          # a 413 from the proxy and a 500 from Roe need different fixes.
+          Rails.logger.warn "[SiteSync::Exchange] upload_files: peer answered HTTP #{response.code} " \
+                            "#{response.message} — #{response.body.to_s[0, 300].squish}"
+          return nil
+        end
 
         JSON.parse(response.body)
       rescue JSON::ParserError

@@ -11,12 +11,13 @@ module LayoutHelper
     # footer.md renders. to_html handles inline-pipe escaping itself.
     html = LayoutMarkdown.render(content, static: @static_generation)
 
-    # Add the active class to header/nav links (header supersedes the legacy
-    # navigation file). Runs on the final HTML, so collection-generated nav
-    # links get it too.
-    if %w[header navigation].include?(filename.to_s)
-      html = add_active_nav_class(html, current_page)
-    end
+    # Add styles to highlight the current/active page. The header/navigation file IS the site
+    # nav, so it defaults on; the footer defaults off. Either way an individual
+    # `menu` block's own `show_active:` overrides the file default for its links
+    # (see render_menu / add_active_nav_class), so a footer menu can opt in and
+    # a header menu can opt out.
+    default_on = %w[header navigation].include?(filename.to_s)
+    html = add_active_nav_class(html, current_page, default_on: default_on)
 
     html.html_safe
   rescue => e
@@ -108,9 +109,11 @@ module LayoutHelper
     # Full roe-anji pipeline so Collections/Cards/Galleries work in the sidebar
     html = LayoutMarkdown.render(body_content, static: @static_generation)
 
-    # Highlight the current page — a `menu` collection in the sidebar is
-    # navigation just like the header, so it gets the same active-link pass.
-    html = add_active_nav_class(html, @post || @page || @doc)
+    # Add styles to highlight the current/active page — but off by default here, unlike the
+    # header. A sidebar is often a static link list or a table of contents where
+    # a highlighted "you are here" is noise, not a cue. A sidebar menu that IS
+    # navigation opts in per block with `show_active: true`.
+    html = add_active_nav_class(html, @post || @page || @doc, default_on: false)
 
     html.html_safe
   rescue => e
@@ -171,7 +174,13 @@ module LayoutHelper
 
   private
 
-  def add_active_nav_class(html, current_page)
+  # Adds the `active` class to the link matching the current page. `default_on`
+  # is the file-level default (header on, footer/sidebar off); an individual
+  # `menu` block overrides it for its own links by carrying `data-show-active`
+  # on its <ul> (emitted by render_menu only when the block sets `show_active:`
+  # explicitly). So a link is highlighted only when it both matches and its
+  # effective show_active is on.
+  def add_active_nav_class(html, current_page, default_on: true)
     doc = Nokogiri::HTML::DocumentFragment.parse(html)
 
     # Get current URL name from the actual content object (not page number)
@@ -193,6 +202,8 @@ module LayoutHelper
     end
 
     doc.css("a").each do |link|
+      next unless active_highlighting_on?(link, default_on)
+
       href = link["href"]
       next unless href
 
@@ -217,6 +228,21 @@ module LayoutHelper
   rescue => e
     Rails.logger.error "Error in add_active_nav_class: #{e.message}"
     html
+  end
+
+  # Whether this link should be highlighted: a `menu` block's own
+  # `data-show-active` (on the nearest ancestor <ul> that carries it) wins over
+  # the file-level default. `"true"`/`"false"` are the only values render_menu
+  # emits; anything else falls through to the default.
+  def active_highlighting_on?(link, default_on)
+    marker = link.ancestors("ul[data-show-active]").first
+    return default_on unless marker
+
+    case marker["data-show-active"]
+    when "true"  then true
+    when "false" then false
+    else default_on
+    end
   end
 
   def add_active_class(link)

@@ -1,7 +1,8 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 0.1.0
-   Bundled with: Roe v0.3.0
+   Version: 1.5
+   Fingerprint: b8d0511a
+   Bundled with: Roe v0.4.0
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -1795,6 +1796,7 @@ figcaption {
 }
 
 .gallery-zoom-link {
+  margin: 0;
   display: block;
   width: 100%;
   padding: 0;
@@ -2611,8 +2613,9 @@ article .content,
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
   font-size: var(--text-sm, 0.875rem);
   border: 1px solid var(--color-border);
-  margin-top: var(--space-6);
-  padding: var(--space-4) var(--space-5);
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-1) var(--space-4);
   --player-progress: 0;
 }
 
@@ -2663,7 +2666,7 @@ article .content,
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-0);
 }
 .player-toggle {
   border: 0;
@@ -2680,6 +2683,7 @@ article .content,
   content: "\23F8";
 }
 .player-speed {
+  margin: 0;
   border: 0;
   padding: 0;
   background: none;
@@ -2734,6 +2738,10 @@ article .content,
 }
 .card-player .player-video {
   width: 100%;
+}
+
+.card-player.card-player-video {
+  padding: 0;
 }
 
 /* ============ MEDIA PLAYERS =============== */
@@ -3079,9 +3087,16 @@ a.btn-episode {
   background: #000;
 }
 
+/* A video embedded in a post's text: ![label](/media/video/clip.mp4).
+   Same player as a video post, spaced like an image. */
+.content .video-player-container.video-embed,
+.video-embed {
+  margin-bottom: var(--space-6);
+}
+
 .video-controls {
   background: #1a1a1a;
-  padding: var(--space-2) var(--space-3);
+  padding: 0;
 }
 
 .video-progress {
@@ -3090,7 +3105,7 @@ a.btn-episode {
   background: rgba(255, 255, 255, 0.2);
   cursor: pointer;
   transition: height 0.2s;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-0);
 }
 
 .video-progress:hover {
@@ -3130,6 +3145,7 @@ a.btn-episode {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  padding: 0 var(--space-2) 0 var(--space-2);
 }
 
 .video-controls-left,
@@ -3139,10 +3155,14 @@ a.btn-episode {
   gap: var(--space-2);
 }
 
+.video-controls-bar button {
+  margin: 0;
+}
+
 .video-btn {
   background: none;
   border: none;
-  padding: var(--space-2);
+  padding: var(--space-0);
   cursor: pointer;
   color: #fff;
   display: flex;
@@ -3586,10 +3606,10 @@ hr.clear-floats {
    products, member forms). Member pages override the .btn-* palette at higher
    specificity — those overrides live in the Members section. */
 
-.btn-primary {
+.btn-primary,
+a.btn-primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-2);
   background: var(--color-heading);
   color: var(--color-bg);
   border: 1px solid var(--color-heading);
@@ -3606,7 +3626,7 @@ hr.clear-floats {
 
 .btn-secondary {
   display: inline-block;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-2);
   background: transparent;
   color: var(--color-heading);
   border: 1px solid var(--color-text);
@@ -3664,6 +3684,12 @@ hr.clear-floats {
 
 .btn-grid {
   padding: var(--space-1) var(--space-1);
+  font-size: var(--text-sm);
+}
+
+a.btn-grid {
+  padding: var(--space-1) var(--space-2);
+  line-height: 1.2;
   font-size: var(--text-sm);
 }
 
@@ -3734,6 +3760,22 @@ hr.clear-floats {
   margin: 0 0 var(--space-6) 0;
 }
 
+/* Recovery codes: one per line, selectable, no whitespace collapsing. The
+   <code> is inline by default, so block + pre is what makes each code sit on
+   its own line (the ERB joins them with newlines and no trailing space). */
+.member-page .account-recovery-codes {
+  display: block;
+  width: fit-content;
+  white-space: pre;
+  cursor: pointer;
+  margin: var(--space-2) 0 var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-bg-dim);
+  border: 1px solid var(--color-border);
+  line-height: 1.6;
+  user-select: all;
+}
+
 .member-page .account-actions {
   display: flex;
   flex-direction: row;
@@ -3779,7 +3821,6 @@ hr.clear-floats {
   text-decoration: none;
   text-wrap: nowrap;
   box-sizing: border-box;
-  line-height: normal;
 }
 
 .member-page button:hover,
@@ -4160,6 +4201,17 @@ hr.clear-floats {
 .product ul.product-variant-list .variant-price {
   color: var(--color-muted);
   justify-self: end;
+}
+
+.product ul.product-variant-list .btn-primary {
+  padding: 0 var(--space-1);
+}
+
+/* The variant you're already on, in the button's place — a store without a
+   cart has nothing to link it to. */
+.product ul.product-variant-list .variant-current {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
 }
 
 /* Single product button with `show_price: true`. A variant list prints its own

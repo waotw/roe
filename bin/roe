@@ -1,0 +1,1311 @@
+#!/bin/bash
+# roe — run several Roe sites side by side.
+#
+# This is the global command. It lives at ~/.roe/bin/roe (copied there by
+# `./roe.sh register`) and knows about every registered install through
+# ~/.roe/installs/<name>.conf. It never runs a site itself: every start,
+# stop and status is handed to that install's own roe.sh, so each site
+# keeps booting with the logic it shipped with.
+#
+#   roe list                 every registered site, running or not
+#   roe start <name>         start a site in the background
+#   roe stop <name>          stop it
+#   roe restart <name>       restart it, reusing the same port
+#   roe status <name>
+#   roe open <name>          open the site — home and admin — in your browser
+#   roe home <name>          open just the home page
+#   roe admin <name>         open just the admin page
+#   roe folder [name]        show the cd command for a site's folder (all sites if omitted)
+#   roe install [tool]       install an optional tool Roe can use (e.g. libvips)
+#   roe start --all          start every registered site
+#   roe stop --all
+#   roe -h                   help (so does a bare `roe`)
+#
+# The name can be left off when there is only one registered site, or —
+# for stop, restart, status, open, home and admin — when only one site is
+# running. `folder` with no name lists every site's cd command.
+#
+# Names are the slugified folder name — "The Briefcase" is the-briefcase.
+# Register a site by running ./roe.sh register inside it.
+
+ROE_HOME="${ROE_HOME:-$HOME/.roe}"
+ROE_REGISTRY_DIR="$ROE_HOME/installs"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# Roe's brand red, #c64320, and the lighter orange #e47e5d it pairs with.
+# Need a 24-bit-colour terminal; otherwise the closest of the 256
+# standard colours.
+case "${COLORTERM:-}" in
+    truecolor|24bit)
+        ROE_RED='\033[38;2;198;67;32m'
+        ROE_ORANGE='\033[38;2;228;126;93m'
+        ;;
+    *)
+        ROE_RED='\033[38;5;166m'
+        ROE_ORANGE='\033[38;5;173m'
+        ;;
+esac
+
+log_error()   { echo -e "${RED}[✗]${NC} $1" >&2; }
+log_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
+log_info()    { echo -e "${CYAN}[i]${NC} $1"; }
+log_success() { echo -e "${GREEN}[✓]${NC} $1"; }
+
+# Read one KEY from a .conf — first match, everything after the first "=".
+_conf_get() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
+
+# Run one install's bin/rails with THAT install's Ruby, from its app folder.
+# The user's terminal may have no Ruby set up (macOS then finds its own old
+# system Ruby) or a different version, and Rails won't boot under either.
+# roe.sh pins the right one before it starts a server; this does the same
+# for the commands that ask Rails directly (install, stripe): mise first,
+# then rbenv, then rvm, each looked for where its installer puts it, so it
+# works from a terminal whose rc never activated them. In a subshell, so
+# nothing leaks into the rest of this command.
+#   run_rails "$root/current/bin/rails" runner '…'
+run_rails() {
+    local rails="$1"; shift
+    with_install_ruby "$(dirname "$(dirname "$rails")")" "$rails" "$@"
+}
+
+# The same, for any command: with_install_ruby <app dir> ruby -v
+with_install_ruby() {
+    local app="$1"; shift
+    (
+        cd "$app" || exit 1
+        if ! command -v mise >/dev/null 2>&1; then
+            for m in "$HOME/.local/bin/mise" /opt/homebrew/bin/mise /usr/local/bin/mise; do
+                [ -x "$m" ] && { PATH="$(dirname "$m"):$PATH"; break; }
+            done
+        fi
+        if [ -f .ruby-version ]; then
+            want="$(tr -d '[:space:]' < .ruby-version)"
+            if command -v mise >/dev/null 2>&1; then
+                eval "$(mise env -C "$app" 2>/dev/null)" 2>/dev/null || true
+            elif command -v rbenv >/dev/null 2>&1; then
+                PATH="$(rbenv root)/versions/$want/bin:$PATH"
+            elif command -v rvm >/dev/null 2>&1; then
+                # shellcheck disable=SC1090
+                source "$(rvm env "$want" --path 2>/dev/null)" 2>/dev/null || true
+            fi
+        fi
+        export PATH
+        exec "$@"
+    )
+}
+
+# The Stripe events `roe stripe` forwards by default — exactly the ones Roe's
+# webhook handler acts on (WebhooksController). Keep in sync with that handler.
+ROE_STRIPE_DEFAULT_EVENTS="checkout.session.completed,charge.refunded,charge.dispute.created,charge.dispute.closed"
+
+# The wordmark: solid blocks in red, shading in orange. Each line is
+# coloured as it goes, so the art below can be edited as plain text.
+banner() {
+    local line
+    while IFS= read -r line; do
+        line="${line//█/${ROE_RED}█}"
+        line="${line//░/${ROE_ORANGE}░}"
+        echo -e "${line}${NC}"
+    done <<'EOF'
+
+███████████
+░░███░░░░░███
+ ░███    ░███   ██████   ██████
+ ░██████████   ███░░███ ███░░███
+ ░███░░░░░███ ░███ ░███░███████
+ ░███    ░███ ░███ ░███░███░░░
+ █████   █████░░██████ ░░██████
+░░░░░   ░░░░░  ░░░░░░   ░░░░░░
+EOF
+}
+
+usage() {
+    banner
+    echo "____________________________________"
+    echo -e "${BOLD} Run all Roe sites at once${NC}"
+    echo "------------------------------------------"
+    echo ""
+    echo -e "${ROE_RED}${BOLD}USAGE${NC}"
+    echo "  roe <command> [name | --all]"
+    echo ""
+    echo -e "${ROE_RED}${BOLD}COMMANDS${NC}"
+    echo -e "  ${ROE_ORANGE}list${NC}        Show every registered site and whether it's running"
+    echo -e "  ${ROE_ORANGE}start${NC}       Start a site in the background"
+    echo -e "  ${ROE_ORANGE}stop${NC}        Stop a site"
+    echo -e "  ${ROE_ORANGE}restart${NC}     Stop, then start again on the same port"
+    echo -e "  ${ROE_ORANGE}status${NC}      Status for each Roe site"
+    echo -e "  ${ROE_ORANGE}open${NC}        Open the site — home and admin — in your browser"
+    echo -e "  ${ROE_ORANGE}home${NC}        Open just the home page"
+    echo -e "  ${ROE_ORANGE}admin${NC}       Open just the admin page"
+    echo -e "  ${ROE_ORANGE}logs${NC}        Recent errors and failures, ready to copy and send"
+    echo -e "  ${ROE_ORANGE}stripe${NC}      Forward Stripe test webhooks to a running site (local testing)"
+    echo -e "  ${ROE_ORANGE}folder${NC}      Show the cd command for each site's folder"
+    echo -e "  ${ROE_ORANGE}install${NC}     Install an optional tool Roe can use (libvips, …)"
+    echo -e "  ${ROE_ORANGE}completion${NC}  Check or set up tab-completion for your shell (--zsh / --bash)"
+    echo ""
+    echo -e "${ROE_RED}${BOLD}FLAGS${NC}"
+    echo -e "  ${ROE_ORANGE}--all${NC}            Apply start, stop or restart to every registered site"
+    echo -e "  ${ROE_ORANGE}--zsh${NC} / ${ROE_ORANGE}--bash${NC}   Shell to check or set up completion for (roe completion)"
+    echo -e "  ${ROE_ORANGE}--events${NC}         Stripe events to forward, comma-separated (roe stripe)"
+    echo -e "  ${ROE_ORANGE}--all-snapshot${NC}   Forward all Stripe snapshot events (roe stripe)"
+    echo -e "  ${ROE_ORANGE}--all-thin${NC}       Forward all Stripe thin events (roe stripe)"
+    echo -e "  ${ROE_ORANGE}--2h${NC} / ${ROE_ORANGE}--day${NC}     Look back two hours or a day instead of one hour (roe logs)"
+    echo -e "  ${ROE_ORANGE}-h${NC}               Show this help"
+    echo ""
+    echo -e "${ROE_RED}${BOLD}EXAMPLES${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe list${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe start roe-site-name${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe open${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe install libvips${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe stripe${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe logs --day | pbcopy${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe stop --all${NC}"
+    echo ""
+    echo -e "${ROE_RED}${BOLD}NOTES${NC}"
+    echo "  • If you only have one Roe site, just use 'roe start/stop',"
+    echo "    you don't need to add a site name."
+    echo "  • 'roe install' lists the optional tools; 'roe install <tool>'"
+    echo "    installs one. The name there is a tool, not a site."
+    echo "  • 'roe stripe' needs the Stripe CLI (roe install stripe) and a"
+    echo "    running site; it forwards test webhooks so you can test checkout"
+    echo "    and upgrades locally. Ctrl-C stops it. By default it forwards the"
+    echo "    events Roe handles; use --events <a,b,c>, --all-snapshot or"
+    echo "    --all-thin to change that (e.g. roe stripe --events charge.refunded)."
+    echo "    'roe stripe remove' clears the local test key again."
+    echo "  • 'roe logs' shows only what went wrong in the last hour: failed pages,"
+    echo "    failed background jobs, and why the server didn't start, if it didn't."
+    echo "    Email addresses and keys are blanked out, so it's safe to send on."
+    echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
+    echo "  • To register a site, run './roe.sh register' inside the Roe folder."
+    echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
+    echo "  • Tab completion for commands and site names is set up when you register."
+    echo "    To check or set it up by hand: roe completion --zsh (or --bash)."
+    echo "  • Registry: $ROE_REGISTRY_DIR"
+}
+
+# ── Registry ──────────────────────────────────────────────────────────────────
+
+all_names() {
+    local f
+    for f in "$ROE_REGISTRY_DIR"/*.conf; do
+        [ -f "$f" ] || continue
+        basename "$f" .conf
+    done
+}
+
+conf_for() {
+    local f="$ROE_REGISTRY_DIR/$1.conf"
+    [ -f "$f" ] && echo "$f"
+}
+
+# Resolve a name to its .conf, or explain what went wrong. Accepts the
+# exact name; if that misses, a unique prefix ("brief" → the-briefcase)
+# is good enough.
+resolve() {
+    local name="$1" f matches
+    f="$(conf_for "$name")" && { echo "$f"; return 0; }
+
+    matches="$(all_names | grep -i -- "$name" || true)"
+    case "$(printf '%s\n' "$matches" | grep -c .)" in
+        1) conf_for "$matches"; return 0 ;;
+        0) log_error "No registered site called '$name'."; echo "  Run 'roe list' to see what's registered." >&2 ;;
+        *) log_error "'$name' matches more than one site:"; printf '%s\n' "$matches" | sed 's/^/    /' >&2 ;;
+    esac
+    return 1
+}
+
+# The root folder must still exist and still hold a roe.sh — a moved or
+# deleted install leaves a stale .conf behind. current/roe.sh is the one
+# the app ships; the root copy is a mirror of it that the updater keeps
+# in step, so prefer the original.
+roe_sh_for() {
+    local f="$1" root
+    root="$(_conf_get "$f" ROOT)"
+    if [ -x "$root/current/roe.sh" ]; then
+        echo "$root/current/roe.sh"
+    elif [ -x "$root/roe.sh" ]; then
+        echo "$root/roe.sh"
+    else
+        log_error "$(basename "$f" .conf): folder is missing or has no roe.sh:"
+        echo "    $root" >&2
+        echo "  If it moved, run ./roe.sh unregister in the old spot (or delete" >&2
+        echo "  $f) and ./roe.sh register in the new one." >&2
+        return 1
+    fi
+}
+
+# ── Process state ─────────────────────────────────────────────────────────────
+
+# PID of the site's Puma if it's running, else nothing. Reads the
+# tmp/pids/server.pid the install's roe.sh writes, and if that's missing
+# or stale, scans process titles for a Puma tagged with the install's
+# app directory (config/puma.rb sets the tag). The pidfile is a single
+# slot that a second start overwrites and Puma deletes on exit, so on its
+# own it loses track of servers.
+server_pid_for() {
+    local root="$1" pidfile pid
+    for pidfile in "$root/current/tmp/pids/server.pid" "$root/tmp/pids/server.pid"; do
+        [ -f "$pidfile" ] || continue
+        pid="$(cat "$pidfile" 2>/dev/null)"
+        [ -n "$pid" ] && ps -p "$pid" >/dev/null 2>&1 && { echo "$pid"; return 0; }
+    done
+    local app_dir="$root/current"
+    [ -d "$app_dir" ] || app_dir="$root"
+    pid="$(ps -axo pid=,command= 2>/dev/null | awk -v dir="[$app_dir]" 'index($0, "puma") && index($0, dir) { print $1; exit }')"
+    [ -n "$pid" ] && { echo "$pid"; return 0; }
+    return 1
+}
+
+# The port a PID is actually listening on. Falls back to the registry
+# port when lsof isn't available. -a ANDs the filters; without it lsof
+# ORs them and hands back some other app's port.
+port_for_pid() {
+    command -v lsof >/dev/null 2>&1 || return 1
+    lsof -a -nP -iTCP -sTCP:LISTEN -p "$1" 2>/dev/null \
+        | awk 'NR > 1 { print $9; exit }' \
+        | sed 's/.*://'
+}
+
+url_for() {
+    local f="$1" host port pid live_port
+    host="$(_conf_get "$f" HOST)"
+    port="$(_conf_get "$f" PORT)"
+    if pid="$(server_pid_for "$(_conf_get "$f" ROOT)")"; then
+        live_port="$(port_for_pid "$pid")"
+        [ -n "$live_port" ] && port="$live_port"
+    fi
+    echo "http://${host}:${port}"
+}
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+
+cmd_list() {
+    local names name f root pid url
+    names="$(all_names)"
+    if [ -z "$names" ]; then
+        echo "No sites registered yet."
+        echo "  Run ./roe.sh register inside a Roe folder to add one."
+        return 0
+    fi
+
+    printf "${BOLD}%-22s %-10s %-36s %s${NC}\n" "NAME" "STATE" "URL" "FOLDER"
+    for name in $names; do
+        f="$(conf_for "$name")"
+        root="$(_conf_get "$f" ROOT)"
+        url="$(url_for "$f")"
+        if pid="$(server_pid_for "$root")"; then
+            printf "%-22s ${GREEN}%-10s${NC} %-36s ${DIM}%s${NC}\n" "$name" "running" "$url" "$root"
+        elif [ ! -d "$root" ]; then
+            printf "%-22s ${RED}%-10s${NC} %-36s ${DIM}%s${NC}\n" "$name" "missing" "$url" "$root"
+        else
+            printf "%-22s ${DIM}%-10s${NC} %-36s ${DIM}%s${NC}\n" "$name" "stopped" "$url" "$root"
+        fi
+    done
+}
+
+# Run one subcommand of an install's roe.sh, from its own folder, with
+# nothing inherited from this shell that could steer it (PORT above all:
+# a stray PORT in the environment would override the registry's).
+# ROE_CLI=1 tells roe.sh it was reached through this command, so its
+# hints say "roe stop" rather than "./roe.sh stop".
+run_in() {
+    local f="$1"; shift
+    local script root
+    script="$(roe_sh_for "$f")" || return 1
+    root="$(_conf_get "$f" ROOT)"
+    # ROE_PREFERRED_PORT is the one PORT we let through (restart reusing the
+    # port it just left). Ambient PORT is still stripped — only this explicit
+    # opt-in survives, and `env -u PORT … PORT=<n>` unsets then re-sets so the
+    # child sees exactly the port we chose.
+    local -a portenv=()
+    [ -n "${ROE_PREFERRED_PORT:-}" ] && portenv=(PORT="$ROE_PREFERRED_PORT")
+    ( cd "$root" && env -u PORT -u ROE_HOST ROE_CLI=1 "${portenv[@]}" "$script" "$@" )
+}
+
+cmd_start() {
+    local f="$1" name
+    name="$(basename "$f" .conf)"
+    if server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$name is already running at $(url_for "$f")"
+        return 0
+    fi
+    echo -e "${BOLD}Starting $name${NC}"
+    run_in "$f" start --daemon
+}
+
+cmd_stop() {
+    local f="$1" name
+    name="$(basename "$f" .conf)"
+    if ! server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$name isn't running"
+        return 0
+    fi
+    echo -e "${BOLD}Stopping $name${NC}"
+    run_in "$f" stop
+}
+
+cmd_restart() {
+    # Reuse the port the server is on right now, so a refreshed browser tab
+    # still lands on the same address. Captured before we stop it; handed to
+    # cmd_start via ROE_PREFERRED_PORT, where resolve_port_collision only
+    # bumps to an alternate if that port is genuinely taken by then. If the
+    # port can't be read (no lsof, server already down), fall back to the
+    # normal registry-port behaviour.
+    local f="$1" pid running_port=""
+    if pid="$(server_pid_for "$(_conf_get "$f" ROOT)")"; then
+        running_port="$(port_for_pid "$pid")"
+    fi
+    cmd_stop "$1"
+    sleep 1
+    ROE_PREFERRED_PORT="$running_port" cmd_start "$1"
+}
+
+cmd_status() { run_in "$1" status; }
+
+# Open one URL in the platform's browser. Echoes it as a fallback when no
+# opener is available (headless, bare container).
+open_url() {
+    local url="$1"
+    if command -v open >/dev/null 2>&1; then open "$url"
+    elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"
+    elif command -v wslview >/dev/null 2>&1; then wslview "$url"
+    elif command -v explorer.exe >/dev/null 2>&1; then explorer.exe "$url" >/dev/null 2>&1 || true
+    else echo "$url"
+    fi
+}
+
+# Shared guard for the browser commands: the site has to be running, or the
+# URL points at nothing. Prints the start hint and fails when it isn't.
+require_running() {
+    local f="$1" name
+    name="$(basename "$f" .conf)"
+    if ! server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null; then
+        log_warning "$name isn't running — start it first: roe start $name"
+        return 1
+    fi
+}
+
+# open: both the home page and the admin page — the two places you'd want
+# after starting a site. home / admin open just the one.
+cmd_open() {
+    local f="$1" url
+    require_running "$f" || return 1
+    url="$(url_for "$f")"
+    open_url "$url"
+    sleep 1   # let the home page open first, so the admin ends up in front
+    open_url "$url/admin"
+}
+
+cmd_home() {
+    local f="$1"
+    require_running "$f" || return 1
+    open_url "$(url_for "$f")"
+}
+
+cmd_admin() {
+    local f="$1"
+    require_running "$f" || return 1
+    open_url "$(url_for "$f")/admin"
+}
+
+# ── Stripe local webhook listener ─────────────────────────────────────────────
+#
+# `roe stripe [name]` forwards Stripe's test-mode webhook events to a running
+# site's local server, so the full checkout → upgrade flow can be tested
+# locally with no public URL. It's a thin, memorable wrapper over:
+#
+#   stripe listen --forward-to localhost:<port>/webhooks/stripe
+#
+# Resolves the site the same way open/status do (one site, or the single
+# running one, or an explicit name), reads its PORT from the registry, makes
+# sure the Stripe CLI is present (offers `roe install stripe` if not) and that
+# the user is logged in (runs `stripe login` first if not), then runs the
+# listener in the FOREGROUND — Ctrl-C stops it, exactly like `stripe listen`.
+
+# Is the Stripe CLI logged in? `stripe config --list` exits non-zero / prints
+# nothing useful before the first `stripe login`. Cheap and side-effect-free.
+stripe_logged_in() {
+    stripe config --list >/dev/null 2>&1 && stripe config --list 2>/dev/null | grep -q .
+}
+
+# Ask a specific site's Rails whether its Stripe test config is ready to receive
+# forwarded webhooks. Prints one of:
+#   READY            — test secret key + price present; good to go
+#   NO_KEY           — no test key saved; the owner must paste one in admin first
+#   NO_PRICE         — key present but no price synced yet (rare; a save fixes it)
+#   UNKNOWN          — couldn't boot Rails to check (wrong Ruby, app error, …)
+# Advisory only: the caller warns but still launches, because the check booting
+# Rails is more fragile than the listener itself. $1 = the site's ROOT.
+stripe_preflight() {
+    local root="$1" rails out
+    rails="$root/current/bin/rails"
+    [ -x "$rails" ] || { echo "UNKNOWN"; return 0; }
+    out="$(run_rails "$rails" runner '
+      sc = StripeConfig.current
+      if sc.secret_key_test.blank?
+        puts "NO_KEY"
+      elsif sc.price_id_test.blank?
+        puts "NO_PRICE"
+      else
+        puts "READY"
+      end
+    ' 2>/dev/null | tail -1)"
+    case "$out" in
+        READY|NO_KEY|NO_PRICE) echo "$out" ;;
+        *)                     echo "UNKNOWN" ;;
+    esac
+}
+
+# Prompt for a test key and install it through StripeConfig.install_test_key!,
+# which does exactly what the admin "Save Test Keys" flow does (write stripe.yml,
+# verify against Stripe, sync the test price). The key is piped to Rails on STDIN
+# so it never appears in argv / `ps`. $1 = site ROOT. Returns 0 if a verified key
+# is now in place, 1 otherwise.
+stripe_install_key() {
+    local root="$1" rails key out
+    rails="$root/current/bin/rails"
+    [ -x "$rails" ] || { log_error "Couldn't find Roe's Rails to save the key."; return 1; }
+
+    echo -e "  ${DIM}Create a restricted key in a Test sandbox: Stripe → Developers → API keys →"
+    echo -e "  Create restricted key. Roe needs Webhook Endpoints: Write (see admin for the full list).${NC}"
+    printf "  Paste your test key (rk_test_… or sk_test_…), or leave blank to skip: "
+    read -r key
+    [ -z "$key" ] && { echo ""; return 1; }
+
+    # Pipe the key in on STDIN; the runner reads one line. Never on argv.
+    out="$(printf '%s' "$key" | run_rails "$rails" runner '
+      r = StripeConfig.install_test_key!(STDIN.read)
+      if r[:ok]
+        puts r[:price_synced] ? "OK_PRICED" : (r[:priced] ? "OK" : "OK_NOPRICE")
+      else
+        puts "ERR\t#{r[:message]}"
+      end
+    ' 2>/dev/null | tail -1)"
+
+    case "$out" in
+        OK|OK_PRICED)
+            log_success "Key saved and verified with Stripe."
+            return 0 ;;
+        OK_NOPRICE)
+            log_success "Key saved and verified."
+            log_info "No test price yet — enable paid membership and set a price in admin, then save, to create it."
+            return 0 ;;
+        ERR*)
+            log_error "${out#ERR	}"
+            return 1 ;;
+        *)
+            log_error "Couldn't save the key (Rails didn't respond as expected)."
+            return 1 ;;
+    esac
+}
+
+cmd_stripe() {
+    local f="$1" name port
+
+    # The Stripe CLI has to be on PATH. If it isn't, point at the one-liner
+    # that installs it through Roe's own managed-tools machinery.
+    if ! command -v stripe >/dev/null 2>&1; then
+        log_warning "The Stripe CLI isn't installed."
+        printf "  Install it now with ${CYAN}roe install stripe${NC}? [Y/n]: "
+        local reply; read -r reply
+        case "${reply:-y}" in
+            [Nn]*) log_info "Left it for you. Run 'roe install stripe' when ready."; return 0 ;;
+        esac
+        cmd_install stripe || return 1
+        # cmd_install may have printed a manual command (Linux) rather than
+        # installing; re-check before carrying on.
+        command -v stripe >/dev/null 2>&1 || {
+            log_error "Stripe CLI still isn't on PATH. Install it, then run 'roe stripe' again."
+            return 1
+        }
+    fi
+
+    name="$(basename "$f" .conf)"
+    require_running "$f" || return 1
+    port="$(_conf_get "$f" PORT)"
+    if [ -z "$port" ]; then
+        log_error "Couldn't read $name's port from the registry."
+        return 1
+    fi
+
+    # Pre-flight: does Roe have what it needs to turn a forwarded webhook into a
+    # real upgrade? The irreducible manual step is one test restricted key pasted
+    # in admin (Stripe has no API to mint a key for your own account, and the CLI
+    # proxies through its own session — it can't hand Roe one). Everything else
+    # Roe derives from that key. Advisory: if we can't boot Rails to check, or it
+    # reports a gap, we say so but still start the listener.
+    local root ready
+    root="$(_conf_get "$f" ROOT)"
+    ready="$(stripe_preflight "$root")"
+    case "$ready" in
+        NO_KEY)
+            log_warning "Roe has no test Stripe key yet, so forwarded webhooks won't upgrade anyone."
+            echo -e "  You can paste one here now (copied from Stripe), and Roe will save and verify it."
+            if stripe_install_key "$root"; then
+                : # key installed and verified — carry on to the listener
+            else
+                printf "  Start the listener anyway (webhooks won't upgrade until a key is added)? [y/N]: "
+                local go; read -r go
+                case "${go:-n}" in [Yy]*) : ;; *) log_info "Stopped. Run 'roe stripe' again when you have a key."; return 0 ;; esac
+            fi
+            ;;
+        NO_PRICE)
+            log_warning "Roe has a key but no synced price yet — save your Stripe settings once in admin to create it."
+            ;;
+        UNKNOWN)
+            log_info "Couldn't check Roe's Stripe setup (Rails didn't boot for the probe) — starting the listener anyway."
+            ;;
+    esac
+
+    # First run needs a browser authorisation. Do it up front so the listener
+    # doesn't start half-authenticated.
+    if ! stripe_logged_in; then
+        log_info "Not logged in to Stripe yet — opening authorisation in your browser."
+        stripe login || { log_error "Stripe login didn't complete. Run 'roe stripe' again once you're logged in."; return 1; }
+    fi
+
+    local target="localhost:${port}/webhooks/stripe"
+    echo -e "${BOLD}Forwarding Stripe webhooks → ${CYAN}${target}${NC}${BOLD} for ${name}${NC}"
+
+    # Newer Stripe CLIs refuse `stripe listen` without being told which events to
+    # forward. Default to exactly the events Roe's webhook handler acts on
+    # (checkout + refunds + disputes); callers can override with
+    # `roe stripe --events a,b,c` or `--all-snapshot` / `--all-thin`.
+    local events="${ROE_STRIPE_EVENTS:-$ROE_STRIPE_DEFAULT_EVENTS}"
+    local -a listen_args=(--forward-to "$target")
+    case "$events" in
+        --all-snapshot|--all-thin)
+            listen_args+=("$events")
+            echo -e "  ${DIM}Forwarding ${events#--} events.${NC}"
+            ;;
+        *)
+            listen_args+=(--events "$events")
+            echo -e "  ${DIM}Events: ${events}${NC}"
+            ;;
+    esac
+    echo -e "  ${DIM}Leave this running while you test. Press Ctrl-C to stop.${NC}"
+    echo ""
+    # Foreground, replacing this process so Ctrl-C goes straight to the listener.
+    exec stripe listen "${listen_args[@]}"
+}
+
+# `roe stripe remove [site]` — clear the local Stripe TEST key this install uses
+# (the counterpart to the paste in `roe stripe`). Test-only: it never touches
+# live/production credentials. Does not need the Stripe CLI or a running server;
+# it just talks to the site's own Rails.
+cmd_stripe_remove() {
+    local f="$1" name root rails out
+    name="$(basename "$f" .conf)"
+    root="$(_conf_get "$f" ROOT)"
+    rails="$root/current/bin/rails"
+    [ -x "$rails" ] || { log_error "Couldn't find Roe's Rails for $name to remove the key."; return 1; }
+
+    printf "  Remove the local Stripe test key for ${BOLD}${name}${NC}? [y/N]: "
+    local go; read -r go
+    case "${go:-n}" in [Yy]*) : ;; *) log_info "Left the key in place."; return 0 ;; esac
+
+    out="$(run_rails "$rails" runner '
+      puts(StripeConfig.remove_test_key! ? "REMOVED" : "NONE")
+    ' 2>/dev/null | tail -1)"
+
+    case "$out" in
+        REMOVED) log_success "Local Stripe test key removed for $name." ;;
+        NONE)    log_info "There was no local test key to remove for $name." ;;
+        *)       log_error "Couldn't remove the key (Rails didn't respond as expected)."; return 1 ;;
+    esac
+}
+
+# folder: print the cd command for each site's folder. A child process can't
+# change the parent shell's working directory, so rather than try, we hand
+# over a copy-paste command. Paths are quoted because a Roe folder can sit at
+# a path with spaces and other shell metacharacters (e.g. "S&M 2019").
+#   roe folder              table for every site
+#   roe folder <name>       just that site's row
+#   roe folder <name> --path   bare path only, for: cd "$(roe folder <name> --path)"
+cmd_folder() {
+    local want="" path_only=0 arg
+    for arg in "$@"; do
+        case "$arg" in
+            --path) path_only=1 ;;
+            --*)    log_error "Unknown option: $arg"; return 1 ;;
+            *)      want="$arg" ;;
+        esac
+    done
+
+    # --path: resolve exactly one site and print its raw (unquoted) path and
+    # nothing else, so it drops straight into cd "$(…)". The caller's quotes
+    # handle the spaces, so we must NOT add our own here.
+    if [ "$path_only" = "1" ]; then
+        local pf
+        if [ -n "$want" ]; then
+            pf="$(resolve "$want")" || return 1
+        elif [ "$(all_names | grep -c .)" = "1" ]; then
+            pf="$(conf_for "$(all_names)")"
+        else
+            log_error "Which site? roe folder <name> --path"
+            return 1
+        fi
+        _conf_get "$pf" ROOT
+        return 0
+    fi
+
+    local names
+    if [ -n "$want" ]; then
+        local wf; wf="$(resolve "$want")" || return 1
+        names="$(basename "$wf" .conf)"
+    else
+        names="$(all_names)"
+    fi
+
+    if [ -z "$names" ]; then
+        log_error "No sites registered yet."
+        echo "  Run ./roe.sh register inside a Roe folder to add one." >&2
+        return 1
+    fi
+
+    # SITE column as wide as the longest name shown (header is 4 chars).
+    local name w=4
+    for name in $names; do [ "${#name}" -gt "$w" ] && w="${#name}"; done
+
+    echo "Roe folders — copy/paste the command for the folder you want to open and hit enter/return:"
+    echo ""
+    printf "${BOLD}  %-${w}s  %s${NC}\n" "SITE" "COMMAND"
+    local f root
+    for name in $names; do
+        f="$(conf_for "$name")"
+        root="$(_conf_get "$f" ROOT)"
+        if [ -d "$root" ]; then
+            printf "  %-${w}s  ${CYAN}cd \"%s\"${NC}\n" "$name" "$root"
+        else
+            printf "  %-${w}s  ${CYAN}cd \"%s\"${NC} ${DIM}(folder missing)${NC}\n" "$name" "$root"
+        fi
+    done
+}
+
+# Names of every registered site whose server is up right now.
+running_names() {
+    local name f
+    for name in $(all_names); do
+        f="$(conf_for "$name")"
+        server_pid_for "$(_conf_get "$f" ROOT)" >/dev/null && echo "$name"
+    done
+}
+
+# When no name is given, pick the only sensible one. With a single
+# registered site there is nothing to choose. With several, stop /
+# restart / status / open can still go ahead when exactly one is running —
+# that is the one being asked about. Prints the name, or nothing.
+default_name() {
+    local fn="$1" names running
+    names="$(all_names)"
+    if [ "$(printf '%s\n' "$names" | grep -c .)" -eq 1 ]; then
+        echo "$names"
+        return 0
+    fi
+    case "$fn" in
+        cmd_stop|cmd_restart|cmd_status|cmd_open|cmd_home|cmd_admin|cmd_stripe)
+            running="$(running_names)"
+            if [ "$(printf '%s\n' "$running" | grep -c .)" -eq 1 ]; then
+                echo "$running"
+                return 0
+            fi
+            ;;
+    esac
+    return 1
+}
+
+# Apply a per-site command to one named site or, with --all, to each.
+for_target() {
+    local fn="$1" target="$2" f name rc=0
+    case "$target" in
+        --all|-a)
+            for name in $(all_names); do
+                "$fn" "$(conf_for "$name")" || rc=1
+                echo ""
+            done
+            return $rc
+            ;;
+        "")
+            if [ -z "$(all_names)" ]; then
+                log_error "No sites registered yet."
+                echo "  Run ./roe.sh register inside a Roe folder to add one." >&2
+                return 1
+            fi
+            if name="$(default_name "$fn")"; then
+                "$fn" "$(conf_for "$name")"
+                return $?
+            fi
+            log_error "To see details add a name, or --all."
+            echo "" >&2
+            cmd_list >&2
+            return 1
+            ;;
+        *)
+            f="$(resolve "$target")" || return 1
+            "$fn" "$f"
+            ;;
+    esac
+}
+
+# ── Install optional tools ────────────────────────────────────────────────────
+#
+# Roe can use optional native tools (libvips, ffmpeg) that it doesn't bundle.
+# The knowledge of what each tool is called on this platform already lives in
+# Rails (ManagedTools), so `roe install` asks Rails for the list and the exact
+# command rather than hardcoding package names here. Registered installs can
+# be on different Roe releases, and a tool only exists in the releases that
+# ship it — so every install is asked and the answers are merged.
+
+# Every registered install's bin/rails, one per line — the install the
+# current directory is inside first, then the rest in registry order.
+all_rails() {
+    local name f root here="" rest=""
+    for name in $(all_names); do
+        f="$(conf_for "$name")"
+        root="$(_conf_get "$f" ROOT)"
+        [ -x "$root/current/bin/rails" ] || continue
+        case "$PWD/" in
+            "$root"/*) here="$root/current/bin/rails" ;;
+            *) rest="$rest$root/current/bin/rails"$'\n' ;;
+        esac
+    done
+    [ -n "$here" ] && echo "$here"
+    printf '%s' "$rest"
+}
+
+# Ask Rails for the managed-tools table as tab-separated lines:
+#   key <TAB> label <TAB> installed(yes/no) <TAB> command <TAB> needs_sudo(yes/no)
+managed_tools_table() {
+    local rails="$1"
+    run_rails "$rails" runner '
+      ManagedTools.statuses.each do |s|
+        puts [s[:key], s[:label], (s[:installed] ? "yes" : "no"),
+              s[:install_command].to_s, (s[:needs_sudo] ? "yes" : "no")].join("\t")
+      end
+    ' 2>/dev/null
+}
+
+# The same table, merged across every registered install, so a tool shipped
+# in a newer Roe (ffmpeg) is offered even when the first-registered site is
+# on an older release. The installs are asked in parallel — each answer
+# boots Rails, about a second — and the first install to list a tool wins
+# (the one the current directory is inside, when there is one).
+all_tools_table() {
+    local dir rails i=0
+    dir="$(mktemp -d "${TMPDIR:-/tmp}/roe-tools.XXXXXX")" || return 1
+    while IFS= read -r rails; do
+        [ -n "$rails" ] || continue
+        managed_tools_table "$rails" > "$dir/$i" &
+        i=$((i + 1))
+    done <<EOF
+$(all_rails)
+EOF
+    wait
+    [ "$i" -gt 0 ] && for ((n = 0; n < i; n++)); do cat "$dir/$n"; done | awk -F'\t' 'NF && !seen[$1]++'
+    rm -rf "$dir"
+}
+
+cmd_install() {
+    local want="$1" table
+    if [ -z "$(all_rails)" ]; then
+        log_error "No usable Roe install found to read the tool list from."
+        echo "  Register a site first: ./roe.sh register inside a Roe folder." >&2
+        return 1
+    fi
+
+    table="$(all_tools_table)"
+    if [ -z "$table" ]; then
+        # Every install failed to answer. Ask the first one again with its
+        # errors kept, so the message says why instead of just that it failed.
+        local first why
+        first="$(all_rails | head -1)"
+        why="$(run_rails "$first" runner 'ManagedTools.statuses' 2>&1 >/dev/null | grep -v '^\s*from ' | tail -3)"
+        local app need have
+        app="$(dirname "$(dirname "$first")")"
+        need="$(tr -d '[:space:]' < "$app/.ruby-version" 2>/dev/null)"
+        have="$(with_install_ruby "$app" ruby -e 'print RUBY_VERSION' 2>/dev/null)"
+        log_error "Couldn't read the tool list from Roe."
+        echo "  INSTALL: $(dirname "$app")" >&2
+        if [ -n "$need" ] && [ "$have" != "$need" ]; then
+            # The usual cause, and bundler's own message about it is noise.
+            echo "  RUBY: this install needs Ruby $need, but found ${have:-none}." >&2
+        elif [ -n "$why" ]; then
+            printf '  ERROR: %s\n' "$why" | sed '2,$s/^/         /' >&2
+        fi
+        echo "  Starting the site once with 'roe start' sets up its Ruby and gems; then try again." >&2
+        return 1
+    fi
+
+    # No tool named: list what's available and each tool's state.
+    if [ -z "$want" ]; then
+        echo -e "${BOLD}Optional tools Roe can use${NC}"
+        echo ""
+        printf "${BOLD}  %-12s %-14s %s${NC}\n" "TOOL" "STATE" "INSTALL WITH"
+        while IFS=$'\t' read -r key label installed command _sudo; do
+            [ -n "$key" ] || continue
+            if [ "$installed" = "yes" ]; then
+                printf "  %-12s ${GREEN}%-14s${NC} ${DIM}%s${NC}\n" "$key" "installed" "—"
+            else
+                printf "  %-12s ${DIM}%-14s${NC} ${CYAN}%s${NC}\n" "$key" "not installed" "roe install $key"
+            fi
+        done <<EOF
+$table
+EOF
+        echo ""
+        echo -e "  Install tool with: ${CYAN}roe install <tool>${NC}"
+        return 0
+    fi
+
+    # A tool was named: ask the first install that knows it for every way
+    # it can go on this computer, best first.
+    local rails
+    rails="$(rails_for_tool "$want")" || {
+        log_error "Roe doesn't manage a tool called '$want'."
+        echo "  Run 'roe install' to see the ones it does." >&2
+        return 1
+    }
+
+    local plan
+    plan="$(rails_task "$rails" "roe:tools:methods[$want]" 2>/dev/null)"
+    if [ -z "$plan" ]; then
+        log_error "Couldn't read the install options for '$want' from Roe."
+        return 1
+    fi
+
+    local _kind key label installed version system
+    IFS=$'\t' read -r _kind key label installed version system <<EOF
+$(printf '%s\n' "$plan" | grep '^tool')
+EOF
+    if [ "$installed" = "yes" ]; then
+        log_success "$label is already installed${version:+ ($(_dash "$version"))}."
+        return 0
+    fi
+
+    echo -e "${BOLD}Install $label${NC}"
+    echo -e "  ${DIM}$(_dash "$system")${NC}"
+    echo ""
+
+    # Show every method: usable ones with what they give you, the rest with
+    # why they're skipped, so nobody wonders why Homebrew wasn't used.
+    local methods=() mkey mlabel usable command sudo restart reason detail
+    while IFS=$'\t' read -r _kind mkey mlabel usable command sudo restart reason detail; do
+        [ "$_kind" = "method" ] || continue
+        if [ "$usable" = "yes" ]; then
+            methods+=("$mkey"$'\t'"$mlabel"$'\t'"$command"$'\t'"$sudo"$'\t'"$restart"$'\t'"$detail"$'\t'"$reason")
+            printf "  ${GREEN}✓${NC} %-17s %s\n" "$mlabel" "$(_dash "$detail")"
+            [ "$reason" != "-" ] && echo -e "    ${DIM}${reason}${NC}"
+        else
+            printf "  ${DIM}✗ %-17s %s${NC}\n" "$mlabel" "$(_dash "$reason")"
+        fi
+    done <<EOF
+$plan
+EOF
+    echo ""
+
+    if [ "${#methods[@]}" -eq 0 ]; then
+        log_error "Roe can't install $label on this computer by itself."
+        echo "  Install it yourself, then it'll be detected automatically." >&2
+        return 1
+    fi
+
+    # Offer each usable method in turn. A failure, or a method that "worked"
+    # but left the tool still missing, moves on to the next one.
+    local i entry first=1 reply
+    for ((i = 0; i < ${#methods[@]}; i++)); do
+        entry="${methods[$i]}"
+        IFS=$'\t' read -r mkey mlabel command sudo restart detail reason <<EOF
+$entry
+EOF
+        if [ -n "$first" ]; then
+            echo -e "  ${BOLD}Recommended: ${mlabel}${NC}"
+        else
+            echo ""
+            echo -e "  ${BOLD}Next option: ${mlabel}${NC}"
+        fi
+        first=""
+        if [ "$mkey" = "download" ]; then
+            echo -e "  Roe will download it: ${DIM}$(_dash "$detail")${NC}"
+        else
+            echo -e "  This will run: ${CYAN}${command}${NC}"
+        fi
+        [ "$sudo" = "yes" ] && echo -e "  ${YELLOW}It uses sudo — you may be asked for your password.${NC}"
+        printf "  Go ahead? [Y/n]: "
+        read -r reply
+        case "${reply:-y}" in
+            [Nn]*)
+                if [ $((i + 1)) -lt ${#methods[@]} ]; then continue; fi
+                log_info "Left it for you. Run 'roe install $want' when you're ready."
+                return 0 ;;
+        esac
+        echo ""
+
+        if install_with_method "$rails" "$want" "$mkey" "$command"; then
+            local check ok ver note
+            check="$(rails_task "$rails" "roe:tools:check[$want]" 2>/dev/null)"
+            IFS=$'\t' read -r ok ver note <<EOF
+$check
+EOF
+            if [ "$ok" = "yes" ]; then
+                echo ""
+                log_success "$label is installed${ver:+ ($(_dash "$ver"))}."
+                echo -e "  Roe will use it straight away — no restart needed."
+                return 0
+            fi
+            echo ""
+            log_warning "That finished, but Roe still can't find a working $label.${note:+ $(_dash "$note")}"
+        else
+            echo ""
+            log_warning "$mlabel didn't work."
+        fi
+    done
+
+    echo ""
+    log_error "None of the options installed $label."
+    echo "  You can install it yourself — Roe finds it automatically once it's on your PATH." >&2
+    return 1
+}
+
+# Run a rake task in an install. Rake looks for the Rakefile in the current
+# folder, so it runs from the app folder (unlike `rails runner`, which works
+# from anywhere) — in a subshell, so the caller's folder doesn't change.
+rails_task() {
+    local rails="$1"; shift
+    run_rails "$rails" "$@"
+}
+
+# "-" is the placeholder the Rails tasks print for an empty field.
+_dash() { [ "$1" = "-" ] || printf '%s' "$1"; }
+
+# The first registered install (the one you're in, first) that can run the
+# install flow for the named tool: its Roe knows the tool and has the
+# roe:tools tasks. Sites on older releases may have neither yet.
+rails_for_tool() {
+    local want="$1" rails
+    while IFS= read -r rails; do
+        [ -n "$rails" ] || continue
+        [ -f "$(dirname "$(dirname "$rails")")/lib/tasks/tools.rake" ] || continue
+        if managed_tools_table "$rails" | cut -f1 | grep -qx "$want"; then
+            echo "$rails"
+            return 0
+        fi
+    done <<EOF
+$(all_rails)
+EOF
+    return 1
+}
+
+# Run one install method. Commands come from Roe's own ManagedTools code
+# (never from user input) and are shown to the user before this runs.
+install_with_method() {
+    local rails="$1" tool="$2" method="$3" command="$4"
+    case "$method" in
+        download) rails_task "$rails" "roe:tools:download[$tool]" >/dev/null ;;
+        *)        eval "$command" ;;
+    esac
+}
+
+# ── Shell completion ──────────────────────────────────────────────────────────
+#
+# The completion script (printed by `roe completion bash|zsh`) shells back
+# into these two hidden helpers, so the list of commands and the list of site
+# names have exactly one source. Names come from all_names, i.e. the live
+# registry — a site registered or removed a moment ago completes correctly with
+# nothing to regenerate.
+
+# The commands a bare `roe` accepts, one per line — the first word to complete.
+complete_commands() {
+    printf '%s\n' list start stop restart status open home admin logs stripe folder install completion help
+}
+
+# The candidates for the SECOND word, given the command being completed for.
+# Per-site commands take a name; start/stop/restart also take --all; install
+# takes a tool name (not a site).
+complete_names() {
+    case "$1" in
+        start|stop|restart) echo "--all" ;;
+        logs) echo "--2h --day" ;;
+        status|open|home|admin|stripe|folder) : ;;
+        install) complete_tools; return 0 ;;
+        completion) echo "--zsh --bash"; return 0 ;;
+        *) return 0 ;;   # list/help take no argument
+    esac
+    all_names
+}
+
+# Tool keys for `roe install <TAB>`, read from the live ManagedTools registry
+# (same source as the command itself). Silent if no install is reachable.
+complete_tools() {
+    all_tools_table | cut -f1
+}
+
+# Print a completion script for the named shell, for sourcing or eval:
+#   eval "$(roe completion zsh)"      # try it in this shell
+#   roe completion bash > file        # or save it and source from your rc
+#
+# This bare form prints the RAW script with no commentary — it's what roe.sh's
+# ensure_roe_completion redirects into ~/.roe/roe-completion.<shell>. Humans use
+# `roe completion --zsh` / `--bash` instead (cmd_completion below), which checks
+# whether completion is set up and offers to install it in plain language.
+completion_script() {
+    case "${1:-}" in
+        bash)
+            cat <<'EOF'
+_roe_complete() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "$(roe __complete_commands)" -- "$cur") )
+    elif [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=( $(compgen -W "$(roe __complete_names "${COMP_WORDS[1]}")" -- "$cur") )
+    fi
+}
+complete -F _roe_complete roe
+EOF
+            ;;
+        zsh)
+            cat <<'EOF'
+# compdef isn't defined until compinit has run; do it ourselves if needed so
+# this file is safe to source on its own.
+if ! typeset -f compdef >/dev/null 2>&1; then
+    autoload -Uz compinit && compinit -u
+fi
+_roe_complete() {
+    if (( CURRENT == 2 )); then
+        compadd -- ${(f)"$(roe __complete_commands)"}
+    elif (( CURRENT == 3 )); then
+        compadd -- ${(f)"$(roe __complete_names ${words[2]})"}
+    fi
+}
+compdef _roe_complete roe
+EOF
+            ;;
+        "")
+            log_error "Which shell? Use: roe completion bash | roe completion zsh"
+            return 1
+            ;;
+        *)
+            log_error "Don't know how to complete for '$1'. Use: roe completion bash | roe completion zsh"
+            return 1
+            ;;
+    esac
+}
+
+# Resolve the interactive rc file where the completion line lives, matching
+# roe.sh's _mise_write_target so status/install agree with what register wrote.
+# Echoes the path, or nothing on an unsupported shell.
+_completion_rc_file() {
+    case "$1" in
+        zsh)
+            local zdot=""
+            command -v zsh >/dev/null 2>&1 && \
+                zdot="$(env -u ZDOTDIR zsh -c 'print -r -- "${ZDOTDIR:-$HOME}"' 2>/dev/null)"
+            [ -n "$zdot" ] || zdot="${ZDOTDIR:-$HOME}"
+            echo "$zdot/.zshrc" ;;
+        bash) echo "$HOME/.bash_profile" ;;
+    esac
+}
+
+# Is the completion line present in the rc file? Matches the marker roe.sh writes.
+_completion_installed_in_rc() {
+    local rc="$1"
+    [ -n "$rc" ] && [ -f "$rc" ] && grep -qF 'tab completion for `roe`' "$rc" 2>/dev/null
+}
+
+# When the rc file is a symlink (dotfile managers like stow/chezmoi/yadm link
+# it into a tracked repo), writing through it lands in the real target while
+# preserving the link — so completion works fine, but the user wants to know
+# the actual file that changed, to commit it. Print a "REAL FILE" line only in
+# that case; stay quiet for the common plain-file setup. $1 = the rc path.
+_print_rc_real_target() {
+    local rc="$1" real
+    [ -L "$rc" ] || return 0
+    # readlink -f resolves the full chain on both GNU and modern macOS; fall
+    # back to a single-hop readlink if -f isn't supported.
+    real="$(readlink -f "$rc" 2>/dev/null || readlink "$rc" 2>/dev/null)"
+    [ -n "$real" ] && [ "$real" != "$rc" ] && \
+        echo -e "  REAL FILE: $real ${DIM}(symlinked — commit this in your dotfiles)${NC}"
+}
+
+# Human-facing: `roe completion --zsh` / `--bash`. Reports whether tab completion
+# is set up for that shell and, if not, offers to install it (writing the script
+# to ~/.roe and a single source-line into the rc file — the same thing register
+# does). Plain language, no raw script dumped at the user.
+cmd_completion() {
+    local shell_name="$1"
+    local comp_file="$ROE_HOME/roe-completion.$shell_name"
+    local rc; rc="$(_completion_rc_file "$shell_name")"
+
+    if [ -z "$rc" ]; then
+        log_error "Tab completion is only available for bash and zsh."
+        return 1
+    fi
+
+    # Already set up?
+    if _completion_installed_in_rc "$rc" && [ -f "$comp_file" ]; then
+        log_success "Tab completion for 'roe' is set up ($shell_name)."
+        echo -e "  SCRIPT: $comp_file"
+        echo -e "  LOADED FROM: $rc"
+        _print_rc_real_target "$rc"
+        echo -e "  ${DIM}Type 'roe ' and hit tab. If it's not working yet, open a new terminal.${NC}"
+        return 0
+    fi
+
+    log_warning "Tab completion for 'roe' isn't set up for $shell_name yet."
+    echo -e "  It lets you type 'roe ' and press tab to complete commands and site names."
+    echo -e "  Roe will:"
+    echo -e "    • write the completion script to ${CYAN}$comp_file${NC}"
+    echo -e "    • add one line to ${CYAN}$rc${NC} to load it"
+    printf "  Set it up now? [Y/n]: "
+    local reply; read -r reply
+    case "${reply:-y}" in
+        [Nn]*) log_info "Left it for now. Run 'roe completion --$shell_name' when you want it."; return 0 ;;
+    esac
+
+    # Write the script (reuse the raw emitter — one source of truth).
+    mkdir -p "$ROE_HOME"
+    if ! completion_script "$shell_name" > "$comp_file" 2>/dev/null; then
+        rm -f "$comp_file"
+        log_error "Couldn't write the completion script to $comp_file."
+        return 1
+    fi
+
+    # Add the source line once.
+    if ! _completion_installed_in_rc "$rc"; then
+        {
+            echo ''
+            echo '# Added by Roe — tab completion for `roe`'
+            echo "[ -f \"$comp_file\" ] && source \"$comp_file\""
+        } >> "$rc" || { log_error "Couldn't write to $rc."; return 1; }
+    fi
+
+    log_success "Tab completion set up for $shell_name."
+    echo -e "  SCRIPT: $comp_file"
+    echo -e "  LOADED FROM: $rc"
+    _print_rc_real_target "$rc"
+    echo -e "  ${DIM}Open a new terminal (or run: source \"$rc\") to start using it.${NC}"
+}
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+#
+# A short report of what went wrong recently, to paste into a message: the
+# install's bin/roe-logs reads its log files and prints only failures. Plain
+# Ruby run with the install's own Ruby, not Rails, so it still works when
+# Rails won't boot — usually the reason someone runs it. The server state
+# comes from here, where the process checks already live.
+
+cmd_logs() {
+    local f="$1" name root app pid="" port=""
+    name="$(basename "$f" .conf)"
+    root="$(_conf_get "$f" ROOT)"
+    app="$root/current"
+    [ -d "$app" ] || app="$root"
+    if [ ! -f "$app/bin/roe-logs" ]; then
+        log_error "$name is on a Roe without 'roe logs'. Update it from Admin → Updates."
+        echo -e "  LOG: ${DIM}$app/log/development.log${NC}" >&2
+        return 1
+    fi
+    if pid="$(server_pid_for "$root")"; then
+        port="$(port_for_pid "$pid")"
+    else
+        pid=""
+    fi
+    ROE_LOGS_SITE="$name" ROE_LOGS_PID="$pid" ROE_LOGS_PORT="$port" \
+        with_install_ruby "$app" ruby "$app/bin/roe-logs" ${ROE_LOGS_WINDOW:+"$ROE_LOGS_WINDOW"}
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+    "")              usage ;;
+    list|ls)         cmd_list ;;
+    start)           for_target cmd_start   "${2:-}" ;;
+    stop)            for_target cmd_stop    "${2:-}" ;;
+    restart)         for_target cmd_restart "${2:-}" ;;
+    status)          for_target cmd_status  "${2:-}" ;;
+    open)            for_target cmd_open    "${2:-}" ;;
+    home)            for_target cmd_home    "${2:-}" ;;
+    admin)           for_target cmd_admin   "${2:-}" ;;
+    stripe)
+        shift
+        # Subcommand: `roe stripe remove [site]` clears the local test key.
+        case "${1:-}" in
+            remove|rm)
+                shift
+                for_target cmd_stripe_remove "${1:-}"
+                ;;
+            *)
+                _stripe_site=""
+                export ROE_STRIPE_EVENTS=""
+                while [ $# -gt 0 ]; do
+                    case "$1" in
+                        --events)
+                            if [ -z "${2:-}" ]; then
+                                log_error "--events needs a comma-separated list, e.g. --events checkout.session.completed,charge.refunded"
+                                exit 1
+                            fi
+                            ROE_STRIPE_EVENTS="$2"; shift 2 ;;
+                        --events=*)       ROE_STRIPE_EVENTS="${1#--events=}"; shift ;;
+                        --all-snapshot|--all-thin) ROE_STRIPE_EVENTS="$1"; shift ;;
+                        -*)
+                            log_error "Unknown flag for 'roe stripe': $1"
+                            echo "  Use --events <a,b,c>, --all-snapshot, or --all-thin." >&2
+                            exit 1 ;;
+                        *)                _stripe_site="$1"; shift ;;
+                    esac
+                done
+                for_target cmd_stripe "$_stripe_site"
+                ;;
+        esac
+        ;;
+    folder)          shift; cmd_folder "$@" ;;
+    logs|log)
+        shift
+        _logs_site=""
+        ROE_LOGS_WINDOW=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --2h|--day) ROE_LOGS_WINDOW="$1"; shift ;;
+                -*)
+                    log_error "Unknown flag for 'roe logs': $1"
+                    echo "  Use --2h or --day. Without one it shows the last hour." >&2
+                    exit 1 ;;
+                *) _logs_site="$1"; shift ;;
+            esac
+        done
+        for_target cmd_logs "$_logs_site"
+        ;;
+    install)         cmd_install "${2:-}" ;;
+    completion)
+        case "${2:-}" in
+            --zsh)  cmd_completion zsh ;;
+            --bash) cmd_completion bash ;;
+            # Bare `zsh`/`bash` still emit the raw script: roe.sh's
+            # ensure_roe_completion redirects this into ~/.roe, and older
+            # installs on this machine call it that way. Don't break them.
+            zsh|bash) completion_script "$2" ;;
+            "")
+                log_error "Which shell? Use: roe completion --zsh | roe completion --bash"
+                return 1 2>/dev/null || exit 1 ;;
+            *)
+                log_error "Unknown option for completion: $2"
+                echo "  Use: roe completion --zsh | roe completion --bash" >&2
+                exit 1 ;;
+        esac
+        ;;
+    # Hidden helpers used by the completion script — not shown in help.
+    __complete_commands) complete_commands ;;
+    __complete_names)    complete_names "${2:-}" ;;
+    help|--help|-h)  usage ;;
+    *)
+        log_error "Unknown command: $1"
+        echo ""
+        usage
+        exit 1
+        ;;
+esac

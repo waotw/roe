@@ -71,8 +71,10 @@ class ContentScaffold
     when :player     then fence("card", [ "type: player" ])
     when :playlist   then playlist_block
     # A bare button IS a product button, and it finds the product it's on, so
-    # no sku is needed here. The price shows by default.
-    when :buy_button then fence("button", [ "text: Add to Cart" ])
+    # no sku is needed here. The price shows by default. Without Snipcart
+    # there's no cart to add to, and a button on its own product's page
+    # renders nothing — so none is written; the author adds their store links.
+    when :buy_button then SiteFeature.snipcart_enabled? ? fence("button", [ "text: Add to Cart" ]) : nil
     end
   end
 

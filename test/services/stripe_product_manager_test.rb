@@ -80,8 +80,8 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     result = manager.sync_from_config(payments_config)
 
     assert result
-    assert_equal "prod_123", @stripe_config.reload.product_id
-    assert_equal "price_456", @stripe_config.price_id
+    assert_equal "prod_123", @stripe_config.reload.current_product_id
+    assert_equal "price_456", @stripe_config.current_price_id
   end
 
   test "sync_from_config retrieves existing product when product_id present" do
@@ -89,7 +89,7 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      product_id: "prod_existing",
+      product_id_test: "prod_existing",
       verified_at: Time.current
     )
 
@@ -103,7 +103,7 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     result = manager.sync_from_config(payments_config)
 
     assert result
-    assert_equal "price_new", @stripe_config.reload.price_id
+    assert_equal "price_new", @stripe_config.reload.current_price_id
   end
 
   test "sync_from_config creates new product when existing product deleted" do
@@ -111,7 +111,7 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     @stripe_config.update!(
       publishable_key_test: "pk_test_123",
       secret_key_test: "sk_test_123",
-      product_id: "prod_deleted",
+      product_id_test: "prod_deleted",
       verified_at: Time.current
     )
 
@@ -129,7 +129,7 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     result = manager.sync_from_config(payments_config)
 
     assert result
-    assert_equal "prod_new", @stripe_config.reload.product_id
+    assert_equal "prod_new", @stripe_config.reload.current_product_id
   end
 
   # ── Price parsing ────────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     manager = StripeProductManager.new
     result = manager.sync_from_config(payments_config)
     assert result
-    assert_equal "price_456", @stripe_config.reload.price_id
+    assert_equal "price_456", @stripe_config.reload.current_price_id
   end
 
   test "parse_price handles integer prices" do
@@ -173,7 +173,7 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     manager = StripeProductManager.new
     result = manager.sync_from_config(payments_config)
     assert result
-    assert_equal "price_456", @stripe_config.reload.price_id
+    assert_equal "price_456", @stripe_config.reload.current_price_id
   end
 
   # ── Error handling ───────────────────────────────────────────────────────
@@ -270,8 +270,8 @@ class StripeProductManagerTest < ActiveSupport::TestCase
     manager = StripeProductManager.new
     result = manager.sync_from_config(payments_config)
     assert result
-    assert_equal "prod_123", @stripe_config.reload.product_id
-    assert_equal "price_456", @stripe_config.price_id
+    assert_equal "prod_123", @stripe_config.reload.current_product_id
+    assert_equal "price_456", @stripe_config.current_price_id
   end
 
   test "uses StripeConfig currency for price" do

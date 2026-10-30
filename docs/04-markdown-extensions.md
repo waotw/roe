@@ -212,6 +212,20 @@ Full option tables live in the user docs (`site/documentation/roe/roeanji_forms-
 
 ---
 
+## Highlights
+
+`==text==` renders as `<mark>text</mark>` (`process_highlights`, after strikethrough). `<mark>` written by hand still works and renders identically. The toolbar's `H` button writes `==`.
+
+```markdown
+A ==bright idea== here.
+```
+
+`HIGHLIGHT_PATTERN` requires the pair to hug its text, so `a == b` is left alone. A run of three or more `=` is never a marker, so setext underlines stay headings. Inline code, HTML tags (`href="?a==b"`) and fenced blocks are skipped.
+
+The match is wrapped as `<mark markdown="span">` so kramdown still parses markdown inside it (`==**bold**==`); kramdown drops the attribute. The live editor's grammar (`app/javascript/markdown_editor/syntax.js`) reads `==` by the same rules, so what shows highlighted while writing is what renders.
+
+---
+
 ## Pullquote Splits
 
 Create side-by-side layouts by splitting paragraphs with `||`:

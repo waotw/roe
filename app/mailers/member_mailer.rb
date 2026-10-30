@@ -27,6 +27,8 @@ class MemberMailer
     end
 
     def email_confirmation(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
       confirmation_url = Rails.application.routes.url_helpers.confirm_email_url(
         token: member.email_confirmation_token,
@@ -49,6 +51,8 @@ class MemberMailer
     end
 
     def welcome(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("welcome", {
@@ -66,6 +70,8 @@ class MemberMailer
     end
 
     def upgrade_success(member, password)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
       account_url = Rails.application.routes.url_helpers.account_url(host: site_url)
 
@@ -85,7 +91,34 @@ class MemberMailer
       )
     end
 
+    # A password invite for a member who hasn't signed in yet — imported or
+    # admin-created. The copy is first-access ("you have an account, here's
+    # your password"), not a migration notice, so it suits members who never
+    # used email sign-in. Temp password the member resets after signing in;
+    # its own editable template (emails/invite.md).
+    def invite(member, temp_password)
+      site_name = SiteConfig.get("title") || "the site"
+      signin_url = Rails.application.routes.url_helpers.signin_url(host: site_url)
+
+      html_body = EmailRenderer.render("invite", {
+        member_name: member.name || "there",
+        member_email: member.email,
+        temp_password: temp_password,
+        signin_url: signin_url,
+        site_name: site_name
+      })
+
+      send_email(
+        to: member.email,
+        to_name: member.name || member.email,
+        subject: "Your account on #{site_name}",
+        html_content: html_body
+      )
+    end
+
     def email_changed(member, old_email)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("email_changed", {
@@ -107,6 +140,8 @@ class MemberMailer
     end
 
     def membership_cancelled(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("membership_cancelled", {
@@ -124,6 +159,8 @@ class MemberMailer
     end
 
     def payment_failed(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
       update_payment_url = Rails.application.routes.url_helpers.account_url(host: site_url)
 
@@ -143,6 +180,8 @@ class MemberMailer
     end
 
     def account_deletion(member)
+      return skipped_result if email_off?
+
       site_name = SiteConfig.get("title") || "the site"
 
       html_body = EmailRenderer.render("account_deletion", {
@@ -160,6 +199,21 @@ class MemberMailer
     end
 
     private
+
+    # The 7 non-login notifications (welcome, receipts, cancellation, etc.) are
+    # courtesy mail, not a login path. With email off the site has no mailer, so
+    # they must become clean no-ops rather than falling through to the fallback,
+    # which reports success and delivers nothing. magic_link and invite are NOT
+    # guarded — they're deliberate sends an operator triggers while email still
+    # works. Returns a skipped result so callers that inspect :success don't
+    # mistake a no-op for a real send.
+    def email_off?
+      !SiteFeature.email_feature_enabled?
+    end
+
+    def skipped_result
+      { success: false, skipped: true, reason: "email feature disabled" }
+    end
 
     def send_email(to:, to_name:, subject:, html_content:)
       Rails.logger.info "🔍 Attempting to send email to #{to}"
@@ -181,8 +235,28 @@ class MemberMailer
 
         if result[:success]
           Rails.logger.info "✉️  Sent '#{subject}' to #{to} (Message ID: #{result[:message_id]})"
+          # A send got through, so the account isn't approval-restricted anymore
+          # (or never was). Drop any stale pending-approval flag.
+          postmark_config.clear_account_pending_approval!
         else
           Rails.logger.error "❌ Failed to send email to #{to}: #{result[:error]}"
+
+          # A rejected From address isn't a transient failure — every send will
+          # fail the same way until the address is verified with Postmark. Record
+          # it so the settings pages can say so, rather than leaving the only
+          # trace in a log the person who tried can't read.
+          if result[:error_code].to_i == PostmarkConfig::SENDER_NOT_VERIFIED
+            postmark_config.record_sender_rejection!(result[:error])
+          end
+
+          # Account pending approval (412): Postmark only allows same-domain
+          # recipients until it approves the account, so a member on an outside
+          # domain gets an opaque failure. Record it so the operator sees the
+          # real reason on the Postmark settings page instead of the member
+          # hitting a dead end. See PostmarkConfig#account_pending_approval?.
+          if result[:error_code].to_i == PostmarkConfig::ACCOUNT_PENDING_APPROVAL
+            postmark_config.record_account_pending_approval!(result[:error])
+          end
         end
 
         # Postmark took it, but a sandbox server records without delivering and

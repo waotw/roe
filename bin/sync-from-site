@@ -9,6 +9,14 @@
 #   1. Docs — exact mirror. site/documentation/roe/ ↔ current/lib/.../roe/.
 #      --delete is on; anything you delete from /site disappears from the
 #      app on the next sync. New files added in /site are propagated.
+#      _versions.yml is the one exception: release:bump owns it (writes
+#      current/'s copy, then copies it to site/), so it's never synced.
+#
+#   1b. Shipped site files — before the copies below. Themes and site JS
+#      carry a header with a Version (yours) and a Fingerprint (this
+#      script's, a hash of the body). Fails if a body changed since the
+#      last commit without a Version bump; otherwise stamps the
+#      Fingerprint in site/ so it and the copy in current/ agree.
 #
 #   2. Themes — update-only. site/theme/ → current/app/themes/.
 #      --existing flag means files that exist in BOTH places are updated
@@ -16,6 +24,10 @@
 #      new bundled theme file, move it manually). Files only in the app
 #      are left alone (preserves bundled defaults like other starter
 #      themes you haven't installed locally).
+#
+#   2b. Site JavaScript — same rule. site/javascript/ → current/app/site_js/,
+#      update-only. You develop these where they're live, then bring
+#      them back for release.
 #
 #   3. Docs index page — single file copy + YAML frontmatter strip.
 #      site/pages/documentation.md → current/app/views/documentation/index.md.
@@ -54,67 +66,142 @@ esac
 
 cd "$ROE_ROOT"
 
+# The orange from bin/roe (#e47e5d), for the not-synced warning. Off when
+# output isn't a terminal (piped to a file or a log), or NO_COLOR is set.
+ROE_ORANGE=''
+BOLD=''
+NC=''
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  case "${COLORTERM:-}" in
+    truecolor|24bit) ROE_ORANGE='\033[38;2;228;126;93m' ;;
+    *)               ROE_ORANGE='\033[38;5;173m' ;;
+  esac
+  BOLD='\033[1m'
+  NC='\033[0m'
+fi
 echo "→ Docs (exact mirror, --delete on):"
 echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/documentation/roe/"
-rsync -avc $DRY_RUN --delete \
+# _versions.yml is excluded: it isn't content, it's release metadata that
+# `bin/rails release:bump` writes in current/ (and copies to site/). Copying
+# site/'s copy over it put back stale versions after every bump — 0.3.0's
+# stamps were lost that way. An excluded file is also protected from
+# --delete, so current/'s copy stays put.
+rsync -avc $DRY_RUN --delete --exclude=_versions.yml \
   site/documentation/roe/ \
   current/lib/site_templates/minimum/documentation/roe/
 echo ""
 
+echo "→ Shipped site files (version check + fingerprint, in site/, before the copy):"
+# Themes and site JS are developed in site/ and copied into current/ by
+# the two steps that follow. Before that copy: for each file whose body
+# changed since the last commit without a Version bump, report it and
+# leave it OUT of the copy — the bump is what tells a site an update
+# exists (the Themes/Scripts page compares version numbers only), so an
+# unbumped change would ship but reach no one, and copying it would just
+# overwrite current/ with that dead change. Files that pass get their
+# header Fingerprint stamped from the body — in site/, so the dev site
+# and the shipped file agree and the Themes page here doesn't call your
+# own work "edited". Version is yours to set; Fingerprint is this
+# script's. Writing into site/ is fine here: it's the developer's own
+# install and they ran the command (rule 8 is about boot).
+#
+# A forgotten bump no longer aborts the whole sync — only the offending
+# file is skipped; everything else syncs. The skipped files are listed
+# loudly at the end and the script exits non-zero so a release isn't cut
+# with a stale file.
+echo "    site/theme/*.css, site/javascript/*.js"
+FAILED_FILES=""
+if [[ -z "$DRY_RUN" ]]; then
+  check_out="$(cd current && bin/rails runner 'failed = ShippedFileInspector.check_release!(site_root: RoeSitePaths::SITE_PATH); failed.each { |rel| $stdout.puts "::FAILED::#{rel}" }' 2>/dev/null)"
+  echo "$check_out" | grep -v '^::FAILED::' || true
+  FAILED_FILES="$(printf '%s\n' "$check_out" | sed -n 's/^::FAILED:://p')"
+else
+  echo "    (skipped in dry run)"
+fi
+echo ""
+
+# Build per-subtree rsync excludes for any file that failed the version
+# check, so it is NOT copied. Everything else syncs normally. (bash 3.2
+# on macOS: arrays are fine; the ${arr[@]+...} guard below keeps an empty
+# array from tripping `set -u`.)
+THEME_EXCLUDES=()
+JS_EXCLUDES=()
+if [[ -n "$FAILED_FILES" ]]; then
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    base="$(basename "$rel")"
+    case "$rel" in
+      app/themes/*)  THEME_EXCLUDES+=(--exclude="$base") ;;
+      app/site_js/*) JS_EXCLUDES+=(--exclude="$base") ;;
+    esac
+  done <<< "$FAILED_FILES"
+fi
+
 echo "→ Themes (update existing files only, --existing on, --delete off):"
 echo "    site/theme/  →  current/app/themes/"
-rsync -avc $DRY_RUN --existing \
+rsync -avc $DRY_RUN --existing ${THEME_EXCLUDES[@]+"${THEME_EXCLUDES[@]}"} \
   site/theme/ \
   current/app/themes/
 echo ""
 
-echo "→ Docs index page (single file copy + frontmatter strip):"
-echo "    site/pages/documentation.md  →  current/app/views/documentation/index.md"
-rsync -vc $DRY_RUN \
-  site/pages/documentation.md \
-  current/app/views/documentation/index.md
-
-# Strip YAML frontmatter from the destination. The /site/pages/
-# source needs `---\n…\n---\n` at the top to be a valid Page, but
-# the bundled view in /current/app/views/ renders only the markdown
-# body — frontmatter would either show as literal text or confuse
-# the markdown parser.
-#
-# awk state machine: on line 1, if it's `---`, enter frontmatter
-# mode. While in frontmatter mode, skip lines until the next `---`
-# (close), then exit. Print everything else. Robust to files that
-# don't start with `---` (no change), files without frontmatter (no
-# change), and `---` horizontal rules later in the body (preserved
-# because in_fm is already 0 by then).
-if [[ -z "$DRY_RUN" ]]; then
-  dest="current/app/views/documentation/index.md"
-  awk '
-    NR == 1 && /^---$/ { in_fm = 1; next }
-    in_fm && /^---$/   { in_fm = 0; next }
-    !in_fm             { print }
-  ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
-  echo "    (stripped YAML frontmatter from destination)"
-fi
+echo "→ Site JavaScript (update existing files only, --existing on, --delete off):"
+# Same rule as themes: you develop the public-site JS in site/javascript/
+# where it's live, then bring it back here for release. Only files Roe
+# already ships are updated; a site-only file stays where it is.
+echo "    site/javascript/  →  current/app/site_js/"
+rsync -avc $DRY_RUN --existing ${JS_EXCLUDES[@]+"${JS_EXCLUDES[@]}"} \
+  site/javascript/ \
+  current/app/site_js/
 echo ""
 
-echo "→ Roe docs index page (single file copy + frontmatter strip):"
-echo "    site/pages/documentation-all.md  →  current/app/views/documentation/roe_index.md"
-rsync -vc $DRY_RUN \
-  site/pages/documentation-all.md \
-  current/app/views/documentation/roe_index.md
-
-# Same frontmatter strip as the /documentation index above: the /site
-# source is a Page (needs `---\n…\n---\n`), the bundled view renders the
-# markdown body only. This is the page served at /documentation/roe.
-if [[ -z "$DRY_RUN" ]]; then
-  dest="current/app/views/documentation/roe_index.md"
+# The two docs index pages. The site/pages/ source needs `---\n…\n---\n`
+# at the top to be a valid Page, but the bundled view in current/app/views/
+# renders only the markdown body — frontmatter would show as literal text
+# or confuse the markdown parser.
+#
+# Strip first, then compare the stripped body with the copy in current/.
+# This used to rsync the whole file and strip afterwards, so the source
+# (with frontmatter) never matched the destination (without): every dry
+# run listed both pages as changed, and every real run rewrote them to
+# the same bytes. Comparing after the strip means a page is only listed,
+# or copied, when its content really changed.
+#
+# awk state machine: on line 1, if it's `---`, enter frontmatter mode.
+# While in frontmatter mode, skip lines until the next `---` (close),
+# then exit. Print everything else. Robust to files that don't start
+# with `---` (no change), files without frontmatter (no change), and
+# `---` horizontal rules later in the body (preserved because in_fm is
+# already 0 by then).
+sync_index_page() {
+  local src="$1" dest="$2" stripped
+  stripped="$(mktemp "${TMPDIR:-/tmp}/sync-index.XXXXXX")"
   awk '
     NR == 1 && /^---$/ { in_fm = 1; next }
     in_fm && /^---$/   { in_fm = 0; next }
     !in_fm             { print }
-  ' "$dest" > "${dest}.tmp" && mv "${dest}.tmp" "$dest"
-  echo "    (stripped YAML frontmatter from destination)"
-fi
+  ' "$src" > "$stripped"
+
+  if [[ -f "$dest" ]] && cmp -s "$stripped" "$dest"; then
+    echo "    up to date"
+  elif [[ -n "$DRY_RUN" ]]; then
+    echo "    would update $dest"
+  else
+    mv "$stripped" "$dest"
+    echo "    updated $dest (YAML frontmatter stripped)"
+    return 0
+  fi
+  rm -f "$stripped"
+}
+
+echo "→ Docs index page (single file copy + frontmatter strip):"
+echo "    site/pages/documentation.md  →  current/app/views/documentation/index.md"
+sync_index_page site/pages/documentation.md current/app/views/documentation/index.md
+echo ""
+
+# The page served at /documentation/roe.
+echo "→ Roe docs index page (single file copy + frontmatter strip):"
+echo "    site/pages/documentation-all.md  →  current/app/views/documentation/roe_index.md"
+sync_index_page site/pages/documentation-all.md current/app/views/documentation/roe_index.md
 echo ""
 
 echo "→ Root launcher/docs (current/ is canonical → mirror to package root):"
@@ -123,6 +210,11 @@ echo "→ Root launcher/docs (current/ is canonical → mirror to package root):
 # too). The root copies are what users actually invoke/read, so keep them
 # in step here rather than only on in-app update. rsync -c so identical
 # files are a no-op.
+#
+# AGENTS.md and CLAUDE.md are deliberately NOT synced. The root copies are
+# the operator's own notes for this install (personal paths, preferences)
+# and point at current/docs/agents/ for Roe's shared conventions. Copying
+# current/AGENTS.md over them would destroy that.
 for f in roe.sh README.md LICENSE; do
   echo "    current/$f  →  $f"
   rsync -vc $DRY_RUN "current/$f" "$f"
@@ -201,6 +293,27 @@ echo ""
 
 if [[ -n "$DRY_RUN" ]]; then
   echo "Dry run complete. Re-run without --dry-run to apply."
+elif [[ -n "$FAILED_FILES" ]]; then
+  echo -e "  ${ROE_ORANGE}================================================================"
+  echo -e "  ${BOLD}!!  FILE CHANGED BUT NO VERSION BUMP  —  NOT SYNCED${NC}"
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    # Name the file you edit, in site/ — not the copy in current/ it would
+    # have been synced to. The bump goes in the site/ file.
+    case "$rel" in
+      app/themes/*)  echo "      - site/theme/$(basename "$rel")" ;;
+      app/site_js/*) echo "      - site/javascript/$(basename "$rel")" ;;
+      *)             echo "      - $rel" ;;
+    esac
+  done <<< "$FAILED_FILES"
+  echo ""
+  echo "      Their bodies changed but Version: did not, so no site would"
+  echo "      ever be offered the update. They were SKIPPED; everything"
+  echo "      else synced. Bump Version: in the header of the site/ files"
+  echo "      above and run again to ship them."
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  exit 1
 else
   echo "Done."
 fi

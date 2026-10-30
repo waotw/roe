@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "crt-shader": {
+      "source": "OutThisLife/crt-shader",
+      "sourceType": "github",
+      "skillPath": "skills/crt-shader/SKILL.md",
+      "computedHash": "339b47406f4d8fc97833b4720237dafcdc03bbbafeb3196f2585fae6d8d642f9"
+    }
+  }
+}

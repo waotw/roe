@@ -1,6 +1,8 @@
 class Admin::PostsController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
+  include RenameRedirect
+  include EditorSave
 
   # Bulk-action wiring (see BulkContentActions).
   def bulk_model = Post
@@ -227,6 +229,8 @@ class Admin::PostsController < Admin::BaseController
     # Ensure podcast GUID (if podcast type + published)
     metadata = ensure_podcast_guid(metadata, Post.new)
 
+    apply_auto_duration!(metadata)
+
     if metadata["tags"].nil? || metadata["tags"] == ""
       metadata["tags"] = []
     end
@@ -238,10 +242,15 @@ class Admin::PostsController < Admin::BaseController
     normalize_and_write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    post = Post.find_by(file_path: file_path.to_s)
+    # Look up by the SAME normalized (realpath) path the model stores. On
+    # production /rails/site is a symlink to /data/site, so the raw file_path
+    # (symlink) wouldn't match the stored realpath and this would falsely report
+    # "failed to sync" for a post that synced fine. See RoeSitePaths.normalize.
+    post = Post.find_by(file_path: RoeSitePaths.normalize(file_path))
 
     if post
-      redirect_to edit_admin_post_path(post), notice: "Post created", flash: { new_post: true }
+      # No "created" notice: you land in the new post's editor, which says so.
+      redirect_to edit_admin_post_path(post), flash: { new_post: true }
     else
       flash[:error] = "Post file created but failed to sync to database"
       redirect_to admin_posts_path
@@ -300,6 +309,10 @@ class Admin::PostsController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # As the editor sent it, before Roe tidies it — so a background save
+      # can tell whether the file now says something the panel doesn't.
+      submitted = metadata.deep_dup
+
       # Remove the error flag if it exists (YAML is now fixed)
       metadata.delete("_yaml_parse_error")
 
@@ -316,6 +329,8 @@ class Admin::PostsController < Admin::BaseController
       # Ensure podcast GUID (if podcast type + published)
       metadata = ensure_podcast_guid(metadata, @post)
 
+      apply_auto_duration!(metadata)
+
       # Re-serialize to YAML after potential GUID modification
       yaml_content = Post.format_metadata_yaml(metadata)
 
@@ -323,13 +338,14 @@ class Admin::PostsController < Admin::BaseController
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@post.file_path, full_content)
-      redirect_to edit_admin_post_path(@post)
+      finish_editor_save_with_warning(edit_admin_post_path(@post))
       return
     end
 
-    # Capture pre-save state so we can detect a publishing transition
-    # (draft/unlisted → published) and queue any newsletter sends below.
+    # Capture pre-save publish state (newsletter transition detection below).
     was_published = @post.published?
+    status_before = @post.status
+    old_address = rename_redirect_source(@post)
 
     # Use the formatted YAML (includes GUID if added/restored)
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
@@ -340,17 +356,23 @@ class Admin::PostsController < Admin::BaseController
 
     # If this save published the post (transitioned from non-published)
     # and it's marked for newsletter delivery, queue the broadcast.
+    # A plain save says nothing: the editor's dot already shows "changes
+    # saved". Publishing (and sending a newsletter) is worth a word — the dot
+    # doesn't know a save made the post live.
     just_published = !was_published && @post.published?
     if just_published && should_send_newsletter?(@post)
       QueueNewsletterBatchesJob.perform_later(@post.id)
       flash[:notice] = "Post published. Newsletter is being sent in the background."
     elsif just_published
       flash[:notice] = "Post published"
-    else
-      flash[:notice] = "Post saved"
     end
 
-    redirect_to edit_admin_post_path(@post)
+    # "Save new URL & redirect" in the editor's slug-change modal: write the
+    # 301 as part of this save (RenameRedirect).
+    add_rename_redirect(Post, old_address, metadata, @post.file_path)
+
+    finish_editor_save(record: @post, resource_type: "post", edit_path: edit_admin_post_path(@post),
+                       file_path: @post.file_path, submitted: submitted, status_before: status_before)
   end
 
   # Copy a post's file verbatim into a numbered sibling — same directory, an
@@ -376,7 +398,7 @@ class Admin::PostsController < Admin::BaseController
     normalize_and_write(new_path, "---\n#{yaml_content}\n---\n#{parsed.content}")
     ContentSync.sync_file(new_path)
 
-    new_post = Post.find_by(file_path: new_path.to_s)
+    new_post = Post.find_by(file_path: RoeSitePaths.normalize(new_path))
     if new_post
       redirect_to edit_admin_post_path(new_post), notice: "Post duplicated"
     else
@@ -494,20 +516,6 @@ class Admin::PostsController < Admin::BaseController
     update_post_status(@post, "draft")
     flash[:notice] = "Post unpublished"
     redirect_to edit_admin_post_path(@post)
-  end
-
-  # Client-side duration backfill (episode_durations controller reads the
-  # audio/video metadata in the browser and posts it here). Only fills a blank
-  # value — never clobbers a real one.
-  def set_duration
-    post = Post.find(params[:id])
-    duration = params[:duration].to_s.strip
-
-    return head :unprocessable_entity unless duration.match?(/\A\d{1,3}:\d{2}(:\d{2})?\z/)
-    return head :no_content if post.metadata["duration"].to_s.strip.present?
-
-    write_metadata_field(post, "duration", duration)
-    head :ok
   end
 
   def search
@@ -774,6 +782,30 @@ class Admin::PostsController < Admin::BaseController
     File.basename(filename)
   end
 
+  # Content → Global → "Automatically add audio and video duration". On, a
+  # post with a duration field gets its file's length on every save: audio
+  # first (it's what the feed sends), else video. Only a length Roe could
+  # confirm is written — no file, a missing one or an unreadable one leaves
+  # whatever is there, so a writer can still type one in. Off, the duration
+  # is left alone (the field's ADD DURATION reads it on request).
+  def apply_auto_duration!(metadata)
+    return unless SiteConfig.auto_duration?
+    return unless duration_field?(metadata)
+
+    source = metadata["audio"].to_s.strip.presence || metadata["video"].to_s.strip.presence
+    return unless source
+
+    found = MediaDurationExtractor.for_media(source)
+    metadata["duration"] = found if found
+  end
+
+  def duration_field?(metadata)
+    return true if metadata.key?("duration")
+
+    fields = Post::POST_TYPES.dig(metadata["post_type"].to_s.to_sym, :metadata_fields) || []
+    fields.any? { |field| field[:name] == "duration" }
+  end
+
   def update_post_status(post, new_status)
     content = File.read(post.file_path)
 
@@ -793,17 +825,6 @@ class Admin::PostsController < Admin::BaseController
       normalize_and_write(post.file_path, new_content)
       ContentSync.sync_file(post.file_path)
     end
-  end
-
-  # Set a single frontmatter field on a post's file and re-sync.
-  def write_metadata_field(post, key, value)
-    content = File.read(post.file_path)
-    return unless content =~ /\A---\s*\n(.*?)\n---\s*\n(.*)/m
-
-    metadata = YAML.safe_load($1, permitted_classes: [ Date, Time, Symbol ]) || {}
-    metadata[key] = value
-    normalize_and_write(post.file_path, "---\n#{Post.format_metadata_yaml(metadata)}\n---\n#{$2}")
-    ContentSync.sync_file(post.file_path)
   end
 
   def normalize_and_write(file_path, content)

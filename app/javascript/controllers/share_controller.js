@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { copyToClipboard } from "clipboard"
 
 // Share button for posts/pages. A single "Share" trigger:
 //   - Touch devices (native share available) → the OS share sheet, which hands
@@ -85,7 +86,7 @@ export default class extends Controller {
 
   async writeClipboard() {
     try {
-      await navigator.clipboard.writeText(this.url)
+      await copyToClipboard(this.url)
       this.flash("Copied!")
     } catch (e) {
       this.flash("Press ⌘/Ctrl-C to copy")

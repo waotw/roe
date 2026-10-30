@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 export default class extends Controller {
   static targets = [
@@ -8,6 +9,7 @@ export default class extends Controller {
     "form",
     "copyUrl",
     "galleryButton",
+    "playerButton",
   ];
 
   connect() {
@@ -34,6 +36,10 @@ export default class extends Controller {
       if (this.hasGalleryButtonTarget) {
         this.galleryButtonTarget.style.display = count > 1 ? "" : "none";
       }
+      // A player plays one file.
+      if (this.hasPlayerButtonTarget) {
+        this.playerButtonTarget.style.display = count === 1 ? "" : "none";
+      }
     } else {
       this.toolbarTarget.style.display = "none";
     }
@@ -49,8 +55,7 @@ export default class extends Controller {
     const url = selected.map((cb) => cb.dataset.filePath).join("\n");
     const btn = event.currentTarget;
 
-    navigator.clipboard
-      .writeText(url)
+    copyToClipboard(url)
       .then(() => this.flashCopied(btn, "Copied!"))
       .catch(() => this.flashCopied(btn, "Press ⌘/Ctrl-C"));
   }
@@ -131,6 +136,26 @@ export default class extends Controller {
     form.submit();
   }
 
+  // One download per selected file, each from its own /media address, so
+  // nothing is zipped or copied on the server — a 1 GB video streams like
+  // any other file. Started a beat apart: browsers drop a burst of
+  // downloads started at the same instant.
+  downloadSelected() {
+    const selected = this.checkboxTargets.filter((cb) => cb.checked);
+    if (selected.length === 0) return;
+
+    selected.forEach((cb, i) => {
+      setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = cb.dataset.filePath.split("/").map(encodeURIComponent).join("/");
+        link.download = cb.dataset.filename || "";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }, i * 400);
+    });
+  }
+
   submitInsert() {
     const selectedCheckboxes = this.checkboxTargets.filter((cb) => cb.checked);
     if (selectedCheckboxes.length === 0) return;
@@ -170,6 +195,43 @@ export default class extends Controller {
     // Closing is the editor's job; it owns the modal.
     this.element.dispatchEvent(
       new CustomEvent("media-picker:close", { bubbles: true }),
+    );
+  }
+
+  // Opened from a card builder field (the player's Audio/Video): the one
+  // file chosen goes back into that field. Like submitGallery, the picker
+  // only hands over the path — the card builder owns the card.
+  submitToCard() {
+    const selected = this.checkboxTargets.find((cb) => cb.checked);
+    if (!selected) return;
+
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:pick-for-card", {
+        bubbles: true,
+        detail: { path: selected.dataset.filePath, filename: selected.dataset.filename },
+      }),
+    );
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:close", { bubbles: true }),
+    );
+  }
+
+  // ADD PLAYER: the one audio or video file selected goes to the card
+  // builder, which opens as a new player card with it in the Audio or Video
+  // field. The picker closes first; the builder opens over the editor.
+  submitPlayer(event) {
+    const selected = this.checkboxTargets.find((cb) => cb.checked);
+    if (!selected) return;
+
+    const kind = event?.currentTarget?.dataset?.mediaKind === "video" ? "video" : "audio";
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:close", { bubbles: true }),
+    );
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:insert-player", {
+        bubbles: true,
+        detail: { kind, path: selected.dataset.filePath },
+      }),
     );
   }
 

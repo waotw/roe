@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { mediaDuration } from "media_duration";
 
 // Used by the publish modal's media fields (audio/video/image) to:
 //   - Warn inline when the path doesn't resolve to a file under site/media/
@@ -84,31 +85,14 @@ export default class extends Controller {
     if (!["audio", "video"].includes(this.kindValue)) return;
     if (this.durationTarget.value.trim()) return; // don't clobber a value already there
 
-    const ext = path.split(".").pop().toLowerCase();
-    const isAudio = ["mp3", "m4a", "wav", "ogg", "flac", "aac"].includes(ext);
-    const isVideo = ["mp4", "webm", "ogv", "mov", "avi", "mkv"].includes(ext);
-    if (!isAudio && !isVideo) return;
-
     try {
-      const mediaElement = isAudio ? new Audio() : document.createElement("video");
-      const duration = await new Promise((resolve, reject) => {
-        mediaElement.addEventListener("loadedmetadata", () => resolve(mediaElement.duration));
-        mediaElement.addEventListener("error", () => reject(new Error("media load failed")));
-        mediaElement.src = path;
-        mediaElement.load();
-      });
-
-      this.durationTarget.value = this.formatDuration(Math.floor(duration));
+      // A file is read in the browser; a YouTube link is looked up on the
+      // server (media_duration.js).
+      this.durationTarget.value = await mediaDuration(path);
     } catch (error) {
-      // Silent — the existence warning already covers a missing file.
+      // Silent — the existence warning already covers a missing file, and a
+      // link with no length to find is left for the writer to fill in.
     }
-  }
-
-  formatDuration(seconds) {
-    const h = String(Math.floor(seconds / 3600)).padStart(2, "0");
-    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
-    const s = String(seconds % 60).padStart(2, "0");
-    return `${h}:${m}:${s}`;
   }
 
   showWarning() {

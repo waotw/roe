@@ -74,6 +74,13 @@ module ContentTemplate
   def self.frontmatter_for(type, overrides = {})
     metadata = REQUIRED.fetch(type.to_s, {}).dup
 
+    # A store without Snipcart sells nothing through a cart, so a new product
+    # isn't given a price of 0.00 to display (it would read as free) — price
+    # and sku start empty, still present so they're easy to fill in.
+    if type.to_s == "product" && !SiteFeature.snipcart_enabled?
+      metadata["price"] = nil
+    end
+
     parsed   = FrontMatterParser::Parser.new(:md).call(template_content(type))
     optional = parsed.front_matter.is_a?(Hash) ? parsed.front_matter : {}
     metadata.merge!(optional)

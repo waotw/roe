@@ -1,0 +1,49 @@
+<%# COPY — shown IN PLACE OF the local integration setup UI when it's hidden in
+    development (see IntegrationSetupHelper#local_integration_setup_hidden?).
+    Points the operator to set the integration up on their live site instead,
+    because local setup can't finish the live half and gets redone in production
+    anyway. Reversible: set development.show_local_integration_setup: true to
+    bring the full local UI back. Placeholder copy — the user rewrites before
+    commit. %>
+<%
+  admin_url = live_admin_url
+%>
+<div class="mb-6 p-6 border border-blue-200 bg-blue-50" data-test="local-setup-hidden">
+  <h3 class="text-base font-semibold text-gray-900 mb-2">Set up Payments/Stripe on your live site</h3>
+
+  <% if site_deployed? && admin_url.present? %>
+    <p class="text-sm text-gray-700 mb-4">
+      Payments are set up on the live (deployed) site. The live site supports both test and live modes. This allows you to test the transaction flow and process real transactions when ready.
+    </p>
+    <p class="text-sm text-gray-700 mb-4">
+      Your site has been deployed. Click the button below to open the Payment/Stripe settings on your live site.
+    </p>
+    <a href="<%= admin_url %>/configs/payments/edit" target="_blank" rel="noopener"
+       data-test="live-admin-link"
+       class="inline-block uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs mr-1">
+      Open live admin →
+    </a>
+    <a href="https://go-roe.com/documentation/roe/guide-deploy" target="_blank" rel="noopener"
+       data-test="deploy-guide-link"
+       class="inline-block uppercase text-xs px-1.5 py-1 border border-orange-800 bg-orange-300 hover:bg-orange-400 font-mono rounded-xs">
+      Open deployment guide →
+    </a>
+  <% else %>
+    <p class="text-sm text-gray-700 mb-4">
+      Payments are set up on the live (deployed) site. The live site supports both test and live modes. This allows you to test the transaction flow and process real transactions when ready.
+    </p>
+    <p class="text-sm text-gray-700 mb-4">
+      Your site hasn't been deployed.
+    </p>
+    <a href="/admin/configs/deploy/edit" target="_blank" rel="noopener"
+       data-test="deploy-settings-link"
+       class="inline-block uppercase text-sm px-3 py-2 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs mr-1">
+      Open deploy settings →
+    </a>
+    <a href="https://go-roe.com/documentation/roe/guide-deploy" target="_blank" rel="noopener"
+       data-test="deploy-guide-link"
+       class="inline-block uppercase text-xs px-1.5 py-1 border border-orange-800 bg-orange-300 hover:bg-orange-400 font-mono rounded-xs">
+      Open deployment guide →
+    </a>
+  <% end %>
+</div>

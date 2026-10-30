@@ -232,7 +232,11 @@ class SiteSyncTransferJob < ApplicationJob
     @original_diff = diff
     @to_live = diff
     if diff_empty?(diff)
-      Rails.logger.info "[SiteSyncTransferJob push] nothing safe to push"
+      if tidy_live?
+        tidy_live!
+      else
+        Rails.logger.info "[SiteSyncTransferJob push] nothing safe to push"
+      end
       return
     end
 
@@ -293,6 +297,9 @@ class SiteSyncTransferJob < ApplicationJob
       SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: push_diff, on_progress: progress_proc)
+    elsif tidy_live?
+      tidy_live!
+      @pushed = true # live's files changed, so its content is reconciled after
     end
 
     if @pulled
@@ -369,22 +376,17 @@ class SiteSyncTransferJob < ApplicationJob
   # can't confirm rather than guessing — an out-of-date baseline costs a
   # re-push, a wrong one costs the file.
   def write_confirmed_baseline!
-    local = SiteSync::Ledger.current
-    peer  = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
+    peer = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
 
     if peer.nil?
       Rails.logger.warn "[SiteSyncTransferJob #{@kind}] peer manifest unavailable — baseline left as-is"
       return
     end
 
-    confirmed = local.select { |path, _| peer.key?(path) }
-    unconfirmed = local.size - confirmed.size
-    if unconfirmed.positive?
-      Rails.logger.info "[SiteSyncTransferJob #{@kind}] #{unconfirmed} local file(s) not on the peer — " \
-                        "left out of the baseline so they stay a push, not a deletion"
-    end
-
-    SiteSync::Ledger.write_manifest!(confirmed)
+    # One rule for every baseline write — see Ledger.write_confirmed!. It also
+    # leaves out files both sides hold in different versions, which this copy
+    # of the rule used to record as agreed.
+    SiteSync::Ledger.write_confirmed!(peer, context: "#{@kind} baseline")
   rescue => e
     # Never fail a transfer that worked over a baseline refresh.
     Rails.logger.warn "[SiteSyncTransferJob #{@kind}] confirmed baseline skipped: #{e.class} #{e.message}"
@@ -434,6 +436,8 @@ class SiteSyncTransferJob < ApplicationJob
   def reconcile_or_abort!
     peer = SiteSync::Exchange.fetch_peer_manifest
     raise PeerUnreachable if peer.nil?
+
+    @peer_manifest = peer
 
     baseline = SiteSync::Ledger.recorded&.dig("files") || {}
     result = SiteSync::Reconciler.reconcile(
@@ -699,6 +703,25 @@ class SiteSyncTransferJob < ApplicationJob
     nil
   end
 
+  # Live still holds video files the live-video setting keeps on this
+  # computer (SiteSync::LiveVideo), and there's nothing else to send. Every
+  # push carries their removal, but with nothing to push no push runs, so a
+  # site with no other changes would keep them on live indefinitely. Not a
+  # change anyone is asked about: each is a file this computer has, and the
+  # setting is the instruction.
+  def tidy_live?
+    Array(@peer_manifest&.dig("kept_here_on_peer")).any?
+  end
+
+  def tidy_live!
+    count = @peer_manifest["kept_here_on_peer"].size
+    Rails.logger.info "[SiteSyncTransferJob] removing #{count} video file(s) kept on this computer from live"
+    update_step(:pushing_to_live)
+    SiteSync.transport.push_local_to_live!(
+      diff: { modified: [], added: [], deleted: [] }, on_progress: progress_proc, tidy: true
+    )
+  end
+
   def diff_empty?(diff)
     diff[:modified].empty? && diff[:added].empty? && diff[:deleted].empty?
   end
@@ -723,8 +746,11 @@ class SiteSyncTransferJob < ApplicationJob
   # Each call updates the cache so the next admin poll sees fresh
   # numbers.
   def progress_proc
-    @progress_proc ||= ->(completed:, total:) {
+    @progress_proc ||= ->(completed:, total:, bytes_done: nil, bytes_total: nil, current: nil) {
       @progress = { completed: completed, total: total }
+      @progress.merge!(bytes_done: bytes_done, bytes_total: bytes_total) if bytes_total.to_i.positive?
+      # The large file in flight, so a long wait names what it's waiting on.
+      @progress[:current] = current if current
       write_running_status
     }
   end

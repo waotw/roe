@@ -36,6 +36,10 @@ class ResponsiveImageRenderer
 
     source_full_path = File.join(RoeSitePaths::SITE_PATH, source_path.sub(%r{^/}, "")).to_s
 
+    # An animated GIF only animates as the original file: every variant is a
+    # still of its first frame. Serve it as-is, whatever's on disk.
+    return simple_img_tag.html_safe if ImageVariantGenerator.animated?(source_full_path)
+
     # Serving gate. libvips is only needed to *create* variants, never to
     # *serve* them, so we check the files on disk first.
     #

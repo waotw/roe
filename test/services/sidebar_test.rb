@@ -11,7 +11,7 @@ class SidebarTest < ActiveSupport::TestCase
   end
 
   teardown do
-    @original ? File.write(@path, @original) : FileUtils.rm_f(@path)
+    @original ? File.binwrite(@path, @original) : FileUtils.rm_f(@path)
   end
 
   def write_sidebar(scope)

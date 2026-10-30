@@ -307,9 +307,13 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     assert_empty MarkdownDoctor.diagnose(fixed)
   end
 
-  # An unindented line is also how a footnote ends, so it says nothing.
+  # An unindented line is also how a footnote ends, so it isn't a failed
+  # continuation. (Being *below* the notes is its own report —
+  # content_after_footnotes — tested under "footnote placement".)
   test "body text after a footnote is not a failed continuation" do
-    assert_empty MarkdownDoctor.diagnose("T[^1]\n\n[^1]: first\n\nBody text.\n")
+    continuation = %i[under_indented_footnote unindented_footnote_line]
+
+    assert_empty types("T[^1]\n\n[^1]: first\n\nBody text.\n") & continuation
     assert_empty MarkdownDoctor.diagnose("T[^1]\n\n[^1]: first\n\n    second para\n")
   end
 
@@ -344,7 +348,12 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
       File.read(Rails.root.join("test/fixtures/files/markdown_doctor_sample.md")),
     )
 
-    assert_empty MarkdownDoctor::ISSUE_TYPES.keys - issues.map { |i| i[:type] },
+    # Text after the notes can't be shown here: it needs the notes to be the
+    # last thing before it, and the sample ends on an unclosed fence on
+    # purpose. It has its own tests under "footnote placement". The link check
+    # needs a rendered page, which the sample isn't given.
+    expected = MarkdownDoctor::ISSUE_TYPES.keys - %i[content_after_footnotes broken_anchor_link]
+    assert_empty expected - issues.map { |i| i[:type] },
       "add a section to markdown_doctor_sample.md for the rules listed above"
     assert issues.any? { |i| i[:fixable] }, "and something for Fix All to do"
   end
@@ -363,5 +372,159 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
   test "indentation inside a code block is content" do
     assert_empty MarkdownDoctor.diagnose("```\n    ```ruby\n```\n")
     assert_empty MarkdownDoctor.diagnose("```\n1. a\n  1. b\n```\n")
+  end
+
+  # --- footnote placement --------------------------------------------------
+  # kramdown renders every footnote at the end of the page, whatever follows
+  # it in the file. So text written below the notes shows above them, and a
+  # line typed under a note without its indent shows in the body.
+
+  test "text below the last footnote is flagged where it starts" do
+    content = "Body[^1].\n\n[^1]: The note.\n\nStray paragraph.\n\n- stray item\n"
+    issue = MarkdownDoctor.diagnose(content).find { |i| i[:type] == :content_after_footnotes }
+
+    assert issue
+    assert_equal 5, issue[:line]
+    assert issue[:fixable]
+  end
+
+  test "Fix All moves text below the notes above them, unchanged" do
+    content = "Body[^1] and[^2].\n\n[^1]: One.\n\n[^2]: Two.\n\nStray paragraph.\n\n- stray item\n"
+    fixed, applied = MarkdownDoctor.fix(content)
+
+    assert_equal "Body[^1] and[^2].\n\nStray paragraph.\n\n- stray item\n\n[^1]: One.\n\n[^2]: Two.\n", fixed
+    assert_equal [ :content_after_footnotes ], applied.map { |i| i[:type] }
+    assert_equal fixed, MarkdownDoctor.fix(fixed).first, "and running it again changes nothing"
+  end
+
+  test "a note's indented second paragraph isn't text after the notes" do
+    assert_empty MarkdownDoctor.diagnose("Body[^1].\n\n[^1]: First.\n\n    Second paragraph.\n")
+  end
+
+  test "a heading after the notes starts a section on purpose" do
+    assert_empty MarkdownDoctor.diagnose("Body[^1].\n\n[^1]: The note.\n\n## Appendix\n\nText.\n")
+  end
+
+  test "notes written beside the paragraphs that use them are left alone" do
+    assert_empty MarkdownDoctor.diagnose("One[^1].\n\n[^1]: Note one.\n\nTwo[^2].\n\n[^2]: Note two.\n")
+  end
+
+  test "text after the notes is only moved up to the next heading" do
+    content = "Body[^1].\n\n[^1]: The note.\n\nStray.\n\n## Appendix\n\nMore.\n"
+    fixed, = MarkdownDoctor.fix(content)
+
+    assert_equal "Body[^1].\n\nStray.\n\n[^1]: The note.\n\n## Appendix\n\nMore.\n", fixed
+  end
+
+  test "an unclosed fence below the notes is reported but not moved" do
+    content = "Body[^1].\n\n[^1]: The note.\n\n```ruby\nputs 1\n"
+    issue = MarkdownDoctor.diagnose(content).find { |i| i[:type] == :content_after_footnotes }
+
+    assert issue
+    assert_not issue[:fixable], "moved above the notes, the fence would swallow them"
+    assert_equal content, MarkdownDoctor.fix(content).first
+  end
+
+  test "a line straight under a note without its indent is flagged and indented" do
+    content = "Body[^1].\n\n[^1]: The note\ncarries on here.\n"
+    issue = MarkdownDoctor.diagnose(content).find { |i| i[:type] == :unindented_footnote_line }
+
+    assert_equal 4, issue[:line]
+    assert_equal "Body[^1].\n\n[^1]: The note\n    carries on here.\n", MarkdownDoctor.fix(content).first
+  end
+
+  test "a heading straight under a note isn't pulled into it" do
+    types = types("Body[^1].\n\n[^1]: The note.\n## Next section\n")
+
+    assert_not_includes types, :unindented_footnote_line
+  end
+
+  test "front matter doesn't throw the move off" do
+    content = "---\ntitle: x\n---\nBody[^1].\n\n[^1]: The note.\n\nStray.\n"
+    fixed, = MarkdownDoctor.fix(content)
+
+    assert_equal "---\ntitle: x\n---\nBody[^1].\n\nStray.\n\n[^1]: The note.\n", fixed
+  end
+
+  # --- formatting that doesn't close -----------------------------------------
+  # Measured against the renderer: ==highlight== can't cross a line break (it's
+  # matched a line at a time), while **bold**, _em_ and ~~strike~~ can. None of
+  # them survives a blank line, which ends the paragraph.
+
+  test "a highlight that closes on a later line is flagged at its opening" do
+    issues = MarkdownDoctor.diagnose("Intro.\n\nSome ==marked\ntext== here.\n")
+
+    assert_equal [ :marker_across_lines ], issues.map { |i| i[:type] }
+    assert_equal 3, issues.first[:line]
+    assert_not issues.first[:fixable], "where it was meant to close is the writer's call"
+  end
+
+  test "bold, strike and highlight that never close in their paragraph are flagged" do
+    assert_equal [ 1, 3 ], MarkdownDoctor.diagnose("Some **bold\n\ntext** here.\n").map { |i| i[:line] }
+    assert_includes types("Some ~~struck text here.\n"), :marker_across_lines
+    assert_includes types("Some ==marked text here.\n"), :marker_across_lines
+  end
+
+  test "formatting that renders fine says nothing" do
+    [
+      "Some **bold\ntext** here.\n",          # bold can cross a line break
+      "A ==marked== word and **bold** one.\n",
+      "If a == b and 2 ** 3, then.\n",        # spaced both sides: not a marker
+      "Title\n=====\n\nText.\n",              # setext underline
+      "Some ***both*** here.\n",
+      "Use `a==b` and `**` here.\n",          # in code
+      "Literal \\*\\* and \\=\\= here.\n",    # escaped
+      "<a href=\"?q==x\">x</a>\n",            # an attribute
+      "snake__case__name here.\n",
+      "```\n**open\n```\n",                   # in a code block
+      "- **one** item\n- two **bold**\n"
+    ].each do |content|
+      assert_not_includes types(content), :marker_across_lines, content.inspect
+    end
+  end
+
+  test "each list item is its own paragraph" do
+    assert_includes types("- **one\n- two**\n"), :marker_across_lines
+  end
+
+  # --- in-page links ---------------------------------------------------------
+  # Checked against the ids of the rendered page, which the caller passes in.
+  # Without them (the CLI, which doesn't render) the check is skipped.
+
+  test "a link to an id that's on the page says nothing" do
+    assert_empty MarkdownDoctor.diagnose("See [setup](#setup).\n", page_ids: %w[setup])
+  end
+
+  test "a link to an id that isn't on the page is flagged, with the likely one" do
+    issue = MarkdownDoctor.diagnose("See [x](#just-text).\n", page_ids: %w[aside just-text-example post-link])
+                          .find { |i| i[:type] == :broken_anchor_link }
+
+    assert_equal 1, issue[:line]
+    assert_includes issue[:message], "#just-text-example"
+    assert_not issue[:fixable]
+  end
+
+  test "no suggestion when nothing is close" do
+    issue = MarkdownDoctor.diagnose("[x](#zzzzzz)\n", page_ids: %w[intro setup])
+                          .find { |i| i[:type] == :broken_anchor_link }
+
+    assert_not_includes issue[:message], "did you mean"
+  end
+
+  test "html links, encoded anchors and links to other pages" do
+    assert_includes types_with_ids("<a href=\"#nope\">x</a>\n", %w[intro]), :broken_anchor_link
+    assert_empty types_with_ids("[x](#caf%C3%A9)\n", %w[café])
+    assert_empty types_with_ids("[x](/about#team)\n", %w[intro]), "only this page is rendered"
+    assert_empty types_with_ids("Use `[x](#nope)` here.\n", %w[intro]), "in code it's an example"
+  end
+
+  test "without page ids the link check is skipped" do
+    assert_not_includes types("[x](#nope)\n"), :broken_anchor_link
+  end
+
+  private
+
+  def types_with_ids(content, ids)
+    MarkdownDoctor.diagnose(content, page_ids: ids).map { |i| i[:type] }
   end
 end

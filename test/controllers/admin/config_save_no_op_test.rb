@@ -14,7 +14,7 @@ class ConfigSaveNoOpTest < ActionDispatch::IntegrationTest
 
   teardown do
     if @original
-      File.write(@path, @original)
+      File.binwrite(@path, @original)
     else
       FileUtils.rm_f(@path)
     end

@@ -20,6 +20,9 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   test "test_connection succeeds with valid token" do
     response = mock("response")
     response.stubs(:code).returns("200")
+    # The body is read on success now: it carries DeliveryType, which decides
+    # whether a test send is actually delivered or only recorded in Activity.
+    response.stubs(:body).returns('{"Name": "Test Server", "DeliveryType": "Live"}')
 
     http = mock("http")
     http.expects(:use_ssl=).with(true)
@@ -30,6 +33,8 @@ class PostmarkServiceTest < ActiveSupport::TestCase
     result = PostmarkService.test_connection
     assert result[:success]
     assert_equal "Connection successful", result[:message]
+    assert_equal "Live", result.dig(:server, "DeliveryType"),
+                 "the server details are kept so a sandbox send isn't described as delivered"
   end
 
   test "test_connection fails with invalid token" do
@@ -100,10 +105,7 @@ class PostmarkServiceTest < ActiveSupport::TestCase
   end
 
   test "send_transactional_email uses site config for from address" do
-    SiteConfig.find_by(file_path: "site/system/global/site.yml")&.update!(
-      config: { "author_email" => "author@test.com", "author" => "Test Author" }
-    )
-    SiteConfig.reload!("site")
+    with_site_config("author_email" => "author@test.com", "author" => "Test Author")
 
     response = mock("response")
     response.stubs(:code).returns("200")
@@ -111,7 +113,9 @@ class PostmarkServiceTest < ActiveSupport::TestCase
 
     http = mock("http")
     http.expects(:use_ssl=).with(true)
-    http.expects(:request).returns(response)
+    http.expects(:request).with do |request|
+      JSON.parse(request.body)["From"] == "Test Author <author@test.com>"
+    end.returns(response)
 
     Net::HTTP.expects(:new).returns(http)
 
@@ -123,29 +127,23 @@ class PostmarkServiceTest < ActiveSupport::TestCase
     )
   end
 
-  test "send_transactional_email falls back to defaults when site config not set" do
-    SiteConfig.find_by(file_path: "site/system/global/site.yml")&.update!(config: {})
-    SiteConfig.reload!("site")
+  test "send_transactional_email refuses to send when no author email is set" do
+    # Postmark rejects any From it hasn't verified, so a stand-in address
+    # can't rescue a send — it only replaces a clear error with a confusing
+    # one. Refusing, and naming the setting, is the useful answer.
+    with_site_config({})
 
-    response = mock("response")
-    response.stubs(:code).returns("200")
-    response.stubs(:body).returns('{"MessageID": "msg-1"}')
+    Net::HTTP.expects(:new).never
 
-    http = mock("http")
-    http.expects(:use_ssl=).with(true)
-    http.expects(:request).with do |request|
-      body = JSON.parse(request.body)
-      body["From"] == "Newsletter <noreply@example.com>"
-    end.returns(response)
-
-    Net::HTTP.expects(:new).returns(http)
-
-    PostmarkService.send_transactional_email(
+    result = PostmarkService.send_transactional_email(
       to_email: "user@example.com",
       to_name: "Test User",
       subject: "Test",
       html_content: "<p>Hello</p>"
     )
+
+    assert_not result[:success]
+    assert_equal SiteSender::MISSING, result[:error]
   end
 
   test "send_transactional_email strips HTML for text body" do
@@ -415,5 +413,69 @@ class PostmarkServiceTest < ActiveSupport::TestCase
       subject: "Test",
       html_content: "<p>Hello</p>"
     )
+  end
+
+  # ── Webhook lookup + on-demand verification (POST /webhooks/{id}/verify) ──
+
+  # Route "METHOD /path" (querystring stripped) to a canned [code, body] so one
+  # stubbed http answers every call the method makes across both streams.
+  def stub_router(routes)
+    http = mock("http")
+    http.stubs(:use_ssl=)
+    http.instance_variable_set(:@routes, routes)
+    def http.request(req)
+      code, body = @routes["#{req.method} #{req.path.split('?').first}"] || [ "404", "{}" ]
+      r = Object.new
+      r.define_singleton_method(:code) { code }
+      r.define_singleton_method(:body) { body }
+      r
+    end
+    Net::HTTP.stubs(:new).returns(http)
+    http
+  end
+
+  test "webhook_for_url? is true when a webhook matches the URL" do
+    url = "https://acme.com/webhooks/postmark/tok"
+    stub_router("GET /webhooks" => [ "200", { "Webhooks" => [ { "ID" => 5, "Url" => url } ] }.to_json ])
+    assert PostmarkService.webhook_for_url?("srv", url)
+  end
+
+  test "webhook_for_url? is false when nothing matches" do
+    stub_router("GET /webhooks" => [ "200", { "Webhooks" => [] }.to_json ])
+    assert_not PostmarkService.webhook_for_url?("srv", "https://acme.com/webhooks/postmark/tok")
+  end
+
+  test "verify_webhooks passes when every registered webhook verifies" do
+    url = "https://acme.com/webhooks/postmark/tok"
+    stub_router(
+      "GET /webhooks"           => [ "200", { "Webhooks" => [ { "ID" => 5, "Url" => url } ] }.to_json ],
+      "POST /webhooks/5/verify" => [ "200", { "Success" => true, "Message" => "3/3 triggers verified" }.to_json ]
+    )
+    result = PostmarkService.verify_webhooks("srv", url)
+    assert result[:ok]
+    assert_equal 1, result[:results].size
+    assert result[:results].first[:success]
+  end
+
+  test "verify_webhooks fails when a webhook does not verify" do
+    url = "https://acme.com/webhooks/postmark/tok"
+    stub_router(
+      "GET /webhooks"           => [ "200", { "Webhooks" => [ { "ID" => 5, "Url" => url } ] }.to_json ],
+      "POST /webhooks/5/verify" => [ "200", { "Success" => false, "Message" => "2/3 triggers verified" }.to_json ]
+    )
+    result = PostmarkService.verify_webhooks("srv", url)
+    assert_not result[:ok]
+  end
+
+  test "verify_webhooks reports when no webhook is registered yet" do
+    stub_router("GET /webhooks" => [ "200", { "Webhooks" => [] }.to_json ])
+    result = PostmarkService.verify_webhooks("srv", "https://acme.com/webhooks/postmark/tok")
+    assert_not result[:ok]
+    assert_match(/no webhook/i, result[:error])
+  end
+
+  test "verify_webhooks needs a token and URL" do
+    assert_not PostmarkService.verify_webhooks("", "https://x")[:ok]
+    assert_not PostmarkService.verify_webhooks("srv", "")[:ok]
   end
 end

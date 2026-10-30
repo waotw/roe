@@ -16,9 +16,10 @@ else
   false
 end
 
-puts "🔧 Content management initializer: #{should_run ? 'ENABLED' : 'DISABLED'}"
-puts "   Console: #{is_console}, Runner: #{is_runner}, Rake: #{is_rake}"
-puts "   PROGRAM_NAME: #{$PROGRAM_NAME}"
+Rails.logger.debug do
+  "Content management initializer: #{should_run ? 'enabled' : 'disabled'} " \
+    "(console: #{is_console}, runner: #{is_runner}, rake: #{is_rake}, program: #{$PROGRAM_NAME})"
+end
 
 if should_run
   Rails.application.config.after_initialize do
@@ -50,6 +51,10 @@ if should_run
         # writing the stock header over their content. (one-time, idempotent)
         LayoutFiles.migrate_navigation_to_header!
         ConfigGenerator.generate_all
+        # Reinstall missing files for enabled features (skip-if-exists), so a
+        # template added in a newer Roe version — e.g. emails/invite.md — lands
+        # on sites that enabled the feature before it shipped. Never overwrites.
+        ConfigGenerator.ensure_enabled_feature_files
         PageGenerator.generate_defaults
         SiteJavascript.seed! # copy shipped JS into site/javascript so the site is self-contained
         ContentSync.sync_all
@@ -62,18 +67,30 @@ if should_run
 
         # Sync Stripe product/price if payments are enabled in members.yml
         # but price_id is missing from the DB — happens when the DB is reset,
-        # after an update wipe, or when members.yml is edited directly.
-        members_yml = SiteConfig::FEATURES_PATH.join("members.yml")
-        members_config = File.exist?(members_yml) ? (YAML.load_file(members_yml) rescue nil) : nil
-        payments_config = members_config&.dig("payments")
-        if payments_config&.dig("enabled") && StripeConfig.current.connected? && StripeConfig.current.price_id.blank?
-          puts "\n💳 Stripe price_id missing — syncing product/price from members.yml..."
-          manager = StripeProductManager.new
-          if manager.sync_from_config(payments_config)
-            puts "✓ Stripe product/price synced (price_id: #{StripeConfig.current.price_id})"
-          else
-            puts "⚠️  Stripe sync failed: #{manager.errors.join(', ')}"
+        # after an update wipe, or when members.yml is edited directly. None of
+        # those go through the admin save/mode-switch paths that otherwise
+        # resync, so this boot check is the only thing that heals them.
+        #
+        # Isolated in its own rescue on purpose: a Stripe outage or config
+        # surprise here must NOT abort the rest of boot. It previously did,
+        # taking ContentWatcher.start (below) down with it, so file-watching
+        # silently never started once payments were enabled.
+        begin
+          members_yml = SiteConfig::FEATURES_PATH.join("members.yml")
+          members_config = File.exist?(members_yml) ? (SiteFile.read_yaml(members_yml) rescue nil) : nil
+          payments_config = members_config&.dig("payments")
+          if payments_config&.dig("enabled") && StripeConfig.current.connected? && StripeConfig.current.current_price_id.blank?
+            puts "\n💳 Stripe price_id missing — syncing product/price from members.yml..."
+            manager = StripeProductManager.new
+            if manager.sync_from_config(payments_config)
+              puts "✓ Stripe product/price synced (price_id: #{StripeConfig.current.current_price_id})"
+            else
+              puts "⚠️  Stripe sync failed: #{manager.errors.join(', ')}"
+            end
           end
+        rescue => e
+          Rails.logger.error "Boot Stripe price sync failed: #{e.class} #{e.message}"
+          puts "⚠️  Boot Stripe price sync skipped: #{e.message}"
         end
 
         # Start watcher in BOTH dev and production (single mode = safe)

@@ -2,5 +2,7 @@ post-link:
   default_image: ''
   default_style: small
   default_link_text: Read full story →
+  default_show_subtitle: ''
+  default_show_excerpt: ''
 pullquote:
   default_position: center

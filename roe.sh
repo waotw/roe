@@ -21,6 +21,86 @@ else
     SITE_DIR="$ROE_ROOT/site"
 fi
 
+# ── Install registry ──────────────────────────────────────────────────────────
+#
+# Several Roe installs can run on one machine at once. Each one registers
+# itself in ~/.roe/installs/<name>.conf so the global `roe` command can
+# find, start and stop them, and so each install knows its own hostname
+# and port. The registry lives OUTSIDE the install on purpose: the in-app
+# updater replaces current/ wholesale, and nothing under an install
+# survives a delete.
+#
+# Each .conf is plain KEY=value, one per line, never sourced (paths may
+# contain spaces or quotes; we read them with sed, not eval):
+#
+#   NAME=the-briefcase
+#   ROOT=/Users/ann/Sites/The Briefcase
+#   HOST=the-briefcase.roe
+#   PORT=3001
+#
+# NAME is the folder name slugified (see slugify), which is also what the
+# Site Sync handshake already uses as an install's identity. HOST is
+# derived from it once, at registration, and stored — never recomputed —
+# so renaming the rules later can't silently move a site.
+#
+# Why a hostname per install: browsers keep cookies per host, not per
+# port, so two installs on localhost:3000 and localhost:3001 share one
+# cookie jar and sign each other out. <name>.roe gives each its own.
+ROE_HOME="${ROE_HOME:-$HOME/.roe}"
+ROE_REGISTRY_DIR="$ROE_HOME/installs"
+ROE_BIN_DIR="$ROE_HOME/bin"
+ROE_HOST_SUFFIX="roe"
+
+# These are filled by load_registry_entry when this install is registered.
+ROE_NAME=""
+ROE_HOST=""
+ROE_PORT=""
+
+# "The Briefcase" → "the-briefcase". Lowercase, every run of anything
+# that isn't a letter or digit becomes one hyphen, no leading/trailing
+# hyphens. Safe as a hostname label and a filename.
+slugify() {
+    printf '%s' "$1" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+install_slug() { slugify "$(basename "$ROE_ROOT")"; }
+
+# Read one KEY from a .conf. Only the first match, and only the part
+# after the first "=", so a path containing "=" survives intact.
+_conf_get() {
+    local file="$1" key="$2"
+    sed -n "s/^${key}=//p" "$file" 2>/dev/null | head -1
+}
+
+# Path of the .conf whose ROOT is this install, or nothing.
+registry_file_for_root() {
+    local f
+    for f in "$ROE_REGISTRY_DIR"/*.conf; do
+        [ -f "$f" ] || continue
+        if [ "$(_conf_get "$f" ROOT)" = "$ROE_ROOT" ]; then
+            echo "$f"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Load this install's registry entry into ROE_NAME/ROE_HOST/ROE_PORT.
+# Returns 1 (and leaves them empty) when the install isn't registered —
+# every caller treats that as "single-install mode", the old behaviour.
+load_registry_entry() {
+    local f
+    f="$(registry_file_for_root)" || return 1
+    ROE_NAME="$(_conf_get "$f" NAME)"
+    ROE_HOST="$(_conf_get "$f" HOST)"
+    ROE_PORT="$(_conf_get "$f" PORT)"
+    [ -n "$ROE_NAME" ]
+}
+
+is_registered() { load_registry_entry; }
+
 # Put APP_DIR's pinned Ruby (current/.ruby-version) on PATH for THIS
 # script process and every child it spawns — chdir-proof and, crucially,
 # non-interactive-safe.
@@ -99,6 +179,66 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# Roe's brand red, #c64320, and the lighter orange #e47e5d it pairs with.
+# Need a 24-bit-colour terminal; otherwise the closest of the 256
+# standard colours. Kept in step with bin/roe, bin/setup and
+# bin/bootstrap, which define the same pair.
+case "${COLORTERM:-}" in
+    truecolor|24bit)
+        ROE_RED='\033[38;2;198;67;32m'
+        ROE_ORANGE='\033[38;2;228;126;93m'
+        ;;
+    *)
+        ROE_RED='\033[38;5;166m'
+        ROE_ORANGE='\033[38;5;173m'
+        ;;
+esac
+
+# The install flow (check / install / setup) is dressed in the brand
+# colours: everything that would be blue or cyan becomes red, amber
+# becomes orange. Green stays green — it means success. Other commands
+# keep the plain terminal palette.
+use_brand_colors() {
+    BLUE="$ROE_RED"
+    CYAN="$ROE_RED"
+    YELLOW="$ROE_ORANGE"
+    export ROE_BRAND=1
+}
+
+# The wordmark: solid blocks in red, shading in orange. Same art as
+# bin/roe. Each line is coloured as it goes, so the art can be edited
+# as plain text.
+banner() {
+    local line
+    while IFS= read -r line; do
+        line="${line//█/${ROE_RED}█}"
+        line="${line//░/${ROE_ORANGE}░}"
+        echo -e "${line}${NC}"
+    done <<'EOF'
+███████████
+░░███░░░░░███
+ ░███    ░███   ██████   ██████
+ ░██████████   ███░░███ ███░░███
+ ░███░░░░░███ ░███ ░███░███████
+ ░███    ░███ ░███ ░███░███░░░
+ █████   █████░░██████ ░░██████
+░░░░░   ░░░░░  ░░░░░░   ░░░░░░
+EOF
+}
+
+# A section heading in a double-line box: red border, orange text.
+#   ╔════════════════════╗
+#   ║   Setting up Roe   ║
+#   ╚════════════════════╝
+brand_box() {
+    local title="$1" width rule="" i
+    width=$(( ${#title} + 6 ))
+    for ((i = 0; i < width; i++)); do rule+="═"; done
+    echo -e "${ROE_RED}╔${rule}╗${NC}"
+    echo -e "${ROE_RED}║${NC}   ${ROE_ORANGE}${BOLD}${title}${NC}   ${ROE_RED}║${NC}"
+    echo -e "${ROE_RED}╚${rule}╝${NC}"
+}
+
 # ── Install logging ───────────────────────────────────────────────────────────
 # check/setup tee their progress to a temp log so a failed run leaves a
 # paste-able trace for support. On a CLEAN finish the log is deleted
@@ -144,6 +284,7 @@ _on_exit() {
 trap _on_exit EXIT
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; _logfile_append "[INFO] $1"; }
+log_next()    { echo -e "${BLUE}[→]${NC} $1"; _logfile_append "[NEXT] $1"; }
 log_success() { echo -e "${GREEN}[✓]${NC} $1"; _logfile_append "[OK]   $1"; }
 log_warning() { echo -e "${YELLOW}[!]${NC} $1"; _logfile_append "[WARN] $1"; }
 log_error()   { echo -e "${RED}[✗]${NC} $1"; _logfile_append "[FAIL] $1"; }
@@ -213,10 +354,10 @@ require_linux_filesystem() {
     echo ""
     echo "  Move Roe onto the Linux side, where it belongs:"
     echo ""
-    echo "      mv \"$ROE_ROOT\" ~/roe && cd ~/roe && ./roe.sh check"
+    echo "  mv \"$ROE_ROOT\" ~/roe && cd ~/roe && ./roe.sh check"
     echo ""
     echo "  You can still open the files from Windows:"
-    echo "      \\\\wsl\$\\$(_wsl_distro)\\home\\$USER\\roe"
+    echo "  \\\\wsl\$\\$(_wsl_distro)\\home\\$USER\\roe"
     echo ""
     return 1
 }
@@ -265,9 +406,9 @@ ensure_macos_build_tools() {
     echo -e "  ${DIM}This will take around ~5–10 min depending on your download speed…${NC}"
     echo ""
     breathing_room
-    read -rp "  [y] install Command Line Tools   [q] quit Roe installation: " REPLY
+    read -rp "  Install the Command Line Tools now? [Y/n]: " REPLY
     case "${REPLY:-y}" in
-        [Qq]*)
+        [NnQq]*)
             echo -e "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
             exit 0
             ;;
@@ -358,7 +499,7 @@ ensure_linux_build_tools() {
 
     if [ -n "$cmd" ]; then
         echo -e "  1. Copy this command:"
-        echo -e "     ${CYAN}${cmd}${NC}"
+        echo -e "  ${CYAN}${cmd}${NC}"
         echo -e "  2. Run it in another terminal (it'll ask for your password — ${BOLD}sudo${NC})"
         echo -e "  3. Come back here and press [c] to continue"
     else
@@ -415,13 +556,13 @@ source_profile() {
             # shellcheck disable=SC1091
             [ -f "$HOME/.zprofile" ] && source "$HOME/.zprofile" 2>/dev/null || true
             # shellcheck disable=SC1091
-            [ -f "$HOME/.zshrc" ]    && source "$HOME/.zshrc"    2>/dev/null || true
+            [ -f "$HOME/.zshrc" ]    && source "$HOME/.zshrc"  2>/dev/null || true
             ;;
         bash)
             # shellcheck disable=SC1091
             [ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" 2>/dev/null || true
             # shellcheck disable=SC1091
-            [ -f "$HOME/.bashrc" ]       && source "$HOME/.bashrc"       2>/dev/null || true
+            [ -f "$HOME/.bashrc" ]       && source "$HOME/.bashrc"  2>/dev/null || true
             ;;
         *)
             # shellcheck disable=SC1091
@@ -464,7 +605,7 @@ install_prompt() {
     [ -n "$note" ] && echo -e "  ${YELLOW}Note:${NC} ${note}"
     echo ""
     echo -e "  1. Copy this command:"
-    echo -e "     ${CYAN}${cmd}${NC}"
+    echo -e "  ${CYAN}${cmd}${NC}"
     echo ""
     echo -e "  2. Open a new terminal window - cmd-t"
     echo -e "  3. Paste and press Enter — wait for it to finish"
@@ -507,14 +648,14 @@ ensure_installed() {
         echo ""
         log_warning "${description} not detected on PATH yet"
         echo "  Common causes:"
-        echo "    • The install in the other terminal hasn't finished"
-        echo "    • PATH changes from the install haven't reached this terminal"
-        echo "    • Newly compiled rbenv shims need a rehash"
+        echo "  • The install in the other terminal hasn't finished"
+        echo "  • PATH changes from the install haven't reached this terminal"
+        echo "  • Newly compiled rbenv shims need a rehash"
         echo ""
         echo "  Choose:"
-        echo "    [r] re-source shell + check again  (default — try this first)"
-        echo "    [i] show the install command again"
-        echo "    [q] quit setup — re-run ./roe.sh check later"
+        echo "  [r] re-source shell + check again  (default — try this first)"
+        echo "  [i] show the install command again"
+        echo "  [q] quit setup — re-run ./roe.sh check later"
         echo ""
         breathing_room
         read -rp "  Choice [R/i/q]: " REPLY
@@ -621,12 +762,29 @@ _rc_candidate_files() {
     esac
 }
 
-# The single rc file we WRITE `mise activate` into — the interactive
-# rc, ZDOTDIR-aware for zsh.
+# The single rc file we WRITE interactive setup lines into (mise activate,
+# PATH, completion) — ZDOTDIR-aware for zsh.
+#
+# For zsh the target MUST be the file zsh actually loads at startup, which is
+# $ZDOTDIR/.zshrc where ZDOTDIR is whatever ~/.zshenv (or /etc/zshenv) sets —
+# NOT a ZDOTDIR a later-running .zshrc reassigns. We can't trust the inherited
+# $ZDOTDIR: roe.sh is invoked from inside the user's shell, so a dotfile setup
+# that does `export ZDOTDIR=$HOME/.zsh` in ~/.zshrc (without sourcing
+# $ZDOTDIR/.zshrc) would hand us ~/.zsh/.zshrc — a file the interactive shell
+# never reads, so the line we write there silently does nothing (this is
+# exactly how tab completion stopped registering). Ask a fresh zsh with the
+# inherited value cleared, so it reports the real startup ZDOTDIR; fall back to
+# the inherited value, then $HOME, if zsh isn't runnable.
 _mise_write_target() {
     local shell_name; shell_name="$(basename "${SHELL:-}")"
     case "$shell_name" in
-        zsh)  echo "${ZDOTDIR:-$HOME}/.zshrc" ;;
+        zsh)
+            local zdot=""
+            command -v zsh >/dev/null 2>&1 && \
+                zdot="$(env -u ZDOTDIR zsh -c 'print -r -- "${ZDOTDIR:-$HOME}"' 2>/dev/null)"
+            [ -n "$zdot" ] || zdot="${ZDOTDIR:-$HOME}"
+            echo "$zdot/.zshrc"
+            ;;
         bash) echo "$HOME/.bash_profile" ;;
         *)    return 1 ;;
     esac
@@ -682,7 +840,7 @@ _warn_other_ruby_managers() {
     if command_exists rvm  || [ -d "$HOME/.rvm" ];  then found="$found rvm";  fi
     if command_exists asdf || [ -d "$HOME/.asdf" ]; then found="$found asdf"; fi
     if [ -d "$HOME/.rubies" ] || [ -f /usr/local/share/chruby/chruby.sh ]; then found="$found chruby"; fi
-    found="$(echo "$found" | xargs)"   # trim whitespace
+    found="$(echo "$found" | xargs)"  # trim whitespace
     [ -z "$found" ] && return 0
 
     echo ""
@@ -707,8 +865,8 @@ handle_ruby_manager_conflicts() {
         echo -e "  the lines are prefixed with a note, never deleted."
         echo ""
         echo "  How would you like to proceed?"
-        echo "    [1] Let Roe handle it      (recommended)"
-        echo "    [2] I'll handle it myself  (quit install for now)"
+        echo "  [1] Let Roe handle it      (recommended)"
+        echo "  [2] I'll handle it myself  (quit install for now)"
         echo ""
         breathing_room
         read -rp "  Choose [1/2]: " REPLY
@@ -869,6 +1027,28 @@ check_ruby() {
 check_git()     { command_exists git; }
 check_sqlite()  { command_exists sqlite3; }
 check_libvips() { command_exists vips; }
+
+# Finds a program the way Roe's Images & Video page does
+# (ManagedTools::Platform.search_dirs): Roe's own download folder first,
+# then PATH, the usual bin folders, then mise's shims. A plain
+# `command -v` would miss the download in ~/.roe/tools, which isn't on PATH.
+_find_tool_program() {
+    local tool="$1" name="$2" dir
+    local tools_dir="${ROE_TOOLS_DIR:-${ROE_HOME:-$HOME/.roe}/tools}"
+    local mise_shims="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
+    for dir in "$tools_dir/$tool"/*/; do
+        [ -x "${dir}${name}" ] && [ -f "${dir}${name}" ] && return 0
+    done
+    command_exists "$name" && return 0
+    for dir in /opt/homebrew/bin /usr/local/bin /usr/bin "$mise_shims"; do
+        [ -x "$dir/$name" ] && [ -f "$dir/$name" ] && return 0
+    done
+    return 1
+}
+
+# Video needs both: ffmpeg to encode, ffprobe to read a video's size and
+# length. A standalone ffmpeg download sometimes comes without ffprobe.
+check_ffmpeg()  { _find_tool_program ffmpeg ffmpeg && _find_tool_program ffmpeg ffprobe; }
 check_bundler() { cd "$APP_DIR" && command_exists bundle; }
 
 # ── Usage ─────────────────────────────────────────────────────────────────────
@@ -879,23 +1059,29 @@ usage() {
     echo "Usage: roe.sh {command}"
     echo ""
     echo -e "${BOLD}Setup Commands:${NC}"
+    echo "  install       Check requirements, then install Roe (same as check)"
     echo "  check         Check system requirements and guide installation"
     echo "  setup         Run the full Roe setup (runs check first)"
     echo "  setup-mise    Add 'mise activate' to your shell rc file (zsh / bash)"
     echo "  setup-rbenv   Add 'rbenv init' to your shell rc file (zsh / bash)"
     echo ""
     echo -e "${BOLD}Server Commands:${NC}"
-    echo "  start     Start the Roe server"
+    echo "  start     Start the Roe server   (--daemon to run in the background)"
     echo "  stop      Stop the Roe server (Rails + Tailwind watcher)"
     echo "  restart   Restart the Roe server"
     echo "  console   Open Rails console"
     echo "  status    Show server status and requirements"
     echo ""
+    echo -e "${BOLD}Running several sites:${NC}"
+    echo "  register    Give this install a name, hostname and port, and install the"
+    echo "     global 'roe' command (roe list | start <name> | stop <name>)"
+    echo "  unregister  Remove this install from the registry"
+    echo ""
     echo -e "${BOLD}Maintenance:${NC}"
     echo "  update    Check for Roe updates"
     echo ""
     echo "Examples:"
-    echo "  ./roe.sh check     # First time? Start here!"
+    echo "  ./roe.sh install   # First time? Start here!"
     echo "  ./roe.sh setup     # Install Roe after requirements are met"
     echo "  ./roe.sh start     # Start the server"
     echo ""
@@ -934,13 +1120,21 @@ print_requirements_summary() {
 
 cmd_check() {
     start_install_log check
-    echo -e "${BOLD}"
-    echo "╔════════════════════════════════════════╗"
-    echo "║        Roe — Requirements Check        ║"
-    echo "╚════════════════════════════════════════╝"
-    echo -e "${NC}"
-    echo "I'll check your system for required dependencies."
-    echo "If anything is missing, I'll guide you through installing it."
+    use_brand_colors
+    # Start on a clean screen so the logo and the intro below it are all in
+    # view, not scrolled off the top of a small window. Then a short pause
+    # after the logo, so it lands before the checks start printing.
+    if [ -t 1 ]; then
+        printf '\033[H\033[2J'
+    fi
+    echo ""
+    banner
+    echo ""
+    [ -t 1 ] && sleep 0.5
+    brand_box "Requirements Check"
+    log_step "Checking your system for required dependencies."
+    echo ""
+    echo "If anything is missing, this program will help you install it."
     echo ""
     echo -e "  OS detected: ${BOLD}${OS}${NC}"
     echo ""
@@ -966,7 +1160,7 @@ cmd_check() {
     # ── Ruby ──────────────────────────────────────────────────────────────────
     if ! check_ruby; then
         log_step "Installing Ruby ${required_ruby} (Required)"
-        log_error "Ruby ${required_ruby}+ is not installedu"
+        log_error "Ruby ${required_ruby}+ is not installed"
         all_good=false
 
         # Two install paths. mise is the default for fresh installs:
@@ -992,9 +1186,9 @@ cmd_check() {
             echo -e "  I'll install mise (a small version manager) and Ruby ${required_ruby} for you — no extra steps."
             echo ""
             breathing_room
-            read -rp "  Install now? [y/q]: " REPLY
+            read -rp "  Install now? [Y/n]: " REPLY
             case "${REPLY:-y}" in
-                [Qq]*)
+                [NnQq]*)
                     echo "  No problem — run ${CYAN}./roe.sh check${NC} whenever you're ready."
                     exit 0
                     ;;
@@ -1007,7 +1201,7 @@ cmd_check() {
                 if ! install_mise; then
                     log_error "Couldn't install mise automatically."
                     echo "  Install it manually, then re-run ./roe.sh check:"
-                    echo "    ${CYAN}curl https://mise.run | sh${NC}"
+                    echo "  ${CYAN}curl https://mise.run | sh${NC}"
                     exit 1
                 fi
                 log_success "mise installed"
@@ -1075,25 +1269,45 @@ cmd_check() {
     # flow, not here.
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    echo ""
     echo -e "${BOLD}═══════════════════════════════════════════${NC}"
     echo ""
 
     if $all_good; then
-        log_success "Ready — Ruby and Git are in place."
+        log_success "Ready — Ruby and Git are installed."
         echo ""
-        echo -e "${BOLD}Next step:${NC} Run the Roe setup"
-        echo -e "   ${CYAN}./roe.sh setup${NC}"
+        brand_box "Roe Setup"
+        log_step "Run the Roe setup"
+        echo -e ""
+        echo -e "This will:"
+        echo -e "• create your site/ folder"
+        echo -e "• create all the necessary files and folders"
+        echo -e "• forge your encryption keys"
+        echo -e "• set up your database"
+        echo -e "• create your admin"
+        echo -e ""
+        echo -e "    You can do this at any time with this command: ${CYAN}./roe.sh setup${NC}"
+        echo -e "    ${DIM}It will not overwrite any existing files or folders you've created${NC}"
         echo ""
         breathing_room
-        read -rp "Run setup now? [y/n]: " REPLY
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        read -rp "Run setup now? [Y/n]: " REPLY
+        if [[ ! $REPLY =~ ^[Nn] ]]; then
             # cmd_setup reuses this log (nesting guard) and marks the
             # whole run OK only once the app boots cleanly.
             cmd_setup
         else
-            # Check-only success — deps are in place, user deferred setup.
+            # Deps are in place and the user skipped setup — usually
+            # because Roe is already installed and they came back for
+            # something else, like resetting the admin password. So
+            # carry on with the rest of the flow (admin user, then
+            # verify, register and start) minus the setup itself. Only
+            # possible once the bundle exists; on a fresh install there
+            # is nothing to continue into.
             mark_install_ok
+            if (cd "$APP_DIR" && bundle check >/dev/null 2>&1); then
+                echo ""
+                (cd "$APP_DIR" && "$APP_DIR/bin/bootstrap")
+                verify_and_finish
+            fi
         fi
     else
         log_error "Some required dependencies are missing"
@@ -1107,6 +1321,7 @@ cmd_check() {
 
 cmd_setup() {
     start_install_log setup
+    use_brand_colors
     log_step "Checking Requirements"
 
     local all_good=true
@@ -1122,12 +1337,21 @@ cmd_setup() {
 
     log_success "All requirements met!"
     echo ""
-    log_step "Running Roe Setup"
+    brand_box "Setting up Roe"
     echo ""
     cd "$APP_DIR"
-    "$APP_DIR/bin/setup" || { log_error "bin/setup failed — see the log path printed below."; exit 1; }
+    # ROE_SH_SETUP tells bin/setup to hand control back here when it is
+    # done, rather than starting the server itself, so verification and
+    # the registration offer below still run.
+    ROE_SH_SETUP=1 "$APP_DIR/bin/setup" || { log_error "bin/setup failed — see the log path printed below."; exit 1; }
 
-    # ── Final verification ─────────────────────────────────────────
+    verify_and_finish
+}
+
+# The tail of the install flow, shared by a full setup and by a re-run
+# that skipped it: confirm the app boots, then offer to register and
+# start the site.
+verify_and_finish() {
     # Confirm the app actually boots (gems load, DB connects, config
     # parses) rather than just assuming setup worked. A non-interactive
     # `runner` is a faithful proxy for "the server will start" without
@@ -1135,16 +1359,92 @@ cmd_setup() {
     log_step "Verifying installation"
     if "$APP_DIR/bin/rails" runner 'print "ok"' 2>/dev/null | grep -q "ok"; then
         log_success "Roe booted cleanly"
-        echo ""
-        echo -e "  ${BOLD}You're ready.${NC} Start Roe with:"
-        echo -e "     ${CYAN}./roe.sh start${NC}"
-        echo -e "  Then open ${CYAN}http://localhost:3000${NC}"
         mark_install_ok
+        offer_registration_after_setup
     else
         log_error "Setup ran, but the app failed to boot."
         echo -e "  Try ${CYAN}./roe.sh start${NC} to see the full error, or check the log path below."
         exit 1
     fi
+}
+
+# The last step of setup: register the site and install the global `roe`
+# command, then offer to start it. Not optional on a fresh install — the
+# point is that every new install has `roe`, so the docs can rely on it.
+# Existing installs are asked once by offer_registration_once instead,
+# and `./roe.sh register` by hand still does the interactive version.
+offer_registration_after_setup() {
+    local name
+    name="$(install_slug)"
+
+    echo ""
+    brand_box "Roe Global Command"
+    echo ""
+    log_step "Installing the global ${CYAN}roe${NC} command"
+    echo ""
+    echo "This allows you to start and stop your Roe sites from any"
+    echo "terminal window. This does two small things:"
+    echo -e "  • adds ${CYAN}http://${name}.${ROE_HOST_SUFFIX}${NC} to your ${CYAN}/etc/hosts${NC}"
+    echo -e "  ${DIM}(your computer will ask for your password)${NC}"
+    echo -e "  • adds the ${CYAN}roe${NC} to your terminal's startup file"
+    echo ""
+
+    cmd_register quiet || return 1
+
+    # So the rest of this script (and anything it spawns) can find `roe`
+    # now, even though the user's own terminal needs a new window.
+    case ":$PATH:" in *":$ROE_BIN_DIR:"*) ;; *) export PATH="$ROE_BIN_DIR:$PATH" ;; esac
+
+    load_registry_entry || return 1
+    echo ""
+    echo -e "  ${BOLD}Site${NC}"
+    echo -e "    Name:     ${CYAN}${ROE_NAME}${NC}"
+    echo -e "    Address:  ${CYAN}http://${ROE_HOST}:${ROE_PORT}${NC}"
+    echo ""
+    echo -e "  You can now use the ${ROE_ORANGE}roe${NC} command(s) anywhere in your terminal:"
+    echo -e "    ${ROE_ORANGE}roe start${NC}"
+    echo -e "    ${ROE_ORANGE}roe stop${NC}"
+    echo -e "    ${ROE_ORANGE}roe open${NC}"
+    echo -e "    ${ROE_ORANGE}roe${NC} for help"
+    echo ""
+    breathing_room
+    read -rp "Start Roe and open your site in the browser? [Y/n]: " REPLY
+    echo ""
+    case "${REPLY:-y}" in
+        [Nn]*)
+            echo -e "  ${BOLD}You're ready.${NC} Start it with ${ROE_ORANGE}roe start${NC} whenever you like."
+            echo ""
+            next_terminal_hint
+            return 0
+            ;;
+    esac
+
+    # Same path the global command takes, so the output and the hints
+    # match what they'll see from `roe start` next time. start_daemon
+    # returns once the port answers, so there is no need to wait again
+    # before opening the browser.
+    ROE_CLI=1 cmd_start --daemon || return 1
+    local site_url="http://${ROE_HOST}:${PORT:-$ROE_PORT}"
+    echo ""
+    if _open_url "$site_url" 2>/dev/null; then
+        sleep 1   # let the home page open first, so the admin ends up in front
+        _open_url "$site_url/admin" 2>/dev/null
+        log_success "Opened your site and its admin in the browser:"
+    else
+        log_info "Roe is running. Open these in your browser:"
+    fi
+    echo -e "    ${CYAN}${site_url}${NC}"
+    echo -e "    ${CYAN}${site_url}/admin${NC}"
+    echo ""
+    next_terminal_hint
+}
+
+# The last line of the install: what to do now. This window's shell may
+# have started before the roe command was added to the startup file, so a
+# new window is the one place roe is sure to work — the step people missed
+# when it sat in the middle of the summary.
+next_terminal_hint() {
+    log_next "Open a new terminal window, type ${ROE_ORANGE}roe status${NC} to see the status of your site or ${ROE_ORANGE}roe${NC} to see a full list of commands."
 }
 
 # ── setup-rbenv command ───────────────────────────────────────────────────────
@@ -1219,16 +1519,366 @@ cmd_setup_mise() {
     fi
 }
 
+# ── Register / unregister ─────────────────────────────────────────────────────
+#
+# `./roe.sh register` adds this install to the registry, gives it a
+# hostname and a port, maps the hostname in /etc/hosts, and installs the
+# global `roe` command. After that `roe start <name>` works from anywhere.
+
+# The line we write to /etc/hosts. The trailing marker lets unregister
+# remove exactly our line and nothing else.
+_hosts_line() { printf '127.0.0.1\t%s\t# roe:%s' "$1" "$2"; }
+
+hosts_has_entry() { grep -qE "^[^#]*[[:space:]]$1([[:space:]]|\$)" /etc/hosts 2>/dev/null; }
+
+# sudo's own prompt is a bare "Password:", which reads like the Roe admin
+# password the install has just shown. Say whose password it is. (WSL never
+# gets here — it can't write the hosts file the browser reads.)
+sudo_password_prompt() {
+    if is_macos; then
+        printf '🔒 Your Mac login password: '
+    else
+        printf '🔒 Your Linux account password: '
+    fi
+}
+
+# Add "127.0.0.1 <host>" to /etc/hosts. Needs sudo once per install —
+# we say so before asking. On WSL the browser lives on the Windows side
+# and reads Windows' own hosts file, which we can't write from here, so
+# we print the line for the user to add instead.
+add_hosts_entry() {
+    local host="$1" name="$2" quiet="${3:-}"
+    hosts_has_entry "$host" && { log_info "$host is already in /etc/hosts"; return 0; }
+
+    if is_wsl; then
+        echo ""
+        log_warning "On Windows the browser reads Windows' hosts file, not WSL's."
+        echo "  Add this line to C:\\Windows\\System32\\drivers\\etc\\hosts (as Administrator):"
+        echo ""
+        echo -e "  ${CYAN}127.0.0.1  ${host}${NC}"
+        echo ""
+        echo "  Until then, use http://localhost:<port> from ./roe.sh status."
+        return 0
+    fi
+
+    # The install flow has already explained the password prompt.
+    if [ -z "$quiet" ]; then
+        echo ""
+        echo -e "  Mapping ${CYAN}${host}${NC} to this computer needs one line in /etc/hosts."
+        echo -e "  ${DIM}(macOS/Linux will ask for your password — that's sudo, for this one edit.)${NC}"
+        echo ""
+    fi
+    if printf '%s\n' "$(_hosts_line "$host" "$name")" | sudo -p "$(sudo_password_prompt)" tee -a /etc/hosts >/dev/null; then
+        log_success "Added $host to /etc/hosts"
+    else
+        log_warning "Couldn't write /etc/hosts. Add this line yourself:"
+        echo -e "  ${CYAN}$(_hosts_line "$host" "$name")${NC}"
+    fi
+}
+
+remove_hosts_entry() {
+    local name="$1"
+    is_wsl && return 0
+    grep -q "# roe:${name}\$" /etc/hosts 2>/dev/null || return 0
+    if sudo -p "$(sudo_password_prompt)" sed -i.bak "/# roe:${name}\$/d" /etc/hosts 2>/dev/null; then
+        sudo rm -f /etc/hosts.bak 2>/dev/null || true
+        log_success "Removed the /etc/hosts line for $name"
+    else
+        log_warning "Couldn't edit /etc/hosts — remove the line ending '# roe:${name}' yourself."
+    fi
+}
+
+# First port from 3000 up that no other registered install has claimed.
+# Fixed per install so the URL is stable; if some unrelated app happens to
+# hold it at start time, resolve_port_collision still shifts us for that
+# run only.
+next_registry_port() {
+    local candidate=3000 f taken
+    taken=" "
+    for f in "$ROE_REGISTRY_DIR"/*.conf; do
+        [ -f "$f" ] || continue
+        taken="$taken$(_conf_get "$f" PORT) "
+    done
+    while :; do
+        case "$taken" in
+            *" $candidate "*) candidate=$((candidate + 1)) ;;
+            *) echo "$candidate"; return 0 ;;
+        esac
+    done
+}
+
+# Put a new copy of bin/roe at ~/.roe/bin/roe without writing over the old
+# one in place. This often runs from inside `roe restart`, while that very
+# file is still being read: bash reads a script from disk as it goes, so
+# overwriting it (cp keeps the same file) leaves the running command to carry
+# on reading the NEW file from the old position — junk errors, or part of a
+# line run as a command. Writing a fresh file beside it and renaming it into
+# place swaps which file the name points at; the running command keeps the
+# old one until it ends, and the next `roe` gets the new one.
+install_global_cli_file() {
+    local src="$1" dest="$ROE_BIN_DIR/roe" tmp
+    tmp="$ROE_BIN_DIR/.roe.new.$$"
+    cp "$src" "$tmp" && chmod +x "$tmp" && mv -f "$tmp" "$dest" && return 0
+    rm -f "$tmp"
+    return 1
+}
+
+# Copy current/bin/roe to ~/.roe/bin/roe. Every install ships the same
+# script, so whichever registered most recently wins — the file is
+# self-contained and only ever shells out to each install's own roe.sh,
+# so version skew between installs doesn't matter.
+install_global_cli() {
+    local src="$APP_DIR/bin/roe"
+    [ -f "$src" ] || { log_warning "bin/roe not found in this install; skipping the global command."; return 0; }
+    mkdir -p "$ROE_BIN_DIR"
+    install_global_cli_file "$src"
+    log_success "Installed the global 'roe' command at $ROE_BIN_DIR/roe"
+    ensure_roe_bin_on_path "$@"
+    ensure_roe_completion
+}
+
+# Write the shell-completion script to ~/.roe and source it from the user's
+# rc, once. Same shape as ensure_roe_bin_on_path: pick the interactive rc for
+# the current shell, write an idempotent marker line, do nothing on reruns.
+# The generated script shells back into `roe`, so site names always come from
+# the live registry — this file never needs regenerating when sites change.
+ensure_roe_completion() {
+    local shell_name; shell_name="$(basename "${SHELL:-}")"
+    case "$shell_name" in
+        bash|zsh) ;;
+        *) return 0 ;;   # only bash/zsh have a script to offer
+    esac
+
+    local comp_file="$ROE_HOME/roe-completion.$shell_name"
+    "$ROE_BIN_DIR/roe" completion "$shell_name" > "$comp_file" 2>/dev/null || {
+        rm -f "$comp_file"; return 0
+    }
+
+    local rc_file marker='# Added by Roe — tab completion for `roe`'
+    rc_file="$(_mise_write_target)" || return 0
+    grep -qF "$marker" "$rc_file" 2>/dev/null && return 0
+
+    {
+        echo ''
+        echo "$marker"
+        echo "[ -f \"$comp_file\" ] && source \"$comp_file\""
+    } >> "$rc_file"
+    log_success "Enabled tab completion for 'roe' in $rc_file (open a new terminal to pick it up)"
+}
+
+# Keep the global CLI in step with the code this install is running. The
+# in-app updater swaps current/ but never touches ~/.roe/bin/roe, so a new
+# bin/roe (a new command, a completion fix) would otherwise only reach the
+# global command the next time someone ran `./roe.sh register` by hand. A
+# registered install calls this on every start: if the shipped bin/roe differs
+# from the installed copy, refresh it (and the completion script with it).
+# Silent when already current, so a normal start says nothing new. PATH and rc
+# lines are only ever ADDED when missing, never re-asked — the copy is the only
+# routine action here.
+refresh_global_cli_if_stale() {
+    is_registered || return 0
+    local src="$APP_DIR/bin/roe"
+    [ -f "$src" ] || return 0
+    # Already current? Nothing to do, stay quiet.
+    if [ -f "$ROE_BIN_DIR/roe" ] && cmp -s "$src" "$ROE_BIN_DIR/roe"; then
+        return 0
+    fi
+    mkdir -p "$ROE_BIN_DIR"
+    install_global_cli_file "$src" || return 0
+    log_info "Updated the global 'roe' command from this install."
+    # Refresh the completion file too (it's regenerated from the new binary),
+    # and make sure PATH + rc lines exist — all idempotent, all silent when
+    # already in place. "yes" skips the PATH prompt: a running install has
+    # already been through registration, so don't re-ask mid-start.
+    ensure_roe_bin_on_path yes
+    ensure_roe_completion
+}
+
+# Offer to put ~/.roe/bin on PATH in the user's shell rc. Same shape as
+# ensure_mise_in_shell: marker line, idempotent, asks first — unless
+# called with "yes", when the answer was already given (the install
+# flow). Sets ROE_PATH_ADDED=1 when it wrote the line, so the caller
+# knows the current terminal can't see `roe` yet.
+ensure_roe_bin_on_path() {
+    local assume_yes="${1:-}"
+    ROE_PATH_ADDED=""
+    case ":$PATH:" in *":$ROE_BIN_DIR:"*) return 0 ;; esac
+
+    local rc_file marker='# Added by Roe — global `roe` command'
+    rc_file="$(_mise_write_target)" || {
+        echo -e "  Add ${CYAN}$ROE_BIN_DIR${NC} to your PATH to use ${CYAN}roe${NC} from anywhere."
+        return 0
+    }
+    grep -qF "$marker" "$rc_file" 2>/dev/null && return 0
+
+    if [ "$assume_yes" != "yes" ]; then
+        echo ""
+        echo -e "  To run ${CYAN}roe${NC} from any folder, ${CYAN}$ROE_BIN_DIR${NC} needs to be on your PATH."
+        breathing_room
+        read -rp "  Add it to $rc_file? [Y/n]: " REPLY
+        case "${REPLY:-y}" in
+            [Nn]*)
+                echo -e "  Skipped. Add this line yourself when you like:"
+                echo -e "  ${CYAN}export PATH=\"\$HOME/.roe/bin:\$PATH\"${NC}"
+                return 0
+                ;;
+        esac
+    fi
+
+    {
+        echo ''
+        echo "$marker"
+        echo 'export PATH="$HOME/.roe/bin:$PATH"'
+    } >> "$rc_file"
+    ROE_PATH_ADDED=1
+    if [ "$assume_yes" = "yes" ]; then
+        log_success "Added $ROE_BIN_DIR to PATH in $rc_file"
+    else
+        log_success "Added $ROE_BIN_DIR to PATH in $rc_file (open a new terminal to pick it up)"
+    fi
+}
+
+cmd_register() {
+    # "quiet": called from the install flow, which explains the steps
+    # itself, adds the PATH line without asking, and prints its own
+    # summary — so skip the per-step preamble and the closing hint.
+    local quiet="" path_answer=""
+    [ "${1:-}" = "quiet" ] && { quiet=1; path_answer="yes"; }
+    local name host port f existing_root
+
+    if load_registry_entry; then
+        log_info "This install is already registered as '$ROE_NAME' (http://$ROE_HOST:$ROE_PORT)."
+        # Re-running is the way to repair a missing hosts line or CLI copy.
+        add_hosts_entry "$ROE_HOST" "$ROE_NAME" "$quiet"
+        install_global_cli "$path_answer"
+        return 0
+    fi
+
+    name="$(install_slug)"
+    if [ -z "$name" ]; then
+        log_error "Couldn't make a name from the folder '$(basename "$ROE_ROOT")' — it needs at least one letter or digit."
+        exit 1
+    fi
+
+    mkdir -p "$ROE_REGISTRY_DIR"
+    f="$ROE_REGISTRY_DIR/$name.conf"
+    if [ -f "$f" ]; then
+        existing_root="$(_conf_get "$f" ROOT)"
+        log_error "The name '$name' is already taken by another install:"
+        echo "  $existing_root"
+        echo ""
+        echo "  Names come from the folder name, so rename this folder to something"
+        echo "  distinct (or unregister the other install) and try again."
+        exit 1
+    fi
+
+    host="$name.$ROE_HOST_SUFFIX"
+    port="$(next_registry_port)"
+
+    printf 'NAME=%s\nROOT=%s\nHOST=%s\nPORT=%s\n' "$name" "$ROE_ROOT" "$host" "$port" > "$f"
+    log_success "Registered '$name' → $ROE_ROOT"
+    [ -z "$quiet" ] && echo -e "  URL: ${CYAN}http://${host}:${port}${NC}"
+
+    add_hosts_entry "$host" "$name" "$quiet"
+    install_global_cli "$path_answer"
+
+    [ -n "$quiet" ] && return 0
+    echo ""
+    echo -e "  Start it with ${CYAN}roe start ${name}${NC} from anywhere, or ${CYAN}./roe.sh start${NC} here."
+}
+
+# On the first start of an unregistered install — which for an existing
+# user means the first start after the update that brought the CLI —
+# offer to register it, once. Declining is remembered in
+# ~/.roe/declined/<slug>: per machine like the registry itself, outside
+# the install so an update can't reset it, and outside site/ so Site
+# Sync doesn't carry a laptop's choice to the live server. After that
+# only the one-line tip shows, which is easy to ignore.
+#
+# Not offered when there is no terminal to answer on (a daemon start
+# from the global `roe`, a launchd job, start.command piped somewhere)
+# — the tip prints instead and nothing is written, so the offer is
+# still waiting the next time someone starts it by hand.
+offer_registration_once() {
+    local name marker
+    name="$(install_slug)"
+    marker="$ROE_HOME/declined/${name:-unnamed}"
+    local tip="  ${DIM}Tip: ${CYAN}./roe.sh register${NC}${DIM} gives this site its own address and the global ${CYAN}roe${NC}${DIM} command.${NC}"
+
+    if [ -f "$marker" ] || [ ! -t 0 ] || [ ! -t 1 ]; then
+        echo -e "$tip"
+        return 0
+    fi
+
+    echo ""
+    echo -e "  ${BOLD}New: run Roe from anywhere with the ${CYAN}roe${NC}${BOLD} command.${NC}"
+    echo -e "  Registering gives this site its own address, ${CYAN}http://${name}.${ROE_HOST_SUFFIX}${NC},"
+    echo -e "  and a global ${CYAN}roe${NC} command: ${CYAN}roe start${NC}  ${CYAN}roe stop${NC}  ${CYAN}roe open${NC}"
+    echo "  Say no and nothing changes — ./roe.sh start keeps working as it always has,"
+    echo "  and you can register any time with ./roe.sh register."
+    echo ""
+    breathing_room
+    read -rp "  Register this site? [Y/n]: " REPLY
+    echo ""
+    case "${REPLY:-y}" in
+        [Nn]*)
+            mkdir -p "$(dirname "$marker")"
+            printf '%s\n' "$ROE_ROOT" > "$marker"
+            echo -e "$tip"
+            ;;
+        *)
+            cmd_register
+            echo ""
+            ;;
+    esac
+}
+
+cmd_unregister() {
+    local f
+    if ! load_registry_entry; then
+        log_warning "This install isn't registered."
+        return 0
+    fi
+    f="$(registry_file_for_root)"
+    rm -f "$f"
+    log_success "Unregistered '$ROE_NAME'"
+    remove_hosts_entry "$ROE_NAME"
+    echo "  The site's files are untouched — only the registry entry is gone."
+}
+
 # ── Start command ─────────────────────────────────────────────────────────────
 
 # Kill any orphaned Tailwind watcher processes from previous runs
+# Kill orphaned Tailwind watchers belonging to THIS install only.
+#
+# The pattern "tailwindcss:watch" matches every Roe install on the
+# machine, so an unfiltered pgrep+kill here would stop the watchers of
+# sibling installs on every start. We therefore check each candidate's
+# full command line for $APP_DIR before killing it.
+#
+# `case` (not grep) does the matching so a path containing spaces, &, or
+# regex metacharacters is compared literally. If a watcher's command line
+# doesn't mention $APP_DIR we leave it alone — an orphan we didn't reap is
+# a far better failure than killing another site's watcher.
 kill_tailwind_watchers() {
-    local pids
-    pids=$(pgrep -f "tailwindcss:watch" 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-        log_info "Killing orphaned Tailwind watcher(s)..."
-        echo "$pids" | xargs kill 2>/dev/null || true
-    fi
+    local pids pid cmd killed=0
+    # The `rails tailwindcss:watch` starter and the tailwindcss program it
+    # runs: ending the starter leaves the program behind, one more each run.
+    pids=$(pgrep -u "$(id -u)" -f "tailwindcss:watch|tailwindcss -i " 2>/dev/null || true)
+    [ -z "$pids" ] && return 0
+
+    for pid in $pids; do
+        cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+        case "$cmd" in
+            *"$APP_DIR"*)
+                kill "$pid" 2>/dev/null || true
+                killed=$((killed + 1))
+                ;;
+        esac
+    done
+
+    [ "$killed" -gt 0 ] && log_info "Killing orphaned Tailwind watcher(s) for this install..."
+    return 0
 }
 
 # ── Port collision handling ──────────────────────────────────────────
@@ -1239,14 +1889,20 @@ kill_tailwind_watchers() {
 # trace they can't interpret. The helpers below let us recover
 # gracefully:
 #
-#   1. If the thing on the port responds as Roe (HTTP probe → "Roe"
-#      in the /admin page title), we kill it. Two Roes on one port is
-#      impossible and starting a new one is what the user asked for.
+#   1. If the listener belongs to THIS install (its command line
+#      contains $APP_DIR), we kill it. Restarting our own server is
+#      exactly what the user asked for, and two Roes on one port is
+#      impossible.
 #
-#   2. If the thing on the port is something else, we pick an
-#      alternate port (next free above the requested one). Killing an
-#      unknown process is too dangerous — could be the user's other
-#      dev work.
+#   2. Anything else — including a DIFFERENT Roe install — is left
+#      running, and we pick an alternate port (next free above the
+#      requested one). Killing a process we don't own is too dangerous:
+#      it could be the user's other dev work, or another live site.
+#
+#      This is deliberately narrower than "any Roe on the port is
+#      disposable". Several installs can run side by side, so a Roe on
+#      the port is not necessarily a stale copy of OUR Roe — it may be a
+#      site someone is using.
 #
 # Requires lsof (for port checks and finding the PID — ships on macOS,
 # universally available on Linux). curl is used for the Roe HTTP probe.
@@ -1269,8 +1925,207 @@ is_roe_on_port() {
     local port="$1"
     command -v curl >/dev/null 2>&1 || return 1
     local body
-    body=$(curl -sf --max-time 2 "http://localhost:$port/admin" 2>/dev/null || true)
+    # -L: /admin redirects to the sign-in page when nobody's logged in,
+    # and the title we're looking for is on that page, not in the 302.
+    body=$(curl -sfL --max-time 2 "http://localhost:$port/admin" 2>/dev/null || true)
     [ -n "$body" ] && echo "$body" | grep -q "Roe"
+}
+
+# Returns 0 if the process listening on the given port belongs to THIS
+# install — i.e. its command line mentions $APP_DIR. This is what lets us
+# restart our own server while leaving a sibling install's alone. `case`
+# matches literally, so spaces and metacharacters in the path are safe.
+port_owned_by_this_install() {
+    local port="$1" pid cmd
+    command -v lsof >/dev/null 2>&1 || return 1
+    pid=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    [ -z "$pid" ] && return 1
+    cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+    case "$cmd" in
+        *"$APP_DIR"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Every Puma master serving THIS install, one PID per line, whether or
+# not tmp/pids/server.pid knows about it. config/puma.rb tags each
+# server's process title with its app directory, so this is a title
+# scan. Workers forked by Solid Queue carry their own titles and so
+# are not matched; the pidfile is checked too for servers started
+# before the tag existed.
+#
+# The pidfile alone is not enough: it is a single slot, so a second
+# start overwrites it and Puma removes it on exit — every server but
+# the last one started becomes invisible, then a stop leaves the rest
+# running and the next start binds yet another port.
+server_pids_for_this_install() {
+    local pids="" pid
+    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
+        pid=$(cat "$APP_DIR/tmp/pids/server.pid" 2>/dev/null)
+        [ -n "$pid" ] && ps -p "$pid" >/dev/null 2>&1 && pids="$pid"
+    fi
+    pids="$pids
+$(ps -axo pid=,command= 2>/dev/null | awk -v dir="[$APP_DIR]" 'index($0, "puma") && index($0, dir) { print $1 }')"
+    # And by folder: a server started before the tag existed, whose pidfile
+    # an update moved into current.backup/ along with its code.
+    for pid in $(pgrep -u "$(id -u)" -f '^puma ' 2>/dev/null); do
+        [ "$(roe_process_kind "$pid")" = "server" ] && pids="$pids
+$pid"
+    done
+    printf '%s\n' "$pids" | grep -E '^[0-9]+$' | sort -un
+}
+
+# ── This install's own processes ──────────────────────────────────────
+#
+# Roe only ever stops what it can show is its own: a process run by this
+# user, working from inside this install's folder, and one of the kinds Roe
+# starts — a Puma server or a Solid Queue job process. Working from inside
+# the folder covers current/ and also current.backup/ and current.broken-*,
+# where an update moves the old code: a process keeps its folder through a
+# rename, and the system reports the new name. Another Rails app or another
+# Roe site works from its own folder, so it never matches; nor does a shell,
+# an editor or a `rails console` that happens to be in this one, since
+# they're none of those kinds.
+
+# The real path of this install, so a symlinked folder still compares
+# equal to what the system reports for a process.
+ROE_ROOT_REAL="$(cd "$ROE_ROOT" 2>/dev/null && pwd -P || printf '%s' "$ROE_ROOT")"
+
+# The folder a process is working from, or nothing if it can't be read.
+pid_cwd() {
+    if [ -e "/proc/$1/cwd" ]; then
+        readlink "/proc/$1/cwd" 2>/dev/null
+        return 0
+    fi
+    command -v lsof >/dev/null 2>&1 || return 0
+    lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1
+}
+
+# Prints "server" or "jobs" when a PID is one of this install's processes;
+# fails for anything else. See the note above for what counts.
+roe_process_kind() {
+    local pid="$1" cmd uid cwd kind
+    cmd="$(ps -o command= -p "$pid" 2>/dev/null)" || return 1
+    case "$cmd" in
+        "puma "*|*"/puma "*)                              kind="server" ;;
+        "solid-queue-"*|*"/bin/jobs"*|*"solid_queue:start"*) kind="jobs" ;;
+        # A video encode a job started (VideoVariantGenerator.run_ffmpeg
+        # writes into tmp/video_variants/). ffmpeg keeps encoding when the
+        # job that started it is ended, so it's stopped along with the jobs.
+        *ffmpeg*"/tmp/video_variants/"*)                  kind="encode" ;;
+        *) return 1 ;;
+    esac
+    uid="$(ps -o uid= -p "$pid" 2>/dev/null | tr -d ' ')"
+    [ "$uid" = "$(id -u)" ] || return 1
+    cwd="$(pid_cwd "$pid")"
+    [ -n "$cwd" ] || return 1
+    # The trailing slash keeps /Code/roe from matching /Code/roe-blog.
+    case "$cwd/" in
+        "$ROE_ROOT_REAL"/*) echo "$kind"; return 0 ;;
+    esac
+    return 1
+}
+
+# A Solid Queue process of this user's whose working folder has been
+# deleted — left by an app that was moved or removed. Only ever reported,
+# never stopped: nothing on it shows whose it was.
+orphaned_job_process() {
+    local pid="$1" cmd uid
+    cmd="$(ps -o command= -p "$pid" 2>/dev/null)" || return 1
+    case "$cmd" in "solid-queue-"*) ;; *) return 1 ;; esac
+    uid="$(ps -o uid= -p "$pid" 2>/dev/null | tr -d ' ')"
+    [ "$uid" = "$(id -u)" ] || return 1
+    [ -z "$(pid_cwd "$pid")" ] || [ ! -d "$(pid_cwd "$pid")" ]
+}
+
+# Every background-job process of this install, one PID per line —
+# supervisors first, so stopping them doesn't race their own workers, then
+# workers, then any video encode they started.
+job_pids_for_this_install() {
+    local pid kind supervisors="" others="" encodes=""
+    for pid in $(pgrep -u "$(id -u)" -f 'solid-queue-|bin/jobs|solid_queue:start|tmp/video_variants/' 2>/dev/null); do
+        kind="$(roe_process_kind "$pid")" || continue
+        case "$kind" in
+            encode) encodes="$encodes $pid"; continue ;;
+            jobs) ;;
+            *) continue ;;
+        esac
+        case "$(ps -o command= -p "$pid" 2>/dev/null)" in
+            *supervisor*|*bin/jobs*|*solid_queue:start*) supervisors="$supervisors $pid" ;;
+            *) others="$others $pid" ;;
+        esac
+    done
+    for pid in $supervisors $others $encodes; do echo "$pid"; done
+}
+
+# Stop processes: ask each to finish, give them up to 10 seconds, then end
+# any still running. Asking isn't always enough — a job process whose
+# server has gone can ignore it indefinitely, and keep the port it was
+# handed. Prints one line per process.
+#   stop_processes "Rails server" 123 456
+stop_processes() {
+    local label="$1" pid i alive
+    shift
+    [ $# -gt 0 ] || return 0
+    for pid in "$@"; do kill "$pid" 2>/dev/null || true; done
+    for i in $(seq 1 20); do
+        alive=""
+        for pid in "$@"; do ps -p "$pid" >/dev/null 2>&1 && alive="$alive $pid"; done
+        [ -z "$alive" ] && break
+        sleep 0.5
+    done
+    for pid in "$@"; do
+        if ps -p "$pid" >/dev/null 2>&1; then
+            kill -9 "$pid" 2>/dev/null || true
+            log_warning "$label didn't stop when asked, so it was ended (PID: $pid)"
+        else
+            log_success "$label stopped (PID: $pid)"
+        fi
+    done
+}
+
+# The background jobs (video encoding, image versions, the hourly Site Sync
+# and update checks) as their own program, not inside the server. Inside
+# the server, the job processes it started were handed its open port, and
+# one left behind by an ended server kept that port — the site wouldn't
+# load at its address, and the next start moved to another port. Output
+# goes to the background log, where `roe logs` reads startup failures.
+start_jobs() {
+    nohup "$APP_DIR/bin/jobs" >> "$APP_DIR/log/roe-daemon.log" 2>&1 &
+    echo "$!" > "$APP_DIR/tmp/pids/jobs.pid"
+}
+
+# Stop this install's background jobs: the jobs program first (it takes its
+# workers with it), then anything still running — workers it couldn't stop,
+# a video encode, or job processes an earlier run left behind.
+stop_jobs() {
+    local pids pid supervisors=""
+    pids="$(job_pids_for_this_install)"
+    for pid in $pids; do
+        case "$(ps -o command= -p "$pid" 2>/dev/null)" in
+            *supervisor*|*bin/jobs*|*solid_queue:start*) supervisors="$supervisors $pid" ;;
+        esac
+    done
+    # shellcheck disable=SC2086
+    [ -n "$supervisors" ] && stop_processes "Background jobs" $supervisors
+    pids="$(job_pids_for_this_install)"
+    # shellcheck disable=SC2086
+    [ -n "$pids" ] && stop_processes "Leftover background-job process" $pids
+    rm -f "$APP_DIR/tmp/pids/jobs.pid"
+    return 0
+}
+
+# Echo the first TCP port the given PID is listening on. Used so the
+# "already running" notice can print the real URL instead of assuming
+# 3000 — which is wrong as soon as more than one install exists.
+listening_port_for_pid() {
+    local pid="$1"
+    command -v lsof >/dev/null 2>&1 || return 1
+    # -a ANDs the filters. Without it lsof ORs them and returns every
+    # listening socket on the machine, so we'd report some other app's port.
+    lsof -a -nP -iTCP -sTCP:LISTEN -p "$pid" 2>/dev/null \
+        | awk 'NR > 1 { print $9; exit }' \
+        | sed 's/.*://'
 }
 
 # Soft-kill (SIGTERM) the process bound to a port. Waits a moment for
@@ -1312,14 +2167,37 @@ find_free_port() {
 resolve_port_collision() {
     port_in_use "$PORT" || return 0    # Port is free, nothing to do.
 
-    if is_roe_on_port "$PORT"; then
-        log_warning "Roe is already running on port $PORT. Stopping it before starting fresh…"
+    # This site's own leftover — a server or a background-job process from
+    # an earlier run (see roe_process_kind) — is stopped, not stepped round.
+    local holder kind what
+    holder=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    if [ -n "$holder" ] && kind="$(roe_process_kind "$holder")"; then
+        what="server"
+        [ "$kind" = "jobs" ] && what="background-job process"
+        log_warning "Port $PORT is held by a $what left from an earlier run of this site. Stopping it…"
+        stop_processes "Leftover $what" "$holder"
+        if ! port_in_use "$PORT"; then
+            log_info "Port $PORT is free again."
+            return 0
+        fi
+    fi
+
+    if port_owned_by_this_install "$PORT"; then
+        log_warning "This install is already serving port $PORT. Restarting it…"
         kill_pid_on_port "$PORT"
         if ! port_in_use "$PORT"; then
             log_info "Port $PORT is now free."
             return 0
         fi
-        log_warning "Port $PORT didn't free up after stopping the other Roe. Looking for an alternate."
+        log_warning "Port $PORT didn't free up. Looking for an alternate."
+    elif is_roe_on_port "$PORT"; then
+        log_warning "A different Roe install is serving port $PORT — leaving it running. Looking for an alternate port."
+    elif [ -n "$holder" ] && orphaned_job_process "$holder"; then
+        # Can't be shown to be this site's, so it isn't stopped — but it
+        # isn't a mystery app either, and the person can end it.
+        log_warning "Port $PORT is held by a background-job process whose folder no longer exists (PID: $holder)."
+        echo "    It was left by a Roe or Rails app that was moved or deleted, so Roe can't tell whose it is"
+        echo "    and leaves it alone. To end it: kill -9 $holder"
     else
         log_warning "Port $PORT is in use by another app (not Roe). Looking for an alternate port."
     fi
@@ -1328,8 +2206,12 @@ resolve_port_collision() {
     local new_port
     new_port=$(find_free_port "$((original_port + 1))")
     if [ -n "$new_port" ]; then
-        PORT="$new_port"
-        log_info "Using port $PORT instead of $original_port."
+        # MUST be exported: Puma reads ENV["PORT"] (config/puma.rb). A bare
+        # assignment stays script-local, so the banner would advertise the
+        # new port while Puma still bound the old one and died with
+        # EADDRINUSE.
+        export PORT="$new_port"
+        log_warning "Roe will use port $PORT this time, not $original_port. Its address is http://${ROE_HOST:-localhost}:$PORT"
     else
         log_error "Couldn't find a free port near $original_port. Free up a port, or set PORT=<n> ./roe.sh start to choose one yourself."
         exit 1
@@ -1337,24 +2219,94 @@ resolve_port_collision() {
 }
 
 cmd_start() {
+    # Flags of our own, stripped before the rest goes to `rails server`.
+    #   --daemon      run in the background (what the global `roe` uses)
+    #   --no-browser  don't open tabs after starting
+    local DAEMON=0 OPEN_BROWSER=1 arg
+    local -a server_args=()
+    for arg in "$@"; do
+        case "$arg" in
+            --daemon)     DAEMON=1; OPEN_BROWSER=0 ;;
+            --no-browser) OPEN_BROWSER=0 ;;
+            *)            server_args+=("$arg") ;;
+        esac
+    done
+    set -- "${server_args[@]}"
+
     log_info "Starting Roe..."
 
-    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
-        PID=$(cat "$APP_DIR/tmp/pids/server.pid")
-        if ps -p "$PID" > /dev/null 2>&1; then
-            log_warning "Server is already running (PID: $PID)"
-            log_info "View: http://localhost:3000/welcome in your browser to use Roe."
-            return 0
+    # A registered install has its own hostname and port; an unregistered
+    # one behaves exactly as before (localhost, PORT or 3000).
+    if ! load_registry_entry; then
+        offer_registration_once
+        # They may have just said yes, so pick up the new hostname and port.
+        load_registry_entry || true
+    fi
+    local display_host="${ROE_HOST:-localhost}"
+
+    # An update swapped current/ but left ~/.roe/bin/roe untouched; refresh it
+    # from the code we're about to boot so the global command and its
+    # completion match this version. Silent unless it actually changed.
+    refresh_global_cli_if_stale
+
+    # Refuse to start a second server for this install. Checks every
+    # Puma tagged with this app directory, not just the pidfile, so a
+    # server the pidfile has lost track of still counts — otherwise each
+    # start would bind the next port up and leave the old one running.
+    local running_pids running_pid running_port
+    running_pids="$(server_pids_for_this_install)"
+    if [ -n "$running_pids" ]; then
+        for running_pid in $running_pids; do
+            running_port=$(listening_port_for_pid "$running_pid")
+            if [ -n "$running_port" ]; then
+                log_warning "Server is already running (PID: $running_pid) on http://${display_host}:${running_port}"
+            else
+                log_warning "Server is already running (PID: $running_pid)"
+            fi
+        done
+        # Make sure the pidfile names one of them, so stop and status
+        # work again if it had been lost.
+        [ -f "$APP_DIR/tmp/pids/server.pid" ] || echo "$running_pids" | head -1 > "$APP_DIR/tmp/pids/server.pid"
+        if [ -n "${ROE_CLI:-}" ]; then
+            log_info "Run 'roe restart' to restart it, or 'roe stop' first."
         else
-            rm -f "$APP_DIR/tmp/pids/server.pid"
+            log_info "Run './roe.sh restart' to restart it, or './roe.sh stop' first."
         fi
+        return 0
+    fi
+    rm -f "$APP_DIR/tmp/pids/server.pid"
+
+    # No server is running, so any background-job process of this site's is
+    # left from an earlier run. It would run jobs alongside the new ones, and
+    # one started inside an older server can be holding the site's port.
+    local leftover_jobs
+    leftover_jobs="$(job_pids_for_this_install)"
+    if [ -n "$leftover_jobs" ]; then
+        log_warning "Found background-job processes left from an earlier run of this site. Stopping them…"
+        # shellcheck disable=SC2086
+        stop_processes "Leftover background jobs" $leftover_jobs
+        rm -f "$APP_DIR/tmp/pids/jobs.pid"
     fi
 
     cd "$APP_DIR"
-    export SOLID_QUEUE_IN_PUMA=1
-    RAILS_ENV="${RAILS_ENV:-development}"
+    export RAILS_ENV="${RAILS_ENV:-development}"
+    # On this computer the jobs run as their own program (start_jobs), so
+    # they can't hold the server's port. Elsewhere — a server started this
+    # way with no one to restart the pieces — they stay inside it.
+    if [ "$RAILS_ENV" = "development" ]; then
+        unset SOLID_QUEUE_IN_PUMA
+    else
+        export SOLID_QUEUE_IN_PUMA=1
+    fi
 
-    PORT="${PORT:-3000}"
+    # Exported so the child `bin/rails server` → Puma actually sees it; see
+    # the note in resolve_port_collision. Precedence: an explicit PORT=<n>
+    # on the command line, then the port the registry assigned, then 3000.
+    export PORT="${PORT:-${ROE_PORT:-3000}}"
+
+    # The app reads this for mailer links and Host Authorization, so a
+    # registered install generates URLs at its own hostname.
+    [ -n "$ROE_HOST" ] && export ROE_HOST
 
     # Recover gracefully if something is already on PORT — either kill
     # it (if it identifies as another Roe install via HTTP probe) or
@@ -1362,10 +2314,15 @@ cmd_start() {
     # $PORT in place, so $URL has to be derived AFTER this call.
     resolve_port_collision
 
-    URL="http://localhost:${PORT}"
+    URL="http://${display_host}:${PORT}"
 
     if [ "$RAILS_ENV" = "development" ]; then
         kill_tailwind_watchers
+
+        if [ "$DAEMON" = "1" ]; then
+            start_daemon "$@"
+            return $?
+        fi
 
         echo ""
         echo -e "  ${BOLD}${GREEN}Roe is ready to start${NC}"
@@ -1373,12 +2330,12 @@ cmd_start() {
         echo -e "  Admin:  ${CYAN}${URL}/admin${NC}"
         echo ""
         echo "  Choose:"
-        echo "    [y] Start server and open in browser  (default)"
-        echo "    [s] Start server only — don't open browser"
-        echo "    [q] Quit without starting"
+        echo "  [y] Start server and open in browser  (default)"
+        echo "  [s] Start server only — don't open browser"
+        echo "  [q] Quit without starting"
         echo ""
         breathing_room
-        read -rp "  Choice [y/s/q]: " REPLY
+        read -rp "  Choice [Y/s/q]: " REPLY
         echo ""
 
         # Default (empty input) = launch browser. Anything starting with
@@ -1395,7 +2352,7 @@ cmd_start() {
                 log_info "Starting server — browser will not open automatically."
                 ;;
             *)
-                OPEN_BROWSER=1
+                # Honour --no-browser even when the user hits Enter.
                 ;;
         esac
 
@@ -1409,43 +2366,23 @@ cmd_start() {
         echo "$TAILWIND_PID" > "$APP_DIR/tmp/pids/tailwind.pid"
         log_info "Tailwind watcher running (PID: $TAILWIND_PID)"
 
+        start_jobs
+        log_info "Background jobs running (PID: $(cat "$APP_DIR/tmp/pids/jobs.pid"))"
+
         cleanup() {
             log_info "Stopping Tailwind CSS watcher..."
             kill "$TAILWIND_PID" 2>/dev/null || true
             rm -f "$APP_DIR/tmp/pids/tailwind.pid"
+            # The tailwindcss program the watcher started outlives it.
+            kill_tailwind_watchers
+            stop_jobs
         }
         trap cleanup EXIT INT TERM
 
         # Open browser after a short delay to let the server boot.
-        # Supports macOS (open) and Linux (xdg-open). Skipped entirely
-        # when the user chose [s] (start server only) at the prompt.
-        #
-        # Two tabs: the public site (/) first, then the admin (/admin)
-        # LAST so admin ends up the focused/frontmost tab — the user
-        # lands ready to sign in, with their live site one tab over.
+        # Skipped entirely when the user chose [s] or passed --no-browser.
         if [ "$OPEN_BROWSER" = "1" ]; then
-            (
-                sleep 3
-                _open_url() {
-                    if command -v open >/dev/null 2>&1; then
-                        open "$1"
-                    elif command -v xdg-open >/dev/null 2>&1; then
-                        xdg-open "$1"
-                    elif command -v wslview >/dev/null 2>&1; then
-                        # WSL: hands the URL to the Windows default browser.
-                        # A bare Ubuntu has no xdg-open, so without this the
-                        # server starts and nothing opens.
-                        wslview "$1"
-                    elif command -v explorer.exe >/dev/null 2>&1; then
-                        # Fallback when wslu isn't installed. explorer.exe
-                        # exits non-zero even when it works, hence the `|| true`.
-                        explorer.exe "$1" >/dev/null 2>&1 || true
-                    fi
-                }
-                _open_url "${URL}/"
-                sleep 1   # let the first tab open before the second steals focus
-                _open_url "${URL}/admin"
-            ) &
+            open_site_in_browser "$URL" &
         fi
 
         # bin/thrust is shipped by Rails 8 (the thruster gem) and would
@@ -1461,24 +2398,116 @@ cmd_start() {
     fi
 }
 
+# Hand a URL to the default browser. Supports macOS (open), Linux
+# (xdg-open) and WSL (wslview / explorer.exe).
+_open_url() {
+    if command -v open >/dev/null 2>&1; then
+        open "$1"
+    elif command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$1"
+    elif command -v wslview >/dev/null 2>&1; then
+        # WSL: hands the URL to the Windows default browser. A bare
+        # Ubuntu has no xdg-open, so without this nothing opens.
+        wslview "$1"
+    elif command -v explorer.exe >/dev/null 2>&1; then
+        # Fallback when wslu isn't installed. explorer.exe exits
+        # non-zero even when it works, hence the `|| true`.
+        explorer.exe "$1" >/dev/null 2>&1 || true
+    else
+        # Nothing to open a browser with (a server, a bare container).
+        return 1
+    fi
+}
+
+# Open the public site, then the admin, in the default browser. Two
+# tabs, admin LAST so it ends up frontmost — the user lands ready to
+# sign in with their live site one tab over.
+open_site_in_browser() {
+    local url="$1"
+    sleep 3
+    _open_url "${url}/"
+    sleep 1   # let the first tab open before the second steals focus
+    _open_url "${url}/admin"
+}
+
+# Background start: Tailwind watcher and Puma both detached from this
+# terminal, output to log/roe-daemon.log, PID files where stop/status
+# already look. Waits until the port answers (or gives up) so the caller
+# gets a truthful "it's up" / "it didn't start".
+start_daemon() {
+    local log_file="$APP_DIR/log/roe-daemon.log"
+    mkdir -p "$APP_DIR/log" "$APP_DIR/tmp/pids"
+
+    # Marks where this start's output begins, with the time: Rails' own
+    # boot lines have none. bin/roe-logs (roe logs) reads back to the last
+    # one to show why a start failed.
+    printf '\n==> Roe starting %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')" >> "$log_file"
+
+    nohup "$APP_DIR/bin/rails" "tailwindcss:watch[always]" >> "$log_file" 2>&1 &
+    echo "$!" > "$APP_DIR/tmp/pids/tailwind.pid"
+
+    start_jobs
+
+    # Puma's own -d/--daemon was removed in Puma 5, so we detach it
+    # ourselves. `rails server` sets PIDFILE to tmp/pids/server.pid by
+    # default; we pin it so stop/status always find the right file.
+    export PIDFILE="$APP_DIR/tmp/pids/server.pid"
+    nohup "$APP_DIR/bin/rails" server "$@" >> "$log_file" 2>&1 &
+    local server_pid=$!
+    disown 2>/dev/null || true
+
+    local i
+    for i in $(seq 1 30); do
+        if port_in_use "$PORT"; then
+            log_success "Roe is running in the background on ${URL}"
+            echo -e "  LOG:  ${DIM}${log_file}${NC}"
+            if [ -n "${ROE_CLI:-}" ]; then
+                # Started through the global `roe` command, so point at
+                # that. The name is only needed when there is more than
+                # one site to choose from.
+                local site="" n
+                n="$(ls "$ROE_REGISTRY_DIR"/*.conf 2>/dev/null | wc -l | tr -d ' ')"
+                [ "${n:-0}" -gt 1 ] && [ -n "${ROE_NAME:-}" ] && site=" $ROE_NAME"
+                echo -e "  OPEN: ${CYAN}roe open${site}${NC}"
+                echo -e "  STOP: ${CYAN}roe stop${site}${NC}"
+            else
+                echo -e "  STOP: ${CYAN}./roe.sh stop${NC}"
+            fi
+            return 0
+        fi
+        ps -p "$server_pid" >/dev/null 2>&1 || break
+        sleep 1
+    done
+
+    log_error "Roe didn't come up on port $PORT. The last lines of the log:"
+    tail -n 20 "$log_file" 2>/dev/null | sed 's/^/    /'
+    # Nothing to do jobs for without a server.
+    stop_jobs >/dev/null
+    return 1
+}
+
 # ── Stop command ──────────────────────────────────────────────────────────────
 
 cmd_stop() {
     log_info "Stopping Roe..."
 
-    # Stop Rails server
-    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
-        PID=$(cat "$APP_DIR/tmp/pids/server.pid")
-        if ps -p "$PID" > /dev/null 2>&1; then
-            kill "$PID"
-            log_success "Rails server stopped (PID: $PID)"
-        else
-            log_warning "PID file exists but Rails server not running"
-        fi
-        rm -f "$APP_DIR/tmp/pids/server.pid"
+    # Stop every Rails server for this install — see
+    # server_pids_for_this_install for why the pidfile alone is not
+    # trusted. Wait for each to exit so a restart can rebind the port.
+    local pids
+    pids="$(server_pids_for_this_install)"
+    if [ -n "$pids" ]; then
+        # shellcheck disable=SC2086
+        stop_processes "Rails server" $pids
     else
         log_warning "Rails server is not running"
     fi
+    rm -f "$APP_DIR/tmp/pids/server.pid"
+
+    # The background jobs: the program start_jobs runs, plus any job process
+    # an earlier run left behind (older servers ran the jobs inside
+    # themselves, and an ended server didn't always take them with it).
+    stop_jobs
 
     # Stop Tailwind watcher (pid file)
     if [ -f "$APP_DIR/tmp/pids/tailwind.pid" ]; then
@@ -1498,6 +2527,23 @@ cmd_stop() {
 
 cmd_restart() {
     log_info "Restarting Roe..."
+
+    # Reuse the port the server is on right now, so a browser tab still lands
+    # on the same address after a refresh. Capture it before we stop, then
+    # export it as PORT so cmd_start prefers it; resolve_port_collision still
+    # bumps to an alternate only if it's genuinely taken by the time we rebind.
+    # Skipped when the caller already set PORT, when nothing is running, or
+    # when lsof can't read the port — all fall back to the old behaviour.
+    if [ -z "${PORT:-}" ]; then
+        local restart_pids restart_pid restart_port=""
+        restart_pids="$(server_pids_for_this_install)"
+        for restart_pid in $restart_pids; do
+            restart_port="$(listening_port_for_pid "$restart_pid")"
+            [ -n "$restart_port" ] && break
+        done
+        [ -n "$restart_port" ] && export PORT="$restart_port"
+    fi
+
     cmd_stop
     sleep 1
     cmd_start "$@"
@@ -1524,16 +2570,32 @@ cmd_status() {
     echo "App:     $APP_DIR"
     echo "Site:    $SITE_DIR"
     echo "Version: $(grep 'version:' "$ROE_ROOT/VERSION" 2>/dev/null | cut -d'"' -f2 || echo 'unknown')"
+    if load_registry_entry; then
+        echo "Name:    $ROE_NAME  (registered — http://${ROE_HOST}:${ROE_PORT})"
+    else
+        echo "Name:    not registered  (./roe.sh register to run alongside other sites)"
+    fi
     echo ""
 
-    # Server
-    if [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
-        PID=$(cat "$APP_DIR/tmp/pids/server.pid")
-        if ps -p "$PID" > /dev/null 2>&1; then
-            log_success "Rails server running (PID: $PID)"
-        else
-            log_error "PID file exists but server not running (stale)"
+    local status_host="${ROE_HOST:-localhost}"
+
+    # Server — every one for this install, not just the pidfile's
+    local status_pids status_pid
+    status_pids="$(server_pids_for_this_install)"
+    if [ -n "$status_pids" ]; then
+        for status_pid in $status_pids; do
+            STATUS_PORT=$(listening_port_for_pid "$status_pid")
+            if [ -n "$STATUS_PORT" ]; then
+                log_success "Rails server running (PID: $status_pid) on http://${status_host}:${STATUS_PORT}"
+            else
+                log_success "Rails server running (PID: $status_pid)"
+            fi
+        done
+        if [ "$(echo "$status_pids" | grep -c .)" -gt 1 ]; then
+            log_warning "More than one server is running for this install. Stop will end all of them."
         fi
+    elif [ -f "$APP_DIR/tmp/pids/server.pid" ]; then
+        log_error "PID file exists but server not running (stale)"
     else
         log_warning "Rails server is not running"
     fi
@@ -1547,6 +2609,29 @@ cmd_status() {
         fi
     fi
 
+    # Background jobs: their own program now, or inside an older server.
+    # Running properly means a supervisor is there; workers or a scheduler
+    # on their own are what's left after the supervisor was ended — they
+    # look busy but nothing picks the work up.
+    local job_pids job_sup=""
+    job_pids="$(job_pids_for_this_install | tr '\n' ' ' | sed 's/ *$//')"
+    for status_pid in $job_pids; do
+        case "$(ps -o command= -p "$status_pid" 2>/dev/null)" in
+            *supervisor*|*bin/jobs*|*solid_queue:start*) job_sup="$status_pid" ;;
+        esac
+    done
+    if [ -n "$job_pids" ] && [ -z "$status_pids" ]; then
+        log_warning "Background-job processes are running with no server (PID: $job_pids)."
+        echo "    They're left from an earlier run and can hold the site's port. 'roe restart' clears them."
+    elif [ -n "$job_pids" ] && [ -z "$job_sup" ]; then
+        log_warning "Only part of the background jobs is running (PID: $job_pids), so jobs won't be done."
+        echo "    'roe restart' starts them properly."
+    elif [ -n "$job_pids" ]; then
+        log_success "Background jobs running (PID: $job_pids)"
+    elif [ -n "$status_pids" ]; then
+        log_warning "Background jobs aren't running: videos won't be encoded and Site Sync won't check in. Restart to start them."
+    fi
+
     # Requirements
     echo ""
     echo -e "${BOLD}Requirements:${NC}"
@@ -1556,10 +2641,17 @@ cmd_status() {
     else
         log_error "Ruby ${required_ruby}+ not found"
     fi
-    check_git     && log_success "Git $(git --version | cut -d' ' -f3)"   || log_error "Git not found"
-    check_bundler && log_success "Bundler"                                  || log_error "Bundler not found"
-    check_sqlite  && log_success "SQLite3"                                  || log_error "SQLite3 not found"
+    check_git     && log_success "Git $(git --version | cut -d' ' -f3)"  || log_error "Git not found"
+    check_bundler && log_success "Bundler"                         || log_error "Bundler not found"
+    check_sqlite  && log_success "SQLite3"                         || log_error "SQLite3 not found"
     check_libvips && log_success "libvips (optional)" || log_warning "libvips not installed (optional)"
+    if check_ffmpeg; then
+        log_success "ffmpeg (optional)"
+    elif _find_tool_program ffmpeg ffmpeg; then
+        log_warning "ffmpeg found, but ffprobe is missing (optional — both are needed for video)"
+    else
+        log_warning "ffmpeg not installed (optional)"
+    fi
 
     # Confirm the Windows setup is the supported one, so a user who followed
     # the docs gets told it worked rather than nothing at all.
@@ -1570,6 +2662,43 @@ cmd_status() {
             *)      log_success "On the Linux filesystem" ;;
         esac
     fi
+
+    # Last, so a restart's output comes after the rest of the status.
+    if [ -n "$status_pids" ]; then check_content_watcher; fi
+}
+
+# The ContentWatcher can stop hearing about file changes while still
+# running — after the disk it watches is remounted, for one — so saves stop
+# reaching the site with nothing said. bin/roe-watch-check looks for a
+# content file changed since the watcher last heard anything; this only
+# speaks up when it finds one. A restart loads every file again, so it also
+# picks up whatever was missed.
+check_content_watcher() {
+    [ -f "$APP_DIR/bin/roe-watch-check" ] || return 0
+    check_ruby > /dev/null 2>&1 || return 0
+
+    local detail
+    detail="$(cd "$APP_DIR" && ruby "$APP_DIR/bin/roe-watch-check" "$SITE_DIR" 2>/dev/null)" && return 0
+    [ -n "$detail" ] || return 0
+
+    echo ""
+    log_warning "The ContentWatcher appears to have stopped picking up changes."
+    echo "$detail"
+
+    # Only ask when someone can answer: piped or scripted, a prompt would
+    # wait forever.
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+        echo "    Restart Roe to load them: roe restart${ROE_NAME:+ $ROE_NAME}"
+        return 0
+    fi
+
+    local answer=""
+    printf "    Restart Roe to load them? [y/N] "
+    read -r answer || answer=""
+    case "$answer" in
+        y|Y|yes|YES|Yes) echo ""; cmd_restart ;;
+        *) echo "    Left as is. To restart later: roe restart${ROE_NAME:+ $ROE_NAME}" ;;
+    esac
 }
 
 # ── Update command ────────────────────────────────────────────────────────────
@@ -1607,6 +2736,7 @@ esac
 
 case "${1:-}" in
     check)        cmd_check ;;
+    install)      cmd_check ;;
     setup)        cmd_setup ;;
     setup-mise)   cmd_setup_mise ;;
     setup-rbenv)  cmd_setup_rbenv ;;
@@ -1616,6 +2746,8 @@ case "${1:-}" in
     console) cmd_console ;;
     status)  cmd_status ;;
     update)  cmd_update ;;
+    register)   cmd_register ;;
+    unregister) cmd_unregister ;;
     help|--help|-h) usage ;;
     *)
         log_error "Unknown command: ${1:-}"

@@ -7,6 +7,10 @@ require "test_helper"
 # are live (they resolve from metadata at render), and any block whose value is
 # missing is skipped rather than written empty.
 class ContentScaffoldTest < ActiveSupport::TestCase
+  # A store with a cart. The test site's store.yml comes and goes with other
+  # tests, and no store.yml reads as Snipcart off — so say which this is.
+  setup { SiteFeature.stubs(:snipcart_enabled?).returns(true) }
+
   def body(type, metadata = {}, template_body = "")
     ContentScaffold.body_for(type, metadata: metadata, template_body: template_body)
   end

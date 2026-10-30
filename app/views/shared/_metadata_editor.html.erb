@@ -126,7 +126,7 @@
   end
 %>
 <div id="metadata-container"
-     data-controller="metadata-editor<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' %>"
+     data-controller="metadata-editor duration-detect<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' && SiteFeature.snipcart_enabled? %>"
      data-release-link-settings-path-value="<%= admin_edit_music_config_path %>"
      data-metadata-editor-known-fields-value="<%= known_fields_config.to_json %>"
      data-metadata-editor-default-author-value="<%= ERB::Util.html_escape(default_author) %>"
@@ -141,13 +141,49 @@
      data-metadata-editor-product-groups-value="<%= (ProductGroup.all rescue []).to_json %>"
      <% end %>
      style="--metadata-label-width: <%= label_column_ch %>ch"
-     class="mb-5">
+     class="mb-3">
   <div class="flex items-center justify-between mb-2">
-    <button type="button"
-            data-action="click->metadata-editor#toggleMetadataSection"
-      class="text-sm font-semibold text-gray-700 hover:text-gray-900">
-      Metadata <span data-metadata-editor-target="arrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer"><%= metadata_hidden.present? ? '▶' : '▼' %></span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button type="button"
+              data-action="click->metadata-editor#toggleMetadataSection"
+        class="text-sm font-semibold text-gray-700 hover:text-gray-900">
+        Metadata <span data-metadata-editor-target="arrow" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer"><%= metadata_hidden.present? ? '▶' : '▼' %></span>
+      </button>
+      <%# Add Field sits up here beside the toggle, rather than at the foot of
+          a long list where it got lost. It shows only while the form is open:
+          the metadata-add-field rule in application.css hides it when the
+          section is closed or showing RAW, where a field added to the hidden
+          form would be lost on the way back. CSS rather than the controller,
+          so metadata_editor_controller.js is untouched. %>
+      <%# `flex`, not `inline-block`: an inline-block takes the page's 24px line
+          height around its 18px button, which made the header row taller
+          when this appeared and nudged Metadata and RAW down. %>
+      <div class="relative flex" data-metadata-add-field>
+        <button type="button"
+              data-action="click->metadata-editor#toggleAddFieldMenu"
+          class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer inline-block">
+          + Add Field
+        </button>
+        <div data-metadata-editor-target="addFieldMenu"
+          class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 min-w-50">
+          <% available_known_fields.each do |field_name| %>
+            <button type="button"
+                  data-action="click->metadata-editor#addKnownField"
+              data-field-name="<%= field_name %>"
+              class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono"
+              data-available-field="<%= field_name %>">
+              <%= field_name %>
+            </button>
+          <% end %>
+          <div class="border-t border-gray-200"></div>
+          <button type="button"
+                data-action="click->metadata-editor#addCustomField"
+            class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono italic text-gray-600">
+            Custom field...
+          </button>
+        </div>
+      </div>
+    </div>
     <button type="button"
             data-action="click->metadata-editor#toggleMetadataView"
       data-metadata-editor-target="toggleBtn"
@@ -158,10 +194,13 @@
 
   <!-- Form View -->
   <div data-metadata-editor-target="content" class="<%= metadata_hidden %>">
-    <div data-metadata-editor-target="formView" class="space-y-2">
-      <div data-metadata-editor-target="fieldsContainer" class="space-y-2">
+    <%# A white box like the editor's, so the form reads as one block. %>
+    <div data-metadata-editor-target="formView" class="space-y-2 bg-white border border-gray-300 p-3">
+      <%# The url_name box sits outside fieldsContainer: switching back from
+          RAW rebuilds that container from the YAML (yamlToForm empties it),
+          and url_name isn't in the YAML, so the box went with it. %>
       <% if item&.persisted? && item.respond_to?(:url_name) && item.url_name.present? %>
-        <div class="mb-3 p-2 bg-blue-50 border border-blue-200 text-sm font-mono mb-4">
+        <div class="p-2 bg-blue-50 border border-blue-200 text-sm font-mono mb-4">
           <div>
             <span class="text-blue-800 font-semibold">url_name:</span>
             <code class="text-xs ml-2"><%= item.url_name %></code>
@@ -179,6 +218,7 @@
           <% end %>
         </div>
       <% end %>
+      <div data-metadata-editor-target="fieldsContainer" class="space-y-2">
         <%# Render known fields in config order first %>
         <% known_fields_config.each do |field_name, config| %>
           <% next unless metadata_hash.key?(field_name) %>
@@ -196,7 +236,7 @@
                 field by construction. It used to be a separate row indented by
                 a spacer that copied the label's width — two rules that had to
                 agree, and didn't. %>
-            <div class="flex-1 min-w-0">
+            <div class="flex-1 min-w-0 max-w-[500px]">
               <div class="flex <%= checkbox_row ? 'items-center' : 'items-start' %> gap-2">
             <% case config[:type] %>
               <% when :text %>
@@ -366,7 +406,7 @@
                   if datetime_value.include?('T')
                     datetime_value = datetime_value[0..15]
                   end
-                %>
+              %>
               <input type="datetime-local"
                       id="metadata-field-<%= field_name %>"
                       name="metadata_fields[<%= field_name %>]"
@@ -418,15 +458,7 @@
                 <p class="text-xs text-gray-500 mt-1 mb-0.5"><%= config[:note] %></p>
               <% end %>
             </div>
-              <% if !config[:required] %>
-                <button type="button"
-                      data-action="click->metadata-editor#removeMetadataField"
-                  class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0 cursor-pointer">
-                  ×
-                </button>
-              <% else %>
-                <div class="w-6 shrink-0"></div>
-              <% end %>
+              <%= render "shared/metadata_remove_button", placeholder: config[:required] %>
             </div>
           <% end %>
           <%# Then render custom fields (not in known_fields_config) %>
@@ -435,7 +467,7 @@
               <input type="text"
                   value="<%= field_name %>"
                   placeholder="field_name"
-                  class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
+                  class="font-mono text-xs px-2 py-2 border border-gray-300 metadata-label"
                   data-custom-key>
               <input type="text"
                   id="metadata-field-<%= field_name.parameterize %>"
@@ -443,42 +475,12 @@
                   value="<%= ERB::Util.html_escape(value.to_s) %>"
                   class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                   data-metadata-field="<%= field_name %>">
-              <button type="button"
-                    data-action="click->metadata-editor#removeMetadataField"
-                class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0 cursor-pointer">
-                ×
-              </button>
+              <%= render "shared/metadata_remove_button" %>
             </div>
           <% end %>
-        </div>
-        <!-- Add Field Button with Dropdown -->
-        <div class="relative inline-block">
-          <button type="button"
-                data-action="click->metadata-editor#toggleAddFieldMenu"
-            class="text-xs font-mono uppercase px-3 py-1 border border-gray-400 hover:bg-gray-200 rounded-xs cursor-pointer">
-            + Add Field
-          </button>
-          <div data-metadata-editor-target="addFieldMenu"
-            class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 min-w-50">
-            <% available_known_fields.each do |field_name| %>
-              <button type="button"
-                    data-action="click->metadata-editor#addKnownField"
-                data-field-name="<%= field_name %>"
-                class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono"
-                data-available-field="<%= field_name %>">
-                <%= field_name %>
-              </button>
-            <% end %>
-            <div class="border-t border-gray-200"></div>
-            <button type="button"
-                  data-action="click->metadata-editor#addCustomField"
-              class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs font-mono italic text-gray-600">
-              Custom field...
-            </button>
-          </div>
-        </div>
       </div>
     </div>
+  </div>
     <!-- Raw YAML View -->
     <div data-metadata-editor-target="yamlView" class="hidden">
       <textarea name="metadata"
@@ -486,6 +488,10 @@
               class="w-full font-mono text-sm p-2 border border-gray-300 bg-gray-50 "
               rows="12"><%= metadata %></textarea>
     </div>
+    <%# The × for rows built in JavaScript — cloned from here so there's one
+        copy of it (shared/_metadata_remove_button). %>
+    <template data-metadata-editor-target="removeButtonTemplate"><%= render "shared/metadata_remove_button" %></template>
+    <template data-metadata-editor-target="removeSpacerTemplate"><%= render "shared/metadata_remove_button", placeholder: true %></template>
     <!-- Hidden field to store final metadata YAML -->
     <input type="hidden"
          name="metadata"

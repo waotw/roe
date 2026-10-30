@@ -24,6 +24,10 @@ class ContentSync
     return if Rails.env.test?
 
     ImageVariantGenerator.prune_all!
+    # Video renditions are never pruned for being unused (they're slow to
+    # make and can't be rebuilt on a live site); only those whose original
+    # is gone.
+    VideoVariantGenerator.prune_orphans!
   rescue => e
     Rails.logger.warn "[ContentSync] variant prune skipped: #{e.class} #{e.message}"
   end
@@ -137,17 +141,33 @@ class ContentSync
     "avi" => "video", "mkv" => "video"
   }.freeze
 
+  # The media files content sync keeps a record for. Every type above
+  # except heic/heif, which the media browser converts on upload.
+  SYNCED_MEDIA_EXTENSIONS = %w[
+    jpg jpeg png gif webp svg bmp
+    mp3 m4a wav ogg flac aac
+    mp4 webm ogv mov avi mkv
+  ].freeze
+
   MEDIA_INSERT_BATCH = 200
 
   def sync_media
     # Sync all media types (images, audio, video) - EXCLUDE variants folder
-    media_files = Dir.glob(File.join(RoeSitePaths::SITE_MEDIA_PATH, "**", "*.{jpg,jpeg,png,gif,webp,svg,bmp,mp3,m4a,wav,ogg,flac,aac,mp4,webm,ogv,mov,avi,mkv}"))
-                     .reject { |path| path.include?("/variants/") }
+    # Any case: a .MOV missed here reads as deleted, and removing its record
+    # deletes its video web versions.
+    media_files = RoeSitePaths.files_with_extensions(RoeSitePaths::SITE_MEDIA_PATH, SYNCED_MEDIA_EXTENSIONS)
+                              .reject { |path| path.include?("/variants/") }
+    # On live, videos whose originals the live-video setting keeps on the
+    # writing computer: only their web versions are here. Their records
+    # stay (and are made for a video that arrived this way), or removing
+    # the record would delete those web versions too. Empty on the writing
+    # computer, where a missing original means it was deleted.
+    kept_elsewhere = VideoVariantGenerator.stand_in_originals
 
     puts "\n🎬 Found #{media_files.count} media files"
 
     # Handle orphaned media
-    handle_orphaned_media(media_files)
+    handle_orphaned_media(media_files, also_present: kept_elsewhere)
 
     puts "=" * 60
 
@@ -167,6 +187,7 @@ class ContentSync
 
     new_records = []
     image_paths_for_queue = []
+    video_paths_for_queue = []
 
     media_files.each do |file_path|
       web_path = File.realpath(file_path).sub(real_site_path, "")
@@ -183,9 +204,23 @@ class ContentSync
         updated_at:  now
       }
       image_paths_for_queue << web_path if canonical == "images"
+      video_paths_for_queue << web_path if canonical == "video"
     rescue => e
       Rails.logger.error "[ContentSync] Failed to inspect #{file_path}: #{e.message}"
       puts "  ✗ Error: #{File.basename(file_path)} - #{e.message}"
+    end
+
+    kept_elsewhere.each do |web_path|
+      next if existing_paths.include?(web_path)
+
+      manifest = VideoVariantGenerator.manifest_path(web_path)
+      new_records << {
+        file_path:   web_path,
+        media_type:  "video",
+        uploaded_at: (File.mtime(manifest) rescue now),
+        created_at:  now,
+        updated_at:  now
+      }
     end
 
     inserted = 0
@@ -211,6 +246,14 @@ class ContentSync
         image_count += 1 if ImageVariantGenerator.queue_baseline!(web_path)
       end
       puts "🖼️  Queued #{image_count} images for baseline variant" if image_count.positive?
+    end
+
+    # New videos (a file dropped into site/media/video, or one Site Sync
+    # brought in) get their web versions here, for the same reason. No-op
+    # where ffmpeg isn't installed.
+    if video_paths_for_queue.any?
+      video_count = video_paths_for_queue.count { |web_path| VideoVariantGenerator.queue!(web_path) }
+      puts "🎬 Queued #{video_count} videos for web versions" if video_count.positive?
     end
 
     puts "=" * 60
@@ -425,11 +468,11 @@ class ContentSync
     end
   end
 
-  def handle_orphaned_media(current_files)
+  def handle_orphaned_media(current_files, also_present: [])
     # Convert to web paths for comparison
     # Handle symlinks - resolve to real path before substitution
     real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, "") }
+    current_web_paths = current_files.map { |f| File.realpath(f).sub(real_site_path, "") } + Array(also_present)
 
     orphans = Medium.where.not(file_path: current_web_paths)
 

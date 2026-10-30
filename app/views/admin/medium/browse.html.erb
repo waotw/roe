@@ -1,63 +1,12 @@
-<div class="mb-1 pb-2 border-b border-gray-300">
+<%# media-upload wraps BOTH the upload input (in the header below) and the grid
+    (in the content div). Stimulus only wires actions/targets inside the
+    controller's element, so the input and grid must share one scope — hence
+    this outer wrapper rather than putting media-upload on the content div. %>
+<div data-controller="media-upload">
+<div class="mb-0 pb-2 border-b border-gray-300">
   <div class="flex items-start justify-between">
-      <h1 class="text-2xl font-bold">Media Browser</h1>
-      <div class="flex flex-col items-end gap-1">
-        <%= link_to "SYSTEM IMAGES", browse_images_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
-        <%= button_to "PRUNE VARIANTS",
-                      prune_variants_admin_medium_index_path,
-                      method: :post,
-                      form: { data: { turbo: false },
-                              onsubmit: "return confirm('Reduce variants for unused images and delete variants for images that have been deleted? In-use variants and original images are untouched.');" },
-                      class: "uppercase text-[.65rem] text-amber-700 px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
-        <%= link_to "About variants ↗", "https://go-roe.com/documentation/image-optimization", target: "_blank", class: "text-xs text-gray-400 hover:text-gray-600 underline" %>
-      </div>
-  </div>
-  <%= render 'image_optimization' %>
-</div>
-
-<div data-controller="media-filter media-bulk-select media-upload"
-     data-media-filter-total-value="<%= @media.count %>">
-
-  <!-- Tabs for Media Types -->
-  <div class="mb-4 border-b border-gray-200">
-      <div class="flex justify-between items-center">
-      <nav class="-mb-px flex space-x-8">
-        <!-- Always show 'All' -->
-        <button
-          data-action="click->media-filter#filterByType"
-          data-type="all"
-          data-media-filter-target="tab"
-          class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-          All
-        </button>
-
-        <!-- Show tabs for types that exist -->
-        <% if @existing_types.include?('images') %>
-          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-            Images
-          </button>
-        <% end %>
-
-        <% if @existing_types.include?('audio') %>
-          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-            Audio
-          </button>
-        <% end %>
-
-        <% if @existing_types.include?('video') %>
-          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-            Video
-          </button>
-        <% end %>
-        <% if @has_global_media && MediaUsageIndex.global_tab_enabled? %>
-          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-            Global
-          </button>
-        <% end %>
-          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-4 px-1 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
-            Unused
-          </button>
-      </nav>
+    <div class="flex gap-4">
+      <h1 class="text-2xl font-bold leading-7">Media Browser</h1>
       <!-- Upload Form -->
       <%= form_with url: admin_medium_index_path, method: :post, multipart: true, local: true do |f| %>
         <%= f.file_field :files,
@@ -68,10 +17,81 @@
             name: "files[]",
             data: { media_upload_target: "input", action: "change->media-upload#upload" } %>
 
-        <label for="file-upload-input" class="cursor-pointer inline-flex items-center uppercase text-base text-white px-3 py-1 border border-lime-900 bg-lime-700 hover:bg-lime-600 font-mono rounded-xs">
+        <label for="file-upload-input" class="cursor-pointer inline-flex items-center uppercase text-base text-white px-2.5 py-0.5 border border-lime-900 bg-lime-700 hover:bg-lime-600 font-mono rounded-xs">
           UPLOAD
         </label>
       <% end %>
+    </div>
+      <div class="flex flex-col items-end gap-1">
+        <%= link_to "SYSTEM IMAGES", browse_images_admin_system_assets_path, target: "_blank", class: "uppercase text-xs px-1.5 py-0.5 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+        <%= button_to "PRUNE VARIANTS",
+                      prune_variants_admin_medium_index_path,
+                      method: :post,
+                      form: { data: { turbo: false },
+                              onsubmit: "return confirm('Reduce variants for unused images and delete variants for images that have been deleted? In-use variants and original images are untouched.');" },
+                      class: "uppercase text-[.65rem] text-amber-700 px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
+        <%# Shown only when ffmpeg is installed and some videos have no web
+            versions yet (or failed last time). COPY: button label + confirm %>
+        <% if @videos_to_optimize.to_i.positive? %>
+          <%= button_to "OPTIMIZE VIDEOS (#{@videos_to_optimize})",
+                        optimize_videos_admin_medium_index_path,
+                        method: :post,
+                        form: { data: { turbo: false },
+                                onsubmit: "return confirm('Optimize #{@videos_to_optimize} #{'video'.pluralize(@videos_to_optimize)}? This runs in the background, one at a time, and can take a while for long videos.');" },
+                        class: "uppercase text-[.65rem] text-amber-700 px-1.5 py-0.5 border border-amber-800 bg-amber-200 hover:bg-amber-300 font-mono rounded-xs" %>
+        <% end %>
+        <%= link_to "About variants ↗", "https://go-roe.com/documentation/roe/image-optimization", target: "_blank", class: "text-xs text-gray-400 hover:text-gray-600 underline" %>
+      </div>
+  </div>
+  <%= render 'image_optimization' %>
+  <%# Refilled by media-upload#refreshNotices when a video finishes while
+      the page is open, so the notice appears without a refresh. %>
+  <div id="video-notices-slot"><%= render 'video_notices', notices: @video_notices || [] %></div>
+</div>
+
+<div data-controller="media-filter media-bulk-select"
+     data-media-filter-total-value="<%= @media.count %>">
+
+  <!-- Tabs for Media Types -->
+  <div class="mb-4 border-b border-gray-200">
+      <div class="flex justify-between items-center">
+      <nav class="flex space-x-0">
+        <!-- Always show 'All' -->
+        <button
+          data-action="click->media-filter#filterByType"
+          data-type="all"
+          data-media-filter-target="tab"
+          class="whitespace-nowrap border-b-2 py-2 px-6 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+          All
+        </button>
+
+        <!-- Show tabs for types that exist -->
+        <% if @existing_types.include?('images') %>
+          <button data-action="click->media-filter#filterByType" data-type="images" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-2 px-6 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Images
+          </button>
+        <% end %>
+
+        <% if @existing_types.include?('audio') %>
+          <button data-action="click->media-filter#filterByType" data-type="audio" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-2 px-6 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Audio
+          </button>
+        <% end %>
+
+        <% if @existing_types.include?('video') %>
+          <button data-action="click->media-filter#filterByType" data-type="video" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-2 px-6 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Video
+          </button>
+        <% end %>
+        <% if @has_global_media && MediaUsageIndex.global_tab_enabled? %>
+          <button data-action="click->media-filter#filterByType" data-type="global" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-2 px-6 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Global
+          </button>
+        <% end %>
+          <button data-action="click->media-filter#filterByType" data-type="unused" data-media-filter-target="tab" class="whitespace-nowrap border-b-2 py-2 px-6 text-sm font-mono uppercase border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700">
+            Unused
+          </button>
+      </nav>
     </div>
   </div>
 
@@ -92,6 +112,16 @@
                 class="text-xs px-3 py-1.5 border border-gray-600 bg-white hover:bg-gray-100 rounded-xs font-mono uppercase">
           Clear Selection
         </button>
+        <%# Live site only. Large videos aren't in the backup a sync takes
+            before it changes live (SiteSync::BackupPolicy), so this is how
+            to keep a copy of one. On this machine the files are already
+            here in site/media. %>
+        <% if Rails.env.production? %>
+          <button data-action="click->media-bulk-select#downloadSelected"
+                  class="text-xs px-3 py-1.5 border border-blue-600 bg-blue-100 hover:bg-blue-200 rounded-xs font-mono uppercase">
+            Download
+          </button>
+        <% end %>
         <%= button_to "Delete Selected",
                       bulk_destroy_admin_medium_index_path,
                       method: :post,
@@ -222,32 +252,31 @@
 
   function copyMarkdown(event, path, filename) {
     const markdown = `![${filename}](${path})`;
-    navigator.clipboard.writeText(markdown).then(() => {
-      const btn = event.target;
-      const originalText = btn.textContent;
-      btn.textContent = 'Copied!';
-      btn.classList.add('bg-green-200');
-      setTimeout(() => {
-        btn.textContent = originalText;
-        btn.classList.remove('bg-green-200');
-      }, 1500);
-    }).catch(err => {
-      alert('Failed to copy: ' + err);
-    });
+    flashCopy(event.target, window.copyToClipboard(markdown));
   }
 
   function copyUrl(event, path) {
-    navigator.clipboard.writeText(path).then(() => {
-      const btn = event.target;
-      const originalText = btn.textContent;
+    flashCopy(event.target, window.copyToClipboard(path));
+  }
+
+  // window.copyToClipboard (app/javascript/clipboard.js) falls back to
+  // execCommand where navigator.clipboard is missing — which it is on
+  // http://<name>.roe, the address every registered install runs at.
+  function flashCopy(btn, promise) {
+    const originalText = btn.textContent;
+    promise.then(() => {
       btn.textContent = 'Copied!';
       btn.classList.add('bg-green-200');
+    }).catch(() => {
+      btn.textContent = 'Press ⌘/Ctrl-C';
+    }).finally(() => {
       setTimeout(() => {
         btn.textContent = originalText;
         btn.classList.remove('bg-green-200');
       }, 1500);
-    }).catch(err => {
-      alert('Failed to copy: ' + err);
     });
   }
 </script>
+<%= render 'video_progress_modal' %>
+</div>
+<%# /media-upload wrapper %>

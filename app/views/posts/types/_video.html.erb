@@ -1,17 +1,10 @@
-<div class="video-player-container">
-  <video class="video-player-video" controls preload="metadata">
-    <source src="<%= post.video %>" type="video/mp4">
-    <source src="<%= post.video %>" type="video/webm">
-    <source src="<%= post.video %>" type="video/ogg">
-    Your browser doesn't support video playback.
-  </video>
-
-  <% if post.duration.present? %>
-    <div class="media-meta">
-      <span class="duration"><%= post.duration %></span>
-    </div>
-  <% end %>
-</div>
+<%# A video post. The player is the same ```card type: player an author can
+    put in the body — supplied here only when the body has none, and when
+    content.yml's players.video is on (Post#show_template_player?). One
+    player either way. %>
+<% if post.show_template_player? %>
+  <%= render "posts/template_player", post: post %>
+<% end %>
 
 <div class="post-content">
   <%= render_post_content(post) %>

@@ -63,33 +63,33 @@ Everything below this point is only visible to paid members. This is where your 
 
 ### 3. Without a Paywall Form
 
-If you mark a post as `audience: paid` but don't add a paywall, visitors who try to access it will be redirected to your `/upgrade` page.
+If you mark a post as `audience: paid` but don't add a paywall form, visitors who try to access it will be redirected to your `/upgrade` page.
 
-## Media files and paid content
+## Files behind paid content
 
-Adding `audience: paid` to a post or page's metadata will protect any media files in the content of that post or page. Direct links to those files are blocked as well.
+Marking a post paid also protects the files it uses. An audio file, image or video that only paid content points at is served to paid members, admins, and nobody else — anyone else gets a 403, even with the exact URL.
 
-#### There are a few exceptions:
+This is worth knowing because it wasn't always true. A gated page hides its own links, but the file underneath sat at a guessable address; anyone who had the URL kept it, including someone who had since cancelled.
 
-- Roe allows you to give previews of paid content. Any media files in the content above the paywall will be public.
-- Posts and pages can have an `image` in their metadata. These images will always remain public.
-- <mark>A media file that is referenced in both paid and free content stays public.</mark>
+Roe works out which files to protect from what references them. A file is protected when **every** post or page using it is paid.
 
-#### How to know if media is public or protected
+<mark>A file used by both paid and free content stays public.</mark> That's deliberate: the alternative is that editing an unrelated paid post silently breaks an image on a page anyone can read. If something you meant to protect is readable, this is usually why — find it with the `Paid` and `Free` toggles together in the [Media browser](/documentation/roe/media#audiences).
 
- The [Media browser](/documentation/roe/media#audiences) allows you to filter by `paid` and `free` media so you can verify if something is protected. Check both `paid` and `free` to find files that are in `paid` posts but are still public.
+Resized copies of an image are protected with their original, so a paid photo can't be read at 800px instead.
 
-![Roe - Media Browser with Paid and Free filters checked](/media/images/media_paid_free.png)
+### Paid members reading on your site
 
-### Podcasts and music
+Nothing to do. A signed-in paid member's session carries them, so images and audio load as they'd expect.
 
-Paid members are given private feeds for podcasts and music. If a user cancels their account, thier private links will no longer work. See [Podcast feeds](/documentation/roe/podcast-feed-tags#feed-urls).
+### Podcast and music apps
+
+An app fetching an episode has no session, so private feeds put a token in each file's URL. That token is unique to the member, grants reading files and nothing else, and stops working the moment they cancel or downgrade. See [Podcast feeds](/documentation/roe/podcast-feed-tags#feed-urls).
 
 ## Paid podcasts and releases
 
-In Roe, you can add `audience: paid` to the podcast or music release globally. This will set all episodes or tracks as paid. However, you can override this for individual episodes or tracks.
+A podcast or a music release carries an audience of its own, and its episodes or tracks inherit it. Set the show to `paid` and everything in it is paid, without editing each episode.
 
-An episode that sets `audience: everyone` overrides the global setting for that episode:
+An episode that sets its own audience overrides the show. That's what lets you sell a paid podcast with free openers:
 
 ```yaml
 ---
@@ -99,23 +99,37 @@ audience: everyone
 ---
 ```
 
-### How people subscribe
+Leave `audience` off an episode and it follows the show. Set it, and it doesn't.
 
-If a podcast contains at least one free episode, there will be a public feed which contains the free episodes and previews of the paid episodes. Previews appear in the public feed with their title and description but no audio file.
+Resolution is the same everywhere in Roe: **the episode, then its show, then everyone.**
+
+### What people can subscribe to
+
+A public feed exists whenever the show has something public in it — not simply when the show isn't paid.
+
+| Show | Episodes | Public feed |
+|------|----------|-------------|
+| free | some paid | the free ones, with paid as previews |
+| paid | some free | the free ones |
+| paid | none free | none at all |
+
+So a paid podcast with three free openers has a feed people can subscribe to, hear the openers, and upgrade from. A paid podcast with nothing free has no public feed, and the only way in is the private one.
+
+Previews count as public: with **Show paid content** on, paid episodes appear in the public feed with their title and description but no audio.
 
 Music releases work the same way — see [Settings → Music](/documentation/roe/settings-music#paid-music).
 
-## Upgrade Buttons
+## Smart Upgrade Buttons
 
 ### Options
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `for` | Yes | `checkout` |
+| `for` | Yes | Must be `checkout` |
 | `member-button-text` | No | For logged-in members |
 | `non-member-button-text` | No | For non-members (shows sign-up link) |
 
-The upgrade form shows different buttons depending on who's viewing it:
+The upgrade page shows different buttons depending on who's viewing it:
 
 ````markdown
 ```form
@@ -130,3 +144,5 @@ non-member-button-text: Sign up as paid member
 - **Signed-in free members** see "Upgrade Now" → goes straight to Stripe
 - **Not signed in** see "Sign up as paid member" → goes to signup page
 - **Paid members** don't see the form (they're already paid)
+
+This creates a better experience - everyone sees the right call-to-action for their situation.

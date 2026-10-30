@@ -11,25 +11,34 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   # conflicts:   the serialized conflicts from the blocked status (each has
   #              "path" and "type"), so we know the right action per path.
   def perform(resolutions, conflicts)
-    started_at = Time.current
+    @started_at = started_at = Time.current
     resolutions = resolutions.to_h
     plan = build_plan(resolutions, conflicts)
 
-    write_status(state: :running, step_label: "Resolving #{resolutions.size} conflict(s)…", started_at: started_at)
+    # Same status shape as SiteSyncTransferJob — a `step` from its STEPS and
+    # the transport's progress — so the Site Sync page shows where it is. It
+    # used to write only a `step_label`, which the status endpoint replaces
+    # with one looked up from `step`; with no step that was nil, and the
+    # page sat on "Starting…" for the whole of a ten-minute video push.
+    update_step(:starting)
 
     pushed = plan[:push_add].any? || plan[:push_delete].any?
     pulled = plan[:pull_add].any? || plan[:pull_delete].any?
 
     # Keep-mine files flow local → live.
     if pushed
-      SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete])
-      SiteSync.transport.push_local_to_live!(diff: { modified: [], added: plan[:push_add], deleted: plan[:push_delete] })
+      update_step(:backing_up_live)
+      SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete], on_progress: progress_proc)
+      update_step(:pushing_to_live)
+      SiteSync.transport.push_local_to_live!(diff: { modified: [], added: plan[:push_add], deleted: plan[:push_delete] }, on_progress: progress_proc)
     end
 
     # Keep-live files flow live → local.
     if pulled
+      update_step(:backing_up_local)
       @local_snapshot = SiteSync::BackupManager.create
-      SiteSync.transport.pull_live_to_local!(diff: { modified: [], added: plan[:pull_add], deleted: plan[:pull_delete] })
+      update_step(:pulling_from_live)
+      SiteSync.transport.pull_live_to_local!(diff: { modified: [], added: plan[:pull_add], deleted: plan[:pull_delete] }, on_progress: progress_proc)
     end
 
     # Re-baseline only what was actually settled.
@@ -47,8 +56,10 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     rebaseline!(plan)
     invalidate_status_caches
 
+    update_step(:reconciling_content)
     ContentSync.sync_all if pulled
     SiteSync::Exchange.reconcile_peer_content! if pushed
+    update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
 
     # Again, now nothing else will touch /site. ContentSync above can rewrite a
@@ -81,22 +92,37 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   # this run actually transferred or deleted qualify; everything else keeps
   # whatever the last real sync recorded — including being absent, which is
   # what keeps a local-only file safely on the push side of the next reconcile.
+  #
+  # A settled path is recorded only if both sides now hold the same version
+  # (Ledger.same_state?). One changed again while this ran keeps its old
+  # entry, so the next sync sees that change instead of the record claiming
+  # agreement. Without live's file list there's no way to check, so nothing
+  # is recorded — stale drift is visible and recoverable; a wrong record isn't.
   def rebaseline!(plan)
     recorded = SiteSync::Ledger.recorded&.dig("files") || {}
     current  = SiteSync::Ledger.current
+    peer     = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
     settled  = plan.values.flatten.uniq
 
+    if peer.nil?
+      Rails.logger.warn "[SiteSyncConflictResolutionJob] peer manifest unavailable — baseline left as-is"
+      return
+    end
+
     baseline = recorded.dup
+    unagreed = 0
     settled.each do |path|
-      if current.key?(path)
+      if !current.key?(path) && !peer.key?(path)
+        baseline.delete(path)
+      elsif SiteSync::Ledger.same_state?(current[path], peer[path])
         baseline[path] = current[path]
       else
-        baseline.delete(path)
+        unagreed += 1
       end
     end
 
-    Rails.logger.info "[SiteSyncConflictResolutionJob] re-baselined #{settled.size} settled path(s); " \
-                      "#{(recorded.keys | current.keys).size - baseline.size} left out of the baseline"
+    Rails.logger.info "[SiteSyncConflictResolutionJob] re-baselined #{settled.size - unagreed} settled path(s); " \
+                      "#{unagreed} differ from the peer and keep their previous entry"
     SiteSync::Ledger.write_manifest!(baseline)
   end
 
@@ -135,5 +161,30 @@ class SiteSyncConflictResolutionJob < ApplicationJob
 
   def write_status(attrs)
     Rails.cache.write(SiteSyncTransferJob::STATUS_CACHE_KEY, attrs, expires_in: SiteSyncTransferJob::STATUS_TTL)
+  end
+
+  # Progress reporting, in the same shape SiteSyncTransferJob writes.
+
+  def update_step(step)
+    @step = step
+    @progress = nil
+    Rails.logger.info "[SiteSyncConflictResolutionJob] step: #{step}"
+    write_running_status
+  end
+
+  def progress_proc
+    @progress_proc ||= ->(completed:, total:, bytes_done: nil, bytes_total: nil, current: nil) {
+      @progress = { completed: completed, total: total }
+      @progress.merge!(bytes_done: bytes_done, bytes_total: bytes_total) if bytes_total.to_i.positive?
+      # The large file in flight, so a long wait names what it's waiting on.
+      @progress[:current] = current if current
+      write_running_status
+    }
+  end
+
+  def write_running_status
+    payload = { state: :running, kind: :resolve, step: @step, started_at: @started_at }
+    payload[:progress] = @progress if @progress
+    write_status(payload)
   end
 end

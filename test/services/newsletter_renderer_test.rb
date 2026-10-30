@@ -109,9 +109,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   end
 
   test "converts relative URLs to absolute" do
-    SiteConfig.stubs(:current).returns(
-      OpenStruct.new(config: { "url" => "https://example.com" })
-    )
+    with_site_config("url" => "https://example.com")
 
     post_with_links = create(:post,
       metadata: {
@@ -130,7 +128,7 @@ class NewsletterRendererTest < ActiveSupport::TestCase
   end
 
   test "uses localhost fallback when site URL not configured" do
-    SiteConfig.stubs(:current).returns(nil)
+    with_site_config({})
 
     renderer = NewsletterRenderer.new(@public_post)
     html = renderer.render
@@ -227,5 +225,52 @@ class NewsletterRendererTest < ActiveSupport::TestCase
     renderer = NewsletterRenderer.new(@public_post, @member)
     assert_equal @public_post, renderer.post
     assert_equal @member, renderer.member
+  end
+
+  # ============================================================================
+  # Header image (post featured image)
+  # ============================================================================
+
+  test "renders the post header image when image_in_header is enabled" do
+    with_site_config("url" => "https://example.com")
+    post = create(:post,
+      metadata: {
+        "title" => "Header Image Post",
+        "status" => "published",
+        "date" => "2024-02-01",
+        "image" => "/media/images/hero.jpg",
+        "image_in_header" => "true"
+      },
+      content: "Body text."
+    )
+
+    html = NewsletterRenderer.new(post).render
+    article = Nokogiri::HTML(html).at_css("article")
+
+    assert_not_nil article.at_css("img"), "header image should render in the article"
+    assert_includes html, "https://example.com/media/", "header image URL must be absolute"
+  end
+
+  test "omits the header image when image_in_header is not enabled" do
+    post = create(:post,
+      metadata: {
+        "title" => "No Header Image Post",
+        "status" => "published",
+        "date" => "2024-02-02",
+        "image" => "/media/images/hero.jpg",
+        "image_in_header" => "false"
+      },
+      content: "Body text."
+    )
+
+    html = NewsletterRenderer.new(post).render
+    article = Nokogiri::HTML(html).at_css("article")
+
+    assert_nil article.at_css("img"), "header image must not render when disabled"
+  end
+
+  test "omits the header image when the post has no image" do
+    html = NewsletterRenderer.new(@public_post).render
+    assert_nil Nokogiri::HTML(html).at_css("article img")
   end
 end

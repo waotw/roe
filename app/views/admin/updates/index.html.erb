@@ -33,11 +33,7 @@
     <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
       <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠ Updates run from your local install</h3>
       <p class="text-sm text-amber-800">
-        Roe's in-app updater swaps files in <code class="font-mono text-xs bg-amber-100 px-0.5">current/</code>,
-        which a deployed container image can't do. This page is read-only here — the
-        amber dot in the nav tells you when an update is available, but to actually
-        apply it, open your <strong>local</strong> Roe install's Updates & Deploy
-        page and run it there. Then deploy to push the new version to your live site.
+        Currently, updates run on your local install and are deployed to your live site. This page is read-only here — the amber dot in the Admin tells you when an update is available, open Updates & Deploy on your local site to update and then deploy to this live site.
       </p>
     </div>
   <% end %>
@@ -52,8 +48,32 @@
       <p class="text-sm text-amber-800">
         You're on a git branch (not a release tag), so the in-app updater is
         disabled here to avoid clobbering your working tree. Use <code class="font-mono text-xs bg-amber-100 px-0.5">git pull</code>
-        to sync. The page below is informational only.
+        to update Roe. The update info on this page is read-only.
       </p>
+    </div>
+  <% end %>
+
+  <%# Themes and site scripts with a newer version than the site's copy. A
+      Roe update brings these in but never installs them — the site owns
+      its copies — so they're offered on the Themes page, and this says so
+      right after an update, where people look. COPY: placeholder. %>
+  <% if shipped_file_updates.any? %>
+    <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
+      <h3 class="text-sm font-semibold text-amber-900 mb-1">
+        <%= pluralize(shipped_file_updates.size, "theme or script update") %> available
+      </h3>
+      <p class="text-sm text-amber-800 mb-2">
+        Roe ships newer versions of these files than your site has. Your copies are never replaced automatically, review and install them on the
+        <%= link_to "Themes page", admin_themes_path, class: "underline font-medium" %>.
+      </p>
+      <ul class="text-sm text-amber-800 list-disc ml-4">
+        <% shipped_file_updates.each do |u| %>
+          <li>
+            <code class="font-mono text-xs bg-amber-100 px-0.5"><%= u[:kind] == :theme ? "site/theme" : "site/javascript" %>/<%= u[:name] %></code>
+            v<%= u[:installed] %> → v<%= u[:bundled] %>
+          </li>
+        <% end %>
+      </ul>
     </div>
   <% end %>
 
@@ -67,6 +87,7 @@
         <li>Updates include new features, bug fixes, and security patches</li>
         <li>Your content in the <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/</code> folder is preserved during updates</li>
         <li>Configuration files are not overwritten</li>
+        <li>Themes and site scripts (in <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/theme/</code> and <code class="text-xs rounded-xs py-0.5 px-0.5 bg-gray-200">site/javascript/</code>) are never replaced. When an update brings a new version, a dot appears on Themes, and you can install from there. If you've edited a file, Roe keeps a copy of your version.</li>
         <li>If an update fails, the system will automatically roll back</li>
       </ul>
     </details>
@@ -98,7 +119,7 @@
       <h3 class="text-sm font-semibold text-gray-900 mb-1">Update channel</h3>
       <p class="text-xs text-gray-600">
         <% if @update_channel == "nightly" %>
-          You're on the <strong>Nightly</strong> channel — pre-release tags from Codeberg are visible below. Use only for testing the update flow; nightly builds may be unstable.
+          You're on the <strong>Nightly</strong> channel — pre-release tags are visible below. Use only for testing the update flow; nightly builds may be unstable.
         <% else %>
           You're on the <strong>Stable</strong> channel — only released versions show up. Switch to Nightly to test the update flow against pre-release tags.
         <% end %>
@@ -135,11 +156,11 @@
             Pre-release available: <code class="font-mono text-xs bg-purple-100 px-1 rounded">v<%= @update_info[:prerelease_version] %></code>
           </h3>
           <p class="text-sm text-purple-800 mb-2">
-            A <code class="font-mono text-xs bg-purple-100 px-1 rounded">-nightly</code> tag is available on Codeberg. This panel appears because you're on the <strong>Nightly</strong> release channel — switch to Stable for official releases.
+            A <code class="font-mono text-xs bg-purple-100 px-1 rounded">-nightly</code> tag is available. This panel appears because you're on the <strong>Nightly</strong> release channel — switch to Stable for official releases.
           </p>
           <% if @update_info[:prerelease_url].present? %>
             <p class="text-xs text-purple-700">
-              <a href="<%= @update_info[:prerelease_url] %>" target="_blank" rel="noopener" class="underline hover:text-purple-900">View release notes on Codeberg →</a>
+              <a href="<%= @update_info[:prerelease_url] %>" target="_blank" rel="noopener" class="underline hover:text-purple-900">View release notes on <%= forge_name(@update_info[:prerelease_url]) %> →</a>
             </p>
           <% end %>
         </div>
@@ -189,6 +210,45 @@
         — restart it to load the new code.
       </p>
 
+      <% if @restart_command %>
+        <%# Registered install: one command from any terminal. %>
+        <div class="bg-white border border-blue-200 rounded-xs p-5 mb-3">
+          <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart Roe</h4>
+
+          <ol class="space-y-5 text-sm text-gray-800">
+            <li>
+              <p class="font-medium mb-1">1. Open any terminal window.</p>
+              <p class="text-xs text-gray-600 leading-relaxed">
+                On macOS: search for <strong>Terminal</strong> in Spotlight with
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">⌘</kbd>
+                +
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">Space</kbd>.
+                It doesn't matter which folder it's in.
+              </p>
+            </li>
+
+            <li>
+              <p class="font-medium mb-2">2. Paste this command and press Enter:</p>
+              <div class="flex items-center gap-2">
+                <code class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xs font-mono text-sm select-all"><%= @restart_command %></code>
+                <button type="button"
+                        data-action="click->updates#copyCommand"
+                        data-command="<%= @restart_command %>"
+                        class="px-3 py-2 border border-gray-400 bg-white hover:bg-gray-50 text-xs font-mono rounded-xs">
+                  Copy
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-gray-600 leading-relaxed">
+                Once it says Roe is running, refresh this page (
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">⌘</kbd>
+                +
+                <kbd class="px-1.5 py-0.5 border border-gray-400 bg-gray-100 rounded-xs font-mono text-xs">R</kbd>)
+                to confirm Roe updated successfully.
+              </p>
+            </li>
+          </ol>
+        </div>
+      <% else %>
       <div class="bg-white border border-blue-200 rounded-xs p-5 mb-3">
         <h4 class="text-sm font-semibold text-gray-900 mb-4">Restart your Roe server</h4>
 
@@ -285,6 +345,7 @@
           </p>
         </div>
       </details>
+      <% end %>
     </div>
   <% elsif @restart_complete %>
     <%# Update is done AND the server has restarted — VersionChecker
@@ -324,16 +385,16 @@
         </div>
 
         <% if @update_info[:release_notes].present? %>
+          <%# Markdown from the release on the forge, rendered and sanitized
+              (release_notes_html). Whole notes, in a panel that scrolls
+              past ~24rem so a long release doesn't push Update Now off
+              the screen. %>
           <div class="mt-4 p-4 bg-white border border-blue-200 rounded-xs">
             <h3 class="text-sm font-semibold text-gray-900 mb-2">Release Notes</h3>
-            <div class="prose prose-sm max-w-none text-gray-700">
-              <%= simple_format(@update_info[:release_notes]) %>
+            <div class="prose prose-sm max-w-none text-gray-700 max-h-96 overflow-y-auto prose-h1:text-lg prose-h2:text-base prose-h2:mt-5 prose-h3:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:bg-gray-100 prose-code:px-0.5 prose-code:rounded-xs prose-code:font-normal">
+              <%= release_notes_html(@update_info[:release_notes]) %>
             </div>
           </div>
-          <%= link_to "View full release notes on Codeberg →",
-                      @update_info[:release_url],
-                      target: "_blank",
-                      class: "text-sm text-blue-600 hover:text-blue-900 underline" %>
         <% end %>
 
         <div class="mt-6 pt-4 border-t border-blue-200">
@@ -358,9 +419,9 @@
                           class: "inline-flex items-center px-4 py-2 border border-gray-800 bg-blue-600 hover:bg-blue-700 text-white font-mono rounded-xs" %>
           <% end %>
 
-          <%= link_to "View full release notes on Codeberg →",
+          <%= link_to "View release on #{forge_name(@update_info[:release_url])} →",
                       @update_info[:release_url],
-                      target: "_blank",
+                      target: "_blank", rel: "noopener",
                       class: "text-sm text-blue-600 hover:text-blue-900 underline" %>
         </div>
       </div>
@@ -442,12 +503,15 @@
       </div>
 
       <%# ── Running / failed are shown in the active-deploy box pinned to
-          the top of the page — nothing to render here. ── %>
-      <% if deploy_state == :running || deploy_state == :failed %>
+          the top of the page. While one is active we render neither a banner
+          nor the Deploy button here (Start Deploy refuses mid-deploy). ── %>
+      <% unless deploy_state == :running || deploy_state == :failed %>
 
-      <%# ── Completed state (only show if not dismissed) ── %>
-      <% elsif deploy_state == :completed && !@deploy_status[:dismissed] %>
-        <div id="deploy-result" class="bg-green-50 border border-green-200 rounded-xs p-4">
+      <%# ── Completed banner — persistent until dismissed or the next deploy.
+          Additive: it sits ABOVE the deploy button rather than replacing it,
+          so you can deploy again while last deploy's status is still shown. ── %>
+      <% if deploy_state == :completed && !@deploy_status[:dismissed] %>
+        <div id="deploy-result" class="bg-green-50 border border-green-200 rounded-xs p-4 mb-6">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-sm font-semibold text-green-900">Deploy completed successfully</h3>
@@ -474,9 +538,10 @@
             </details>
           <% end %>
         </div>
+      <% end %><%# /completed banner %>
 
       <%# ── Not ready — prerequisites unmet ── %>
-      <% elsif @deploy_issues.any? %>
+      <% if @deploy_issues.any? %>
         <div class="bg-amber-50 border border-amber-200 rounded-xs p-4">
           <h3 class="text-sm font-semibold text-amber-900 mb-2">Not ready to deploy</h3>
           <ul class="text-sm text-amber-800 list-disc list-inside space-y-1 mb-3">
@@ -504,6 +569,28 @@
               <%= link_to "See install instructions →", admin_edit_deploy_config_path, class: "underline" %>
             </p>
           <% else %>
+            <% if @videos_optimizing.any? %>
+              <%# A note, not a stop: Deploy stays available. %>
+              <% names = @videos_optimizing.map { |m| File.basename(m.file_path) } %>
+              <div class="mb-3 bg-amber-50 border border-amber-200 rounded-xs p-3 text-sm text-amber-800"
+                   data-deploy-video-note>
+                <%# COPY: deploy note while videos are being optimized %>
+                <p class="font-semibold text-amber-900">
+                  <%= names.size == 1 ? "A video is" : "#{names.size} videos are" %> being optimized:
+                  <span class="font-mono font-normal"><%= names.first(3).join(", ") %><%= " and #{names.size - 3} more" if names.size > 3 %></span>
+                </p>
+                <p class="mt-1">
+                  <% if @deploy_target == 'kamal' %>
+                    It's best to wait until that's done. Kamal builds Roe on this computer, so a deploy now
+                    competes with the video for it: both run slower, and a deploy that shows nothing for 10 minutes is stopped.
+                  <% else %>
+                    Deploying now is fine, since Fly builds in the cloud. The video's web versions reach your live site
+                    through Site Sync once they're made, not with this deploy.
+                  <% end %>
+                  <%= link_to "See progress in Media →", admin_medium_index_path, class: "underline hover:text-amber-900" %>
+                </p>
+              </div>
+            <% end %>
             <button type="button"
                     data-action="click->updates#checkBeforeDeploy"
                     data-deploy-url="<%= admin_start_deploy_path %>"
@@ -514,14 +601,16 @@
             <p class="mt-2 text-xs text-gray-500">
               Deploys the current build on disk.
               <% if @deploy_target == 'kamal' %>
-                Kamal builds on the remote server — expect 5–10 minutes.
+                Kamal builds on this computer, then sends it to your server — expect 5–10 minutes.
               <% else %>
                 Fly builds in the cloud — typically 2–5 minutes.
               <% end %>
             </p>
           <% end %>
         </div>
-      <% end %>
+      <% end %><%# /ready-or-not-ready %>
+
+      <% end %><%# /unless running or failed %>
 
     </div><%# /deploy card %>
   </div><%# /deploy section %>

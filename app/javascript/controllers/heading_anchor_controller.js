@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 // Public-site heading anchors. For every heading with an id, drops a small
 // "copy link" control in the left gutter that appears on hover. Clicking it
@@ -62,29 +63,9 @@ export default class extends Controller {
     history.replaceState(null, "", `#${id}`);
 
     const url = `${location.origin}${location.pathname}#${id}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).catch(() => this.fallbackCopy(url));
-    } else {
-      this.fallbackCopy(url);
-    }
-  }
-
-  // Clipboard API needs a secure context (https/localhost); fall back to a
-  // hidden textarea + execCommand for plain-http self-hosted sites.
-  fallbackCopy(text) {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand("copy");
-    } catch (_) {
-      /* clipboard unavailable — no-op */
-    }
-    ta.remove();
+    copyToClipboard(url).catch(() => {
+      /* clipboard unavailable — the anchor is in the URL bar regardless */
+    });
   }
 
   // Instantly show the "copied" icon, then revert after ~1s (no fade).

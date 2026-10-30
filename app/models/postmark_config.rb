@@ -9,6 +9,13 @@ class PostmarkConfig < ApplicationRecord
   # AR Encryption — uses master.key
   encrypts :server_token
   encrypts :webhook_token
+  # An Account API token can Manage Servers and read Sender Signatures across
+  # the whole account — a much larger blast radius than a Server token. It is
+  # kept ONLY in production (see store_account_token?), where the box is a
+  # controlled server and the value can't be read back from the admin UI;
+  # keeping it there powers the pre-emptive sender-signature check. Local never
+  # writes it — the setup service uses the token in-request and discards it.
+  encrypts :account_token
 
   # ── Singleton ────────────────────────────────────────────────────────────
 
@@ -98,13 +105,95 @@ class PostmarkConfig < ApplicationRecord
     end
   end
 
+  # ── Sender verification ──────────────────────────────────────────────────
+  #
+  # verify! answers "does the token work". This answers "will Postmark accept
+  # the address we send FROM", which is a different question with a different
+  # failure: ErrorCode 400, "The 'From' address you supplied is not a Sender
+  # Signature on your account."
+  #
+  # There's no way to ask without sending. Listing Sender Signatures needs an
+  # Account API token and Roe only holds a Server token, so the check is a real
+  # send — which means a successful one delivers a real email.
+  #
+  # The ADDRESS is stored rather than a status. "Verified" is then just "the
+  # address that worked is the address we'd use now", so changing author_email
+  # makes it unverified by itself — no reset hook to wire up or keep in step.
+
+  # Postmark's code for an unconfirmed or unknown Sender Signature.
+  SENDER_NOT_VERIFIED = 400
+
+  # Postmark's code for "account pending approval" — a new account may only send
+  # to recipients on its own domain until Postmark approves it. Same code is used
+  # for a few restrictions; the message names the domain limitation. See
+  # account_pending_approval?.
+  ACCOUNT_PENDING_APPROVAL = 412
+
+  def sender_verified?
+    SiteSender.configured? && sender_verified_address == SiteSender.address
+  end
+
+  # A send was attempted and refused because of the From address. Only
+  # meaningful for the address currently configured — once that changes, the
+  # old failure says nothing about the new address.
+  def sender_rejected? = sender_error.present? && !sender_verified?
+
+  # Send a real message to prove the From address is accepted. Returns the
+  # PostmarkService result so the caller can report what happened.
+  def verify_sender!(to:, server_token: nil)
+    return { success: false, error: SiteSender::MISSING } unless SiteSender.configured?
+
+    result = PostmarkService.send_transactional_email(
+      to_email: to, to_name: to, tag: "sender-verification",
+      subject: "Test email from #{SiteConfig.get('title').presence || 'your Roe site'}",
+      html_content: "<p>This is a test. If you're reading it, Roe can send email " \
+                    "from #{ERB::Util.html_escape(SiteSender.address)}.</p>",
+      server_token: server_token
+    )
+
+    if result[:success]
+      update_columns(sender_verified_address: SiteSender.address, sender_error: nil)
+    else
+      update_columns(sender_verified_address: nil, sender_error: result[:error].to_s.presence)
+    end
+
+    result
+  end
+
+  # Called after a real send fails, so a rejection discovered in the wild
+  # surfaces the same way a button press would.
+  def record_sender_rejection!(error)
+    update_columns(sender_verified_address: nil, sender_error: error.to_s.presence)
+  end
+
+  # True once a real send has been refused with ErrorCode 412 (account pending
+  # approval). Reactive: Postmark has no clean read-only "am I approved?" check,
+  # and the built-in test email only goes to the operator's own (same-domain)
+  # address, which the restriction always allows — so this is only known after a
+  # send to an outside domain (a real member) is attempted.
+  def account_pending_approval? = account_approval_error.present?
+
+  # Record a 412 caught in the wild so the status page can warn the operator,
+  # rather than leaving a member with an opaque "couldn't send" error and the
+  # reason buried in a log they can't read.
+  def record_account_pending_approval!(error)
+    update_columns(account_approval_error: error.to_s.presence)
+  end
+
+  # A send succeeded, so the account is clearly no longer restricted — clear any
+  # stale pending-approval flag. Cheap no-op when it's already nil.
+  def clear_account_pending_approval!
+    update_columns(account_approval_error: nil) if account_approval_error.present?
+  end
+
   # ── Disconnect ───────────────────────────────────────────────────────────
 
   def disconnect!
     update!(
       server_token: nil,
       connected_at: nil,
-      verified_at: nil
+      verified_at: nil,
+      account_approval_error: nil
     )
     self.class.clear_test_config
   end
@@ -134,11 +223,102 @@ class PostmarkConfig < ApplicationRecord
     webhook_token
   end
 
-  # ── Test config file ─────────────────────────────────────────────────────
+  # ── Account-API setup token ──────────────────────────────────────────────
+  #
+  # Whether this install may KEEP the account token. Production only: the token
+  # can create and delete servers account-wide, so it's stored (encrypted) only
+  # on a controlled server where it powers the ongoing pre-emptive signature
+  # check. Local runs the same setup but discards the token afterwards — the
+  # setup service is handed the token directly and never persists it here.
+  def self.store_account_token? = Rails.env.production?
+
+  def account_token_present?
+    safe_encrypted_read(:account_token).present?
+  end
+
+  # The stored account token (production only), or nil. Used for the standing
+  # sender-signature check; local always returns nil since it never stored one.
+  def stored_account_token
+    safe_encrypted_read(:account_token)
+  end
+
+  def store_account_token!(token)
+    update!(account_token: token)
+  end
+
+  def remove_account_token!
+    update!(account_token: nil)
+  end
+
+  # ── Webhook status ───────────────────────────────────────────────────────
+  #
+  # Two complementary checks, because "configured" and "working" aren't the
+  # same thing:
+  #
+  #   webhook_configured? — a live, read-only API check that the webhook is
+  #     REGISTERED and aimed at our URL (Postmark's side of the config). Cheap,
+  #     no email. Confirms setup, NOT that a POST actually reaches us.
+  #
+  #   verify_webhooks!  — asks Postmark to test the endpoint on demand (POST
+  #     /webhooks/{id}/verify): it POSTs a test of each enabled event type
+  #     (Delivery, Bounce, SpamComplaint) to us and reports whether each got a
+  #     200 — synchronously, no email, DKIM-independent. webhook_verified_at is
+  #     stamped only when every webhook passes. This is the "it works" proof.
+
+  # Registered with Postmark and pointing at `url`? Live API lookup, no send.
+  def webhook_configured?(url)
+    return false if url.blank? || server_token.blank?
+
+    PostmarkService.webhook_for_url?(server_token, url)
+  end
+
+  def webhook_verified? = webhook_verified_at.present?
+
+  # Run Postmark's on-demand verification for every Roe webhook at `url` and
+  # stamp the result. Returns the service's { ok:, results:, error: } hash.
+  def verify_webhooks!(url)
+    result = PostmarkService.verify_webhooks(server_token, url)
+    update_columns(webhook_verified_at: (result[:ok] ? Time.current : nil))
+    result
+  end
+
+  # ── Server activity page (Postmark dashboard deep-link) ──────────────────
+  #
+  # The activity/events page for a server lives at
+  #   https://account.postmarkapp.com/servers/{ID}/streams/outbound/events
+  # Neither the {ID} nor the server name is stored — both come back on the
+  # /server call that test_connection already makes. Fetched live per token so
+  # the link and name always describe the server the given tab sends through.
+  ACTIVITY_URL = "https://account.postmarkapp.com/servers/%<id>s/streams/outbound/events"
+
+  ServerInfo = Struct.new(:id, :name, :delivery_type, :activity_url, keyword_init: true)
+
+  # One /server lookup → { name:, activity_url:, … }, or nil on blank token /
+  # API failure (callers treat nil as "couldn't reach it").
+  def server_info_for(token)
+    return nil if token.blank?
+
+    result = PostmarkService.test_connection(token)
+    server = result[:server]
+    return nil unless server.is_a?(Hash) && server["ID"].present?
+
+    ServerInfo.new(
+      id: server["ID"], name: server["Name"], delivery_type: server["DeliveryType"],
+      activity_url: format(ACTIVITY_URL, id: server["ID"])
+    )
+  rescue StandardError
+    nil
+  end
+
+  def activity_url_for(token)
+    server_info_for(token)&.activity_url
+  end
+
+
 
   def self.test_config
     return {} unless File.exist?(TEST_CONFIG_PATH)
-    YAML.load_file(TEST_CONFIG_PATH)["test"] || {}
+    SiteFile.read_yaml(TEST_CONFIG_PATH)["test"] || {}
   rescue => e
     Rails.logger.error "Failed to load Postmark test config: #{e.message}"
     {}

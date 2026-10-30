@@ -85,7 +85,7 @@ GEM
     bindex (0.8.1)
     bootsnap (1.24.6)
       msgpack (~> 1.2)
-    brakeman (8.0.6)
+    brakeman (8.1.0)
       racc
     builder (3.3.0)
     bundler-audit (0.9.3)
@@ -124,6 +124,7 @@ GEM
     factory_bot (6.6.0)
       activesupport (>= 6.1.0)
     fastimage (2.4.1)
+    ffi (1.17.4)
     ffi (1.17.4-aarch64-linux-gnu)
     ffi (1.17.4-aarch64-linux-musl)
     ffi (1.17.4-arm-linux-gnu)
@@ -457,6 +458,7 @@ GEM
     unicode_utils (1.4.0)
     uri (1.1.1)
     useragent (0.16.11)
+    wahwah (1.6.7)
     web-console (4.3.0)
       actionview (>= 8.0.0)
       bindex (>= 0.4.0)
@@ -536,8 +538,9 @@ DEPENDENCIES
   tty-spinner (~> 0.9)
   turbo-rails (~> 2.0)
   tzinfo-data
+  wahwah (~> 1.6)
   web-console
   webrick (~> 1.9)
 
 BUNDLED WITH
-   2.4.10
+  4.0.10

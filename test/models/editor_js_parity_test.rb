@@ -47,8 +47,8 @@ class EditorJsParityTest < ActiveSupport::TestCase
   test "the JS builds the same column wrapper as the ERB" do
     erb = File.read(Rails.root.join("app/views/shared/_metadata_editor.html.erb"))
 
-    assert_match 'class="flex-1 min-w-0"', erb, "the ERB should wrap the field in a column"
-    assert_match 'class="flex-1 min-w-0"', js, "the JS row builder should match it"
+    assert_match 'class="flex-1 min-w-0 max-w-[500px]"', erb, "the ERB should wrap the field in a column"
+    assert_match 'class="flex-1 min-w-0 max-w-[500px]"', js, "the JS row builder should match it"
   end
 
   # A checkbox is a small square: it centres against its label, and the label
@@ -76,7 +76,7 @@ class EditorJsParityTest < ActiveSupport::TestCase
     %w[_addKnownFieldByName addKnownFieldToForm].each do |builder|
       body = js[/^  #{builder}\(.*?\n  \}/m].to_s
 
-      assert_match 'class="flex-1 min-w-0"', body, "#{builder} builds a flat row"
+      assert_match 'class="flex-1 min-w-0 max-w-[500px]"', body, "#{builder} builds a flat row"
       assert_match(/config\.note/, body, "#{builder} drops the field's note")
     end
   end

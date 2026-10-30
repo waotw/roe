@@ -14,7 +14,9 @@ class PageStatusRepairTest < ActiveSupport::TestCase
   end
 
   teardown do
-    @original ? File.write(@path, @original) : FileUtils.rm_f(@path)
+    # binwrite to match the binread: File.write would convert the raw bytes
+    # to UTF-8 and raise on a page an earlier test left with an em dash in it.
+    @original ? File.binwrite(@path, @original) : FileUtils.rm_f(@path)
     FileUtils.rm_f(File.join(@dir, "my-own-page.md"))
   end
 

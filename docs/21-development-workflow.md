@@ -111,6 +111,8 @@ The north star: **updates should be safe** — content, themes, and sites keep w
 
 ## Cutting a Release (maintainer)
 
+**Use `bin/release`.** `bin/release 0.4.0` (or `bin/release 0.5.0-nightly.1`) runs every step below in order: the checks, the version bump, the merge into `main`, the tag, the push, the installer zips and the GitHub release. It stops whenever something needs you, and `bin/release` with no version carries on from there. `bin/release status` lists the steps. The commands below are what it runs, for when you need to do one by hand.
+
 Pre-releases are tagged on `development` (they're builds toward the next version). The final is tagged on `main` after merging.
 
 **A nightly / rc — on `development`:** just tag the current commit. No `VERSION` bump — the installer sets it from the tag (see the tagging rules above).

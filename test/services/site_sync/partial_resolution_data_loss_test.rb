@@ -75,6 +75,8 @@ class SiteSync::PartialResolutionDataLossTest < ActiveSupport::TestCase
 
     SiteSync::Ledger.stubs(:recorded).returns({ "files" => recorded })
     SiteSync::Ledger.stubs(:current).returns(current)
+    # Live now has what was pushed; the unresolved file stays local-only.
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => current.except("posts/unresolved.md"))
     written = nil
     SiteSync::Ledger.stubs(:write_manifest!).with { |m| written = m; true }
 
@@ -90,6 +92,7 @@ class SiteSync::PartialResolutionDataLossTest < ActiveSupport::TestCase
     job = SiteSyncConflictResolutionJob.new
     SiteSync::Ledger.stubs(:recorded).returns({ "files" => { "posts/gone.md" => entry } })
     SiteSync::Ledger.stubs(:current).returns({})
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => {})
     written = nil
     SiteSync::Ledger.stubs(:write_manifest!).with { |m| written = m; true }
 
@@ -169,14 +172,14 @@ class SiteSync::PartialResolutionDataLossTest < ActiveSupport::TestCase
     job = SiteSyncTransferJob.new
     job.instance_variable_set(:@kind, :sync)
 
-    SiteSync::Ledger.stubs(:current).returns(
+    SiteSync::Ledger.any_instance.stubs(:current_manifest).returns(
       "posts/shared.md" => entry, "posts/local-only.md" => entry(20)
     )
     SiteSync::Exchange.stubs(:fetch_peer_manifest).returns(
       "files" => { "posts/shared.md" => entry }
     )
     written = nil
-    SiteSync::Ledger.stubs(:write_manifest!).with { |m| written = m; true }
+    SiteSync::Ledger.any_instance.stubs(:write_manifest!).with { |m| written = m; true }
 
     job.send(:write_confirmed_baseline!)
 

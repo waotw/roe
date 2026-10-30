@@ -1,0 +1,37 @@
+<%# COPY — Snipcart status checklist, mirroring the Stripe/Postmark pattern.
+    Snipcart has no management API, so the honest signals are: snippet connected,
+    mode, whether an order webhook has actually been received, and whether the
+    store domain matches the site. Placeholder copy — rewrite before commit. %>
+<% items = SnipcartStatus.for(@snipcart_config, ui_production: integration_ui_production?) %>
+<%
+  icon = ->(state) do
+    case state
+    when :ok      then %(<span class="text-green-700">✓</span>)
+    when :todo    then %(<span class="text-amber-700">•</span>)
+    when :warn    then %(<span class="text-red-700">✕</span>)
+    when :unknown then %(<span class="text-gray-400">…</span>)
+    else               %(<span class="text-gray-400">·</span>)
+    end.html_safe
+  end
+  label_class = ->(state) do
+    { ok: "text-gray-900", todo: "text-amber-900", warn: "text-red-900",
+      unknown: "text-gray-500", info: "text-gray-700" }[state] || "text-gray-700"
+  end
+%>
+
+<div class="config-section mb-6 p-4 border border-gray-200 bg-gray-50" data-test="snipcart-status">
+  <h3 class="text-base font-semibold text-gray-900 mb-3">Integration Status</h3>
+  <ul class="space-y-2">
+    <% items.each do |item| %>
+      <li class="flex items-start gap-2 text-sm">
+        <span class="mt-0.5 w-4 text-center font-mono"><%= icon.call(item.state) %></span>
+        <span>
+          <span class="font-medium <%= label_class.call(item.state) %>"><%= item.label %></span>
+          <% if item.detail.present? %>
+            <span class="text-gray-500"> — <%= item.detail %></span>
+          <% end %>
+        </span>
+      </li>
+    <% end %>
+  </ul>
+</div>

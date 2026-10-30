@@ -195,6 +195,58 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   end
 
   # =============================================================================
+  # Highlight Tests (==text==)
+  # =============================================================================
+
+  # The live editor offers ==text== beside the <mark> the toolbar has always
+  # written. Both have to come out as the same element.
+  test "==text== renders as <mark>, the same as a <mark> tag" do
+    assert_includes render("A ==bright idea== here."), "<mark>bright idea</mark>"
+    assert_includes render("A <mark>bright idea</mark> here."), "<mark>bright idea</mark>"
+  end
+
+  test "highlights work inside other inline markdown" do
+    assert_includes render("**a ==b== c**"), "<strong>a <mark>b</mark> c</strong>"
+    assert_includes render("==**bold** inside=="), "<mark><strong>bold</strong> inside</mark>"
+  end
+
+  test "a spaced comparison is not a highlight" do
+    html = render("If a == b and c == d then.")
+    assert_not_includes html, "<mark>"
+    assert_includes html, "a == b and c == d"
+  end
+
+  test "three or more equals signs are never a highlight marker" do
+    assert_includes render("Title\n=====\n\nBody."), "<h1"
+    assert_not_includes render("a ===b=== c"), "<mark>"
+  end
+
+  test "inline code keeps its equals signs" do
+    html = render("Use `a==b && c==d` here.")
+    assert_not_includes html, "<mark>"
+    assert_includes html, "<code>a==b &amp;&amp; c==d</code>"
+  end
+
+  test "fenced code keeps its equals signs" do
+    html = render("```ruby\nx ==y== z\n```")
+    assert_not_includes html, "<mark>"
+  end
+
+  test "an attribute inside an HTML tag is left alone" do
+    html = render('<a href="/s?q==x==">link</a>')
+    assert_includes html, 'href="/s?q==x=="'
+    assert_not_includes html, "<mark>"
+  end
+
+  test "a backslash escapes the marker" do
+    assert_not_includes render('Not \==this== one.'), "<mark>"
+  end
+
+  test "highlights in a footnote render" do
+    html = render("Text[^1]\n\n[^1]: A ==noted== point.")
+    assert_includes html, "<mark>noted</mark>"
+  end
+  # =============================================================================
   # Footnote Tests
   # =============================================================================
 
@@ -1522,6 +1574,25 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       assert_includes render("```button\nfor: subscribe\n```"), 'href="/sign-up"'
       assert_includes render("```button\ntype: subscribe\n```"), 'href="/sign-up"'
     end
+  end
+
+  # The signup form's upgrade button posts to /signup_and_checkout via
+  # formaction, which Turbo Drive ignores (it posts to the form action
+  # instead) — so the form must opt out of Turbo, or "upgrade" silently runs
+  # the free signup path and the page appears to just refresh.
+  test "signup form opts out of Turbo so the upgrade button's formaction is honoured" do
+    model = TestModel.new("")
+    model.stubs(:form_authenticity_token).returns("tok")
+    # Catch-all first: the form also asks other members settings (password
+    # sign-in reads auth.email_enabled). Unset reads as the default.
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
+
+    html = model.send(:render_signup_form, "Sign up free", "Become a paid member")
+
+    assert_includes html, 'data-turbo="false"', "signup form must opt out of Turbo"
+    assert_includes html, 'formaction="/signup_and_checkout"', "upgrade button keeps its formaction"
+    refute_includes html, "<%#", "no stray ERB comment should leak into the raw HTML"
   end
 
   test "share button carries the stable .share hook + omits empty values" do

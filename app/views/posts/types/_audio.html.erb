@@ -1,11 +1,10 @@
-<div class="media-player">
-  <audio controls preload="metadata">
-    <source src="<%= post.audio %>" type="audio/mpeg">
-    <source src="<%= post.audio %>" type="audio/mp4">
-    <source src="<%= post.audio %>" type="audio/ogg">
-    Your browser doesn't support audio playback.
-  </audio>
-</div>
+<%# An audio post. The player is the same ```card type: player an author can
+    put in the body — supplied here only when the body has none, and when
+    content.yml's players.audio is on (Post#show_template_player?). One
+    player either way. This used to be the browser's bare <audio controls>. %>
+<% if post.show_template_player? %>
+  <%= render "posts/template_player", post: post %>
+<% end %>
 
 <div class="post-content">
   <%= render_post_content(post) %>

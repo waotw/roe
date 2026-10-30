@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 require "fileutils"
+require "io/console"
 require "open3"
 require "tmpdir"
 
@@ -9,6 +10,45 @@ ROE_ROOT = File.basename(APP_ROOT) == "current" ? File.expand_path("..", APP_ROO
 def system!(*args)
   system(*args, exception: true)
 end
+
+# ── Progress line width ─────────────────────────────────────────────────
+# A progress line is redrawn in place: \r back to the start of the row,
+# clear it, print the new one. That only works while the line fits on ONE
+# row. Wider than the window, it wraps, \r only reaches the start of the
+# last row, and every update leaves the earlier rows behind — a stack of
+# lines instead of one bar. A new Terminal window is 80 columns, and a
+# Bundler line is long, so the activity text is cut to whatever room the
+# window has, measured on every redraw (the window can be resized).
+def terminal_columns
+  cols = IO.console&.winsize&.last.to_i
+  cols.positive? ? cols : 80
+rescue StandardError
+  80
+end
+
+# The "  ·  activity" tail for a progress line, cut to fit beside `head`
+# (ANSI colour codes take no room on screen). Empty when there's no room
+# worth using.
+def progress_tail(head, activity, dim: "\e[2m", reset: "\e[0m")
+  return "" if activity.nil? || activity.to_s.strip.empty?
+
+  shown = head.gsub(/\e\[[0-9;]*m/, "").length
+  room  = terminal_columns - shown - 5 - 1 # 5 for "  ·  ", 1 so the cursor never wraps
+  return "" if room < 8
+
+  clean = activity.to_s.gsub(/\e\[[0-9;]*m/, "").strip
+  clean = "#{clean[0, room - 1]}…" if clean.length > room
+  "#{dim}  ·  #{clean}#{reset}"
+end
+
+# ── Brand colours ───────────────────────────────────────────────────────
+# Roe red #c64320 and orange #e47e5d, matching roe.sh and bin/roe. Raw
+# escapes, because the gem-free BootstrapProgress below runs before the
+# bundle exists. 24-bit where the terminal says it can; else the closest
+# of the 256 standard colours.
+TRUECOLOR  = %w[truecolor 24bit].include?(ENV["COLORTERM"].to_s)
+ROE_RED    = TRUECOLOR ? "\e[38;2;198;67;32m"  : "\e[38;5;166m"
+ROE_ORANGE = TRUECOLOR ? "\e[38;2;228;126;93m" : "\e[38;5;173m"
 
 # ── Setup TUI ───────────────────────────────────────────────────────────
 # One updating line per step: [progress bar] pct  Label  ·  live activity.
@@ -88,14 +128,14 @@ class SetupTUI
 
   def bar(fraction)
     filled = (BAR_WIDTH * fraction).round
-    @pastel.cyan("█" * filled) + @pastel.dim("░" * (BAR_WIDTH - filled))
+    "#{ROE_RED}#{'█' * filled}\e[0m" + @pastel.dim("░" * (BAR_WIDTH - filled))
   end
 
   def render(activity)
     return unless @tty
     frac = @total.zero? ? 0.0 : @done.to_f / @total
     line = "  [#{bar(frac)}] #{(frac * 100).round.to_s.rjust(3)}%  #{@pastel.bold(@label)}"
-    line += @pastel.dim("  ·  #{truncate(activity)}") if activity && !activity.empty?
+    line += progress_tail(line, activity)
     @out.print("\r\e[K#{line}")
     @out.flush
   end
@@ -121,23 +161,18 @@ class SetupTUI
     @out.puts
     @out.puts @pastel.dim("Full log saved to: #{@log_path}")
   end
-
-  def truncate(str, max = 48)
-    clean = str.to_s.gsub(/\e\[[0-9;]*m/, "").strip
-    clean.length > max ? "#{clean[0, max - 1]}…" : clean
-  end
 end
 
 # ── Bundle-step progress (no gems) ────────────────────────────────────────
 # The full TUI gems (pastel, tty-box) live in the bundle, so they can't be
 # loaded until AFTER `bundle install` runs. This tiny renderer gives that
-# one step the same look anyway — a cyan progress bar + live activity line
+# one step the same look anyway — a red progress bar + live activity line
 # finalizing to a ✓ — using nothing but raw ANSI (no gem dependencies). It
 # drives the bar off the gem count in Gemfile.lock, advancing as Bundler
 # fetches/installs each gem, then snaps to 100% on success.
 class BootstrapProgress
   BAR_WIDTH = 20
-  C = "\e[36m"  # cyan
+  C = ROE_RED   # bar fill
   D = "\e[2m"   # dim
   G = "\e[32m"  # green
   R = "\e[31m"  # red
@@ -224,7 +259,7 @@ class BootstrapProgress
     return unless @tty
     f = fraction
     line = "  [#{bar(f)}] #{(f * 100).round.to_s.rjust(3)}%  #{B}#{@label}#{X}"
-    line += "  #{D}·  #{truncate(activity)}#{X}" if activity && !activity.empty?
+    line += progress_tail(line, activity, dim: D, reset: X)
     @out.print("\r\e[K#{line}")
     @out.flush
   end
@@ -252,11 +287,6 @@ class BootstrapProgress
     @out.puts
     @out.puts "#{D}Full log saved to: #{@log_path}#{X}"
   end
-
-  def truncate(str, max = 48)
-    clean = str.to_s.gsub(/\e\[[0-9;]*m/, "").strip
-    clean.length > max ? "#{clean[0, max - 1]}…" : clean
-  end
 end
 
 FileUtils.chdir APP_ROOT do
@@ -281,15 +311,19 @@ FileUtils.chdir APP_ROOT do
   pastel   = Pastel.new
   log_path = File.join(Dir.tmpdir, "roe-setup-#{Process.pid}.log")
 
-  puts
-  puts TTY::Box.frame(
-    pastel.bold("Setting up Roe"),
-    padding: [0, 3],
-    align: :center,
-    border: :thick,
-    style: { border: { fg: :cyan } }
-  )
-  puts
+  # roe.sh setup prints its own "Setting up Roe" heading before calling
+  # us; only draw one here when run directly (bin/setup by hand).
+  unless ENV["ROE_SH_SETUP"]
+    puts
+    puts TTY::Box.frame(
+      pastel.bold("Setting up Roe"),
+      padding: [0, 3],
+      align: :center,
+      border: :thick,
+      style: { border: { fg: :red } }
+    )
+    puts
+  end
 
   # 8 progress-tracked steps (the interactive admin setup runs separately
   # after, with its own UI).
@@ -479,6 +513,13 @@ FileUtils.chdir APP_ROOT do
     File.chmod(0o755, start_command)
     puts pastel.dim("Created start.command (double-click to start the server)")
   end
+
+  # When roe.sh setup called us it verifies the boot, offers to register
+  # the site, and starts it — so hand control back rather than starting
+  # here, or those steps would only run after the user stopped the server.
+  # --skip-server is Rails' flag for the same thing; bin/ci passes it, and
+  # without it the CI run would start a server and never finish.
+  exit 0 if ENV["ROE_SH_SETUP"] || ARGV.include?("--skip-server")
 
   puts
   puts TTY::Box.frame(

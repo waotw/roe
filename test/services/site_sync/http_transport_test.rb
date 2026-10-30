@@ -66,6 +66,82 @@ module SiteSync
       end
     end
 
+    # A video rendition is far bigger than a batch, and one request that size
+    # died on the way to the live site. Large files go on their own, in
+    # pieces, before the batches; deletions still wait for the last batch.
+    test "files over the batch limit go up in pieces, first, and deletions still come last" do
+      site_write("media/video/variants/big-720p.mp4", "B" * 300)
+      site_write("posts/small.md", "S")
+      stub_const(HttpTransport, :PUSH_BATCH_MAX_BYTES, 100)
+
+      order = []
+      Exchange.stubs(:upload_large_file).with { |rel, **| order << [ :large, rel ]; true }.returns(true)
+      Exchange.stubs(:upload_files).with do |archive_bytes:, deleted:, **|
+        order << [ :batch, TarArchive.unpack(archive_bytes, dest: Dir.mktmpdir.tap { |d| @created << d }), deleted ]
+        true
+      end.returns({ "ok" => true })
+
+      HttpTransport.push_local_to_live!(diff: { added: %w[media/video/variants/big-720p.mp4 posts/small.md], modified: [], deleted: [ "posts/old.md" ] })
+
+      assert_equal [ :large, "media/video/variants/big-720p.mp4" ], order.first
+      assert_equal [ :batch, [ "posts/small.md" ], [ "posts/old.md" ] ], order.last
+    end
+
+    test "a large file that can't be sent fails the push with the reason" do
+      site_write("media/video/variants/huge-720p.mp4", "H" * 300)
+      stub_const(HttpTransport, :PUSH_BATCH_MAX_BYTES, 100)
+      Exchange.stubs(:upload_large_file).raises(Exchange::ChunkedUploadError, "The live site can't receive large files yet — deploy this version of Roe to it, then sync again.")
+      Exchange.expects(:upload_files).never
+
+      error = assert_raises(HttpTransport::HttpTransportError) do
+        HttpTransport.push_local_to_live!(diff: { added: [ "media/video/variants/huge-720p.mp4" ], modified: [], deleted: [ "posts/keep.md" ] })
+      end
+      assert_match(/deploy this version/, error.message)
+    end
+
+    # A push of one big video and a few small files used to report "0 of 5
+    # files" for the whole of the video's upload, which looked stuck. The
+    # transport now reports bytes as well, piece by piece for a large file.
+    test "push reports bytes as they go, including each piece of a large file" do
+      site_write("media/video/variants/big-720p.mp4", "B" * 300)
+      site_write("posts/small.md", "S" * 10)
+      stub_const(HttpTransport, :PUSH_BATCH_MAX_BYTES, 100)
+
+      Exchange.stubs(:upload_large_file).with do |_rel, on_bytes:, **|
+        on_bytes.call(100)
+        on_bytes.call(300)
+        true
+      end.returns(true)
+      Exchange.stubs(:upload_files).returns({ "ok" => true })
+
+      reports = []
+      HttpTransport.push_local_to_live!(
+        diff: { added: %w[media/video/variants/big-720p.mp4 posts/small.md], modified: [], deleted: [] },
+        on_progress: ->(**report) { reports << report }
+      )
+
+      assert_equal 310, reports.first[:bytes_total]
+      assert_equal [ 0, 100, 300, 300, 310 ], reports.map { |r| r[:bytes_done] }
+      assert_equal [ 0, 0, 0, 1, 2 ], reports.map { |r| r[:completed] }
+      assert reports.all? { |r| r[:total] == 2 }
+    end
+
+    def stub_const(mod, name, value)
+      original = mod.const_get(name)
+      mod.send(:remove_const, name)
+      mod.const_set(name, value)
+      @restore_consts ||= []
+      @restore_consts << [ mod, name, original ]
+    end
+
+    def after_teardown
+      Array(@restore_consts).each do |mod, name, original|
+        mod.send(:remove_const, name)
+        mod.const_set(name, original)
+      end
+      super
+    end
+
     # ----------------------------------------------------------------- pull
 
     test "pull downloads changed files, restores mtimes, and deletes removed ones" do
@@ -168,6 +244,80 @@ module SiteSync
       assert_equal 3, calls.size, "one bounded request per batch, not one big download"
       assert_equal [ [ "posts/ba.md" ], [ "posts/bb.md" ], [ "posts/bc.md" ] ], calls
       %w[ba bb bc].each { |f| assert File.exist?(File.join(out, "posts/#{f}.md")), "#{f} in backup" }
+    end
+
+    # A 1.2 GB video in one download took the live server down and stopped
+    # the sync. Files over the batch limit now come one at a time, in
+    # pieces; the rest still come in batches. Video web versions are left
+    # out — they're made again from the original.
+    test "backup fetches large files in pieces and leaves out video web versions" do
+      site_write("posts/keep.md", "K")
+      site_write("media/video/variants/clip-video.json", "{}")
+      big = HttpTransport::PUSH_BATCH_MAX_BYTES + 1
+      peer_files = {
+        "posts/keep.md"                        => { "size" => 1, "mtime" => 1 },
+        "media/video/variants/clip-video.json" => { "size" => 2, "mtime" => 1 },
+        "media/video/variants/clip-720p.mp4"   => { "size" => 5, "mtime" => 1 },
+        "media/video/clip.mov"                 => { "size" => big, "mtime" => 1 }
+      }
+      Exchange.stubs(:fetch_peer_manifest).returns({ "files" => peer_files })
+
+      batched = []
+      Exchange.stubs(:download_files).with { |paths| batched.concat(paths); true }.returns(
+        TarArchive.pack(root: SITE, paths: [ "posts/keep.md", "media/video/variants/clip-video.json" ])
+      )
+      pieced = []
+      Exchange.stubs(:download_large_file).with do |rel, dest:, staging_dir:, on_bytes:|
+        pieced << rel
+        on_bytes.call(big / 2)
+        FileUtils.mkdir_p(File.dirname(dest))
+        File.write(dest, "video")
+        true
+      end.returns({ "size" => big, "mtime" => 1 })
+
+      reports = []
+      out = HttpTransport.backup_live_to_local!(files: peer_files.keys, on_progress: ->(**r) { reports << r })
+      @created << out if out
+
+      assert_equal %w[media/video/clip.mov], pieced
+      assert_equal %w[media/video/variants/clip-video.json posts/keep.md], batched.sort
+      assert_equal "video", File.read(File.join(out, "media/video/clip.mov"))
+      assert_not File.exist?(File.join(out, "media/video/variants/clip-720p.mp4"))
+
+      during = reports.find { |r| r[:current] }
+      assert_equal "media/video/clip.mov", during[:current]
+      assert_equal big / 2, during[:bytes_done]
+      assert_equal 3, reports.last[:completed]
+      assert_nil reports.last[:current]
+    end
+
+    test "a large file that can't be fetched fails the backup with the reason" do
+      peer_files = { "media/video/clip.mov" => { "size" => HttpTransport::PUSH_BATCH_MAX_BYTES + 1, "mtime" => 1 } }
+      Exchange.stubs(:fetch_peer_manifest).returns({ "files" => peer_files })
+      Exchange.stubs(:download_large_file).raises(Exchange::ChunkedUploadError, "The live site can't send large files yet — deploy this version of Roe to it, then sync again.")
+
+      error = assert_raises(HttpTransport::HttpTransportError) do
+        HttpTransport.backup_live_to_local!(files: peer_files.keys)
+      end
+      assert_match(/deploy this version/, error.message)
+    end
+
+    # Pulling a video uploaded on live used to fail the same way.
+    test "pull fetches large files in pieces into the site" do
+      big = HttpTransport::PUSH_BATCH_MAX_BYTES + 1
+      rel = "media/video/zz-pulled.mov"
+      @created << File.join(SITE, rel)
+      Exchange.stubs(:fetch_peer_file_states).returns({ rel => { "size" => big, "mtime" => 1 } })
+      Exchange.stubs(:fetch_peer_manifest).returns({ "files" => {} })
+      Exchange.expects(:download_files).never
+      Exchange.stubs(:download_large_file).with do |r, dest:, staging_dir:, **|
+        File.write(dest, "pulled") if r == rel && staging_dir.start_with?(SITE)
+        true
+      end.returns({ "size" => big, "mtime" => 1 })
+
+      HttpTransport.pull_live_to_local!(diff: { added: [ rel ], modified: [], deleted: [] })
+
+      assert_equal "pulled", File.read(File.join(SITE, rel))
     end
   end
 end

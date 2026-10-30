@@ -52,7 +52,7 @@ module SiteSync
 
     # 2. Check deploy.yml target setting (most reliable - user-configured)
     if File.exist?(SiteConfig::DEPLOY_FILE)
-      config = YAML.load_file(SiteConfig::DEPLOY_FILE) rescue {}
+      config = (SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) rescue nil) || {}
       target = config["target"].to_s.downcase
       return :kamal if target == "kamal"
       return :fly if target == "fly"

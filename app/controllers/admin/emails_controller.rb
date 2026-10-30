@@ -6,6 +6,10 @@ class Admin::EmailsController < Admin::BaseController
       name: "Send Sign In Link",
       variables: [ "@member_name", "@member_email", "@magic_link", "@site_name" ]
     },
+    "invite" => {
+      name: "Member Invite (password)",
+      variables: [ "@member_name", "@member_email", "@temp_password", "@signin_url", "@site_name" ]
+    },
     "welcome" => {
       name: "Welcome New Member",
       variables: [ "@member_name", "@member_email", "@site_name" ]
@@ -74,6 +78,13 @@ class Admin::EmailsController < Admin::BaseController
     @available_variables = template_info ? template_info[:variables] : []
 
     @preview_path = preview_admin_email_path(@filename)
+
+    # Invite mode: compose_invite stashed a member selection and sent us here to
+    # the invite template. Show the "Send to N members" button; a plain visit to
+    # the invite template (no stashed selection) is just a normal edit.
+    pending = Array(session[:invite_member_ids])
+    @invite_mode = (@filename == "invite" && pending.any?)
+    @invite_count = pending.size if @invite_mode
   end
 
   def update
@@ -113,6 +124,8 @@ class Admin::EmailsController < Admin::BaseController
       "confirmation_url" => "https://yoursite.com/confirm-email/crystal-river-sunset-73",
       "site_name" => SiteConfig.get("title") || "Your Site",
       "password" => "smooth-river-dawn-17",
+      "temp_password" => "smooth-river-dawn-17",
+      "signin_url" => "#{request.base_url}/sign-in",
       "account_url" => "#{request.base_url}/account",
       "update_payment_url" => "#{request.base_url}/account/payment",
       "new_email" => "jane.new@example.com",

@@ -14,8 +14,14 @@ import { Controller } from "@hotwired/stimulus";
 //
 // Deliberately isolated from editor_controller: it reads/writes the shared
 // textarea directly rather than reaching into that controller's state.
+//
+// The Card ▼ toolbar button reads the caret (like the nav / collection / gallery
+// builders): when the caret is on a ```card block it turns amber, reads "Edit
+// Card", and a click opens that card directly (skipping the dropdown, since the
+// type is known from the block); the insert button reads "Update" and rewrites
+// the block in place. Caret elsewhere is the old dropdown-and-insert behaviour.
 export default class extends Controller {
-  static targets = ["modal", "typeSelect", "group", "error"];
+  static targets = ["modal", "typeSelect", "group", "error", "toggleButton", "insertButton"];
 
   // Override fields whose placeholders mirror the referenced item's values.
   static PLACEHOLDER_KEYS = [
@@ -34,20 +40,73 @@ export default class extends Controller {
       '[data-editor-target="textarea"]',
     );
     this.savedPos = null;
+    // { start, finish, indent } line range while editing an existing block.
+    this.editing = null;
     this.snapshotDefaults();
+
+    if (this.textarea) {
+      this._refresh = () => this.updateToggleButton();
+      ["keyup", "click", "select", "input", "focus"].forEach((ev) =>
+        this.textarea.addEventListener(ev, this._refresh));
+      document.addEventListener("selectionchange", this._refresh);
+    }
+    this.updateToggleButton();
+
+    // A file chosen in the media picker for one of this modal's fields (the
+    // player's Audio/Video "Choose…" buttons, see pickMedia).
+    this.onPickedForCard = (event) => this.fillPickedField(event.detail?.path);
+    this.element.addEventListener("media-picker:pick-for-card", this.onPickedForCard);
+
+    // ADD PLAYER in the media picker: a new player card with that file.
+    this.onInsertPlayer = (event) => this.openPlayerWith(event.detail || {});
+    this.element.addEventListener("media-picker:insert-player", this.onInsertPlayer);
+  }
+
+  disconnect() {
+    this.element.removeEventListener("media-picker:pick-for-card", this.onPickedForCard);
+    this.element.removeEventListener("media-picker:insert-player", this.onInsertPlayer);
+    if (!this._refresh) return;
+    ["keyup", "click", "select", "input", "focus"].forEach((ev) =>
+      this.textarea?.removeEventListener(ev, this._refresh));
+    document.removeEventListener("selectionchange", this._refresh);
+  }
+
+  // First handler on the Card button, ahead of editor#toggleCardMenu. On a
+  // ```card block it opens that card for editing and stops the dropdown from
+  // also opening; anywhere else it does nothing and the dropdown opens as usual.
+  caretClick(event) {
+    const block = this.blockAtCursor();
+    if (!block) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.openForEdit(block);
+  }
+
+  openForEdit(block) {
+    this.savedPos = this.textarea ? this.textarea.selectionStart : null;
+    this.editing = { start: block.start, finish: block.finish, indent: block.indent };
+    this.clearError();
+    this.hideAllResults();
+    this.loadBlock(block.body);
+    this.updateInsertLabel();
+    const menu = this.element.querySelector('[data-editor-target="cardMenu"]');
+    if (menu) menu.classList.add("hidden");
+    this.modalTarget.style.display = "flex";
   }
 
   // Opened from a Card dropdown item (or the Product button) carrying
-  // data-card-type.
+  // data-card-type. Always a fresh insert.
   open(event) {
     event?.preventDefault();
     const type = event?.currentTarget?.dataset?.cardType || "pullquote";
     this.savedPos = this.textarea ? this.textarea.selectionStart : null;
+    this.editing = null;
 
     this.typeSelectTarget.value = type;
     this.showActiveGroup();
     this.clearError();
     this.hideAllResults();
+    this.updateInsertLabel();
 
     // Restore live placeholders if reopening with a reference already chosen.
     const group = this.activeGroup();
@@ -60,6 +119,154 @@ export default class extends Controller {
     this.modalTarget.style.display = "flex";
   }
 
+  // --- media picker ---------------------------------------------------------
+
+  // "Choose…" beside a media field (data-cb-pick="audio" | "video"). The
+  // picker opens over this modal — the editor owns it — and the file chosen
+  // comes back as media-picker:pick-for-card. This modal stays open
+  // underneath with everything typed so far.
+  pickMedia(event) {
+    event?.preventDefault();
+    const button = event.currentTarget;
+    this.pickingField = button.dataset.cbPickField;
+    this.element.dispatchEvent(
+      new CustomEvent("card-builder:pick-media", {
+        bubbles: true,
+        detail: { mediaType: button.dataset.cbPick },
+      }),
+    );
+  }
+
+  fillPickedField(path) {
+    const group = this.activeGroup();
+    const el = group?.querySelector(`[data-cb-field="${this.pickingField}"]`);
+    this.pickingField = null;
+    if (!el || !path) return;
+
+    el.value = path;
+    el.classList.remove("cb-empty");
+    this.clearError();
+  }
+
+  // ADD PLAYER from the media picker: a fresh player card with the picked
+  // file in Audio or Video, the other emptied so the card plays this one.
+  // Opened, not inserted, so the rest (title, show_duration…) can be set
+  // first — the same as reaching it from Card ▼ → Player. Goes in where the
+  // cursor was; the picker never moves it.
+  openPlayerWith({ kind, path }) {
+    if (!path) return;
+    this.open({
+      preventDefault() {},
+      currentTarget: { dataset: { cardType: "player" } },
+    });
+
+    const group = this.activeGroup();
+    if (!group) return;
+    ["audio", "video"].forEach((key) => {
+      const el = group.querySelector(`[data-cb-field="${key}"]`);
+      if (!el) return;
+      el.value = key === kind ? path : "";
+      el.classList.toggle("cb-empty", !el.value);
+    });
+  }
+
+  // --- caret detection ------------------------------------------------------
+
+  // The ```card block enclosing the caret, or null. Returns the inclusive line
+  // range (both fences), the opening fence's indent, and the body lines. A
+  // leading indent is allowed (a card nested in a footnote); any other fence
+  // between the caret and an opener means the caret isn't in a card block.
+  blockAtCursor() {
+    const ta = this.textarea;
+    if (!ta) return null;
+    const lines = ta.value.split("\n");
+    const caretLine = ta.value.slice(0, ta.selectionStart).split("\n").length - 1;
+
+    let open = -1, indent = "";
+    for (let i = caretLine; i >= 0; i--) {
+      const m = lines[i].match(/^(\s*)```card\s*$/);
+      if (m) { open = i; indent = m[1]; break; }
+      if (/^\s*```/.test(lines[i])) return null;
+    }
+    if (open < 0) return null;
+
+    let close = open + 1;
+    while (close < lines.length && !/^\s*```\s*$/.test(lines[close])) close++;
+    if (close >= lines.length || caretLine > close) return null;
+
+    return { start: open, finish: close, indent, body: lines.slice(open + 1, close) };
+  }
+
+  // Parse a ```card body into a { key: value } map, matching parse_card_config:
+  // a line `key: value` (lowercase key) starts a field; a following line with
+  // no `key:` continues the previous value only when that key is a prose key
+  // (`text`), which is what lets a pull quote hold several paragraphs. Values
+  // are trimmed, like the renderer's transform_values(&:strip).
+  static PROSE_KEYS = ["text"];
+  static OPTION_RE = /^[ \t]*([a-z_][a-z0-9_]*)[ \t]*:[ \t]?(.*)$/;
+
+  parseBlock(body) {
+    const cfg = {};
+    let current = null;
+    body.forEach((line) => {
+      const m = line.match(this.constructor.OPTION_RE);
+      if (m) {
+        current = m[1];
+        cfg[current] = m[2];
+      } else if (current && this.constructor.PROSE_KEYS.includes(current)) {
+        cfg[current] = `${cfg[current]}\n${line}`;
+      }
+    });
+    Object.keys(cfg).forEach((k) => { cfg[k] = cfg[k].trim(); });
+    return cfg;
+  }
+
+  // Fill the form from a card block: switch to its type, show that group, then
+  // set each field within it. A reference card (post-link/product-link) also
+  // re-fetches the linked item's live placeholders for the override fields.
+  loadBlock(body) {
+    const cfg = this.parseBlock(body);
+    const type = cfg.type || "pullquote";
+    this.typeSelectTarget.value = type;
+    this.showActiveGroup();
+
+    const group = this.activeGroup();
+    if (!group) return;
+    Object.entries(cfg).forEach(([k, v]) => {
+      if (k === "type") return;
+      const el = group.querySelector(`[data-cb-field="${k}"]`);
+      if (!el) return;
+      el.value = v;
+      el.classList.toggle("cb-empty", !el.value);
+    });
+
+    const ref = group.querySelector("[data-cb-search-url]");
+    if (ref && ref.value.trim()) this.applyPlaceholders(group, ref.value.trim());
+  }
+
+  updateToggleButton() {
+    if (!this.hasToggleButtonTarget || !this.textarea) return;
+    const editing = !!this.blockAtCursor();
+    const b = this.toggleButtonTarget;
+    if (this._defaultLabel === undefined) this._defaultLabel = b.innerHTML;
+    if (editing) b.textContent = "Edit Card";
+    else b.innerHTML = this._defaultLabel;
+    b.classList.toggle("bg-amber-100", editing);
+    b.classList.toggle("hover:bg-amber-200", editing);
+    b.classList.toggle("border-amber-700", editing);
+    b.classList.toggle("text-amber-900", editing);
+    b.classList.toggle("bg-gray-200", !editing);
+    b.classList.toggle("hover:bg-gray-300", !editing);
+    b.classList.toggle("border-gray-800", !editing);
+  }
+
+  // "Update" when editing an existing block, "Insert" for a fresh one.
+  updateInsertLabel() {
+    if (this.hasInsertButtonTarget) {
+      this.insertButtonTarget.textContent = this.editing ? "Update" : "Insert";
+    }
+  }
+
   close(event) {
     event?.preventDefault();
     this.modalTarget.style.display = "none";
@@ -70,6 +277,7 @@ export default class extends Controller {
   // successful insert also resets, so the next card starts fresh.
   cancel(event) {
     event?.preventDefault();
+    this.editing = null;
     this.resetFields();
     this.close();
   }
@@ -143,17 +351,40 @@ export default class extends Controller {
       lines.push(`${el.dataset.cbField}: ${value}`);
     });
 
-    const block = "```card\n" + lines.join("\n") + "\n```";
+    // Editing indents the block to match the fence it replaces (a card nested
+    // in a footnote keeps its indent); a fresh insert isn't indented. A prose
+    // `text:` value can hold newlines, so indent each of its lines too.
+    const indent = this.editing ? this.editing.indent : "";
+    const bodyLines = lines
+      .join("\n")
+      .split("\n")
+      .map((l) => indent + l);
+    const block = indent + "```card\n" + bodyLines.join("\n") + "\n" + indent + "```";
+    const editing = this.editing;
+    this.editing = null;
     this.close();
 
     if (this.textarea) {
       this.textarea.focus({ preventScroll: true });
-      const pos = this.savedPos ?? this.textarea.selectionStart;
-      this.textarea.setSelectionRange(pos, pos);
+      const ta = this.textarea;
+      let from, to;
+      if (editing) {
+        const all = ta.value.split("\n");
+        from = all.slice(0, editing.start).join("\n").length + (editing.start > 0 ? 1 : 0);
+        to = all.slice(0, editing.finish + 1).join("\n").length;
+      } else {
+        const pos = this.savedPos ?? ta.selectionStart;
+        from = pos;
+        to = pos;
+      }
+      ta.setSelectionRange(from, to);
       document.execCommand("insertText", false, block);
+      const end = from + block.length;
+      ta.setSelectionRange(end, end);
     }
 
     this.resetFields();
+    this.updateToggleButton();
   }
 
   // --- validation ----------------------------------------------------------

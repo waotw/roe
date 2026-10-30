@@ -38,67 +38,28 @@
       Both banners share the same show/hide toggle as their
       respective settings section so they track the target radio. %>
 
-  <%# Signed out of Fly. Shown at setup rather than only at deploy time,
+  <%# The wording of these is in app/views/admin/deploy_messages/, shared with
+      the deploy page, so each is written once.
+
+      Signed out of Fly is shown at setup rather than only at deploy time,
       because `fly deploy` without a session produces no output and never
       returns — the deploy page just sits there. Telling someone here costs
       them nothing; finding out from a stuck screen costs them the deploy. %>
-  <% if @fly_cli_available && !@fly_signed_in %>
-    <div id="fly-auth-warning"
-         class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (@config_hash['target'].presence || 'kamal') != 'fly' %>">
-      <h3 class="text-sm font-semibold text-amber-900 mb-1">You're not signed in to Fly</h3>
-      <p class="text-sm text-amber-800 mb-3">
-        Your Fly session has expired, or you haven't signed in on this computer yet.
-        Deploying without one hangs with no output rather than failing, so sign in first.
-      </p>
-      <ol class="text-sm text-amber-800 mb-3 list-decimal list-inside space-y-1">
-        <li>Open a terminal — any folder will do.</li>
-        <li>Run the command below. It opens your browser.</li>
-        <li>Sign in to Fly. You'll see &ldquo;Your CLI is connected now. Feel free to close this tab.&rdquo;</li>
-        <li>Back in the terminal you'll see <code class="font-mono text-xs bg-amber-100 px-0.5">successfully logged in as &lt;your email&gt;</code></li>
-        <li>Reload this page.</li>
-      </ol>
-      <div class="font-mono text-xs bg-white border border-amber-200 p-3">
-        <p class="select-all">fly auth login</p>
-      </div>
-    </div>
+  <% chosen = @config_hash['target'].presence || 'kamal' %>
+
+  <% if @fly_auth_message %>
+    <%= render "admin/deploy_messages/message", key: @fly_auth_message, context: :settings,
+               id: "fly-auth-warning", hidden: chosen != 'fly' %>
   <% end %>
 
   <% unless @fly_cli_available %>
-    <div id="fly-cli-warning"
-         class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (target = @config_hash['target'].presence || 'kamal') != 'fly' %>">
-      <h3 class="text-sm font-semibold text-amber-900 mb-1">Fly CLI not installed</h3>
-      <p class="text-sm text-amber-800 mb-3">
-        The <code class="font-mono text-xs bg-amber-100 px-0.5">fly</code> command-line tool is
-        required to build and deploy to Fly.io. Install it, then reload this page.
-      </p>
-      <div class="space-y-2 font-mono text-xs bg-white border border-amber-200 p-3">
-        <p class="text-amber-700 font-sans text-xs font-semibold mb-1">macOS (Homebrew — recommended)</p>
-        <p class="select-all">brew install flyctl</p>
-        <p class="text-amber-700 font-sans text-xs font-semibold mt-2 mb-1">macOS / Linux (official installer)</p>
-        <p class="select-all">curl -L https://fly.io/install.sh | sh</p>
-        <p class="text-amber-700 font-sans text-xs font-semibold mt-2 mb-1">Then authenticate</p>
-        <p class="select-all">fly auth login</p>
-      </div>
-      <p class="mt-2 text-xs text-amber-700">
-        Full docs: <a href="https://fly.io/docs/flyctl/install/" target="_blank" class="underline">fly.io/docs/flyctl/install</a>
-      </p>
-    </div>
+    <%= render "admin/deploy_messages/message", key: "fly_cli_missing", context: :settings,
+               id: "fly-cli-warning", hidden: chosen != 'fly' %>
   <% end %>
 
   <% unless @kamal_cli_available %>
-    <div id="kamal-cli-warning"
-         class="mb-4 border border-amber-300 bg-amber-50 p-4 <%= 'hidden' if (@config_hash['target'].presence || 'kamal') != 'kamal' %>">
-      <h3 class="text-sm font-semibold text-amber-900 mb-1">Kamal CLI not available</h3>
-      <p class="text-sm text-amber-800 mb-3">
-        <code class="font-mono text-xs bg-amber-100 px-0.5">bundle exec kamal</code> could not be found.
-        Kamal is included in Roe's Gemfile — running <code class="font-mono text-xs bg-amber-100 px-0.5">bundle install</code>
-        from the <code class="font-mono text-xs bg-amber-100 px-0.5">current/</code> directory should resolve this.
-      </p>
-      <div class="font-mono text-xs bg-white border border-amber-200 p-3 space-y-1">
-        <p class="select-all">cd current/</p>
-        <p class="select-all">bundle install</p>
-      </div>
-    </div>
+    <%= render "admin/deploy_messages/message", key: "kamal_cli_missing", context: :settings,
+               id: "kamal-cli-warning", hidden: chosen != 'kamal' %>
   <% end %>
 
   <%
@@ -581,6 +542,7 @@
     const kamalStatusBadge     = document.getElementById('kamal-status-badge');
     const flyStatusBadge       = document.getElementById('fly-status-badge');
     const flyCliWarning        = document.getElementById('fly-cli-warning');
+    const flyAuthWarning       = document.getElementById('fly-auth-warning');
     const kamalCliWarning      = document.getElementById('kamal-cli-warning');
     const kamalRegistrySection = document.getElementById('kamal-registry-section');
     const flySecretsNote       = document.getElementById('fly-secrets-note');
@@ -622,6 +584,7 @@
 
       // CLI warnings + secrets badges only show for the active target
       if (flyCliWarning)        flyCliWarning.classList.toggle('hidden', isKamal);
+      if (flyAuthWarning)       flyAuthWarning.classList.toggle('hidden', isKamal);
       if (kamalCliWarning)      kamalCliWarning.classList.toggle('hidden', !isKamal);
       if (kamalRegistrySection) kamalRegistrySection.classList.toggle('hidden', !isKamal);
       if (flySecretsNote)       flySecretsNote.classList.toggle('hidden', isKamal);

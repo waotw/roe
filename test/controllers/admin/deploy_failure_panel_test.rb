@@ -132,4 +132,62 @@ class Admin::DeployFailurePanelTest < ActionDispatch::IntegrationTest
     assert_match "totally novel explosion", panel
     assert_match "Retry deploy", panel
   end
+
+  # ── What to do next ────────────────────────────────────────────────────────
+  #
+  # The wording is in app/views/admin/deploy_messages/; these check the page
+  # picks the right one and always has one.
+
+  def message_keys = panel.scan(/data-deploy-message="([\w-]+)"/).flatten
+
+  test "an unrecognised failure still says what to try next" do
+    failed_deploy(log: "totally novel explosion")
+    get admin_updates_path
+
+    assert_equal [ "unrecognised" ], message_keys
+    assert_match "Retry without cache", panel, "it tells them the cold build exists, even before it's offered"
+  end
+
+  test "a deploy Roe lost track of explains itself once, not twice" do
+    Rails.cache.write(PerformDeployJob::STATUS_CACHE_KEY,
+                      { state: :failed, target: "fly", version_tag: "1", log: "", abandoned: true,
+                        error: DeployWatchdog::ABANDONED_MESSAGE }, expires_in: 1.hour)
+    get admin_updates_path
+
+    assert_equal [ "deploy_interrupted" ], message_keys
+    assert_match "fly machine leases clear", panel
+    assert_equal 1, panel.scan("Roe stopped before this deploy finished").size,
+                 "the short error line repeats the message heading"
+  end
+
+  test "a deploy the sign-in check stopped shows the sign-in steps" do
+    Rails.cache.write(PerformDeployJob::STATUS_CACHE_KEY,
+                      { state: :failed, target: "fly", version_tag: "1",
+                        log: "[preflight] You're not signed in to Fly",
+                        error: "You're not signed in to Fly.",
+                        preflight: [ { key: "fly_signed_out", title: "You're not signed in to Fly" } ] },
+                      expires_in: 1.hour)
+    get admin_updates_path
+
+    assert_equal [ "fly_signed_out" ], message_keys
+    assert_match "fly auth login", panel
+    assert_match "Then deploy again.", panel
+  end
+
+  # Saved by a Roe from before messages had names. It keeps showing what it
+  # saved until it's dismissed or deployed again.
+  test "an older stopped deploy shows the wording it saved" do
+    Rails.cache.write(PerformDeployJob::STATUS_CACHE_KEY,
+                      { state: :failed, target: "kamal", version_tag: "1", log: "",
+                        error: "Docker isn't running on this computer.",
+                        preflight: [ { title: "Docker isn't running on this computer",
+                                       explanation: "Saved explanation.", steps: [ "Saved <code>step</code>." ] } ] },
+                      expires_in: 1.hour)
+    get admin_updates_path
+
+    assert_response :success
+    assert_empty message_keys
+    assert_match "Saved explanation.", panel
+    assert_match "Saved <code>step</code>.", panel
+  end
 end

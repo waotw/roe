@@ -16,6 +16,30 @@
     </div>
   </div>
 
+  <%# Invite mode: compose_invite stashed a member selection. A banner says who
+      this is going to, and a Send button (below, next to Save) writes the
+      template AND mails it. Without a pending selection this whole block is
+      absent and the page is an ordinary template edit. %>
+  <% if @invite_mode %>
+    <div class="mb-4 p-3 border border-blue-300 bg-blue-50 rounded-xs font-sans">
+      <p class="text-sm text-blue-900 mb-2">
+        <strong>Send a password invite</strong> to
+        <strong><%= pluralize(@invite_count, "member") %></strong>.
+        Edit the email below, then <strong>Send</strong>. Your changes are
+        saved as the template for future invite emails. You'll always be able to review before sending.
+      </p>
+      <p class="text-sm text-blue-900 mb-2 ">Each member gets a new temporary password which they can reset after they sign in.</p>
+
+      <div class="flex justify-end">
+        <%= link_to "← Cancel (Back to Members)", admin_members_path, class: "inline-flex uppercase text-sm px-1.5 py-0.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
+      </div>
+
+      <%# The Send button lives in the editor form (below) so it submits the
+          edited content. This form only carries the CSRF token + method; the
+          actual button is rendered inside the editor via @invite_mode. %>
+    </div>
+  <% end %>
+
   <%= render 'shared/editor_actions', resource: @filename, resource_type: 'email' %>
 
   <!-- Available Variables Panel -->

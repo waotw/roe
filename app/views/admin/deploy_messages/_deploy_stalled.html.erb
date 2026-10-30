@@ -1,0 +1,32 @@
+<%# The deploy printed nothing for several minutes, so Roe stopped it.
+    `target` is "kamal" or "fly". %>
+<p>
+  The deploy printed nothing for several minutes, so Roe stopped it and freed
+  the job. The log below is everything it printed before going quiet — usually
+  the last thing it did is the thing it got stuck on. A stall like this is
+  typically a command waiting on something that will never answer: a prompt
+  nobody can see, a connection with no timeout of its own, or a builder that
+  went away mid-build.
+</p>
+
+<ol>
+  <li>Deploy again — a stall is often momentary, such as a slow registry or a builder that dropped.</li>
+  <li>If it stops at the same point every time, run the deploy yourself in a terminal. A prompt Roe can't show you will be visible there.</li>
+  <li>Look for anything waiting on input: an unknown SSH host key or an expired login will wait forever rather than fail.</li>
+  <% if target == "fly" %>
+    <li>If the next deploy is blocked on a machine lease, this one left it behind. Clear it with <code>fly machine leases clear</code>.</li>
+  <% else %>
+    <li>If the next deploy says the deploy lock is already in place, this one left it behind. Release it with <code>kamal lock release</code>.</li>
+  <% end %>
+</ol>
+
+<p>Nothing was left running — Roe stops the whole deploy, so it's safe to deploy again.</p>
+
+<p>
+  More detail:
+  <% if target == "fly" %>
+    <a href="/documentation/roe/troubleshoot-deployment#deploy-hangs-at-machine-checks" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+  <% else %>
+    <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+  <% end %>
+</p>

@@ -200,10 +200,10 @@ export default class extends Controller {
     this.tabTargets.forEach((tab) => {
       if (tab.dataset.type === type) {
         tab.classList.remove("border-transparent", "text-gray-500");
-        tab.classList.add("border-blue-500", "text-blue-600");
+        tab.classList.add("bg-blue-100", "border-blue-600", "text-blue-600");
       } else {
         tab.classList.add("border-transparent", "text-gray-500");
-        tab.classList.remove("border-blue-500", "text-blue-600");
+        tab.classList.remove("bg-blue-100", "border-blue-600", "text-blue-600");
       }
     });
   }

@@ -10,6 +10,20 @@ require "securerandom"
 
 pastel = Pastel.new
 
+# Roe red #c64320 and orange #e47e5d, matching roe.sh, bin/roe and
+# bin/setup. 24-bit where the terminal says it can; else the closest of
+# the 256 standard colours. tty-box only takes named colours for its
+# border, so the heading box is drawn by hand.
+truecolor  = %w[truecolor 24bit].include?(ENV["COLORTERM"].to_s)
+roe_red    = truecolor ? "\e[38;2;198;67;32m"  : "\e[38;5;166m"
+roe_orange = truecolor ? "\e[38;2;228;126;93m" : "\e[38;5;173m"
+brand_box = lambda do |title|
+  rule = "═" * (title.length + 6)
+  puts "#{roe_red}╔#{rule}╗\e[0m"
+  puts "#{roe_red}║\e[0m   #{roe_orange}\e[1m#{title}\e[0m   #{roe_red}║\e[0m"
+  puts "#{roe_red}╚#{rule}╝\e[0m"
+end
+
 # Read from the real controlling terminal, NOT the inherited $stdin.
 # bin/setup invokes this script via `system(ruby, bootstrap, in: $stdin)`,
 # and that redirected stdin doesn't give tty-prompt's reader the raw-mode
@@ -40,15 +54,15 @@ breathing_room = lambda do |lines = 5|
   $stdout.flush
 end
 
-# Yes/no helper. tty-prompt's own `yes?` always renders its suffix in
-# parens with the default answer capitalized — `(Y/n)` — and won't let
-# you blank it out. We want a plain lowercase `[y/n]` everywhere, so we
-# build it on `ask`: full control of the label, still accepts
-# y/yes/n/no, and `default:` decides what a bare Enter means.
+# Yes/no helper. tty-prompt's own `yes?` renders its suffix in parens —
+# `(Y/n)` — which doesn't match the rest of Roe's prompts. So it's built on
+# `ask`: the label is `[Y/n]` or `[y/N]` — the capital letter is what a
+# bare Enter means, the same as everywhere else in roe.sh and bin/roe —
+# and it still accepts y/yes/n/no.
 yes_no = lambda do |message, default: true|
   loop do
     breathing_room.call
-    answer = prompt.ask("#{message} [y/n]") { |q| q.modify :strip, :down }
+    answer = prompt.ask("#{message} #{default ? '[Y/n]' : '[y/N]'}") { |q| q.modify :strip, :down }
     answer = (default ? "y" : "n") if answer.to_s.empty?
     return true  if %w[y yes].include?(answer)
     return false if %w[n no].include?(answer)
@@ -57,16 +71,10 @@ yes_no = lambda do |message, default: true|
 end
 
 puts
-# Note: no emoji INSIDE tty-box frames — they're rendered 2 columns wide
-# by terminals but counted as 1 by tty-box's width math, which drifts
-# the right border. Emoji are fine on plain (non-boxed) lines below.
-puts TTY::Box.frame(
-  pastel.bold("Admin User Setup"),
-  padding: [0, 3],
-  align: :center,
-  border: :thick,
-  style: { border: { fg: :cyan } }
-)
+# Note: no emoji INSIDE box frames — they're rendered 2 columns wide
+# by terminals but counted as 1 by the width math, which drifts the
+# right border. Emoji are fine on plain (non-boxed) lines below.
+brand_box.call("Admin User Setup")
 puts
 
 existing_user = User.first
@@ -113,13 +121,13 @@ if method == :random
   # clear: true wipes the line afterwards so the green summary box that
   # follows starts clean.
   spinner = TTY::Spinner.new(
-    "[:spinner] Generating super secure password…",
+    "[:spinner] Forging super secure password…",
     format: :dots,
     clear: true,
     output: $stdout
   )
   spinner.auto_spin
-  sleep 1.2
+  sleep 1.5
   password = SecureRandom.alphanumeric(16)
   spinner.stop
 
@@ -174,9 +182,9 @@ if user.save
     puts pastel.bold("🔒  Recovery codes")
     puts pastel.dim("Save these somewhere safe. Each works once to reset your password if you lose access.")
     puts
-    recovery_codes.each { |code| puts "   #{pastel.cyan(code)}" }
+    recovery_codes.each { |code| puts "   #{roe_red}#{code}\e[0m" }
     puts
-    puts pastel.dim("Use one at /recovery/new (the link is on the sign-in page).")
+    puts pastel.dim("Use them at /recovery/new (the link to \"Use a recovery code\" is on the admin sign-in page).")
   elsif existing_user
     remaining = user.recovery_codes.unconsumed.count
     puts pastel.dim("Existing recovery codes left untouched (#{remaining} still usable).")
@@ -184,7 +192,7 @@ if user.save
   end
 
   puts
-  puts "Sign in at #{pastel.cyan('http://localhost:3000/admin')}"
+  puts "Sign in at #{roe_red}http://localhost:3000/admin\e[0m"
   puts
 
   # Hold the screen so credentials/codes aren't scrolled away by the

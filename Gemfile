@@ -43,6 +43,10 @@ gem "listen", "~> 3.8"
 gem "kramdown", "~> 2.4"
 gem "front_matter_parser", "~> 1.0"
 
+# Audio length (mp3, m4a, ogg, flac, wav) read in plain Ruby, so a site with
+# audio but no ffmpeg still gets durations. Video uses ffprobe.
+gem "wahwah", "~> 1.6"
+
 # Formerly default gems, now "bundled" gems on Ruby 3.4+/4.0 — must be declared
 # explicitly under Bundler. csv: Substack import; ostruct: required in post.rb.
 gem "csv"

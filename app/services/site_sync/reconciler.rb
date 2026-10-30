@@ -79,10 +79,16 @@ module SiteSync
         #
         # Safe to be silent about only because these ship with Roe: they're
         # always on this computer, and turning the setting back on restores them.
-        if SiteSync::Ledger.roe_docs_excluded?
-          baseline = baseline.reject { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
-          local    = local.reject    { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
-          peer     = peer.reject     { |path, _| SiteSync::Ledger.roe_docs_path?(path) }
+        #
+        # Video files the live-video setting keeps on this computer
+        # (SiteSync::LiveVideo) are out of scope the same way, and just as
+        # safe: each is a file this computer has. A copy live still holds
+        # isn't a pull, and the original's absence from our manifest isn't a
+        # deletion to confirm.
+        if SiteSync::Ledger.roe_docs_excluded? || SiteSync::LiveVideo.held_back_paths.any?
+          baseline = baseline.reject { |path, _| SiteSync::Ledger.out_of_scope?(path) }
+          local    = local.reject    { |path, _| SiteSync::Ledger.out_of_scope?(path) }
+          peer     = peer.reject     { |path, _| SiteSync::Ledger.out_of_scope?(path) }
         end
 
         push = []; push_delete = []; pull = []; pull_delete = []; conflicts = []; converged = []
@@ -96,9 +102,17 @@ module SiteSync
           next unless local_changed || peer_changed
 
           if local_changed && !peer_changed
-            (l ? push : push_delete) << path
+            if overwrites_newer?(from: l, onto: p)
+              conflicts << classify_conflict(path, l, p)
+            else
+              (l ? push : push_delete) << path
+            end
           elsif peer_changed && !local_changed
-            (p ? pull : pull_delete) << path
+            if overwrites_newer?(from: p, onto: l)
+              conflicts << classify_conflict(path, l, p)
+            else
+              (p ? pull : pull_delete) << path
+            end
           elsif same?(l, p)
             converged << path # both sides landed on the same state
           else
@@ -221,6 +235,23 @@ module SiteSync
         return true if a.nil? && b.nil?
         return false if a.nil? || b.nil?
         a["size"] == b["size"] && a["mtime"] == b["mtime"]
+      end
+
+      # Would copying `from` over `onto` replace a newer file with an older one?
+      #
+      # The baseline says which side changed, and it's only as good as the
+      # last write to it. One that recorded a file as agreed when the two
+      # sides held different versions — a setting saved while a long sync
+      # ran, before Ledger.write_confirmed! checked — makes the side that
+      # still matches the record look untouched, and the newer copy gets
+      # quietly overwritten with the older. Every transfer stamps the copy
+      # with the original's modified time, so a real change is never older
+      # than the copy it replaces; when it is, the record is wrong, and the
+      # sync asks instead.
+      def overwrites_newer?(from:, onto:)
+        return false if from.nil? || onto.nil?
+
+        onto["mtime"].to_i > from["mtime"].to_i
       end
 
       def classify_conflict(path, local, peer)

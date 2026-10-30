@@ -87,7 +87,17 @@
        data-editor-pullquote-template-value="<%= SiteConfig.default('cards', 'pullquote_button_template') %>"
        data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
        data-editor-currency-symbol-value="<%= store_currency_symbol %>"
-       data-editor-highlight-media-value="<%= params[:highlight] %>">
+       data-editor-highlight-media-value="<%= params[:highlight] %>"
+       data-editor-original-url-name-value="<%= @post.url_name %>"
+       data-editor-filename-slug-value="<%= File.basename(@post.file_path.to_s, '.md') %>"
+       data-editor-published-value="<%= @post.published? %>">
+
+    <%# Hidden field the editor sets when the user picks "Create redirect & save"
+        in the slug-change modal. PostsController#update reads it and writes the
+        301 via RedirectManager — no separate round-trip, no post-save prompt. %>
+    <input type="hidden" name="create_redirect_from" value=""
+           form="post-form" data-editor-target="redirectFromField">
+
 
     <%= render 'shared/editor_actions', resource: @post, resource_type: 'post' %>
 
@@ -104,6 +114,11 @@
 
     <%= render 'shared/editor_drawer', resource: @post, resource_type: 'post' %>
     <%= render 'shared/leave_modal' %>
+
+    <%# Slug-change decision modal — shown BEFORE the save completes when a
+        published post's url_name was edited (see editor#save). Hidden until the
+        editor fills in the from/to and reveals it. %>
+    <%= render 'redirect_modal' %>
 
   </div>
   <!-- End Stimulus controller -->

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { copyToClipboard } from "clipboard";
 
 // Makes subscribe links behave sensibly per device.
 //
@@ -71,14 +72,10 @@ export default class extends Controller {
   }
 
   async copyInstead(event, el) {
-    // Only take over when we can actually deliver: without a clipboard the
-    // link is still better than nothing, so let it through.
-    if (!navigator.clipboard) return;
-
     event.preventDefault();
 
     try {
-      await navigator.clipboard.writeText(this.absoluteUrl(el.getAttribute("href")));
+      await copyToClipboard(this.absoluteUrl(el.getAttribute("href")));
       this.flash(el);
     } catch (e) {
       // Denied or unavailable — fall back to following the link, which is

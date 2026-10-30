@@ -28,7 +28,7 @@ Roe runs on **macOS**, **Linux**, and **Windows via WSL2**. To launch Roe you ne
   - macOS: Xcode Command Line Tools
   - Linux: `build-essential` (or your distribution's equivalent)
 
-The install script (`./roe.sh check`) installs and configures all of the above for you on macOS and Linux. For Windows see below.
+The install script (`./roe.sh install`) installs and configures all of the above for you on macOS and Linux. For Windows see below.
 
 Roe's Ruby gems are installed automatically by Bundler during setup — there's nothing to install by hand.
 
@@ -102,7 +102,7 @@ Install these to turn on extra features. Roe runs fine without them.
 
 ```bash
 # From roe's root folder, start the install and setup
-./roe.sh check
+./roe.sh install
 ```
 
 ```bash
@@ -116,6 +116,47 @@ Install these to turn on extra features. Roe runs fine without them.
 - **Content**: Edit files in Admin with The Editor or in `site/` directory with text editor of your choice
 - **Updates**: Use Admin → Updates to check for and install updates
 - **Backups**: Automatic backups stored in `backups/` when using Site Sync and Deploy from Admin
+
+## Running Several Sites
+
+Each Roe folder is one site. To run more than one at a time, register each
+one — from inside its folder:
+
+```bash
+./roe.sh register
+```
+
+The install offers to do this for you at the end, and an unregistered site
+asks once the first time you start it. Saying no changes nothing; you can
+register any time.
+
+That gives the site a name from its folder (`The Briefcase` becomes
+`the-briefcase`), its own address (`http://the-briefcase.roe:3001`),
+and installs a global `roe` command. Registration asks for your password
+once, to add the address to `/etc/hosts`.
+
+```bash
+roe list                    # every registered site, running or stopped
+roe start the-briefcase     # runs in the background
+roe stop the-briefcase
+roe restart the-briefcase   # comes back on the same port
+roe open the-briefcase      # opens the home page and the admin
+roe admin the-briefcase     # just the admin
+roe folder                  # the cd command for each site's folder
+roe install libvips         # install an optional tool Roe can use
+roe start --all
+roe                         # help
+```
+
+With only one site registered you can leave the name off: `roe start`,
+`roe stop`, `roe open`. `roe install` on its own lists the optional tools
+and whether each is installed.
+
+Each site has its own address so you can be signed in to all of them at
+once. `./roe.sh start` inside a folder still works exactly as before.
+
+The registry lives in `~/.roe/installs/`. Run `./roe.sh unregister` in a
+folder to remove that site from it.
 
 ## Documentation & Support
 

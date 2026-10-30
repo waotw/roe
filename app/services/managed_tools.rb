@@ -11,7 +11,7 @@
 module ManagedTools
   # The known tools, in display order. Add a tool = add its subclass here.
   def self.all
-    [ Libvips.new ]
+    [ Libvips.new, Ffmpeg.new, StripeCli.new ]
   end
 
   def self.find(key)
@@ -19,8 +19,10 @@ module ManagedTools
   end
 
   # Fresh status snapshots for every tool (re-detects on each call so a
-  # post-install re-check reflects reality).
-  def self.statuses(platform = Platform.current)
-    all.map { |tool| tool.status(platform) }
+  # post-install re-check reflects reality). Pass `group:` to get only the
+  # tools for one Tools page (:media or :development).
+  def self.statuses(platform = Platform.current, group: nil)
+    tools = group ? all.select { |tool| tool.group == group } : all
+    tools.map { |tool| tool.status(platform) }
   end
 end

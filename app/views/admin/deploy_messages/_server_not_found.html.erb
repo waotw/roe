@@ -1,0 +1,18 @@
+<%# DNS has no answer for the server's hostname. %>
+<p>
+  There's no record of <code><%= host %></code> on the internet yet. Either it's
+  misspelled in Settings → Deploy, or the domain doesn't point anywhere yet.
+</p>
+
+<ol>
+  <li>Check the server address in Settings → Deploy.</li>
+  <li>Confirm the address is found — this should print your server's IP address:</li>
+</ol>
+<pre>dig +short <%= host %></pre>
+
+<p>A domain you've just set up can take a few hours to be found everywhere. Then deploy again.</p>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

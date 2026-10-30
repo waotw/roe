@@ -1018,14 +1018,12 @@ class StaticGenerator
   # every build so the output always has them; sync_directory skips unchanged
   # files and prunes orphans.
   # Publish site JS to /javascript/. The shipped source is the base; the
-  # per-site copies in site/javascript/ overlay it so overrides win — the same
-  # site-first-then-source resolution the dynamic controller uses.
+  # per-site copies in site/javascript/ overlay it so the site's own files
+  # win — the same site-first resolution the dynamic controller uses.
   def copy_site_javascript
     out = @output_dir.join("javascript")
     sync_directory(SiteJavascript.source_dir, out) # shipped base
 
-    # Overlay the per-site copies (and any site-only additions) on top without
-    # removing the base — a site override wins, matching the dynamic resolver.
     return unless File.directory?(SiteJavascript.site_dir)
 
     Dir.glob(File.join(SiteJavascript.site_dir, "*")).each do |f|
@@ -1062,9 +1060,24 @@ class StaticGenerator
     sync_directory(
       File.join(RoeSitePaths::SITE_PATH, "media"),
       @output_dir.join("media"),
-      skip_if: ->(rel) { rel =~ IMAGE_ORIGINAL_PATTERN }
+      skip_if: ->(rel) { rel =~ IMAGE_ORIGINAL_PATTERN || video_original_served_as_variant?(rel) || video_manifest?(rel) }
     )
     puts "  ✓ Media synced"
+  end
+
+  # A video original whose web versions exist isn't referenced by any page
+  # (VideoRenderer serves the renditions), so a 1 GB source needn't ship.
+  # Videos without renditions still ship — they're what the page plays.
+  def video_original_served_as_variant?(rel)
+    return false unless rel.start_with?("video/") && !rel.include?("/variants/")
+    return false unless VideoVariantGenerator.video_file?(rel)
+
+    VideoVariantGenerator.available_renditions(File.join(RoeSitePaths::SITE_PATH, "media", rel)).any?
+  end
+
+  # The manifest is for Roe, not for visitors.
+  def video_manifest?(rel)
+    rel.include?("/variants/") && rel.end_with?(VideoVariantGenerator::MANIFEST_SUFFIX)
   end
 
   def sync_directory(source, dest, skip_if: nil)

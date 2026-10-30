@@ -105,4 +105,40 @@ class SiteSync::ConfirmedBaselineTest < ActiveSupport::TestCase
     assert_empty offenders.map { |f| f.sub(Rails.root.to_s + "/", "") },
       "write_current! records local-only files as if the peer had them"
   end
+
+  # A setting saved while a 39-minute sync ran: both sides have the file, in
+  # different versions. Recording ours as agreed made the next sync read
+  # live's older copy as the change, and pull it over the newer one.
+  test "a file both sides hold in different versions is not recorded as agreed" do
+    local = local_manifest
+    path  = local.keys.first
+    old   = { "size" => 1, "mtime" => 1 }
+    SiteSync::Ledger.new.write_manifest!(local.merge(path => old))
+    peer  = local.merge(path => { "size" => local[path]["size"] + 1, "mtime" => 2 })
+
+    SiteSync::Ledger.write_confirmed!(peer)
+
+    recorded = JSON.parse(File.read(@ledger.send(:ledger_path)))["files"]
+    assert_equal old, recorded[path], "keeps the last agreed state, so the change shows next sync"
+    assert_equal local.except(path).keys.sort, (recorded.keys - [ path ]).sort
+  end
+
+  test "a file differing with no earlier agreement is left out entirely" do
+    local = local_manifest
+    path  = local.keys.first
+    SiteSync::Ledger.new.write_manifest!({})
+    peer  = local.merge(path => { "size" => 999_999, "mtime" => 2 })
+
+    SiteSync::Ledger.write_confirmed!(peer)
+
+    assert_not_includes baseline_paths, path
+  end
+
+  test "nothing writes a baseline from the local tree alone" do
+    offenders = %w[app/jobs/site_sync_transfer_job.rb].select do |file|
+      File.read(Rails.root.join(file)).match?(/local\.select \{ \|path, _\| peer\.key\?\(path\) \}/)
+    end
+
+    assert_empty offenders, "a second copy of the confirmed-baseline rule drifted from the first once already"
+  end
 end

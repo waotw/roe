@@ -1,0 +1,26 @@
+<%# Shown on Settings → Deploy, before a deploy Roe stopped, and when Fly's
+    session ran out partway through a deploy. %>
+<p>
+  <% if context == :during %>
+    Fly signed you out partway through, so the deploy had no permission to carry on.
+  <% else %>
+    Your Fly session has expired, or you haven't signed in on this computer yet.
+    Deploying without one hangs with no output rather than failing, so
+    <%= context == :settings ? "sign in first." : "Roe stopped before it started." %>
+  <% end %>
+</p>
+
+<ol>
+  <li>Open a terminal — any folder will do.</li>
+  <li>Run the command below. It opens your browser.</li>
+  <li>Sign in to Fly. You'll see &ldquo;Your CLI is connected now. Feel free to close this tab.&rdquo;</li>
+  <li>Back in the terminal you'll see <code>successfully logged in as &lt;your email&gt;</code></li>
+  <li><%= context == :settings ? "Reload this page." : "Then deploy again." %></li>
+</ol>
+
+<pre>fly auth login</pre>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#fly-signed-out" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

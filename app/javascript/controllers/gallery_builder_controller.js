@@ -23,6 +23,8 @@ export default class extends Controller {
   static targets = [
     "wrap",
     "menu",
+    "toggleButton",
+    "insertButton",
     "carousel",
     "aspect",
     "ratioNote",
@@ -35,6 +37,12 @@ export default class extends Controller {
   // `![alt](src)` with an optional `(*caption*)`. The space is optional to match
   // process_image_captions — see the comment there.
   static IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)[ \t]*(?:\(\*([^*]*)\*\))?/g;
+
+  // Directive keys a gallery body understands, mirroring GALLERY_DIRECTIVES /
+  // parse_gallery in HasMarkdownExtensions. A `key: value` line with one of
+  // these (and no image) is config; anything else stays content.
+  static DIRECTIVES = ["slideshow", "caption", "aspect_ratio"];
+  static DIRECTIVE_RE = /^\s*([a-z_]+)\s*:\s*(.+?)\s*$/i;
 
   static FOOTNOTE_DEF_RE = /^\[\^[^\]]+\]:/;
 
@@ -49,6 +57,8 @@ export default class extends Controller {
     // Whether those images came out of a selection, which is what decides
     // between replacing that selection and inserting at the cursor.
     this.fromSelection = false;
+    // { start, finish, indent } line range while editing an existing block.
+    this.editing = null;
 
     this.onOutside = (e) => {
       if (this.menuTarget.classList.contains("hidden")) return;
@@ -67,6 +77,16 @@ export default class extends Controller {
       this.pickerOpen = false;
     };
     this.element.addEventListener("media-picker:close", this.onPickerClosed);
+
+    // Relabel the toolbar button to "Edit Gallery" (amber) when the caret is
+    // on a ```gallery block, matching the other builders.
+    if (this.textarea) {
+      this._refresh = () => this.updateToggleButton();
+      ["keyup", "click", "select", "input", "focus"].forEach((ev) =>
+        this.textarea.addEventListener(ev, this._refresh));
+      document.addEventListener("selectionchange", this._refresh);
+    }
+    this.updateToggleButton();
   }
 
   disconnect() {
@@ -79,6 +99,11 @@ export default class extends Controller {
       "media-picker:close",
       this.onPickerClosed,
     );
+    if (this._refresh) {
+      ["keyup", "click", "select", "input", "focus"].forEach((ev) =>
+        this.textarea?.removeEventListener(ev, this._refresh));
+      document.removeEventListener("selectionchange", this._refresh);
+    }
   }
 
   toggle(event) {
@@ -87,16 +112,37 @@ export default class extends Controller {
     else this.hide();
   }
 
-  // Opened by the author. Capture the selection and, if it holds images and the
-  // list is empty, start from those — "select some images, hit Gallery" now
-  // fills the list instead of going straight to markdown, so more can be added
-  // before anything is written.
+  // Opened by the author. Capture the selection and decide what to start from:
+  //   - caret inside a ```gallery block → edit it (load its images/directives,
+  //     the insert will replace it)
+  //   - a selection that holds image lines → seed from those (unchanged)
+  //   - otherwise → start empty
   open() {
     this.savedStart = this.textarea ? this.textarea.selectionStart : null;
     this.savedEnd = this.textarea ? this.textarea.selectionEnd : null;
 
-    if (this.images.length === 0) this.seedFromSelection();
+    const block = this.blockAtCursor();
+    if (block) {
+      this.editing = { start: block.start, finish: block.finish, indent: block.indent };
+      this.loadBlock(block.body);
+    } else {
+      // Opening away from a block after an abandoned edit (the popover has no
+      // cancel — an outside click just hides it) must not carry that block's
+      // loaded images into a fresh insert. Clear them; then the usual
+      // seed-from-selection applies.
+      if (this.editing) this.reset();
+      this.editing = null;
+      if (this.images.length === 0) this.seedFromSelection();
+    }
+    this.updateInsertLabel();
     this.show();
+  }
+
+  // "Update" when editing an existing block, "Insert" for a fresh one.
+  updateInsertLabel() {
+    if (this.hasInsertButtonTarget) {
+      this.insertButtonTarget.textContent = this.editing ? "Update" : "Insert";
+    }
   }
 
   // Reopened after a trip to the picker: the selection captured on the way out
@@ -136,6 +182,77 @@ export default class extends Controller {
 
     this.images = found;
     this.fromSelection = true;
+  }
+
+  // --- editing an existing block --------------------------------------------
+
+  // The ```gallery block enclosing the caret, or null. Returns the inclusive
+  // line range (both fences), the opening fence's indent, and the body lines.
+  // A leading indent is allowed (a gallery inside a footnote); any other fence
+  // between the caret and an opener means the caret isn't in a gallery block.
+  blockAtCursor() {
+    const ta = this.textarea;
+    if (!ta) return null;
+    const lines = ta.value.split("\n");
+    const caretLine = ta.value.slice(0, ta.selectionStart).split("\n").length - 1;
+
+    let open = -1, indent = "";
+    for (let i = caretLine; i >= 0; i--) {
+      const m = lines[i].match(/^(\s*)```gallery\s*$/);
+      if (m) { open = i; indent = m[1]; break; }
+      if (/^\s*```/.test(lines[i])) return null;
+    }
+    if (open < 0) return null;
+
+    let close = open + 1;
+    while (close < lines.length && !/^\s*```\s*$/.test(lines[close])) close++;
+    if (close >= lines.length || caretLine > close) return null;
+
+    return { start: open, finish: close, indent, body: lines.slice(open + 1, close) };
+  }
+
+  // Split a block body into images and directive fields, matching parse_gallery:
+  // a `key: value` line whose key is a known directive (and which holds no
+  // image) is config; everything else is scanned for images.
+  loadBlock(body) {
+    const images = [];
+    let slideshow = false, aspect = "", caption = "";
+    body.forEach((line) => {
+      const m = line.match(this.constructor.DIRECTIVE_RE);
+      if (m && !/!\[/.test(line)) {
+        const key = m[1].toLowerCase();
+        if (this.constructor.DIRECTIVES.includes(key)) {
+          if (key === "slideshow") slideshow = /^(true|yes|1|on)$/i.test(m[2].trim());
+          else if (key === "aspect_ratio") aspect = m[2].trim();
+          else if (key === "caption") caption = m[2].trim();
+          return;
+        }
+      }
+      for (const im of line.matchAll(this.constructor.IMAGE_RE)) {
+        images.push({ path: im[2].trim(), alt: im[1].trim(), caption: (im[3] || "").trim() });
+      }
+    });
+
+    this.images = images;
+    this.fromSelection = false;
+    if (this.hasCarouselTarget) this.carouselTarget.checked = slideshow;
+    if (this.hasAspectTarget) this.aspectTarget.value = aspect;
+    if (this.hasCaptionTarget) this.captionTarget.value = caption;
+    this.updateRatioNote();
+  }
+
+  updateToggleButton() {
+    if (!this.hasToggleButtonTarget || !this.textarea) return;
+    const editing = !!this.blockAtCursor();
+    const b = this.toggleButtonTarget;
+    b.textContent = editing ? "Edit Gallery" : "Gallery";
+    b.classList.toggle("bg-amber-100", editing);
+    b.classList.toggle("hover:bg-amber-200", editing);
+    b.classList.toggle("border-amber-700", editing);
+    b.classList.toggle("text-amber-900", editing);
+    b.classList.toggle("bg-gray-200", !editing);
+    b.classList.toggle("hover:bg-gray-300", !editing);
+    b.classList.toggle("border-gray-800", !editing);
   }
 
   pickImages(event) {
@@ -227,6 +344,7 @@ export default class extends Controller {
     if (this.hasCaptionTarget) this.captionTarget.value = "";
     this.images = [];
     this.fromSelection = false;
+    this.editing = null;
     this.updateRatioNote();
     this.renderImages();
   }
@@ -237,12 +355,45 @@ export default class extends Controller {
     const directives = this.directives();
     const images = this.images.map((image) => this.imageLine(image));
     const fromSelection = this.fromSelection;
+    const editing = this.editing;
 
     this.reset();
     this.hide();
     if (!this.textarea) return;
 
     this.textarea.focus({ preventScroll: true });
+
+    // Editing an existing block: rebuild it with the loaded/edited images and
+    // directives and replace its whole line range in place, keeping the fence's
+    // original indent. An emptied gallery still writes a placeholder so the
+    // block stays valid and re-editable.
+    if (editing) {
+      const indent = editing.indent;
+      const line = (text) => (text ? indent + text : "");
+      const body = images.length > 0
+        ? [ ...images, ...directives ].map(line)
+        : [ line("__PLACEHOLDER__"), ...directives.map(line) ];
+      const block = this.block(indent, body);
+
+      const all = this.textarea.value.split("\n");
+      const from = all.slice(0, editing.start).join("\n").length + (editing.start > 0 ? 1 : 0);
+      const to = all.slice(0, editing.finish + 1).join("\n").length;
+      this.textarea.setSelectionRange(from, to);
+      document.execCommand("insertText", false, block);
+
+      if (images.length === 0) {
+        const idx = block.indexOf("__PLACEHOLDER__");
+        if (idx !== -1) {
+          this.textarea.setSelectionRange(from + idx, from + idx + "__PLACEHOLDER__".length);
+        }
+      } else {
+        const pos = from + block.length;
+        this.textarea.setSelectionRange(pos, pos);
+      }
+      this.updateToggleButton();
+      return;
+    }
+
     const start = this.savedStart ?? this.textarea.selectionStart;
     const end = this.savedEnd ?? this.textarea.selectionEnd;
     const hasSelection = start !== null && end !== null && start !== end;
@@ -300,6 +451,7 @@ export default class extends Controller {
         );
       }
     }
+    this.updateToggleButton();
   }
 
   blockContext(start) {

@@ -1,7 +1,19 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 0.1.1
-   Bundled with: Roe v0.3.0
+   Version: 1.4
+   Fingerprint: ab52175f
+   Bundled with: Roe v0.4.0.
+
+   This theme was installed from Roe. Leave this comment
+   in place and the admin will detect when a new version
+   is available and offer to update it.
+
+   Either of these actions will create a custom theme outside of the updates system:
+
+   - Change the "Roe Theme" name to anything else
+   - install and rename css file in /site/theme/
+
+   You can always download a fresh copy of the newest version of any built in theme.
 
    A deliberately minimal theme that stays as close to plain HTML
    rendering as possible while still supporting Roe's components.
@@ -2364,8 +2376,9 @@ article .content,
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
   font-size: var(--text-sm, 0.875rem);
   border: 1px solid var(--color-border);
-  margin-top: var(--space-6);
-  padding: var(--space-4) var(--space-4);
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-1) var(--space-4);
   --player-progress: 0;
 }
 
@@ -2825,6 +2838,12 @@ a.btn-episode {
   display: block;
   aspect-ratio: 16 / 9;
   background: #000;
+}
+
+/* A video embedded in a post's text: ![label](/media/video/clip.mp4).
+   Same player as a video post, spaced like an image. */
+.content .video-player-container.video-embed {
+  margin-bottom: var(--space-6);
 }
 
 .video-controls {
@@ -3834,6 +3853,13 @@ hr.clear-floats {
 .product ul.product-variant-list .variant-price {
   color: var(--color-muted);
   justify-self: end;
+}
+
+/* The variant you're already on, in the button's place — a store without a
+   cart has nothing to link it to. */
+.product ul.product-variant-list .variant-current {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
 }
 
 /* Single product button with `show_price: true`. A variant list prints its own

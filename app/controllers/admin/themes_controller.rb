@@ -22,7 +22,94 @@ class Admin::ThemesController < Admin::BaseController
       theme[:installed_version] = installed_header&.version
       theme[:bundled_version]   = bundled_header&.version
       theme[:status]            = bundled_path ? ThemeInspector.status(bundled_path: bundled_path, installed_path: installed_path) : :custom
+      # Whether the installed copy's body still matches the fingerprint it
+      # was installed with. nil when there's nothing to compare against.
+      theme[:edited]            = (theme[:installed] && bundled_path && theme[:status] != :custom) ? ThemeInspector.edited?(installed_path) : nil
     end
+
+    # The site scripts Roe ships (search, gallery, checkout, footnotes):
+    # same shipped-file story as the themes, without an editor. Each row
+    # carries the report so the view can say current / update / custom,
+    # and whether an update would overwrite the site's own edits.
+    @site_scripts = SiteJavascript.reports.map do |name, report|
+      {
+        name:              name,
+        display_name:      report.installed&.name || report.bundled&.name || name.delete_suffix(".js"),
+        installed_version: report.installed&.version,
+        bundled_version:   report.bundled&.version,
+        status:            report.status,
+        edited:            report.edited,
+        path:              "site/javascript/#{name}"
+      }
+    end
+  end
+
+  # Replace the site's copy of a shipped script with the current one. The
+  # button is only shown for an outdated tracked file; the confirm in the
+  # view is where an edited copy gets its warning. `keep_copy` saves the
+  # current file beside it first, so nothing is lost either way.
+  def update_script
+    name = File.basename(params[:id].to_s)
+    name = "#{name}.js" unless name.end_with?(".js")
+    keep_as = params[:keep_copy].present? ? keep_script_copy(name) : nil
+
+    SiteJavascript.update!(name)
+    flash[:notice] = "#{name} updated to the latest version." + (keep_as ? " Your previous copy is at site/javascript/#{File.basename(keep_as)}." : "")
+  rescue ArgumentError => e
+    flash[:error] = e.message
+  rescue => e
+    flash[:error] = "Couldn't update #{name}: #{e.message}"
+  ensure
+    redirect_to admin_themes_path
+  end
+
+  # UPDATE ALL: every script with a newer shipped version, in one click.
+  # An edited copy is always kept beside the new one first, as
+  # "Update & keep my copy" does for one file — clicking the button for all
+  # of them is no reason to lose someone's changes. Custom files, and ones
+  # already current or ahead, are left alone. One failure doesn't stop the
+  # rest; the message says which went through.
+  def update_all_scripts
+    updated = []
+    kept = []
+    failed = []
+
+    SiteJavascript.reports.each do |name, report|
+      next unless report.status == :tracked_outdated
+
+      begin
+        copy = report.edited ? keep_script_copy(name) : nil
+        SiteJavascript.update!(name)
+        updated << name
+        kept << File.basename(copy) if copy
+      rescue => e
+        failed << "#{name} (#{e.message})"
+      end
+    end
+
+    if updated.any?
+      message = "Updated #{updated.to_sentence}."
+      message += " Your previous #{kept.one? ? 'copy is' : 'copies are'} in site/javascript/: #{kept.to_sentence}." if kept.any?
+      flash[:notice] = message
+    elsif failed.empty?
+      flash[:notice] = "All site scripts are already up to date."
+    end
+    flash[:error] = "Couldn't update #{failed.to_sentence}." if failed.any?
+    redirect_to admin_themes_path
+  end
+
+  # The site's copy, as a download — for someone who wants it before
+  # updating, or who edited it and wants it somewhere safe.
+  def download_script
+    name = File.basename(params[:id].to_s)
+    name = "#{name}.js" unless name.end_with?(".js")
+    path = File.join(SiteJavascript.site_dir, name)
+    return head(:not_found) unless SiteJavascript.shipped_names.include?(name) && File.exist?(path)
+
+    # Served as a generic download, not as JavaScript: Rails refuses a JS
+    # content type on a plain GET as a cross-origin-script precaution, and
+    # this is a file for someone to keep, not to run.
+    send_file path, type: "application/octet-stream", disposition: "attachment", filename: name
   end
 
   def edit
@@ -45,13 +132,24 @@ class Admin::ThemesController < Admin::BaseController
 
     File.write(theme_file, params[:content])
 
-    flash[:notice] = "#{theme_name.capitalize} theme updated successfully"
-    redirect_to edit_admin_theme_path(theme_name)
+    respond_to do |format|
+      # The CSS editor saves in the background and stays where it is.
+      format.json { render json: { saved: true } }
+      format.html do
+        flash[:notice] = "#{theme_name.capitalize} theme updated successfully"
+        redirect_to edit_admin_theme_path(theme_name)
+      end
+    end
   rescue => e
-    flash[:error] = "Failed to update theme: #{e.message}"
-    @theme_name = theme_name
-    @theme_content = params[:content]
-    render :edit
+    respond_to do |format|
+      format.json { render json: { error: e.message }, status: :unprocessable_entity }
+      format.html do
+        flash[:error] = "Failed to update theme: #{e.message}"
+        @theme_name = theme_name
+        @theme_content = params[:content]
+        render :edit
+      end
+    end
   end
 
   def activate
@@ -211,6 +309,20 @@ class Admin::ThemesController < Admin::BaseController
   end
 
   private
+
+  # Save the site's copy of a script beside it before an update replaces it:
+  # search.js → search-v1.0.0.js (or a date when there's no version).
+  # Returns the saved path, or nil when there was no site copy to keep.
+  def keep_script_copy(name)
+    site_path = File.join(SiteJavascript.site_dir, name)
+    return nil unless File.exist?(site_path)
+
+    report = SiteJavascript.reports[name]
+    suffix = report&.installed&.version ? "v#{report.installed.version}" : Time.current.strftime("%Y-%m-%d")
+    keep_as = File.join(SiteJavascript.site_dir, "#{name.delete_suffix('.js')}-#{suffix}.js")
+    FileUtils.cp(site_path, keep_as)
+    keep_as
+  end
 
   def list_available_themes
     themes = {}

@@ -6,9 +6,13 @@ module Api
     # receive the results. Auth via shared SyncConfig token, same as the
     # rest of /api/site_sync.
     #
-    # Idempotency policy is skip-if-exists across the board:
-    #   - Members keyed by email (unique index)
-    #   - Newsletter sends keyed by [post_id, member_id] (unique index)
+    # Members are keyed by email and updated in place — a final import before
+    # launch is meant to land, so skipping everything already here made the
+    # last step of the workflow a no-op. SiteSync::MemberPublish owns which
+    # ones are safe to touch and what it refuses to overwrite.
+    #
+    # Newsletter sends stay skip-if-exists, keyed by [post_id, member_id]
+    # (unique index) — a send either happened or it didn't.
     #
     # Posts are NOT shipped here — they arrive via the file-based site
     # sync (rsync). Newsletter sends reference posts by their natural
@@ -17,36 +21,12 @@ module Api
     class ImportsController < BaseController
       # POST /api/site_sync/publish_members
       # Body:    { members: [ {email, name, metadata, status, tier, ...}, ... ] }
-      # Returns: { inserted, skipped, errors: [...] }
+      # Returns: { inserted, updated, skipped, follow_up: {...}, errors: [...] }
       def publish_members
         payload = JSON.parse(request.body.read)
-        members = Array(payload["members"])
+        result  = ::SiteSync::MemberPublish.call(Array(payload["members"]))
 
-        inserted = 0
-        skipped  = 0
-        errors   = []
-
-        members.each do |attrs|
-          email = attrs["email"].to_s.strip
-          if email.blank?
-            errors << "blank email skipped"
-            next
-          end
-
-          if Member.exists?(email: email)
-            skipped += 1
-            next
-          end
-
-          begin
-            Member.create!(member_attrs_from(attrs))
-            inserted += 1
-          rescue => e
-            errors << "#{email}: #{e.class} #{e.message}"
-          end
-        end
-
-        render json: { inserted: inserted, skipped: skipped, errors: errors }
+        render json: result.to_h
       rescue JSON::ParserError => e
         render json: { error: "invalid json: #{e.message}" }, status: :bad_request
       rescue => e
@@ -124,35 +104,6 @@ module Api
 
       private
 
-      # Whitelist of fields we accept from the sender. Stripped:
-      #   - id / import_id   (PKs and FKs don't survive cross-DB)
-      #   - access_token     (unique-indexed; live regenerates via callback)
-      #   - password_digest, email_confirmation_token (transient/auth state
-      #     that doesn't belong to imported members)
-      #   - stripe_customer_id / stripe_payment_intent_id (point at dev's
-      #     test Stripe customers — meaningless on live)
-      def member_attrs_from(attrs)
-        {
-          email:                       attrs["email"].to_s.strip,
-          name:                        attrs["name"],
-          metadata:                    attrs["metadata"] || {},
-          status:                      attrs["status"],
-          tier:                        attrs["tier"],
-          newsletter_status:           attrs["newsletter_status"],
-          created_at:                  attrs["created_at"],
-          updated_at:                  attrs["updated_at"],
-          subscribed_at:               attrs["subscribed_at"],
-          cancelled_at:                attrs["cancelled_at"],
-          paid_at:                     attrs["paid_at"],
-          paid_amount_cents:           attrs["paid_amount_cents"],
-          paid_currency:               attrs["paid_currency"],
-          refunded_at:                 attrs["refunded_at"],
-          refunded_amount_cents:       attrs["refunded_amount_cents"],
-          refunded_currency:           attrs["refunded_currency"],
-          email_confirmation_sent_at:  attrs["email_confirmation_sent_at"],
-          pending_email:               attrs["pending_email"]
-        }
-      end
 
       # Look up the target post. Tries substack_post_id first (most stable
       # — comes straight from Substack and is preserved in metadata),

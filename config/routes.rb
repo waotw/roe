@@ -20,6 +20,10 @@ Rails.application.routes.draw do
       get "manifest",                   to: "exchange#manifest"
       post "download",                  to: "exchange#download"
       post "upload",                    to: "exchange#upload"
+      post "upload_chunk",              to: "chunked_uploads#chunk"
+      post "upload_finish",             to: "chunked_uploads#finish"
+      post "download_info",             to: "chunked_downloads#info"
+      post "download_chunk",            to: "chunked_downloads#chunk"
       post "database",                  to: "exchange#database"
       post "publish_members",           to: "imports#publish_members"
       post "publish_newsletter_sends",  to: "imports#publish_newsletter_sends"
@@ -53,15 +57,24 @@ Rails.application.routes.draw do
     get  "updates/git_status",        to: "updates#git_status",     as: "git_status"
     post "updates/channel",           to: "updates#update_channel", as: "update_channel"
 
-    # Dependencies — optional external tools (libvips, …): status + the
+    # Dependencies — optional external tools, on two Tools pages: Images &
+    # Video (libvips, ffmpeg) and Developer Tools (Stripe CLI). Status + the
     # OS-correct install command. Read-only; installs happen in a terminal.
-    get "dependencies", to: "dependencies#index", as: "dependencies"
+    get "dependencies",             to: "dependencies#index",       as: "dependencies"
+    get "dependencies/development", to: "dependencies#development", as: "development_dependencies"
+
+    # Imports — one page linking the four importers (Substack, feeds,
+    # files, media), each of which keeps its own routes below.
+    get "importers", to: "importers#index", as: "importers"
 
     # Markdown diagnostics for the editor. Shared by posts/pages/products/emails
     # — they all render shared/_editor. POST because the content being checked
     # is in the body (it hasn't been saved yet).
     post "markdown/check", to: "markdown#check", as: "check_markdown"
     post "markdown/fix",   to: "markdown#fix",   as: "fix_markdown"
+    # The live editor's block cards: which Roe-anji blocks would render a
+    # warning instead of themselves.
+    post "markdown/blocks", to: "markdown#blocks", as: "markdown_blocks"
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
@@ -117,6 +130,10 @@ Rails.application.routes.draw do
     delete "layout/sidebar", to: "layouts#destroy_sidebar", as: "destroy_layout_sidebar"
     get "layouts", to: "layouts#index"
     post "layouts/generate_missing", to: "layouts#generate_missing", as: "generate_missing_admin_layouts"
+    # The menu builder: takes the editor's current text, returns the link
+    # list it found with a best-guess page for each. Pure — writes nothing;
+    # the editor applies the result to its own textarea.
+    post "layouts/menu_builder", to: "layouts#menu_builder", as: "layouts_menu_builder"
 
     resources :posts, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       collection do
@@ -132,7 +149,6 @@ Rails.application.routes.draw do
         post :preview
         get :preview
         patch :rename
-        patch :set_duration
         post :duplicate
         post :send_test_email
         get :newsletter_status
@@ -166,11 +182,15 @@ Rails.application.routes.draw do
         post :queue_missing_variants
         post :prune_variants
         post :bulk_destroy
+        post :dismiss_video_notices
+        get :video_notices
+        post :optimize_videos
       end
       member do
         patch :rename
         post :regenerate_variants
         get :card
+        get :video_status
       end
     end
 
@@ -208,6 +228,7 @@ Rails.application.routes.draw do
         get :new_members_setup
         post :create_members
         delete :delete_members
+        post :confirm_members_passwords
         get :new_store_setup
         post :create_store
         delete :delete_store
@@ -222,6 +243,7 @@ Rails.application.routes.draw do
     patch  "configs/payments/live",       to: "configs#update_payments_live",   as: "live_payments_config"
     patch  "configs/payments/mode",       to: "configs#update_payments_mode",   as: "mode_payments_config"
     post   "configs/payments/verify",     to: "configs#verify_payments",        as: "verify_payments_config"
+    post   "configs/payments/webhook",    to: "configs#setup_payments_webhook", as: "setup_payments_webhook_config"
     delete "configs/payments/disconnect", to: "configs#disconnect_payments",    as: "disconnect_payments_config"
 
     get    "configs/newsletters/edit",                      to: "configs#edit_newsletters",                  as: "edit_newsletters_config"
@@ -229,8 +251,13 @@ Rails.application.routes.draw do
     patch  "configs/newsletters/live",                      to: "configs#update_newsletters_live",           as: "live_newsletters_config"
     patch  "configs/newsletters/mode",                      to: "configs#update_newsletters_mode",           as: "mode_newsletters_config"
     post   "configs/newsletters/verify",                    to: "configs#verify_newsletters",                as: "verify_newsletters_config"
+    post   "configs/newsletters/send_test_email",           to: "configs#send_test_email_newsletters",        as: "send_test_email_newsletters_config"
     delete "configs/newsletters/disconnect",                to: "configs#disconnect_newsletters",            as: "disconnect_newsletters_config"
     post   "configs/newsletters/regenerate_webhook_token",  to: "configs#regenerate_postmark_webhook_token", as: "regenerate_webhook_token_newsletters_config"
+    post   "configs/newsletters/account_setup/preview",     to: "configs#postmark_account_setup_preview",     as: "postmark_account_setup_preview_config"
+    post   "configs/newsletters/account_setup",             to: "configs#postmark_account_setup_run",         as: "postmark_account_setup_config"
+    post   "configs/newsletters/webhook/verify",            to: "configs#postmark_verify_webhooks",            as: "postmark_verify_webhooks_config"
+    delete "configs/newsletters/account_token",             to: "configs#remove_postmark_account_token",      as: "remove_postmark_account_token_config"
 
     get    "configs/snipcart/edit",       to: "configs#edit_snipcart",          as: "edit_snipcart_integration_config"
     patch  "configs/snipcart",            to: "configs#update_snipcart",        as: "snipcart_integration_config"
@@ -245,6 +272,13 @@ Rails.application.routes.draw do
         patch :update
         post :activate
         post :reset
+      end
+      # The site scripts Roe ships live on the Themes page too — same
+      # shipped-file story, no editor. :id is the script's basename.
+      collection do
+        post "scripts/:id/update", to: "themes#update_script", as: :update_script
+        post "scripts/update_all", to: "themes#update_all_scripts", as: :update_all_scripts
+        get  "scripts/:id/download", to: "themes#download_script", as: :download_script
       end
     end
 
@@ -263,7 +297,19 @@ Rails.application.routes.draw do
         patch :cancel_membership
         patch :reactivate_membership
       end
+      collection do
+        post :bulk_destroy
+        post :bulk_purge
+        post :bulk_set_tier
+        post :bulk_newsletter
+        post :compose_invite
+        patch :send_invite
+      end
     end
+
+    # Shop orders received from Snipcart webhooks. Not in the admin nav yet —
+    # linked from the dashboard — but a real top-level page.
+    resources :orders, only: [ :index, :show ]
 
     resources :imports, only: [ :index, :new, :create, :show, :destroy ] do
       member do
@@ -335,6 +381,8 @@ Rails.application.routes.draw do
 
     get   "configs/custom_code/edit", to: "configs#edit_custom_code", as: "edit_custom_code_config"
     patch "configs/custom_code",      to: "configs#update_custom_code", as: "custom_code_config"
+    get   "configs/redirects/edit",   to: "configs#edit_redirects", as: "edit_redirects_config"
+    patch "configs/redirects",        to: "configs#update_redirects", as: "redirects_config"
 
     get "configs/fonts/edit", to: "configs#edit_fonts", as: "edit_fonts_config"
     patch "configs/fonts", to: "configs#update_fonts", as: "fonts_config"
@@ -396,6 +444,11 @@ Rails.application.routes.draw do
   delete "signout", to: "members/sessions#destroy"
   get "signin/:token", to: "members/sessions#signin_with_token", as: :token_signin
 
+  # Member password recovery via recovery codes (email-off sites). The page
+  # lives at /recover-account (a Roe Page); the POST resets the password.
+  get "recover-account", to: "members/recovery#new", as: :member_recovery
+  post "recover-account", to: "members/recovery#create"
+
   # GET aliases for the public signin/signup PAGES. The post routes above
   # handle form submissions to /signin and /signup, but Rails' signin_path
   # / signup_path helpers resolve to those URLs, and a guest redirected
@@ -416,6 +469,16 @@ Rails.application.routes.draw do
   # New private feed URLs, when the old ones have been shared or leaked.
   post "account/feeds/regenerate", to: "members/accounts#regenerate_media_token",
        as: :regenerate_media_token
+  # New recovery codes (password-mode / email-off sites).
+  post "account/recovery-codes/regenerate", to: "members/accounts#regenerate_recovery_codes",
+       as: :regenerate_recovery_codes
+  # Routine password change for a signed-in member (password-mode sites).
+  patch "account/password", to: "members/accounts#update_password",
+        as: :update_account_password
+  # Newsletter on/off from the account page, so a member isn't dependent on
+  # finding the unsubscribe link in an email — or on having ever received one.
+  patch "account/newsletter", to: "members/accounts#update_newsletter",
+        as: :account_newsletter
   delete "account", to: "members/accounts#destroy", as: :delete_account
   get "/unsubscribe/:token", to: "members/subscriptions#unsubscribe", as: :unsubscribe
   post "/unsubscribe/:token", to: "members/subscriptions#confirm_unsubscribe"
@@ -463,6 +526,9 @@ Rails.application.routes.draw do
   # Public search index (client-side site search). Static builds bake the
   # same JSON to /search-index.json so search works with no backend.
   get "search-index.json", to: "search#index", as: :search_index, defaults: { format: "json" }
+  # The same index with paid posts' full text, for signed-in paid members.
+  # Dynamic sites only; never baked into a static build.
+  get "members/search-index.json", to: "search#members", as: :members_search_index, defaults: { format: "json" }
 
   # Feeds
   get "feed", to: "feeds#rss", defaults: { format: "xml" }, as: :feed
@@ -506,6 +572,13 @@ Rails.application.routes.draw do
 
   # Stripe webhooks
   post "webhooks/stripe", to: "webhooks#stripe", as: :stripe_webhook
+
+  # Snipcart webhooks — one URL for all store events. Snipcart offers no HMAC
+  # and its validation callback needs the secret API key, so we authenticate
+  # with an unguessable token in the path (Postmark-style). Legacy tokenless
+  # route kept so an old pasted URL fails clearly (401) rather than 404.
+  post "webhooks/snipcart/:token", to: "webhooks/snipcart#create", as: :snipcart_webhook
+  post "webhooks/snipcart", to: "webhooks/snipcart#create"
 
   # Pages catch-all (MUST BE LAST)
   get ":url_name", to: "pages#show", as: :page

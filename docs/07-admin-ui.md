@@ -34,6 +34,32 @@ The editor (`app/javascript/controllers/editor_controller.js`) provides:
 - Collection insertion
 - Action insertion — button (product/share/subscribe) and form (signup, paywall, …) blocks
 
+### Live Markdown Editor (beta)
+
+`editor.mode` in `content.yml` chooses between `live`, `source` and `textarea`. Unset means `textarea` while the editor is in beta. It's set from Settings → Content → Writing editor.
+
+For `live` and `source`, `markdown_editor_controller.js` imports `app/javascript/markdown_editor/` and puts a CodeMirror 6 editor in place of `#content-textarea`. The CodeMirror modules are vendored and pinned `preload: false`, so no other page downloads them.
+
+**The textarea is never replaced.** It stays in the form, hidden, and `editor.js` points its properties at the editor: `value`, `selectionStart`/`selectionEnd`, `setSelectionRange`, `setRangeText`, `focus`, and `document.execCommand("insertText")`. Its `input` events fire as they would for a real textarea. Enter and Tab are passed to the textarea's own keydown listeners first. As a result, `editor_controller`, the four block builders, site links, the markdown check, draft recovery, save and preview all work against either editor without knowing which one is running.
+
+Code that needs more than a textarea can do checks `textarea.roeEditor`. That property is present only when the live editor is running.
+- `goTo` / `goToLine` / `revealPos` place a line using CodeMirror's measured heights, clear of the sticky toolbar and the action drawer. Jump to heading, jump to line in the markdown check, and the footnote jumps all use them.
+- `footnoteAt` / `footnoteContinuation` decide whether the caret is in a footnote using the syntax tree.
+
+| File | Does |
+|------|------|
+| `editor.js` | The editor, the textarea stand-in, keyboard shortcuts, scroll placement |
+| `syntax.js` | Markdown grammar: CommonMark + GFM tables/strikethrough + `==highlight==`, `\|\|aside\|\|`, footnotes |
+| `live_preview.js` | Hides markers except where the caret is: per element for inline marks, per line for headings, quotes and lists |
+| `roe_blocks.js` | Roe-anji block cards, automatic gallery detection, server warning checks |
+| `footnotes.js` | Footnote detection, Enter indent, paste indent |
+
+**Block cards** come from fenced blocks of the kinds `to_html` skips: `collection`, `card`, `gallery`, `form`, `button`, `search`. They also come from runs of consecutive image lines, found by `autoGalleryRuns()`, which mirrors `process_auto_galleries`. Keep the two in step. Each card is one row per source line at the editor's line height, so opening and closing a block never moves the page.
+
+Broken blocks are found by `POST /admin/markdown/blocks`. It renders each block through `to_html(preview: true)` and returns any `[data-roe-warning]` boxes, which are marked by `dev_warning`. The editor shows that box in place of the card.
+
+Styles are in the `MARKDOWN EDITOR` section of `app/assets/stylesheets/application.css`. Anything that sets the editor's own padding has to go through `EditorView.theme` in `editor.js`, because CodeMirror's injected styles outrank the stylesheet. The `roe-md-editor` class is set through `editorAttributes` for the same reason: CodeMirror rewrites the class attribute.
+
 ### Keyboard Shortcuts
 
 | Shortcut | Action |

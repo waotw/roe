@@ -12,8 +12,13 @@ class Page < ApplicationRecord
   # defaults: { url_name: "home" }) so we special-case it; everything
   # else uses the catch-all `:url_name` route.
   def public_url
-    return "/" if url_name == "home"
-    "/#{url_name}"
+    self.class.public_url_for(url_name)
+  end
+
+  # The address a page with this url_name has. Also used to work out the new
+  # address when a page is renamed (RenameRedirect).
+  def self.public_url_for(slug)
+    slug.to_s == "home" ? "/" : "/#{slug}"
   end
 
   def self.create_or_update_from_file(file_path)

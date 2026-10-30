@@ -12,7 +12,13 @@
         item: defined?(item) ? item : nil %>
   <% end %>
 
-  <div>
+  <%# markdown-editor swaps the textarea below for the live editor
+      (app/javascript/markdown_editor). `editor.mode: textarea` in content
+      settings turns it off and leaves the plain textarea, as before. %>
+  <% editor_mode = SiteConfig.content("editor.mode").to_s.presence_in(%w[live source textarea]) || "textarea" %>
+  <div data-controller="markdown-editor"
+       data-markdown-editor-mode-value="<%= editor_mode %>"
+       data-markdown-editor-blocks-url-value="<%= admin_markdown_blocks_path %>">
     <!-- Sticky container for buttons + TOC -->
     <%# reveal: a markdown check can be started from the sticky drawer at the
         bottom of the window, with this toolbar scrolled away or its lower half
@@ -23,7 +29,11 @@
          class="sticky top-0 z-10 bg-white border-b border-gray-300">
           <!-- Button bar -->
           <div class="flex justify-start gap-6 items-center py-2 px-2 border-x border-t border-gray-300">
-            <div class="flex gap-4">
+            <%# flex-wrap: when the window is too narrow for one row, the last
+                group — Roe-anji blocks and Media — drops to a second row,
+                starting on the left under the formatting buttons. Everything
+                stays one click away; nothing goes behind a menu. %>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
             <div class="flex gap-1">
           <button type="button" data-action="click->editor#insertBold" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><strong>B</strong></button>
           <button type="button" data-action="click->editor#insertItalic" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]"><em>I</em></button>
@@ -36,9 +46,11 @@
           <button type="button" data-action="click->editor#insertLink" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">🔗</button>
           <button type="button" data-action="click->editor#insertFootnote" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">f<sup>1</sup></button>
         </div>
-        <div class="flex gap-1">
+        <%# Wraps on its own too, so on a phone the block buttons fold onto as
+            many rows as they need instead of running off the edge. %>
+        <div class="flex flex-wrap gap-1">
           <div class="relative inline-flex" data-gallery-builder-target="wrap">
-            <button type="button" data-action="click->gallery-builder#toggle" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Gallery</button>
+            <button type="button" data-action="click->gallery-builder#toggle" data-gallery-builder-target="toggleButton" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] text-nowrap">Gallery</button>
             <div data-gallery-builder-target="menu" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-800 shadow-lg z-20 p-3" style="min-width: 260px;">
               <label class="flex items-center gap-2 text-xs mb-2 text-gray-700">
                 <input type="checkbox" data-gallery-builder-target="carousel" data-action="change->gallery-builder#updateRatioNote" class="h-4 w-4 border-gray-300 rounded">
@@ -81,12 +93,13 @@
                 </button>
               </div>
 
-              <button type="button" data-action="click->gallery-builder#insert" class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs w-full">Insert</button>
+              <button type="button" data-action="click->gallery-builder#insert" data-gallery-builder-target="insertButton" class="uppercase text-xs px-3 py-1 border border-gray-800 bg-gray-800 text-white hover:bg-gray-700 font-mono rounded-xs w-full">Insert</button>
             </div>
           </div>
           <div class="relative inline-flex">
             <button type="button"
-                    data-action="click->editor#toggleCardMenu"
+                    data-action="click->card-builder#caretClick click->editor#toggleCardMenu"
+                    data-card-builder-target="toggleButton"
                     class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] text-nowrap items-center">
               Card <span class="text-base leading-0">▼</span>
             </button>
@@ -109,13 +122,19 @@
                         data-card-type="product-link"
                         class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Product Link</button>
               <% end %>
+              <%# COPY: Card menu label %>
+              <button type="button"
+                      data-action="click->card-builder#open"
+                      data-card-type="player"
+                      class="block w-full text-left px-3 py-1.5 hover:bg-gray-100 text-xs">Player</button>
             </div>
           </div>
-          <button type="button" data-action="click->collection-builder#open" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]">Collection</button>
+          <button type="button" data-action="click->collection-builder#open" data-collection-builder-target="toggleButton" class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] text-nowrap">Collection</button>
           <% if store_enabled? || members_enabled? %>
             <div class="relative inline-flex" data-action-builder-menu>
               <button type="button"
-                      data-action="click->action-builder#toggleMenu"
+                      data-action="click->action-builder#caretClick click->action-builder#toggleMenu"
+                      data-action-builder-target="toggleButton"
                       class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] text-nowrap items-center">
                 Action <span class="text-base leading-0">▼</span>
               </button>
@@ -195,52 +214,73 @@
             No bottom padding on the row: the tabs have their own, so they reach
             the panel's top edge and can join it. The whole active-tab look
             (background, border) lives in application.css — see .editor-tab. %>
-        <div class="editor-tabs flex items-center gap-1 px-1.5 py-1 border-t border-x border-gray-300">
-          <button type="button"
-                  data-action="click->editor#toggleTOC click->markdown-doctor#closePanel"
-                  class="editor-tab editor-tab-toc text-xs text-gray-600 hover:text-gray-900 text-nowrap">
-            Table of Contents
-            <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
-          </button>
+        <div class="editor-tabs flex items-center gap-1 px-1.5 py-1 border-t border-x border-gray-300 justify-between">
+          <%# Left: the tabs and the check's status. Its own flex row, so the
+              tabs, dot and summary line up the way they did as direct children
+              of the strip. %>
+          <div class="flex items-center gap-1">
+            <button type="button"
+                    data-action="click->editor#toggleTOC click->markdown-doctor#closePanel"
+                    class="editor-tab editor-tab-toc text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+              Table of Contents
+              <span data-editor-target="tocArrow" class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
+            </button>
 
-          <%# Present only while there's something to read. Arriving and leaving
-              costs no vertical space — the table-of-contents tab sets the row's
-              height — so it can follow the writing without shoving the page
-              around. Nothing here opens on its own; that's always a click. %>
-          <button type="button"
-                  data-markdown-doctor-target="toggleRow"
-                  data-action="click->markdown-doctor#togglePanel click->editor#closeTOC"
-                  class="editor-tab editor-tab-markdown hidden text-xs text-gray-600 hover:text-gray-900 text-nowrap">
-            Markdown Check
-            <%# Collapsed to start: the tab now arrives on its own when a check
-                finds something, with the panel still closed. %>
-            <span data-markdown-doctor-target="arrow"
-                  class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
-          </button>
+            <%# Present only while there's something to read. Arriving and leaving
+                costs no vertical space — the table-of-contents tab sets the row's
+                height — so it can follow the writing without shoving the page
+                around. Nothing here opens on its own; that's always a click. %>
+            <button type="button"
+                    data-markdown-doctor-target="toggleRow"
+                    data-action="click->markdown-doctor#togglePanel click->editor#closeTOC"
+                    class="editor-tab editor-tab-markdown hidden text-xs text-gray-600 hover:text-gray-900 text-nowrap">
+              Markdown Check
+              <%# Collapsed to start: the tab now arrives on its own when a check
+                  finds something, with the panel still closed. %>
+              <span data-markdown-doctor-target="arrow"
+                    class="text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono h-4.5 rounded-xs leading-none text-blue-800 cursor-pointer">▶</span>
+            </button>
 
-          <%# Status. Green says the markdown is fine, amber that something's
-              worth a look — the same two colours the save dot uses, since it's
-              the same question asked about a different thing. Grey until the
-              first check answers, so a document with problems never flashes
-              green on the way in. The dot is decorative; the text beside it
-              carries the meaning, which is what a screen reader will read.
 
-              Both sit outside the panel so they stay legible with it closed —
-              which, for a clean document, is the only state there is.
+            <%# Status. Green says the markdown is fine, amber that something's
+                worth a look — the same two colours the save dot uses, since it's
+                the same question asked about a different thing. Grey until the
+                first check answers, so a document with problems never flashes
+                green on the way in. The dot is decorative; the text beside it
+                carries the meaning, which is what a screen reader will read.
 
-              Undo is here rather than in the Fixable section because a
-              successful Fix All empties that section, which is exactly when undo
-              is wanted. The fix only touches the textarea, so Ctrl+Z and "don't
-              save" already undo it; this just makes one click reversible in one. %>
-          <span data-markdown-doctor-target="dot" aria-hidden="true"
-                class="inline-block w-2 h-2 rounded-full bg-gray-300 ml-1 shrink-0"></span>
-          <span data-markdown-doctor-target="summary" class="text-xs text-gray-500 ml-1.5"></span>
-          <button type="button"
-                  data-markdown-doctor-target="revertButton"
-                  data-action="click->markdown-doctor#revert"
-                  class="hidden uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
-            Undo Fix
-          </button>
+                Both sit outside the panel so they stay legible with it closed —
+                which, for a clean document, is the only state there is.
+
+                Undo is here rather than in the Fixable section because a
+                successful Fix All empties that section, which is exactly when undo
+                is wanted. The fix only touches the textarea, so Ctrl+Z and "don't
+                save" already undo it; this just makes one click reversible in one. %>
+            <span data-markdown-doctor-target="dot" aria-hidden="true"
+                  class="inline-block w-2 h-2 rounded-full bg-gray-300 ml-1 shrink-0"></span>
+            <span data-markdown-doctor-target="summary" class="text-xs text-gray-500 ml-1.5"></span>
+            <button type="button"
+                    data-markdown-doctor-target="revertButton"
+                    data-action="click->markdown-doctor#revert"
+                    class="hidden uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
+              Undo Fix
+            </button>
+          </div>
+
+          <%# Right: Live / Source. The text says which mode is on; the button
+              says what clicking it does: "Live mode [SOURCE]". Hidden until the
+              live editor has loaded, so the plain textarea never shows a switch
+              that does nothing. %>
+          <span data-markdown-editor-target="modeToggle"
+                class="hidden items-center gap-1.5 text-xs text-gray-600 text-nowrap">
+            <span data-markdown-editor-target="modeState">Live mode</span>
+            <button type="button"
+                    data-markdown-editor-target="modeButton"
+                    data-action="click->markdown-editor#toggleMode"
+                    class="uppercase text-xs px-1.5 py-0 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem] cursor-pointer">
+              <span data-markdown-editor-target="modeLabel">Source</span>
+            </button>
+          </span>
         </div>
 
         <%# Two sections, because the distinction is what the writer acts on:
@@ -306,15 +346,17 @@
             class: "w-full font-mono text-sm p-1 border-x border-b border-gray-300 bg-white resize-none overflow-hidden pb-96 focus:placeholder-transparent",
             data: {
               editor_target: "textarea",
+              markdown_editor_target: "textarea",
               action: "input->editor#hideFlashOnInput input->editor#updateTOC " \
                       "markdown-doctor:contentChanged->editor#refreshPreview"
             },
             id: "content-textarea" %>
   </div>
 
-  <!-- Media Picker Modal -->
+  <!-- Media Picker Modal. z-[60]: the card builder (z-50) opens it from its
+       Audio/Video "Choose…" buttons, so it has to sit above that modal. -->
   <div data-editor-target="mediaPickerModal"
-       class="fixed inset-0 z-50 items-center justify-center"
+       class="fixed inset-0 z-[60] items-center justify-center"
        style="display: none;">
     <!-- Backdrop: clicking this closes the modal -->
     <div class="absolute inset-0 bg-black/50"

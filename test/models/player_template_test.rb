@@ -59,8 +59,9 @@ class PlayerTemplateTest < ActiveSupport::TestCase
     html = Post.find_by("json_extract(metadata, '$.url_name') = ?", slug).to_html
 
     assert_includes html, "card-player"
-    assert_includes html, %(data-controller="audio-player")
+    assert_includes html, %(data-player="audio")
     assert_not_includes html, "<source", "no audio source when the post has none"
+    assert_match(/<audio[^>]*controls[^>]*hidden/, html, "an empty browser bar would play nothing, so it starts hidden")
   end
 
   test "playlist renders just the track list, no transport" do
@@ -77,7 +78,7 @@ class PlayerTemplateTest < ActiveSupport::TestCase
     assert_not_includes html, "collection-player"
   end
 
-  test "player card uses the post's audio + association artwork, wired to audio-player" do
+  test "player card uses the post's audio + association artwork, for player.js" do
     slug = ContentWriter.new.write(kind: :post, filename: "pc-host",
       metadata: { "title" => "Episode One", "url_name" => "pc-host", "status" => "published",
                   "post_type" => "podcast", "podcast" => "myshow", "audio" => "/media/ep1.mp3" },
@@ -88,9 +89,9 @@ class PlayerTemplateTest < ActiveSupport::TestCase
     html = Post.find_by("json_extract(metadata, '$.url_name') = ?", slug).to_html
 
     assert_includes html, "card-player"
-    assert_includes html, %(data-controller="audio-player")
+    assert_includes html, %(data-player="audio")
     assert_includes html, %(<source src="/media/ep1.mp3")
-    assert_includes html, %(data-audio-player-target="playButton")
+    assert_includes html, %(data-player-part="play")
     assert_includes html, "Episode One", "post title in the player"
     assert_includes html, %(src="/system/images/art.jpg"), "artwork from the post's podcast association"
   end

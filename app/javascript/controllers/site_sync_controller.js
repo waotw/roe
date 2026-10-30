@@ -15,6 +15,7 @@ export default class extends Controller {
     "progress",
     "progressLabel",
     "progressBar",
+    "progressFile",
   ];
 
   connect() {
@@ -74,15 +75,47 @@ export default class extends Controller {
     this.progressTarget.hidden = false;
 
     if (this.hasProgressLabelTarget) {
-      this.progressLabelTarget.textContent =
-        `${progress.completed} of ${progress.total} files transferred`;
+      this.progressLabelTarget.textContent = progressText(progress);
+    }
+
+    // The large file in flight, if any — a long wait names what it's on.
+    if (this.hasProgressFileTarget) {
+      this.progressFileTarget.textContent = progress.current || "";
+      this.progressFileTarget.hidden = !progress.current;
     }
 
     if (this.hasProgressBarTarget) {
-      const pct = progress.total > 0
-        ? Math.round((progress.completed / progress.total) * 100)
-        : 0;
+      // By bytes when we have them: a sync of one large video and four
+      // small files is one big file's worth of waiting, not five steps.
+      const [done, total] = progress.bytes_total
+        ? [progress.bytes_done, progress.bytes_total]
+        : [progress.completed, progress.total];
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
       this.progressBarTarget.style.width = `${pct}%`;
     }
   }
+}
+
+// Kept in step with the server-rendered label in
+// admin/site_sync/index.html.erb, so the first paint and every poll read
+// the same.
+function progressText(progress) {
+  const files = `${progress.completed} of ${progress.total} files`;
+  if (!progress.bytes_total) return `${files} transferred`;
+
+  return `${files} · ${humanSize(progress.bytes_done)} of ${humanSize(progress.bytes_total)}`;
+}
+
+// Matches Rails' number_to_human_size defaults (three significant digits,
+// trailing zeros dropped), which the server-rendered label uses.
+function humanSize(bytes) {
+  const units = ["Bytes", "KB", "MB", "GB", "TB"];
+  let value = bytes || 0;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const shown = unit === 0 ? Math.round(value) : Number(value.toPrecision(3));
+  return `${shown} ${units[unit]}`;
 }

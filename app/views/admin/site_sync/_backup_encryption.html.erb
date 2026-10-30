@@ -2,16 +2,29 @@
     full-site backup encrypted with this passphrase — the plaintext DB
     never leaves the host. The passphrase lives where staging happens
     (production), so the form shows there; local just gets a note pointing
-    at the live site plus a status line for what's already in backups. %>
-<% passphrase_set = @sync_config.backup_passphrase_set? %>
+    at the live site plus a status line for what's already in backups.
+
+    On local the badge reports the LIVE site's state, learned from the
+    last exchange (SyncConfig#peer_backup_encryption) — the local
+    passphrase is always empty and would read "Off" while backups were
+    arriving encrypted every sync. %>
+<% if Rails.env.production? %>
+  <% passphrase_set = @sync_config.backup_passphrase_set? %>
+  <% live_encryption = passphrase_set %>
+<% else %>
+  <% passphrase_set = false %>
+  <% live_encryption = @sync_config.peer_backup_encryption %>
+<% end %>
 
 <div class="bg-white border border-gray-200 rounded-xs p-6 mb-6">
   <div class="flex items-center gap-2 mb-1">
     <h2 class="text-lg font-semibold text-gray-900">Database backup encryption</h2>
-    <% if passphrase_set %>
+    <% if live_encryption == true %>
       <span class="text-xs font-normal text-green-800 bg-green-100 px-2 py-0.5 rounded">ON</span>
-    <% else %>
+    <% elsif live_encryption == false %>
       <span class="text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Off</span>
+    <% else %>
+      <span class="text-xs font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Unknown</span>
     <% end %>
   </div>
 
@@ -54,16 +67,32 @@
     <% end %>
   <% else %>
     <%# ── Local/dev: the passphrase must be set on the LIVE site ── %>
-    <div class="bg-blue-50 border border-blue-200 rounded-xs p-4 text-sm text-blue-900">
-      <p class="mb-2 max-w-3xl">
-        <strong>Set the backup passphrase on your live site.</strong> The live database is encrypted
-        on the server before it's synced locally.
-        Open <a href="<%= @site_url %>/admin/site_sync" class="font-mono text-xs underline">Site Sync → Site Backups</a> on your live site to set it.
-      </p>
-      <p class="text-xs text-blue-800">
-        Once it's set on live, every sync pulls a fresh encrypted database into your backups below.
-      </p>
-    </div>
+    <% if live_encryption == true %>
+      <div class="bg-green-50 border border-green-200 rounded-xs p-4 text-sm text-green-900">
+        <p class="mb-2 max-w-3xl">
+          ✓ Your live site has a backup passphrase set. Each sync pulls a fresh, encrypted copy of
+          the live database into your backups below.
+        </p>
+        <p class="text-xs text-green-800">
+          To change or clear it, open <a href="<%= @site_url %>/admin/site_sync" class="font-mono underline">Site Sync → Site Backups</a> on your live site.
+        </p>
+      </div>
+    <% else %>
+      <div class="bg-blue-50 border border-blue-200 rounded-xs p-4 text-sm text-blue-900">
+        <p class="mb-2 max-w-3xl">
+          <strong>Set the backup passphrase on your live site.</strong> The live database is encrypted
+          on the server before it's synced locally.
+          Open <a href="<%= @site_url %>/admin/site_sync" class="font-mono text-xs underline">Site Sync → Site Backups</a> on your live site to set it.
+        </p>
+        <p class="text-xs text-blue-800">
+          <% if live_encryption.nil? %>
+            This page learns the live site's setting on the next sync.
+          <% else %>
+            Once it's set on live, every sync pulls a fresh encrypted database into your backups below.
+          <% end %>
+        </p>
+      </div>
+    <% end %>
 
     <% latest_encrypted = @live_db_backups&.first %>
     <div class="mt-3 text-xs <%= latest_encrypted ? 'text-green-800' : 'text-gray-500' %>">

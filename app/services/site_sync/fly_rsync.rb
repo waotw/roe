@@ -75,7 +75,9 @@ module SiteSync
     # since DBs have their own backup system.
     BACKUP_EXCLUDES = (COMMON_EXCLUDES + [
       "--exclude=db/"
-    ]).freeze
+      # Video web versions out, their -video.json kept — the same rule as
+      # the HTTP transport and local snapshots (SiteSync::BackupPolicy).
+    ] + SiteSync::BackupPolicy.rsync_filter_args).freeze
 
     # When deleting many files via fly ssh console, batch them so
     # a single SSH session covers a whole chunk (each fly ssh call
@@ -106,9 +108,9 @@ module SiteSync
       # file-count progress in the admin UI without parsing rsync
       # themselves.
 
-      def push_local_to_live!(diff: nil, on_progress: nil)
+      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false)
         if diff
-          push_selective(diff, on_progress: on_progress)
+          push_selective(diff, on_progress: on_progress, tidy: tidy)
         else
           push_full(on_progress: on_progress)
         end
@@ -139,7 +141,7 @@ module SiteSync
 
       # ─── Push ─────────────────────────────────────────────────────
 
-      def push_selective(diff, on_progress: nil)
+      def push_selective(diff, on_progress: nil, tidy: false)
         modified = Array(diff[:modified])
         added    = Array(diff[:added])
         deleted  = Array(diff[:deleted])
@@ -155,17 +157,27 @@ module SiteSync
           )
         end
 
-        remove_remote_files(deleted) if deleted.any?
+        # Video files the live-video setting keeps on this computer, removed
+        # from live while a push is happening anyway (SiteSync::LiveVideo).
+        # Not in the diff, so never backed up from live first or listed as a
+        # deletion: every one is a file this computer has.
+        # tidy: a sync with nothing else to send, run to remove those.
+        deleted += SiteSync::LiveVideo.to_purge if files_to_send.any? || deleted.any? || tidy
+        remove_remote_files(deleted.uniq) if deleted.any?
       end
 
       def push_full(on_progress: nil)
         rsync(
           source:      "#{RoeSitePaths::SITE_PATH}/",
           dest:        "#{machine_id}:#{REMOTE_SITE_PATH}",
-          excludes:    PUSH_EXCLUDES,
+          excludes:    PUSH_EXCLUDES + SiteSync::LiveVideo.rsync_exclude_args,
           delete:      true,
           on_progress: on_progress
         )
+        # --delete leaves excluded files alone, so held-back video still on
+        # live is removed by name.
+        purge = SiteSync::LiveVideo.to_purge
+        remove_remote_files(purge) if purge.any?
       end
 
       # ─── Pull ─────────────────────────────────────────────────────
@@ -186,6 +198,7 @@ module SiteSync
           )
         end
 
+        deleted = deleted.reject { |rel| SiteSync::LiveVideo.held_back?(rel) }
         remove_local_files(deleted) if deleted.any?
       end
 
@@ -193,7 +206,9 @@ module SiteSync
         rsync(
           source:      "#{machine_id}:#{REMOTE_SITE_PATH}",
           dest:        "#{RoeSitePaths::SITE_PATH}/",
-          excludes:    PULL_EXCLUDES,
+          # Held-back video is on this computer only; without these rules
+          # --delete would remove it here because live doesn't have it.
+          excludes:    PULL_EXCLUDES + SiteSync::LiveVideo.rsync_exclude_args,
           delete:      true,
           on_progress: on_progress
         )
@@ -248,7 +263,7 @@ module SiteSync
           # when there's nothing to track. Major slowdown over fly
           # ssh console.
           flags:    "-rltzPi #{link_dest}",
-          excludes: BACKUP_EXCLUDES
+          excludes: BACKUP_EXCLUDES + SiteSync::LiveVideo.rsync_exclude_args
         )
 
         output, success = run_streaming(cmd, on_progress: on_progress)
@@ -280,7 +295,7 @@ module SiteSync
         return ENV["FLY_APP_NAME"] if ENV["FLY_APP_NAME"].present?
 
         if File.exist?(SiteConfig::DEPLOY_FILE)
-          config = YAML.load_file(SiteConfig::DEPLOY_FILE) || {}
+          config = SiteFile.read_yaml(SiteConfig::DEPLOY_FILE) || {}
           name = config["app_name"].to_s.strip
           return name if name.present?
         end

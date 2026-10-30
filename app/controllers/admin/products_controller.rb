@@ -1,6 +1,8 @@
 class Admin::ProductsController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
+  include RenameRedirect
+  include EditorSave
 
   def bulk_model = Product
   def bulk_index_path = admin_products_path
@@ -53,7 +55,7 @@ class Admin::ProductsController < Admin::BaseController
 
     title = title_param.presence || filename_to_title(filename)
     overrides = { "title" => title, "url_name" => filename }.merge(create_field_overrides("product"))
-    overrides["sku"] = suggested_sku(overrides) if overrides["sku"].blank?
+    overrides["sku"] = suggested_sku(overrides) if overrides["sku"].blank? && SiteFeature.snipcart_enabled?
 
     metadata, body = ContentTemplate.frontmatter_for("product", overrides)
 
@@ -63,11 +65,18 @@ class Admin::ProductsController < Admin::BaseController
     SiteFile.write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    relative_path = file_path.to_s.sub(RoeSitePaths::SITE_PATH.to_s + "/", "")
+    # Build the SAME relative key the model stores: strip the normalized
+    # (realpath) site path from the normalized file path. On production
+    # /rails/site is a symlink to /data/site, so stripping the raw SITE_PATH
+    # from the raw file_path wouldn't match — falsely reporting "failed to
+    # sync". See RoeSitePaths.normalize and Product.create_or_update_from_file.
+    relative_path = RoeSitePaths.normalize(file_path)
+                                .sub(RoeSitePaths.normalize(RoeSitePaths::SITE_PATH.to_s) + "/", "")
     product = Product.find_by(file_path: relative_path)
 
     if product
-      redirect_to edit_admin_product_path(product), notice: "Product created"
+      # No "created" notice: you land in the new product's editor, which says so.
+      redirect_to edit_admin_product_path(product)
     else
       flash[:error] = "Product file created but failed to sync to database"
       redirect_to admin_products_path
@@ -103,6 +112,10 @@ class Admin::ProductsController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # As the editor sent it, before Roe tidies it — so a background save
+      # can tell whether the file now says something the panel doesn't.
+      submitted = metadata.deep_dup
+
       # Handle tags
       if metadata["tags"].is_a?(String)
         if metadata["tags"].strip.empty? || metadata["tags"] == "[]"
@@ -120,12 +133,14 @@ class Admin::ProductsController < Admin::BaseController
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
-      redirect_to edit_admin_product_path(@product)
+      finish_editor_save_with_warning(edit_admin_product_path(@product))
       return
     end
 
     # Capture pre-save state to detect a publishing transition for flash text.
     was_published = @product.status == "published"
+    status_before = @product.status
+    old_address = rename_redirect_source(@product)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
@@ -133,8 +148,11 @@ class Admin::ProductsController < Admin::BaseController
     ContentSync.sync_file(File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     @product.reload
 
-    flash[:notice] = (!was_published && @product.status == "published") ? "Product published" : "Product saved"
-    redirect_to edit_admin_product_path(@product)
+    # A plain save says nothing — the editor's dot shows "changes saved".
+    flash[:notice] = "Product published" if !was_published && @product.status == "published"
+    add_rename_redirect(Product, old_address, metadata, @product.file_path)
+    finish_editor_save(record: @product, resource_type: "product", edit_path: edit_admin_product_path(@product),
+                       file_path: File.join(RoeSitePaths::SITE_PATH, @product.file_path), submitted: submitted, status_before: status_before)
   end
 
   def show
@@ -317,7 +335,7 @@ class Admin::ProductsController < Admin::BaseController
     # Required fields that are already set — shown as read-only "✓" confirmation
     # bullets. The metadata editor is the source of truth, so the modal just
     # reflects it: present → confirm, missing → fill in.
-    @present_requirements = Product::REQUIRED_FIELDS
+    @present_requirements = Product.required_fields
       .select { |name| @product.metadata[name].to_s.strip.present? }
       .map { |name| { name: name, label: name.humanize, value: @product.metadata[name] } }
     @resource_label = "Product"

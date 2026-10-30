@@ -9,6 +9,12 @@ class Member < ApplicationRecord
 
   belongs_to :import, optional: true
 
+  # Recovery codes for a password reset when the site runs with email off.
+  # Mirrors the admin User#recovery_codes. See MemberRecoveryCode.
+  has_many :member_recovery_codes, dependent: :destroy
+
+  RECOVERY_CODE_COUNT = 8
+
   # No dependent: — a donation is a payment record and outlives the account.
   has_many :donations
   has_many :newsletter_sends, dependent: :destroy
@@ -50,6 +56,25 @@ class Member < ApplicationRecord
     where("json_extract(metadata, '$.substack_imported') IS NULL OR json_extract(metadata, '$.substack_imported') = 0")
   }
 
+  # The inverse: members that came from an import (Substack today). Used by the
+  # Members admin to filter the imported set — e.g. to bulk-remove free imports.
+  scope :imported, -> {
+    where("json_extract(metadata, '$.substack_imported') = 1 OR json_extract(metadata, '$.substack_imported') = true")
+  }
+
+  # Members an admin can send a password invite to: imported or admin-created,
+  # and still live. These didn't self-sign-up, so they have no credentials yet —
+  # unlike a direct signup, which set its own and needs no invite. Used to gate
+  # the bulk Invite action (send sign-in details before email is turned off).
+  scope :invitable, -> {
+    where(status: :active).where(
+      "json_extract(metadata, '$.substack_imported') = 1 OR " \
+      "json_extract(metadata, '$.substack_imported') = true OR " \
+      "json_extract(metadata, '$.admin_created') = 1 OR " \
+      "json_extract(metadata, '$.admin_created') = true"
+    )
+  }
+
   # Scope for newsletter recipients based on content audience
   scope :for_newsletter, ->(audience) {
     case audience
@@ -79,6 +104,14 @@ class Member < ApplicationRecord
   def self.anonymized_email_for(id) = "deleted-#{id}@#{ANONYMIZED_DOMAIN}"
 
   def anonymized? = status_deleted?
+
+  # Origin predicates. imported? = came from an import (Substack today);
+  # admin_created? = an admin added it by hand. Either means the member didn't
+  # self-sign-up, so it has no credentials yet and can be sent a password invite
+  # (while it's still live). A direct signup is neither and needs no invite.
+  def imported? = !!metadata&.dig("substack_imported")
+  def admin_created? = !!metadata&.dig("admin_created")
+  def invitable? = status_active? && (imported? || admin_created?)
 
   # :member, :admin, or nil for accounts deleted before this was recorded —
   # the admin panel falls back to neutral wording rather than guessing.
@@ -193,6 +226,17 @@ class Member < ApplicationRecord
         donation.update_columns(email: self.class.anonymized_email_for(id))
       end
 
+      # Metadata is wiped to drop anything personal stashed in it, but a few
+      # non-identifying origin facts are kept so the record stays filterable
+      # after deletion: who deleted it, and whether it came from an import (a
+      # boolean about provenance, not a person — the admin wants to purge
+      # imported tombstones specifically).
+      kept_metadata = { "deleted_by" => by.to_s }
+      if metadata["substack_imported"]
+        kept_metadata["substack_imported"] = true
+        kept_metadata["substack_imported_at"] = metadata["substack_imported_at"]
+      end
+
       update!(
         email: self.class.anonymized_email_for(id),
         name: ANONYMIZED_NAME,
@@ -201,7 +245,7 @@ class Member < ApplicationRecord
         email_confirmation_token: nil,
         email_confirmation_sent_at: nil,
         stripe_customer_id: nil,
-        metadata: { "deleted_by" => by.to_s },
+        metadata: kept_metadata,
         access_token: self.class.generate_password,
         media_token: self.class.generate_media_token,
         newsletter_status: :unsubscribed,
@@ -290,6 +334,37 @@ class Member < ApplicationRecord
     end
   end
 
+  # Wipe + regenerate this member's recovery codes, returning the plaintext set
+  # (dash-formatted) for one-time display. Plaintext is never stored — only the
+  # bcrypt digest of each normalized code. Mirrors User#generate_recovery_codes!.
+  def generate_recovery_codes!
+    plaintexts = Array.new(RECOVERY_CODE_COUNT) { RecoveryCode.generate_plaintext }
+    transaction do
+      member_recovery_codes.destroy_all
+      plaintexts.each do |display|
+        normalized = RecoveryCode.normalize_plaintext(display)
+        member_recovery_codes.create!(code_digest: BCrypt::Password.create(normalized))
+      end
+    end
+    plaintexts
+  end
+
+  # Find the MemberRecoveryCode whose digest matches the supplied plaintext
+  # (with or without dashes), consumed or not. nil on a miss. Caller checks
+  # #consumed? to tell a spent code from an invalid one. Mirrors
+  # User#find_recovery_code.
+  def find_recovery_code(plaintext)
+    normalized = RecoveryCode.normalize_plaintext(plaintext)
+    return nil if normalized.empty?
+    member_recovery_codes.find do |rc|
+      begin
+        BCrypt::Password.new(rc.code_digest) == normalized
+      rescue BCrypt::Errors::InvalidHash
+        false
+      end
+    end
+  end
+
   # Generate a readable password for manual upgrades
   def self.generate_password
     # Expanded word list for memorable passwords
@@ -352,6 +427,24 @@ class Member < ApplicationRecord
 
     @stripe_customer ||= Stripe::Customer.retrieve(stripe_customer_id, StripeConfig.request_options)
   rescue Stripe::InvalidRequestError
+    nil
+  end
+
+  # The hosted Stripe receipt for this member's payment, fetched live. The URL
+  # lives on the Charge, not the PaymentIntent, so we expand latest_charge in
+  # one call. Not stored: it always reflects the current charge (refunds etc.)
+  # and keeps no Stripe data in Roe. Any Stripe hiccup returns nil so the
+  # account page degrades to "Receipt emailed by Stripe" rather than 500-ing.
+  def stripe_receipt_url
+    return nil if stripe_payment_intent_id.blank?
+
+    pi = Stripe::PaymentIntent.retrieve(
+      { id: stripe_payment_intent_id, expand: [ "latest_charge" ] },
+      StripeConfig.request_options
+    )
+    pi.latest_charge&.receipt_url
+  rescue Stripe::StripeError => e
+    Rails.logger.warn "[Member##{id}] receipt lookup failed: #{e.class} #{e.message}"
     nil
   end
 

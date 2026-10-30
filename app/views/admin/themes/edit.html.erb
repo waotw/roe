@@ -25,7 +25,8 @@
   <!-- Wrap in CSS Editor Stimulus controller -->
   <div data-controller="css-editor"
        data-css-editor-theme-name-value="<%= @theme_name %>"
-       data-css-editor-preview-id-value="<%= @preview_id %>">
+       data-css-editor-preview-id-value="<%= @preview_id %>"
+       data-css-editor-highlight-value="<%= params[:highlight] %>">
 
     <div class="mb-5 flex justify-between items-center sticky top-0 bg-white z-10 py-2 px-4">
       <div class="flex gap-2.5 items-center">
@@ -50,6 +51,7 @@
 
       <div class="m-0 p-0 contents">
         <span class="text-xs text-gray-500 font-mono">
+          <span data-css-editor-target="saveStatus" aria-live="polite"></span>
           <span data-css-editor-target="unsavedIndicator" class="hidden text-amber-600">● Unsaved changes</span>
         </span>
       </div>

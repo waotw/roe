@@ -1,6 +1,7 @@
 <% content_for :title, "Imports" %>
 <div class="max-w-6xl mx-auto">
-  <div class="flex justify-between items-center mb-6">
+  <%= link_to "← Imports", admin_importers_path, class: "text-sm text-gray-500 hover:text-gray-700" %>
+  <div class="flex justify-between items-center mb-6 mt-1">
     <h1 class="text-2xl font-bold">Substack Imports</h1>
     <%= link_to "New Import", new_admin_import_path, class: "uppercase text-sm px-1.5 py-0.5 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
   </div>

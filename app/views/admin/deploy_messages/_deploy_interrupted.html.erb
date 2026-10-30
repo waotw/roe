@@ -1,0 +1,20 @@
+<%# Roe lost track of a deploy — usually because Roe was quit or restarted
+    while it ran. `target` is "kamal" or "fly". %>
+<p>
+  Roe was quit or restarted while this deploy was running, so it never
+  finished. Nothing was left running in the background.
+</p>
+
+<ol>
+  <li>Deploy again — it's safe.</li>
+  <% if target == "fly" %>
+    <li>If that deploy is blocked on a machine lease, this one left it behind. Clear it with <code>fly machine leases clear</code>, then deploy again.</li>
+  <% else %>
+    <li>If that deploy says the deploy lock is already in place, this one left it behind. Release it with <code>kamal lock release</code>, then deploy again.</li>
+  <% end %>
+</ol>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

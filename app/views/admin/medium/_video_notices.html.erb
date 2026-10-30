@@ -1,0 +1,49 @@
+<%# Shown on the Media Browser when videos have finished (or failed) being
+    optimized since it was last dismissed — stays until Dismiss, like the
+    deploy-finished banner. Locals: notices (VideoVariantGenerator.status_for
+    hashes). %>
+<% done   = notices.select { |n| n[:state] == "done" } %>
+<% failed = notices.select { |n| n[:state] == "failed" } %>
+<% human  = ->(bytes) { bytes ? number_to_human_size(bytes, precision: 2) : "?" } %>
+<% if done.any? || failed.any? %>
+  <div id="video-notices" class="mt-3 border rounded-xs p-3 <%= failed.any? && done.empty? ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200' %>">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <%# COPY: video-optimized notice heading %>
+        <h3 class="text-sm font-semibold <%= done.any? ? 'text-green-900' : 'text-red-900' %>">
+          <% if done.any? %>
+            <%= done.one? ? "Video optimized" : "#{done.size} videos optimized" %>
+          <% else %>
+            <%= failed.one? ? "A video couldn't be optimized" : "#{failed.size} videos couldn't be optimized" %>
+          <% end %>
+        </h3>
+        <ul class="mt-1 space-y-0.5">
+          <% done.each do |n| %>
+            <li class="text-xs text-green-800 font-mono truncate">
+              ✓ <%= n[:name] %>
+              <span class="text-green-700">
+                <% if n[:served_as_original] %>
+                  — already web-ready; the original is served as it is
+                <% else %>
+                  — <%= human.(n.dig(:source, "size")) %> →
+                  <%= n[:outputs].map { |o| "#{o['name']} #{human.(o['size'])}" }.join(" · ") %>
+                <% end %>
+              </span>
+            </li>
+          <% end %>
+          <% failed.each do |n| %>
+            <li class="text-xs text-red-800 font-mono">
+              ✗ <%= n[:name] %>
+              <span class="block ml-4 text-red-700 font-sans"><%= n[:error].presence || "Something went wrong." %> The original is served until it's fixed.</span>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+      <%= button_to "Dismiss",
+                    dismiss_video_notices_admin_medium_index_path,
+                    method: :post,
+                    form: { data: { turbo: false } },
+                    class: "shrink-0 uppercase text-xs font-mono px-3 py-1.5 border border-green-600 bg-green-100 hover:bg-green-200 text-green-800 rounded-xs" %>
+    </div>
+  </div>
+<% end %>

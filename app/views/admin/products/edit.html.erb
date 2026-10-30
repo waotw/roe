@@ -55,7 +55,16 @@
        data-editor-resource-id-value="<%= @product.id %>"
        data-editor-preview-path-value="<%= @preview_path || preview_admin_product_path(@product) %>"
        data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
-       data-editor-currency-symbol-value="<%= store_currency_symbol %>">
+       data-editor-currency-symbol-value="<%= store_currency_symbol %>"
+       data-editor-original-url-name-value="<%= @product.url_name %>"
+       data-editor-filename-slug-value="<%= File.basename(@product.file_path.to_s, '.md') %>"
+       data-editor-published-value="<%= @product.published? %>"
+       data-editor-public-path-prefix-value="/store/">
+
+    <%# Set by the editor when the user picks "Save new URL & redirect" in the
+        slug-change modal; ProductsController#update writes the 301 (RenameRedirect). %>
+    <input type="hidden" name="create_redirect_from" value=""
+           form="product-form" data-editor-target="redirectFromField">
 
     <turbo-frame id="sku-generator-modal"></turbo-frame>
 
@@ -72,6 +81,9 @@
 
     <%= render 'shared/editor_drawer', resource: @product, resource_type: 'product' %>
     <%= render 'shared/leave_modal' %>
+
+    <%# Slug-change decision modal for a published product (see editor#save). %>
+    <%= render 'admin/posts/redirect_modal', noun: "product" %>
 
   </div>
   <!-- End Stimulus controller -->

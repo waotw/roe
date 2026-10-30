@@ -36,6 +36,29 @@ module SiteSync
       assert state[:env_info].key?(:rails_subdir)
     end
 
+    # The fact that the live site encrypts its DB backups travels over the
+    # handshake so local can show the live state — its own passphrase is
+    # always empty. Only "on"/"off" travels, never the passphrase.
+    test "local_state advertises whether a backup passphrase is set, never the passphrase" do
+      assert_equal "off", SiteSync::Exchange.local_state[:env_info][:backup_encryption]
+
+      SyncConfig.current.update!(backup_passphrase: "correct horse battery staple")
+      info = SiteSync::Exchange.local_state[:env_info]
+      assert_equal "on", info[:backup_encryption]
+      assert_not_includes info.values.map(&:to_s), "correct horse battery staple"
+    end
+
+    test "peer_backup_encryption is nil until told, then true or false, and off can overwrite on" do
+      c = SyncConfig.current
+      assert_nil c.peer_backup_encryption
+
+      c.merge_peer_env!("backup_encryption" => "on")
+      assert_equal true, c.reload.peer_backup_encryption
+
+      c.merge_peer_env!("backup_encryption" => "off")
+      assert_equal false, c.reload.peer_backup_encryption
+    end
+
     test "handle_inbound persists the peer's env_info as plaintext" do
       SiteSync::Exchange.handle_inbound(
         "fingerprint" => "abc",

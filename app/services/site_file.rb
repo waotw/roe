@@ -37,4 +37,24 @@ class SiteFile
   def self.changed?(path, content)
     !File.exist?(path) || File.binread(path) != content.to_s.b
   end
+
+  # Parse a config file. The read counterpart to .write, and the reason it
+  # exists is the same shape: a config change that silently doesn't land.
+  #
+  # Deliberately not YAML.load_file. Bootsnap caches that on (mtime, size),
+  # and mtime is whole-second on at least some filesystems — so two writes of
+  # the same byte length inside one second hand back the FIRST parse. Proven,
+  # not theoretical: sync_from_file left the database record holding the
+  # previous contents while the file on disk held the new ones.
+  #
+  # It matters most in the read-modify-write savers (update_payments and
+  # friends), where a stale read is merged and written back, discarding the
+  # save before it.
+  #
+  # Same parsing defaults as load_file, so nothing else changes.
+  def self.read_yaml(path, permitted_classes: [])
+    return nil unless File.exist?(path)
+
+    YAML.load(File.read(path), filename: path.to_s, permitted_classes: permitted_classes)
+  end
 end

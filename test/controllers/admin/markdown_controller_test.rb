@@ -64,11 +64,73 @@ class Admin::MarkdownControllerTest < ActionDispatch::IntegrationTest
     assert_empty json["issues"]
   end
 
+  # The link check reads ids from the rendered page, so an id that comes from
+  # a heading — not written in the markdown anywhere — still counts.
+  test "check reports a link to a heading that isn't on the page" do
+    content = "## Setup and install\n\nSee [setup](#setup-and-install) and [old](#setup).\n"
+    post admin_check_markdown_path, params: { content: content }
+
+    links = json["issues"].select { |i| i["type"] == "broken_anchor_link" }
+    assert_equal 1, links.size, "the heading's own id is found"
+    assert_includes links.first["message"], "\"setup\""
+  end
+
   test "the endpoints require an admin session" do
     delete session_path
 
     post admin_check_markdown_path, params: { content: "x" }
     assert_response :redirect
+
+    post admin_markdown_blocks_path, params: { blocks: [ "x" ] }
+    assert_response :redirect
+  end
+
+  # ── Live editor block cards ─────────────────────────────────────────────
+
+  test "blocks returns the parser's own warning for a broken block, and none for a good one" do
+    good = "```collection\nsource: posts\nlimit: 2\n```"
+    bad = "```collection\nsource: postz\n```"
+
+    post admin_markdown_blocks_path, params: { blocks: [ good, bad ] }
+
+    assert_response :success
+    good_result, bad_result = json["blocks"]
+    assert_empty good_result["warnings"]
+
+    warning = bad_result["warnings"].first
+    assert_match(/collection source/i, warning["title"])
+    assert_includes warning["message"], "postz"
+    # The box itself, so the editor shows what the preview would.
+    assert_includes warning["html"], "data-roe-warning"
+    assert_not_includes warning["message"], warning["title"], "the title isn't repeated in the message"
+  end
+
+  test "blocks answers in the order asked, one entry per block" do
+    blocks = [
+      "```card\ntype: pullquotex\ntext: hi\n```",
+      "```card\ntype: pullquote\ntext: hi\n```",
+      "```form\ntype: [\n```"
+    ]
+    post admin_markdown_blocks_path, params: { blocks: blocks }
+
+    assert_equal 3, json["blocks"].size
+    assert_match(/pullquotex/, json["blocks"][0]["warnings"].first["message"])
+    assert_empty json["blocks"][1]["warnings"]
+    assert_not_empty json["blocks"][2]["warnings"]
+  end
+
+  test "blocks with nothing to check returns nothing" do
+    post admin_markdown_blocks_path
+
+    assert_response :success
+    assert_equal [], json["blocks"]
+  end
+
+  test "blocks is capped, so one request can't render a thousand collections" do
+    many = Array.new(Admin::MarkdownController::MAX_BLOCKS + 5) { "```card\ntype: aside\ntext: x\n```" }
+    post admin_markdown_blocks_path, params: { blocks: many }
+
+    assert_equal Admin::MarkdownController::MAX_BLOCKS, json["blocks"].size
   end
 
   # The panel lives in shared/_editor, so every resource that renders the editor
@@ -143,6 +205,31 @@ class Admin::MarkdownControllerTest < ActionDispatch::IntegrationTest
     assert_match(/data-markdown-doctor-target="panel"\s+data-sticky-toolbar-keep-open/,
       response.body)
     assert_includes response.body, "markdown-doctor:opened->sticky-toolbar#reveal"
+  ensure
+    File.delete(path) if path && File.exist?(path)
+  end
+
+  # The live editor wraps the textarea rather than replacing it in the markup:
+  # the textarea is what submits, and what every other controller talks to.
+  test "the editor mounts the live markdown editor around the textarea, with a way back" do
+    path = File.join(RoeSitePaths::SITE_PATH, "posts", "live-editor.md")
+    File.write(path, "---\ntitle: \"Live Editor\"\nstatus: draft\nurl_name: live-editor\n---\nBody.\n")
+    record = Post.create!(file_path: path, content: "Body.",
+      metadata: { "title" => "Live Editor", "status" => "draft", "url_name" => "live-editor" })
+
+    get edit_admin_post_path(record)
+
+    page = Nokogiri::HTML(response.body)
+    host = page.at_css('[data-controller~="markdown-editor"]')
+    assert host, "markdown-editor controller is mounted"
+    # Off by default while it's in beta: an unset `editor.mode` means the
+    # plain textarea. Live is opted into from Settings → Content.
+    assert_equal "textarea", host["data-markdown-editor-mode-value"]
+    assert_equal admin_markdown_blocks_path, host["data-markdown-editor-blocks-url-value"]
+    assert host.at_css('#content-textarea[data-markdown-editor-target="textarea"]'),
+      "the textarea stays, inside the controller, so the form still submits it"
+    assert host.at_css('[data-markdown-editor-target="modeToggle"].hidden'),
+      "the Live/Source switch is hidden until the editor has loaded"
   ensure
     File.delete(path) if path && File.exist?(path)
   end

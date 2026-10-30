@@ -1,0 +1,42 @@
+<%# COPY — read-only Postmark webhook status. Roe adds the webhook URL to your
+    Postmark servers automatically during setup, so there's nothing to paste or
+    copy here — just confirmation, and a pointer to the Danger Zone for rotating
+    the token. Local never registers a webhook (Postmark can't reach localhost)
+    and doesn't need one — webhooks activate on the live site — so locally this
+    is a settled ✓, not an action item. Placeholder copy — rewrite before commit. %>
+<%
+  production = integration_ui_production?
+  registered = resolved_webhook_url.present? && @postmark_config.webhook_configured?(resolved_webhook_url)
+  verified   = @postmark_config.webhook_verified?
+%>
+<div class="config-section mb-0 mt-8 p-4 border border-gray-200 bg-gray-50" data-test="postmark-webhook-status">
+  <h3 class="text-base font-semibold text-gray-900 mb-2">Webhook</h3>
+
+  <% if !production %>
+    <%# Local: nothing to do — webhooks live on the deployed site. Settled ✓. %>
+    <p class="text-sm text-gray-900" data-test="postmark-webhook-local">
+      Webhooks work on your live site. Roe sets them up and verifies them there — nothing to do locally.
+    </p>
+  <% elsif registered && verified %>
+    <p class="text-sm text-gray-900" data-test="postmark-webhook-ok">
+      <span class="text-green-700 font-mono">✓</span>
+      Webhook URL added to your Postmark server and verified.
+    </p>
+  <% elsif registered %>
+    <p class="text-sm text-amber-900" data-test="postmark-webhook-registered">
+      <span class="text-amber-700 font-mono">•</span>
+      Webhook URL added to your Postmark server. Send a test email above to verify it end-to-end.
+    </p>
+  <% else %>
+    <p class="text-sm text-amber-900" data-test="postmark-webhook-missing">
+      <span class="text-amber-700 font-mono">•</span>
+      Webhook not registered yet. Use <em>Postmark Setup</em> above to add it to your servers.
+    </p>
+  <% end %>
+
+  <p class="text-xs text-gray-500 mt-2">
+    <%# COPY %>
+    You can regenerate a new token in the Danger Zone below. If you reset your token,
+    use <em>Postmark Setup</em> above to add your new token to your Postmark servers.
+  </p>
+</div>

@@ -1,66 +1,51 @@
+<%# Donation confirmation. Like checkout, the Donation row is created by the
+    Stripe webhook (checkout.session.completed → WebhooksController), so this
+    page polls until that row appears, then sends the donor to the success
+    page. Look the row up by stripe_session_id — the actual column; an earlier
+    version queried a non-existent `session_id`, which raised
+    SQLite3::SQLException ("no such column: donations.session_id") on every
+    visit and broke the confirmation page for everyone. The member-vs-anonymous
+    split is gone: both land here the same way and wait on the same row. %>
+<% donation = Donation.find_by(stripe_session_id: @session_id) if @session_id.present? %>
 <div class="member-page">
-  <% if current_member&.paid? %>
-    <%# For donations, we don't track paid status the same way, so check if donation exists %>
-    <% donation = Donation.find_by(session_id: @session_id) if @session_id %>
-    <% if donation || current_member %>
-      <script>
-        window.location.href = "<%= donation_success_path %>";
-      </script>
-    <% else %>
-      <div class="alert alert--info">
-        <h1>Processing Payment...</h1>
-        <p>Please wait while we confirm your payment.</p>
-        <p class="alert-note">This page will update automatically.</p>
-      </div>
-
-      <script nonce="<%= request.content_security_policy_nonce %>">
-        setTimeout(function() {
-          window.location.reload();
-        }, 2000);
-      </script>
-    <% end %>
+  <% if donation %>
+    <script nonce="<%= request.content_security_policy_nonce %>">
+      window.location.href = "<%= donation_success_path %>";
+    </script>
   <% else %>
-    <%# Anonymous donation - check for donation record %>
-    <% donation = Donation.find_by(session_id: @session_id) if @session_id %>
-    <% if donation %>
-      <script>
-        window.location.href = "<%= donation_success_path %>";
-      </script>
-    <% else %>
-      <div class="alert alert--info">
-        <h1>Processing Payment...</h1>
-        <p>Please wait while we confirm your payment.</p>
-        <p class="alert-note">This page will update automatically.</p>
-      </div>
+    <div class="alert alert--info">
+      <h1>Processing Payment...</h1>
+      <p>Please wait while we confirm your payment.</p>
+      <p class="alert-note">This page will update automatically.</p>
+    </div>
 
-      <script nonce="<%= request.content_security_policy_nonce %>">
-        (function() {
-          let attempts = 0;
-          const maxAttempts = 30; // 60 seconds max
-          
-          function checkPayment() {
-            attempts++;
-            
-            if (attempts >= maxAttempts) {
-              document.querySelector('.member-page').innerHTML = `
-                <div class="alert alert--error">
-                  <h1>Payment Status Unclear</h1>
-                  <p>We're having trouble confirming your donation.</p>
-                  <p class="alert-note">Please check your email for a receipt. If you were charged but don't see confirmation, please contact us.</p>
-                </div>
-                <div class="form-actions">
-                  <a href="/" class="btn-secondary">Back to Home</a>
-                </div>
-              `;
-              return;
-            }
-            
-            window.location.reload();
+    <script nonce="<%= request.content_security_policy_nonce %>">
+      (function() {
+        let attempts = 0;
+        const maxAttempts = 30; // 30 * 2s = 60 seconds max
+
+        function checkPayment() {
+          attempts++;
+
+          if (attempts >= maxAttempts) {
+            document.querySelector('.member-page').innerHTML = `
+              <div class="alert alert--error">
+                <h1>Payment Status Unclear</h1>
+                <p>We're having trouble confirming your donation.</p>
+                <p class="alert-note">Please check your email for a receipt. If you were charged but don't see confirmation, please contact us.</p>
+              </div>
+              <div class="form-actions">
+                <a href="/" class="btn-secondary">Back to Home</a>
+              </div>
+            `;
+            return;
           }
-          
-          setTimeout(checkPayment, 2000);
-        })();
-      </script>
-    <% end %>
+
+          window.location.reload();
+        }
+
+        setTimeout(checkPayment, 2000);
+      })();
+    </script>
   <% end %>
 </div>

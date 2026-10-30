@@ -49,7 +49,11 @@ module ContentMetadataSchema
 
   def self.create_fields_for(resource_type)
     schema = fields_for(resource_type)
-    Array(CREATE_FIELDS[resource_type.to_s]).filter_map do |name|
+    names = Array(CREATE_FIELDS[resource_type.to_s])
+    # Price and SKU are for the cart. A store that links out to buy has no
+    # cart, so the new-product form doesn't ask for them.
+    names -= Product::SNIPCART_FIELDS if resource_type.to_s == "product" && !SiteFeature.snipcart_enabled?
+    names.filter_map do |name|
       as_create_field(name, schema[name.to_s])
     end
   end
@@ -134,6 +138,9 @@ module ContentMetadataSchema
       "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. nav, footer)" },
       "url_name" => { type: :text, label: "url_name", hint: "auto-generated from title if blank" },
       "image" => { type: :text, label: "image", hint: "Post image, episode artwork, etc: /media/images/image-file.png", required: required_for_type.call("image") },
+      # Right under image, where it belongs: the editor adds it as soon as an
+      # image is set, and the order here is the order rows appear in.
+      "image_in_header" => { type: :checkbox, label: "image_in_header", hint: "Show post image in the header?" },
       "excerpt" => { type: :textarea, label: "excerpt" },
       "audience" => {
         type: :select,
@@ -152,12 +159,17 @@ module ContentMetadataSchema
 
       # Media fields — required flag comes from Post::POST_TYPES for the current type
       "audio" => { type: :text, label: "audio", hint: "Example: /media/audio/audio-file.mp3", required: required_for_type.call("audio") },
-      "video" => { type: :text, label: "video", hint: "Example: /media/video/video-file.mp4", required: required_for_type.call("video") },
+      # COPY: video field hint
+      "video" => { type: :text, label: "video", hint: "Example: /media/video/video-file.mp4, or a YouTube link", required: required_for_type.call("video") },
+      # Editable either way: with auto duration on, Roe replaces it on save
+      # only when it can read the file's length, so a length it can't read
+      # can still be typed in. Off, ADD DURATION sits beside it
+      # (duration_detect_controller.js).
       "duration" => {
         type: :text,
         label: "duration",
-        hint: "Auto-calculated from media file",
-        readonly: true,
+        # COPY: duration field placeholder (auto on / off)
+        hint: SiteConfig.auto_duration? ? "Set from the file on save" : "HH:MM:SS",
         required: required_for_type.call("duration")
       },
       "captions" => { type: :text, label: "captions", hint: "Path to captions file" },
@@ -218,12 +230,18 @@ module ContentMetadataSchema
       "lyrics" => { type: :textarea, label: "lyrics" },
 
       "show_sidebar" => { type: :checkbox, label: "show_sidebar" },
-      "image_in_header" => { type: :checkbox, label: "image_in_header", hint: "Show post image in the header?" },
       "related" => { type: :text, label: "related", hint: "Related item url_names, comma-separated (bi-directional)" }
     }
   end
 
   def self.product_fields
+    # SKU and price are what Snipcart needs; a store that links out to buy
+    # doesn't (Product.required_fields). The Snipcart-only fields — digital,
+    # file_guid, weight — stay defined, so a value already in a file still
+    # renders as itself, but leave the Add Field menu.
+    snipcart = SiteFeature.snipcart_enabled?
+    snipcart_only = snipcart ? {} : { available: false }
+
     {
       # Core product fields
       "title" => { type: :text, label: "title", required: true },
@@ -243,10 +261,11 @@ module ContentMetadataSchema
       },
       "url_name" => { type: :text, label: "url_name", hint: "auto-generated from title if blank" },
       "status" => { type: :select, label: "status", options: [ "draft", "published" ], required: true },
-      "price" => { type: :text, label: "price", required: true, hint: "Price in dollars (e.g., 29.99)" },
-      "sku" => { type: :text, label: "sku", required: true, hint: "Product SKU (required for publishing)" },
+      "price" => { type: :text, label: "price", required: snipcart, hint: "Price in dollars (e.g., 29.99)" },
+      "sku" => { type: :text, label: "sku", required: snipcart,
+                 hint: snipcart ? "Product SKU (required for publishing)" : "Optional. A short code a button can find this product by." },
       "image" => { type: :text, label: "image", required: true, hint: "Product image: /media/images/product.jpg" },
-      "description" => { type: :textarea, label: "description", hint: "Short description for Snipcart" },
+      "description" => { type: :textarea, label: "description", hint: snipcart ? "Short description for Snipcart" : "Short description" },
       # A downloadable product. Turning this on reveals `file_guid` and drops
       # shipping from the cart. Snipcart has no API for digital goods — the
       # GUID is a copy-paste from their dashboard, so the editor links there.
@@ -254,12 +273,12 @@ module ContentMetadataSchema
         type: :checkbox,
         label: "digital",
         hint: "A digital file (e.g. mp3, ePub, PDF, etc."
-      },
+      }.merge(snipcart_only),
       "file_guid" => {
         type: :text,
         label: "file_guid",
         hint: "The file GUID from your Snipcart dashboard"
-      },
+      }.merge(snipcart_only),
       # Snipcart requires weight in grams, as a whole number, and won't quote
       # postage without it. The unit sits after the input rather than in the
       # label: label width sets the whole column (longest label + 1 in the
@@ -271,7 +290,7 @@ module ContentMetadataSchema
         suffix: "grams",
         hint: "500",
         note: "Whole grams. Needed for Snipcart shipping rates — leave blank for digital products."
-      },
+      }.merge(snipcart_only),
       "tags" => { type: :text, label: "tags", hint: "featured, sale, …" },
       "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. featured)" },
       "show_sidebar" => { type: :checkbox, label: "show_sidebar" },

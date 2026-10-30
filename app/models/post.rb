@@ -25,8 +25,10 @@ class Post < ApplicationRecord
   # Public URL for the post on the live site (matches the `:post` route
   # in config/routes.rb → `posts/:url_name`).
   def public_url
-    "/posts/#{url_name}"
+    self.class.public_url_for(url_name)
   end
+
+  def self.public_url_for(slug) = "/posts/#{slug}"
 
   # Every post type, and everything that makes one. This hash is the only place
   # a type is defined — to add one, add an entry here:
@@ -77,8 +79,12 @@ class Post < ApplicationRecord
       metadata_fields: [
         { name: "audio", type: :text, required: true, label: "Audio File",
           hint: "Path to audio file (e.g., /media/audio/episode-1.mp3)" },
-        { name: "video", type: :text, label: "Video File",
-          hint: "Optional. Adds a video version of this episode (e.g., /media/video/episode-1.mp4). The site renders video when present; the RSS feed still uses the audio file." },
+        # COPY: video field hint (podcast)
+        # auto_add: false — shown when the post has a video, otherwise
+        # offered in + Add Field rather than added to every podcast
+        # (metadata_editor_controller#updateFieldVisibility).
+        { name: "video", type: :text, label: "Video File", auto_add: false,
+          hint: "Optional. Adds a video version of this episode: a file (e.g., /media/video/episode-1.mp4) or a YouTube link. The site renders video when present; the RSS feed still uses the audio file." },
         { name: "duration", type: :text, required: true, label: "Duration",  # ← Mark as required
           hint: 'Auto-extracted from audio file, or manual (e.g., "3600" seconds or "01:00:00")' },
         { name: "podcast", type: :select, label: "Podcast",
@@ -157,8 +163,9 @@ class Post < ApplicationRecord
       description: "Article with featured video player",
       icon: "🎬",
       metadata_fields: [
-        { name: "video", type: :text, required: true, label: "Video File",
-          hint: "Path to video file (e.g., /media/video/my-video.mp4)" },
+        # COPY: video field label + hint (video post)
+        { name: "video", type: :text, required: true, label: "Video",
+          hint: "A video file (e.g., /media/video/my-video.mp4) or a YouTube link from its Share button" },
         { name: "duration", type: :text, label: "Duration",
           hint: 'Optional, e.g., "12:34"' }
       ],
@@ -283,6 +290,73 @@ class Post < ApplicationRecord
 
   def has_media?
     post_type.in?([ "audio", "video" ]) && (audio.present? || video.present?)
+  end
+
+  # ── The player at the top of a media post ────────────────────────────────
+  #
+  # Players are moving into Markdown: a ```card with `type: player` (and, for
+  # podcasts and releases, a `player` collection later). During the move,
+  # posts written before it still rely on the post type's template to show a
+  # player, so the template supplies one — unless the body already has its
+  # own, and only when content.yml's `players.video` / `players.audio` hasn't
+  # turned that off. Never two players for the same episode or video.
+  #
+  # Only a card playing the post's *own* media stands in for the template's
+  # player: one with no `audio:`/`video:` (it falls back to the post's), or
+  # one naming the post's own file. A card playing something else — a song
+  # linked from a podcast's show notes — is extra, and the post's player stays.
+
+  POST_TYPES_WITH_PLAYERS = %w[video audio music podcast].freeze
+
+  # Each ```card block in the body: its option lines, up to the closing fence.
+  CARD_BLOCK_RE = /^[ \t]*```card[ \t]*\r?\n((?:(?!^[ \t]*```).*\r?\n)*?)[ \t]*```/
+
+  def own_player_card_in_body?
+    content.to_s.scan(CARD_BLOCK_RE).any? do |(block)|
+      config = parse_card_config(block)
+      next false unless unquote(config[:type]) == "player"
+
+      sources = [ config[:audio], config[:video] ].map { |s| unquote(s) }.reject(&:blank?)
+      sources.empty? || sources.any? { |src| own_media?(src) }
+    end
+  end
+
+  # :video or :audio — what the template's player would play — or nil when
+  # this type has no player, or there's nothing for it to play. A podcast
+  # with a video plays the video, as its template always has.
+  def template_player_kind
+    return nil unless post_type.in?(POST_TYPES_WITH_PLAYERS)
+    return :video if video.to_s.strip.present? && post_type.in?(%w[video podcast])
+    return :audio if audio.to_s.strip.present? && post_type.in?(%w[audio music podcast])
+
+    nil
+  end
+
+  def show_template_player?
+    kind = template_player_kind
+    kind.present? && !own_player_card_in_body? && self.class.template_players_enabled?(kind)
+  end
+
+  # Is `src` this post's own audio or video? The same file however it's
+  # written (with or without the leading slash, %20 for spaces, a ?query),
+  # or the same YouTube video whichever share link was copied.
+  def own_media?(src)
+    [ audio, video ].map { |s| s.to_s.strip }.reject(&:blank?).any? do |mine|
+      theirs_embed = VideoEmbed.for(src)
+      mine_embed = VideoEmbed.for(mine)
+      if theirs_embed || mine_embed
+        theirs_embed && mine_embed &&
+          theirs_embed.provider == mine_embed.provider && theirs_embed.id == mine_embed.id
+      else
+        comparable_media_path(src) == comparable_media_path(mine)
+      end
+    end
+  end
+
+  # content.yml `players.video` / `players.audio`. Unset means on, so a site
+  # that never touches the setting looks the way it always has.
+  def self.template_players_enabled?(kind)
+    SiteConfig.content("players.#{kind}").to_s.strip.downcase != "false"
   end
 
   # Additional post-specific scopes
@@ -702,7 +776,10 @@ class Post < ApplicationRecord
       files = Dir.glob(base.join("**/*"))
                  .select { |f| File.file?(f) }
                  .map { |f| "/media/" + Pathname.new(f).relative_path_from(base).to_s }
-      Set.new(files)
+      # On live, a video whose original is kept on the writing computer is
+      # still there to play (VideoVariantGenerator.stand_in_originals), so a
+      # post that names the original isn't missing media.
+      Set.new(files + VideoVariantGenerator.stand_in_originals)
     end
   end
 
@@ -815,6 +892,21 @@ class Post < ApplicationRecord
   end
 
   private
+
+  # A card option without its quotes: `audio: "/media/a.mp3"` → /media/a.mp3.
+  def unquote(value)
+    value.to_s.strip.delete_prefix('"').delete_suffix('"').delete_prefix("'").delete_suffix("'").strip
+  end
+
+  # A local media path in one form for comparing: no query or fragment,
+  # spaces decoded, a single leading slash, and the site's own address
+  # dropped, so `media/a.mp3`, `/media/a.mp3` and `https://site/media/a.mp3`
+  # all match. Case is kept — Linux file names are case-sensitive.
+  def comparable_media_path(src)
+    path = src.to_s.strip.sub(/[?#].*\z/, "")
+    path = path.sub(%r{\Ahttps?://[^/]+}i, "") if path.match?(%r{\Ahttps?://[^/]+/media/}i)
+    "/#{CGI.unescape(path.tr('+', '%2B')).delete_prefix('/')}"
+  end
 
   def self.fix_guid_in_file(file_path)
     return false unless File.exist?(file_path)

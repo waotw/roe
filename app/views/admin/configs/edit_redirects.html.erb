@@ -1,0 +1,77 @@
+<% content_for :title, "Edit Redirects" %>
+
+<div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300">
+  <div class="flex items-baseline gap-2">
+    <h1 class="text-3xl font-bold font-sans">Redirects</h1>
+    <a href="/documentation/roe/redirects" target="_blank" class="text-blue-500">[info/doc ↗]</a>
+  </div>
+  <%= link_to "← Back to Settings",
+              admin_configs_path,
+              class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
+</div>
+
+<p class="text-sm text-gray-700 mb-5">
+  301/302 redirects from old URLs to new ones. Roe adds one automatically when you
+  rename a published post's URL, and you can add or edit them by hand here. This
+  file syncs between your local and live sites like any other content.
+</p>
+
+<%# Current rules, parsed for easy reading. The raw YAML below is the editable
+    source of truth. %>
+<% if @redirects.present? %>
+  <div class="mb-6 border border-gray-300 overflow-hidden rounded-xs">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+        <tr>
+          <th class="text-left font-medium px-3 py-1.5">From</th>
+          <th class="text-left font-medium px-3 py-1.5">To</th>
+          <th class="text-left font-medium px-3 py-1.5">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @redirects.each do |from, target| %>
+          <%
+            to     = target.is_a?(Hash) ? target["to"] : target
+            status = target.is_a?(Hash) ? (target["status"] || 301) : 301
+          %>
+          <tr class="border-t border-gray-100 font-mono">
+            <td class="px-3 py-1.5 text-gray-900"><%= from %></td>
+            <td class="px-3 py-1.5 text-gray-700"><%= to %></td>
+            <td class="px-3 py-1.5 text-gray-500"><%= status %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="text-sm text-gray-500 italic mb-6">No redirects yet.</p>
+<% end %>
+
+<%= form_with url: admin_redirects_config_path, method: :patch, local: true, class: "space-y-4" do %>
+  <div>
+    <label for="content" class="block text-sm font-semibold uppercase text-gray-900 mb-1">
+      redirects.yml
+    </label>
+    <p class="text-xs text-gray-600 mb-2">
+      A <code class="bg-gray-100 px-1">redirects:</code> map of
+      <code class="bg-gray-100 px-1">"from path": { to: "/new/path", status: 301 }</code>.
+      A trailing <code class="bg-gray-100 px-1">/*</code> on a from-path matches everything under it.
+    </p>
+    <%= text_area_tag :content,
+                      @config_content,
+                      id: "content",
+                      rows: 16,
+                      class: "w-full font-mono text-sm p-3 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                      spellcheck: false %>
+  </div>
+
+  <div class="h-12"></div>
+
+  <div class="flex items-center gap-3 p-4 border border-gray-400 fixed bottom-8 right-12 bg-white">
+    <%= submit_tag "Save",
+                   class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs cursor-pointer" %>
+    <%= link_to "Cancel",
+                admin_configs_path,
+                class: "uppercase text-sm px-4 py-2 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+  </div>
+<% end %>

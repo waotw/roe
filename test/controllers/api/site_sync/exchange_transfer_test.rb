@@ -13,6 +13,11 @@ module Api
       SITE = RoeSitePaths::SITE_PATH
 
       def setup
+        # A known token for this test. The stored one is encrypted with the
+        # test site's secret_key_base, which is regenerated whenever the
+        # test site's secrets are reset — read back afterwards it's nil and
+        # every request 503s ("token missing").
+        SyncConfig.current.update!(token: SecureRandom.hex(32))
         @token = SyncConfig.current.token
         @created = []
       end

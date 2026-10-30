@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -105,6 +105,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
     t.index ["referenceable_type", "referenceable_id"], name: "index_media_references_on_referenceable"
   end
 
+  create_table "member_recovery_codes", force: :cascade do |t|
+    t.string "code_digest", null: false
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.integer "member_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["member_id"], name: "index_member_recovery_codes_on_member_id"
+  end
+
   create_table "members", force: :cascade do |t|
     t.string "access_token", limit: 36, null: false
     t.datetime "cancelled_at"
@@ -168,13 +177,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
   end
 
   create_table "postmark_configs", force: :cascade do |t|
+    t.text "account_approval_error"
+    t.text "account_token"
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
+    t.text "sender_error"
+    t.string "sender_verified_address"
     t.text "server_token"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
     t.string "webhook_token"
+    t.datetime "webhook_verified_at"
   end
 
   create_table "posts", force: :cascade do |t|
@@ -226,11 +240,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
-    t.text "secret_key_live"
-    t.text "secret_key_test"
     t.text "snippet"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
+    t.string "webhook_token"
+  end
+
+  create_table "snipcart_orders", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "currency"
+    t.string "email"
+    t.integer "mode", default: 0, null: false
+    t.string "name"
+    t.json "payload", default: {}, null: false
+    t.datetime "placed_at"
+    t.integer "refunded_amount_cents"
+    t.datetime "refunded_at"
+    t.string "refunded_currency"
+    t.string "snipcart_token", null: false
+    t.string "status"
+    t.integer "total_cents"
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_snipcart_orders_on_email"
+    t.index ["mode"], name: "index_snipcart_orders_on_mode"
+    t.index ["placed_at"], name: "index_snipcart_orders_on_placed_at"
+    t.index ["snipcart_token"], name: "index_snipcart_orders_on_snipcart_token", unique: true
   end
 
   create_table "solid_cable_messages", force: :cascade do |t|
@@ -266,8 +300,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
     t.datetime "created_at", null: false
     t.string "currency"
     t.integer "mode", default: 0, null: false
-    t.string "price_id"
-    t.string "product_id"
+    t.string "price_id_live"
+    t.string "price_id_test"
+    t.string "product_id_live"
+    t.string "product_id_test"
     t.text "publishable_key_live"
     t.text "publishable_key_test"
     t.text "secret_key_live"
@@ -315,6 +351,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_02_000000) do
   add_foreign_key "donations", "members"
   add_foreign_key "media", "imports"
   add_foreign_key "media_references", "media"
+  add_foreign_key "member_recovery_codes", "members"
   add_foreign_key "members", "imports"
   add_foreign_key "newsletter_sends", "imports"
   add_foreign_key "posts", "imports"

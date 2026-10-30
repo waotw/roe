@@ -40,3 +40,11 @@ plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
 # In other environments, only set the PID file if requested.
 pidfile ENV["PIDFILE"] if ENV["PIDFILE"]
+
+# Put the app directory in the process title, so it reads
+#   puma 8.0.2 (tcp://localhost:3000) [/path/to/roe/current]
+# rather than the default "[current]". roe.sh and the global `roe`
+# command find this install's servers by scanning for that tag: the
+# pidfile is a single slot that a second start overwrites and Puma
+# deletes on exit, so on its own it loses track of servers.
+tag File.expand_path("..", __dir__)

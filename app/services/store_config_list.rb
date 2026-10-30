@@ -37,7 +37,7 @@ class StoreConfigList
     path = STORE_PATH.call
     return nil unless File.exist?(path)
 
-    (YAML.load_file(path) || {})[key]
+    (SiteFile.read_yaml(path) || {})[key]
   rescue Psych::SyntaxError, Errno::EACCES => e
     Rails.logger.warn "[StoreConfigList] Couldn't read #{key} from store.yml: #{e.message}"
     nil

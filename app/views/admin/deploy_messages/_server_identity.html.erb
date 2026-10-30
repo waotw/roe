@@ -1,0 +1,19 @@
+<%# SSH refused the server's key: it's new to this computer, or it changed. %>
+<p>
+  SSH won't connect to a server it doesn't recognise, or one whose key has
+  changed since last time. If you've just rebuilt or replaced the server, the
+  change is expected. If you haven't, stop and find out why it changed.
+</p>
+
+<p>Connect once by hand and accept the key:</p>
+<pre>ssh <%= user %>@<%= host %></pre>
+
+<p>If the key changed for a reason you know about, remove the old one first, then connect again:</p>
+<pre>ssh-keygen -R <%= host %></pre>
+
+<p>Then deploy again.</p>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

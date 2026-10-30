@@ -46,7 +46,8 @@
     </div>
   </td>
   <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
-    <%= store_currency_symbol %><%= sprintf('%.2f', product.price) %>
+    <%# A product needn't set a price without Snipcart; "—" rather than $0.00. %>
+    <% if product.metadata["price"].to_s.strip.present? %><%= store_currency_symbol %><%= sprintf('%.2f', product.price) %><% else %>—<% end %>
   </td>
   <td class="whitespace-nowrap px-4 <%= rowpad %> text-sm <%= dimmed ? 'text-gray-400' : 'text-gray-500' %>">
     <%= product.sku.presence || '—' %>

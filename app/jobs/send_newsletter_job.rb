@@ -18,8 +18,14 @@ class SendNewsletterJob < ApplicationJob
 
     return { sent: 0, failed: 0 } if members_to_send.empty?
 
-    from_email = SiteConfig.current("site")&.config&.dig("author_email") || "noreply@example.com"
-    from_name = SiteConfig.current("site")&.config&.dig("author") || "Newsletter"
+    # Same refusal as the transactional path — a newsletter sent from a
+    # stand-in address is rejected by Postmark, just later and less clearly.
+    unless SiteSender.configured?
+      Rails.logger.error "[SendNewsletterJob] #{SiteSender::MISSING}"
+      return { sent: 0, failed: members_to_send.size, error: SiteSender::MISSING }
+    end
+
+    from = SiteSender.from_header
 
     # Build messages array with member association
     messages_with_members = members_to_send.map do |member|
@@ -28,7 +34,7 @@ class SendNewsletterJob < ApplicationJob
       html_content = renderer.render
 
       message = {
-        From: "#{from_name} <#{from_email}>",
+        From: from,
         To: "#{member.name} <#{member.email}>",
         Subject: post.title || "Newsletter",
         HtmlBody: html_content,

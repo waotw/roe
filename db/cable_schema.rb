@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   create_table "deploy_secrets", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "registry_password"
@@ -77,6 +77,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
   end
 
   create_table "media", force: :cascade do |t|
+    t.string "audience", default: "free", null: false
     t.datetime "created_at", null: false
     t.string "file_path"
     t.integer "import_id"
@@ -86,6 +87,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.datetime "uploaded_at"
     t.datetime "variants_generated_at"
     t.string "variants_status", default: "pending"
+    t.index ["audience"], name: "index_media_on_audience"
     t.index ["file_path"], name: "index_media_on_file_path", unique: true
     t.index ["import_id"], name: "index_media_on_import_id"
     t.index ["source_url"], name: "index_media_on_source_url"
@@ -95,11 +97,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
   create_table "media_references", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "medium_id", null: false
-    t.integer "post_id", null: false
+    t.integer "referenceable_id", null: false
+    t.string "referenceable_type", null: false
     t.datetime "updated_at", null: false
     t.index ["medium_id"], name: "index_media_references_on_medium_id"
-    t.index ["post_id", "medium_id"], name: "index_media_references_on_post_id_and_medium_id", unique: true
-    t.index ["post_id"], name: "index_media_references_on_post_id"
+    t.index ["referenceable_type", "referenceable_id", "medium_id"], name: "index_media_references_on_referenceable_and_medium", unique: true
+    t.index ["referenceable_type", "referenceable_id"], name: "index_media_references_on_referenceable"
+  end
+
+  create_table "member_recovery_codes", force: :cascade do |t|
+    t.string "code_digest", null: false
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.integer "member_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["member_id"], name: "index_member_recovery_codes_on_member_id"
   end
 
   create_table "members", force: :cascade do |t|
@@ -110,6 +122,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.datetime "email_confirmation_sent_at"
     t.string "email_confirmation_token"
     t.integer "import_id"
+    t.string "media_token", limit: 36
     t.json "metadata", default: {}
     t.string "name"
     t.integer "newsletter_status", default: 0, null: false
@@ -130,23 +143,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.index ["access_token"], name: "index_members_on_access_token", unique: true
     t.index ["email"], name: "index_members_on_email", unique: true
     t.index ["import_id"], name: "index_members_on_import_id"
+    t.index ["media_token"], name: "index_members_on_media_token", unique: true
     t.index ["status"], name: "index_members_on_status"
     t.index ["stripe_customer_id"], name: "index_members_on_stripe_customer_id", unique: true
     t.index ["tier", "status"], name: "index_members_on_tier_and_status"
   end
 
   create_table "newsletter_sends", force: :cascade do |t|
+    t.datetime "attempted_at"
     t.datetime "created_at", null: false
+    t.string "error"
     t.integer "import_id"
     t.integer "member_id", null: false
     t.string "message_id"
     t.integer "post_id", null: false
-    t.datetime "sent_at", null: false
+    t.datetime "sent_at"
+    t.string "status", default: "sent", null: false
     t.datetime "updated_at", null: false
     t.index ["import_id"], name: "index_newsletter_sends_on_import_id"
     t.index ["member_id"], name: "index_newsletter_sends_on_member_id"
     t.index ["message_id"], name: "index_newsletter_sends_on_message_id"
     t.index ["post_id", "member_id"], name: "index_newsletter_sends_on_post_id_and_member_id", unique: true
+    t.index ["post_id", "status"], name: "index_newsletter_sends_on_post_id_and_status"
     t.index ["post_id"], name: "index_newsletter_sends_on_post_id"
   end
 
@@ -159,13 +177,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
   end
 
   create_table "postmark_configs", force: :cascade do |t|
+    t.text "account_approval_error"
+    t.text "account_token"
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
+    t.text "sender_error"
+    t.string "sender_verified_address"
     t.text "server_token"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
     t.string "webhook_token"
+    t.datetime "webhook_verified_at"
   end
 
   create_table "posts", force: :cascade do |t|
@@ -217,11 +240,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.datetime "connected_at"
     t.datetime "created_at", null: false
     t.integer "mode", default: 0, null: false
-    t.text "secret_key_live"
-    t.text "secret_key_test"
     t.text "snippet"
     t.datetime "updated_at", null: false
     t.datetime "verified_at"
+    t.string "webhook_token"
+  end
+
+  create_table "snipcart_orders", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "currency"
+    t.string "email"
+    t.integer "mode", default: 0, null: false
+    t.string "name"
+    t.json "payload", default: {}, null: false
+    t.datetime "placed_at"
+    t.integer "refunded_amount_cents"
+    t.datetime "refunded_at"
+    t.string "refunded_currency"
+    t.string "snipcart_token", null: false
+    t.string "status"
+    t.integer "total_cents"
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_snipcart_orders_on_email"
+    t.index ["mode"], name: "index_snipcart_orders_on_mode"
+    t.index ["placed_at"], name: "index_snipcart_orders_on_placed_at"
+    t.index ["snipcart_token"], name: "index_snipcart_orders_on_snipcart_token", unique: true
   end
 
   create_table "solid_cable_messages", force: :cascade do |t|
@@ -245,9 +288,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.integer "port", default: 22
     t.integer "protocol", default: 0, null: false
     t.string "remote_path"
+    t.text "ssh_key_passphrase"
     t.text "ssh_private_key"
     t.datetime "updated_at", null: false
     t.string "username"
+    t.boolean "verify_tls", default: true, null: false
   end
 
   create_table "stripe_configs", force: :cascade do |t|
@@ -255,8 +300,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
     t.datetime "created_at", null: false
     t.string "currency"
     t.integer "mode", default: 0, null: false
-    t.string "price_id"
-    t.string "product_id"
+    t.string "price_id_live"
+    t.string "price_id_test"
+    t.string "product_id_live"
+    t.string "product_id_test"
     t.text "publishable_key_live"
     t.text "publishable_key_test"
     t.text "secret_key_live"
@@ -304,7 +351,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_193832) do
   add_foreign_key "donations", "members"
   add_foreign_key "media", "imports"
   add_foreign_key "media_references", "media"
-  add_foreign_key "media_references", "posts"
+  add_foreign_key "member_recovery_codes", "members"
   add_foreign_key "members", "imports"
   add_foreign_key "newsletter_sends", "imports"
   add_foreign_key "posts", "imports"

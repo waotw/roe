@@ -1,5 +1,6 @@
 // Configure your import map in config/importmap.rb. Read more: https://github.com/rails/importmap-rails
 import "@hotwired/turbo-rails";
+import "clipboard";
 import "controllers";
 import "delete_modal";
 import "theme_reset_modal";

@@ -1,0 +1,16 @@
+<%# The server's disk is full. %>
+<p>
+  Old images and build layers pile up with every deploy and eventually fill
+  the disk. This is the most common failure on a small server that's been
+  running a long time.
+</p>
+
+<p>Clear out the old layers. This removes unused images, not your running site:</p>
+<pre>ssh <%= user %>@<%= host %> 'docker system prune -af'</pre>
+
+<p>Then deploy again.</p>
+
+<p>
+  More detail:
+  <a href="/documentation/roe/troubleshoot-deployment#troubleshooting-kamal" target="_blank" rel="noopener">Troubleshooting → Deployment</a>
+</p>

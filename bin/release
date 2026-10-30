@@ -1,0 +1,1322 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+#
+# bin/release — takes you through publishing a Roe release, one step at a
+# time, and stops whenever something needs you.
+#
+#   bin/release 0.4.0              a stable release
+#   bin/release 0.5.0-nightly.1    a nightly (or -rc.N): checks, tag, push
+#   bin/release                    pick up where you left off
+#
+# Quitting is always safe. Progress is kept in current/tmp/release/, and the
+# next run works out where you are from git itself: the checks before the
+# version bump run again every time (they're quick, and a fix you made in
+# site/ is synced over before anything is checked), bin/ci is skipped when it
+# already passed on this exact commit, and anything you confirmed by hand
+# stays confirmed.
+#
+# Every git write is shown first and asks before it happens.
+#
+# Kept to plain Ruby syntax so it parses on the system Ruby too; the Rails
+# commands it runs get the mise Ruby through PATH below.
+
+require "yaml"
+require "json"
+require "open3"
+require "fileutils"
+require "shellwords"
+require "time"
+require "rubygems"
+require "digest"
+
+CURRENT    = File.expand_path("..", __dir__)
+ROOT       = File.expand_path("..", CURRENT)
+SITE       = File.join(ROOT, "site")
+STATE_DIR  = File.join(CURRENT, "tmp", "release")
+STATE_FILE = File.join(STATE_DIR, "state.yml")
+
+REMOTE      = "roe" # one remote, two push URLs: GitHub and Codeberg
+GITHUB_REPO = "waotw/roe"
+DEFAULT_MIRRORS = { # where RoeUpdater::Forge looks for tags
+  "GitHub"     => "https://github.com/waotw/roe",
+  "Codeberg"   => "https://codeberg.org/waotw/roe",
+  "go-roe.com" => "https://go-roe.com/roe.git"
+}.freeze
+
+# For trying the script on a throwaway clone: point the mirror checks at
+# local repos ("GitHub=/tmp/a.git,Codeberg=/tmp/a.git"), and stop before
+# anything reaches the real GitHub release.
+TEST_RUN = !ENV["ROE_RELEASE_TEST_MIRRORS"].to_s.empty?
+MIRRORS = if TEST_RUN
+  ENV["ROE_RELEASE_TEST_MIRRORS"].split(",").to_h { |pair| pair.split("=", 2) }.freeze
+else
+  DEFAULT_MIRRORS
+end
+LATEST_ZIP_URL = "https://github.com/#{GITHUB_REPO}/releases/latest/download/roe.zip"
+RELEASES_API   = "https://api.github.com/repos/#{GITHUB_REPO}/releases?per_page=20"
+
+# The install that tests the in-app update, then deploys go-roe.com.
+UPDATE_TEST_SITE = "roe_site"
+
+# A by-hand test is only asked for when something it covers changed since
+# the last stable release. Paths are inside current/.
+CONDITIONAL = {
+  "fresh_install" => %w[install.sh roe.sh bin/setup bin/bootstrap bin/roe bin/build-installer
+                        .ruby-version Gemfile Gemfile.lock],
+  "phone"         => %w[app/themes app/assets/stylesheets app/views app/site_js app/javascript],
+  "stripe"        => /stripe|checkout|payment|donation|snipcart/i
+}.freeze
+
+shims = File.expand_path("~/.local/share/mise/shims")
+if File.directory?(shims) && !ENV["PATH"].to_s.split(":").include?(shims)
+  ENV["PATH"] = "#{shims}:#{ENV["PATH"]}"
+end
+
+# ── Colour (same escapes as bin/roe; Terminal.app drops 24-bit) ─────────────
+
+COLOR      = $stdout.tty? && ENV["NO_COLOR"].to_s.empty?
+TRUECOLOR  = %w[truecolor 24bit].include?(ENV["COLORTERM"].to_s)
+ROE_RED    = COLOR ? (TRUECOLOR ? "\e[38;2;198;67;32m"  : "\e[38;5;166m") : ""
+ROE_ORANGE = COLOR ? (TRUECOLOR ? "\e[38;2;228;126;93m" : "\e[38;5;173m") : ""
+GREEN      = COLOR ? "\e[32m" : ""
+DIM        = COLOR ? "\e[2m"  : ""
+BOLD       = COLOR ? "\e[1m"  : ""
+RESET      = COLOR ? "\e[0m"  : ""
+
+def ok(text)
+  puts "  #{GREEN}✓#{RESET} #{text}"
+end
+
+def bad(text)
+  puts "  #{ROE_RED}✗#{RESET} #{text}"
+end
+
+def say(text = "")
+  puts(text.empty? ? "" : "    #{text}")
+end
+
+def dim(text)
+  puts "    #{DIM}#{text}#{RESET}"
+end
+
+def orange(text)
+  "#{ROE_ORANGE}#{text}#{RESET}"
+end
+
+def list(lines, limit = 25)
+  lines.first(limit).each { |l| puts "      #{l}" }
+  dim("…and #{lines.size - limit} more") if lines.size > limit
+end
+
+# ── Running things ──────────────────────────────────────────────────────────
+
+def capture(*command, chdir: CURRENT)
+  out, status = Open3.capture2e(*command, chdir: chdir)
+  [ out, status.success? ]
+end
+
+# stdout only, stripped; nil when git fails.
+def git(*args)
+  out, _err, status = Open3.capture3("git", *args, chdir: CURRENT)
+  status.success? ? out.strip : nil
+end
+
+def git_lines(*args)
+  git(*args).to_s.lines.map(&:chomp).reject(&:empty?)
+end
+
+# A program run with no arguments, as [path, name] so Ruby never hands it
+# to the shell. A lone string goes through /bin/sh whenever it holds a
+# space or "&" — and "/Volumes/S&M 2019/…" has both, so sh ran
+# "/Volumes/S" in the background and a command called "M".
+def program(relative)
+  path = File.join(CURRENT, relative)
+  [ path, path ]
+end
+
+def stream(*command, chdir: CURRENT, **options)
+  system(*command, chdir: chdir, **options)
+end
+
+# ── Prompts ─────────────────────────────────────────────────────────────────
+
+# "Check again" starts the run over from the top, so a fix made in site/ is
+# synced over and every earlier check sees it — not just the one that failed.
+class Restart < StandardError; end
+
+def read_answer
+  line = $stdin.gets
+  quit! if line.nil?
+  line.strip.downcase
+end
+
+def quit!
+  puts
+  puts "  Stopped. Progress is saved — run #{orange("bin/release")} to pick up from here."
+  puts
+  exit 0
+end
+
+# A check failed. ENTER fixes-and-rechecks, c (soft checks only) carries on.
+def pause(soft: false)
+  puts
+  choices = [ "#{BOLD}ENTER#{RESET} check again" ]
+  choices << "#{BOLD}c#{RESET} continue anyway" if soft
+  choices << "#{BOLD}q#{RESET} quit"
+  print "  #{choices.join("   ")}  › "
+  answer = read_answer
+  quit! if answer == "q"
+  return :continue if soft && answer == "c"
+
+  raise Restart
+end
+
+# A soft check found something and you chose to carry on: remember exactly
+# what it found, so resuming shows it again but doesn't ask again. Anything
+# new or different asks.
+def soft_stop(key, findings)
+  signature = Digest::SHA1.hexdigest(Array(findings).join("\n"))
+  if state.dig("accepted", key) == signature
+    dim("Same as when you chose to carry on before — not asking again.")
+    mark_done(key, "carried on")
+    return :continue
+  end
+  return unless pause(soft: true) == :continue
+
+  (state["accepted"] ||= {})[key] = signature
+  mark_done(key, "carried on")
+  :continue
+end
+
+def yes?(question, default: true)
+  print "  #{question} #{default ? "[Y/n]" : "[y/N]"} "
+  answer = read_answer
+  quit! if answer == "q"
+  answer.empty? ? default : answer.start_with?("y")
+end
+
+# ── State ───────────────────────────────────────────────────────────────────
+
+def state
+  @state ||= File.exist?(STATE_FILE) ? (YAML.safe_load(File.read(STATE_FILE)) || {}) : {}
+end
+
+def save_state
+  FileUtils.mkdir_p(STATE_DIR)
+  File.write(STATE_FILE, state.to_yaml)
+end
+
+def version
+  state["version"]
+end
+
+def tag
+  "v#{version}"
+end
+
+def stable?
+  state["kind"] == "stable"
+end
+
+def prev_stable
+  state["prev"]
+end
+
+def release_dir
+  File.join(STATE_DIR, tag)
+end
+
+def notes_path
+  File.join(release_dir, "notes.md")
+end
+
+def done
+  state["done"] ||= {}
+end
+
+def mark_done(key, value = Time.now.iso8601)
+  done[key] = value
+  save_state
+end
+
+def head
+  git("rev-parse", "HEAD")
+end
+
+def clean?
+  git_lines("status", "--porcelain").empty?
+end
+
+def tag_exists?
+  !git("rev-parse", "-q", "--verify", "refs/tags/#{tag}").to_s.empty?
+end
+
+def committed_version
+  git("show", "HEAD:VERSION").to_s[/^version:\s*['"]?([^'"\s]+)/, 1]
+end
+
+def file_version
+  File.read(File.join(CURRENT, "VERSION"))[/^version:\s*['"]?([^'"\s]+)/, 1]
+end
+
+def changed_since_prev(*paths)
+  return [] unless prev_stable
+
+  git_lines("diff", "--name-only", "#{prev_stable}..HEAD", "--", *paths)
+end
+
+# Once the version is bumped, the checks before it are over. Running the
+# site/ sync again then would also undo the bump: release:bump stamps
+# "Bundled with: Roe vX" into current/app/themes, and the sync copies
+# site/theme over it.
+def past_prep?
+  return tag_exists? unless stable?
+
+  state["bumped"] || committed_version == version || tag_exists?
+end
+
+# ── Steps ───────────────────────────────────────────────────────────────────
+
+Step = Struct.new(:key, :title, :kinds, :phase)
+
+STEPS = [
+  Step.new("clean",         "Nothing uncommitted in current/",                   %w[stable pre], :prep),
+  Step.new("branch",        "On development and up to date",                     %w[stable pre], :prep),
+  Step.new("main_in",       "Anything only on main is in development too",       %w[stable],     :prep),
+  Step.new("docs_pass",     "Read through the docs that changed",                %w[stable],     :prep),
+  Step.new("sync",          "Bring docs, themes and site JS over from site/",    %w[stable pre], :prep),
+  Step.new("leftovers",     "No TODO, FIXME or /bw left in what ships",           %w[stable pre], :prep),
+  Step.new("doctor",        "Markdown Doctor on the docs",                       %w[stable pre], :prep),
+  Step.new("secrets",       "No keys or secrets committed",                      %w[stable pre], :prep),
+  Step.new("migrations",    "The last release's database migrates cleanly",     %w[stable pre], :prep),
+  Step.new("ci",            "bin/ci passes (RuboCop, audits, Brakeman, tests)",   %w[stable pre], :prep),
+  Step.new("notes",         "Write the release notes",                           %w[stable],     :notes),
+  Step.new("bump",          "Bump the version and commit it",                    %w[stable],     :bump),
+  Step.new("tag",           "Merge into main and tag",                           %w[stable pre], :tag),
+  Step.new("push",          "Push to GitHub and Codeberg",                       %w[stable pre], :publish),
+  Step.new("build",         "Build the installer zips",                          %w[stable],     :publish),
+  Step.new("github",        "Publish the GitHub release",                        %w[stable],     :publish),
+  Step.new("verify",        "Check the release can be found and downloaded",     %w[stable pre], :publish),
+  Step.new("update_test",   "In-app update test on #{UPDATE_TEST_SITE}",         %w[stable],     :after),
+  Step.new("deploy",        "Deploy go-roe.com",                                 %w[stable],     :after),
+  Step.new("fresh_install", "Fresh install test",                                %w[stable],     :after),
+  Step.new("phone",         "Phone check",                                       %w[stable],     :after),
+  Step.new("stripe",        "Stripe test checkout",                              %w[stable],     :after)
+].freeze
+
+def steps
+  kind = stable? ? "stable" : "pre"
+  STEPS.select { |s| s.kinds.include?(kind) }
+end
+
+def title_for(step)
+  return "Tag #{tag} on development" if step.key == "tag" && !stable?
+  return "Push development and #{tag}" if step.key == "push" && !stable?
+
+  step.title
+end
+
+# Already finished, so the run can pass it with a tick.
+def already_done?(step)
+  return true if step.phase == :prep && past_prep?
+
+  case step.key
+  when "docs_pass", "update_test", "deploy", "fresh_install", "phone", "stripe",
+       "push", "build", "github", "verify"
+    done.key?(step.key)
+  when "ci"     then done["ci"] == head && clean?
+  when "notes"  then done.key?("notes") && notes_finished?
+  when "bump"   then committed_version == version
+  when "tag"    then tag_exists? && git("merge-base", "--is-ancestor", tag, "HEAD") && true
+  else false # the quick checks run every time
+  end
+end
+
+def run_all
+  loop do
+    begin
+      all = steps
+      all.each_with_index do |step, i|
+        if already_done?(step)
+          ok("#{DIM}#{title_for(step)}#{RESET}")
+          next
+        end
+        puts
+        puts "  #{ROE_ORANGE}#{BOLD}#{i + 1}/#{all.size}#{RESET}  #{BOLD}#{title_for(step).upcase}#{RESET}"
+        send("step_#{step.key}")
+      end
+      finish
+      return
+    rescue Restart
+      puts
+      dim("Checking again from the top…")
+      puts
+    end
+  end
+end
+
+# ── Before the bump ─────────────────────────────────────────────────────────
+
+def step_clean
+  # Files a partial sync already brought over don't count: the sync step
+  # commits them. Anything else uncommitted does.
+  from_sync = state["sync_pending"] || []
+  dirty = git_lines("status", "--porcelain").reject { |l| from_sync.include?(l[3..]) }
+  if dirty.empty?
+    ok(from_sync.empty? ? "Working tree is clean" : "Nothing uncommitted apart from what the sync brought over")
+    return mark_done("clean")
+  end
+
+  bad("current/ has changes that aren't committed:")
+  list(dirty)
+  say "Commit or stash them first, so the release is exactly what's committed."
+  pause
+end
+
+def step_branch
+  branch = git("rev-parse", "--abbrev-ref", "HEAD")
+  unless branch == "development"
+    bad("You're on #{branch}. Releases start from development.")
+    say "Switch with #{orange("git switch development")}"
+    return pause
+  end
+
+  _out, fetched = capture("git", "fetch", "--quiet", REMOTE, "--tags")
+  unless fetched
+    bad("Couldn't fetch from #{REMOTE}. Are you online?")
+    return pause
+  end
+
+  behind = git("rev-list", "--count", "development..#{REMOTE}/development").to_i
+  if behind.positive?
+    bad("#{REMOTE}/development has #{behind} commit(s) you don't have.")
+    say "Pull them first: #{orange("git pull #{REMOTE} development")}"
+    return pause
+  end
+
+  ok("On development, nothing new on #{REMOTE}")
+  mark_done("branch")
+end
+
+# Brings local main level with roe/main without checking it out. Three
+# shapes are fine: the same commit; local main ahead (commits made on main
+# and not pushed yet — they go out with this release); roe/main ahead
+# (fast-forwarded here). Only the two having split apart needs you.
+# (`git fetch roe main:main` can't be used: git refuses it when local main
+# is the one ahead.)
+def main_up_to_date?
+  _out, fetched = capture("git", "fetch", "--quiet", REMOTE, "main")
+  unless fetched
+    bad("Couldn't fetch main from #{REMOTE}. Are you online?")
+    return false
+  end
+
+  local  = git("rev-parse", "main")
+  remote = git("rev-parse", "#{REMOTE}/main")
+  return true if local == remote
+
+  if git("merge-base", "--is-ancestor", "#{REMOTE}/main", "main")
+    ahead = git("rev-list", "--count", "#{REMOTE}/main..main")
+    dim("Local main is #{ahead} commit(s) ahead of #{REMOTE}/main; they go out with this release.")
+    return true
+  end
+
+  if git("merge-base", "--is-ancestor", "main", "#{REMOTE}/main")
+    unless git("update-ref", "refs/heads/main", remote, local)
+      bad("Couldn't move main up to #{REMOTE}/main.")
+      return false
+    end
+    ok("Brought main up to date with #{REMOTE}/main")
+    return true
+  end
+
+  # COPY
+  bad("main and #{REMOTE}/main have split apart.")
+  say "Only on your main:"
+  list(git_lines("log", "--format=%h %s", "#{REMOTE}/main..main"))
+  say "Only on #{REMOTE}/main:"
+  list(git_lines("log", "--format=%h %s", "main..#{REMOTE}/main"))
+  say "Sort out main by hand (for example #{orange("git switch main && git pull --rebase #{REMOTE} main")}),"
+  say "switch back to development, then check again."
+  false
+end
+
+# A fix made straight on main (a hotfix, a docs link) would otherwise reach
+# the release only at the merge into main, unchecked — and for a line both
+# sides didn't touch, main's version wins. Merged in here, the sync then
+# puts site/'s copy of any doc back and every check sees the result.
+def step_main_in
+  return pause unless main_up_to_date?
+
+  only_on_main = git_lines("log", "--format=%h %s", "development..main")
+  if only_on_main.empty?
+    ok("main has nothing that development doesn't")
+    return mark_done("main_in")
+  end
+
+  # COPY
+  say "main has #{only_on_main.size} commit(s) development doesn't. Left there, they'd join"
+  say "the release at the merge into main without being checked:"
+  list(only_on_main)
+  say "Docs among them are replaced by site/'s copy at the sync step — site/ wins."
+  puts
+  quit! unless yes?("Merge main into development?")
+
+  out, merged = capture("git", "merge", "--no-edit", "--quiet", "main")
+  unless merged
+    bad("The merge stopped with conflicts:")
+    list(out.lines.map(&:rstrip), 20)
+    say "Resolve them and commit (git status shows where), then check again."
+    return pause
+  end
+  ok("Merged main into development")
+  mark_done("main_in")
+end
+
+def docs_needing_a_read
+  shipped = File.join(CURRENT, "lib/site_templates/minimum/documentation/roe")
+  source  = File.join(SITE, "documentation/roe")
+  committed = changed_since_prev("lib/site_templates/minimum/documentation/roe")
+              .map { |p| File.basename(p) }
+  # Edits in site/ that haven't been synced over yet count too.
+  unsynced = Dir.glob(File.join(source, "*.md")).map { |p| File.basename(p) }.reject do |name|
+    other = File.join(shipped, name)
+    File.exist?(other) && File.read(other) == File.read(File.join(source, name))
+  end
+  (committed + unsynced).uniq.reject { |n| n.start_with?("_") }.sort
+                        .select { |n| File.exist?(File.join(source, n)) }
+end
+
+def step_docs_pass
+  docs = docs_needing_a_read
+  if docs.empty?
+    ok("No docs changed since #{prev_stable}")
+    return mark_done("docs_pass", "nothing changed")
+  end
+
+  # COPY
+  say "#{docs.size} doc(s) in site/documentation/roe/ changed since #{prev_stable}."
+  say "Read them as someone new would: stale steps, broken links, old screenshots."
+  say "Fix anything in site/ — the next step copies it into current/."
+  puts
+  list(docs, 60)
+  manual_confirm("docs_pass")
+end
+
+def step_sync
+  out, synced = capture(program("bin/sync-from-site"))
+  remember_sync_pending
+  unless synced
+    bad("bin/sync-from-site stopped:")
+    warning = out.lines.drop_while { |l| !l.include?("!!") }
+    list((warning.empty? ? out.lines.last(15) : warning).map(&:rstrip), 30)
+    say "Continuing anyway leaves those files out of the release."
+    soft_stop("sync", warning) # :continue falls through to committing what did sync
+  end
+
+  changed = git_lines("status", "--porcelain")
+  if changed.empty?
+    ok("current/ already matches site/")
+    remember_sync_pending
+    return mark_done("sync")
+  end
+
+  say "The sync changed these in current/:"
+  list(changed, 40)
+  puts
+  message = "docs: sync documentation, themes and site JS from site/ for #{version}"
+  if yes?("Commit them as \"#{message}\"?")
+    capture("git", "add", "-A")
+    _out, committed = capture("git", "commit", "--quiet", "-m", message)
+    raise "git commit failed" unless committed
+
+    ok("Committed")
+    remember_sync_pending
+    return mark_done("sync")
+  end
+
+  say "Then commit what you want (and discard what you don't) yourself."
+  pause
+end
+
+# What the sync left uncommitted, so the clean check on the next pass knows
+# those changes are the sync's and not stray work. Only recorded when the
+# tree was clean before the sync ran (the clean step guarantees that).
+def remember_sync_pending
+  state["sync_pending"] = git_lines("status", "--porcelain").map { |l| l[3..] }
+  save_state
+end
+
+LEFTOVER_CODE  = "(^|[^A-Za-z_])(TODO|FIXME|XXX)([^A-Za-z_]|$)"
+LEFTOVER_BW    = "/bw([^A-Za-z_]|$)"
+READER_FACING  = %w[lib/site_templates app/views app/themes app/site_js README.md].freeze
+
+def step_leftovers
+  # /bw anywhere in what ships; TODO and FIXME only where a user reads them
+  # (code keeps its developer notes).
+  hits = git_lines("grep", "-nIE", LEFTOVER_BW, "--", ".", ":!bin/release") +
+         git_lines("grep", "-nIE", LEFTOVER_CODE, "--", *READER_FACING)
+  site_paths = Dir.glob(File.join(SITE, "documentation/roe/**/*.md")) +
+               Dir.glob(File.join(SITE, "theme/*.css")) +
+               Dir.glob(File.join(SITE, "javascript/*.js")) +
+               Dir.glob(File.join(SITE, "pages/documentation*.md"))
+  pattern = Regexp.new("#{LEFTOVER_CODE}|#{LEFTOVER_BW}")
+  site_paths.each do |path|
+    File.foreach(path).with_index(1) do |line, n|
+      hits << "#{path.sub("#{ROOT}/", "")}:#{n}:#{line.strip}" if line.match?(pattern)
+    end
+  end
+  hits.uniq!
+
+  if hits.empty?
+    ok("Nothing left behind")
+    return mark_done("leftovers")
+  end
+
+  bad("Found #{hits.size} leftover(s):")
+  list(hits.map { |h| h[0, 150] }, 30)
+  say "Fix docs and themes in site/, not current/ — they're synced from there."
+  soft_stop("leftovers", hits)
+end
+
+def step_doctor
+  out, clean = capture(File.join(CURRENT, "bin/roe-markdown-doctor"), File.join(SITE, "documentation/roe"))
+  if clean
+    ok("No Markdown problems in the docs")
+    return mark_done("doctor")
+  end
+
+  report = out.lines.map(&:rstrip)
+  report = report.take_while { |l| !l.start_with?("Supplemental") }
+                 .reject { |l| l =~ /: 0\z/ || l.empty? }
+  bad("Markdown Doctor found problems:")
+  list(report.map { |l| l.sub("#{ROOT}/", "") }, 40)
+  soft_stop("doctor", report)
+end
+
+SECRET_PATTERN = [
+  "sk_live_[0-9A-Za-z]{20,}", "rk_live_[0-9A-Za-z]{20,}", "whsec_[0-9A-Za-z]{24,}",
+  "-----BEGIN [A-Z ]*PRIVATE KEY-----", "ghp_[0-9A-Za-z]{30,}", "github_pat_[0-9A-Za-z_]{30,}",
+  "AKIA[0-9A-Z]{16}", "xox[abp]-[0-9A-Za-z-]{20,}"
+].join("|")
+
+def step_secrets
+  hits = git_lines("grep", "-nIE", SECRET_PATTERN, "--", ".", ":!bin/release")
+  key_files = git_lines("ls-files").grep(%r{(\A|/)(master\.key|[^/]+\.key|\.env(\.[a-z]+)?)\z})
+  if hits.empty? && key_files.empty?
+    ok("No live keys, private keys or key files tracked")
+    return mark_done("secrets")
+  end
+
+  bad("These look like real secrets:")
+  list((hits.map { |h| h[0, 120] } + key_files.map { |f| "#{f} (tracked key file)" }), 30)
+  say "Remove them from the repo (and rotate them — they're in history)."
+  soft_stop("secrets", hits + key_files)
+end
+
+MIGRATE_CHECK = <<~'RUBY'
+  # Written by bin/release. Builds a throwaway database at the last
+  # release's schema, runs today's migrations on it, and compares the
+  # result with db/schema.rb.
+  old_schema, db_path = ARGV
+  require "stringio"
+  FileUtils.rm_f(db_path)
+  ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: db_path)
+  ActiveRecord::Migration.verbose = false
+  load old_schema
+  context = ActiveRecord::MigrationContext.new(Rails.root.join("db/migrate").to_s)
+  pending = context.migrations.map(&:version) - context.get_all_versions
+  context.migrate
+  io = StringIO.new
+  ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, io)
+  tidy = ->(s) { s.lines.reject { |l| l.start_with?("#") || l.include?(".define(version:") }.join.strip }
+  same = tidy.call(io.string) == tidy.call(File.read(Rails.root.join("db/schema.rb")))
+  File.write("#{db_path}.schema.rb", io.string) unless same
+  puts "PENDING=#{pending.size}"
+  puts(same ? "MATCH" : "DIFF")
+RUBY
+
+def step_migrations
+  changed = changed_since_prev("db/migrate")
+  if prev_stable.nil? || changed.empty?
+    ok("No new migrations since #{prev_stable || "the first release"}")
+    return mark_done("migrations")
+  end
+
+  dir = File.join(release_dir, "migrate-check")
+  FileUtils.mkdir_p(dir)
+  old_schema = File.join(dir, "schema-#{prev_stable}.rb")
+  File.write(old_schema, git("show", "#{prev_stable}:db/schema.rb").to_s + "\n")
+  File.write(File.join(dir, "check.rb"), MIGRATE_CHECK)
+  db = File.join(dir, "check.sqlite3")
+
+  out, ran = capture(File.join(CURRENT, "bin/rails"), "runner", File.join(dir, "check.rb"), old_schema, db)
+  pending = out[/PENDING=(\d+)/, 1]
+  if ran && out.include?("MATCH")
+    ok("#{prev_stable}'s database takes the #{pending} new migration(s) and ends up matching db/schema.rb")
+    return mark_done("migrations")
+  end
+
+  if ran && out.include?("DIFF")
+    bad("After migrating, #{prev_stable}'s database doesn't match db/schema.rb.")
+    say "Compare: #{orange("diff #{db}.schema.rb db/schema.rb")}"
+  else
+    bad("Migrating #{prev_stable}'s database failed:")
+    list(out.lines.map(&:rstrip).reject { |l| l.include?("warning:") }.last(20))
+  end
+  soft_stop("migrations", out)
+end
+
+def step_ci
+  say "Running bin/ci — RuboCop, bundler-audit, Brakeman, the tests and seeds."
+  say "This takes a few minutes."
+  puts
+  # No keyboard (stdin closed at once): anything in CI that asks a question
+  # fails instead of waiting. Output is shown live and kept for the hints.
+  output = +""
+  passed = Open3.popen2e(program("bin/ci"), chdir: CURRENT) do |stdin, out, wait|
+    stdin.close
+    out.each_line { |line| print line; output << line }
+    wait.value.success?
+  end
+  if passed
+    ok("bin/ci passed on #{head[0, 7]}")
+    return mark_done("ci", head)
+  end
+
+  bad("bin/ci failed — see above.")
+  ci_hints(output).each { |hint| say hint }
+  say "Fix and commit, then check again (it re-runs from the top)."
+  # Continuing is remembered for this commit, so resuming doesn't rerun CI.
+  mark_done("ci", head) if pause(soft: true) == :continue
+end
+
+# COPY — what to do about the failures CI has a known fix for.
+def ci_hints(output)
+  plain = output.gsub(/\e\[[\d;]*m/, "")
+  hints = []
+  if plain.include?("is not the latest version")
+    hints << "Brakeman fails until it's the newest release (bin/brakeman adds --ensure-latest):"
+    hints << "  #{orange("bundle update brakeman --conservative")}, then commit Gemfile.lock."
+  end
+  if plain =~ /offenses? detected, \d+ offenses? autocorrectable/
+    hints << "RuboCop can fix its offenses itself: #{orange("bin/rubocop -a")}, then commit."
+  end
+  failing = plain.scan(%r{^bin/rails test (\S+:\d+)}).flatten.uniq
+  unless failing.empty?
+    hints << "Failing tests — rerun just these with:"
+    failing.first(10).each { |t| hints << "  #{orange("bin/rails test #{t}")}" }
+  end
+  hints
+end
+
+# ── Release notes ───────────────────────────────────────────────────────────
+
+NOTE_MARKERS = [ "<!-- WRITE", "<!-- DRAFT" ].freeze
+
+def notes_finished?
+  File.exist?(notes_path) && NOTE_MARKERS.none? { |m| File.read(notes_path).include?(m) }
+end
+
+CONVENTIONAL = [
+  [ "Features",      /\Afeat(ure)?(\(|!|:)/ ],
+  [ "Fixes",         /\Afix(\(|!|:)/ ],
+  [ "Performance",   /\Aperf(\(|!|:)/ ],
+  [ "Documentation", /\Adocs(\(|!|:)/ ],
+  [ "Refactoring",   /\Arefactor(\(|!|:)/ ],
+  [ "Everything else", // ]
+].freeze
+
+def draft_notes
+  commits = git_lines("log", "#{prev_stable}..HEAD", "--no-merges", "--format=%s")
+  groups = Hash.new { |h, k| h[k] = [] }
+  commits.uniq.each do |subject|
+    name = CONVENTIONAL.find { |_, pattern| subject.match?(pattern) }.first
+    groups[name] << subject.sub(/\A[a-z]+(\(([^)]*)\))?!?:\s*/) { $2 ? "(#{$2}) " : "" }
+  end
+  today = Time.now.strftime("%-d %B %Y")
+  prev_number = prev_stable.to_s.delete_prefix("v")
+
+  # COPY — the starting shape of every release's notes.
+  draft = +<<~MD
+    # Roe #{version}
+
+    Released #{today}. #{commits.size} changes since #{prev_number}.
+
+    <!-- WRITE: a sentence or two on what this release is about. -->
+
+    ---
+
+    ## <!-- WRITE: the first big change -->
+
+    ## Fixes
+
+    ## Known issues
+
+    - <!-- WRITE: or delete this section -->
+
+    ---
+
+    **Full changelog:** https://github.com/#{GITHUB_REPO}/compare/#{prev_stable}...#{tag}
+
+    <!-- DRAFT: every commit since #{prev_stable}, to write from. Delete from here to the end. -->
+  MD
+  CONVENTIONAL.each do |name, _|
+    next if groups[name].empty?
+
+    draft << "\n### #{name}\n\n" << groups[name].map { |s| "- #{s}" }.join("\n") << "\n"
+  end
+  draft
+end
+
+def open_notes
+  editor = ENV["VISUAL"].to_s.empty? ? ENV["EDITOR"].to_s : ENV["VISUAL"].to_s
+  if editor.empty?
+    system("open", "-t", notes_path)
+  else
+    system(*Shellwords.split(editor), notes_path)
+  end
+end
+
+def step_notes
+  FileUtils.mkdir_p(release_dir)
+  unless File.exist?(notes_path)
+    File.write(notes_path, draft_notes)
+    ok("Drafted #{notes_path.sub("#{CURRENT}/", "")}")
+    open_notes
+  end
+
+  loop do
+    say "Notes: #{orange(notes_path.sub("#{CURRENT}/", ""))}"
+    say "The commit list at the bottom is for writing from. Delete it, and every"
+    say "<!-- WRITE --> marker, when you're done."
+    puts
+    print "  #{BOLD}ENTER#{RESET} I've finished and saved   #{BOLD}o#{RESET} open them   #{BOLD}q#{RESET} quit  › "
+    answer = read_answer
+    quit! if answer == "q"
+    if answer == "o"
+      open_notes
+      next
+    end
+
+    left = NOTE_MARKERS.select { |m| File.read(notes_path).include?(m) }
+    if left.empty?
+      ok("Release notes are ready")
+      return mark_done("notes")
+    end
+    bad("Still has #{left.map { |m| "#{m} -->" }.join(" and ")} in it.")
+  end
+end
+
+# ── Bump, tag, push ─────────────────────────────────────────────────────────
+
+def step_bump
+  unless file_version == version
+    say "Running #{orange("bin/rails release:bump VERSION=#{version}")}"
+    puts
+    out, bumped = capture(File.join(CURRENT, "bin/rails"), "release:bump", "VERSION=#{version}")
+    # Its closing "git add -p / git commit / git tag / git push" advice is
+    # for running it alone; this script does those steps next.
+    report = out.lines.map(&:rstrip).take_while { |l| !l.start_with?("Done. Review") }
+                .reject { |l| l.include?("warning:") || l.start_with?("RoeSecrets") }
+    report.each { |l| puts "    #{l}" }
+    unless bumped
+      bad("release:bump failed — see above.")
+      return pause
+    end
+    state["bumped"] = true
+    save_state
+  end
+
+  puts
+  say "The bump changed:"
+  list(git_lines("status", "--porcelain"), 40)
+  puts
+  loop do
+    print "  Commit it as \"Release #{tag}\"? [Y/n]  #{BOLD}d#{RESET} show the diff  › "
+    answer = read_answer
+    quit! if answer == "q"
+    if answer == "d"
+      stream("git", "diff")
+      next
+    end
+    break if answer.empty? || answer.start_with?("y")
+
+    say "Left uncommitted. Change what you need, then run bin/release again"
+    say "(or commit it yourself with any message — it only checks VERSION)."
+    quit!
+  end
+
+  capture("git", "add", "-A")
+  _out, committed = capture("git", "commit", "--quiet", "-m", "Release #{tag}")
+  raise "git commit failed" unless committed
+
+  ok("Committed Release #{tag}")
+  mark_done("bump")
+end
+
+def step_tag
+  stable? ? tag_stable : tag_prerelease
+end
+
+def tag_prerelease
+  unless tag_exists?
+    return quit! unless yes?("Tag #{head[0, 7]} (development) as #{tag}? Nothing leaves your computer yet.")
+
+    _out, tagged = capture("git", "tag", tag)
+    raise "git tag failed" unless tagged
+  end
+  ok("Tagged #{tag}")
+  mark_done("tag")
+end
+
+# main is never checked out: the merge is built with git merge-tree, so the
+# files under the running dev server don't change until development
+# fast-forwards at the end (to the same content plus anything only on main).
+def tag_stable
+  unless tag_exists?
+    unless yes?("Merge development into main and tag it #{tag}? Nothing leaves your computer yet.")
+      quit!
+    end
+
+    return pause unless main_up_to_date?
+
+    unless git("merge-base", "--is-ancestor", "development", "main")
+      out, merged = capture("git", "merge-tree", "--write-tree", "main", "development")
+      unless merged
+        bad("development and main conflict:")
+        list(out.lines.map(&:rstrip).drop(1), 30)
+        say "Merge them by hand: #{orange("git switch main && git merge --no-ff development")}"
+        say "then switch back to development and run bin/release again."
+        quit!
+      end
+      tree = out.lines.first.strip
+      commit = git("commit-tree", tree, "-p", "main", "-p", "development", "-m", "Merge branch 'development'")
+      raise "git commit-tree failed" if commit.to_s.empty?
+
+      git("update-ref", "refs/heads/main", commit) || raise("git update-ref failed")
+      ok("Merged development into main")
+    end
+
+    git("tag", tag, "main") || raise("git tag failed")
+    ok("Tagged main as #{tag}")
+  end
+
+  unless git("merge-base", "--is-ancestor", tag, "HEAD")
+    _out, forwarded = capture("git", "merge", "--ff-only", "--quiet", tag)
+    unless forwarded
+      bad("Couldn't fast-forward development to #{tag}.")
+      return pause
+    end
+    ok("development fast-forwarded to #{tag}")
+  end
+  mark_done("tag")
+end
+
+def remote_refs(url, *refs)
+  out, ran = capture("git", "ls-remote", url, *refs)
+  return nil unless ran
+
+  out.lines.to_h { |l| sha, ref = l.split; [ ref, sha ] }
+end
+
+def push_refs
+  stable? ? [ "main", "development", "refs/tags/#{tag}" ] : [ "development", "refs/tags/#{tag}" ]
+end
+
+def pushed_everywhere?
+  wanted = push_refs.to_h do |ref|
+    full = ref.start_with?("refs/") ? ref : "refs/heads/#{ref}"
+    [ full, git("rev-parse", ref) ]
+  end
+  %w[GitHub Codeberg].all? do |name|
+    remote = remote_refs(MIRRORS[name], *wanted.keys)
+    remote && wanted.all? { |ref, sha| remote[ref] == sha }
+  end
+end
+
+def step_push
+  if pushed_everywhere?
+    ok("GitHub and Codeberg already have #{tag}")
+    return mark_done("push")
+  end
+
+  if stable?
+    say "Once #{tag} is pushed, every Roe install on the stable channel is offered"
+    say "#{version} by its Updates page."
+  else
+    say "Once #{tag} is pushed, installs on the nightly channel are offered it."
+  end
+  puts
+  quit! unless yes?("Push #{push_refs.map { |r| r.sub("refs/tags/", "") }.join(", ")} to GitHub and Codeberg?")
+
+  unless stream("git", "push", REMOTE, *push_refs)
+    bad("The push failed — see above.")
+    return pause
+  end
+  unless pushed_everywhere?
+    bad("Pushed, but GitHub or Codeberg doesn't show it yet.")
+    return pause
+  end
+
+  ok("Pushed to GitHub and Codeberg")
+  mark_done("push")
+end
+
+# ── Publish ─────────────────────────────────────────────────────────────────
+
+def dist_dir
+  File.join(release_dir, "dist")
+end
+
+def zips
+  [ File.join(dist_dir, "roe-#{version}.zip"), File.join(dist_dir, "roe.zip") ]
+end
+
+def step_build
+  root_version = File.read(File.join(ROOT, "VERSION"))[/^version:\s*['"]?([^'"\s]+)/, 1]
+  unless git("rev-parse", "HEAD") == git("rev-parse", "#{tag}^{commit}") && clean? && root_version == version
+    bad("The zip is built from the working tree, and it isn't exactly #{tag}:")
+    say "HEAD #{head[0, 7]}, #{tag} #{git("rev-parse", "--short", "#{tag}^{commit}")}, " \
+        "#{clean? ? "clean" : "uncommitted changes"}, root VERSION #{root_version}"
+    return pause
+  end
+
+  FileUtils.rm_rf(dist_dir)
+  FileUtils.mkdir_p(dist_dir)
+  out, built = capture(File.join(CURRENT, "bin/build-installer"), "-o", dist_dir)
+  unless built && File.exist?(zips.first)
+    bad("bin/build-installer failed:")
+    list(out.lines.map(&:rstrip).last(15))
+    return pause
+  end
+  FileUtils.cp(zips.first, zips.last)
+
+  zips.each { |z| ok("#{File.basename(z)} (#{(File.size(z) / 1024.0 / 1024).round(1)} MB)") }
+  mark_done("build")
+end
+
+def gh_release
+  out, found = capture("gh", "release", "view", tag, "-R", GITHUB_REPO, "--json", "isDraft,isPrerelease,assets,url")
+  return nil unless found
+
+  JSON.parse(out)
+end
+
+def step_github
+  if TEST_RUN
+    say "Test run — stopping before anything is sent to GitHub."
+    quit!
+  end
+
+  zips.each do |z|
+    next if File.exist?(z)
+
+    done.delete("build")
+    save_state
+    bad("#{File.basename(z)} is missing — building again.")
+    raise Restart
+  end
+
+  release = gh_release
+  if release.nil?
+    out, made = capture("gh", "release", "create", tag, "-R", GITHUB_REPO, "--draft", "--verify-tag",
+                        "--title", "Roe - #{version}", "--notes-file", notes_path, *zips)
+    unless made
+      bad("Couldn't create the GitHub release:")
+      list(out.lines.map(&:rstrip))
+      return pause
+    end
+    state["notes_uploaded"] = File.mtime(notes_path).to_i
+    save_state
+    ok("Created a draft release")
+    release = gh_release
+  end
+
+  if release["isDraft"]
+    if File.mtime(notes_path).to_i != state["notes_uploaded"]
+      capture("gh", "release", "edit", tag, "-R", GITHUB_REPO, "--notes-file", notes_path)
+      state["notes_uploaded"] = File.mtime(notes_path).to_i
+      save_state
+      ok("Updated the draft with your latest notes.md")
+    end
+    say "Draft: #{orange(release["url"].to_s.sub("/tag/", "/edit/"))}"
+    say "Look it over. Edits go in notes.md — a later run uploads them again."
+    puts
+    unless yes?("Publish Roe #{version} for everyone?", default: false)
+      say "Still a draft. Run bin/release when you're ready."
+      quit!
+    end
+  end
+
+  # Not a pre-release, and marked latest: that's what makes
+  # releases/latest/download/roe.zip (the docs' Download link) resolve.
+  _out, published = capture("gh", "release", "edit", tag, "-R", GITHUB_REPO,
+                            "--draft=false", "--prerelease=false", "--latest")
+  unless published
+    bad("Couldn't publish the release.")
+    return pause
+  end
+
+  names = gh_release.fetch("assets", []).map { |a| a["name"] }
+  missing = zips.reject { |z| names.include?(File.basename(z)) }
+  unless missing.empty?
+    capture("gh", "release", "upload", tag, "-R", GITHUB_REPO, "--clobber", *missing)
+    ok("Uploaded #{missing.map { |z| File.basename(z) }.join(", ")}")
+  end
+
+  ok("Published https://github.com/#{GITHUB_REPO}/releases/tag/#{tag}")
+  mark_done("github")
+end
+
+def http_head(url)
+  out, _ok = capture("curl", "-sI", "--max-time", "20", url)
+  [ out[/\AHTTP\/[\d.]+ (\d+)/, 1], out[/^location:\s*(\S+)/i, 1] ]
+end
+
+def step_verify
+  checks = []
+  MIRRORS.each do |name, url|
+    refs = remote_refs(url, "refs/tags/#{tag}")
+    checks << [ refs && !refs.empty?, "#{name} has #{tag} (the in-app updater looks here)" ]
+  end
+
+  if stable?
+    code, location = http_head(LATEST_ZIP_URL)
+    checks << [ code == "302" && location.to_s.include?("/#{tag}/"),
+               "The docs' Download link gets #{tag}'s roe.zip#{code == "302" ? "" : " (HTTP #{code})"}" ]
+
+    api, _ran = capture("curl", "-fsSL", "--max-time", "20", RELEASES_API)
+    newest = api[%r{"browser_download_url"\s*:\s*"([^"]*roe-[0-9]+\.[0-9]+\.[0-9]+\.zip)"}, 1]
+    checks << [ newest.to_s.include?("/#{tag}/"), "go-roe.com/install picks #{tag}" ]
+  end
+
+  checks.each { |passed, text| passed ? ok(text) : bad(text) }
+  if checks.all?(&:first)
+    return mark_done("verify")
+  end
+
+  say "GitHub can take a minute to catch up — check again shortly."
+  pause(soft: true)
+end
+
+# ── By hand, after it's out ─────────────────────────────────────────────────
+
+# COPY — what each by-hand step asks you to do.
+MANUAL = {
+  "docs_pass" => [],
+  "update_test" => [
+    "On #{UPDATE_TEST_SITE}: Admin → Updates → Check for updates → update to VERSION.",
+    "Then #{"roe restart #{UPDATE_TEST_SITE}"} and check the site and the admin load,",
+    "and the release notes show on the Updates page."
+  ],
+  "deploy" => [
+    "Deploy go-roe.com from #{UPDATE_TEST_SITE}: Admin → Deploy."
+  ],
+  "fresh_install" => [
+    "In a clean UTM machine: curl -fsSL https://go-roe.com/install | bash",
+    "Finish the setup, open the admin, and create a post."
+  ],
+  "phone" => [
+    "One pass on your phone through the public site and the admin."
+  ],
+  "stripe" => [
+    "A test-mode checkout on #{UPDATE_TEST_SITE} (card 4242 4242 4242 4242)."
+  ]
+}.freeze
+
+def manual_confirm(key)
+  puts
+  print "  #{BOLD}ENTER#{RESET} done   #{BOLD}s#{RESET} skip this time   #{BOLD}q#{RESET} quit  › "
+  answer = read_answer
+  quit! if answer == "q"
+  mark_done(key, answer == "s" ? "skipped" : Time.now.iso8601)
+  answer == "s" ? dim("Skipped") : ok("Done")
+end
+
+def triggered_by(key)
+  rule = CONDITIONAL[key]
+  return changed_since_prev(*rule) if rule.is_a?(Array)
+
+  changed_since_prev(".").grep(rule).reject { |p| p.start_with?("test/") }
+end
+
+def manual_step(key)
+  if CONDITIONAL.key?(key)
+    files = triggered_by(key)
+    if files.empty?
+      ok("Not needed — nothing it covers changed since #{prev_stable}")
+      return mark_done(key, "not needed")
+    end
+    dim("Changed since #{prev_stable}: #{files.first(6).join(", ")}#{files.size > 6 ? ", …" : ""}")
+  end
+  MANUAL.fetch(key).each { |line| say line.gsub("VERSION", version) }
+  manual_confirm(key)
+end
+
+%w[update_test deploy fresh_install phone stripe].each do |key|
+  define_method("step_#{key}") { manual_step(key) }
+end
+
+# ── Start, finish, status ───────────────────────────────────────────────────
+
+STABLE_VERSION = /\A\d+\.\d+\.\d+\z/
+PRE_VERSION    = /\A\d+\.\d+\.\d+-(nightly|rc)(\.[0-9A-Za-z]+)*\z/
+
+def stable_tags
+  git_lines("tag", "-l", "v*").select { |t| t.delete_prefix("v").match?(STABLE_VERSION) }
+                              .sort_by { |t| Gem::Version.new(t.delete_prefix("v")) }
+end
+
+def start(requested)
+  requested = requested.delete_prefix("v")
+  kind = if requested.match?(STABLE_VERSION) then "stable"
+  elsif requested.match?(PRE_VERSION) then "pre"
+  end
+  abort "  #{requested} isn't a version. Use 0.4.0, or 0.5.0-nightly.1 / 0.5.0-rc.1." unless kind
+
+  if version && version != requested && !state["finished"]
+    say "A release of #{version} is in progress."
+    exit 0 unless yes?("Forget it and start #{requested} instead? (Nothing in git is undone.)", default: false)
+    @state = {}
+  end
+
+  if version != requested || state["finished"]
+    base = Gem::Version.new(requested.split("-").first)
+    prev = stable_tags.reverse.find { |t| Gem::Version.new(t.delete_prefix("v")) < base }
+    if kind == "stable" && stable_tags.include?("v#{requested}")
+      abort "  v#{requested} is already released. Use bin/release with no version to finish one in progress."
+    end
+    commits = prev ? git("rev-list", "--count", "--no-merges", "#{prev}..HEAD").to_i : 0
+    what = kind == "stable" ? "a stable release" : "a pre-release (checks, tag and push only)"
+    puts
+    say "#{BOLD}Roe #{requested}#{RESET} — #{what}, #{commits} changes since #{prev || "the start"}."
+    exit 0 unless yes?("Start it?")
+    @state = { "version" => requested, "kind" => kind, "prev" => prev,
+               "started" => Time.now.iso8601, "done" => {} }
+    save_state
+  end
+  run_all
+end
+
+def finish
+  puts
+  if stable?
+    site_changes = Open3.capture2("git", "status", "--porcelain", chdir: SITE).first.lines.size
+    if site_changes.positive?
+      dim("site/ has #{site_changes} uncommitted change(s) — the sync stamps Fingerprints and the")
+      dim("bump writes _versions.yml there. Commit them in site/ when you're ready.")
+      puts
+    end
+    puts "  #{GREEN}#{BOLD}Roe #{version} is out.#{RESET}"
+    say "https://github.com/#{GITHUB_REPO}/releases/tag/#{tag}"
+  else
+    puts "  #{GREEN}#{BOLD}#{tag} is tagged and pushed.#{RESET} Nightly-channel installs will be offered it."
+  end
+  puts
+  FileUtils.mkdir_p(release_dir)
+  state["finished"] = Time.now.iso8601
+  File.write(File.join(release_dir, "state.yml"), state.to_yaml)
+  FileUtils.rm_f(STATE_FILE)
+end
+
+def status
+  unless version
+    say "No release in progress."
+    return
+  end
+  puts
+  say "#{BOLD}Roe #{version}#{RESET} (#{stable? ? "stable" : "pre-release"}, since #{prev_stable})"
+  puts
+  marked_next = false
+  steps.each do |step|
+    value = done[step.key]
+    title = title_for(step)
+    if value
+      suffix = [ "skipped", "not needed", "carried on" ].include?(value.to_s) ? " #{DIM}(#{value})#{RESET}" : ""
+      ok("#{title}#{suffix}")
+    elsif !marked_next
+      puts "  #{ROE_ORANGE}→#{RESET} #{BOLD}#{title}#{RESET}  #{DIM}#{step.key}#{RESET}"
+      marked_next = true
+    else
+      puts "  #{DIM}·#{RESET} #{title}  #{DIM}#{step.key}#{RESET}"
+    end
+  end
+  puts
+  dim("Ticks are the last time each step finished; a run checks again before trusting them.")
+  puts
+end
+
+def redo_step(key)
+  unless version && steps.any? { |s| s.key == key }
+    abort "  Name a step to redo: #{steps.map(&:key).join(", ")}"
+  end
+  done.delete(key)
+  state["accepted"]&.delete(key)
+  save_state
+  ok("#{key} will run again next time")
+end
+
+def abandon
+  return say("No release in progress.") unless version
+  return unless yes?("Forget the #{version} release in progress? Nothing in git is undone.", default: false)
+
+  FileUtils.rm_f(STATE_FILE)
+  ok("Forgotten. #{release_dir.sub("#{CURRENT}/", "")} (notes, zips) is left in place.")
+end
+
+def suggested_version
+  latest = git_lines("tag", "-l", "v*").max_by do |t|
+    Gem::Version.new(t.delete_prefix("v").tr("-", "."))
+  rescue ArgumentError
+    Gem::Version.new("0")
+  end.to_s.delete_prefix("v")
+  latest.include?("-") ? latest.split("-").first : nil
+end
+
+def help
+  next_version = suggested_version || "0.4.0"
+  major, minor, = next_version.split(".")
+  next_nightly = "#{major}.#{minor.to_i + 1}.0-nightly.1"
+  # COPY
+  puts <<~HELP
+
+    #{BOLD}Publish a Roe release, one step at a time.#{RESET}
+    It runs every check, stops whenever something needs you, and picks up
+    where you left off when you run it again.
+
+    #{ROE_RED}#{BOLD}USAGE#{RESET}
+      #{orange("bin/release <version>")}    start (or carry on with) a release
+      #{orange("bin/release")}              carry on with the release in progress
+
+    #{ROE_RED}#{BOLD}COMMANDS#{RESET}
+      status                 every step, ticked or not
+      redo <step>            run a step you finished again (status shows the names)
+      abandon                forget the release in progress (git is left alone)
+      help                   this screen
+
+    #{ROE_RED}#{BOLD}EXAMPLES#{RESET}
+      #{orange("bin/release #{next_version}")}              a stable release
+      #{orange("bin/release #{next_nightly}")}    a nightly: checks, tag, push — no bump or GitHub release
+
+    #{ROE_RED}#{BOLD}NOTES#{RESET}
+      Quitting (q, or Ctrl-C) is always safe.
+      Fix docs and themes in site/; every check-again syncs them over first.
+      Notes, the migration check and the zips live in current/tmp/release/<tag>/.
+  HELP
+end
+
+# ── Main ────────────────────────────────────────────────────────────────────
+
+trap("INT") { quit! }
+
+case ARGV[0]
+when nil
+  version && !state["finished"] ? run_all : help
+when "help", "-h", "--help" then help
+when "status"  then status
+when "redo"    then redo_step(ARGV[1].to_s)
+when "abandon" then abandon
+else start(ARGV[0])
+end

@@ -1,6 +1,8 @@
 class Admin::PagesController < Admin::BaseController
   include BulkContentActions
   include CreatesContent
+  include RenameRedirect
+  include EditorSave
 
   def bulk_model = Page
   def bulk_index_path = admin_pages_path
@@ -106,7 +108,9 @@ class Admin::PagesController < Admin::BaseController
     normalize_and_write(file_path, content)
     ContentSync.sync_file(file_path)
 
-    page = Page.find_by(file_path: file_path.to_s)
+    # Match the normalized (realpath) path the model stores — see the note in
+    # PostsController#create and RoeSitePaths.normalize (production symlink).
+    page = Page.find_by(file_path: RoeSitePaths.normalize(file_path))
 
     if page
       redirect_to edit_admin_page_path(page)
@@ -141,6 +145,10 @@ class Admin::PagesController < Admin::BaseController
         raise "Metadata must be key-value pairs"
       end
 
+      # As the editor sent it, before Roe tidies it — so a background save
+      # can tell whether the file now says something the panel doesn't.
+      submitted = metadata.deep_dup
+
       # Handle tags (defensive — pages don't surface tags in the editor
       # by default, but a user could add the field via the Add Field menu
       # or in RAW YAML).
@@ -163,12 +171,14 @@ class Admin::PagesController < Admin::BaseController
       flash[:warning] = "YAML warning: #{e.message}. File saved anyway."
       full_content = "---\n#{metadata_yaml}\n---\n#{params[:content]}"
       normalize_and_write(@page.file_path, full_content)
-      redirect_to edit_admin_page_path(@page)
+      finish_editor_save_with_warning(edit_admin_page_path(@page))
       return
     end
 
     # Capture pre-save state to detect a publishing transition for flash text.
     was_published = @page.published?
+    status_before = @page.status
+    old_address = rename_redirect_source(@page)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@page.file_path, full_content)
@@ -176,9 +186,12 @@ class Admin::PagesController < Admin::BaseController
     ContentSync.sync_file(@page.file_path)
     @page.reload
 
-    flash[:notice] = (!was_published && @page.published?) ? "Page published" : "Page saved"
+    # A plain save says nothing — the editor's dot shows "changes saved".
+    flash[:notice] = "Page published" if !was_published && @page.published?
+    add_rename_redirect(Page, old_address, metadata, @page.file_path)
 
-    redirect_to edit_admin_page_path(@page)
+    finish_editor_save(record: @page, resource_type: "page", edit_path: edit_admin_page_path(@page),
+                       file_path: @page.file_path, submitted: submitted, status_before: status_before)
   end
 
   # Copy a page's file into a numbered sibling — "-N" on the filename, " N" on
@@ -202,7 +215,7 @@ class Admin::PagesController < Admin::BaseController
     normalize_and_write(new_path, "---\n#{yaml_content}\n---\n#{parsed.content}")
     ContentSync.sync_file(new_path)
 
-    new_page = Page.find_by(file_path: new_path.to_s)
+    new_page = Page.find_by(file_path: RoeSitePaths.normalize(new_path))
     if new_page
       redirect_to edit_admin_page_path(new_page), notice: "Page duplicated"
     else

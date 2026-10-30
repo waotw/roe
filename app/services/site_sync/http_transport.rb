@@ -38,12 +38,15 @@ module SiteSync
     class << self
       # ─── Push (local → live) ──────────────────────────────────────
 
-      def push_local_to_live!(diff: nil, on_progress: nil)
+      # tidy: true pushes even with nothing in the diff, so the purge below
+      # still reaches live (SiteSyncTransferJob passes it when live holds
+      # video files this computer keeps).
+      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false)
         Rails.logger.info "[SiteSync::HttpTransport] push over HTTP → #{Exchange.peer_url}"
         diff ||= full_diff_for_push
         changed = changed_files(diff)
         deleted = Array(diff[:deleted])
-        return if changed.empty? && deleted.empty?
+        return if changed.empty? && deleted.empty? && !tidy
 
         # Roe's docs when the setting says local-only. Not part of the diff —
         # both sides exclude them from their manifests, so neither can see what
@@ -56,10 +59,44 @@ module SiteSync
         # Deliberately quiet — the docs ship with Roe, so this can't lose
         # anything, and the setting is the instruction.
         purge = Ledger.roe_docs_to_purge
+        # Video files the live-video setting keeps on this computer — the
+        # same reasoning: live can't be asked what it still has (they're out
+        # of scope on this side), every one is a file here, and the setting
+        # is the instruction. Never part of the diff, so never backed up from
+        # live first or listed as a deletion to confirm.
+        video_purge = LiveVideo.to_purge
+        purge += video_purge
         deleted += purge
 
         total = changed.size
-        on_progress&.call(completed: 0, total: total)
+        # Bytes as well as files: one 1 GB video is one "file", so a file
+        # count alone sits at 0 of 5 for ten minutes and looks stuck.
+        sizes = changed.to_h { |rel| [ rel, File.size?(File.join(RoeSitePaths::SITE_PATH, rel)).to_i ] }
+        bytes_total = sizes.values.sum
+        bytes_done  = 0
+        done = 0
+        report = ->(bytes_now = bytes_done, current: nil) {
+          on_progress&.call(completed: done, total: total, bytes_done: bytes_now, bytes_total: bytes_total, current: current)
+        }
+        report.call
+
+        # Files too big for a batch go up on their own, in pieces
+        # (Exchange.upload_large_file) — one request that size dies at the
+        # live site's proxy or times out. They go first, before any batch:
+        # the last batch carries the deletions, and those must wait until
+        # every new file has landed. A large-only push still ends with the
+        # (possibly empty) last batch, which is what carries deletions.
+        large, small = changed.partition { |rel| sizes[rel] > PUSH_BATCH_MAX_BYTES }
+        large.each do |rel|
+          begin
+            Exchange.upload_large_file(rel, on_bytes: ->(sent) { report.call(bytes_done + sent, current: rel) })
+          rescue Exchange::ChunkedUploadError => e
+            raise HttpTransportError, e.message
+          end
+          done += 1
+          bytes_done += sizes[rel]
+          report.call
+        end
 
         # Chunk into bounded batches. Deletions ride the LAST batch so the peer
         # only removes files after every new file has landed — a mid-push
@@ -67,10 +104,9 @@ module SiteSync
         # independently (transient network blips), peer writes are atomic, and
         # a fresh push recomputes its diff against the peer's current state — so
         # a re-run skips what already landed and converges without corruption.
-        batches = batch_paths(changed)
+        batches = batch_paths(small)
         batches << [] if batches.empty? # deletions-only push still needs a call
         last = batches.length - 1
-        done = 0
 
         batches.each_with_index do |paths, i|
           # Per-file size+mtime so the peer can restore mtimes after unpack.
@@ -80,18 +116,22 @@ module SiteSync
 
           Exchange.with_retries(label: "upload batch #{i + 1}/#{batches.length}") do
             result = Exchange.upload_files(archive_bytes: archive, manifest: manifest, deleted: del)
-            raise HttpTransportError, "upload to peer failed" if result.nil?
+            # The peer's actual answer (status and body) is in the log —
+            # Exchange.upload_files writes it there.
+            raise HttpTransportError, "upload to peer failed (see the log for the live site's answer)" if result.nil?
 
             # The peer reports what it actually removed, which is how a purge
             # stays silent when there was nothing left to remove.
             if i == last && purge.any? && (removed = result["deleted"].to_i) > 0
-              Rails.logger.info "[SiteSync::HttpTransport] removed #{removed} Roe documentation " \
-                                "file(s) from live (docs.roe: local)"
+              Rails.logger.info "[SiteSync::HttpTransport] live removed #{removed} file(s), counting any kept " \
+                                "on this computer (#{purge.size} asked: Roe's docs set to local, and video " \
+                                "files held back by sync_live_video: #{LiveVideo.choice})"
             end
           end
 
           done += paths.size
-          on_progress&.call(completed: done, total: total)
+          bytes_done += paths.sum { |rel| sizes[rel].to_i }
+          report.call
         end
 
         # Match the rsync flow's post-push bookkeeping: rewrite the peer's
@@ -112,27 +152,15 @@ module SiteSync
         return if changed.empty? && deleted.empty?
 
         if changed.any?
-          on_progress&.call(completed: 0, total: changed.size)
-
           # Fetch peer mtimes up front so we can stamp them after unpack, and
           # size the download batches (the local copy may not exist yet).
           states = Exchange.fetch_peer_file_states(changed)
 
-          done = 0
-          batches = batch_by_size(changed) { |rel| states.dig(rel, "size") }
-          batches.each_with_index do |batch, i|
-            bytes = nil
-            Exchange.with_retries(label: "download batch #{i + 1}/#{batches.size}") do
-              bytes = Exchange.download_files(batch)
-              raise HttpTransportError, "download from peer failed" if bytes.nil?
-            end
-
-            written = TarArchive.unpack(bytes, dest: RoeSitePaths::SITE_PATH)
-            SiteWriter.restore_mtimes(root: RoeSitePaths::SITE_PATH, manifest: states.slice(*written))
-
-            done += written.size
-            on_progress&.call(completed: done, total: changed.size)
-          end
+          # Large files come in pieces and land via .sync-uploads/, on the
+          # same disk as /site and excluded from the Ledger and backups.
+          fetch_from_peer(changed, dest_root: RoeSitePaths::SITE_PATH, meta: states,
+                          staging_dir: File.join(RoeSitePaths::SITE_PATH, ".sync-uploads"),
+                          label: "download", on_progress: on_progress)
         end
 
         SiteWriter.delete_paths(root: RoeSitePaths::SITE_PATH, paths: deleted) if deleted.any?
@@ -159,14 +187,18 @@ module SiteSync
         raise HttpTransportError, "cannot back up live: peer manifest unavailable" unless peer
 
         peer_files = peer["files"] || {}
-        wanted =
+        requested =
           if files
-            requested = Array(files).uniq
-            return nil if requested.empty?
-            requested & peer_files.keys # selective: only files that exist live
+            list = Array(files).uniq
+            return nil if list.empty?
+            list & peer_files.keys # selective: only files that exist live
           else
             peer_files.keys # full snapshot
           end
+
+        # Video web versions are made again from the original — see
+        # BackupPolicy. Everything else is backed up, large files included.
+        wanted = requested.reject { |rel| BackupPolicy.video_web_version?(rel) }
         return nil if wanted.empty?
 
         backup_dir, backup_root, timestamp = new_backup_dir
@@ -174,41 +206,82 @@ module SiteSync
         FileUtils.mkdir_p(backup_dir)
 
         to_download = []
-        linked = 0
         wanted.each do |rel|
           if previous && hardlink_reusable?(previous, rel, peer_files[rel])
             link_into(previous, backup_dir, rel)
-            linked += 1
           else
             to_download << rel
           end
         end
 
-        if to_download.any?
-          downloaded = 0
-          batches = batch_by_size(to_download) { |rel| peer_files.dig(rel, "size") }
-          batches.each_with_index do |batch, i|
-            bytes = nil
-            Exchange.with_retries(label: "backup download batch #{i + 1}/#{batches.size}") do
-              bytes = Exchange.download_files(batch)
-              raise HttpTransportError, "backup download from peer failed" if bytes.nil?
-            end
-
-            written = TarArchive.unpack(bytes, dest: backup_dir)
-            SiteWriter.restore_mtimes(root: backup_dir, manifest: peer_files.slice(*written))
-
-            downloaded += written.size
-            on_progress&.call(completed: linked + downloaded, total: wanted.size)
-          end
-        else
-          on_progress&.call(completed: linked, total: wanted.size)
-        end
+        # Linked files count as done from the start; only downloads move the
+        # bar. Large files come in pieces, staged beside the snapshots (same
+        # disk, so the finished file is moved into place, not copied).
+        fetch_from_peer(to_download, dest_root: backup_dir, meta: peer_files,
+                        staging_dir: File.join(backup_root, ".downloads"),
+                        label: "backup download", on_progress: on_progress,
+                        already_done: wanted.size - to_download.size)
 
         update_latest_symlink(backup_root, timestamp)
         backup_dir
       end
 
       private
+
+      # Download `paths` from the peer into `dest_root`, stamping each with
+      # the peer's modified time from `meta` ({ rel => { "size", "mtime" } }).
+      # Files over the batch limit come one at a time in pieces
+      # (Exchange.download_large_file) — the peer builds a batch in memory,
+      # and one large video was enough to take it down. The rest come in
+      # bounded batches as before. Progress counts files and bytes, piece by
+      # piece for a large file, so a long download is visibly moving.
+      def fetch_from_peer(paths, dest_root:, meta:, staging_dir:, label:, on_progress: nil, already_done: 0)
+        total       = paths.size + already_done
+        sizes       = paths.to_h { |rel| [ rel, meta.dig(rel, "size").to_i ] }
+        bytes_total = sizes.values.sum
+        bytes_done  = 0
+        done        = already_done
+        report = ->(bytes_now = bytes_done, current: nil) {
+          on_progress&.call(completed: done, total: total, bytes_done: bytes_now, bytes_total: bytes_total, current: current)
+        }
+        report.call
+        return if paths.empty?
+
+        large, small = paths.partition { |rel| sizes[rel] > PUSH_BATCH_MAX_BYTES }
+
+        large.each do |rel|
+          # Same guard TarArchive.unpack applies to every batch entry: stay
+          # inside dest_root, and never write an excluded path.
+          safe = TarArchive.safe_relative_path(rel, File.expand_path(dest_root))
+          raise HttpTransportError, "refusing to write #{rel}" if Ledger.excluded?(safe)
+
+          begin
+            Exchange.download_large_file(safe, dest: File.join(dest_root, safe), staging_dir: staging_dir,
+                                         on_bytes: ->(got) { report.call(bytes_done + got, current: safe) })
+          rescue Exchange::ChunkedUploadError => e
+            raise HttpTransportError, e.message
+          end
+          done += 1
+          bytes_done += sizes[rel]
+          report.call
+        end
+
+        batches = batch_by_size(small) { |rel| sizes[rel] }
+        batches.each_with_index do |batch, i|
+          bytes = nil
+          Exchange.with_retries(label: "#{label} batch #{i + 1}/#{batches.size}") do
+            bytes = Exchange.download_files(batch)
+            raise HttpTransportError, "#{label} from peer failed" if bytes.nil?
+          end
+
+          written = TarArchive.unpack(bytes, dest: dest_root)
+          SiteWriter.restore_mtimes(root: dest_root, manifest: meta.slice(*written))
+
+          done += written.size
+          bytes_done += batch.sum { |rel| sizes[rel] }
+          report.call
+        end
+      end
 
       # added + modified, de-duped and sorted — the set of files whose
       # bytes actually move (deletes are handled separately).

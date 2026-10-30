@@ -10,9 +10,7 @@ audience: everyone
 
 Sign in to access your account.
 
-**Free members:** You don't need a password - just enter your email.
-
-**Paid members:** Enter your email and password.
+**Members:** You don't need a password - just enter your email.
 
 ```form
 for: signin

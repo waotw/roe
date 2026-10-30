@@ -34,7 +34,7 @@ class Admin::BaseController < ApplicationController
       ConfigGenerator.new.generate_newsletters_config
     end
 
-    if SiteFeature.store_enabled? && !SiteFeature.snipcart_integration_file?
+    if SiteFeature.snipcart_enabled? && !SiteFeature.snipcart_integration_file?
       ConfigGenerator.new.generate_snipcart_config
     end
   end

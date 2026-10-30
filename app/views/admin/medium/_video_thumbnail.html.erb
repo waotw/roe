@@ -1,0 +1,35 @@
+<%# A video's thumbnail, shared by the Media Browser card and the editor's
+    media picker: the poster frame once it's made (else 🎬), and — while
+    its web versions are being made — an "optimizing N%" label and a thin
+    progress bar along the bottom.
+
+    The wrapper carries data-video-progress-id and data-video-progress-name,
+    and while optimizing it's a button to reopen the progress window (the
+    Media Browser's click handler looks for that). The picker leaves it a
+    plain thumbnail: clicking there selects the video.
+
+    Locals: media, height ("h-32" / "h-24"), status (optional — a
+    VideoVariantGenerator.status_for hash, to avoid reading it twice). %>
+<% video = local_assigns[:status] || VideoVariantGenerator.status_for(media) %>
+<% optimizing = video[:state] == "optimizing" %>
+<div class="relative w-full <%= height %> bg-gray-900 flex items-center justify-center overflow-hidden"
+     data-video-state="<%= video[:state] %>"
+     data-video-progress-id="<%= media.id %>"
+     data-video-progress-name="<%= File.basename(media.file_path) %>"
+     <% if optimizing %>title="Optimizing — click to see progress"<% end %>>
+  <% if video[:poster].present? %>
+    <%= image_tag video[:poster], alt: File.basename(media.file_path), class: "w-full #{height} object-cover", loading: "lazy" %>
+    <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <span class="text-white/90 text-2xl drop-shadow">▶</span>
+    </span>
+  <% else %>
+    <span class="text-4xl">🎬</span>
+  <% end %>
+  <%# COPY: small status label on a video thumbnail %>
+  <% if optimizing %>
+    <span class="absolute top-1 right-1 font-mono text-[10px] uppercase px-1 bg-black/70 text-amber-300 rounded-xs">optimizing <%= video[:percent] %>%</span>
+    <span class="absolute bottom-0 left-0 h-1 bg-amber-400" style="width: <%= video[:percent] %>%"></span>
+  <% elsif video[:state] == "failed" %>
+    <span class="absolute top-1 right-1 font-mono text-[10px] uppercase px-1 bg-red-700 text-white rounded-xs" title="<%= video[:error] %>">not optimized</span>
+  <% end %>
+</div>
