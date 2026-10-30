@@ -172,7 +172,7 @@ class ConfigGenerator
     "members.yml" => "features/members",
     "store.yml"   => "features/store",
     "podcast.yml" => "features/podcast",
-    "music.yml"   => "features/music",
+    "music.yml"   => "features/music"
   }.freeze
 
   def ensure_enabled_feature_files

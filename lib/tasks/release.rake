@@ -196,7 +196,10 @@ namespace :release do
       # Replace `Bundled with: Roe vX.Y.Z` preserving the leading
       # whitespace + comment indentation that's standard in theme
       # headers. Case-insensitive on "Roe" defensively.
-      new_content = content.sub(/^(\s*Bundled with:\s*Roe\s+v)[\d.]+/i) do
+      # \d+(\.\d+)* rather than [\d.]+, which also ate a sentence's full
+      # stop ("Roe v0.4.0." → "Roe v0.4.0"), so every bump and the next
+      # sync-from-site fought over it.
+      new_content = content.sub(/^(\s*Bundled with:\s*Roe\s+v)\d+(?:\.\d+)*/i) do
         "#{Regexp.last_match(1)}#{version}"
       end
 

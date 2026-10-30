@@ -336,7 +336,7 @@ export default class extends Controller {
       : "";
 
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? "" : "pt-1.5"}">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}:
       </label>
       <div class="flex-1 min-w-0 max-w-[500px]">
@@ -1034,7 +1034,7 @@ export default class extends Controller {
 
     // Now use all the variables
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? "" : "pt-1.5"}">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
         ${config.label}${asterisk}:
       </label>
       <div class="flex-1 min-w-0 max-w-[500px]">

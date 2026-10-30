@@ -136,17 +136,17 @@ module SiteSync
       nil
     end
 
-# The whitelist of fields accepted from the sender. Stripped, and why:
-#   - id / import_id   PKs and FKs don't survive crossing databases
-#   - access_token     unique-indexed; this side mints its own on create
-#   - media_token      same
-#   - password_digest, email_confirmation_token
-#                      auth state that doesn't belong to an imported member
-#   - stripe_customer_id / stripe_payment_intent_id
-#                      point at the sender's test Stripe customers
-#
-# Lived on the controller until this class took over applying them; one
-# copy, so the shape accepted and the shape written can't drift apart.
+    # The whitelist of fields accepted from the sender. Stripped, and why:
+    #   - id / import_id   PKs and FKs don't survive crossing databases
+    #   - access_token     unique-indexed; this side mints its own on create
+    #   - media_token      same
+    #   - password_digest, email_confirmation_token
+    #                      auth state that doesn't belong to an imported member
+    #   - stripe_customer_id / stripe_payment_intent_id
+    #                      point at the sender's test Stripe customers
+    #
+    # Lived on the controller until this class took over applying them; one
+    # copy, so the shape accepted and the shape written can't drift apart.
     def member_attrs(attrs)
       {
         email:                       attrs["email"].to_s.strip,

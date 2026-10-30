@@ -20,7 +20,7 @@ class CreateSnipcartOrders < ActiveRecord::Migration[8.1]
       t.string  :refunded_currency
       t.datetime :refunded_at
       t.datetime :placed_at
-      t.json    :payload, default: {}, null: false
+      t.json :payload, default: {}, null: false
       t.timestamps
     end
 

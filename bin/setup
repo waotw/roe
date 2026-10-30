@@ -517,7 +517,9 @@ FileUtils.chdir APP_ROOT do
   # When roe.sh setup called us it verifies the boot, offers to register
   # the site, and starts it — so hand control back rather than starting
   # here, or those steps would only run after the user stopped the server.
-  exit 0 if ENV["ROE_SH_SETUP"]
+  # --skip-server is Rails' flag for the same thing; bin/ci passes it, and
+  # without it the CI run would start a server and never finish.
+  exit 0 if ENV["ROE_SH_SETUP"] || ARGV.include?("--skip-server")
 
   puts
   puts TTY::Box.frame(
