@@ -26,6 +26,8 @@ export default class extends Controller {
     "fieldsContainer",
     "addFieldMenu",
     "finalInput",
+    "removeButtonTemplate",
+    "removeSpacerTemplate",
   ];
 
   coreFieldNames = [
@@ -322,13 +324,7 @@ export default class extends Controller {
     const inputHtml = this.buildInputHtml(fieldName, config, defaultValue);
 
     // Conditionally add delete button (not for required fields)
-    const deleteButton = config.required
-      ? '<div class="w-6 flex-shrink-0"></div>'
-      : `<button type="button"
-                 data-action="click->metadata-editor#removeMetadataField"
-                 class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-          ×
-        </button>`;
+    const deleteButton = this.removeButtonHtml(config.required);
 
     // Field and note share one column, mirroring the ERB partial — the note
     // then lines up with the field without anything having to reproduce the
@@ -340,7 +336,7 @@ export default class extends Controller {
       : "";
 
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? "" : "pt-1.5"}">
         ${config.label}:
       </label>
       <div class="flex-1 min-w-0 max-w-[500px]">
@@ -437,11 +433,7 @@ export default class extends Controller {
              placeholder="value"
              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
              data-custom-value>
-      <button type="button"
-              data-action="click->metadata-editor#removeMetadataField"
-              class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-        ×
-      </button>
+      ${this.removeButtonHtml()}
     `;
 
     container.appendChild(row);
@@ -551,6 +543,17 @@ export default class extends Controller {
   }
 
   // ========== HELPER METHODS ==========
+
+  // The × that removes a field, or (required) an invisible copy holding its
+  // place. Written once, in shared/_metadata_remove_button, and cloned from
+  // the <template>s _metadata_editor renders — so rows built here look like
+  // rows drawn on page load.
+  removeButtonHtml(required = false) {
+    const template = required
+      ? this.hasRemoveSpacerTemplateTarget && this.removeSpacerTemplateTarget
+      : this.hasRemoveButtonTemplateTarget && this.removeButtonTemplateTarget;
+    return template ? template.innerHTML.trim() : "";
+  }
 
   isFieldRequired(fieldName) {
     // Check base config first
@@ -1027,17 +1030,11 @@ export default class extends Controller {
       : "";
 
     // Define delete button (must be BEFORE row.innerHTML)
-    const deleteButton = isRequired
-      ? '<div class="w-6 flex-shrink-0"></div>'
-      : `<button type="button"
-                 data-action="click->metadata-editor#removeMetadataField"
-                 class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-          ×
-        </button>`;
+    const deleteButton = this.removeButtonHtml(isRequired);
 
     // Now use all the variables
     row.innerHTML = `
-      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? '' : 'pt-1.5'}">
+      <label class="font-mono text-xs px-2 py-1 text-gray-700 metadata-label shrink-0 ${isCheckbox ? "" : "pt-1.5"}">
         ${config.label}${asterisk}:
       </label>
       <div class="flex-1 min-w-0 max-w-[500px]">
@@ -1081,11 +1078,7 @@ export default class extends Controller {
              placeholder="value"
              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
              data-custom-value>
-      <button type="button"
-              data-action="click->metadata-editor#removeMetadataField"
-              class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 flex-shrink-0">
-        ×
-      </button>
+      ${this.removeButtonHtml()}
     `;
 
     container.appendChild(row);
@@ -1640,7 +1633,7 @@ export default class extends Controller {
                data-metadata-field="duration"
                placeholder="${config.hint || ""}"
                readonly>
-        <div class="w-6 flex-shrink-0"></div>
+        ${this.removeButtonHtml(true)}
       `;
 
     // Insert in correct position

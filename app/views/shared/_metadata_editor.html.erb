@@ -406,7 +406,7 @@
                   if datetime_value.include?('T')
                     datetime_value = datetime_value[0..15]
                   end
-                %>
+              %>
               <input type="datetime-local"
                       id="metadata-field-<%= field_name %>"
                       name="metadata_fields[<%= field_name %>]"
@@ -458,15 +458,7 @@
                 <p class="text-xs text-gray-500 mt-1 mb-0.5"><%= config[:note] %></p>
               <% end %>
             </div>
-              <% if !config[:required] %>
-                <button type="button"
-                      data-action="click->metadata-editor#removeMetadataField"
-                  class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0 cursor-pointer">
-                  ×
-                </button>
-              <% else %>
-                <div class="w-6 shrink-0"></div>
-              <% end %>
+              <%= render "shared/metadata_remove_button", placeholder: config[:required] %>
             </div>
           <% end %>
           <%# Then render custom fields (not in known_fields_config) %>
@@ -475,7 +467,7 @@
               <input type="text"
                   value="<%= field_name %>"
                   placeholder="field_name"
-                  class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
+                  class="font-mono text-xs px-2 py-2 border border-gray-300 metadata-label"
                   data-custom-key>
               <input type="text"
                   id="metadata-field-<%= field_name.parameterize %>"
@@ -483,11 +475,7 @@
                   value="<%= ERB::Util.html_escape(value.to_s) %>"
                   class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
                   data-metadata-field="<%= field_name %>">
-              <button type="button"
-                    data-action="click->metadata-editor#removeMetadataField"
-                class="mt-px px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 shrink-0 cursor-pointer">
-                ×
-              </button>
+              <%= render "shared/metadata_remove_button" %>
             </div>
           <% end %>
       </div>
@@ -500,6 +488,10 @@
               class="w-full font-mono text-sm p-2 border border-gray-300 bg-gray-50 "
               rows="12"><%= metadata %></textarea>
     </div>
+    <%# The × for rows built in JavaScript — cloned from here so there's one
+        copy of it (shared/_metadata_remove_button). %>
+    <template data-metadata-editor-target="removeButtonTemplate"><%= render "shared/metadata_remove_button" %></template>
+    <template data-metadata-editor-target="removeSpacerTemplate"><%= render "shared/metadata_remove_button", placeholder: true %></template>
     <!-- Hidden field to store final metadata YAML -->
     <input type="hidden"
          name="metadata"

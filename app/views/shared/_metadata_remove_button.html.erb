@@ -1,0 +1,21 @@
+<%#
+  The × that removes a metadata field — the one copy. Edit its look here.
+
+  Used by the rows _metadata_editor draws, and by the rows the metadata editor
+  builds in JavaScript (+ Add Field, custom fields, a post type adding its
+  fields), which clone it from the <template>s at the bottom of
+  _metadata_editor. So a change here reaches every row.
+
+  -ml-1: the row spaces label, field and × with gap-2; this pulls the × to
+  4px from its field without squeezing the label.
+
+  placeholder: true draws an invisible copy for a required field, which can't
+  be removed. Being a copy, it's always exactly the button's width, so
+  required and optional rows line up.
+%>
+<% classes = "-ml-1 mt-px px-1 py-0.5 text-xs leading-none bg-red-100 border border-red-200 rounded-xs hover:bg-red-200 text-red-700 shrink-0 cursor-pointer" %>
+<% if local_assigns[:placeholder] %>
+  <span class="<%= classes %> invisible" aria-hidden="true">×</span>
+<% else %>
+  <button type="button" data-action="click->metadata-editor#removeMetadataField" class="<%= classes %>">×</button>
+<% end %>
