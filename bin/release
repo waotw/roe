@@ -126,6 +126,15 @@ def git_lines(*args)
   git(*args).to_s.lines.map(&:chomp).reject(&:empty?)
 end
 
+# A program run with no arguments, as [path, name] so Ruby never hands it
+# to the shell. A lone string goes through /bin/sh whenever it holds a
+# space or "&" — and "/Volumes/S&M 2019/…" has both, so sh ran
+# "/Volumes/S" in the background and a command called "M".
+def program(relative)
+  path = File.join(CURRENT, relative)
+  [ path, path ]
+end
+
 def stream(*command, chdir: CURRENT, **options)
   system(*command, chdir: chdir, **options)
 end
@@ -496,7 +505,7 @@ def step_docs_pass
 end
 
 def step_sync
-  out, synced = capture(File.join(CURRENT, "bin/sync-from-site"))
+  out, synced = capture(program("bin/sync-from-site"))
   remember_sync_pending
   unless synced
     bad("bin/sync-from-site stopped:")
@@ -666,7 +675,7 @@ def step_ci
   # No keyboard (stdin closed at once): anything in CI that asks a question
   # fails instead of waiting. Output is shown live and kept for the hints.
   output = +""
-  passed = Open3.popen2e(File.join(CURRENT, "bin/ci"), chdir: CURRENT) do |stdin, out, wait|
+  passed = Open3.popen2e(program("bin/ci"), chdir: CURRENT) do |stdin, out, wait|
     stdin.close
     out.each_line { |line| print line; output << line }
     wait.value.success?
