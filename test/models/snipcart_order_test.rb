@@ -138,4 +138,27 @@ class SnipcartOrderTest < ActiveSupport::TestCase
     assert_equal "Buyer Person", order.name           # kept in its own column
     assert_not order.reload.payload.key?("billingAddress") # but not in the payload
   end
+
+  # The admin links to these urls, and they come from Snipcart's payload — so a
+  # url that would do anything but open a page is dropped.
+  test "an item url is kept only when it's a web address or a path on this site" do
+    urls = {
+      "https://shop.example.com/store/zine" => "https://shop.example.com/store/zine",
+      "http://shop.example.com/store/zine"  => "http://shop.example.com/store/zine",
+      "/store/zine"                          => "/store/zine",
+      "  /store/zine "                       => "/store/zine",
+      "javascript:alert(1)"                  => nil,
+      "JavaScript:alert(1)"                  => nil,
+      " javascript:alert(1)"                 => nil,
+      "data:text/html,<script>x</script>"    => nil,
+      "//evil.example.com"                   => nil,
+      "/\\evil.example.com"                  => nil,
+      "store/zine"                           => nil,
+      ""                                     => nil
+    }
+    order = SnipcartOrder.record_completed!(completed_payload("token" => "urls",
+      "items" => urls.keys.map { |u| { "name" => "Item", "id" => "SKU", "url" => u } }))
+
+    assert_equal urls.values, order.items.map(&:url)
+  end
 end

@@ -57,6 +57,24 @@ class Admin::OrdersControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-test=order-product] a[href=?]", "https://shop.example.com/store/zine"
   end
 
+  test "a javascript: item url is shown as text, never as a link" do
+    completed("t1", "a@b.com", items: [
+      { "name" => "Zine", "id" => "ZINE-01", "url" => "javascript:alert(document.cookie)" }
+    ])
+    order = SnipcartOrder.last
+
+    get admin_orders_path
+    assert_response :success
+    assert_select "[data-test=order-product]", text: /ZINE-01/
+    assert_select "[data-test=order-product] a", count: 0
+    assert_select "a[href^='javascript']", count: 0
+
+    get admin_order_path(order)
+    assert_response :success
+    assert_select "[data-test=order-detail]", text: /Zine/
+    assert_select "a[href^='javascript']", count: 0
+  end
+
   test "only the current mode's orders are shown" do
     completed("t1", "a@b.com", mode: "test")
     completed("t2", "c@d.com", mode: "live")

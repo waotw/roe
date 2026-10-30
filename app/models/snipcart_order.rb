@@ -42,13 +42,21 @@ class SnipcartOrder < ApplicationRecord
   # Returns [] for an order with no captured items (e.g. a bare refund row).
   Item = Struct.new(:name, :sku, :url, :quantity, keyword_init: true)
 
+  # The admin links to an item's url, and it comes from Snipcart's payload,
+  # not from us — so only a web address or a path on this site is kept. A
+  # "javascript:" (or any other scheme) would run when clicked in the admin.
+  # "//host" and "/\host" are refused too: browsers read both as a link to
+  # another site.
+  LINKABLE_URL = %r{\A(?:https?://|/(?![/\\]))}i
+
   def items
     Array(payload["items"]).filter_map do |i|
       next unless i.is_a?(Hash)
+      url = i["url"].to_s.strip
       Item.new(
         name:     i["name"].presence,
         sku:      i["id"].presence,
-        url:      i["url"].presence,
+        url:      url.match?(LINKABLE_URL) ? url : nil,
         quantity: i["quantity"]
       )
     end
