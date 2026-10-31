@@ -160,7 +160,7 @@ if { : > /dev/tty; } 2>/dev/null; then
   case "$reply" in
     [Yy]*)
       cd "$dest" || die "Couldn't enter $dest"
-      exec ./roe.sh check < /dev/tty
+      ROE_FROM_INSTALLER=1 exec ./roe.sh check < /dev/tty
       ;;
   esac
 fi

@@ -1116,6 +1116,117 @@ print_requirements_summary() {
     echo ""
 }
 
+# ── Naming the site folder ────────────────────────────────────────────────────
+#
+# The folder name becomes the site's name: install_slug turns it into the
+# registry NAME, the `roe start <name>` name and the .roe address. A fresh
+# install arrives as roe-<version>, so ask once, before setup, what to call
+# it, and rename the folder here. Renaming later breaks the link between
+# the folder and its registry entry, so this is the one easy moment.
+#
+# Only asked when all of these hold:
+#   - a terminal to answer on (stdin and stdout)
+#   - the folder still has the release's own name (roe-0.4.0, roe-0.5.0-dev)
+#   - no site/ yet and not registered, so nothing points at this path
+#
+# Renaming the folder this script is running from is fine: the running
+# script keeps its open file, and every path below is updated to the new
+# name. Only the user's own Terminal still shows the old path, and the
+# install ends by asking them to open a new window anyway.
+default_folder_name() {
+    [[ "$(basename "$ROE_ROOT")" =~ ^roe-[0-9]+\.[0-9]+\.[0-9]+ ]]
+}
+
+offer_folder_name() {
+    [ -n "${ROE_FOLDER_ASKED:-}" ] && return 0
+    ROE_FOLDER_ASKED=1
+    [ -t 0 ] && [ -t 1 ] || return 0
+    default_folder_name || return 0
+    [ -e "$SITE_DIR" ] && return 0
+    registry_file_for_root >/dev/null && return 0
+
+    local old_root="$ROE_ROOT" parent current answer slug new_root taken
+    parent="$(dirname "$old_root")"
+    current="$(basename "$old_root")"
+
+    brand_box "Name Your Site (folder)"
+    echo ""
+    echo "This folder holds your site, and its name becomes your site's name:"
+    echo -e "the ${ROE_ORANGE}roe${NC} command and your site's local address both use it."
+    echo ""
+    echo -e "  ${DIM}The folder is called ${current} now. Rename it to something unique —${NC}"
+    echo -e "  ${DIM}Press enter to rename it or s to skip and keep the name as is.${NC}"
+    echo ""
+
+    # Renaming is the default (Enter); s, c or n keeps the name.
+    read -rp "Rename the folder? [R/s]: " answer
+    case "$answer" in
+        [SsCcNn]*)
+            echo ""
+            return 0
+            ;;
+    esac
+    echo ""
+
+    while true; do
+        read -rp "New folder name: " answer
+        # Trim spaces at either end; inner spaces are fine ("The Briefcase").
+        answer="$(printf '%s' "$answer" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+        if [ -z "$answer" ]; then
+            log_warning "Type a name, or s to keep '$current'."
+            continue
+        fi
+        if [ "$answer" = "s" ] || [ "$answer" = "S" ] || [ "$answer" = "$current" ]; then
+            echo ""
+            return 0
+        fi
+
+        slug="$(slugify "$answer")"
+        new_root="$parent/$answer"
+        if [[ "$answer" == */* || "$answer" == .* ]]; then
+            log_warning "Use a plain name — no / and not starting with a dot."
+        elif [ -z "$slug" ]; then
+            log_warning "The name needs at least one letter or digit."
+        elif [ -e "$new_root" ] && [ ! "$new_root" -ef "$old_root" ]; then
+            log_warning "There's already a folder called '$answer' next to this one."
+        elif [ -f "$ROE_REGISTRY_DIR/$slug.conf" ]; then
+            taken="$(_conf_get "$ROE_REGISTRY_DIR/$slug.conf" ROOT)"
+            log_warning "Another Roe site on this computer is already called '$slug':"
+            echo "    $taken"
+        elif ! mv "$old_root" "$new_root" 2>/dev/null; then
+            log_warning "Couldn't rename the folder. Keeping '$current'."
+            echo ""
+            return 0
+        else
+            break
+        fi
+    done
+
+    # Point everything at the new path. ROE_ROOT_REAL is set at load
+    # time further down; recompute it so process checks match the new name.
+    ROE_ROOT="$new_root"
+    SCRIPT_DIR="${new_root}${SCRIPT_DIR#"$old_root"}"
+    APP_DIR="${new_root}${APP_DIR#"$old_root"}"
+    SITE_DIR="$new_root/site"
+    ROE_ROOT_REAL="$(cd "$ROE_ROOT" 2>/dev/null && pwd -P || printf '%s' "$ROE_ROOT")"
+    case "$PWD/" in
+        "$old_root"/*) cd "${new_root}${PWD#"$old_root"}" 2>/dev/null || cd "$new_root" ;;
+    esac
+
+    echo ""
+    log_success "Renamed the folder to ${BOLD}${answer}${NC}"
+    echo -e "    Site name:  ${CYAN}${slug}${NC}"
+    echo -e "    Address:    ${CYAN}http://${slug}.${ROE_HOST_SUFFIX}${NC}"
+    echo -e "    Folder:     ${CYAN}${new_root}${NC}"
+    # Started from inside the folder (./roe.sh check), the user's own
+    # Terminal still shows the old name. From the one-line installer it
+    # was never inside, so there's nothing to say.
+    if [ -z "${ROE_FROM_INSTALLER:-}" ]; then
+        echo -e "    ${DIM}This window still shows the old folder name until you open a new one.${NC}"
+    fi
+    echo ""
+}
+
 # ── Check command ─────────────────────────────────────────────────────────────
 
 cmd_check() {
@@ -1131,6 +1242,7 @@ cmd_check() {
     banner
     echo ""
     [ -t 1 ] && sleep 0.5
+    offer_folder_name
     brand_box "Requirements Check"
     log_step "Checking your system for required dependencies."
     echo ""
@@ -1322,6 +1434,7 @@ cmd_check() {
 cmd_setup() {
     start_install_log setup
     use_brand_colors
+    offer_folder_name
     log_step "Checking Requirements"
 
     local all_good=true
