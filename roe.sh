@@ -1159,7 +1159,7 @@ offer_folder_name() {
     echo ""
 
     # Renaming is the default (Enter); s, c or n keeps the name.
-    read -rp "Rename the folder? [R/s]: " answer
+    read -rp "Rename the folder or skip? [R/s]: " answer
     case "$answer" in
         [SsCcNn]*)
             echo ""
