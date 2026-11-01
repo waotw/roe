@@ -53,6 +53,50 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_includes html, "cat log | grep error"
   end
 
+  # A fence with no language used to skip protection, so pipe escaping,
+  # strikethrough and highlights all ran inside it.
+  test "a bare fence is a code block shown exactly as written" do
+    html = render("Before.\n\n```\na | b ~~c~~ ==d==\n```\n\nAfter.\n")
+
+    assert_includes html, "<pre><code>a | b ~~c~~ ==d==</code></pre>"
+  end
+
+  test "strikethrough doesn't run inside inline code" do
+    html = render("Write `~~old~~` for ~~old~~.")
+
+    assert_includes html, "<code>~~old~~</code>"
+    assert_includes html, "<del>old</del>"
+  end
+
+  # Four backticks show an example of a fenced block, ``` lines and all.
+  test "a three-backtick fence inside a four-backtick block stays content" do
+    html = render("````\n```card\nurl: /x\n```\n````\n")
+
+    assert_includes html, "<pre><code class=\"language-text\">```card\nurl: /x\n```</code></pre>"
+  end
+
+  # A Roe block's closing ``` must not be read as the opening of a bare code
+  # block, which would swallow the text after it.
+  test "text after a Roe block isn't turned into code" do
+    html = render("```search\n```\n\nPlain ==text== here.\n\n```\nreal code\n```\n")
+
+    assert_includes html, "<mark>text</mark>"
+    assert_includes html, "<pre><code>real code</code></pre>"
+  end
+
+  test "a fence inside a list item drops the list's indent" do
+    html = render("1. Live at:\n    ```\n    https://example.com\n    ```\n2. Next.\n")
+
+    assert_includes html, "<pre><code>https://example.com</code></pre>"
+    assert_no_match %r{<br\s*/?>\s*<pre}, html
+  end
+
+  test "a fence with no closing line is left alone" do
+    html = render("```\nnever closed | here\n")
+
+    assert_not_includes html, "CODE_BLOCK_PLACEHOLDER"
+  end
+
   # Kramdown wraps the placeholder in a paragraph. <pre> can't live inside <p>,
   # so restoring only the token left `<p><pre>…</pre></p>`, which every later
   # Nokogiri pass rewrote to `<p></p><pre>…</pre>` — a stray empty paragraph

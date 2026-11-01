@@ -41,39 +41,10 @@ module HasMarkdownExtensions
       content
     end
 
-    # Step 1: Convert backtick fenced code blocks to HTML
+    # Step 1: Convert fenced code blocks to HTML, so nothing below (pipes,
+    # strikethrough, highlights, blocks) touches code. See protect_fenced_code.
     code_blocks = {}
-    counter = 0
-
-    # Handle 4+ backticks first (allow optional whitespace after language)
-    processed_content = source.gsub(/````+(\w*)\s*\r?\n(.*?)````+/m) do
-      lang = $1.empty? ? "text" : $1
-      code = $2
-      token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
-      code_blocks[token] = render_code_block(code, lang)
-      counter += 1
-      token
-    end
-
-    # Handle 3-backtick blocks (skip collection/card/gallery)
-    processed_content = processed_content.gsub(/```(\w+)\s*\r?\n(.*?)```/m) do
-      lang = $1
-      code = $2
-
-      # Skip special blocks
-      if [ "collection", "card", "gallery", "form", "button", "search" ].include?(lang)
-        next $~.to_s
-      end
-
-      token = "CODE_BLOCK_PLACEHOLDER_#{counter}_END"
-      code_blocks[token] = if lang == "poetry"
-        render_poetry_block(code)
-      else
-        render_code_block(code, lang)
-      end
-      counter += 1
-      token
-    end
+    processed_content = protect_fenced_code(source, code_blocks)
 
     # Protect || split markers from Kramdown's table parsing. Every
     # marker restores to the same value, so a single shared placeholder
@@ -121,6 +92,10 @@ module HasMarkdownExtensions
     # silently mangles any code block containing them.
     code_blocks.each do |token, html_code|
       html.gsub!(%r{<p>\s*#{Regexp.escape(token)}\s*</p>}) { html_code }
+      # With soft line breaks, a fence right under a list item's text (no
+      # blank line) leaves a <br> before the block. The block starts its own
+      # line anyway, so the break goes.
+      html.gsub!(%r{<br\s*/?>\s*#{Regexp.escape(token)}}) { "\n#{html_code}" }
       html.gsub!(token) { html_code }
     end
 
@@ -320,6 +295,72 @@ module HasMarkdownExtensions
 
   private
 
+  # Roe's own blocks, written as ```name fences. They're left in place for
+  # their processors further down, never shown as code. Shown as code with
+  # four backticks, which is how the docs show an example of one.
+  ROE_BLOCK_FENCES = %w[collection card gallery form button search].freeze
+
+  # Swap every fenced code block for a placeholder, rendered to HTML now and
+  # put back after kramdown. Code is shown exactly as written: without this,
+  # pipe escaping, ~~strikethrough~~ and ==highlights== ran inside it.
+  #
+  # Read line by line, the way CommonMark reads fences:
+  # - an opening line is three or more backticks (or tildes), optionally
+  #   indented (inside a list item) and followed by a language;
+  # - it closes on a line of at least as many of the same character and
+  #   nothing else, so a ``` example inside a ```` block stays content;
+  # - a fence with no closing line is left alone.
+  # A bare ``` fence is a code block too. Before, only fences with a language
+  # were protected, so a bare one was mangled by everything below.
+  #
+  # Three backticks with a Roe block name (```card) stay as they are; four or
+  # more are always code. Poetry keeps its own renderer.
+  def protect_fenced_code(source, code_blocks)
+    lines = source.to_s.split("\n", -1)
+    out = []
+    i = 0
+
+    while i < lines.length
+      opener = lines[i].chomp("\r").match(/\A([ \t]*)(`{3,}|~{3,})[ \t]*([^`\s]*)[^`]*\z/)
+      close_at = opener && (i + 1...lines.length).find do |j|
+        lines[j].chomp("\r").match?(/\A[ \t]*#{Regexp.escape(opener[2][0])}{#{opener[2].length},}[ \t]*\z/)
+      end
+
+      fence = opener && opener[2]
+      lang = opener && opener[3]
+      if close_at.nil?
+        out << lines[i]
+        i += 1
+        next
+      end
+
+      # A Roe block passes through whole, closing fence included, so that
+      # fence isn't read as the opening of a bare code block.
+      if fence == "```" && ROE_BLOCK_FENCES.include?(lang)
+        out.concat(lines[i..close_at])
+        i = close_at + 1
+        next
+      end
+
+      # Inside a list item the whole fence is indented; drop that indent from
+      # each line (up to the fence's own), as CommonMark does, so the code
+      # isn't shifted right by the list's indentation.
+      indent = opener[1].length
+      code = lines[(i + 1)...close_at].map { |l| l.chomp("\r").sub(/\A[ \t]{0,#{indent}}/, "") }.join("\n")
+      code += "\n" unless code.empty?
+      token = "CODE_BLOCK_PLACEHOLDER_#{code_blocks.size}_END"
+      code_blocks[token] = if lang == "poetry" && fence.length == 3
+        render_poetry_block(code)
+      else
+        render_code_block(code, lang.empty? && fence.length > 3 ? "text" : lang)
+      end
+      out << "#{opener[1]}#{token}"
+      i = close_at + 1
+    end
+
+    out.join("\n")
+  end
+
   def render_code_block(code, language)
     # Drop the newline before the closing fence — plus any indentation the
     # fence carries when the block sits inside a list — so it doesn't render
@@ -354,8 +395,12 @@ module HasMarkdownExtensions
   end
 
   def process_strikethrough(markdown)
-    # Convert ~~text~~ to <del>text</del> (which Kramdown preserves)
-    markdown.gsub(/~~([^~]+)~~/, '<del>\1</del>')
+    # Convert ~~text~~ to <del>text</del> (which Kramdown preserves). Inline
+    # code is skipped, as in process_highlights: `~~x~~` is code, shown as typed.
+    markdown.gsub(/(`+).*?\1|~~([^~]+)~~/) do
+      text = Regexp.last_match(2)
+      text ? "<del>#{text}</del>" : Regexp.last_match(0)
+    end
   end
 
   # ==text== → <mark>text</mark>, the same element the toolbar's highlight

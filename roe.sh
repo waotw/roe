@@ -1116,25 +1116,43 @@ print_requirements_summary() {
     echo ""
 }
 
-# ── Naming the site folder ────────────────────────────────────────────────────
+# ── Naming and placing the site folder ────────────────────────────────────────
 #
 # The folder name becomes the site's name: install_slug turns it into the
 # registry NAME, the `roe start <name>` name and the .roe address. A fresh
-# install arrives as roe-<version>, so ask once, before setup, what to call
-# it, and rename the folder here. Renaming later breaks the link between
-# the folder and its registry entry, so this is the one easy moment.
+# install arrives as roe-<version> in whatever folder the installer ran in
+# (the one-line command uses the home folder). So ask once, before setup,
+# what to call it and where it should live, and rename or move it here.
+# Doing either after registration breaks the link between the folder and
+# its registry entry, so this is the one easy moment.
 #
 # Only asked when all of these hold:
 #   - a terminal to answer on (stdin and stdout)
 #   - the folder still has the release's own name (roe-0.4.0, roe-0.5.0-dev)
 #   - no site/ yet and not registered, so nothing points at this path
+# The location question is skipped under WSL, where Roe has to stay in the
+# Linux home folder (see require_linux_filesystem).
 #
-# Renaming the folder this script is running from is fine: the running
-# script keeps its open file, and every path below is updated to the new
-# name. Only the user's own Terminal still shows the old path, and the
-# install ends by asking them to open a new window anyway.
+# Renaming or moving the folder this script is running from is fine: the
+# running script keeps its open file, and every path below is updated. Only
+# the user's own Terminal still shows the old path, and the install ends by
+# asking them to open a new window anyway.
 default_folder_name() {
     [[ "$(basename "$ROE_ROOT")" =~ ^roe-[0-9]+\.[0-9]+\.[0-9]+ ]]
+}
+
+# Point every path at the folder's new location. ROE_ROOT_REAL is set at
+# load time further down; recompute it so process checks match.
+_set_roe_root() {
+    local old_root="$ROE_ROOT" new_root="$1"
+    ROE_ROOT="$new_root"
+    SCRIPT_DIR="${new_root}${SCRIPT_DIR#"$old_root"}"
+    APP_DIR="${new_root}${APP_DIR#"$old_root"}"
+    SITE_DIR="$new_root/site"
+    ROE_ROOT_REAL="$(cd "$ROE_ROOT" 2>/dev/null && pwd -P || printf '%s' "$ROE_ROOT")"
+    case "$PWD/" in
+        "$old_root"/*) cd "${new_root}${PWD#"$old_root"}" 2>/dev/null || cd "$new_root" ;;
+    esac
 }
 
 offer_folder_name() {
@@ -1145,9 +1163,8 @@ offer_folder_name() {
     [ -e "$SITE_DIR" ] && return 0
     registry_file_for_root >/dev/null && return 0
 
-    local old_root="$ROE_ROOT" parent current answer slug new_root taken
-    parent="$(dirname "$old_root")"
-    current="$(basename "$old_root")"
+    local start_root="$ROE_ROOT" current
+    current="$(basename "$ROE_ROOT")"
 
     brand_box "Name Your Site (folder)"
     echo ""
@@ -1158,15 +1175,35 @@ offer_folder_name() {
     echo -e "  ${DIM}Press enter to rename it or s to skip and keep the name as is.${NC}"
     echo ""
 
-    # Renaming is the default (Enter); s, c or n keeps the name.
-    read -rp "Rename the folder or skip? [R/s]: " answer
-    case "$answer" in
-        [SsCcNn]*)
-            echo ""
-            return 0
-            ;;
-    esac
+    _ask_folder_name "$current"
+    is_wsl || _ask_folder_location
+
+    [ "$ROE_ROOT" = "$start_root" ] && return 0
+    local slug
+    slug="$(install_slug)"
+    log_success "Your site's folder is ready"
+    echo -e "    Site name:  ${CYAN}${slug}${NC}"
+    echo -e "    Address:    ${CYAN}http://${slug}.${ROE_HOST_SUFFIX}${NC}"
+    echo -e "    Folder:     ${CYAN}${ROE_ROOT}${NC}"
+    # Started from inside the folder (./roe.sh check), the user's own
+    # Terminal still shows the old path. From the one-line installer it
+    # was never inside, so there's nothing to say.
+    if [ -z "${ROE_FROM_INSTALLER:-}" ]; then
+        echo -e "    ${DIM}This window still shows the old folder until you open a new one.${NC}"
+    fi
     echo ""
+}
+
+# The rename half. Renaming is the default (Enter); s, c or n keeps the name.
+_ask_folder_name() {
+    local current="$1" answer slug new_root taken parent
+    parent="$(dirname "$ROE_ROOT")"
+
+    read -rp "Rename the folder or skip? [R/s]: " answer
+    echo ""
+    case "$answer" in
+        [SsCcNn]*) return 0 ;;
+    esac
 
     while true; do
         read -rp "New folder name: " answer
@@ -1187,44 +1224,238 @@ offer_folder_name() {
             log_warning "Use a plain name — no / and not starting with a dot."
         elif [ -z "$slug" ]; then
             log_warning "The name needs at least one letter or digit."
-        elif [ -e "$new_root" ] && [ ! "$new_root" -ef "$old_root" ]; then
+        elif [ -e "$new_root" ] && [ ! "$new_root" -ef "$ROE_ROOT" ]; then
             log_warning "There's already a folder called '$answer' next to this one."
         elif [ -f "$ROE_REGISTRY_DIR/$slug.conf" ]; then
             taken="$(_conf_get "$ROE_REGISTRY_DIR/$slug.conf" ROOT)"
             log_warning "Another Roe site on this computer is already called '$slug':"
             echo "    $taken"
-        elif ! mv "$old_root" "$new_root" 2>/dev/null; then
+        elif ! mv "$ROE_ROOT" "$new_root" 2>/dev/null; then
             log_warning "Couldn't rename the folder. Keeping '$current'."
             echo ""
             return 0
         else
-            break
+            _set_roe_root "$new_root"
+            log_success "Renamed the folder to ${BOLD}${answer}${NC}"
+            echo ""
+            return 0
         fi
     done
+}
 
-    # Point everything at the new path. ROE_ROOT_REAL is set at load
-    # time further down; recompute it so process checks match the new name.
-    ROE_ROOT="$new_root"
-    SCRIPT_DIR="${new_root}${SCRIPT_DIR#"$old_root"}"
-    APP_DIR="${new_root}${APP_DIR#"$old_root"}"
-    SITE_DIR="$new_root/site"
-    ROE_ROOT_REAL="$(cd "$ROE_ROOT" 2>/dev/null && pwd -P || printf '%s' "$ROE_ROOT")"
-    case "$PWD/" in
-        "$old_root"/*) cd "${new_root}${PWD#"$old_root"}" 2>/dev/null || cd "$new_root" ;;
-    esac
+# The location half. Enter keeps the folder where it is; c chooses another
+# folder to put it in: Finder's folder picker on a Mac, the desktop's own
+# picker on Linux (zenity or kdialog), and otherwise a typed or dragged path.
+# The wording always says "the folder to put <name> inside", since what's
+# being chosen is the new parent, not the site folder itself.
+_ask_folder_location() {
+    local name parent where answer picked status
+    name="$(basename "$ROE_ROOT")"
 
-    echo ""
-    log_success "Renamed the folder to ${BOLD}${answer}${NC}"
-    echo -e "    Site name:  ${CYAN}${slug}${NC}"
-    echo -e "    Address:    ${CYAN}http://${slug}.${ROE_HOST_SUFFIX}${NC}"
-    echo -e "    Folder:     ${CYAN}${new_root}${NC}"
-    # Started from inside the folder (./roe.sh check), the user's own
-    # Terminal still shows the old name. From the one-line installer it
-    # was never inside, so there's nothing to say.
-    if [ -z "${ROE_FROM_INSTALLER:-}" ]; then
-        echo -e "    ${DIM}This window still shows the old folder name until you open a new one.${NC}"
+    while true; do
+        parent="$(dirname "$ROE_ROOT")"
+        if [ "$parent" = "$HOME" ]; then
+            where="your home folder (${parent})"
+        else
+            where="${parent}"
+        fi
+        echo -e "${BOLD}${name}${NC} is in ${where}."
+        echo -e "  ${DIM}You can keep it there or choose another folder to put it in.${NC}"
+        echo ""
+        read -rp "Keep it here or choose another folder? [K/c]: " answer
+        echo ""
+        case "$answer" in
+            [Cc]*) ;;
+            *) return 0 ;;
+        esac
+
+        picked=""
+        _pick_folder_with_dialog "$name"
+        status=$?
+        case "$status" in
+            0) ;;                          # picked holds the folder
+            2) echo -e "  ${DIM}No folder chosen. ${name} stays where it is.${NC}"
+               echo ""
+               return 0 ;;
+            *) _pick_folder_by_typing "$name" || return 0 ;;
+        esac
+
+        _move_roe_folder_into "$picked" && return 0
+        # Refused (missing folder, clash, cloud folder declined): ask again.
+    done
+}
+
+# Opens the system's folder picker. Sets `picked` and returns 0 on a
+# choice, 2 when the user cancels, 1 when there's no picker to open (no
+# desktop session, over SSH, no zenity/kdialog), so the caller falls back
+# to typing.
+_pick_folder_with_dialog() {
+    local name="$1" prompt out rc
+    prompt="Choose the folder to put “${name}” inside"
+
+    if is_macos && command_exists osascript; then
+        echo -e "  Opening a Finder window. Choose the folder to put ${BOLD}${name}${NC} inside,"
+        echo -e "  then click ${BOLD}Choose${NC}."
+        echo ""
+        # The prompt goes in as an argument, so quotes in the name can't
+        # break the script. `activate` brings the window to the front.
+        out="$(osascript - "$prompt" 2>&1 <<'APPLESCRIPT'
+on run argv
+    activate
+    POSIX path of (choose folder with prompt (item 1 of argv) default location (path to home folder))
+end run
+APPLESCRIPT
+)"
+        rc=$?
+        if [ $rc -eq 0 ] && [ -n "$out" ]; then
+            picked="${out%/}"
+            return 0
+        fi
+        case "$out" in *"-128"*) return 2 ;; esac   # Cancel
+        echo -e "  ${DIM}The Finder window didn't open, so type the folder's path instead.${NC}"
+        echo ""
+        return 1
     fi
+
+    if is_linux && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+        if command_exists zenity; then
+            echo -e "  Opening a folder window. Choose the folder to put ${BOLD}${name}${NC} inside."
+            echo ""
+            out="$(zenity --file-selection --directory --title="$prompt" --filename="$HOME/" 2>/dev/null)"
+            rc=$?
+        elif command_exists kdialog; then
+            echo -e "  Opening a folder window. Choose the folder to put ${BOLD}${name}${NC} inside."
+            echo ""
+            out="$(kdialog --getexistingdirectory "$HOME" --title "$prompt" 2>/dev/null)"
+            rc=$?
+        else
+            return 1
+        fi
+        if [ $rc -eq 0 ] && [ -n "$out" ]; then
+            picked="${out%/}"
+            return 0
+        fi
+        [ $rc -eq 1 ] && return 2                    # Cancel
+        echo -e "  ${DIM}The folder window didn't open, so type the folder's path instead.${NC}"
+        echo ""
+        return 1
+    fi
+
+    return 1
+}
+
+# No picker: ask for the path. Dragging a folder onto the terminal window
+# types its path, with backslashes before spaces (macOS Terminal) or in
+# quotes (most Linux terminals) and a trailing space; all three are undone.
+# Sets `picked`; returns 1 when the user presses Enter to keep it.
+_pick_folder_by_typing() {
+    local name="$1" answer unescaped
+    echo -e "Which folder should ${BOLD}${name}${NC} go inside?"
+    echo -e "  Type that folder's path, or drag the folder from your file manager onto this window."
+    echo -e "  ${DIM}For example, ~/Sites puts it at ~/Sites/${name}. Press enter to keep it where it is.${NC}"
     echo ""
+    while true; do
+        read -rp "Put ${name} inside: " answer
+        answer="$(printf '%s' "$answer" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+        if [ -z "$answer" ]; then
+            echo ""
+            return 1
+        fi
+        case "$answer" in
+            \'*\') answer="${answer:1:${#answer}-2}" ;;
+            \"*\") answer="${answer:1:${#answer}-2}" ;;
+        esac
+        case "$answer" in
+            "~") answer="$HOME" ;;
+            "~/"*) answer="$HOME/${answer#"~/"}" ;;
+        esac
+        if [ ! -d "$answer" ]; then
+            unescaped="$(printf '%s' "$answer" | sed -E 's/\\(.)/\1/g')"
+            [ -d "$unescaped" ] && answer="$unescaped"
+        fi
+        if [ ! -d "$answer" ]; then
+            log_warning "There's no folder at: $answer"
+            echo -e "  ${DIM}Make the folder first, or press enter to keep ${name} where it is.${NC}"
+            continue
+        fi
+        picked="${answer%/}"
+        echo ""
+        return 0
+    done
+}
+
+# Folders a sync service manages. Their syncing copies the database while
+# Roe is writing to it, which is how SQLite files get damaged. On a Mac with
+# "Desktop & Documents Folders" turned on in iCloud, those two are synced
+# too; iCloud Drive then holds Desktop/ and Documents/ folders of its own.
+_cloud_synced_folder() {
+    local real
+    real="$(cd "$1" 2>/dev/null && pwd -P || printf '%s' "$1")"
+    case "$real/" in
+        */Library/Mobile\ Documents/*|*/Library/CloudStorage/*|*/Dropbox/*|*/Dropbox\ \(*|*/OneDrive/*|*/OneDrive\ -\ *|*/Google\ Drive/*|*/pCloud\ Drive/*|*/Box\ Sync/*)
+            return 0 ;;
+    esac
+    local icloud="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+    case "$real/" in
+        "$HOME"/Desktop/*) [ -d "$icloud/Desktop" ] && return 0 ;;
+        "$HOME"/Documents/*) [ -d "$icloud/Documents" ] && return 0 ;;
+    esac
+    return 1
+}
+
+# Move the site folder into $1. Returns 1 (having said why) when it can't
+# or the user backs out, so the caller asks again.
+_move_roe_folder_into() {
+    local dest_parent="$1" name new_root answer
+    name="$(basename "$ROE_ROOT")"
+    dest_parent="$(cd "$dest_parent" 2>/dev/null && pwd)" || {
+        log_warning "Couldn't open that folder."
+        echo ""
+        return 1
+    }
+    new_root="$dest_parent/$name"
+
+    if [ "$dest_parent" -ef "$(dirname "$ROE_ROOT")" ]; then
+        echo -e "  ${DIM}${name} is already there.${NC}"
+        echo ""
+        return 0
+    fi
+    case "$(cd "$dest_parent" && pwd -P)/" in
+        "$ROE_ROOT_REAL"/*)
+            log_warning "That folder is inside ${name} itself. Choose a folder outside it."
+            echo ""
+            return 1 ;;
+    esac
+    if [ -e "$new_root" ]; then
+        log_warning "There's already a folder called '${name}' in ${dest_parent}."
+        echo ""
+        return 1
+    fi
+    if [ ! -w "$dest_parent" ]; then
+        log_warning "You don't have permission to add folders to ${dest_parent}."
+        echo ""
+        return 1
+    fi
+    if _cloud_synced_folder "$dest_parent"; then
+        log_warning "${dest_parent} is kept in sync by a cloud service (iCloud, Dropbox, OneDrive…)."
+        echo "    Syncing copies Roe's database while Roe is writing to it, which can damage it."
+        echo -e "    ${DIM}A folder that isn't synced is safer. Back up with Roe's own backups instead.${NC}"
+        echo ""
+        read -rp "Put it there anyway? [y/N]: " answer
+        echo ""
+        [[ $answer =~ ^[Yy] ]] || return 1
+    fi
+
+    echo -e "  Moving ${name} to ${dest_parent}…"
+    if ! mv "$ROE_ROOT" "$new_root" 2>/dev/null; then
+        log_warning "Couldn't move the folder. ${name} stays where it is."
+        echo ""
+        return 0
+    fi
+    _set_roe_root "$new_root"
+    log_success "Moved ${BOLD}${name}${NC} to ${dest_parent}"
+    echo ""
+    return 0
 }
 
 # ── Check command ─────────────────────────────────────────────────────────────
