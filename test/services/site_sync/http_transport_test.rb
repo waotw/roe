@@ -310,8 +310,14 @@ module SiteSync
       Exchange.stubs(:fetch_peer_file_states).returns({ rel => { "size" => big, "mtime" => 1 } })
       Exchange.stubs(:fetch_peer_manifest).returns({ "files" => {} })
       Exchange.expects(:download_files).never
+      # Stands in for the real download, which creates dest's folder first;
+      # without that, the write failed whenever an earlier test had removed
+      # media/video from the test site.
       Exchange.stubs(:download_large_file).with do |r, dest:, staging_dir:, **|
-        File.write(dest, "pulled") if r == rel && staging_dir.start_with?(SITE)
+        if r == rel && staging_dir.start_with?(SITE)
+          FileUtils.mkdir_p(File.dirname(dest))
+          File.write(dest, "pulled")
+        end
         true
       end.returns({ "size" => big, "mtime" => 1 })
 
