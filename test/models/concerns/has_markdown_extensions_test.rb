@@ -24,6 +24,35 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   # Code Block Protection Tests
   # =============================================================================
 
+  # A bare | outside a table is escaped so kramdown doesn't read the line as a
+  # table row. Code is shown exactly as written, so inside a code span the
+  # escape showed up as "&#124;" (the install guide's `curl … | bash`).
+  test "a pipe in inline code shows as a pipe" do
+    html = render("Run `curl -fsSL https://go-roe.com/install | bash` now.")
+
+    assert_includes html, "<code>curl -fsSL https://go-roe.com/install | bash</code>"
+    assert_not_includes html, "#124;"
+  end
+
+  test "a pipe in prose still doesn't make a table" do
+    html = render("Choose this | or that, then `a | b`.")
+
+    assert_not_includes html, "<table"
+    assert_includes html, "<code>a | b</code>"
+  end
+
+  test "a markdown table still renders" do
+    html = render("| Name | Use |\n| --- | --- |\n| `a | b` | pipe |\n")
+
+    assert_includes html, "<table"
+  end
+
+  test "a pipe in a fenced code block shows as a pipe" do
+    html = render("```sh\ncat log | grep error\n```\n")
+
+    assert_includes html, "cat log | grep error"
+  end
+
   # Kramdown wraps the placeholder in a paragraph. <pre> can't live inside <p>,
   # so restoring only the token left `<p><pre>…</pre></p>`, which every later
   # Nokogiri pass rewrote to `<p></p><pre>…</pre>` — a stray empty paragraph

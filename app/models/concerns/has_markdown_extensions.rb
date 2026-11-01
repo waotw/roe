@@ -432,8 +432,11 @@ module HasMarkdownExtensions
         in_table = false
       end
 
-      # Not in table, escape pipes
-      line.gsub(/\|/, "&#124;")
+      # Not in table, escape pipes, except inside `code spans`: code is shown
+      # exactly as written, so the entity would appear as "&#124;", and
+      # kramdown never reads a pipe inside a code span as a table cell anyway.
+      # Same code-span match as process_highlights.
+      line.gsub(/(`+).*?\1|\|/) { Regexp.last_match(1) ? Regexp.last_match(0) : "&#124;" }
     end.join("\n")
   end
 
