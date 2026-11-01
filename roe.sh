@@ -1260,7 +1260,7 @@ _ask_folder_location() {
             where="${parent}"
         fi
         echo -e "${BOLD}${name}${NC} is in ${where}."
-        echo -e "  ${DIM}You can keep it there or choose another folder to put it in.${NC}"
+        echo -e "  ${DIM}You can keep it there or choose another folder for the Roe folder.${NC}"
         echo ""
         read -rp "Keep it here or choose another folder? [K/c]: " answer
         echo ""
