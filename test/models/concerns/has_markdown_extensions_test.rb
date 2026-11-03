@@ -1668,6 +1668,48 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     refute_includes html, "<%#", "no stray ERB comment should leak into the raw HTML"
   end
 
+  # members.yml free_signup: false — joining is paid only, so the form has no
+  # free path at all: one button, and the form itself posts to checkout.
+  test "paid-only signup form has one button and posts straight to checkout" do
+    model = TestModel.new("")
+    model.stubs(:form_authenticity_token).returns("tok")
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+
+    html = model.send(:render_signup_form, "Sign up free", "Become a paid member")
+
+    assert_includes html, 'action="/signup_and_checkout"'
+    assert_includes html, ">Become a paid member</button>"
+    refute_includes html, "Sign up free", "no free button"
+    refute_includes html, "formaction", "nothing left that posts anywhere else"
+  end
+
+  test "paid-only signup form falls back to the button text when there's no upgrade text" do
+    model = TestModel.new("")
+    model.stubs(:form_authenticity_token).returns("tok")
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+
+    html = model.send(:render_signup_form, "Join", nil)
+
+    assert_includes html, ">Join</button>"
+    assert_includes html, 'action="/signup_and_checkout"'
+  end
+
+  test "paid-only with payments off says sign-ups are closed instead of drawing a form" do
+    model = TestModel.new("")
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(false)
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+
+    html = model.send(:render_signup_form, "Sign up", nil)
+
+    assert_includes html, "Sign-ups are closed."
+    refute_includes html, "<form"
+  end
+
   test "share button carries the stable .share hook + omits empty values" do
     html = TestModel.new("").send(:render_share_button, {}, {})
     assert_includes html, '<div class="share" data-controller="share">'

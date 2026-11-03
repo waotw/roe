@@ -41,6 +41,11 @@ class CheckoutController < ApplicationController
 
   def payment_processing
     @session_id = params[:session_id]
+
+    # Paid-only sign-up: the account waits, signed out, until the webhook
+    # confirms the payment. Once it's active and paid, sign them in here.
+    sign_in_confirmed_pending_member
+
     # If already paid, redirect to success page
     if current_member&.paid?
       redirect_to checkout_success_path
@@ -66,6 +71,18 @@ class CheckoutController < ApplicationController
   end
 
   private
+
+  def sign_in_confirmed_pending_member
+    pending_id = session[:pending_member_id]
+    return unless pending_id
+
+    member = Member.find_by(id: pending_id)
+    return unless member&.status_active? && member.paid?
+
+    session.delete(:pending_member_id)
+    session[:member_id] = member.id
+    Current.member = member
+  end
 
   def require_member
     unless current_member

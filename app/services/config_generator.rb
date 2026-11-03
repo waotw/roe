@@ -138,12 +138,13 @@ class ConfigGenerator
   #      already written it, so the existence check trips and it's
   #      skipped — no double write, no overwrite.
   #   3. Conditional integration drop-ins (Stripe / Postmark).
-  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", email_enabled: true, newsletter_enabled: false)
+  def generate_members_defaults(show_paid_content: true, payments_enabled: false, payment_price: "0.00", email_enabled: true, newsletter_enabled: false, free_signup: true)
     overwrite_from_template(
       folder:   "features/members",
       template: "system/features/members.yml.erb",
       target:   File.join(FEATURES_PATH, "members.yml"),
       locals: {
+        free_signup:        free_signup,
         payments_enabled:   payments_enabled,
         payment_price:      payment_price,
         email_enabled:      email_enabled,

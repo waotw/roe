@@ -16,6 +16,20 @@
 
     <%= form_with url: create_members_admin_configs_path, method: :post, class: "space-y-6" do |f| %>
 
+      <!-- Free members -->
+      <%# COPY: placeholder wording — owner will rewrite %>
+      <div class="bg-gray-50 border border-gray-300 p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">Free Members</h3>
+
+        <label class="flex items-start gap-3 cursor-pointer">
+          <%= f.check_box :free_signup, { checked: true, class: "mt-1" }, "true", "false" %>
+          <div>
+            <div class="font-medium text-gray-900">Enable free members</div>
+            <div class="text-sm text-gray-600">Anyone can join for free, and paid membership is an upgrade. Turn this off to make joining paid only (needs Paid Memberships, below).</div>
+          </div>
+        </label>
+      </div>
+
       <!-- Payments -->
       <div class="bg-gray-50 border border-gray-300 p-6">
         <h3 class="font-semibold text-gray-900 mb-3">Paid Memberships</h3>

@@ -3645,6 +3645,17 @@ module HasMarkdownExtensions
     payments_enabled = SiteConfig.feature("members", "payments.enabled")
     payments_enabled = (payments_enabled == true || payments_enabled == "true")
 
+    # Paid only (members.yml free_signup: false): no free button. With no
+    # payments either, nobody can join, so say so instead of drawing a form.
+    paid_only = SiteFeature.paid_only_signup?
+    if paid_only && !payments_enabled
+      return <<~HTML
+        <div class="signup-closed">
+          <p>Sign-ups are closed.</p>
+        </div>
+      HTML
+    end
+
     # Only show upgrade button if payments are enabled AND text is provided
     upgrade_button = if upgrade_button_text.present? && payments_enabled
       <<~HTML
@@ -3687,6 +3698,19 @@ module HasMarkdownExtensions
       ""
     end
 
+    # Paid only: one button, and the whole form goes to checkout, so there's
+    # no free path in it at all. Labelled with the upgrade text if the block
+    # has one, else its button text.
+    form_action = "/signup"
+    buttons = <<~HTML
+      <button type="submit" class="btn-outline">#{button_text}</button>
+      #{upgrade_button}
+    HTML
+    if paid_only
+      form_action = "/signup_and_checkout"
+      buttons = %(<button type="submit" class="btn-primary">#{upgrade_button_text.presence || button_text}</button>\n)
+    end
+
     # data-turbo="false" on the form: the upgrade button uses
     # formaction="/signup_and_checkout" to post somewhere other than the form's
     # own action. Turbo Drive ignores a secondary button's formaction and posts
@@ -3694,7 +3718,7 @@ module HasMarkdownExtensions
     # the free /signup path and the page just re-rendered. A native submit
     # honors formaction.
     <<~HTML
-      <form action="/signup" method="post" data-turbo="false">
+      <form action="#{form_action}" method="post" data-turbo="false">
         <input type="hidden" name="authenticity_token" value="#{form_authenticity_token}">
 
         #{error_html}
@@ -3711,8 +3735,7 @@ module HasMarkdownExtensions
 
         #{password_field}
 
-        <button type="submit" class="btn-outline">#{button_text}</button>
-        #{upgrade_button}
+        #{buttons}
       </form>
     HTML
   end
