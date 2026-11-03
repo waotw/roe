@@ -33,6 +33,10 @@ module Members
 
       member = Member.find_by(email: params[:member][:email])
 
+      # A paid-only sign-up whose payment never came through. "No account
+      # found" would be wrong, and they can't sign in until they've paid.
+      return redirect_pending_payment if member&.status_pending?
+
       if member&.active?
         member.regenerate_token!
 
@@ -68,6 +72,10 @@ module Members
       if member&.active? && member.password_digest.present? && member.authenticate(password)
         session[:member_id] = member.id
         redirect_to root_path, notice: "Signed in successfully"
+      elsif member&.status_pending? && member.password_digest.present? && member.authenticate(password)
+        # Only after the password matches, so the form still never reveals
+        # which emails have accounts.
+        redirect_pending_payment
       else
         flash.now[:alert] = "Incorrect email or password"
         @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")
@@ -78,6 +86,14 @@ module Members
     def destroy
       session.delete(:member_id)
       redirect_to root_path, notice: "Signed out successfully"
+    end
+
+    # COPY: placeholder wording — owner will rewrite
+    # Redirect rather than render, like the failed-send message above: a site
+    # without a sign-in page would otherwise blow up on the template.
+    def redirect_pending_payment
+      redirect_to "/sign-in", alert: "This account's payment hasn't gone through yet, so it isn't active. " \
+                                     "To finish joining, sign up again with the same email and complete the payment."
     end
 
     # Same destination as a successful send — from the reader's side nothing has

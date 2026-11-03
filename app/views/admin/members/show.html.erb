@@ -38,6 +38,8 @@
               <% if @member.cancelled_at %>
                 <span class="mt-1 text-xs text-gray-500"><%= @member.cancelled_at.strftime("%b %d, %Y") %></span>
               <% end %>
+            <% elsif @member.status_pending? %>
+              <span class="inline-flex bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Pending payment</span>
             <% else %>
               <span class="inline-flex bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">Cancelled</span>
             <% end %>
@@ -173,6 +175,22 @@
                 records below are kept. It can't be reactivated.
               </p>
             </div>
+
+          <% elsif @member.status_pending? %>
+
+            <%# COPY: placeholder wording — owner will rewrite %>
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">Payment Not Received</h4>
+              <p class="text-sm text-gray-500 font-sans">
+                This person started a paid sign-up but didn't finish paying, so they can't sign in.
+                They can finish by signing up again with the same email. Activate gives them a free
+                account without paying.
+              </p>
+            </div>
+            <%= button_to "Activate", reactivate_membership_admin_member_path(@member),
+                method: :patch,
+                class: "inline-flex items-center uppercase text-sm px-3 py-2 border border-gray-800 bg-green-200 hover:bg-green-300 font-mono rounded-xs",
+                form: { data: { turbo_confirm: "Activate this account as a free member, without payment?" } } %>
 
           <% else %>
 

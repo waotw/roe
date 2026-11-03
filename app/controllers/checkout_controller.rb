@@ -1,10 +1,12 @@
 class CheckoutController < ApplicationController
   skip_before_action :require_authentication
-  before_action :require_member, only: [ :create ]
+  before_action :require_checkout_member, only: [ :create ]
 
   def create
+    member = checkout_member
+
     # Ensure member is free tier
-    unless current_member.tier_free?
+    unless member.tier_free?
       redirect_to root_path, alert: "You already have a paid membership"
       return
     end
@@ -19,7 +21,7 @@ class CheckoutController < ApplicationController
     # Create Stripe Checkout Session
     session = Stripe::Checkout::Session.create(
       {
-        customer_email: current_member.email,
+        customer_email: member.email,
         mode: "payment",
         line_items: [ {
           price: stripe_config.current_price_id,
@@ -28,7 +30,7 @@ class CheckoutController < ApplicationController
         success_url: checkout_payment_processing_url + "?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: checkout_cancel_url,
         metadata: {
-          member_id: current_member.id
+          member_id: member.id
         }
       },
       StripeConfig.request_options
@@ -68,9 +70,30 @@ class CheckoutController < ApplicationController
   def cancel
     # Load page for sidebar
     @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-cancel")
+    # A paid-only sign-up that left Stripe without paying: say the account
+    # waits on the payment, and Try Again picks it up.
+    @pending_member = pending_member_from_session
   end
 
   private
+
+  # Who a checkout is for: the signed-in member upgrading, or a paid-only
+  # sign-up that hasn't paid yet (signed out, so it's held in the session by
+  # Members::RegistrationsController#create_and_checkout).
+  def checkout_member
+    current_member || pending_member_from_session
+  end
+
+  def require_checkout_member
+    require_member unless checkout_member
+  end
+
+  def pending_member_from_session
+    pending_id = session[:pending_member_id]
+    return unless pending_id
+
+    Member.status_pending.find_by(id: pending_id)
+  end
 
   def sign_in_confirmed_pending_member
     pending_id = session[:pending_member_id]

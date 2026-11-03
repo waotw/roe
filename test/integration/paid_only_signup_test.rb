@@ -90,6 +90,40 @@ class PaidOnlySignupTest < ActionDispatch::IntegrationTest
     assert_nil session[:pending_member_id]
   end
 
+  # The ways back for someone who left Stripe without paying.
+  test "Try Again on the cancel page restarts checkout for the pending account" do
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+    Stripe::Checkout::Session.stubs(:create).returns(@checkout)
+    post "/signup_and_checkout", params: @params
+    member = Member.find_by(email: "ann@example.com")
+
+    get checkout_cancel_path
+    assert_includes response.body, "Your membership starts once the payment goes through."
+    assert_select "form[action='#{create_checkout_path}'][data-turbo=false] button", text: "Try Again"
+
+    Stripe::Checkout::Session.unstub(:create)
+    Stripe::Checkout::Session.expects(:create).with do |args, _opts|
+      args[:customer_email] == "ann@example.com" && args[:metadata][:member_id] == member.id
+    end.returns(@checkout)
+
+    post create_checkout_path
+
+    assert_redirected_to "https://checkout.stripe.com/test"
+    assert_nil session[:member_id], "still not signed in until it's paid"
+  end
+
+  test "signing in with a pending account says the payment didn't go through" do
+    SiteFeature.stubs(:member_passwords_enabled?).returns(false)
+    create(:member, email: "ann@example.com", tier: :free, status: :pending)
+    MemberMailer.expects(:magic_link).never
+
+    post "/signin", params: { member: { email: "ann@example.com" } }
+
+    assert_redirected_to "/sign-in"
+    assert_match "payment hasn't gone through", flash[:alert]
+    assert_nil session[:member_id]
+  end
+
   test "with free sign-ups on, the paid button signs in a free member straight away, as before" do
     SiteFeature.stubs(:paid_only_signup?).returns(false)
     Stripe::Checkout::Session.expects(:create).with do |args, _opts|
