@@ -112,16 +112,26 @@ class PaidOnlySignupTest < ActionDispatch::IntegrationTest
     assert_nil session[:member_id], "still not signed in until it's paid"
   end
 
-  test "signing in with a pending account says the payment didn't go through" do
+  test "signing in with a pending account sends them to sign up, where they finish" do
     SiteFeature.stubs(:member_passwords_enabled?).returns(false)
     create(:member, email: "ann@example.com", tier: :free, status: :pending)
     MemberMailer.expects(:magic_link).never
 
     post "/signin", params: { member: { email: "ann@example.com" } }
 
-    assert_redirected_to "/sign-in"
+    assert_redirected_to "/sign-up"
     assert_match "payment hasn't gone through", flash[:alert]
     assert_nil session[:member_id]
+  end
+
+  test "a site without a sign-up page sends them back to sign in instead" do
+    SiteFeature.stubs(:member_passwords_enabled?).returns(false)
+    Page.where("json_extract(metadata, '$.url_name') = ?", "sign-up").delete_all
+    create(:member, email: "ann@example.com", tier: :free, status: :pending)
+
+    post "/signin", params: { member: { email: "ann@example.com" } }
+
+    assert_redirected_to "/sign-in"
   end
 
   test "with free sign-ups on, the paid button signs in a free member straight away, as before" do

@@ -66,6 +66,26 @@ class StripeConfig < ApplicationRecord
     mode_test? ? webhook_signing_secret_test : webhook_signing_secret_live
   end
 
+  # Where `roe stripe` leaves the Stripe CLI listener's signing secret. The
+  # CLI signs what it forwards with its own secret, not the dashboard
+  # endpoint's (the one in stripe.yml, which Site Sync carries to the live
+  # site, so it mustn't be replaced). Local and gitignored.
+  CLI_WEBHOOK_SECRET_PATH = Rails.root.join("tmp", "stripe_cli_webhook_secret")
+
+  # Every secret a webhook may be signed with: the saved one, plus the
+  # CLI's in development (where `roe stripe` runs) in test mode.
+  def webhook_signing_secrets
+    secrets = [ current_webhook_signing_secret ]
+    secrets << self.class.cli_webhook_secret if mode_test? && Rails.env.development?
+    secrets.map { |s| s.to_s.strip }.reject(&:empty?).uniq
+  end
+
+  def self.cli_webhook_secret
+    File.read(CLI_WEBHOOK_SECRET_PATH).strip.presence if File.file?(CLI_WEBHOOK_SECRET_PATH)
+  rescue SystemCallError
+    nil
+  end
+
   # Product/price IDs are mode-specific (a test-mode ID is invalid for a live
   # key), so they're stored per mode like the keys. current_* picks the active
   # mode's ID; the writer stores into the active mode's slot.

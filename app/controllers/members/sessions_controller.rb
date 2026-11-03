@@ -89,11 +89,16 @@ module Members
     end
 
     # COPY: placeholder wording — owner will rewrite
-    # Redirect rather than render, like the failed-send message above: a site
-    # without a sign-in page would otherwise blow up on the template.
+    # Send them to sign up, which is how they finish: signing up again with
+    # the same email picks up the pending account and goes to payment. Falls
+    # back to the sign-in page on a site without a sign-up page. A redirect,
+    # not a render, like the failed-send message above: a missing page would
+    # otherwise blow up on the template.
     def redirect_pending_payment
-      redirect_to "/sign-in", alert: "This account's payment hasn't gone through yet, so it isn't active. " \
-                                     "To finish joining, sign up again with the same email and complete the payment."
+      signup = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-up")
+      redirect_to signup ? "/sign-up" : "/sign-in",
+                  alert: "This account's payment hasn't gone through yet, so it isn't active. " \
+                         "Sign up again with the same email to finish paying."
     end
 
     # Same destination as a successful send — from the reader's side nothing has
