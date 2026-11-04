@@ -53,7 +53,7 @@ Site Sync:
 
 #### First Time
 
-1. Deploy your Roe app to your host (see [Guide → Deploy](/documentation/guide-deploy))
+1. Deploy your Roe app to your host (see [Guide: Deploy](/documentation/guide-deploy))
 2. Go to [Admin → Site Sync](/admin/site_sync) on your **local** site
 3. Enter your **Live Site URL** (e.g., `https://yoursite.com`)
 4. Click **Save Settings**

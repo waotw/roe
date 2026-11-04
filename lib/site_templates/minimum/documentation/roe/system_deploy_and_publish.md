@@ -30,7 +30,7 @@ You have two ways to put your site online, and each one decides which hosts you 
 - **Publish a static site** — just HTML, CSS, and JavaScript. Every web host supports this.
 - **Deploy the Roe app** — run Roe on a host that supports Ruby on Rails. Many hosts do.
 
-To publish a static site, see [Guide → Publish a static site](/documentation/roe/guide-publish).
+To publish a static site, see [Guide: Publish a static site](/documentation/roe/guide-publish).
 
 ## When to use a static site vs. deploy the Roe app
 
@@ -65,4 +65,4 @@ Deploy the Roe app when:
 - you need the Members, Newsletter, or Payments features
 - you want to sign in to your live site and make edits
 
-To deploy the app, see [Guide → Deploy Roe](/documentation/roe/guide-deploy).
+To deploy the app, see [Guide: Deploy Roe](/documentation/roe/guide-deploy).

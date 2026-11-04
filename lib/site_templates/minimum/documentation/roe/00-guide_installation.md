@@ -1,5 +1,5 @@
 ---
-title: Guide → Installation
+title: "Guide: Installation"
 status: published
 url_name: guide-installation
 tags: guide, getting-started
@@ -18,157 +18,90 @@ template: links
 
 # Installing Roe
 
-Roe runs on your own computer. Before you can use it, Roe will install the tools it needs to run. You can see a list of all tools here: [Requirements for Roe](/documentation/roe/roe-requirements)
+Roe is installed with a single command in the terminal. The installer explains each step and checks before it does anything.
 
-This is the biggest step in getting started — and you only take it once. After Roe is installed, you can create as many Roe sites as you like without installing anything again.
+Roe will install the tools it needs to run. It only does this once. After that, you can add more Roe sites without installing anything else. The full list of tools is in [Requirements for Roe](/documentation/roe/roe-requirements).
 
-You won't do the work by hand. Roe has a friendly installer script that checks what your computer already has, installs only what's missing, and tells what each section is doing and when it is done.
+## Install with a single command
 
-These instructions cover macOS, Linux, and Windows. Windows support is new and I'm still gathering feedback on it — if you hit something these steps don't cover, I'd love to hear from you: [roe@weareontheweb.com](mailto:roe@weareontheweb.com).
+### Mac and Linux
 
-## Download Roe
+ open Terminal and run:
 
-[Download Roe](https://github.com/waotw/roe/releases/latest/download/roe.zip).
+`cd ~ && curl -fsSL https://go-roe.com/install | bash`
 
-The download is a single zip file. Inside it are two main folders, plus a few supporting files:
+### Windows
 
-- `/current` — the Roe application itself (its code)
-- `/site` — everything that belongs to you: your content, settings, and databases
+Open PowerShell as Administrator and run:
 
-Now follow the steps for your computer:
+`irm https://go-roe.com/install.ps1 | iex`
 
-- [Install on a Mac](#install-on-a-mac)
-- [Install on Linux](#install-on-linux)
-- [Install on Windows](#install-on-windows)
+Then follow the prompts. Details for each operating system below: [macOS](#macos), [Linux](#linux) and [Windows](#windows).
 
-<mark>Note for Windows:</mark> you don't need the download above. Roe installs itself in one command — skip to [Install on Windows](#install-on-windows).
+==Note:== If you stop partway through the installation, don't run the one-line command again: it downloads a new Roe folder. Instead, open the Roe folder in your Terminal, [instructions below](#install-roe-manually), and run `./roe.sh install`. This will pick up the installation and skip what was already done.
 
-## Install on a Mac
+### What the installer does
 
-1. Unzip the file you downloaded. Move the unzipped **Roe folder** wherever you'd like to keep your website on your computer.
-2. Open the Terminal app.
-    - Hold down `command` + `space` to open Spotlight.
-    - Type `terminal` and press `return`. The Terminal opens.
-3. Point the Terminal at your Roe folder.
-    - Type `cd` followed by a space. Don't press `return` yet.
-    - Drag the Roe folder onto the Terminal window. Its location drops in after `cd`.
-    - Press `return`.
-4. Type `./roe.sh install` and press `return`. The script checks what's already installed.
-5. **Install system tools.** The script lists anything missing and offers to install it.
-    - When you see `Install now? [y/q]`, type `y` and press `return`.
-    - You can see a list of all tools used by Roe [here](/documentation/roe/roe-requirements) 
-    - <mark>Note:</mark> on a fresh Mac, macOS may ask to install Apple's Command Line Tools in a separate window. Let that installer finish, then return to the Terminal and press `c` to continue.
-    - The first run takes a few minutes. Wait until the prompt returns and you see `[✓] Ready — Ruby and Git are in place.`
-6. **Run the Roe setup.** When you see `Next step: Run the Roe setup`, type `y` and press `return`.
-    - A progress screen appears. Setup installs Roe related [tools](/documentation/roe/roe-requirements#the-ruby-gems-roe-installs), creates your `/site` folder, prepares the database, generates default settings, and basic content.
-7. **Create your admin user.** When setup finishes, Roe asks for your account details.
-    - Enter the email you want to sign in with.
-    - Choose a random or a manual password.
-    - <mark>Write your password down somewhere safe.</mark> If you choose a random one, Roe shows it only once.
-    - **Save your recovery codes.** Roe shows them next. <mark>Write these down too — you won't ever see them again.</mark> They let you reset your password if you lose it.
-    - Once everything is written down and saved, press any key to continue.
-8. **Install the global `roe` command and register your site.**
-    - To make it easier to work with Roe, this step adds a few lines to a few files on your system.
-    - This allows you to `start` and `stop` your Roe site(s) from any terminal window. See [Roe App Commands](/documentation/roe/roe-application-commands).
-9. Press `y` and `return` to start Roe.
-10. Roe starts the server and opens in your browser.
-11. Sign in with the admin user you just created.
+1. Downloads the latest Roe release and unpacks it into a folder in your home folder.
+2. Offers to rename the Roe folder.
+3. Checks your computer for what Roe needs and installs anything missing.
+4. Sets up Roe and your site.
+5. Installs the `roe` command and gives your site its own address, such as `http://my-site.roe`. Your computer asks for your password to add the address.
+6. Starts Roe and opens your site and its admin in your browser.
 
-That's it — Roe is running. See [Getting Started with Roe](/documentation/roe/getting-started-with-roe) to start exploring.
+### macOS
 
-## Install on Linux
+- **Opening Terminal:** press `command` + `space`, type `terminal` and press `return`.
+- **Command Line Tools:** if needed, macOS installs Apple's Command Line Tools in a separate window. This takes 5–10 minutes. When it has finished, go back to Terminal and press `c`.
+- **Password:** the password prompt is for your Mac login, not for Roe.
 
-1. Unzip the file you downloaded. Move the unzipped Roe folder wherever you'd like to keep your website.
-2. Open the Roe folder in your terminal.
+### Linux
 
-    You can do this with `cd`. If the Roe folder is in your home directory, use:
+- **unzip:** the installer needs `curl` and `unzip`. If `unzip` is missing, install it with your package manager (for example, `sudo apt-get install unzip`) and run the command again.
+- **Build tools:** if your system has no C compiler or `make`, the installer shows the command for your distribution. Run it in a second terminal, then press `c`.
+- **Password:** the password prompt is for your Linux account (`sudo`).
 
-    `cd ~/roe-folder-name`
+### Windows
 
-    Most Linux file managers can also open a terminal already pointed at the current folder. The menu name varies by distribution:
+Roe runs on Windows inside **WSL**, a Linux system built into Windows 10 and 11. The installer sets WSL up, then runs the same installer as Mac and Linux.
 
-    - **GNOME Files (Nautilus)** — right-click inside the Roe folder and select `Open in Terminal`. If you don't see this option, install the helper: `sudo apt-get install nautilus-extension-gnome-terminal` (Ubuntu/Debian), or the equivalent for your distro.
-    - **KDE Dolphin** — open the Roe folder and press `F4` to drop into an embedded terminal already pointed at it. Or right-click and select `Open Terminal Here`.
-    - **Other file managers** — most have a similar `Open Terminal Here` option in the right-click menu. If not, open a terminal manually and `cd` into the folder.
+- **Opening PowerShell as Administrator:** press the `Windows` key, type `powershell`, right-click **Windows PowerShell**, choose `Run as administrator`, then click `Yes`.
+- **Restart:** if WSL isn't installed yet, Windows needs a restart. Restart, then run the same command again.
+- **Linux username:** the first time Linux starts, it asks for a username and password. They're only used inside Linux. <mark>Write the password down.</mark> The installer asks for it when installing tools.
+- **Your site's address:** Roe shows a line to add to your Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`, opened as Administrator). Until you add it, use `http://localhost:3000`.
 
-    If your distribution doesn't ship one of these, this is a good general reference: [How to Open a Folder in Linux](https://linuxvox.com/blog/how-to-open-folder-in-linux/).
-3. Type `./roe.sh install` and press `enter`. The script checks what's already installed.
-4. **Install system tools.** The script lists anything missing and offers to install it.
-    - When you see `Install now? [y/q]`, type `y` and press `enter`.
-    - You can see a list of all tools used by Roe [here](/documentation/roe/roe-requirements).
-    - <mark>Note for Linux:</mark> if your system is missing the C compiler and `make` that Ruby needs to build its libraries, the script shows the install command for your distribution (Debian/Ubuntu `apt-get`, Fedora/RHEL `dnf`, Arch `pacman`, and so on). Copy it, run it in another terminal, then return here and press `c` to continue.
-    - The first run takes a few minutes. Wait until you see `[✓] Ready — Ruby and Git are in place.`
-5. **Run the Roe setup.** When you see `Next step: Run the Roe setup`, type `y` and press `enter`.
-    - A progress screen appears. Setup installs Roe related [tools](/documentation/roe/roe-requirements#the-ruby-gems-roe-installs), creates your `/site` folder, prepares the database, generates default settings, and basic content.
-6. **Create your admin user.** When setup finishes, Roe asks for your account details.
-    - Enter the email you want to sign in with.
-    - Choose a random or a manual password.
-    - <mark>Write your password down somewhere safe.</mark> If you choose a random one, the script shows it only once.
-    - **Save your recovery codes.** Roe shows them next. <mark>Write these down too — you won't ever see them again.</mark> They let you reset your password if you lose it.
-    - Once everything is written down and saved, press any key to continue.
-7. **Install the global `roe` command and register your site.**
-    - To make it easier to work with Roe, this step adds a few lines to a few files on your system. Linux asks for your password once, to add your site's address to `/etc/hosts`.
-    - This allows you to `start` and `stop` your Roe site(s) from any terminal window. See [Roe App Commands](/documentation/roe/roe-application-commands).
-8. Press `y` and `enter` to start Roe.
-9. Roe starts the server and opens in your browser.
-10. Sign in with the admin user you just created.
+#### Where your files are
 
-## Install on Windows
+Roe must stay in your Linux home folder. Windows drives (`C:`) can't store the file permissions Roe needs, and Roe can't see changes made to files there. Roe checks for this and stops if it's on a Windows drive.
 
-Roe runs on Windows inside **WSL** — a full Linux system that Microsoft builds into Windows 10 and 11. You don't need to know anything about Linux to use it. Windows installs it for you, and from then on Roe behaves exactly as it does on a Mac.
-
-One command sets up everything, including Roe itself.
-
-1. Open **PowerShell as Administrator**.
-    - Press the `Windows` key and type `powershell`.
-    - Right-click **Windows PowerShell** and choose `Run as administrator`.
-    - Click `Yes` when Windows asks for permission.
-2. Copy this line, paste it into PowerShell, and press `enter`:
-
-    `irm https://go-roe.com/install.ps1 | iex`
-
-3. **If Windows needs to install Linux first**, the script sets it up and asks you to restart.
-    - Restart your computer.
-    - Open PowerShell as Administrator again and run the same command a second time.
-    - <mark>Note:</mark> this restart is required by Windows, not by Roe. Once it's done, you never need it again.
-4. **Create your Linux username** if you're asked for one. This happens the first time Linux starts.
-    - Pick any username and password you like. They're only used inside Linux.
-    - <mark>Write the password down.</mark> Linux asks for it when installing tools.
-5. The script installs Roe into your Linux home folder and hands over to the Roe installer. From here, everything matches the Mac and Linux steps above:
-    - **Install system tools.** When you see `Install now? [y/q]`, type `y` and press `enter`. The first run takes a few minutes. Wait for `[✓] Ready — Ruby and Git are in place.`
-    - **Run the Roe setup.** When you see `Next step: Run the Roe setup`, type `y` and press `enter`.
-    - **Create your admin user.** Enter your email, choose a password, and <mark>write down your password and your recovery codes</mark> — you won't see the codes again.
-    - **Install the global `roe` command and register your site.** This lets you `start` and `stop` Roe from any terminal window. Roe shows one line to add to your Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`, opened as Administrator) so your site's address works in your Windows browser. You can do that now or later — until then, use the `http://localhost:3000` address instead.
-    - Press `y` and `enter` to start Roe.
-6. Roe opens in your normal Windows browser at `http://localhost:3000`.
-7. Sign in with the admin user you just created.
-
-### Where your files live
-
-Roe installs into your Linux home folder, and it needs to stay there. Windows drives (your `C:` drive) can't store the file permissions Roe needs, and they hide file changes from Roe — so your edits would quietly stop appearing on your site. Roe checks for this and stops with instructions rather than letting you find out later.
-
-Your files are still yours, and Windows can see them. Open File Explorer and paste this into the address bar:
+To open your files from Windows, paste this into File Explorer's address bar:
 
 `\\wsl$\Ubuntu\home\your-username\`
 
-You'll find your Roe folder there, with `/site` inside it — the same folder Mac and Linux users have.
+#### Editing files from Windows
 
-### Editing your files from Windows
+Use [Visual Studio Code](https://code.visualstudio.com) with its **WSL** extension. Open the Ubuntu app from the Start menu and run `code ~/your-roe-folder`.
 
-The friendliest way is [Visual Studio Code](https://code.visualstudio.com):
+#### Starting Roe later
 
-1. Install VS Code on Windows.
-2. Install its **WSL** extension (search for `WSL` in the Extensions panel).
-3. Open the Ubuntu app from your Start menu and type: `code ~/roe-folder-name`
+Open the **Ubuntu** app and run `roe start`.
 
-VS Code opens on Windows while your files stay on the Linux side, which keeps everything working as it should.
+## Install Roe manually
 
-### Starting Roe again later
+You can install Roe without the one-line command:
 
-Open the **Ubuntu** app from your Start menu, then type `roe start` and hit `return`.
+1. [Download Roe](https://github.com/waotw/roe/releases/latest/download/roe.zip) and unzip it.
+2. Rename the folder and move it where you want to keep your site.
+3. Open Terminal in that folder: type `cd`, a space, drag the folder onto the Terminal window, and press `return`.
+4. Run `./roe.sh install`.
 
-If `roe` isn't found yet (you skipped the register step above), use the folder script instead: `cd ~/roe-folder-name && ./roe.sh start`.
+From step 3 of [What the installer does](#what-the-installer-does), the steps are the same.
 
-## You're done
+The folder holds two main folders:
 
-Roe is installed and running. See [Getting Started with Roe](/documentation/roe/getting-started-with-roe) for your next steps.
+- `/current`: the Roe application.
+- `/site`: your content, settings and databases.
+
+## Next
+
+Sign in with your admin user, then see [Getting Started with Roe](/documentation/roe/getting-started-with-roe).

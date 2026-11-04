@@ -1,5 +1,5 @@
 ---
-title: Guide → Deploy the Roe app
+title: "Guide: Deploy the Roe app"
 status: published
 url_name: guide-deploy
 tags: guide, deploy

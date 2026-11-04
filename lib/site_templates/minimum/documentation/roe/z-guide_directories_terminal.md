@@ -1,5 +1,5 @@
 ---
-title: Guide → Find your Roe Folder
+title: "Guide: Find your Roe Folder"
 status: unlisted
 url_name: guide-roe-folder
 tags:
