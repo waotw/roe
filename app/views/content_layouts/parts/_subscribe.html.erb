@@ -1,15 +1,7 @@
-<%#
-  Podcast subscribe section. Renders, in order:
-    - the show's app/service links from podcast.yml (blank ones hidden),
-    - the public RSS feed (omitted when the show is paid-only, unless
-      the viewer is an admin),
-    - the private RSS feed for admins and paid + active members.
-
-  `subscribe_display: menu` in podcast.yml collapses everything behind a
-  single "Subscribe" button using a native <details> element — zero JS.
-  The default (`links`) shows everything inline. Renders nothing when
-  there's no link to show.
-%>
+<%# The show's subscribe links, for an episode or a page connected to a
+    podcast. Nothing when there's no podcast or no link to show. %>
+<% if record.metadata["podcast"].present? && (kind == "post" || context[:podcast_config]) %>
+  <% post = record; podcast_config = context[:podcast_config] %>
 <% key = post.metadata["podcast"] %>
 <% app_links = PodcastConfig.subscribe_links(podcast_config) %>
 <% show_public = key.present? && (authenticated? || PodcastConfig.public_feed?(key)) %>
@@ -69,4 +61,5 @@
       <%= links %>
     </div>
   <% end %>
+<% end %>
 <% end %>

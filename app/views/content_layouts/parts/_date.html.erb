@@ -1,0 +1,6 @@
+<% date = record.respond_to?(:date) ? record.date : nil %>
+<% if date.respond_to?(:strftime) %>
+  <time class="<%= kind %>-date" datetime="<%= date %>">
+    <%= date.strftime("%B %d, %Y") %>
+  </time>
+<% end %>

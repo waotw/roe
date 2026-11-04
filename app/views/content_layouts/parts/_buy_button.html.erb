@@ -1,0 +1,7 @@
+<%# The product's own buy button, with its price beside it unless the layout
+    has a `price` part. Skipped when the body has a ```button (BodyCheck). %>
+<% if kind == "product" && record.sku.present? %>
+  <% config = { "sku" => record.sku } %>
+  <% config["show_price"] = "false" if context[:layout_parts].include?("price") %>
+  <%= ProductButtonRenderer.render(config, current_product: record, authenticated: editor_preview?).html_safe %>
+<% end %>

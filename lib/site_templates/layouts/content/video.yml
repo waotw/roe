@@ -1,0 +1,11 @@
+# The layout of a video post: what shows around its writing, in order.
+# Roe's own copy. Save it from Admin → Layouts to make it your site's.
+#
+# One part per line. [a, b] puts parts in one group, styled together.
+
+- [title, feed_links]
+- subtitle
+- [date, author]
+- image
+- player
+- body

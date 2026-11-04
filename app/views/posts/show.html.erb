@@ -1,16 +1,9 @@
-<% article_classes = "post post-#{@post.post_type}" %>
-<article class="<%= article_classes %>">
+<%# The post's layout (site/layout/content/<type>.yml, or Roe's own) draws
+    everything inside the article: header, player, body, subscribe links.
+    See ContentLayoutHelper. %>
+<article class="post post-<%= @post.post_type %>">
   <div class="content">
-    <%= render 'posts/header', post: @post, podcast_config: @podcast_config %>
-
-    <% if lookup_context.exists?("posts/types/#{@post.post_type}", [], true) %>
-      <%= render "posts/types/#{@post.post_type}", post: @post, podcast_config: @podcast_config, podcast_episodes: @podcast_episodes %>
-    <% else %>
-      <%# Fallback to article if type partial doesn't exist %>
-      <%= render "posts/types/article", post: @post %>
-    <% end %>
-
-    <%= render 'posts/footer', post: @post %>
+    <%= render_content_layout(@post) %>
   </div>
 </article>
 

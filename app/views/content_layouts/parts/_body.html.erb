@@ -1,0 +1,17 @@
+<%# The record's own writing. %>
+<% case kind %>
+<% when "post" %>
+  <div class="post-content">
+    <%= render_post_content(record) %>
+  </div>
+<% when "page" %>
+  <div class="content">
+    <%= render_page_content(record, context: context[:page_context]).html_safe %>
+  </div>
+<% when "product" %>
+  <%= product_content(record) %>
+<% when "documentation" %>
+  <div class="content">
+    <%= record.to_html(static: @static_generation) %>
+  </div>
+<% end %>

@@ -1,0 +1,7 @@
+<%# An episode with no author of its own shows its show's. The bullet is
+    part of the span, as it was before layouts, so `date` and `author` side by
+    side read "March 3, 2026 • Ben". %>
+<% author = record.metadata["author"].to_s.strip.presence || context[:podcast_config]&.dig("author") %>
+<% if author.present? %>
+  <span class="<%= kind %>-author"> • <%= author %></span>
+<% end %>

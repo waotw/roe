@@ -8,7 +8,5 @@
   </p>
 <% end %>
 <article class="content documentation">
-  <div class="content">
-    <%= @doc.to_html(static: @static_generation) %>
-  </div>
+  <%= render_content_layout(@doc) %>
 </article>
