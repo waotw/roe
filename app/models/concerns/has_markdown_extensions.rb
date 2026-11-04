@@ -2015,7 +2015,7 @@ module HasMarkdownExtensions
         partial: "shared/video_player",
         locals: { src: video_src, label: label, extra_class: "player-video" }
       )
-      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}</div>)
+      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}#{player_series_nav_html(config)}</div>)
     end
 
     card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
@@ -2072,8 +2072,36 @@ module HasMarkdownExtensions
           </div>
         </div>
         #{player_duration_html(config)}
+        #{player_series_nav_html(config)}
       </div>
     HTML
+  end
+
+  # ⏮ ⏭ under a player playing a podcast episode or a music track: links to
+  # the episode or track before and after it (Post#series_neighbours). Only
+  # when the card plays the post's own media — a card playing some other file
+  # isn't this episode's player — and nothing when there's no neighbour.
+  def player_series_nav_html(config)
+    return "" unless is_a?(Post) && post_type.in?(%w[podcast music])
+
+    sources = [ config[:audio], config[:video] ].map(&:to_s).map(&:strip).reject(&:blank?)
+    return "" unless sources.empty? || sources.any? { |src| own_media?(src) }
+
+    previous, following = series_neighbours
+    return "" unless previous || following
+
+    noun = post_type == "music" ? "track" : "episode"
+    link = lambda do |item, rel, label|
+      return "" unless item
+      %(<a class="player-series-#{rel}" rel="#{rel}" href="#{ERB::Util.html_escape(item_path(item))}">) +
+        %(<span class="player-series-label">#{label}</span> ) +
+        %(<span class="player-series-title">#{ERB::Util.html_escape(item.title)}</span></a>)
+    end
+
+    %(<nav class="player-series" aria-label="#{noun.capitalize}s">) +
+      link.call(previous, "prev", "⏮ Previous #{noun}") +
+      link.call(following, "next", "Next #{noun} ⏭") +
+      "</nav>"
   end
 
   # `show_duration: true` — the length, under the player, before anything

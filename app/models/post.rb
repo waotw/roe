@@ -43,7 +43,7 @@ class Post < ApplicationRecord
   #         hint: "What goes here" },       # required: true → marked * and
   #     ],                                  # checked before publishing
   #     create_fields: %w[thing],           # the short list the NEW POST form asks
-  #     scaffold: [ :player, :content ]     # markdown written into the new file
+  #     scaffold: [ :content ]              # markdown written into the new file
   #   }
   #
   # The three lists do different jobs:
@@ -109,10 +109,9 @@ class Post < ApplicationRecord
         { name: "captions", type: :text, label: "Captions/Transcript",
           hint: "Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)" }
       ],
-      # Player above the writing, episode list below — the order the ERB
-      # episode page used. The list needs `podcast:` to know what to gather, so
-      # it's only written once that's set.
-      scaffold: [ :player, :content, :playlist ],
+      # Only the writing: the podcast layout draws the player above it and
+      # the episode list below (lib/site_templates/layouts/content/podcast.yml).
+      scaffold: [ :content ],
       # season comes before episode_number because it scopes it: episode 1 of
       # season 2 is a different episode 1.
       create_fields: %w[audio podcast season episode_number]
@@ -140,9 +139,10 @@ class Post < ApplicationRecord
         { name: "lyrics", type: :textarea, label: "Lyrics",
           hint: "The full text, if you want it kept with the track." }
       ],
-      # Same shape as a podcast episode: the track's player, then the rest of
-      # the release. Needs `release:` before the list can be written.
-      scaffold: [ :player, :content, :playlist ],
+      # The music layout draws the player; the release's track list has no
+      # layout part yet, so it's written into the body. Needs `release:`
+      # before the list can be written.
+      scaffold: [ :content, :playlist ],
       create_fields: %w[audio release track_number]
     },
     audio: {
@@ -155,7 +155,7 @@ class Post < ApplicationRecord
         { name: "duration", type: :text, label: "Duration",
           hint: 'Optional, e.g., "12:34"' }
       ],
-      scaffold: [ :player, :content ],
+      scaffold: [ :content ],
       create_fields: %w[audio]
     },
     video: {
@@ -169,7 +169,7 @@ class Post < ApplicationRecord
         { name: "duration", type: :text, label: "Duration",
           hint: 'Optional, e.g., "12:34"' }
       ],
-      scaffold: [ :player, :content ],
+      scaffold: [ :content ],
       create_fields: %w[video]
     }
   }.freeze
@@ -335,6 +335,33 @@ class Post < ApplicationRecord
   def show_template_player?
     kind = template_player_kind
     kind.present? && !own_player_card_in_body? && self.class.template_players_enabled?(kind)
+  end
+
+  # The episode before and after this one in its show, or the track before
+  # and after it in its release: [previous, next], either nil at an end.
+  # Episodes run by date (previous = the older one); tracks by track number.
+  # [nil, nil] for anything that isn't in a show or a release.
+  def series_neighbours
+    @series_neighbours ||= begin
+      field, order =
+        case post_type
+        when "podcast" then [ "podcast", "date" ]
+        when "music"   then [ "release", "track_number" ]
+        end
+      key = field && metadata[field].to_s.strip.presence
+
+      if key
+        siblings = Post.published
+          .where("json_extract(metadata, '$.post_type') = ?", post_type)
+          .where("json_extract(metadata, '$.#{field}') = ?", key)
+          .to_a
+          .sort_by { |p| order == "date" ? p.date.to_s : p.metadata["track_number"].to_i }
+        index = siblings.index { |p| p.id == id }
+        index ? [ (siblings[index - 1] if index > 0), siblings[index + 1] ] : [ nil, nil ]
+      else
+        [ nil, nil ]
+      end
+    end
   end
 
   # Is `src` this post's own audio or video? The same file however it's

@@ -2382,6 +2382,22 @@ article .content,
   --player-progress: 0;
 }
 
+/* ⏮ ⏭ under a podcast episode's or music track's player card: the episode
+   or track before and after it. Previous on the left, next on the right. */
+.player-series {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-2, 0.5rem) 0;
+}
+.player-series-next {
+  margin-left: auto;
+  text-align: right;
+}
+.player-series-label {
+  color: var(--color-muted, inherit);
+}
+
 /* Artwork (show_artwork) sits left of the now/transport column; drop it and the
    column reflows full-width. Its left edge lines up with the column's. */
 .player-body {

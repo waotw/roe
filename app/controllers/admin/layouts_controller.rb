@@ -20,6 +20,7 @@ class Admin::LayoutsController < Admin::BaseController
       { name: "Footer", file: "footer", path: admin_layout_footer_edit_path, exists: LayoutFiles.exist?("footer") },
       { name: "Sidebar", file: "sidebar", path: admin_layout_sidebar_edit_path, exists: LayoutFiles.exist?("sidebar") }
     ]
+    @content_layouts = content_layouts
   end
 
   def edit_header
@@ -117,6 +118,31 @@ class Admin::LayoutsController < Admin::BaseController
   end
 
   private
+
+  # Roe's layout for every type, in the order types are listed elsewhere,
+  # then the site's extra layouts. Each says whether the site has its own copy.
+  def content_layouts
+    names = ->(dir) { Dir.glob(File.join(dir, "*.yml")).map { |f| File.basename(f, ".yml") } }
+    roe = names.call(ContentLayout::ROE_DIR)
+    site = names.call(ContentLayout::SITE_DIR)
+    order = Post::POST_TYPES.keys.map(&:to_s) + %w[page product documentation]
+
+    types = roe.sort_by { |n| order.index(n) || order.size }.map do |name|
+      { name: name, label: content_layout_label(name), customised: site.include?(name), extra: false }
+    end
+    extras = (site - roe).sort.map { |name| { name: name, label: name, customised: true, extra: true } }
+    types + extras
+  end
+
+  def content_layout_label(name)
+    if (config = Post::POST_TYPES[name.to_sym])
+      "#{config[:label]} posts"
+    elsif name == "documentation"
+      "Documentation"
+    else
+      name.humanize.pluralize
+    end
+  end
 
   def ensure_layout_directory_exists
     layout_dir = File.join(RoeSitePaths::SITE_PATH, "layout")

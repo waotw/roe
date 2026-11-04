@@ -164,17 +164,16 @@ class Admin::PostsNewFlowTest < ActionDispatch::IntegrationTest
 
   # --- type + create fields → a body that renders --------------------------
 
-  test "an audio post arrives with its audio set and a player in the body" do
+  test "an audio post arrives with its audio set, and no player in the body — the layout draws it" do
     create_post(filename: "flow-audio", post_type: "audio", fields: { audio: "/media/audio/a.mp3" })
 
     content = file_for("flow-audio")
     assert_includes content, 'post_type: "audio"'
     assert_includes content, 'audio: "/media/audio/a.mp3"'
-    assert_includes content, "```card"
-    assert_includes content, "type: player"
+    assert_not_includes content, "type: player"
   end
 
-  test "a music track arrives with a player and its release's track list" do
+  test "a music track arrives with its release's track list" do
     SiteFeature.stubs(:music_enabled?).returns(true)
     create_post(filename: "flow-music", post_type: "music",
                 fields: { audio: "/media/audio/t.mp3", release: "summer-ep", track_number: "3" })

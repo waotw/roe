@@ -8,28 +8,30 @@
 #
 # There is deliberately NO placeholder syntax. Blocks are live: `card type:
 # player` resolves the post's audio at render, so it can't go stale. Values that
-# would be frozen into the body (a title, an image path) are only written where
-# the type actually needs them there.
+# would be frozen into the body (a page's title) are only written where the
+# type actually needs them there.
 #
 # WHICH BLOCKS: per-post-type lists live in Post::POST_TYPES[:scaffold] next to
 # that type's metadata_fields; pages and products don't vary, so they're below.
-# `:content` marks where the editable template body goes — for a podcast the
-# player sits above it and the episode list below, mirroring the layout this
-# replaces.
+# `:content` marks where the editable template body goes.
+#
+# Anything the type's content layout already draws (lib/site_templates/
+# layouts/content/) stays out of the body: a post's title and player, a
+# product's title, image and buy button. Older content with those blocks in
+# its body keeps them — the layout skips its own copy (ContentLayout::BodyCheck).
 #
 # A block that needs a value it doesn't have is skipped rather than written
-# empty: no playlist until we know which podcast, no image tag until there's an
-# image. The author fills the field in and adds the block from the builder.
+# empty: no playlist until we know which release. The author fills the field
+# in and adds the block from the builder.
 class ContentScaffold
   # Pages and products have no sub-types.
   #
-  # Posts get no `# title` — the post layout renders it from metadata
-  # (posts/_header.html.erb). Pages and products DO, because their views don't:
-  # a page leaves its title to the markdown, and a product's first <h1> is what
-  # products_helper#product_content tags as the title.
+  # A page gets its `# title`, because the page layout is only its body. A
+  # product's layout draws its title, image and button, so its body is only
+  # the writing.
   SCAFFOLDS = {
     "page"    => [ :title, :content ],
-    "product" => [ :image, :title, :content, :buy_button ]
+    "product" => [ :content ]
   }.freeze
 
   DEFAULT = [ :content ].freeze
@@ -67,27 +69,12 @@ class ContentScaffold
     case block
     when :content    then @template_body.strip
     when :title      then title.present? ? "# #{title}" : nil
-    when :image      then image_block
-    when :player     then fence("card", [ "type: player" ])
     when :playlist   then playlist_block
-    # A bare button IS a product button, and it finds the product it's on, so
-    # no sku is needed here. The price shows by default. Without Snipcart
-    # there's no cart to add to, and a button on its own product's page
-    # renders nothing — so none is written; the author adds their store links.
-    when :buy_button then SiteFeature.snipcart_enabled? ? fence("button", [ "text: Add to Cart" ]) : nil
     end
   end
 
   def title
     @metadata["title"].to_s.strip
-  end
-
-  # Skipped until there's an image — an empty src renders a broken image.
-  def image_block
-    image = @metadata["image"].to_s.strip
-    return nil if image.empty?
-
-    "![#{title.presence || 'Image'}](#{image})"
   end
 
   # A playlist has to know what to gather. The association key is on the post

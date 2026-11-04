@@ -115,6 +115,12 @@ class NewsletterRenderer
     #    stray <img> the transformer didn't own.
     content_html = convert_relative_urls(content_html)
 
+    # 4. Place it in the post's layout, as on its page: title, date, author,
+    #    image and the rest in the layout's order (ContentLayout::Text).
+    article_html = convert_relative_urls(
+      ContentLayout::Text.new(post, mode: :email, body_html: content_html).html
+    )
+
     <<~HTML
       <!DOCTYPE html>
       <html>
@@ -133,14 +139,7 @@ class NewsletterRenderer
               #{email_header}
 
               <article>
-                <h1>#{post_title}</h1>
-                #{post_metadata_html}
-                #{post_header_image}
-                #{post_video_link}
-
-                <div class="post-content">
-                  #{content_html}
-                </div>
+                #{article_html}
               </article>
 
               #{email_footer}
@@ -176,33 +175,6 @@ class NewsletterRenderer
     premailer.to_inline_css
   end
 
-  # The post's header/featured image, shown only when the post opts into it
-  # (metadata image + image_in_header), mirroring the web post header. Runs the
-  # bare <img> through the email transformer so it gets the large variant, an
-  # absolute URL, and email-safe sizing like every other image.
-  def post_header_image
-    return "" unless post.respond_to?(:image) && post.image.present?
-    return "" unless post.metadata["image_in_header"].to_s == "true"
-
-    # Build the responsive <picture> the same way the web header does, then let
-    # the transformer collapse it to a single large-variant <img> for email.
-    # (post.image is a raw source path, not a variant, so it must go through
-    # ResponsiveImageRenderer first to resolve the variant set.)
-    picture = ResponsiveImageRenderer.render(post.image, alt: post_title)
-    NewsletterImageTransformer.transform(picture, site_url: email_site_url)
-  end
-
-  # A video post whose video is on YouTube: its thumbnail, linking to the
-  # video, where the player sits on the web page. Email clients strip
-  # iframes, so the player itself can't go in. A video file of our own
-  # isn't sent either — email can't play it — so this is YouTube only.
-  def post_video_link
-    return "" unless post.respond_to?(:video)
-
-    embed = VideoEmbed.for(post.video)
-    embed ? embed.link_html(label: post_title).to_s : ""
-  end
-
   # Email header (logo, etc)
   def email_header
     <<~HTML
@@ -235,22 +207,6 @@ class NewsletterRenderer
     HTML
   end
 
-  # Post metadata (author, date, etc)
-  def post_metadata_html
-    parts = []
-
-    parts << "By #{post.metadata['author']}" if post.metadata["author"].present?
-    parts << format_date(post.metadata["date"]) if post.metadata["date"].present?
-
-    return "" if parts.empty?
-
-    <<~HTML
-      <div class="post-meta" style="color: #666; font-size: 0.875rem; margin-bottom: 2rem;">
-        #{parts.join(" • ")}
-      </div>
-    HTML
-  end
-
   # Helper methods to get data from metadata
   def post_title
     post.metadata["title"] || "Untitled"
@@ -262,15 +218,6 @@ class NewsletterRenderer
 
   def active_theme
     SiteConfig.get("theme.active") || "default"
-  end
-
-  def format_date(date_value)
-    return nil if date_value.blank?
-
-    date = date_value.is_a?(Date) ? date_value : Date.parse(date_value.to_s)
-    date.strftime("%B %d, %Y")
-  rescue
-    date_value.to_s
   end
 
   # Fallback CSS if theme doesn't have a stylesheet

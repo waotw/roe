@@ -155,4 +155,52 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     get product_path(product.url_name)
     assert_select "h1.product-title", product.title
   end
+
+  # ── ⏮ ⏭ in the body's player card ──
+
+  test "a podcast episode's own player card links the episodes before and after it" do
+    older  = a_post("podcast", audio: "/media/audio/1.mp3", podcast: "show", date: "2024-01-01")
+    middle = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01", content: CARD)
+    newer  = a_post("podcast", audio: "/media/audio/3.mp3", podcast: "show", date: "2024-03-01")
+
+    get post_path(middle.url_name)
+    assert_select ".post-content .card-player nav.player-series" do
+      assert_select "a.player-series-prev[href=?]", "/posts/#{older.url_name}", text: /#{older.title}/
+      assert_select "a.player-series-next[href=?]", "/posts/#{newer.url_name}", text: /#{newer.title}/
+    end
+  end
+
+  test "the first episode has only a next link, and a show of one has none" do
+    first = a_post("podcast", audio: "/media/audio/1.mp3", podcast: "show", date: "2024-01-01", content: CARD)
+    a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01")
+    alone = a_post("podcast", audio: "/media/audio/9.mp3", podcast: "solo", date: "2024-01-01", content: CARD)
+
+    get post_path(first.url_name)
+    assert_select ".player-series-prev", 0
+    assert_select ".player-series-next", 1
+
+    get post_path(alone.url_name)
+    assert_select ".player-series", 0
+  end
+
+  test "a music track links the tracks before and after it by track number" do
+    t2 = a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2, content: CARD)
+    t1 = a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
+    t3 = a_post("music", audio: "/media/audio/c.mp3", release: "ep", track_number: 3)
+
+    get post_path(t2.url_name)
+    assert_select "a.player-series-prev[href=?]", "/posts/#{t1.url_name}"
+    assert_select "a.player-series-next[href=?]", "/posts/#{t3.url_name}"
+  end
+
+  test "audio posts, and a card playing another file, get no links" do
+    a_post("podcast", audio: "/media/audio/1.mp3", podcast: "show", date: "2024-01-01")
+    other = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01",
+      content: "```card\ntype: player\naudio: /media/audio/song.mp3\n```")
+    get post_path(other.url_name)
+    assert_select ".player-series", 0
+
+    get post_path(a_post("audio", audio: "/media/audio/a.mp3").url_name)
+    assert_select ".player-series", 0
+  end
 end
