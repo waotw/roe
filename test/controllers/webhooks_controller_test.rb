@@ -64,6 +64,50 @@ class WebhooksControllerTest < ActionDispatch::IntegrationTest
     assert_response :bad_request
   end
 
+  # `roe stripe` forwards events signed with the Stripe CLI's own secret, not
+  # the saved dashboard one; every one used to fail verification locally.
+  def signed_post(payload, secret)
+    ts = Time.now.to_i
+    sig = Stripe::Webhook::Signature.compute_signature(Time.at(ts), payload, secret)
+    post "/webhooks/stripe", params: payload,
+      headers: { "CONTENT_TYPE" => "application/json", "HTTP_STRIPE_SIGNATURE" => "t=#{ts},v1=#{sig}" }
+  end
+
+  def checkout_payload
+    { id: "evt_cli", object: "event", type: "checkout.session.completed",
+      data: { object: { id: "cs_cli", object: "checkout.session", customer: "cus_cli",
+                        payment_intent: "pi_cli", amount_total: 4900, currency: "usd",
+                        metadata: { member_id: @member.id.to_s } } } }.to_json
+  end
+
+  test "in development, an event signed by the Stripe CLI's secret is accepted too" do
+    Rails.stubs(:env).returns(ActiveSupport::EnvironmentInquirer.new("development"))
+    StripeConfig.stubs(:cli_webhook_secret).returns("whsec_cli_999")
+
+    signed_post(checkout_payload, "whsec_cli_999")
+
+    assert_response :ok
+    assert @member.reload.paid?
+  end
+
+  test "the saved secret still works alongside the CLI's" do
+    Rails.stubs(:env).returns(ActiveSupport::EnvironmentInquirer.new("development"))
+    StripeConfig.stubs(:cli_webhook_secret).returns("whsec_cli_999")
+
+    signed_post(checkout_payload, "whsec_test_123")
+
+    assert_response :ok
+  end
+
+  test "outside development the CLI's secret isn't accepted" do
+    StripeConfig.stubs(:cli_webhook_secret).returns("whsec_cli_999")
+
+    signed_post(checkout_payload, "whsec_cli_999")
+
+    assert_response :bad_request
+    assert_not @member.reload.paid?
+  end
+
   test "returns 400 for malformed JSON" do
     post "/webhooks/stripe",
       params: "not valid json",

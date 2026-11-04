@@ -24,6 +24,79 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
   # Code Block Protection Tests
   # =============================================================================
 
+  # A bare | outside a table is escaped so kramdown doesn't read the line as a
+  # table row. Code is shown exactly as written, so inside a code span the
+  # escape showed up as "&#124;" (the install guide's `curl … | bash`).
+  test "a pipe in inline code shows as a pipe" do
+    html = render("Run `curl -fsSL https://go-roe.com/install | bash` now.")
+
+    assert_includes html, "<code>curl -fsSL https://go-roe.com/install | bash</code>"
+    assert_not_includes html, "#124;"
+  end
+
+  test "a pipe in prose still doesn't make a table" do
+    html = render("Choose this | or that, then `a | b`.")
+
+    assert_not_includes html, "<table"
+    assert_includes html, "<code>a | b</code>"
+  end
+
+  test "a markdown table still renders" do
+    html = render("| Name | Use |\n| --- | --- |\n| `a | b` | pipe |\n")
+
+    assert_includes html, "<table"
+  end
+
+  test "a pipe in a fenced code block shows as a pipe" do
+    html = render("```sh\ncat log | grep error\n```\n")
+
+    assert_includes html, "cat log | grep error"
+  end
+
+  # A fence with no language used to skip protection, so pipe escaping,
+  # strikethrough and highlights all ran inside it.
+  test "a bare fence is a code block shown exactly as written" do
+    html = render("Before.\n\n```\na | b ~~c~~ ==d==\n```\n\nAfter.\n")
+
+    assert_includes html, "<pre><code>a | b ~~c~~ ==d==</code></pre>"
+  end
+
+  test "strikethrough doesn't run inside inline code" do
+    html = render("Write `~~old~~` for ~~old~~.")
+
+    assert_includes html, "<code>~~old~~</code>"
+    assert_includes html, "<del>old</del>"
+  end
+
+  # Four backticks show an example of a fenced block, ``` lines and all.
+  test "a three-backtick fence inside a four-backtick block stays content" do
+    html = render("````\n```card\nurl: /x\n```\n````\n")
+
+    assert_includes html, "<pre><code class=\"language-text\">```card\nurl: /x\n```</code></pre>"
+  end
+
+  # A Roe block's closing ``` must not be read as the opening of a bare code
+  # block, which would swallow the text after it.
+  test "text after a Roe block isn't turned into code" do
+    html = render("```search\n```\n\nPlain ==text== here.\n\n```\nreal code\n```\n")
+
+    assert_includes html, "<mark>text</mark>"
+    assert_includes html, "<pre><code>real code</code></pre>"
+  end
+
+  test "a fence inside a list item drops the list's indent" do
+    html = render("1. Live at:\n    ```\n    https://example.com\n    ```\n2. Next.\n")
+
+    assert_includes html, "<pre><code>https://example.com</code></pre>"
+    assert_no_match %r{<br\s*/?>\s*<pre}, html
+  end
+
+  test "a fence with no closing line is left alone" do
+    html = render("```\nnever closed | here\n")
+
+    assert_not_includes html, "CODE_BLOCK_PLACEHOLDER"
+  end
+
   # Kramdown wraps the placeholder in a paragraph. <pre> can't live inside <p>,
   # so restoring only the token left `<p><pre>…</pre></p>`, which every later
   # Nokogiri pass rewrote to `<p></p><pre>…</pre>` — a stray empty paragraph
@@ -1593,6 +1666,48 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
     assert_includes html, 'data-turbo="false"', "signup form must opt out of Turbo"
     assert_includes html, 'formaction="/signup_and_checkout"', "upgrade button keeps its formaction"
     refute_includes html, "<%#", "no stray ERB comment should leak into the raw HTML"
+  end
+
+  # members.yml free_signup: false — joining is paid only, so the form has no
+  # free path at all: one button, and the form itself posts to checkout.
+  test "paid-only signup form has one button and posts straight to checkout" do
+    model = TestModel.new("")
+    model.stubs(:form_authenticity_token).returns("tok")
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+
+    html = model.send(:render_signup_form, "Sign up free", "Become a paid member")
+
+    assert_includes html, 'action="/signup_and_checkout"'
+    assert_includes html, ">Become a paid member</button>"
+    refute_includes html, "Sign up free", "no free button"
+    refute_includes html, "formaction", "nothing left that posts anywhere else"
+  end
+
+  test "paid-only signup form falls back to the button text when there's no upgrade text" do
+    model = TestModel.new("")
+    model.stubs(:form_authenticity_token).returns("tok")
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(true)
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+
+    html = model.send(:render_signup_form, "Join", nil)
+
+    assert_includes html, ">Join</button>"
+    assert_includes html, 'action="/signup_and_checkout"'
+  end
+
+  test "paid-only with payments off says sign-ups are closed instead of drawing a form" do
+    model = TestModel.new("")
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "payments.enabled").returns(false)
+    SiteFeature.stubs(:paid_only_signup?).returns(true)
+
+    html = model.send(:render_signup_form, "Sign up", nil)
+
+    assert_includes html, "Sign-ups are closed."
+    refute_includes html, "<form"
   end
 
   test "share button carries the stable .share hook + omits empty values" do

@@ -23,6 +23,15 @@ module Members
     end
 
     def create
+      # Paid only (members.yml free_signup: false): no free accounts, even
+      # from a form posted here directly. The form itself has no free button.
+      if SiteFeature.paid_only_signup?
+        @member = Member.new(registration_params)
+        @member.errors.add(:base, "This site doesn't offer free membership. Join with the paid option instead.") # COPY
+        render "pages/show", status: :unprocessable_entity
+        return
+      end
+
       @member = Member.new(registration_params)
       @member.tier = :free
       @member.status = :active
@@ -55,13 +64,23 @@ module Members
     end
 
     def create_and_checkout
-      @member = Member.new(registration_params)
+      paid_only = SiteFeature.paid_only_signup?
+      @member = paid_only ? pending_member_for_signup : Member.new(registration_params)
       @member.tier = :free
-      @member.status = :active
+      # Paid only: the account stays pending, and signed out, until Stripe
+      # confirms the payment (WebhooksController#handle_checkout_completed).
+      # Otherwise it's a free member straight away, upgraded on payment.
+      @member.status = paid_only ? :pending : :active
 
       if @member.save
-        # Auto-signin
-        session[:member_id] = @member.id
+        if paid_only
+          # Not signed in yet: a pending account must not get member access.
+          # payment_processing signs them in once the payment is confirmed.
+          session[:pending_member_id] = @member.id
+        else
+          # Auto-signin
+          session[:member_id] = @member.id
+        end
 
         # Create Stripe checkout session
         stripe_config = StripeConfig.current
@@ -70,6 +89,10 @@ module Members
           redirect_to root_path, alert: "There was an issue with the upgrade system. Please contact the site owner."
           return
         end
+
+        # Paid only lands on the processing page, which waits for the payment
+        # to be confirmed and then signs the member in.
+        success_url = paid_only ? checkout_payment_processing_url : checkout_success_url
 
         begin
           checkout_session = Stripe::Checkout::Session.create(
@@ -80,7 +103,7 @@ module Members
                 quantity: 1
               } ],
               mode: "payment",
-              success_url: checkout_success_url + "?session_id={CHECKOUT_SESSION_ID}",
+              success_url: success_url + "?session_id={CHECKOUT_SESSION_ID}",
               cancel_url: checkout_cancel_url,
               metadata: {
                 member_id: @member.id,
@@ -108,6 +131,18 @@ module Members
       # has_secure_password ignores a blank password, so email-mode signups that
       # never send the field are unaffected.
       params.require(:member).permit(:email, :name, :password)
+    end
+
+    # Someone who closed the Stripe page and tries again has a pending account
+    # under that email already; reuse it rather than refusing the email as
+    # taken. Only pending accounts are reused, never an active one.
+    def pending_member_for_signup
+      email = registration_params[:email].to_s.strip
+      existing = Member.status_pending.where("LOWER(email) = ?", email.downcase).first if email.present?
+      return Member.new(registration_params) unless existing
+
+      existing.assign_attributes(registration_params.except(:email))
+      existing
     end
 
     def redirect_if_signed_in

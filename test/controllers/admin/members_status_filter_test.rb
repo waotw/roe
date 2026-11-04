@@ -21,4 +21,18 @@ class Admin::MembersStatusFilterTest < ActionDispatch::IntegrationTest
     # The dropdown still opens on the remembered choice.
     assert_select "select[data-members-filter-target=statusFilter] option[value=cancelled][selected]"
   end
+
+  # A paid-only sign-up that never paid fell through to the Cancelled badge.
+  test "a pending member is labelled Pending payment, not Cancelled" do
+    pending = Member.create!(email: "pending-#{SecureRandom.hex(4)}@example.com", name: "Pending", status: :pending)
+
+    get admin_members_path
+    row = css_select("tr").find { |tr| tr.text.include?(pending.email) }
+    assert_includes row.text, "Pending payment"
+    assert_not_includes row.text, "Cancelled"
+
+    get admin_member_path(pending)
+    assert_includes response.body, "Pending payment"
+    assert_includes response.body, "Payment Not Received"
+  end
 end

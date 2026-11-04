@@ -5,12 +5,14 @@ class WebhooksController < ApplicationController
   def stripe
     payload = request.body.read
     sig_header = request.env["HTTP_STRIPE_SIGNATURE"]
-    signing_secret = StripeConfig.current.current_webhook_signing_secret
+    signing_secrets = StripeConfig.current.webhook_signing_secrets
 
-    event = if signing_secret.present?
+    event = if signing_secrets.any?
               # Verified path. Stripe::Webhook.construct_event raises
               # SignatureVerificationError on tampered or forged payloads.
-              Stripe::Webhook.construct_event(payload, sig_header, signing_secret)
+              # More than one secret only locally: `roe stripe` forwards
+              # events signed by the Stripe CLI (see StripeConfig).
+              construct_verified_event(payload, sig_header, signing_secrets)
     else
               # Unverified fallback for fresh installs or local development
               # where the writer hasn't pasted in the signing secret yet.
@@ -49,6 +51,16 @@ class WebhooksController < ApplicationController
   end
 
   private
+
+  # The first secret that verifies wins; if none does, the last failure is
+  # raised so the caller logs it and answers 400 as before.
+  def construct_verified_event(payload, sig_header, secrets)
+    secrets.each_with_index do |secret, i|
+      return Stripe::Webhook.construct_event(payload, sig_header, secret)
+    rescue Stripe::SignatureVerificationError
+      raise if i == secrets.size - 1
+    end
+  end
 
   def handle_checkout_completed(session)
     member_id = session.metadata&.[]("member_id")

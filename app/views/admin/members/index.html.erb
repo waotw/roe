@@ -26,6 +26,7 @@
         <option value="active"<% if params[:status] == 'active' %> selected<% end %>>Active</option>
         <option value="cancelled"<% if params[:status] == 'cancelled' %> selected<% end %>>Cancelled</option>
         <option value="deleted"<% if params[:status] == 'deleted' %> selected<% end %>>Deleted</option>
+        <option value="pending"<% if params[:status] == 'pending' %> selected<% end %>>Pending payment</option>
       </select>
     </div>
 
@@ -339,6 +340,8 @@
                       <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Active</span>
                     <% elsif member.anonymized? %>
                       <span class="inline-flex bg-gray-200 px-2 text-xs font-semibold leading-5 text-gray-700">Deleted</span>
+                    <% elsif member.status_pending? %>
+                      <span class="inline-flex bg-amber-100 px-2 text-xs font-semibold leading-5 text-amber-800">Pending payment</span>
                     <% else %>
                       <span class="inline-flex bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">Cancelled</span>
                     <% end %>

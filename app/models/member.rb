@@ -4,7 +4,10 @@ class Member < ApplicationRecord
   # `deleted` is the member asking to be forgotten. The row stays so delivery
   # records and payments keep a valid owner; everything identifying them is
   # cleared. See #anonymize!.
-  enum :status, { active: 0, cancelled: 1, deleted: 2 }, prefix: true
+  # `pending` is a paid-only sign-up (members.yml free_signup: false) waiting
+  # for Stripe to confirm the payment. It can't sign in; the checkout webhook
+  # makes it active and paid. A closed Stripe page leaves it pending.
+  enum :status, { active: 0, cancelled: 1, deleted: 2, pending: 3 }, prefix: true
   enum :newsletter_status, { subscribed: 0, unsubscribed: 1, bounced: 2 }, prefix: true
 
   belongs_to :import, optional: true
@@ -405,6 +408,9 @@ class Member < ApplicationRecord
     transaction do
       update!(
         tier: :paid,
+        # A paid-only sign-up waits as pending until this payment; paying
+        # makes it a real member. Any other status is left as it was.
+        status: status_pending? ? :active : status,
         password: password,
         password_confirmation: password,
         stripe_customer_id: customer_id,

@@ -30,4 +30,4 @@ Updates are handled on this page: [Admin → Updates & Deploy](/admin/updates). 
 
 ## Deployment
 
-Deployment is similar. There is a full guide to deployment here: [Guide → Deploy]
+Deployment is similar. There is a full guide to deployment here: [Guide: Deploy]

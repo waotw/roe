@@ -82,6 +82,23 @@ module SiteFeature
     members_enabled? && !email_feature_enabled?
   end
 
+  # Free sign-ups. On unless members.yml says `free_signup: false`, so a
+  # members.yml written before this setting existed keeps letting people join
+  # free. Off makes joining paid only: the signup form drops its free button,
+  # POST /signup refuses, and the paid button's account stays inactive until
+  # Stripe confirms the payment (Members::RegistrationsController).
+  def free_signup_enabled?
+    return false unless members_enabled?
+    ![ false, "false" ].include?(SiteConfig.feature("members", "free_signup"))
+  end
+
+  # The "off" side of free_signup, for the places that behave differently
+  # when joining is paid only. False whenever members are off, so nothing
+  # changes for a site without members.
+  def paid_only_signup?
+    members_enabled? && !free_signup_enabled?
+  end
+
   # Newsletters enabled = members enabled AND newsletter.enabled in members.yml.
   # Sending posts as broadcasts, and nothing else — it no longer decides whether
   # email works at all.

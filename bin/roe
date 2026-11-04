@@ -574,6 +574,19 @@ cmd_stripe() {
     local target="localhost:${port}/webhooks/stripe"
     echo -e "${BOLD}Forwarding Stripe webhooks → ${CYAN}${target}${NC}${BOLD} for ${name}${NC}"
 
+    # The listener signs what it forwards with its own secret, which isn't the
+    # one Roe saved for the dashboard webhook — so Roe rejected every forwarded
+    # event. Leave the CLI's secret where this site looks for it
+    # (StripeConfig::CLI_WEBHOOK_SECRET_PATH). The saved one stays untouched:
+    # it's in stripe.yml, which Site Sync carries to the live site.
+    local cli_secret secret_file="$root/current/tmp/stripe_cli_webhook_secret"
+    cli_secret="$(stripe listen --print-secret 2>/dev/null | tr -d '[:space:]')"
+    if [ "${cli_secret#whsec_}" != "$cli_secret" ] && [ -d "$root/current/tmp" ]; then
+        ( umask 077 && printf '%s\n' "$cli_secret" > "$secret_file" )
+    else
+        log_warning "Couldn't read the Stripe CLI's signing secret, so ${name} may reject forwarded events."
+    fi
+
     # Newer Stripe CLIs refuse `stripe listen` without being told which events to
     # forward. Default to exactly the events Roe's webhook handler acts on
     # (checkout + refunds + disputes); callers can override with

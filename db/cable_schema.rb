@@ -12,8 +12,8 @@
 
 ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   create_table "deploy_secrets", force: :cascade do |t|
-    t.datetime "created_at", null: false
     t.text "registry_password"
+    t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
 
@@ -77,7 +77,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   end
 
   create_table "media", force: :cascade do |t|
-    t.string "audience", default: "free", null: false
     t.datetime "created_at", null: false
     t.string "file_path"
     t.integer "import_id"
@@ -87,6 +86,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
     t.datetime "uploaded_at"
     t.datetime "variants_generated_at"
     t.string "variants_status", default: "pending"
+    t.string "audience", default: "free", null: false
     t.index ["audience"], name: "index_media_on_audience"
     t.index ["file_path"], name: "index_media_on_file_path", unique: true
     t.index ["import_id"], name: "index_media_on_import_id"
@@ -97,19 +97,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   create_table "media_references", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "medium_id", null: false
-    t.integer "referenceable_id", null: false
-    t.string "referenceable_type", null: false
     t.datetime "updated_at", null: false
+    t.string "referenceable_type", null: false
+    t.integer "referenceable_id", null: false
     t.index ["medium_id"], name: "index_media_references_on_medium_id"
     t.index ["referenceable_type", "referenceable_id", "medium_id"], name: "index_media_references_on_referenceable_and_medium", unique: true
     t.index ["referenceable_type", "referenceable_id"], name: "index_media_references_on_referenceable"
   end
 
   create_table "member_recovery_codes", force: :cascade do |t|
+    t.integer "member_id", null: false
     t.string "code_digest", null: false
     t.datetime "consumed_at"
     t.datetime "created_at", null: false
-    t.integer "member_id", null: false
     t.datetime "updated_at", null: false
     t.index ["member_id"], name: "index_member_recovery_codes_on_member_id"
   end
@@ -122,7 +122,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
     t.datetime "email_confirmation_sent_at"
     t.string "email_confirmation_token"
     t.integer "import_id"
-    t.string "media_token", limit: 36
     t.json "metadata", default: {}
     t.string "name"
     t.integer "newsletter_status", default: 0, null: false
@@ -140,6 +139,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
     t.datetime "subscribed_at"
     t.integer "tier", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.string "media_token", limit: 36
     t.index ["access_token"], name: "index_members_on_access_token", unique: true
     t.index ["email"], name: "index_members_on_email", unique: true
     t.index ["import_id"], name: "index_members_on_import_id"
@@ -150,16 +150,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   end
 
   create_table "newsletter_sends", force: :cascade do |t|
-    t.datetime "attempted_at"
     t.datetime "created_at", null: false
-    t.string "error"
     t.integer "import_id"
     t.integer "member_id", null: false
     t.string "message_id"
     t.integer "post_id", null: false
     t.datetime "sent_at"
-    t.string "status", default: "sent", null: false
     t.datetime "updated_at", null: false
+    t.string "status", default: "sent", null: false
+    t.string "error"
+    t.datetime "attempted_at"
     t.index ["import_id"], name: "index_newsletter_sends_on_import_id"
     t.index ["member_id"], name: "index_newsletter_sends_on_member_id"
     t.index ["message_id"], name: "index_newsletter_sends_on_message_id"
@@ -177,18 +177,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   end
 
   create_table "postmark_configs", force: :cascade do |t|
-    t.text "account_approval_error"
-    t.text "account_token"
     t.datetime "connected_at"
     t.datetime "created_at", null: false
-    t.integer "mode", default: 0, null: false
-    t.text "sender_error"
-    t.string "sender_verified_address"
     t.text "server_token"
     t.datetime "updated_at", null: false
-    t.datetime "verified_at"
     t.string "webhook_token"
+    t.integer "mode", default: 0, null: false
+    t.datetime "verified_at"
+    t.string "sender_verified_address"
+    t.text "sender_error"
+    t.text "account_token"
     t.datetime "webhook_verified_at"
+    t.text "account_approval_error"
   end
 
   create_table "posts", force: :cascade do |t|
@@ -211,11 +211,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   end
 
   create_table "recovery_codes", force: :cascade do |t|
+    t.integer "user_id", null: false
     t.string "code_digest", null: false
     t.datetime "consumed_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.integer "user_id", null: false
     t.index ["user_id"], name: "index_recovery_codes_on_user_id"
   end
 
@@ -247,20 +247,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   end
 
   create_table "snipcart_orders", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "currency"
-    t.string "email"
-    t.integer "mode", default: 0, null: false
-    t.string "name"
-    t.json "payload", default: {}, null: false
-    t.datetime "placed_at"
-    t.integer "refunded_amount_cents"
-    t.datetime "refunded_at"
-    t.string "refunded_currency"
     t.string "snipcart_token", null: false
-    t.string "status"
+    t.string "email"
+    t.string "name"
     t.integer "total_cents"
+    t.string "currency"
+    t.string "status"
+    t.integer "refunded_amount_cents"
+    t.string "refunded_currency"
+    t.datetime "refunded_at"
+    t.datetime "placed_at"
+    t.json "payload", default: {}, null: false
+    t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "mode", default: 0, null: false
     t.index ["email"], name: "index_snipcart_orders_on_email"
     t.index ["mode"], name: "index_snipcart_orders_on_mode"
     t.index ["placed_at"], name: "index_snipcart_orders_on_placed_at"
@@ -278,21 +278,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
   end
 
   create_table "static_site_sync_configs", force: :cascade do |t|
-    t.integer "auth_mode", default: 0
-    t.datetime "created_at", null: false
     t.string "host"
-    t.datetime "last_pushed_at"
-    t.string "last_verification_error"
-    t.datetime "last_verified_at"
-    t.text "password"
     t.integer "port", default: 22
-    t.integer "protocol", default: 0, null: false
-    t.string "remote_path"
-    t.text "ssh_key_passphrase"
-    t.text "ssh_private_key"
-    t.datetime "updated_at", null: false
     t.string "username"
+    t.integer "auth_mode", default: 0
+    t.text "password"
+    t.text "ssh_private_key"
+    t.string "remote_path"
+    t.datetime "last_pushed_at"
+    t.datetime "last_verified_at"
+    t.string "last_verification_error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.integer "protocol", default: 0, null: false
     t.boolean "verify_tls", default: true, null: false
+    t.text "ssh_key_passphrase"
   end
 
   create_table "stripe_configs", force: :cascade do |t|
@@ -300,28 +300,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_111547) do
     t.datetime "created_at", null: false
     t.string "currency"
     t.integer "mode", default: 0, null: false
-    t.string "price_id_live"
-    t.string "price_id_test"
-    t.string "product_id_live"
-    t.string "product_id_test"
     t.text "publishable_key_live"
     t.text "publishable_key_test"
     t.text "secret_key_live"
     t.text "secret_key_test"
     t.datetime "updated_at", null: false
-    t.datetime "verified_at"
     t.string "webhook_signing_secret_live"
     t.string "webhook_signing_secret_test"
+    t.datetime "verified_at"
+    t.string "product_id_test"
+    t.string "product_id_live"
+    t.string "price_id_test"
+    t.string "price_id_live"
   end
 
   create_table "sync_configs", force: :cascade do |t|
-    t.text "backup_passphrase"
-    t.datetime "created_at", null: false
-    t.text "peer_env"
-    t.string "peer_url"
-    t.string "ssh_key_path"
     t.text "token"
+    t.string "peer_url"
+    t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "ssh_key_path"
+    t.text "backup_passphrase"
+    t.text "peer_env"
   end
 
   create_table "update_statuses", force: :cascade do |t|

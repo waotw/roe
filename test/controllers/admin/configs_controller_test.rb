@@ -847,6 +847,40 @@ class Admin::ConfigsControllerTest < ActionDispatch::IntegrationTest
     assert_not SiteFeature.always_show_member_icon?, "turning it back off has to stick too"
   end
 
+  # free_signup is top-level (not grouped like the others), and a members.yml
+  # from before it existed has no such key: it still has to show, checked.
+  test "the members editor shows Enable free members, checked when members.yml doesn't mention it" do
+    get admin_edit_members_config_path
+
+    assert_includes response.body, "Enable free members"
+    assert_select "input[type=checkbox][data-config-field='free_signup'][checked]", 1
+  end
+
+  test "turning free members off saves and reads back as paid only" do
+    patch admin_members_config_path,
+          params: { content: "free_signup: false\npayments:\n  enabled: true\n" }
+
+    assert SiteFeature.paid_only_signup?, "saved, then read back as free sign-ups on"
+
+    patch admin_members_config_path,
+          params: { content: "free_signup: true\npayments:\n  enabled: true\n" }
+
+    assert_not SiteFeature.paid_only_signup?
+  end
+
+  # Turning members on: free members is on unless the owner unticks it.
+  test "the members setup window offers Enable free members, ticked" do
+    File.delete(SiteConfig::FEATURES_PATH.join("members.yml"))
+
+    get new_members_setup_admin_configs_path
+
+    assert_response :success
+    assert_includes response.body, "Enable free members"
+    assert_select "input[type=checkbox][name='free_signup'][value='true'][checked]", 1
+    assert_select "input[type=hidden][name='free_signup'][value='false']", 1,
+      "unticked has to send false, or it reads as on"
+  end
+
   private
 
   def ensure_feature_file(filename)

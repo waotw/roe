@@ -4,9 +4,19 @@
     <p>
       You cancelled the checkout process. No charges were made.
     </p>
+    <% if @pending_member %>
+      <%# COPY: placeholder wording — owner will rewrite %>
+      <p>
+        Your membership starts once the payment goes through.
+      </p>
+    <% end %>
 
+    <%# button_to, not link_to with method: :post — without rails-ujs that
+        link was a plain GET to /checkout, which has no route. Turbo off: the
+        answer is a redirect to Stripe, which Turbo's fetch can't follow. %>
     <div class="form-actions">
-      <%= link_to "Try Again", create_checkout_path, method: :post, class: "btn-primary" %>
+      <%= button_to "Try Again", create_checkout_path, method: :post, class: "btn-primary",
+            form: { data: { turbo: false }, style: "display: inline" } %>
       <%= link_to "Back to Home", root_path, class: "btn-secondary" %>
     </div>
   </div>

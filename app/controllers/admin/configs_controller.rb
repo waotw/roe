@@ -1381,6 +1381,7 @@ class Admin::ConfigsController < Admin::BaseController
     @field_options = build_field_options_for_members
     @field_hints = build_field_hints_for_members
     @field_checkboxes = MEMBERS_CHECKBOX_FIELDS
+    @field_labels = MEMBERS_FIELD_LABELS
 
     render :edit
   end
@@ -1443,13 +1444,17 @@ class Admin::ConfigsController < Admin::BaseController
     # Newsletter needs email to send — can't broadcast with no mailer. If email
     # is off, newsletter is forced off regardless of what the form said.
     newsletter_enabled = email_enabled && params[:newsletter_enabled] == "true"
+    # Checked by default in the setup window; only an explicit "false" (the
+    # unchecked box's hidden field) turns free sign-ups off.
+    free_signup = params[:free_signup] != "false"
 
     ConfigGenerator.new.generate_members_defaults(
       show_paid_content: show_paid,
       payments_enabled: payments_enabled,
       payment_price: payment_price,
       email_enabled: email_enabled,
-      newsletter_enabled: newsletter_enabled
+      newsletter_enabled: newsletter_enabled,
+      free_signup: free_signup
     )
     SiteConfig.sync_from_file("defaults/members")
 
@@ -2566,7 +2571,10 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   # Settings that read as on/off rather than as a choice between two things.
-  MEMBERS_CHECKBOX_FIELDS = [ "display.always_show_member_icon", "auth.email_enabled", "newsletter.enabled", "payments.enabled", "everyone.show_paid_content" ].freeze
+  MEMBERS_CHECKBOX_FIELDS = [ "free_signup", "display.always_show_member_icon", "auth.email_enabled", "newsletter.enabled", "payments.enabled", "everyone.show_paid_content" ].freeze
+
+  # Labels for top-level settings whose key doesn't read well humanized.
+  MEMBERS_FIELD_LABELS = { "free_signup" => "Enable free members" }.freeze
 
   # Whether the submitted members.yml turns email from on -> off, compared to
   # the current on-disk state via the same rule SiteFeature uses (absent key =
@@ -2592,7 +2600,9 @@ class Admin::ConfigsController < Admin::BaseController
     # for a members.yml written before this setting existed — it was a
     # magic-link site, so email is on (matches SiteFeature#email_feature_enabled?).
     auth = { "email_enabled" => true }.merge(config["auth"] || {})
-    { "display" => display, "auth" => auth }.merge(config)
+    # free_signup leads, and defaults on for a members.yml from before it
+    # existed (matches SiteFeature#free_signup_enabled?).
+    { "free_signup" => true, "display" => display, "auth" => auth }.merge(config)
   end
 
   def build_field_options_for_members
@@ -2638,6 +2648,7 @@ class Admin::ConfigsController < Admin::BaseController
     currency = stripe_config.connected? ? stripe_config.default_currency.upcase : "USD"
 
     {
+      "free_signup" => "On: anyone can join as a free member, and paid membership is an upgrade. Off: people can only join by paying (needs payments, below); with payments off too, the signup form shows that sign-ups are closed. Existing free members are kept.",
       "payments.enabled" => "Turn on the payments system (requires connection to your Stripe account). Then choose what you want to offer in the mode field below.",
       "payments.mode" => "memberships = lifetime paid access (price below). donations = one-time support payments (no membership granted). both = offer both options.",
       "payments.price" => "Membership price in #{currency} (only used when mode is memberships or both, e.g., 49.00)",

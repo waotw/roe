@@ -215,7 +215,7 @@ The domain of your site has to be registered with Snipcart for this to work.
 
 ## Going Live
 
-In order to add a Live API key to Roe, you'll need to deploy your site to a web host: [Guide → Deploy](/documentation/roe/guide-deploy)
+In order to add a Live API key to Roe, you'll need to deploy your site to a web host: [Guide: Deploy](/documentation/roe/guide-deploy)
 
 1. **Add a credit card to Snipcart** - required to use LIVE mode.
 2. **Get Live API Key** - From your Snipcart dashboard

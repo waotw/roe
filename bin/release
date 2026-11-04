@@ -673,11 +673,20 @@ def step_ci
   say "This takes a few minutes."
   puts
   # No keyboard (stdin closed at once): anything in CI that asks a question
-  # fails instead of waiting. Output is shown live and kept for the hints.
+  # fails instead of waiting. Output is shown live, as it arrives rather
+  # than a whole line at a time, so a question without a line ending still
+  # shows. It's kept for the hints.
   output = +""
   passed = Open3.popen2e(program("bin/ci"), chdir: CURRENT) do |stdin, out, wait|
     stdin.close
-    out.each_line { |line| print line; output << line }
+    loop do
+      chunk = out.readpartial(4096)
+      print chunk
+      $stdout.flush
+      output << chunk
+    rescue EOFError
+      break
+    end
     wait.value.success?
   end
   if passed

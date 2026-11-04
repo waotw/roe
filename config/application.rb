@@ -1,6 +1,19 @@
 require_relative "boot"
 
-require "rails/all"
+# Only the parts of Rails that Roe uses. `rails/all` also loaded Active
+# Storage, Action Text and Action Mailbox, which Roe never used (media is
+# Roe's own code, and there are no attachments, rich text or inbound mail),
+# yet their routes were mounted and their security advisories applied.
+# Action Cable stays: the newsletter send status updates live through it.
+require "rails"
+require "active_model/railtie"
+require "active_job/railtie"
+require "active_record/railtie"
+require "action_controller/railtie"
+require "action_mailer/railtie"
+require "action_view/railtie"
+require "action_cable/engine"
+require "rails/test_unit/railtie"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.

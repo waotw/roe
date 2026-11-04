@@ -13,11 +13,14 @@
 
     <script nonce="<%= request.content_security_policy_nonce %>">
       (function() {
-        let attempts = 0;
+        // The count rides in the address: each check is a full reload, so a
+        // counter in this script started again at 0 every time and the
+        // 60-second limit never arrived.
+        const url = new URL(window.location.href);
+        const attempts = parseInt(url.searchParams.get('check') || '0', 10) + 1;
         const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds max
-        
+
         function checkPayment() {
-          attempts++;
           
           if (attempts >= maxAttempts) {
             // Timeout - show error
@@ -36,7 +39,8 @@
           }
           
           // Reload to check payment status
-          window.location.reload();
+          url.searchParams.set('check', attempts);
+          window.location.replace(url.toString());
         }
         
         // Check every 2 seconds

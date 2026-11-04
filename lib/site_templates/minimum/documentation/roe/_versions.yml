@@ -1,7 +1,7 @@
 ---
-00-guide_installation.md: 0.4.0
-03-guide_deploy.md: 0.3.0
-03-guide_publish.md: 0.3.0
+00-guide_installation.md: 0.4.1
+03-guide_deploy.md: 0.4.1
+03-guide_publish.md: 0.4.1
 04-about_file-first-approach.md: 0.0.34
 050_glossary.md: 0.3.0
 0A-how-roe-works.md: 0.3.0
@@ -27,13 +27,13 @@ DC-content_paid.md: 0.4.0
 admin_layouts.md: 0.3.0
 admin_members.md: 0.4.0
 admin_themes.md: 0.2.0
-admin_updates_deploy.md: 0.4.0
+admin_updates_deploy.md: 0.4.1
 features_members.md: 0.4.0
 features_music.md: 0.3.0
 features_newsletters.md: 0.2.0
 features_payments.md: 0.3.0
 features_podcasts.md: 0.3.0
-features_store.md: 0.2.0
+features_store.md: 0.4.1
 integrations_postmark.md: 0.4.0
 integrations_snipcart.md: 0.4.0
 integrations_stripe.md: 0.4.0
@@ -48,8 +48,8 @@ roeanji_image-galleries.md: 0.3.0
 roeanji_search.md: 0.3.0
 settings_redirects.md: 0.4.0
 system-recovery.md: 0.2.0
-system-site_sync.md: 0.4.0
-system_deploy_and_publish.md: 0.3.0
+system-site_sync.md: 0.4.1
+system_deploy_and_publish.md: 0.4.1
 system_feeds.md: 0.3.0
 system_podcast-feed-tags.md: 0.3.0
 tools_feed-imports.md: 0.4.0
@@ -98,4 +98,4 @@ z-def_ssh.md: 0.3.0
 z-def_ssl_tls.md: 0.3.0
 z-def_webhook.md: 0.4.0
 z-def_yaml.md: 0.0.33
-z-guide_directories_terminal.md: 0.2.0
+z-guide_directories_terminal.md: 0.4.1

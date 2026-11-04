@@ -1,5 +1,5 @@
 ---
-title: Guide → Publish a static site
+title: "Guide: Publish a static site"
 status: published
 url_name: guide-publish
 tags: guide, publish
