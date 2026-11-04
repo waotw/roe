@@ -134,6 +134,23 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "h1", 1
   end
 
+  test "a page connected to a podcast uses the podcast-page layout" do
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    PodcastConfig.stubs(:get).returns({ "title" => "The Show" })
+    page = create(:page, metadata: { "title" => "Show", "url_name" => "the-show", "status" => "published", "podcast" => "show" }, content: "About the show.")
+
+    assert_equal "podcast-page", ContentLayout.for(page).name
+    get "/#{page.url_name}"
+    assert_select "h1.podcast-page-title", "The Show"
+  end
+
+  test "a site's custom page layout doesn't change podcast pages" do
+    site_layout("page", "- title\n- body\n")
+    page = create(:page, metadata: { "title" => "Show", "url_name" => "show-2", "status" => "published", "podcast" => "show" }, content: "x")
+    assert_equal "podcast-page", ContentLayout.for(page).name
+    assert_equal "page", ContentLayout.for(create(:page, metadata: { "title" => "A", "url_name" => "a-page", "status" => "published" }, content: "x")).name
+  end
+
   test "a product shows its title, image and button from the layout" do
     product = a_product
     get product_path(product.url_name)

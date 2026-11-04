@@ -125,7 +125,7 @@ class Admin::LayoutsController < Admin::BaseController
     names = ->(dir) { Dir.glob(File.join(dir, "*.yml")).map { |f| File.basename(f, ".yml") } }
     roe = names.call(ContentLayout::ROE_DIR)
     site = names.call(ContentLayout::SITE_DIR)
-    order = Post::POST_TYPES.keys.map(&:to_s) + %w[page product documentation]
+    order = Post::POST_TYPES.keys.map(&:to_s) + %w[page podcast-page product documentation]
 
     types = roe.sort_by { |n| order.index(n) || order.size }.map do |name|
       { name: name, label: content_layout_label(name), customised: site.include?(name), extra: false }
@@ -139,6 +139,8 @@ class Admin::LayoutsController < Admin::BaseController
       "#{config[:label]} posts"
     elsif name == "documentation"
       "Documentation"
+    elsif name == "podcast-page"
+      "Podcast pages"
     else
       name.humanize.pluralize
     end

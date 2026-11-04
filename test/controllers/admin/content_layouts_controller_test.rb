@@ -20,7 +20,8 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     %w[article podcast page product documentation].each do |name|
       assert_select "a[href=?]", "/admin/layouts/content/#{name}/edit"
     end
-    assert_includes response.body, "Roe's default"
+    assert_select "th", "Status"
+    assert_select "td", "default"
   end
 
   test "a type on Roe's default opens Roe's copy, and saving makes it the site's" do
@@ -40,7 +41,7 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/no body/, flash[:alert])
   end
 
-  test "Use Roe's default deletes the site's copy" do
+  test "Use default deletes the custom file" do
     File.write(ContentLayout.site_path("article"), "- body\n")
     delete "/admin/layouts/content/article"
     assert_not File.exist?(ContentLayout.site_path("article"))

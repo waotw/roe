@@ -1,9 +1,9 @@
 # Content layouts in the admin: the Content section of the Layouts page.
 #
-# Every type is editable straight away. A type still on Roe's default opens
-# Roe's copy; saving writes site/layout/content/<name>.yml, which from then on
-# is the site's. "Use Roe's default" deletes the site's copy, so the type goes
-# back to Roe's and picks up its improvements in updates.
+# Every type is editable straight away. A type on the default opens Roe's
+# copy; saving writes site/layout/content/<name>.yml, a custom layout from
+# then on. "Use default" deletes the custom file, so the type goes back to
+# Roe's and picks up its improvements in updates.
 #
 # Extra layouts (New layout) are picked per post with `layout: <name>`.
 class Admin::ContentLayoutsController < Admin::BaseController
@@ -40,7 +40,7 @@ class Admin::ContentLayoutsController < Admin::BaseController
     File.delete(path) if File.file?(path)
 
     if File.file?(ContentLayout.roe_default_path(@name))
-      redirect_to admin_edit_content_layout_path(@name), notice: "#{@name.humanize} is back on Roe's default layout"
+      redirect_to admin_edit_content_layout_path(@name), notice: "#{@name.humanize} is back on the default layout"
     else
       redirect_to admin_layouts_path, notice: "#{@name} layout deleted"
     end
@@ -60,11 +60,9 @@ class Admin::ContentLayoutsController < Admin::BaseController
     end
   end
 
-  # COPY: placeholder wording — owner will rewrite
+  # No comments in the file (AGENTS.md rule 5): the editor's side panel
+  # explains the format.
   NEW_LAYOUT = <<~YAML.freeze
-    # Use this layout on a post by adding `layout: <name>` to its metadata.
-    # One part per line. [a, b] puts parts in one group, styled together.
-
     - title
     - body
   YAML

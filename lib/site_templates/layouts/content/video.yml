@@ -1,6 +1,3 @@
-# The layout of a video post: what shows around its writing, in order.
-# One part per line. [a, b] puts parts in one group, styled together.
-
 - [title, feed_links]
 - subtitle
 - [date, author]

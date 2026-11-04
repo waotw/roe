@@ -41,7 +41,7 @@ class ContentLayout
   # Layouts named after a kind of record. `layout:` can't pick these: posts
   # imported from Jekyll often carry `layout: page` or `layout: post`, which
   # meant Jekyll's templates, not ours.
-  RECORD_LAYOUTS = %w[page product documentation].freeze
+  RECORD_LAYOUTS = %w[page podcast-page product documentation].freeze
 
   def self.for(record)
     type = type_for(record)
@@ -50,11 +50,13 @@ class ContentLayout
     named || find(type) || find(fallback_for(record)) || empty
   end
 
-  # The type name a record's layout file is named after.
+  # The type name a record's layout file is named after. A page connected to
+  # a podcast (`podcast: <key>`) has its own, which leads with the show's name
+  # and subscribe links; falls back to the page layout if that's missing.
   def self.type_for(record)
     case record
     when Post          then record.post_type.presence || "article"
-    when Page          then "page"
+    when Page          then record.metadata["podcast"].to_s.strip.present? ? "podcast-page" : "page"
     when Product       then "product"
     when Documentation then "documentation"
     else record.class.name.underscore
@@ -62,7 +64,11 @@ class ContentLayout
   end
 
   def self.fallback_for(record)
-    record.is_a?(Post) ? "article" : type_for(record)
+    case record
+    when Post then "article"
+    when Page then "page"
+    else type_for(record)
+    end
   end
 
   # The site's copy if it has one, otherwise Roe's. nil when neither exists.

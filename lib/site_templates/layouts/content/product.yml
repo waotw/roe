@@ -1,5 +1,2 @@
-# The layout of a product: what shows around its writing, in order.
-# One part per line. [a, b] puts parts in one group, styled together.
-
 - [image, title, buy_button]
 - body

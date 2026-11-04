@@ -4,7 +4,7 @@
 
   <%# COPY: placeholder wording — owner will rewrite %>
   <h2 class="mt-8 text-xl font-bold text-gray-900 font-sans">Site</h2>
-  <p class="mt-1 text-sm text-gray-700 font-sans">On every page. In <code class="bg-gray-100 px-1">site/layout/</code>.</p>
+  <p class="mt-1 text-sm text-gray-700 font-sans">The global layout elements.</p>
 
   <div class="mt-4">
     <table class="min-w-full divide-y divide-gray-300 border border-gray-200">
@@ -59,7 +59,7 @@
     <div>
       <h2 class="text-xl font-bold text-gray-900 font-sans">Content</h2>
       <p class="mt-1 text-sm text-gray-700 font-sans">
-        What each type's page shows around its writing, in order. In <code class="bg-gray-100 px-1">site/layout/content/</code>.
+        Layout templates for each content type.
       </p>
     </div>
     <%= form_with url: admin_content_layouts_path, method: :post, class: "flex items-center gap-2 font-mono" do |f| %>
@@ -76,24 +76,22 @@
         <tr>
           <th class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Layout</th>
           <th class="py-3.5 px-3 text-left text-sm font-semibold text-gray-900">File</th>
-          <th class="py-3.5 px-3 text-left text-sm font-semibold text-gray-900">Using</th>
+          <th class="py-3.5 px-3 text-left text-sm font-semibold text-gray-900">Status</th>
           <th class="relative py-3.5 pl-3 pr-4 text-right"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @content_layouts.each do |layout| %>
           <tr>
-            <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900"><%= layout[:label] %></td>
-            <td class="py-4 px-3 text-sm text-gray-600"><%= layout[:name] %>.yml</td>
-            <td class="py-4 px-3 text-sm text-gray-600">
+            <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
               <% if layout[:extra] %>
-                Posts with <code class="bg-gray-100 px-1">layout: <%= layout[:name] %></code>
-              <% elsif layout[:customised] %>
-                Your site's copy
+                <code class="bg-gray-100 px-1">layout: <%= layout[:name] %></code>
               <% else %>
-                Roe's default
+                <%= layout[:label] %>
               <% end %>
             </td>
+            <td class="py-4 px-3 text-sm text-gray-600"><%= layout[:name] %>.yml</td>
+            <td class="py-4 px-3 text-sm text-gray-600"><%= layout[:customised] ? "custom" : "default" %></td>
             <td class="py-4 pl-3 pr-4 text-right text-sm">
               <%= link_to "Edit", admin_edit_content_layout_path(layout[:name]), class: "text-blue-600 hover:text-blue-900" %>
             </td>
