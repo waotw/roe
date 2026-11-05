@@ -10,15 +10,8 @@ export default class extends Controller {
 
   connect() {
     this.token = document.querySelector('meta[name="csrf-token"]')?.content;
-    // Live-update any card whose variants are still processing on load, so the
-    // ⏳ badge isn't stuck until a manual refresh (cap to avoid a poll storm).
-    if (this.hasGridTarget) {
-      Array.from(
-        this.gridTarget.querySelectorAll('[data-variants-pending="true"]'),
-      )
-        .slice(0, 24)
-        .forEach((card) => this.watchVariants(card));
-    }
+    // Cards whose previews are still being made are polled by media-lazy
+    // once they're on screen (it calls watchVariants), not all at load.
   }
 
   // Bound to the file input's change event.

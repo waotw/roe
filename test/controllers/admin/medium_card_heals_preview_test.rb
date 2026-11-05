@@ -21,6 +21,10 @@ class Admin::MediumCardHealsPreviewTest < ActionDispatch::IntegrationTest
     gif << "\x3B".b
     File.binwrite(@path, gif)
 
+    # The real check loads ruby-vips; stubbing it alone left Vips undefined
+    # when this file ran before any other image test, so the GIF read as
+    # still and the test failed depending on order.
+    skip "libvips isn't installed" unless ImageVariantGenerator.available?
     ImageVariantGenerator.stubs(:available?).returns(true)
     # Added the old way: no preview, no job. insert_all skips after_create,
     # which would queue it.
@@ -46,6 +50,10 @@ class Admin::MediumCardHealsPreviewTest < ActionDispatch::IntegrationTest
 
   test "an image whose preview exists isn't queued again" do
     ImageVariantGenerator.stubs(:baseline_exists?).returns(true)
+    # The grid card shows the thumb itself, so it has to be on disk.
+    thumb = ImageVariantGenerator.variant_path_for(@path, :thumb)
+    FileUtils.mkdir_p(File.dirname(thumb))
+    File.binwrite(thumb, File.binread(@path))
 
     assert_no_enqueued_jobs(only: GenerateImageVariantsJob) do
       get card_admin_medium_path(@medium), as: :json

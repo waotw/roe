@@ -49,7 +49,7 @@
   <div id="video-notices-slot"><%= render 'video_notices', notices: @video_notices || [] %></div>
 </div>
 
-<div data-controller="media-filter media-bulk-select"
+<div data-controller="media-filter media-bulk-select media-rename"
      data-media-filter-total-value="<%= @media.count %>">
 
   <!-- Tabs for Media Types -->
@@ -192,12 +192,38 @@
   </div>
 
   <!-- Media Grid -->
-  <div class="grid grid-cols-4 gap-2" data-media-filter-target="grid" data-media-upload-target="grid">
+  <%# media-lazy: fills "Used in" and polls pending previews only for the
+      cards on screen. %>
+  <div class="grid grid-cols-4 gap-2" data-media-filter-target="grid" data-media-upload-target="grid"
+       data-controller="media-lazy" data-media-lazy-usages-url-value="<%= usages_admin_medium_index_path %>">
     <% @media.each do |media| %>
       <%= render "media_card", media: media, usages: @media_usages[media.file_path],
-                 mixed: @mixed_media_ids.include?(media.id) %>
+                 mixed: @mixed_media_ids.include?(media.id), lazy_usages: true %>
     <% end %>
   </div>
+
+  <%# The one rename form every card shares; media-rename copies it into the
+      card that's double-clicked and fills in the address and name. %>
+  <template data-media-rename-target="form">
+    <%= form_with url: "", method: :patch, class: "filename-edit flex flex-col gap-1",
+          data: { action: "click->media-rename#stop keydown->media-rename#keydown" } do |f| %>
+      <div class="flex items-center gap-1">
+        <%= f.text_field :new_filename, value: "",
+            class: "font-mono text-xs px-1 py-0.5 border border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white flex-1 min-w-0" %>
+        <span class="text-xs text-gray-500 font-mono shrink-0" data-extension></span>
+      </div>
+      <div class="flex gap-1">
+        <%= f.submit "✓",
+            class: "flex-1 px-1.5 py-0.5 bg-green-500 text-white hover:bg-green-600 text-xs  cursor-pointer border-0",
+            title: "Save (Enter)" %>
+        <button type="button" data-action="media-rename#cancel"
+                class="flex-1 px-1.5 py-0.5 bg-gray-300 text-gray-700 hover:bg-gray-400 text-xs "
+                title="Cancel (Esc)">
+          ✕
+        </button>
+      </div>
+    <% end %>
+  </template>
   <% if @media.empty? %>
     <p data-media-upload-target="empty" class="text-gray-600 mt-2">No media uploaded yet.</p>
   <% end %>

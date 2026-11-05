@@ -75,21 +75,25 @@ class Admin::MediaAudienceFilterTest < ActionDispatch::IntegrationTest
 
   # The $ next to a usage is what tells you which reference is doing the
   # protecting — and on a mixed file, which one isn't.
+  # "Used in" arrives once the card is on screen (MediumController#usages).
+  def usages_html(record)
+    get usages_admin_medium_index_path, params: { ids: [ record.id ] }, as: :json
+    response.parsed_body[record.id.to_s].to_s
+  end
+
   test "a paid reference is marked in Used in" do
-    medium("/media/images/marked.jpg")
+    record = medium("/media/images/marked.jpg")
     content(Post, audience: "paid", path: "/media/images/marked.jpg")
 
-    get browse_admin_medium_index_path
-
-    assert_select "[title=?]", "Paid — this reference protects the file"
+    assert_includes usages_html(record), 'title="Paid — this reference protects the file"'
   end
 
   test "a free reference is not marked" do
-    medium("/media/images/plain.jpg")
+    record = medium("/media/images/plain.jpg")
     content(Post, audience: "everyone", path: "/media/images/plain.jpg")
 
-    get browse_admin_medium_index_path
-
-    assert_select "[title=?]", "Paid — this reference protects the file", count: 0
+    html = usages_html(record)
+    assert_includes html, "Used in:"
+    assert_not_includes html, "Paid — this reference protects the file"
   end
 end

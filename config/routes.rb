@@ -184,6 +184,7 @@ Rails.application.routes.draw do
         post :bulk_destroy
         post :dismiss_video_notices
         get :video_notices
+        get :usages
         post :optimize_videos
       end
       member do
