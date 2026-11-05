@@ -196,13 +196,19 @@ export default class extends Controller {
     const id = card.dataset.mediaId;
     if (!id) return;
     const video = card.dataset.mediaType === "video";
-    const interval = video ? 4000 : 1500;
-    const maxAttempts = video ? Infinity : 8;
+    // An image preview is usually ready in a second, but behind a queue of
+    // others (a page of new images, a just-deployed site) it can take
+    // minutes. Check often at first, then less often, for about four
+    // minutes; after that the box says there's no preview and offers a
+    // retry, rather than looking busy forever.
+    const interval = (n) =>
+      video ? 4000 : Math.min(1500 * 1.5 ** Math.max(n - 1, 0), 15000);
+    const maxAttempts = video ? Infinity : 22;
 
     let attempts = 0;
     const retry = () => {
       if (attempts < maxAttempts && document.contains(this.element)) {
-        setTimeout(poll, interval * 2);
+        setTimeout(poll, interval(attempts) * 2);
       }
     };
     const poll = () => {
@@ -227,19 +233,34 @@ export default class extends Controller {
             // type. Re-run the active filter so the swapped card obeys it.
             this.reapplyFilters();
           }
-          if (
-            data.pending &&
-            attempts < maxAttempts &&
-            document.contains(this.element)
-          ) {
-            setTimeout(poll, interval);
-          } else if (video && !data.pending) {
-            this.refreshNotices();
+          if (!data.pending) {
+            if (video) this.refreshNotices();
+          } else if (attempts >= maxAttempts) {
+            this.previewGaveUp(fresh || current);
+          } else if (document.contains(this.element)) {
+            setTimeout(poll, interval(attempts));
           }
         })
         .catch(retry);
     };
-    setTimeout(poll, interval);
+    setTimeout(poll, interval(0));
+  }
+
+  // The preview box of a card whose preview never arrived. Retrying polls
+  // the card again, which queues the preview again (MediumController#card).
+  // COPY: placeholder wording — owner will rewrite
+  previewGaveUp(card) {
+    const box = card?.querySelector("[data-preview-box]");
+    if (!box) return;
+    box.innerHTML = `no preview <button type="button" class="underline hover:text-gray-700" data-action="click->media-upload#retryPreview">retry</button>`;
+  }
+
+  retryPreview(event) {
+    event.stopPropagation();
+    const card = event.target.closest("[data-media-id]");
+    const box = card?.querySelector("[data-preview-box]");
+    if (box) box.textContent = "preview…";
+    this.watchVariants(card);
   }
 
   errorPlaceholder(placeholder, name, error) {

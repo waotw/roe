@@ -1,5 +1,16 @@
 #!/usr/bin/env ruby
 
+# On macOS, a process that forks and then loads certain system libraries in
+# the child is killed by the Objective-C runtime ("may have been in progress
+# in another thread when fork() was called … Crashing instead"). Solid Queue
+# forks its worker, and the worker loads libvips for image previews, so
+# every image job died mid-run. The runtime reads this switch only when the
+# process starts, so set it and start again before anything loads; exec
+# keeps the same process ID. Linux has no such check.
+if RUBY_PLATFORM.include?("darwin") && ENV["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] != "YES"
+  exec({ "OBJC_DISABLE_INITIALIZE_FORK_SAFETY" => "YES" }, RbConfig.ruby, __FILE__, *ARGV)
+end
+
 require_relative "../config/environment"
 require "solid_queue/cli"
 
