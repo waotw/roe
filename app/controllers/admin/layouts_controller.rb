@@ -119,31 +119,37 @@ class Admin::LayoutsController < Admin::BaseController
 
   private
 
-  # Roe's layout for every type, in the order types are listed elsewhere,
-  # then the site's extra layouts. Each says whether the site has its own copy.
+  # The Content table, grouped like the Products table: Posts (one row per
+  # post type), Pages, Products, Documentation, then the site's own extra
+  # layouts. A row whose feature is off (podcasts, music, the store) is left
+  # out to keep the list short — unless the site has customised it, so a
+  # file it made never disappears from view.
+  ContentLayoutGroup = Struct.new(:name, :rows)
+
   def content_layouts
     names = ->(dir) { Dir.glob(File.join(dir, "*.yml")).map { |f| File.basename(f, ".yml") } }
     roe = names.call(ContentLayout::ROE_DIR)
     site = names.call(ContentLayout::SITE_DIR)
-    order = Post::POST_TYPES.keys.map(&:to_s) + %w[page podcast-page product documentation]
+    row = ->(name, label) { { name: name, label: label, customised: site.include?(name), extra: !roe.include?(name) } }
+    shown = ->(name, feature) { roe.include?(name) && (feature.nil? || SiteFeature.public_send(feature) || site.include?(name)) }
 
-    types = roe.sort_by { |n| order.index(n) || order.size }.map do |name|
-      { name: name, label: content_layout_label(name), customised: site.include?(name), extra: false }
+    posts = Post::POST_TYPES.filter_map do |type, config|
+      row.call(type.to_s, config[:label]) if shown.call(type.to_s, config[:feature])
     end
-    extras = (site - roe).sort.map { |name| { name: name, label: name, customised: true, extra: true } }
-    types + extras
-  end
+    pages = [ [ "page", "Page", nil ], [ "podcast-page", "Podcast page", :podcast_enabled? ] ].filter_map do |name, label, feature|
+      row.call(name, label) if shown.call(name, feature)
+    end
+    products = shown.call("product", :store_enabled?) ? [ row.call("product", "Product") ] : []
+    docs = shown.call("documentation", nil) ? [ row.call("documentation", "Documentation") ] : []
+    extras = (site - roe).sort.map { |name| row.call(name, name) }
 
-  def content_layout_label(name)
-    if (config = Post::POST_TYPES[name.to_sym])
-      "#{config[:label]} posts"
-    elsif name == "documentation"
-      "Documentation"
-    elsif name == "podcast-page"
-      "Podcast pages"
-    else
-      name.humanize.pluralize
-    end
+    [
+      ContentLayoutGroup.new("Posts", posts),
+      ContentLayoutGroup.new("Pages", pages),
+      ContentLayoutGroup.new("Products", products),
+      ContentLayoutGroup.new("Documentation", docs),
+      ContentLayoutGroup.new("Extra layouts", extras)
+    ].reject { |group| group.rows.empty? }
   end
 
   def ensure_layout_directory_exists

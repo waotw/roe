@@ -13,15 +13,51 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the Layouts page lists the site files and every content type" do
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    SiteFeature.stubs(:store_enabled?).returns(true)
+
     get "/admin/layouts"
     assert_response :success
     assert_select "h2", "Site"
     assert_select "h2", "Content"
-    %w[article podcast page product documentation].each do |name|
+    %w[article podcast music page podcast-page product documentation].each do |name|
       assert_select "a[href=?]", "/admin/layouts/content/#{name}/edit"
     end
     assert_select "th", "Status"
-    assert_select "td", "default"
+    assert_select "td span", "default"
+  end
+
+  test "layouts are grouped like products: posts by type, then pages, products, documentation" do
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    SiteFeature.stubs(:store_enabled?).returns(true)
+
+    get "/admin/layouts"
+    groups = css_select("tbody[data-layout-group]").map { |t| t["data-layout-group"] }
+    assert_equal %w[posts pages products documentation], groups
+    assert_select "tbody[data-layout-group=posts] td", text: "Article"
+    assert_select "tbody[data-layout-group=pages] td", text: "Podcast page"
+  end
+
+  test "podcast, music and store layouts are hidden while their feature is off" do
+    SiteFeature.stubs(:podcast_enabled?).returns(false)
+    SiteFeature.stubs(:music_enabled?).returns(false)
+    SiteFeature.stubs(:store_enabled?).returns(false)
+
+    get "/admin/layouts"
+    %w[podcast music podcast-page product].each do |name|
+      assert_select "a[href=?]", "/admin/layouts/content/#{name}/edit", count: 0
+    end
+    assert_select "tbody[data-layout-group=products]", 0
+    assert_select "a[href=?]", "/admin/layouts/content/article/edit"
+  end
+
+  test "a customised layout stays listed even with its feature off" do
+    SiteFeature.stubs(:podcast_enabled?).returns(false)
+    File.write(ContentLayout.site_path("podcast"), "- body\n")
+
+    get "/admin/layouts"
+    assert_select "a[href=?]", "/admin/layouts/content/podcast/edit"
   end
 
   test "a type on Roe's default opens Roe's copy, and saving makes it the site's" do
