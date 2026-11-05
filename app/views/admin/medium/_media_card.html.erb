@@ -51,7 +51,7 @@
           <%# Preview not made yet: a box, never the original. The card is
               polled while it's on screen, which queues the preview, and
               swapped for the finished card. %>
-          <div class="w-full h-32 mb-2 bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center text-xs text-gray-400 font-mono">preview…</div>
+          <div class="w-full h-32 mb-2 bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center gap-1 text-xs text-gray-400 font-mono" data-preview-box>preview…</div>
         <% else %>
           <%= image_tag preview.last, alt: File.basename(media.file_path), class: "w-full h-32 object-cover mb-2", loading: "lazy" %>
         <% end %>
