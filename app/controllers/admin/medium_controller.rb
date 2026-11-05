@@ -381,16 +381,34 @@ class Admin::MediumController < Admin::BaseController
     else
       medium.image? && ImageVariantGenerator.available? && !medium.baseline_ready?
     end
+    # The grid card waits only for its own small preview; the rest of the
+    # baseline can finish without the card polling for it.
     # A preview that's still missing gets queued now. Nothing else goes back
     # for one that was never made — animated GIFs added before their thumb
     # counted as their preview never got a job, and stayed pending (and
     # polled) for good. queue! skips anything queued in the last few hours,
     # so polling this can't flood the queue.
     ImageVariantGenerator.queue_baseline!(medium.file_path) if pending && medium.image?
+    card_pending = medium.video? ? pending : (medium.image? && helpers.media_grid_preview(medium.file_path).first == :placeholder)
     render json: {
-      pending: !!pending,
+      pending: !!card_pending,
       card_html: render_to_string(partial: "admin/medium/media_card", formats: [ :html ], locals: { media: medium, usages: usages })
     }
+  end
+
+  # "Used in" for the grid's cards that are on screen: { id => html }. The
+  # browse page leaves it out of the first load, so a large library isn't
+  # thousands of link lists before anything shows (media_lazy_controller).
+  USAGES_BATCH_LIMIT = 100
+
+  def usages
+    ids = Array(params[:ids]).first(USAGES_BATCH_LIMIT).map(&:to_i)
+    index = MediaUsageIndex.fetch
+    html = Medium.where(id: ids).to_h do |medium|
+      [ medium.id, render_to_string(partial: "admin/medium/media_usages", formats: [ :html ],
+                                    locals: { usages: index[medium.file_path] || [] }) ]
+    end
+    render json: html
   end
 
   # Progress of a video's web versions, polled by the upload modal and by
