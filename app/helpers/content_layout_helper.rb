@@ -71,8 +71,12 @@ module ContentLayoutHelper
         PodcastConfig.get(podcast_key)
       end
 
+    release_key = kind == "page" ? record.metadata["release"].to_s.strip.presence : nil
+    release_config = release_key && SiteFeature.music_enabled? ? ReleaseConfig.get(release_key) : nil
+
     {
       podcast_config: podcast_config,
+      release_config: release_config,
       podcast_episodes: episode ? podcast_episodes_for(podcast_key) : nil,
       layout_parts: layout.parts
     }.merge(locals)

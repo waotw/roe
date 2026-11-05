@@ -1,5 +1,7 @@
-<%# The show's subscribe links, for an episode or a page connected to a
-    podcast. Nothing when there's no podcast or no link to show. %>
+<%# Subscribe links: a podcast's (its apps and feeds), for an episode or a
+    page connected to a podcast; or a release's feed, for a page connected to
+    a release (`release: <key>`) that publishes one. Nothing when there's
+    no link to show. %>
 <% if record.metadata["podcast"].present? && (kind == "post" || context[:podcast_config]) %>
   <% post = record; podcast_config = context[:podcast_config] %>
 <% key = post.metadata["podcast"] %>
@@ -62,4 +64,28 @@
     </div>
   <% end %>
 <% end %>
+<% end %>
+<% if record.metadata["podcast"].blank? && (release_key = record.metadata["release"].to_s.strip.presence) && ReleaseConfig.feed_enabled?(release_key) %>
+  <%# A release has no app links, only its feed: the public one unless the
+      release is paid-only, the private one for admins and paid members.
+      Same classes as a podcast's, so themes style both alike. %>
+  <% show_public = authenticated? || !ReleaseFeed.new(release_key).paid? %>
+  <% private_url =
+       if authenticated?
+         "/music/#{release_key}/private.xml"
+       elsif current_member&.paid? && current_member&.active?
+         "/music/#{release_key}/private.xml?token=#{current_member.media_token}"
+       end %>
+  <% if show_public || private_url.present? %>
+    <div class="podcast-subscribe release-subscribe">
+      <div class="subscribe-links" data-controller="subscribe-links">
+        <% if show_public %>
+          <a href="/music/<%= release_key %>.xml" class="feed-link" target="_blank" rel="noopener" data-copy-on-mobile>RSS Feed</a>
+        <% end %>
+        <% if private_url.present? %>
+          <a href="<%= private_url %>" class="feed-link feed-link-private" target="_blank" rel="noopener" data-copy-on-mobile>Private RSS Feed (Paid)</a>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
 <% end %>

@@ -26,7 +26,7 @@ class ContentLayout
   # name is shown as a metadata field when the record has a value for it.
   BUILT_PARTS = %w[
     title subtitle date author image feed_links player body subscribe
-    episodes podcast_title buy_button price
+    episodes podcast_title release_title buy_button price
   ].freeze
 
   # The player, body and what follows them sit outside a post's
@@ -41,7 +41,7 @@ class ContentLayout
   # Layouts named after a kind of record. `layout:` can't pick these: posts
   # imported from Jekyll often carry `layout: page` or `layout: post`, which
   # meant Jekyll's templates, not ours.
-  RECORD_LAYOUTS = %w[page podcast-page product documentation].freeze
+  RECORD_LAYOUTS = %w[page podcast-page music-page product documentation].freeze
 
   def self.for(record)
     type = type_for(record)
@@ -51,15 +51,24 @@ class ContentLayout
   end
 
   # The type name a record's layout file is named after. A page connected to
-  # a podcast (`podcast: <key>`) has its own, which leads with the show's name
-  # and subscribe links; falls back to the page layout if that's missing.
+  # a podcast or a release has its own (page_type_for); it falls back to the
+  # page layout if that file is missing.
   def self.type_for(record)
     case record
     when Post          then record.post_type.presence || "article"
-    when Page          then record.metadata["podcast"].to_s.strip.present? ? "podcast-page" : "page"
+    when Page          then page_type_for(record)
     when Product       then "product"
     when Documentation then "documentation"
     else record.class.name.underscore
+    end
+  end
+
+  # A page connected to a podcast or a release leads with the show's or the
+  # release's name and subscribe links; any other page is just its body.
+  def self.page_type_for(page)
+    if page.metadata["podcast"].to_s.strip.present? then "podcast-page"
+    elsif page.metadata["release"].to_s.strip.present? then "music-page"
+    else "page"
     end
   end
 

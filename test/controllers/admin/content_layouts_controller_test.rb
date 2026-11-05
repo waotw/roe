@@ -21,7 +21,7 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h2", "Site"
     assert_select "h2", "Content"
-    %w[article podcast music page podcast-page product documentation].each do |name|
+    %w[article podcast music page podcast-page music-page product documentation].each do |name|
       assert_select "a[href=?]", "/admin/layouts/content/#{name}/edit"
     end
     assert_select "th", "Status"
@@ -45,7 +45,7 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     SiteFeature.stubs(:store_enabled?).returns(false)
 
     get "/admin/layouts"
-    %w[podcast music podcast-page product].each do |name|
+    %w[podcast music podcast-page music-page product].each do |name|
       assert_select "a[href=?]", "/admin/layouts/content/#{name}/edit", count: 0
     end
     assert_select "tbody[data-layout-group=products]", 0

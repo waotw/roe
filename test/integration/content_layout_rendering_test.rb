@@ -151,6 +151,31 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_equal "page", ContentLayout.for(create(:page, metadata: { "title" => "A", "url_name" => "a-page", "status" => "published" }, content: "x")).name
   end
 
+  test "a page connected to a release uses the music-page layout" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    ReleaseConfig.stubs(:get).returns({ "title" => "Summer EP" })
+    ReleaseConfig.stubs(:feed_enabled?).returns(true)
+    ReleaseFeed.any_instance.stubs(:paid?).returns(false)
+    page = create(:page, metadata: { "title" => "EP", "url_name" => "summer-ep", "status" => "published", "release" => "summer-ep" }, content: "About the record.")
+
+    assert_equal "music-page", ContentLayout.for(page).name
+    get "/#{page.url_name}"
+    assert_select "h1.release-page-title", "Summer EP"
+    assert_select ".release-subscribe a.feed-link[href=?]", "/music/summer-ep.xml"
+    assert_select ".content", /About the record/
+  end
+
+  test "a release without a feed shows its title and no subscribe links" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    ReleaseConfig.stubs(:get).returns({ "title" => "Singles" })
+    ReleaseConfig.stubs(:feed_enabled?).returns(false)
+    page = create(:page, metadata: { "title" => "Singles", "url_name" => "singles-page", "status" => "published", "release" => "singles" }, content: "x")
+
+    get "/#{page.url_name}"
+    assert_select "h1.release-page-title", "Singles"
+    assert_select ".release-subscribe", 0
+  end
+
   test "a product shows its title, image and button from the layout" do
     product = a_product
     get product_path(product.url_name)

@@ -136,7 +136,7 @@ class Admin::LayoutsController < Admin::BaseController
     posts = Post::POST_TYPES.filter_map do |type, config|
       row.call(type.to_s, config[:label]) if shown.call(type.to_s, config[:feature])
     end
-    pages = [ [ "page", "Page", nil ], [ "podcast-page", "Podcast page", :podcast_enabled? ] ].filter_map do |name, label, feature|
+    pages = [ [ "page", "Page", nil ], [ "podcast-page", "Podcast page", :podcast_enabled? ], [ "music-page", "Music page", :music_enabled? ] ].filter_map do |name, label, feature|
       row.call(name, label) if shown.call(name, feature)
     end
     products = shown.call("product", :store_enabled?) ? [ row.call("product", "Product") ] : []
