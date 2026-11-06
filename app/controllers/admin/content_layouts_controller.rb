@@ -21,6 +21,7 @@ class Admin::ContentLayoutsController < Admin::BaseController
     @roe_default = File.file?(roe_path)
     @content = File.read(@customised ? site_path : roe_path)
     @warnings = ContentLayout.parse(@name, @content).warnings
+    @sidebar_position = sidebar_position_for(@name)
   end
 
   def update
@@ -68,6 +69,26 @@ class Admin::ContentLayoutsController < Admin::BaseController
   YAML
 
   private
+
+  # Where the sidebar sits around this layout's content ("left" or "right"),
+  # or nil when it doesn't show for this type — the editor draws the site's
+  # header, sidebar and footer around the textarea so it reads as the middle
+  # of a page. An extra layout can be used by any type, so it shows the
+  # sidebar if the sidebar covers any type. A record's own show_sidebar can
+  # still differ; this is the usual case.
+  def sidebar_position_for(name)
+    covered =
+      case name
+      when *Post::POST_TYPES.keys.map(&:to_s)   then Sidebar.covers?("posts")
+      when "page", "podcast-page", "music-page" then Sidebar.covers?("pages")
+      when "product"                            then Sidebar.covers?("products")
+      when "documentation"                      then Sidebar.covers?("documentation")
+      else Sidebar::TYPES.any? { |type| Sidebar.covers?(type) }
+      end
+    return nil unless covered
+
+    Sidebar.frontmatter["position"].to_s.strip == "right" ? "right" : "left"
+  end
 
   def set_name
     @name = params[:name].to_s

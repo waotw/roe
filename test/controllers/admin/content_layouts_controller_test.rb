@@ -10,6 +10,55 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
 
   teardown do
     Dir.glob(File.join(ContentLayout::SITE_DIR, "*.yml")).each { |f| FileUtils.rm_f(f) }
+    restore_sidebar
+  end
+
+  # The editor frames the textarea with the site's header, sidebar and footer.
+  def write_sidebar(frontmatter)
+    @sidebar_original = File.exist?(Sidebar.path) ? File.binread(Sidebar.path) : false if @sidebar_original.nil?
+    FileUtils.mkdir_p(File.dirname(Sidebar.path))
+    File.write(Sidebar.path, "---\n#{frontmatter}---\n\nSidebar\n")
+  end
+
+  def remove_sidebar
+    @sidebar_original = File.exist?(Sidebar.path) ? File.binread(Sidebar.path) : false if @sidebar_original.nil?
+    FileUtils.rm_f(Sidebar.path)
+  end
+
+  def restore_sidebar
+    return if @sidebar_original.nil?
+
+    @sidebar_original ? File.binwrite(Sidebar.path, @sidebar_original) : FileUtils.rm_f(Sidebar.path)
+  end
+
+  def frame_order
+    css_select("[data-layout-frame], textarea[name=content]").map { |el| el["data-layout-frame"] || "content" }
+  end
+
+  test "the editor frames the layout with the header and footer" do
+    remove_sidebar
+    get "/admin/layouts/content/article/edit"
+    assert_equal %w[header content footer], frame_order
+  end
+
+  test "a left sidebar sits before the layout, a right one after" do
+    write_sidebar("position: left\n")
+    get "/admin/layouts/content/article/edit"
+    assert_equal %w[header sidebar content footer], frame_order
+    assert_select "a[data-layout-frame=sidebar][href=?]", "/admin/layout/sidebar/edit"
+
+    write_sidebar("position: right\n")
+    get "/admin/layouts/content/article/edit"
+    assert_equal %w[header content sidebar footer], frame_order
+  end
+
+  test "the sidebar is left out for a type its scope doesn't cover" do
+    write_sidebar("scope: pages\n")
+    get "/admin/layouts/content/article/edit"
+    assert_select "[data-layout-frame=sidebar]", 0
+
+    get "/admin/layouts/content/page/edit"
+    assert_select "[data-layout-frame=sidebar]", 1
   end
 
   test "the Layouts page lists the site files and every content type" do
