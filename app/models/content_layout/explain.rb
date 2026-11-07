@@ -22,7 +22,10 @@ class ContentLayout
     end
 
     def as_json(*)
-      { html: html_lines, warnings: @layout.warnings, lines: line_help }
+      lines = line_help.transform_values do |entry|
+        entry.merge(text: curly(entry[:text]), boxes: entry[:boxes].map { |b| b.merge(text: curly(b[:text])) })
+      end
+      { html: html_lines, warnings: @layout.warnings.map { |w| curly(w) }, lines: lines }
     end
 
     private
@@ -178,9 +181,9 @@ class ContentLayout
       cls = class_phrase(block.classes)
       case block.role
       when :header
-        "Puts #{list} in a `<header>` with #{cls}. The [header] is the first block in the layout."
+        "Wraps all elments from #{list} in a `<header>` with #{cls}. The [header] is the first block in the layout."
       when :footer
-        "Puts #{list} in a `<footer>` with #{cls}. The [footer] is the last block in the layout."
+        "Wraps all elemnets from #{list} in a `<footer>` with #{cls}. The [footer] is the last block in the layout."
       when :content
         others = block.parts - [ "body" ]
         with = others.any? ? "#{box_range(others)} and the #{noun}'s writing" : "the #{noun}'s writing"
@@ -191,25 +194,48 @@ class ContentLayout
     end
 
     def row_help(row, block)
-      where = place(block)
+      where = place(block, @layout.blocks.index(block))
       if row.parts.length == 1 && row.classes.empty?
         "#{part_help(row.parts.first)} #{where}"
       elsif row.classes.any?
         verb = row.parts.length == 1 ? "Wraps #{box(row.parts.first)}" : "Groups #{box_list(row.parts)}"
-        "#{verb} in a `<div>` with #{class_phrase(row.classes)}, so CSS can style them together. #{where}"
+        "#{verb} in a `<div>` with #{class_phrase(row.classes)}. #{where}"
       else
         "Groups #{box_list(row.parts)} in a `<div class=\"layout-row\">`. " \
           "To give it your own class, start the line with a name: `name: #{row.parts.map { |p| box(p) }.join(" ")}`. #{where}"
       end
     end
 
-    def place(block)
+    # Where a block sits. A group is either between the header and the body
+    # or between the body and the footer — never both.
+    def place(block, index)
       case block.role
       when :header  then "It's in the header."
       when :footer  then "It's in the footer."
       when :content then "It's with the writing."
-      else               "It's in a group between the header and the footer."
+      else
+        content = @layout.blocks.index { |b| b.role == :content }
+        if index < content
+          "It's in a group between the header and the body."
+        else
+          "It's in a group between the body and the footer."
+        end
       end
+    end
+
+    # Straight quotes to curly ones, for display: ' → ’ (or ‘ at the start
+    # of a word), " → “ ”. Text in backticks is code and stays straight,
+    # so `<div class="layout-row">` can still be copied as written.
+    def curly(text)
+      text.to_s.split(/(`[^`]*`)/).map do |chunk|
+        next chunk if chunk.start_with?("`")
+
+        chunk
+          .gsub(/(\A|[\s(\[])'/) { "#{$1}\u2018" }
+          .tr("'", "\u2019")
+          .gsub(/(\A|[\s(\[])"/) { "#{$1}\u201C" }
+          .tr('"', "\u201D")
+      end.join
     end
 
     def part_help(part)

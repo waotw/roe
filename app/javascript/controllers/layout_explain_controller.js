@@ -6,18 +6,19 @@ import { Controller } from "@hotwired/stimulus";
 //
 //   typing      → asks the server again (debounced), redraws the example
 //   caret moves → highlights the example lines the caret's line drew, and
-//                 shows what that line, or the box under the caret, does
-//   focus leaves → back to the general rules, nothing highlighted
+//                 shows what that line, or the box under the caret, does,
+//                 above the general rules (which always stay). The last
+//                 one stays when the textarea loses focus, so it can be
+//                 copied.
 //
 // Nothing here touches the textarea's value or the form.
 export default class extends Controller {
-  static targets = ["input", "html", "warnings", "help"];
+  static targets = ["input", "html", "warnings", "detail"];
   static values = { url: String, initial: Object };
 
   connect() {
     this.explained = this.initialValue;
     this.caret = null;
-    this.generalHelp = this.helpTarget.innerHTML;
     this.render();
 
     this.onSelection = () => {
@@ -26,23 +27,14 @@ export default class extends Controller {
     document.addEventListener("selectionchange", this.onSelection);
     this.inputTarget.addEventListener("input", (this.onInput = () => this.refresh()));
     this.inputTarget.addEventListener("focus", (this.onFocus = () => this.moveCaret()));
-    this.inputTarget.addEventListener("blur", (this.onBlur = () => this.leave()));
   }
 
   disconnect() {
     document.removeEventListener("selectionchange", this.onSelection);
     this.inputTarget.removeEventListener("input", this.onInput);
     this.inputTarget.removeEventListener("focus", this.onFocus);
-    this.inputTarget.removeEventListener("blur", this.onBlur);
     clearTimeout(this.timer);
     this.request?.abort();
-  }
-
-  // The layout isn't being edited: show the general rules again.
-  leave() {
-    this.caret = null;
-    this.render();
-    this.helpTarget.innerHTML = this.generalHelp;
   }
 
   refresh() {
@@ -109,7 +101,7 @@ export default class extends Controller {
     const box = (info.boxes || []).find((b) => this.caret.column >= b.from && this.caret.column <= b.to);
     const text = box ? box.text : info.text;
     const css = info.problem && !box ? "text-red-800" : "";
-    this.helpTarget.innerHTML = text ? `<p class="${css}">${codeSpans(escape(text))}</p>` : "";
+    this.detailTarget.innerHTML = text ? `<p class="${css}">${codeSpans(escape(text))}</p>` : "";
   }
 }
 

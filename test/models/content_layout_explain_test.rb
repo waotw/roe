@@ -48,30 +48,45 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
 
   test "a block's name line explains the block and where its role comes from" do
     help = explain(ARTICLE)[:lines]["1"]
-    assert_equal "Puts [title] to [image] in a `<header>` with the class `post-header`. " \
-                 "The [header] is the first block in the layout.", help[:text]
+    assert_includes help[:text], "[title] to [image]"
+    assert_includes help[:text], "`<header>` with the class `post-header`"
     assert_equal 0, help[:block]
+  end
+
+  test "a group says which side of the body it's on" do
+    lines = explain("[title]\n\n[date]\n\n[body]\n\n[author]\n\n[subtitle]\n")[:lines]
+    assert_match(/between the header and the body\.\z/, lines["3"][:text])
+    assert_match(/between the body and the footer\.\z/, lines["7"][:text])
+  end
+
+  test "quotes are curly in the help, but not inside code" do
+    help = explain("[subtitle] [date]\n[body]\n")[:lines]["1"][:text]
+    assert_includes help, "It’s with the writing."
+    assert_includes help, '`<div class="layout-row">`'
+    refute_includes help.gsub(/`[^`]*`/, ""), "'"
   end
 
   test "a named row is explained, and each box has its own description and columns" do
     help = explain(ARTICLE)[:lines]["2"]
-    assert_match(/\AGroups \[title\] and \[feed links\] in a `<div>` with the class `post-header-top`, so CSS can style them together\. It's in the header\./, help[:text])
+    assert_includes help[:text], "[title] and [feed links]"
+    assert_includes help[:text], "`post-header-top`"
+    assert help[:text].end_with?("It’s in the header.")
     title = help[:boxes].first
     assert_equal [ 17, 24 ], [ title[:from], title[:to] ]
-    assert_equal "The post's title, from `title:`.", title[:text]
+    assert_equal "The post’s title, from `title:`.", title[:text]
   end
 
   test "[body] says whose writing it is" do
-    assert_match(/\AThe post's writing/, explain(ARTICLE)[:lines]["7"][:boxes].first[:text])
-    assert_match(/\AThe product's writing/, explain("[body]\n", "product")[:lines]["1"][:boxes].first[:text])
-    assert_match(/\AThe documentation page's writing/, explain("[body]\n", "documentation")[:lines]["1"][:boxes].first[:text])
+    assert_match(/\AThe post’s writing/, explain(ARTICLE)[:lines]["7"][:boxes].first[:text])
+    assert_match(/\AThe product’s writing/, explain("[body]\n", "product")[:lines]["1"][:boxes].first[:text])
+    assert_match(/\AThe documentation page’s writing/, explain("[body]\n", "documentation")[:lines]["1"][:boxes].first[:text])
   end
 
   test "blank lines, problems and fields are explained" do
     lines = explain("[title]\n\nnot a box\n[location]\n[body]\n")[:lines]
     assert_match(/empty line ends one block/, lines["2"][:text])
     assert lines["3"][:problem]
-    assert_match(/Line 3 isn't a row of \[boxes\]/, lines["3"][:text])
+    assert_match(/Line 3 isn’t a row of \[boxes\]/, lines["3"][:text])
     assert_match(/`location:` field/, lines["4"][:text])
   end
 

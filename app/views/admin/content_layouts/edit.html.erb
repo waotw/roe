@@ -105,7 +105,11 @@
       </dialog>
     </div>
     <p class="text-gray-500 mb-4">Click a line in the layout to see what it does.</p>
-    <div class="mb-4 min-h-[4rem] leading-6" data-layout-explain-target="help">
+    <%# What the clicked line or box does. Stays after the textarea loses
+        focus, so it can be selected and copied; the general rules below
+        are always there. %>
+    <div class="mb-4 border-l-2 border-amber-400 bg-amber-50 px-2 py-1 leading-6 empty:hidden" data-layout-explain-target="detail"></div>
+    <div class="mb-4 min-h-[4rem] leading-6">
       <p class="mb-2">Layouts use <code class="bg-gray-100 px-1">blocks</code> and <code class="bg-gray-100 px-1">[boxes]</code>:</p>
       <ul class="list-disc ml-4 text-xs">
         <li class="mb-2">A <code class="bg-gray-100 px-1">block</code> is a group of <code class="bg-gray-100 px-1">[box]</code>es. A blank line creates a new block.</li>
