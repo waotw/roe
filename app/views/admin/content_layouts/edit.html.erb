@@ -33,7 +33,7 @@
   <% end %>
 </div>
 
-<div class="grid grid-cols-[minmax(36rem,1fr)_minmax(16rem,26rem)] gap-6"
+<div class="grid grid-cols-[minmax(min-content,1fr)_minmax(16rem,26rem)] gap-6"
      data-controller="layout-explain"
      data-layout-explain-url-value="<%= admin_explain_content_layout_path(@name) %>"
      data-layout-explain-initial-value="<%= @explain.to_json %>">
@@ -57,6 +57,7 @@
         <%= sidebar_box.call if @sidebar_position == "left" %>
         <%= f.text_area :content, value: @content, spellcheck: false,
             "aria-label": "#{@name} layout",
+            style: layout_textarea_min_width(@content),
             data: { layout_explain_target: "input", controller: "tab-indent", action: "keydown->tab-indent#keydown" },
             class: "min-w-0 flex-1 bg-white font-mono text-sm p-1 border border-gray-300 box-border h-[500px]" %>
         <%= sidebar_box.call if @sidebar_position == "right" %>

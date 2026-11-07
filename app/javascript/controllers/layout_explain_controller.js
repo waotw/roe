@@ -4,14 +4,17 @@ import { Controller } from "@hotwired/stimulus";
 // (ContentLayout::Explain) and returns the HTML it draws plus a description
 // of every line and [box]; this controller only shows them.
 //
-//   typing      → asks the server again (debounced), redraws the example
+//   typing      → asks the server again (debounced), redraws the example,
+//                 and keeps the textarea at least as wide as its longest
+//                 line (fitWidth)
 //   caret moves → highlights the example lines the caret's line drew, and
 //                 shows what that line, or the box under the caret, does,
 //                 above the general rules (which always stay). The last
 //                 one stays when the textarea loses focus, so it can be
 //                 copied.
 //
-// Nothing here touches the textarea's value or the form.
+// Nothing here touches the textarea's value or the form; only its
+// minimum width.
 export default class extends Controller {
   static targets = ["input", "html", "warnings", "detail"];
   static values = { url: String, initial: Object };
@@ -25,7 +28,7 @@ export default class extends Controller {
       if (document.activeElement === this.inputTarget) this.moveCaret();
     };
     document.addEventListener("selectionchange", this.onSelection);
-    this.inputTarget.addEventListener("input", (this.onInput = () => this.refresh()));
+    this.inputTarget.addEventListener("input", (this.onInput = () => { this.fitWidth(); this.refresh(); }));
     this.inputTarget.addEventListener("focus", (this.onFocus = () => this.moveCaret()));
   }
 
@@ -35,6 +38,13 @@ export default class extends Controller {
     this.inputTarget.removeEventListener("focus", this.onFocus);
     clearTimeout(this.timer);
     this.request?.abort();
+  }
+
+  // Same sum as ContentLayoutHelper#layout_textarea_min_width.
+  fitWidth() {
+    const lines = this.inputTarget.value.split("\n").map((line) => line.replace(/\t/g, "  ").length);
+    const longest = Math.min(80, Math.max(24, ...lines));
+    this.inputTarget.style.minWidth = `calc(${longest + 2}ch + 1rem)`;
   }
 
   refresh() {

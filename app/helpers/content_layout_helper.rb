@@ -37,6 +37,18 @@ module ContentLayoutHelper
     safe_join(blocks, "\n")
   end
 
+  # The layout editor's textarea is at least as wide as its longest line
+  # plus two characters, so a layout opens without wrapping; wider than
+  # that, it takes the spare room and the side panel shrinks first. The
+  # textarea's own font sets `ch`. Kept between 24 and 80 characters so a
+  # stray long line can't push the panel off the page.
+  # Same sum as layout_explain_controller.js#fitWidth, which keeps it up to
+  # date while typing.
+  def layout_textarea_min_width(text)
+    longest = text.to_s.split("\n").map { |line| line.gsub("\t", "  ").length }.max || 0
+    "min-width: calc(#{longest.clamp(24, 80) + 2}ch + 1rem);"
+  end
+
   # Partials are rendered by name only from the fixed list, so a layout file
   # can't reach any other template.
   def render_layout_part(name, record, kind, context)
