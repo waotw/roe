@@ -215,6 +215,41 @@ class ContentLayout
     new(name: name, path: path, source: source, blocks: blocks, warnings: warnings, problems: problems)
   end
 
+  # Evens out indentation on save, keeping whichever way the layout already
+  # does it. The rows under a block's name are either indented or not: if
+  # most of them are, they all get the indentation the first one uses (two
+  # spaces, a tab, …); if most aren't, none are. Names, and rows in blocks
+  # without a name, start at the left edge, and blank lines are emptied.
+  # A layout with no named block has nothing to go by, so it's left as is.
+  # Nothing else changes: the boxes, names and order are the same text.
+  def self.tidy(text)
+    lines = text.to_s.gsub("\r\n", "\n").split("\n", -1)
+    blocks = []
+    lines.each_with_index do |line, i|
+      if line.strip.empty?
+        blocks << [] unless blocks.last&.empty?
+      else
+        blocks << [] if blocks.empty?
+        blocks.last << i
+      end
+    end
+
+    named_rows = blocks.select { |b| b.size > 1 && name_line?(lines[b.first]) }.flat_map { |b| b.drop(1) }
+    return text.to_s if named_rows.empty?
+
+    indented = named_rows.select { |i| lines[i].match?(/\A[ \t]/) }
+    indent = indented.size * 2 >= named_rows.size ? lines[indented.first][/\A[ \t]+/] : ""
+
+    lines.each_with_index.map do |line, i|
+      body = line.sub(/\A[ \t]+/, "")
+      named_rows.include?(i) && !body.empty? ? indent + body : body
+    end.join("\n")
+  end
+
+  def self.name_line?(line)
+    line.to_s.strip.match?(/\A[^\[\]:]+:\z/)
+  end
+
   # The block with [body] is the content; the first block in the layout is
   # the header and the last the footer (unless it's the content), and any
   # others are groups.

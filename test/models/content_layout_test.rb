@@ -41,6 +41,36 @@ class ContentLayoutTest < ActiveSupport::TestCase
     assert_empty layout.warnings
   end
 
+  test "tidy indents every named row when most already are, using their indent" do
+    text = "post-header:\n  [title]\n[subtitle]\n  [date]\n\n[body]\n"
+    assert_equal "post-header:\n  [title]\n  [subtitle]\n  [date]\n\n[body]\n", ContentLayout.tidy(text)
+    assert_equal "top:\n\t[title]\n\t[date]\n\n[body]\n", ContentLayout.tidy("top:\n\t[title]\n[date]\n\n[body]\n")
+  end
+
+  test "tidy flattens named rows when most aren't indented" do
+    text = "post-header:\n[title]\n[subtitle]\n  [date]\n\n[body]\n"
+    assert_equal "post-header:\n[title]\n[subtitle]\n[date]\n\n[body]\n", ContentLayout.tidy(text)
+  end
+
+  test "tidy puts names and unnamed blocks at the left edge and empties blank lines" do
+    text = "  post-header:\n  [title]\n   \n  [body]\n"
+    assert_equal "post-header:\n  [title]\n\n[body]\n", ContentLayout.tidy(text)
+  end
+
+  test "tidy leaves a layout with no named block alone" do
+    text = "  [title]\n\n[body]\n"
+    assert_equal text, ContentLayout.tidy(text)
+  end
+
+  test "tidy doesn't change what a layout draws" do
+    Dir[File.join(ContentLayout::ROE_DIR, "*#{ContentLayout::EXT}")].each do |path|
+      text = File.read(path)
+      assert_equal text, ContentLayout.tidy(text), "#{File.basename(path)} is already tidy"
+      messy = text.lines.each_with_index.map { |l, i| i.odd? ? l.sub(/\A +/, "") : l }.join
+      assert_equal shape(ContentLayout.parse("x", text)), shape(ContentLayout.parse("x", ContentLayout.tidy(messy)))
+    end
+  end
+
   test "indenting is ignored, so a block's rows can sit under its name" do
     flat = ContentLayout.parse("article", "post-header:\npost-meta: [date] [author]\n[image]\n\n[body]\n")
     indented = ContentLayout.parse("article", "post-header:\n  post-meta: [date] [author]\n\t[image]\n\n[body]\n")

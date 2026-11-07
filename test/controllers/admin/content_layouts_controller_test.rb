@@ -120,6 +120,11 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "[body]\n[title]\n", File.read(ContentLayout.site_path("article"))
   end
 
+  test "saving evens out indentation the way the layout already does it" do
+    patch "/admin/layouts/content/article", params: { content: "post-header:\r\n  [title]\r\n[date]\r\n  [image]\r\n\r\n[body]\r\n" }
+    assert_equal "post-header:\n  [title]\n  [date]\n  [image]\n\n[body]\n", File.read(ContentLayout.site_path("article"))
+  end
+
   test "saving a layout with a problem saves it and says what's wrong" do
     patch "/admin/layouts/content/article", params: { content: "[title]\n" }
     assert File.exist?(ContentLayout.site_path("article"))

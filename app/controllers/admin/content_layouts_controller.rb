@@ -34,7 +34,7 @@ class Admin::ContentLayoutsController < Admin::BaseController
   end
 
   def update
-    content = params[:content].to_s.gsub("\r\n", "\n")
+    content = ContentLayout.tidy(params[:content].to_s.gsub("\r\n", "\n"))
     FileUtils.mkdir_p(ContentLayout::SITE_DIR)
     File.write(ContentLayout.site_path(@name), content)
 
