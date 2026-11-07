@@ -33,7 +33,7 @@
   <% end %>
 </div>
 
-<div class="grid grid-cols-[1fr_26rem] gap-6"
+<div class="grid grid-cols-[minmax(36rem,1fr)_minmax(16rem,26rem)] gap-6"
      data-controller="layout-explain"
      data-layout-explain-url-value="<%= admin_explain_content_layout_path(@name) %>"
      data-layout-explain-initial-value="<%= @explain.to_json %>">
