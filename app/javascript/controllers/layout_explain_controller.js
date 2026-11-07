@@ -7,6 +7,7 @@ import { Controller } from "@hotwired/stimulus";
 //   typing      → asks the server again (debounced), redraws the example
 //   caret moves → highlights the example lines the caret's line drew, and
 //                 shows what that line, or the box under the caret, does
+//   focus leaves → back to the general rules, nothing highlighted
 //
 // Nothing here touches the textarea's value or the form.
 export default class extends Controller {
@@ -16,6 +17,7 @@ export default class extends Controller {
   connect() {
     this.explained = this.initialValue;
     this.caret = null;
+    this.generalHelp = this.helpTarget.innerHTML;
     this.render();
 
     this.onSelection = () => {
@@ -24,14 +26,23 @@ export default class extends Controller {
     document.addEventListener("selectionchange", this.onSelection);
     this.inputTarget.addEventListener("input", (this.onInput = () => this.refresh()));
     this.inputTarget.addEventListener("focus", (this.onFocus = () => this.moveCaret()));
+    this.inputTarget.addEventListener("blur", (this.onBlur = () => this.leave()));
   }
 
   disconnect() {
     document.removeEventListener("selectionchange", this.onSelection);
     this.inputTarget.removeEventListener("input", this.onInput);
     this.inputTarget.removeEventListener("focus", this.onFocus);
+    this.inputTarget.removeEventListener("blur", this.onBlur);
     clearTimeout(this.timer);
     this.request?.abort();
+  }
+
+  // The layout isn't being edited: show the general rules again.
+  leave() {
+    this.caret = null;
+    this.render();
+    this.helpTarget.innerHTML = this.generalHelp;
   }
 
   refresh() {

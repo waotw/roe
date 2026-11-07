@@ -1,7 +1,7 @@
 post-header:
-post-header-top: [title] [feed links]
-[subtitle]
-post-meta: [date] [author]
-[image]
+  post-header-top: [title] [feed links]
+  [subtitle]
+  post-meta: [date] [author]
+  [image]
 
 [body]

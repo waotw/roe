@@ -41,6 +41,13 @@ class ContentLayoutTest < ActiveSupport::TestCase
     assert_empty layout.warnings
   end
 
+  test "indenting is ignored, so a block's rows can sit under its name" do
+    flat = ContentLayout.parse("article", "post-header:\npost-meta: [date] [author]\n[image]\n\n[body]\n")
+    indented = ContentLayout.parse("article", "post-header:\n  post-meta: [date] [author]\n\t[image]\n\n[body]\n")
+    assert_equal shape(flat), shape(indented)
+    assert_empty indented.warnings
+  end
+
   test "a name on its own line below the first is skipped, with a warning" do
     layout = ContentLayout.parse("article", "[title]\nmeta:\n[body]\n")
     assert_equal [ [] ], layout.blocks.map(&:classes)
