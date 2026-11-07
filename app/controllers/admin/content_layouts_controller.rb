@@ -22,7 +22,9 @@ class Admin::ContentLayoutsController < Admin::BaseController
     @content = File.read(@customised ? site_path : roe_path)
     @warnings = ContentLayout.parse(@name, @content).warnings
     @sidebar_position = sidebar_position_for(@name)
-    @explain = ContentLayout::Explain.new(@name, @content).as_json
+    explain = ContentLayout::Explain.new(@name, @content)
+    @explain = explain.as_json
+    @box_choices = explain.box_choices
   end
 
   # The editor's live help: the HTML example and what each line means, for

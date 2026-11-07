@@ -28,6 +28,31 @@ class ContentLayout
       { html: html_lines, warnings: @layout.warnings.map { |w| curly(w) }, lines: lines }
     end
 
+    # The boxes the editor offers as buttons for this layout's type: Roe's
+    # parts that draw something for it, then the metadata fields worth
+    # showing on a page. Each is { name:, label: "[feed links]", help: }.
+    def box_choices
+      choice = ->(name) { { name: name, label: box(name), help: curly(part_help(name)) } }
+      { parts: parts_for_type.map(&choice), fields: fields_for_type.map(&choice) }
+    end
+
+    POST_PARTS = %w[title subtitle date author image feed_links].freeze
+
+    # Metadata that isn't for showing on a page: settings, links to other
+    # files, and IDs. Everything else a type's schema has can be a box.
+    HIDDEN_FIELDS = %w[
+      post_type status url_name image_in_header audience published_to audio
+      video captions podcast guid explicit show_sidebar related collection
+      release sku digital file_guid weight group primary page_type layout
+    ].freeze
+
+    # Post fields that only mean something on one kind of post.
+    TYPE_FIELDS = {
+      "duration" => %w[audio video podcast music],
+      "episode_number" => %w[podcast], "season" => %w[podcast], "episode_type" => %w[podcast],
+      "track_number" => %w[music], "isrc" => %w[music], "songwriters" => %w[music], "lyrics" => %w[music]
+    }.freeze
+
     private
 
     # ── which kind of record the layout is for ──
@@ -42,6 +67,40 @@ class ContentLayout
 
     def noun
       { "post" => "post", "page" => "page", "product" => "product", "documentation" => "documentation page" }[@kind]
+    end
+
+    def parts_for_type
+      case @kind
+      when "post"
+        case @name
+        when "article"                then POST_PARTS + %w[body]
+        when "podcast"                then POST_PARTS + %w[player body subscribe episodes]
+        else                               POST_PARTS + %w[player body] # audio, video, music, extra layouts
+        end
+      when "page"
+        case @name
+        when "podcast-page" then %w[podcast_title subscribe title subtitle image body]
+        when "music-page"   then %w[release_title subscribe title subtitle image body]
+        else                     %w[title subtitle image body]
+        end
+      when "product"       then %w[image title price buy_button body]
+      when "documentation" then %w[title body]
+      end
+    end
+
+    # The type's metadata fields, in the metadata editor's order, less the
+    # ones that are settings or already a part.
+    def fields_for_type
+      return [] if @kind == "documentation"
+
+      names = ContentMetadataSchema.fields_for(@kind, metadata: { "post_type" => @name }).keys
+      names.reject do |field|
+        HIDDEN_FIELDS.include?(field) || parts_for_type.include?(field) ||
+          (@kind == "post" && Post::POST_TYPES.key?(@name.to_sym) && TYPE_FIELDS[field] && !TYPE_FIELDS[field].include?(@name))
+      end
+    rescue StandardError => e
+      Rails.logger.warn "[ContentLayout::Explain] couldn't list fields for #{@name}: #{e.message}"
+      []
     end
 
     # ── the HTML example ──

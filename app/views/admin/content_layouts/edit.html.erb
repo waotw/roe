@@ -3,19 +3,20 @@
     COPY: placeholder wording — owner will rewrite %>
 <% content_for :title, "Edit #{@name} layout" %>
 
-<div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300 relative">
-  <h1 class="text-3xl font-bold mb-5 font-sans">Edit Layout: <%= @name %></h1>
+<div class="flex justify-between items-start mb-5 pb-2.5 border-b border-gray-300 relative">
+  <div>
+    <h1 class="text-3xl font-bold mb-2 font-sans">Edit Layout: <%= @name %></h1>
+    <p class="mb-2 text-sm text-gray-700 font-mono">
+      <% if @customised %>
+        site/layout/content/<%= @name %>.txt
+        <span class="text-gray-500">— custom</span>
+      <% else %>
+        <span class="text-gray-500">Below is the default <%= @name %> layout. Edit and save to create a custom layout in site/layout/content/<%= @name %>.txt.</span>
+      <% end %>
+    </p>
+  </div>
   <%= link_to "\u2190 Back to Layouts", admin_layouts_path, class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs" %>
 </div>
-
-<p class="mb-3 text-sm text-gray-700 font-mono">
-  <% if @customised %>
-    site/layout/content/<%= @name %>.txt
-    <span class="text-gray-500">— custom</span>
-  <% else %>
-    <span class="text-gray-500">Below is the default <%= @name %> layout. Edit and save to create a custom layout in site/layout/content/<%= @name %>.txt.</span>
-  <% end %>
-</p>
 
 <% if @warnings.any? %>
   <div class="mb-4 border border-amber-600 bg-amber-50 text-amber-900 text-sm px-3 py-2 font-sans">
@@ -32,6 +33,32 @@
           class: "uppercase text-xs px-1.5 py-0 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs h-4.5 leading-none pt-[0.1rem]" %>
   <% end %>
 </div>
+
+<%# The boxes this type can use, as buttons that add them to the layout at
+    the caret (layout_boxes_controller). Open the first time; whether it's
+    open or closed is remembered (remember_open_controller).
+    COPY: placeholder wording — owner will rewrite %>
+<div data-controller="layout-boxes">
+<details open class="mb-5 border border-gray-300 bg-white"
+         data-controller="remember-open" data-remember-open-key-value="roe:layout-boxes-open"
+         data-action="toggle->remember-open#save">
+  <summary class="cursor-pointer select-none px-3 py-1.5 font-mono text-xs font-semibold uppercase text-gray-700 hover:bg-gray-50">Boxes</summary>
+  <div class="border-t border-gray-200 px-3 py-2 text-sm">
+    <p class="mb-2 text-xs text-gray-500">Click a box to add it at the caret. A box already in the layout is greyed out.</p>
+    <% [ [ "Parts", @box_choices[:parts] ], [ "Fields", @box_choices[:fields] ] ].each do |heading, choices| %>
+      <% next if choices.empty? %>
+      <div class="mb-1.5 flex flex-wrap items-baseline gap-1.5">
+        <span class="w-14 shrink-0 font-mono text-[0.65rem] uppercase text-gray-500"><%= heading %></span>
+        <% choices.each do |choice| %>
+          <button type="button" title="<%= choice[:help] %>"
+                  class="border border-gray-400 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800 hover:border-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed data-[used=true]:opacity-45"
+                  data-layout-boxes-target="button" data-box="<%= choice[:name] %>"
+                  data-action="layout-boxes#add"><%= choice[:label] %></button>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</details>
 
 <div class="grid grid-cols-[minmax(min-content,1fr)_minmax(16rem,26rem)] gap-6"
      data-controller="layout-explain"
@@ -58,7 +85,7 @@
         <%= f.text_area :content, value: @content, spellcheck: false,
             "aria-label": "#{@name} layout",
             style: layout_textarea_min_width(@content),
-            data: { layout_explain_target: "input", controller: "tab-indent", action: "keydown->tab-indent#keydown" },
+            data: { layout_explain_target: "input", layout_boxes_target: "input", controller: "tab-indent", action: "keydown->tab-indent#keydown" },
             class: "min-w-0 flex-1 bg-white font-mono text-sm p-1 border border-gray-300 box-border h-[500px]" %>
         <%= sidebar_box.call if @sidebar_position == "right" %>
       </div>
@@ -122,11 +149,8 @@
       <p class="mb-2">There are 2 ways to add a CSS class. Put <code class="bg-gray-100 px-1">class-name:</code> on a block's first line. Put <code class="bg-gray-100 px-1">css-name:</code> in front of a group of blocks to give that group that class: <code class="bg-gray-100 px-1">post-header-top: [title] [feed links]</code></p>
     </div>
 
-    <h2 class="text-xs font-semibold uppercase text-gray-600 mb-1">Blocks</h2>
-    <ul class="font-mono text-xs leading-6">
-      <% ContentLayout::BUILT_PARTS.each do |part| %><li>[<%= part.tr("_", " ") %>]</li><% end %>
-    </ul>
   </aside>
+</div>
 </div>
 
 <script>

@@ -98,4 +98,29 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
     refute_includes markup(explain("[player]\n[body]\n", "audio")), "layout-group"
     assert_includes markup(explain("story:\n[player]\n[body]\n", "audio")), %(<div class="story">)
   end
+
+  def choices(name) = ContentLayout::Explain.new(name, "").box_choices
+
+  test "each type offers the parts that draw something for it" do
+    assert_equal %w[title subtitle date author image feed_links body], choices("article")[:parts].map { |c| c[:name] }
+    assert_includes choices("podcast")[:parts].map { |c| c[:name] }, "episodes"
+    assert_equal %w[image title price buy_button body], choices("product")[:parts].map { |c| c[:name] }
+    assert_equal %w[title body], choices("documentation")[:parts].map { |c| c[:name] }
+  end
+
+  test "fields are the type's metadata worth showing, not settings or parts" do
+    podcast = choices("podcast")[:fields].map { |c| c[:name] }
+    assert_includes podcast, "episode_number"
+    assert_not_includes podcast, "status"
+    assert_not_includes podcast, "title", "already a part"
+    assert_not_includes choices("article")[:fields].map { |c| c[:name] }, "episode_number"
+    assert_includes choices("music")[:fields].map { |c| c[:name] }, "track_number"
+    assert_empty choices("documentation")[:fields]
+  end
+
+  test "a choice is labelled as a box and described like the help panel" do
+    feed = choices("article")[:parts].find { |c| c[:name] == "feed_links" }
+    assert_equal "[feed links]", feed[:label]
+    assert_match(/RSS links/, feed[:help])
+  end
 end
