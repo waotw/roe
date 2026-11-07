@@ -6,31 +6,21 @@ import { Controller } from "@hotwired/stimulus";
 //   Tab on a selection  indents every selected line by two spaces
 //   Shift-Tab           removes up to two leading spaces (or a tab) from the
 //                       caret's line, or every selected line
-//   Esc, then Tab       leaves the textarea as usual, so keyboard users
-//                       aren't trapped in it
+//   Esc                 leaves the textarea (blur), so keyboard users
+//                       aren't trapped in it; Tab then carries on from
+//                       there as usual
 //
 // Edits go through execCommand("insertText"), so ⌘Z undoes them and an
 // `input` event fires like any typing.
 export default class extends Controller {
   static INDENT = "  ";
 
-  connect() {
-    this.escaped = false;
-  }
-
   keydown(event) {
     if (event.key === "Escape") {
-      this.escaped = true;
+      this.element.blur();
       return;
     }
-    if (event.key !== "Tab" || event.metaKey || event.ctrlKey || event.altKey) {
-      this.escaped = false;
-      return;
-    }
-    if (this.escaped) {
-      this.escaped = false;
-      return; // let Tab move focus
-    }
+    if (event.key !== "Tab" || event.metaKey || event.ctrlKey || event.altKey) return;
 
     event.preventDefault();
     const field = this.element;
