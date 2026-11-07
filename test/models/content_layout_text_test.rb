@@ -4,7 +4,7 @@ require "test_helper"
 # the same order as the page, each in a form that works there.
 class ContentLayoutTextTest < ActiveSupport::TestCase
   teardown do
-    Dir.glob(File.join(ContentLayout::SITE_DIR, "*.yml")).each { |f| FileUtils.rm_f(f) }
+    Dir.glob(File.join(ContentLayout::SITE_DIR, "*#{ContentLayout::EXT}")).each { |f| FileUtils.rm_f(f) }
   end
 
   def a_post(type = "article", **fields)
@@ -46,7 +46,7 @@ class ContentLayoutTextTest < ActiveSupport::TestCase
   end
 
   test "the order follows the site's layout" do
-    site_layout("article", "- body\n- subtitle\n")
+    site_layout("article", "[body]\n[subtitle]\n")
     html = text(a_post(subtitle: "After"), :feed)
     assert_operator html.index("Words."), :<, html.index("After")
   end
@@ -72,12 +72,12 @@ class ContentLayoutTextTest < ActiveSupport::TestCase
   end
 
   test "site-only parts and a layout without the title draw nothing extra" do
-    site_layout("article", "- episodes\n- buy_button\n- body\n")
+    site_layout("article", "[episodes]\n[buy_button]\n[body]\n")
     assert_equal "<p>Words.</p>", text(a_post, :email).gsub(%r{</?div[^>]*>}, "").strip
   end
 
   test "the newsletter email uses the layout" do
-    site_layout("article", "- subtitle\n- body\n")
+    site_layout("article", "[subtitle]\n[body]\n")
     html = NewsletterRenderer.new(a_post(subtitle: "Only this")).preview
     assert_includes html, "Only this"
     assert_not_includes html, "<h1>", "the site's layout has no title"

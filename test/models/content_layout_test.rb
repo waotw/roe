@@ -1,54 +1,80 @@
 require "test_helper"
 
 class ContentLayoutTest < ActiveSupport::TestCase
-  test "a plain list is one part per group, in order" do
-    layout = ContentLayout.parse("article", "- title\n- subtitle\n- body\n")
-    assert_equal [ [ "title" ], [ "subtitle" ], [ "body" ] ], layout.groups
+  def shape(layout)
+    layout.blocks.map { |b| [ b.role, b.classes, b.rows.map { |r| [ r.classes, r.parts ] } ] }
+  end
+
+  test "one box per line is one part per row, in order" do
+    layout = ContentLayout.parse("article", "[title]\n[subtitle]\n[body]\n")
+    assert_equal [ [ "title" ], [ "subtitle" ], [ "body" ] ], layout.rows.map(&:parts)
     assert_empty layout.warnings
   end
 
-  test "[a, b] is one group" do
-    layout = ContentLayout.parse("article", "- [title, feed_links]\n- [date, author]\n- body\n")
-    assert_equal [ %w[title feed_links], %w[date author], [ "body" ] ], layout.groups
+  test "boxes on one line are one row; spaces in a name are underscores" do
+    layout = ContentLayout.parse("article", "[title] [feed links]\n[Date]  [author]\n[body]\n")
+    assert_equal [ %w[title feed_links], %w[date author], [ "body" ] ], layout.rows.map(&:parts)
   end
 
-  test "front matter is read as settings and doesn't become a part" do
-    layout = ContentLayout.parse("article", "---\ndate_format: long\n---\n- title\n- body\n")
-    assert_equal({ "date_format" => "long" }, layout.settings)
-    assert_equal %w[title body], layout.parts
+  test "blank lines make blocks: header, groups, content, footer" do
+    layout = ContentLayout.parse("podcast", "[title]\n\n[date]\n\n[player]\n[body]\n\n[subscribe]\n\n[episodes]\n")
+    assert_equal %i[header group content group footer], layout.blocks.map(&:role)
   end
 
-  test "comments and blank lines are ignored" do
-    layout = ContentLayout.parse("article", "# The article layout\n\n- title\n\n- body\n")
+  test "several blank lines count as one, and leading or trailing ones are ignored" do
+    layout = ContentLayout.parse("article", "\n\n[title]\n\n\n\n[body]\n\n\n")
+    assert_equal %i[header content], layout.blocks.map(&:role)
+  end
+
+  test "a layout that starts with the body has no header; one that ends with it has no footer" do
+    assert_equal %i[content footer], ContentLayout.parse("a", "[body]\n\n[subscribe]\n").blocks.map(&:role)
+    assert_equal %i[header content], ContentLayout.parse("a", "[title]\n\n[body]\n").blocks.map(&:role)
+    assert_equal %i[content], ContentLayout.parse("a", "[body]\n").blocks.map(&:role)
+  end
+
+  test "name: on a block's first line names the block; on a row, the row" do
+    layout = ContentLayout.parse("article", "post-header:\npost-meta: [date] [author]\n\nhero wide:\n[body]\n")
+    assert_equal [
+      [ :header, [ "post-header" ], [ [ [ "post-meta" ], %w[date author] ] ] ],
+      [ :content, %w[hero wide], [ [ [], [ "body" ] ] ] ]
+    ], shape(layout)
+    assert_empty layout.warnings
+  end
+
+  test "a name on its own line below the first is skipped, with a warning" do
+    layout = ContentLayout.parse("article", "[title]\nmeta:\n[body]\n")
+    assert_equal [ [] ], layout.blocks.map(&:classes)
+    assert_match(/first line of a block/, layout.warnings.join)
+  end
+
+  test "a line that isn't boxes is skipped, with a warning naming it" do
+    layout = ContentLayout.parse("article", "Hello there\n# Heading\n[title]\n[body]\n- subtitle\n")
     assert_equal %w[title body], layout.parts
+    assert_equal 3, layout.warnings.size
+    assert_match(/Line 1 isn't a row of \[boxes\]/, layout.warnings.first)
   end
 
   test "a layout without body gets it at the end, with a warning" do
-    layout = ContentLayout.parse("article", "- title\n- subtitle\n")
+    layout = ContentLayout.parse("article", "[title]\n[subtitle]\n")
     assert_equal %w[title subtitle body], layout.parts
-    assert_match(/no body/, layout.warnings.join)
+    assert_equal %i[header content], layout.blocks.map(&:role)
+    assert_match(/no \[body\]/, layout.warnings.join)
   end
 
-  test "a file that isn't a list shows only the body, with a warning" do
-    layout = ContentLayout.parse("article", "title: yes\n")
-    assert_equal [ "body" ], layout.parts
-    assert_match(/isn't a list/, layout.warnings.join)
+  test "a second body is skipped" do
+    layout = ContentLayout.parse("article", "[body]\n\n[body]\n")
+    assert_equal %w[body], layout.parts
+    assert_match(/already/, layout.warnings.join)
   end
 
-  test "broken YAML shows only the body, with a warning" do
-    layout = ContentLayout.parse("article", "- [title\n- body")
-    assert_equal [ "body" ], layout.parts
-    assert_match(/couldn't be read/, layout.warnings.join)
-  end
-
-  test "names that aren't part names are skipped" do
-    layout = ContentLayout.parse("article", "- title\n- \"../../etc/passwd\"\n- { a: 1 }\n- body\n")
-    assert_equal %w[title body], layout.parts
+  test "boxes and class names that aren't plain names are skipped" do
+    layout = ContentLayout.parse("article", "[../../etc/passwd] [title]\n\"><script: [date]\n[body]\n")
+    assert_equal %w[title date body], layout.parts, "a bad class is left off; its row still shows"
     assert_equal 2, layout.warnings.size
   end
 
   test "Roe ships a layout for every post type and record type" do
-    (Post::POST_TYPES.keys.map(&:to_s) + %w[page product documentation]).each do |type|
+    (Post::POST_TYPES.keys.map(&:to_s) + %w[page podcast-page music-page product documentation]).each do |type|
       next if type == "music" && !Post::POST_TYPES.key?(:music)
 
       layout = ContentLayout.find(type)
@@ -59,7 +85,7 @@ class ContentLayoutTest < ActiveSupport::TestCase
   end
 
   test "the site's copy wins over Roe's" do
-    with_site_layout("article", "- body\n- title\n") do
+    with_site_layout("article", "[body]\n[title]\n") do
       layout = ContentLayout.find("article")
       assert_equal :site, layout.source
       assert_equal %w[body title], layout.parts
@@ -67,16 +93,16 @@ class ContentLayoutTest < ActiveSupport::TestCase
   end
 
   test "an edit to the site's copy is picked up" do
-    with_site_layout("article", "- body\n") do |path|
+    with_site_layout("article", "[body]\n") do |path|
       assert_equal %w[body], ContentLayout.find("article").parts
-      File.write(path, "- title\n- body\n- subtitle\n")
+      File.write(path, "[title]\n[body]\n[subtitle]\n")
       File.utime(Time.now + 5, Time.now + 5, path)
       assert_equal %w[title body subtitle], ContentLayout.find("article").parts
     end
   end
 
   test "layout: in a post's metadata picks another layout" do
-    with_site_layout("announcement", "- title\n- body\n") do
+    with_site_layout("announcement", "[title]\n[body]\n") do
       post = Post.new(metadata: { "post_type" => "article", "layout" => "announcement" })
       assert_equal "announcement", ContentLayout.for(post).name
     end

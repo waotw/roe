@@ -1,5 +1,5 @@
-<%# A content layout: a YAML list of parts. A plain textarea — the list is
-    short, and the parts it can hold are listed beside it.
+<%# A content layout: rows of [boxes] in blocks (see ContentLayout). A plain
+    textarea — it's short, and the parts it can hold are listed beside it.
     COPY: placeholder wording — owner will rewrite %>
 <% content_for :title, "Edit #{@name} layout" %>
 
@@ -10,10 +10,10 @@
 
 <p class="mb-3 text-sm text-gray-700 font-mono">
   <% if @customised %>
-    site/layout/content/<%= @name %>.yml
+    site/layout/content/<%= @name %>.txt
     <span class="text-gray-500">— custom</span>
   <% else %>
-    <span class="text-gray-500">Below is the default <%= @name %> layout. Edit and save to create a custom layout in site/layout/content/<%= @name %>.yml.</span>
+    <span class="text-gray-500">Below is the default <%= @name %> layout. Edit and save to create a custom layout in site/layout/content/<%= @name %>.txt.</span>
   <% end %>
 </p>
 
@@ -33,7 +33,10 @@
   <% end %>
 </div>
 
-<div class="grid grid-cols-[1fr_16rem] gap-6">
+<div class="grid grid-cols-[1fr_26rem] gap-6"
+     data-controller="layout-explain"
+     data-layout-explain-url-value="<%= admin_explain_content_layout_path(@name) %>"
+     data-layout-explain-initial-value="<%= @explain.to_json %>">
   <%= form_with url: admin_content_layout_path(@name), method: :patch, id: "content-layout-form" do |f| %>
     <%# The site's header, sidebar and footer, drawn as labelled boxes around
         the textarea so it reads as the middle of a page. Each box links to
@@ -54,21 +57,69 @@
         <%= sidebar_box.call if @sidebar_position == "left" %>
         <%= f.text_area :content, value: @content, spellcheck: false,
             "aria-label": "#{@name} layout",
+            data: { layout_explain_target: "input" },
             class: "min-w-0 flex-1 bg-white font-mono text-sm p-1 border border-gray-300 box-border h-[500px]" %>
         <%= sidebar_box.call if @sidebar_position == "right" %>
       </div>
       <%= frame.call("Footer", "footer", admin_layout_footer_edit_path, "h-10") %>
     </div>
+
   <% end %>
 
-  <aside class="text-sm font-sans text-gray-700">
-    <h2 class="text-xs font-semibold uppercase text-gray-600 mb-1">Writing it</h2>
-    <p class="mb-3">One part per line, in page order. <code class="bg-gray-100 px-1">- [title, subtitle]</code> puts parts in one group, styled together.</p>
-    <p class="mb-3">A part the post's body already has isn't shown twice: a player card in the body replaces <code class="bg-gray-100 px-1">player</code>.</p>
+  <%# Live help (layout_explain_controller): the HTML this layout draws, with
+      the caret's line highlighted, any problems, then what the line or box
+      under the caret does. Before the textarea is focused, the general
+      rules show instead. %>
+  <aside class="text-sm font-sans text-gray-700 min-w-0">
+    <%# COPY: placeholder wording — owner will rewrite %>
+    <%# As tall as the header box and the gap under it (h-10 + gap-2), so the
+        example's top lines up with the textarea's. %>
+    <h2 class="flex h-12 items-end pb-1 text-xs font-semibold uppercase text-gray-600">HTML</h2>
+    <pre class="mb-3 overflow-x-auto border border-gray-200 bg-white p-2 font-mono text-[0.7rem] leading-5 text-gray-800" data-layout-explain-target="html"></pre>
+    <ul class="mb-3 text-xs text-red-800 list-disc pl-4 empty:hidden" data-layout-explain-target="warnings"></ul>
 
-    <h2 class="text-xs font-semibold uppercase text-gray-600 mb-1">Parts</h2>
+    <h2 class="text-xs font-semibold uppercase text-gray-600 mb-1">DETAILS</h2>
+    <%# How a layout is written, as a labelled diagram. Click to open it large
+        (diagram_zoom_controller): zoom with the buttons or ⌘/Ctrl + scroll,
+        drag or scroll to move around, Esc or a click outside to close. %>
+    <div class="mb-3" data-controller="diagram-zoom">
+      <button type="button" class="block w-full cursor-zoom-in border border-gray-300 hover:border-gray-500"
+              data-action="diagram-zoom#open" title="Open larger" aria-label="Open the layout diagram larger">
+        <%= image_tag "roe-layout-diagram.svg", alt: "How a layout is written: blocks, rows, boxes and their CSS classes", class: "block w-full h-auto" %>
+      </button>
+
+      <dialog data-diagram-zoom-target="dialog"
+              class="m-auto h-[90vh] w-[95vw] max-w-none max-h-none overflow-hidden bg-[#202020] p-0 backdrop:bg-black/70 [color-scheme:dark]"
+              data-action="click->diagram-zoom#closeOnBackdrop">
+        <div class="absolute right-3 top-3 z-10 flex gap-1 font-mono text-xs">
+          <button type="button" class="border border-gray-500 bg-gray-800 px-2 py-1 text-gray-100 hover:bg-gray-700" data-action="diagram-zoom#zoomOut" aria-label="Zoom out">−</button>
+          <button type="button" class="border border-gray-500 bg-gray-800 px-2 py-1 text-gray-100 hover:bg-gray-700" data-action="diagram-zoom#reset" data-diagram-zoom-target="level">100%</button>
+          <button type="button" class="border border-gray-500 bg-gray-800 px-2 py-1 text-gray-100 hover:bg-gray-700" data-action="diagram-zoom#zoomIn" aria-label="Zoom in">+</button>
+          <button type="button" class="ml-2 border border-gray-500 bg-gray-800 px-2 py-1 text-gray-100 hover:bg-gray-700" data-action="diagram-zoom#close" aria-label="Close">CLOSE</button>
+        </div>
+        <div class="flex h-full w-full overflow-auto cursor-grab" data-diagram-zoom-target="viewport"
+             data-action="wheel->diagram-zoom#wheel pointerdown->diagram-zoom#dragStart">
+          <%= image_tag "roe-layout-diagram.svg", alt: "", draggable: false,
+                class: "m-auto block h-auto max-w-none shrink-0 select-none", data: { diagram_zoom_target: "image" } %>
+        </div>
+      </dialog>
+    </div>
+    <p class="text-gray-500 mb-4">Click a line in the layout to see what it does.</p>
+    <div class="mb-4 min-h-[4rem] leading-6" data-layout-explain-target="help">
+      <p class="mb-2">Layouts use <code class="bg-gray-100 px-1">blocks</code> and <code class="bg-gray-100 px-1">[boxes]</code>:</p>
+      <ul class="list-disc ml-4 text-xs">
+        <li class="mb-2">A <code class="bg-gray-100 px-1">block</code> is a group of <code class="bg-gray-100 px-1">[box]</code>es. A blank line creates a new block.</li>
+        <li class="mb-2">A <code class="bg-gray-100 px-1">[box]</code> represents an element in the layout. You can group <code class="bg-gray-100 px-1">[boxes]</code> by putting them next to each other. This gives them their own <code class="bg-gray-100 px-1">&lt;div&gt;</code>.</li>
+      </ul>
+      <p class="mb-2">The <code class="bg-gray-100 px-1">[body]</code> block is the content from the post or page. The simplest layout would only include <code class="bg-gray-100 px-1">[body]</code> and would only show the content.</p>
+      <p class="mb-2">You can add a <code class="bg-gray-100 px-1">&lt;header&gt;</code> by including a <code class="bg-gray-100 px-1">block</code> above <code class="bg-gray-100 px-1">[body]</code>.</p>
+      <p class="mb-2">You can add a <code class="bg-gray-100 px-1">&lt;footer&gt;</code> by including a <code class="bg-gray-100 px-1">block</code> below <code class="bg-gray-100 px-1">[body]</code>.</p>
+      <p class="mb-2">There are 2 ways to add a CSS class. Put <code class="bg-gray-100 px-1">class-name:</code> on a block's first line. Put <code class="bg-gray-100 px-1">css-name:</code> in front of a group of blocks to give that group that class: <code class="bg-gray-100 px-1">post-header-top: [title] [feed links]</code></p>
+    </div>
+
+    <h2 class="text-xs font-semibold uppercase text-gray-600 mb-1">Blocks</h2>
     <ul class="font-mono text-xs leading-6">
-      <% ContentLayout::BUILT_PARTS.each do |part| %><li><%= part %></li><% end %>
+      <% ContentLayout::BUILT_PARTS.each do |part| %><li>[<%= part.tr("_", " ") %>]</li><% end %>
     </ul>
   </aside>
 </div>

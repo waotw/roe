@@ -1,40 +1,40 @@
-# Draws a record's content layout (ContentLayout): each part in order,
-# groups as one <div>, a post's top parts inside <header class="post-header">.
+# Draws a record's content layout (ContentLayout): its blocks in order, each
+# as the element its place gives it.
+#
+#   header   <header class="…">   the first block before the content
+#   group    <div class="…">      blocks between header, content and footer
+#   content  the writing and the boxes grouped with it; wrapped in a
+#            <div class="…"> only when the block is named
+#   footer   <footer class="…">   the last block after the content
+#
+# A block or row gets the classes written in the layout; without any, a
+# group is .layout-group and a row of several boxes .layout-row. A row of one
+# box with no classes is the part alone. Roe's default layouts write out the
+# classes themes already use (.post-header, .post-header-top, .post-meta,
+# .podcast-episode, .product-top), so they draw what the post-type templates
+# did — and an edited layout draws only what it says.
 #
 # Each part is a partial in app/views/content_layouts/parts/. A name with no
 # partial is shown as a metadata field when the record has a value for it,
 # and skipped otherwise. A part the body already has is skipped (BodyCheck).
-#
-# The markup and classes match what the post-type templates drew before
-# layouts, so themes keep working: .post-header, .post-header-top, .post-meta,
-# .post-title, .podcast-episode and the rest.
+# Blocks and rows left with nothing to show are dropped.
 module ContentLayoutHelper
-  # A group holding one of these parts also gets the class the old post header
-  # gave that row, so theme rules for .post-header-top and .post-meta apply.
-  GROUP_CLASSES = {
-    "post"    => { "title" => "post-header-top", "date" => "post-meta", "author" => "post-meta" },
-    "product" => { "title" => "product-top" }
-  }.freeze
-
-  # Post types whose parts below the header sat inside a wrapper.
-  POST_BELOW_HEADER_WRAPPERS = { "podcast" => "podcast-episode" }.freeze
-
   def render_content_layout(record, layout: ContentLayout.for(record), **locals)
     kind = layout_kind(record)
     context = layout_context(record, kind, layout, locals)
     body_check = ContentLayout::BodyCheck.new(record)
 
-    rendered = layout.groups.map do |names|
-      html = names.filter_map do |name|
-        next if body_check.has?(name)
-        part = render_layout_part(name, record, kind, context).to_s
-        part.presence && { name: name, html: part }
+    blocks = layout.blocks.filter_map do |block|
+      rows = block.rows.filter_map do |row|
+        parts = row.parts.filter_map do |name|
+          next if body_check.has?(name)
+          render_layout_part(name, record, kind, context).to_s.presence&.html_safe
+        end
+        layout_row_html(row, parts) if parts.any?
       end
-      { names: names, parts: html }
+      layout_block_html(block, rows) if rows.any?
     end
-
-    rendered.reject! { |group| group[:parts].empty? }
-    kind == "post" ? wrap_post_layout(record, rendered) : safe_join(rendered.map { |g| layout_group_html(g, kind) }, "\n")
+    safe_join(blocks, "\n")
   end
 
   # Partials are rendered by name only from the fixed list, so a layout file
@@ -91,30 +91,21 @@ module ContentLayoutHelper
         .to_a
   end
 
-  # A post's parts before the player and body go in <header class="post-header">,
-  # the rest after it. A podcast's lower parts sit in .podcast-episode, as
-  # before layouts.
-  def wrap_post_layout(record, groups)
-    split = groups.index { |g| (g[:names] & ContentLayout::BELOW_HEADER).any? } || groups.length
-    top, rest = groups[0...split], groups[split..]
-
-    out = []
-    out << content_tag(:header, safe_join(top.map { |g| layout_group_html(g, "post") }, "\n"), class: "post-header") if top.any?
-    lower = safe_join(rest.map { |g| layout_group_html(g, "post") }, "\n")
-    wrapper = POST_BELOW_HEADER_WRAPPERS[record.post_type.to_s]
-    out << (wrapper ? content_tag(:div, lower, class: wrapper) : lower) if rest.any?
-    safe_join(out, "\n")
+  def layout_block_html(block, rows)
+    inner = safe_join(rows, "\n")
+    css = block.classes.join(" ").presence
+    case block.role
+    when :header  then content_tag(:header, inner, class: css)
+    when :footer  then content_tag(:footer, inner, class: css)
+    when :content then css ? content_tag(:div, inner, class: css) : inner
+    else               content_tag(:div, inner, class: css || "layout-group")
+    end
   end
 
-  # One part on its own line is drawn as is; a group gets a <div>.
-  def layout_group_html(group, kind)
-    parts = group[:parts].map { |p| p[:html].html_safe }
-    return parts.first if group[:names].length == 1
+  def layout_row_html(row, parts)
+    return parts.first if row.parts.length == 1 && row.classes.empty?
 
-    classes = [ "layout-group" ]
-    mapping = GROUP_CLASSES.fetch(kind, {})
-    classes.concat(group[:names].filter_map { |name| mapping[name] }.uniq)
-    content_tag(:div, safe_join(parts, "\n"), class: classes.join(" "))
+    content_tag(:div, safe_join(parts, "\n"), class: row.classes.join(" ").presence || "layout-row")
   end
 
   # A part named after a metadata field the record has: its value, plainly.

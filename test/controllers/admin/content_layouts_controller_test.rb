@@ -9,7 +9,7 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
-    Dir.glob(File.join(ContentLayout::SITE_DIR, "*.yml")).each { |f| FileUtils.rm_f(f) }
+    Dir.glob(File.join(ContentLayout::SITE_DIR, "*#{ContentLayout::EXT}")).each { |f| FileUtils.rm_f(f) }
     restore_sidebar
   end
 
@@ -103,7 +103,7 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
 
   test "a customised layout stays listed even with its feature off" do
     SiteFeature.stubs(:podcast_enabled?).returns(false)
-    File.write(ContentLayout.site_path("podcast"), "- body\n")
+    File.write(ContentLayout.site_path("podcast"), "[body]\n")
 
     get "/admin/layouts"
     assert_select "a[href=?]", "/admin/layouts/content/podcast/edit"
@@ -115,19 +115,19 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, File.read(ContentLayout.roe_default_path("article")).lines.last.strip
     assert_not File.exist?(ContentLayout.site_path("article")), "opening it writes nothing"
 
-    patch "/admin/layouts/content/article", params: { content: "- body\r\n- title\r\n" }
+    patch "/admin/layouts/content/article", params: { content: "[body]\r\n[title]\r\n" }
     assert_redirected_to "/admin/layouts/content/article/edit"
-    assert_equal "- body\n- title\n", File.read(ContentLayout.site_path("article"))
+    assert_equal "[body]\n[title]\n", File.read(ContentLayout.site_path("article"))
   end
 
   test "saving a layout with a problem saves it and says what's wrong" do
-    patch "/admin/layouts/content/article", params: { content: "- title\n" }
+    patch "/admin/layouts/content/article", params: { content: "[title]\n" }
     assert File.exist?(ContentLayout.site_path("article"))
-    assert_match(/no body/, flash[:alert])
+    assert_match(/no \[body\]/, flash[:alert])
   end
 
   test "Use default deletes the custom file" do
-    File.write(ContentLayout.site_path("article"), "- body\n")
+    File.write(ContentLayout.site_path("article"), "[body]\n")
     delete "/admin/layouts/content/article"
     assert_not File.exist?(ContentLayout.site_path("article"))
     assert_redirected_to "/admin/layouts/content/article/edit"
@@ -148,7 +148,21 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
 
     post "/admin/layouts/content", params: { name: "../evil" }
     assert_match(/lowercase/, flash[:alert])
-    assert_empty Dir.glob(File.join(ContentLayout::SITE_DIR, "*.yml"))
+    assert_empty Dir.glob(File.join(ContentLayout::SITE_DIR, "*#{ContentLayout::EXT}"))
+  end
+
+  test "explain describes unsaved text without writing anything" do
+    post "/admin/layouts/content/article/explain", params: { content: "[title]\n\n[body]\n" }, as: :json
+    assert_response :success
+    json = response.parsed_body
+    assert_includes json["html"].map { |e| e["text"] }, "<header>"
+    assert_match(/title/, json["lines"]["1"]["boxes"].first["text"])
+    assert_not File.exist?(ContentLayout.site_path("article"))
+  end
+
+  test "the editor carries the help for the layout it opens" do
+    get "/admin/layouts/content/article/edit"
+    assert_select "[data-controller=layout-explain][data-layout-explain-initial-value*=post-header]"
   end
 
   test "a name that isn't a layout's can't be read or written" do

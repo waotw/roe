@@ -17,10 +17,7 @@ class CanonicalTemplatesTest < ActiveSupport::TestCase
   # store/members/podcast interpolate ERB into values (and store injects raw
   # YAML), so their canonical form is only knowable after rendering. music has
   # no ERB tags, so it round-trips like plain YAML.
-  # Content layouts (layouts/content/*.yml) are a list edited as text, never
-  # loaded and dumped by a settings form, so they keep their comments and
-  # aren't held to this.
-  TEMPLATES = (Dir.glob(ROOT.join("**", "*.yml")).reject { |f| f.include?("_versions.yml") || f.include?("/layouts/content/") } +
+  TEMPLATES = (Dir.glob(ROOT.join("**", "*.yml")).reject { |f| f.include?("_versions.yml") } +
                [ ROOT.join("features", "music", "system", "features", "music.yml.erb").to_s ]).sort.freeze
 
   def canonical(raw)

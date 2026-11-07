@@ -134,13 +134,14 @@ Rails.application.routes.draw do
     # list it found with a best-guess page for each. Pure — writes nothing;
     # the editor applies the result to its own textarea.
     post "layouts/menu_builder", to: "layouts#menu_builder", as: "layouts_menu_builder"
-    # Content layouts (site/layout/content/<name>.yml): what a type's page
+    # Content layouts (site/layout/content/<name>.txt): what a type's page
     # shows around its writing. Edit, save as the site's copy, go back to
     # Roe's default, or add an extra layout for `layout: <name>`.
     get    "layouts/content/:name/edit", to: "content_layouts#edit",    as: "edit_content_layout"
     patch  "layouts/content/:name",      to: "content_layouts#update",  as: "content_layout"
     delete "layouts/content/:name",      to: "content_layouts#destroy"
     post   "layouts/content",            to: "content_layouts#create",  as: "content_layouts"
+    post   "layouts/content/:name/explain", to: "content_layouts#explain", as: "explain_content_layout"
 
     resources :posts, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       collection do

@@ -127,7 +127,7 @@ class Admin::LayoutsController < Admin::BaseController
   ContentLayoutGroup = Struct.new(:name, :rows)
 
   def content_layouts
-    names = ->(dir) { Dir.glob(File.join(dir, "*.yml")).map { |f| File.basename(f, ".yml") } }
+    names = ->(dir) { Dir.glob(File.join(dir, "*#{ContentLayout::EXT}")).map { |f| File.basename(f, ContentLayout::EXT) } }
     roe = names.call(ContentLayout::ROE_DIR)
     site = names.call(ContentLayout::SITE_DIR)
     row = ->(name, label) { { name: name, label: label, customised: site.include?(name), extra: !roe.include?(name) } }

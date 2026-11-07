@@ -7,7 +7,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
   CARD = "```card\ntype: player\n```".freeze
 
   teardown do
-    Dir.glob(File.join(ContentLayout::SITE_DIR, "*.yml")).each { |f| FileUtils.rm_f(f) }
+    Dir.glob(File.join(ContentLayout::SITE_DIR, "*#{ContentLayout::EXT}")).each { |f| FileUtils.rm_f(f) }
   end
 
   def a_post(type = "article", content: "Words.", **fields)
@@ -81,33 +81,62 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
   # ── a site's own layout ──
 
   test "the site's layout changes the order" do
-    site_layout("article", "- body\n- title\n")
+    site_layout("article", "[body]\n[title]\n")
     post = a_post
     get post_path(post.url_name)
     assert_equal %w[post-content post-title], order(".post-content", ".post-title")
   end
 
   test "a site's layout without a header part has no post-header" do
-    site_layout("article", "- body\n")
+    site_layout("article", "[body]\n")
     get post_path(a_post.url_name)
     assert_select "header.post-header", 0
     assert_select ".post-title", 0
   end
 
-  test "a group gets one layout-group div" do
-    site_layout("article", "- [subtitle, date]\n- body\n")
+  test "a row of boxes without a name gets one layout-row div" do
+    site_layout("article", "[subtitle] [date]\n[body]\n")
     get post_path(a_post(subtitle: "Sub").url_name)
-    assert_select "div.layout-group.post-meta > .post-subtitle + .post-date"
+    assert_select "div.layout-row > .post-subtitle + .post-date"
+  end
+
+  test "the first block is the header, the last the footer, any between are groups" do
+    site_layout("article", "[title]\n\nmeta wide:\n[date]\n\n[body]\n\n[subtitle]\n\n[author]\n")
+    get post_path(a_post(subtitle: "Sub", author: "Ben").url_name)
+    assert_select ".content > header > .post-title"
+    assert_select ".content > div.meta.wide > .post-date"
+    assert_select ".content > .post-content"
+    assert_select ".content > div.layout-group > .post-subtitle"
+    assert_select ".content > footer > .post-author"
+  end
+
+  test "names give a block and a row their classes" do
+    site_layout("article", "top:\nbyline: [date] [author]\n\n[body]\n")
+    get post_path(a_post(author: "Ben").url_name)
+    assert_select "header.top > div.byline > .post-date + .post-author"
+  end
+
+  test "boxes grouped with the body sit inside the content, before or after the writing" do
+    site_layout("article", "story:\n[subtitle]\n[body]\n[date]\n")
+    get post_path(a_post(subtitle: "Sub").url_name)
+    assert_select "div.story > .post-subtitle + .post-content + .post-date"
+    assert_select "article header", 0
+  end
+
+  test "an empty header is left out" do
+    site_layout("article", "[location]\n\n[body]\n")
+    get post_path(a_post.url_name)
+    assert_select "article header", 0
   end
 
   test "a metadata field without a part of its own shows its value" do
-    site_layout("article", "- location\n- body\n")
+    site_layout("article", "[location]\n[body]\n")
     get post_path(a_post(location: "Chicago").url_name)
     assert_select "p.post-field.post-location", "Chicago"
   end
 
   test "layout: in the metadata picks another layout" do
-    site_layout("announcement", "- body\n")
+    site_layout("announcement", "[body]\n")
     get post_path(a_post(layout: "announcement").url_name)
     assert_select ".post-title", 0
     assert_select ".post-content", /Words/
@@ -145,7 +174,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
   end
 
   test "a site's custom page layout doesn't change podcast pages" do
-    site_layout("page", "- title\n- body\n")
+    site_layout("page", "[title]\n[body]\n")
     page = create(:page, metadata: { "title" => "Show", "url_name" => "show-2", "status" => "published", "podcast" => "show" }, content: "x")
     assert_equal "podcast-page", ContentLayout.for(page).name
     assert_equal "page", ContentLayout.for(create(:page, metadata: { "title" => "A", "url_name" => "a-page", "status" => "published" }, content: "x")).name
@@ -179,7 +208,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
   test "a product shows its title, image and button from the layout" do
     product = a_product
     get product_path(product.url_name)
-    assert_select ".product .content .layout-group.product-top h1.product-title", product.title
+    assert_select ".product .content .product-top h1.product-title", product.title
     assert_select ".product-top .product-price", "$12.00"
   end
 

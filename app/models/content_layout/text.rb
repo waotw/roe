@@ -33,7 +33,7 @@ class ContentLayout
     end
 
     def html
-      @layout.groups.filter_map do |names|
+      @layout.rows.map(&:parts).filter_map do |names|
         parts = names.filter_map { |name| part(name).presence }
         next if parts.empty?
         next parts.first if names.length == 1

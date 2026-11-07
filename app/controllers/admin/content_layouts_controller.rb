@@ -1,13 +1,13 @@
 # Content layouts in the admin: the Content section of the Layouts page.
 #
 # Every type is editable straight away. A type on the default opens Roe's
-# copy; saving writes site/layout/content/<name>.yml, a custom layout from
+# copy; saving writes site/layout/content/<name>.txt, a custom layout from
 # then on. "Use default" deletes the custom file, so the type goes back to
 # Roe's and picks up its improvements in updates.
 #
 # Extra layouts (New layout) are picked per post with `layout: <name>`.
 class Admin::ContentLayoutsController < Admin::BaseController
-  before_action :set_name, only: [ :edit, :update, :destroy ]
+  before_action :set_name, only: [ :edit, :update, :destroy, :explain ]
 
   def edit
     site_path = ContentLayout.site_path(@name)
@@ -22,6 +22,13 @@ class Admin::ContentLayoutsController < Admin::BaseController
     @content = File.read(@customised ? site_path : roe_path)
     @warnings = ContentLayout.parse(@name, @content).warnings
     @sidebar_position = sidebar_position_for(@name)
+    @explain = ContentLayout::Explain.new(@name, @content).as_json
+  end
+
+  # The editor's live help: the HTML example and what each line means, for
+  # the text as it stands (unsaved). Reads nothing and writes nothing.
+  def explain
+    render json: ContentLayout::Explain.new(@name, params[:content].to_s).as_json
   end
 
   def update
@@ -61,12 +68,12 @@ class Admin::ContentLayoutsController < Admin::BaseController
     end
   end
 
-  # No comments in the file (AGENTS.md rule 5): the editor's side panel
-  # explains the format.
-  NEW_LAYOUT = <<~YAML.freeze
-    - title
-    - body
-  YAML
+  # No comments in the file: the editor's side panel explains the format.
+  NEW_LAYOUT = <<~TEXT.freeze
+    [title]
+
+    [body]
+  TEXT
 
   private
 

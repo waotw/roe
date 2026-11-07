@@ -1,21 +1,34 @@
 # What a content type's page shows around its writing, and in what order.
 #
-# A layout is a YAML list of part names, one per line, in page order:
+# A layout is plain text: rows of [boxes], in blocks separated by blank lines.
 #
-#   - [title, feed_links]
-#   - subtitle
-#   - [date, author]
-#   - player
-#   - body
+#   post-header:
+#   post-header-top: [title] [feed links]
+#   [subtitle]
+#   post-meta: [date] [author]
 #
-# `[a, b]` puts parts in one group (one <div>), so a theme can style them
-# together. Optional front matter above the list (between `---` lines) holds
-# settings for the whole layout; none are read yet.
+#   [player]
+#   [body]
+#
+#   [subscribe]
+#
+# - A box is a part (see BUILT_PARTS) or a metadata field. Spaces in a name
+#   are underscores: [feed links] is feed_links.
+# - Boxes on one line are one row: grouped in one <div> (the row's name, or
+#   .layout-row) for CSS to style. Roe doesn't lay them out itself.
+# - The block holding [body] is the content: its other boxes come before or
+#   after the writing. The first block in the layout is the <header> and the
+#   last the <footer>, unless that block holds [body]; blocks in between are
+#   groups.
+# - `name:` alone on a block's first line gives that block classes;
+#   `name: [a] [b]` gives one row classes. Several names, space-separated,
+#   give several classes.
+# Anything else is skipped with a warning, so stray text never reaches a page.
 #
 # Where a layout comes from, first match wins:
 #   1. `layout: <name>` in the record's metadata, from the site or Roe
-#   2. site/layout/content/<type>.yml — the site's own copy
-#   3. Roe's default, lib/site_templates/layouts/content/<type>.yml
+#   2. site/layout/content/<type>.txt — the site's own copy
+#   3. Roe's default, lib/site_templates/layouts/content/<type>.txt
 # so there's always one. Posts use their post_type (article, podcast, …);
 # pages, products and documentation have one each.
 class ContentLayout
@@ -29,14 +42,26 @@ class ContentLayout
     episodes podcast_title release_title buy_button price
   ].freeze
 
-  # The player, body and what follows them sit outside a post's
-  # <header class="post-header">; everything before the first of these is
-  # inside it. Matches today's post page, where the player is below the header.
-  BELOW_HEADER = %w[player body subscribe episodes buy_button].freeze
-
   NAME_RE = /\A[a-z0-9][a-z0-9_-]*\z/
+  CLASS_RE = /\A[A-Za-z_][A-Za-z0-9_-]*\z/
+  EXT = ".txt"
 
-  attr_reader :name, :path, :source, :settings, :groups, :warnings
+  # A line: optional `classes:` then optional [boxes]. Nothing else.
+  LINE_RE = /\A(?:(?<classes>[^\[\]:]+):)?\s*(?<boxes>(?:\[[^\[\]]*\]\s*)*)\z/
+
+  # One row of boxes (one <div> when it has several), and its classes. line is
+  # where it was written (1-based), for the editor's live help.
+  Row = Struct.new(:classes, :parts, :line)
+
+  # Lines between blank lines. role is :header, :group, :content or :footer;
+  # line is the line of its `name:`, if it has one.
+  Block = Struct.new(:classes, :rows, :role, :line) do
+    def parts = rows.flat_map(&:parts)
+  end
+
+  # problems: line number → what's wrong with it, for lines that were skipped
+  # or partly skipped.
+  attr_reader :name, :path, :source, :blocks, :warnings, :problems
 
   # Layouts named after a kind of record. `layout:` can't pick these: posts
   # imported from Jekyll often carry `layout: page` or `layout: post`, which
@@ -84,8 +109,8 @@ class ContentLayout
   def self.find(name)
     return nil unless name.to_s.match?(NAME_RE)
 
-    site = File.join(SITE_DIR, "#{name}.yml")
-    roe  = File.join(ROE_DIR, "#{name}.yml")
+    site = site_path(name)
+    roe  = roe_default_path(name)
     if File.file?(site)
       load(name, site, :site)
     elsif File.file?(roe)
@@ -94,11 +119,11 @@ class ContentLayout
   end
 
   def self.roe_default_path(name)
-    File.join(ROE_DIR, "#{name}.yml")
+    File.join(ROE_DIR, "#{name}#{EXT}")
   end
 
   def self.site_path(name)
-    File.join(SITE_DIR, "#{name}.yml")
+    File.join(SITE_DIR, "#{name}#{EXT}")
   end
 
   # Parsed layouts, kept until the file changes. A page view reads one small
@@ -120,70 +145,119 @@ class ContentLayout
   end
 
   def self.empty
-    new(name: "empty", path: nil, source: :roe, settings: {}, groups: [ [ "body" ] ], warnings: [])
+    new(name: "empty", path: nil, source: :roe,
+        blocks: [ Block.new([], [ Row.new([], [ "body" ]) ], :content) ], warnings: [])
   end
 
-  # Text → layout. A file that can't be read as a list falls back to the body
-  # alone, with a warning, rather than breaking the page.
+  # Text → layout. Lines that aren't rows of boxes are skipped with a
+  # warning; a layout without [body] gets it at the end. Never raises, so a
+  # broken file still shows the writing.
   def self.parse(name, text, path: nil, source: :site)
     warnings = []
-    settings_text, list_text = split_front_matter(text.to_s)
-
-    settings = settings_text ? safe_yaml(settings_text, warnings, "settings") : {}
-    settings = {} unless settings.is_a?(Hash)
-
-    list = safe_yaml(list_text, warnings, "list")
-    unless list.is_a?(Array)
-      warnings << "The layout isn't a list of parts, so only the body is shown." unless list.nil?
-      list = []
+    problems = {}
+    warn = lambda do |number, message|
+      warnings << message
+      problems[number] = [ problems[number], message ].compact.join(" ") if number
     end
+    blocks = []
+    current = nil
+    body_seen = false
 
-    groups = list.filter_map do |item|
-      names = Array(item).map { |n| n.to_s.strip }.reject(&:empty?)
-      if names.empty? || !names.all? { |n| n.match?(NAME_RE) }
-        warnings << "Skipped #{item.inspect}: a part is one name, or a group like [title, subtitle]."
+    text.to_s.gsub("\r\n", "\n").split("\n").each.with_index(1) do |raw, number|
+      line = raw.strip
+      if line.empty?
+        current = nil
         next
       end
-      names
+
+      match = line.match(LINE_RE)
+      unless match
+        warn.call(number, "Line #{number} isn't a row of [boxes], so it was skipped: #{line}")
+        next
+      end
+
+      classes = class_list(match[:classes], number, warn)
+      boxes = match[:boxes].scan(/\[([^\[\]]*)\]/).flatten
+      current ||= Block.new([], [], nil).tap { |block| blocks << block }
+
+      if boxes.empty?
+        if current.rows.empty? && current.classes.empty?
+          current.classes = classes
+          current.line = number
+        else
+          warn.call(number, "Line #{number}: a name on its own line only works as the first line of a block.")
+        end
+        next
+      end
+
+      parts = boxes.filter_map do |box|
+        part = box.strip.downcase.gsub(/\s+/, "_")
+        if !part.match?(NAME_RE)
+          warn.call(number, "Line #{number}: [#{box}] isn't a part or field name, so it was skipped.")
+          next
+        elsif part == "body" && body_seen
+          warn.call(number, "Line #{number}: [body] is already in this layout, so this one was skipped.")
+          next
+        end
+        body_seen ||= part == "body"
+        part
+      end
+      current.rows << Row.new(classes, parts, number) if parts.any?
     end
 
-    unless groups.flatten.include?("body")
-      warnings << "This layout has no body, so the writing is shown after everything else."
-      groups << [ "body" ]
+    blocks.reject! { |block| block.rows.empty? }
+    unless body_seen
+      warn.call(nil, "This layout has no [body], so the writing is shown after everything else.")
+      blocks << Block.new([], [ Row.new([], [ "body" ]) ], nil)
     end
+    assign_roles(blocks)
 
-    new(name: name, path: path, source: source, settings: settings, groups: groups, warnings: warnings)
+    new(name: name, path: path, source: source, blocks: blocks, warnings: warnings, problems: problems)
   end
 
-  # `---\nsettings\n---\nlist` → [settings, list]; no front matter → [nil, text].
-  def self.split_front_matter(text)
-    match = text.match(/\A---[ \t]*\r?\n(.*?)^---[ \t]*\r?\n?(.*)\z/m)
-    match ? [ match[1], match[2] ] : [ nil, text ]
+  # The block with [body] is the content; the first block in the layout is
+  # the header and the last the footer (unless it's the content), and any
+  # others are groups.
+  def self.assign_roles(blocks)
+    content = blocks.index { |block| block.parts.include?("body") }
+    blocks.each_with_index do |block, i|
+      block.role =
+        if i == content then :content
+        elsif i.zero? then :header
+        elsif i == blocks.length - 1 && i > content then :footer
+        else :group
+        end
+    end
   end
+  private_class_method :assign_roles
 
-  def self.safe_yaml(text, warnings, what)
-    YAML.safe_load(text.to_s)
-  rescue Psych::Exception => e
-    warnings << "The layout's #{what} couldn't be read: #{e.message}"
-    nil
+  def self.class_list(text, number, warn)
+    names = text.to_s.split
+    bad = names.reject { |n| n.match?(CLASS_RE) }
+    warn.call(number, "Line #{number}: #{bad.join(", ")} can't be used as a class name, so it was left off.") if bad.any?
+    names - bad
   end
-  private_class_method :safe_yaml
+  private_class_method :class_list
 
-  def initialize(name:, path:, source:, settings:, groups:, warnings:)
+  def initialize(name:, path:, source:, blocks:, warnings:, problems: {})
     @name = name
     @path = path
     @source = source
-    @settings = settings
-    @groups = groups
+    @blocks = blocks
     @warnings = warnings
+    @problems = problems
   end
 
   def site?
     source == :site
   end
 
+  def rows
+    blocks.flat_map(&:rows)
+  end
+
   def parts
-    groups.flatten
+    rows.flat_map(&:parts)
   end
 
   def includes?(part)

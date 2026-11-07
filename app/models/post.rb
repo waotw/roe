@@ -110,7 +110,7 @@ class Post < ApplicationRecord
           hint: "Path to VTT captions file (e.g., /media/captions/episode-1.en.vtt)" }
       ],
       # Only the writing: the podcast layout draws the player above it and
-      # the episode list below (lib/site_templates/layouts/content/podcast.yml).
+      # the episode list below (lib/site_templates/layouts/content/podcast.txt).
       scaffold: [ :content ],
       # season comes before episode_number because it scopes it: episode 1 of
       # season 2 is a different episode 1.
