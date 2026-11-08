@@ -309,6 +309,19 @@ class Admin::ConfigsController < Admin::BaseController
       }
     },
 
+    # COPY: Content Layouts section — label and hint
+    layouts: {
+      label: "Content Layouts",
+      fields: {
+        "content_layouts" => {
+          type: :checkbox,
+          label: "Enable content layouts",
+          hint: "Edit the layouts for posts, pages and products, in Admin → Layouts. Off, Roe's default layouts " \
+                "are used. Turning this off will not delete any layouts you've saved."
+        }
+      }
+    },
+
     search: {
       label: "Search",
       fields: {

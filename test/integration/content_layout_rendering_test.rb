@@ -4,6 +4,10 @@ require "test_helper"
 # post-type templates, a site's own copy changes the order, and a part the
 # body already has isn't drawn twice.
 class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
+  # These tests are about what a site's own layouts do, so content layouts
+  # are on; the off state has its own tests.
+  setup { SiteConfig.stubs(:content_layouts?).returns(true) }
+
   CARD = "```card\ntype: player\n```".freeze
 
   teardown do

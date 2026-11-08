@@ -68,9 +68,12 @@ class ContentLayout
   # meant Jekyll's templates, not ours.
   RECORD_LAYOUTS = %w[page podcast-page music-page product documentation].freeze
 
+  # With content layouts off (SiteConfig.content_layouts?), only Roe's
+  # defaults are used: the site's files and `layout:` are ignored, not
+  # removed.
   def self.for(record)
     type = type_for(record)
-    custom = record.respond_to?(:metadata) ? record.metadata["layout"].to_s.strip : ""
+    custom = SiteConfig.content_layouts? && record.respond_to?(:metadata) ? record.metadata["layout"].to_s.strip : ""
     named = custom.match?(NAME_RE) && !RECORD_LAYOUTS.include?(custom) ? find(custom) : nil
     named || find(type) || find(fallback_for(record)) || empty
   end
@@ -105,13 +108,14 @@ class ContentLayout
     end
   end
 
-  # The site's copy if it has one, otherwise Roe's. nil when neither exists.
+  # The site's copy if it has one and content layouts are on, otherwise
+  # Roe's. nil when neither exists.
   def self.find(name)
     return nil unless name.to_s.match?(NAME_RE)
 
     site = site_path(name)
     roe  = roe_default_path(name)
-    if File.file?(site)
+    if SiteConfig.content_layouts? && File.file?(site)
       load(name, site, :site)
     elsif File.file?(roe)
       load(name, roe, :roe)

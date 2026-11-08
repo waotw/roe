@@ -6,7 +6,11 @@
 # Roe's and picks up its improvements in updates.
 #
 # Extra layouts (New layout) are picked per post with `layout: <name>`.
+#
+# Only while content layouts are on (Settings → Content). Off, every page
+# uses Roe's defaults and these actions go back to the Layouts page.
 class Admin::ContentLayoutsController < Admin::BaseController
+  before_action :require_content_layouts
   before_action :set_name, only: [ :edit, :update, :destroy, :explain ]
 
   def edit
@@ -97,6 +101,12 @@ class Admin::ContentLayoutsController < Admin::BaseController
     return nil unless covered
 
     Sidebar.frontmatter["position"].to_s.strip == "right" ? "right" : "left"
+  end
+
+  def require_content_layouts
+    return if SiteConfig.content_layouts?
+
+    redirect_to admin_layouts_path, alert: "Content layouts are off. Turn them on in Settings → Content to edit them."
   end
 
   def set_name

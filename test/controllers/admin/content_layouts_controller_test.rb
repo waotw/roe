@@ -3,6 +3,10 @@ require "test_helper"
 # The Content section of the Layouts page: every type editable straight away,
 # saved as the site's copy, back to Roe's default, and new layouts.
 class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
+  # These tests are about what a site's own layouts do, so content layouts
+  # are on; the off state has its own tests.
+  setup { SiteConfig.stubs(:content_layouts?).returns(true) }
+
   setup do
     sign_in_as(users(:one))
     FileUtils.mkdir_p(ContentLayout::SITE_DIR)

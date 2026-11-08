@@ -3,6 +3,10 @@ require "test_helper"
 # The newsletter and feed items follow the post's layout: the same parts in
 # the same order as the page, each in a form that works there.
 class ContentLayoutTextTest < ActiveSupport::TestCase
+  # These tests are about what a site's own layouts do, so content layouts
+  # are on; the off state has its own tests.
+  setup { SiteConfig.stubs(:content_layouts?).returns(true) }
+
   teardown do
     Dir.glob(File.join(ContentLayout::SITE_DIR, "*#{ContentLayout::EXT}")).each { |f| FileUtils.rm_f(f) }
   end

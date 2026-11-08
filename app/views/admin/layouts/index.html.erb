@@ -68,70 +68,83 @@
     </table>
   </div>
 
-  <%# Content layouts: what each type's page shows around its writing.
-      Every type opens straight into the editor; saving makes the file the
-      site's own. COPY: placeholder wording — owner will rewrite %>
-  <div class="mt-10 flex items-end justify-between gap-4">
-    <div>
+  <%# Content layouts are off by default: every page uses Roe's defaults, so
+      only the heading and the way to turn them on. COPY: placeholder
+      wording — owner will rewrite %>
+  <% unless SiteConfig.content_layouts? %>
+    <div class="mt-10">
       <h2 class="text-xl font-bold text-gray-900 font-sans">Content</h2>
       <p class="mt-1 text-sm text-gray-700 font-sans">
-        Layout templates for each content type.
+        Content layouts are off. Posts, pages and products use Roe's defaults.
+        To edit them, <%= link_to "Enable content layouts", admin_edit_content_config_path(focus: "content_layouts"), class: "underline" %> in Settings → Content.
       </p>
     </div>
-    <%= form_with url: admin_content_layouts_path, method: :post, class: "flex items-center gap-2 font-mono" do |f| %>
-      <%= f.text_field :name, placeholder: "announcement", required: true, pattern: "[a-z0-9][a-z0-9_-]*",
-            title: "Lowercase letters, numbers, - and _",
-            class: "text-sm px-2 py-1 border border-gray-300 w-44" %>
-      <%= f.submit "New layout", class: "text-sm px-3 py-1 bg-blue-100 border border-blue-600 hover:bg-blue-200 text-blue-700 rounded-xs cursor-pointer" %>
-    <% end %>
-  </div>
+  <% else %>
+    <%# Content layouts: what each type's page shows around its writing.
+        Every type opens straight into the editor; saving makes the file the
+        site's own. COPY: placeholder wording — owner will rewrite %>
+    <div class="mt-10 flex items-end justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-bold text-gray-900 font-sans">Content</h2>
+        <p class="mt-1 text-sm text-gray-700 font-sans">
+          Layout templates for each content type.
+        </p>
+      </div>
+      <%= form_with url: admin_content_layouts_path, method: :post, class: "flex items-center gap-2 font-mono" do |f| %>
+        <%= f.text_field :name, placeholder: "announcement", required: true, pattern: "[a-z0-9][a-z0-9_-]*",
+              title: "Lowercase letters, numbers, - and _",
+              class: "text-sm px-2 py-1 border border-gray-300 w-44" %>
+        <%= f.submit "New layout", class: "text-sm px-3 py-1 bg-blue-100 border border-blue-600 hover:bg-blue-200 text-blue-700 rounded-xs cursor-pointer" %>
+      <% end %>
+    </div>
 
-  <%# Styled like the Products table: one <tbody> per group, a slate header
-      row for the group, then its layouts. %>
-  <div class="mt-4 overflow-hidden ring-1 ring-black ring-opacity-5">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th scope="col" class="py-2 px-6 md:px-4 text-left text-sm font-semibold text-gray-900 uppercase">Layout</th>
-          <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">File</th>
-          <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
-          <th scope="col" class="relative w-full py-1.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
-        </tr>
-      </thead>
-      <% @content_layouts.each do |group| %>
-        <tbody class="divide-y divide-gray-200 bg-white" data-layout-group="<%= group.name.parameterize %>">
+    <%# Styled like the Products table: one <tbody> per group, a slate header
+        row for the group, then its layouts. %>
+    <div class="mt-4 overflow-hidden ring-1 ring-black ring-opacity-5">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
           <tr>
-            <td colspan="4" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide bg-slate-300 font-mono text-slate-800">
-              <%= group.name %>
-            </td>
+            <th scope="col" class="py-2 px-6 md:px-4 text-left text-sm font-semibold text-gray-900 uppercase">Layout</th>
+            <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">File</th>
+            <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
+            <th scope="col" class="relative w-full py-1.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
           </tr>
-          <% group.rows.each do |layout| %>
+        </thead>
+        <% @content_layouts.each do |group| %>
+          <tbody class="divide-y divide-gray-200 bg-white" data-layout-group="<%= group.name.parameterize %>">
             <tr>
-              <td class="whitespace-nowrap py-4 pl-6 md:pl-4 pr-4 text-sm font-medium">
-                <%= link_to admin_edit_content_layout_path(layout[:name]), class: "text-blue-600 hover:text-blue-900" do %>
-                  <% if layout[:extra] %>layout: <%= layout[:name] %><% else %><%= layout[:label] %><% end %>
-                <% end %>
-              </td>
-              <td class="whitespace-nowrap px-4 py-4 text-sm text-gray-500"><%= layout[:name] %>.txt</td>
-              <td class="whitespace-nowrap px-4 py-4 text-sm">
-                <% if layout[:customised] %>
-                  <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">custom</span>
-                <% else %>
-                  <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">default</span>
-                <% end %>
-              </td>
-              <td class="relative w-full whitespace-nowrap py-4 pl-3 md:pr-4 pr-6 text-right text-sm font-medium">
-                <div class="flex items-center justify-end gap-2">
-                  <%= link_to icon_svg("edit", class: "w-[1.1rem] h-[1.1rem]"), admin_edit_content_layout_path(layout[:name]),
-                        class: "text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
-                </div>
+              <td colspan="4" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide bg-slate-300 font-mono text-slate-800">
+                <%= group.name %>
               </td>
             </tr>
-          <% end %>
-        </tbody>
-      <% end %>
-    </table>
-  </div>
+            <% group.rows.each do |layout| %>
+              <tr>
+                <td class="whitespace-nowrap py-4 pl-6 md:pl-4 pr-4 text-sm font-medium">
+                  <%= link_to admin_edit_content_layout_path(layout[:name]), class: "text-blue-600 hover:text-blue-900" do %>
+                    <% if layout[:extra] %>layout: <%= layout[:name] %><% else %><%= layout[:label] %><% end %>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap px-4 py-4 text-sm text-gray-500"><%= layout[:name] %>.txt</td>
+                <td class="whitespace-nowrap px-4 py-4 text-sm">
+                  <% if layout[:customised] %>
+                    <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">custom</span>
+                  <% else %>
+                    <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800">default</span>
+                  <% end %>
+                </td>
+                <td class="relative w-full whitespace-nowrap py-4 pl-3 md:pr-4 pr-6 text-right text-sm font-medium">
+                  <div class="flex items-center justify-end gap-2">
+                    <%= link_to icon_svg("edit", class: "w-[1.1rem] h-[1.1rem]"), admin_edit_content_layout_path(layout[:name]),
+                          class: "text-slate-400 hover:text-blue-700", title: "Edit", "aria-label": "Edit" %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        <% end %>
+      </table>
+    </div>
+  <% end %>
 
   <%# Delete-confirmation modal for the sidebar. Uses the shared
       "type DELETE to confirm" pattern from posts/pages, with a custom

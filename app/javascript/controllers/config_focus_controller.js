@@ -13,10 +13,13 @@ export default class extends Controller {
     // config_fields[<field>]; others (e.g. podcast) use <prefix>[<field>]
     // like podcast[artwork]. Match the leaf field across those forms —
     // exact flat name, then any name ending in [<field>], then a bare name.
+    // Hidden inputs are skipped: a checkbox is preceded by a hidden input of
+    // the same name (its unchecked value), which can't be focused or scrolled to.
+    const visible = ":not([type=hidden])"
     const input =
-      this.element.querySelector(`[name="config_fields[${field}]"]`) ||
-      this.element.querySelector(`[name$="[${field}]"]`) ||
-      this.element.querySelector(`[name="${field}"]`)
+      this.element.querySelector(`[name="config_fields[${field}]"]${visible}`) ||
+      this.element.querySelector(`[name$="[${field}]"]${visible}`) ||
+      this.element.querySelector(`[name="${field}"]${visible}`)
     if (!input) return
 
     // Defer so layout/toggles settle before we scroll into view.

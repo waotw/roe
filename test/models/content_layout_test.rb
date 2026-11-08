@@ -1,6 +1,10 @@
 require "test_helper"
 
 class ContentLayoutTest < ActiveSupport::TestCase
+  # These tests are about what a site's own layouts do, so content layouts
+  # are on; the off state has its own tests.
+  setup { SiteConfig.stubs(:content_layouts?).returns(true) }
+
   def shape(layout)
     layout.blocks.map { |b| [ b.role, b.classes, b.rows.map { |r| [ r.classes, r.parts ] } ] }
   end
