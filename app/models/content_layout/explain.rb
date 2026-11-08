@@ -28,15 +28,15 @@ class ContentLayout
       { html: html_lines, warnings: @layout.warnings.map { |w| curly(w) }, lines: lines }
     end
 
-    # The boxes the editor offers as buttons for this layout's type: Roe's
-    # parts that draw something for it, then the metadata fields worth
-    # showing on a page. Each is { name:, label: "[feed links]", help: }.
+    # The boxes the editor offers as buttons for this layout's type, in one
+    # list: Roe's parts that draw something for it, then the other metadata
+    # fields worth showing on a page. Each is { name:, label: "[feed links]",
+    # help: }.
     def box_choices
-      choice = ->(name) { { name: name, label: box(name), help: curly(part_help(name)) } }
-      { parts: parts_for_type.map(&choice), fields: fields_for_type.map(&choice) }
+      (parts_for_type + fields_for_type).map { |name| { name: name, label: box(name), help: curly(part_help(name)) } }
     end
 
-    POST_PARTS = %w[title subtitle date author image feed_links].freeze
+    POST_PARTS = %w[title subtitle date author image feed_links excerpt tags].freeze
 
     # Metadata that isn't for showing on a page: settings, links to other
     # files, and IDs. Everything else a type's schema has can be a box.
@@ -79,11 +79,11 @@ class ContentLayout
         end
       when "page"
         case @name
-        when "podcast-page" then %w[podcast_title subscribe title subtitle image body]
-        when "music-page"   then %w[release_title subscribe title subtitle image body]
-        else                     %w[title subtitle image body]
+        when "podcast-page" then %w[podcast_title subscribe title subtitle image excerpt tags body]
+        when "music-page"   then %w[release_title subscribe title subtitle image excerpt tags body]
+        else                     %w[title subtitle image excerpt tags body]
         end
-      when "product"       then %w[image title price buy_button body]
+      when "product"       then %w[image title price buy_button tags body]
       when "documentation" then %w[title body]
       end
     end
@@ -181,6 +181,8 @@ class ContentLayout
       when "release_title" then %(<h1 class="release-page-title">Release name</h1>)
       when "buy_button"    then %(<button class="snipcart-add-item">Add to cart</button>)
       when "price"         then %(<p class="product-price">$10.00</p>)
+      when "excerpt"       then %(<p class="#{k}-excerpt">Excerpt</p>)
+      when "tags"          then %(<ul class="#{k}-tags"><li class="#{k}-tag">tag</li></ul>)
       when "body"
         case k
         when "post"    then %(<div class="post-content">…the post's writing…</div>)
@@ -319,6 +321,8 @@ class ContentLayout
       when "release_title" then "The name of the release this page is connected to (`release:`)."
       when "buy_button"    then "The product's buy button. Left out when the writing has its own `button` block."
       when "price"         then "The product's price. With [price] in the layout, the buy button leaves its own price off."
+      when "excerpt"       then "The #{n}'s excerpt, from `excerpt:`, as written. Nothing when it has none."
+      when "tags"          then "The #{n}'s tags, from `tags:`, as a list. Nothing when it has none."
       else "Shows the #{n}'s `#{part}:` field when it has one, and nothing when it doesn't."
       end
     end

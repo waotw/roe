@@ -1,0 +1,8 @@
+<%# The record's tags (`tags:`), one list item each. Plain text: there are
+    no tag pages to link to. Nothing when it has none. %>
+<% tags = record.respond_to?(:tags) ? Array(record.tags).map { |t| t.to_s.strip }.reject(&:blank?) : [] %>
+<% if tags.any? %>
+  <ul class="<%= kind %>-tags">
+    <% tags.each do |tag| %><li class="<%= kind %>-tag"><%= tag %></li><% end %>
+  </ul>
+<% end %>

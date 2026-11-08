@@ -82,4 +82,11 @@ class ContentLayoutTextTest < ActiveSupport::TestCase
     assert_includes html, "Only this"
     assert_not_includes html, "<h1>", "the site's layout has no title"
   end
+
+  test "the excerpt and tags reach the email as plain paragraphs" do
+    site_layout("article", "[excerpt]\n[tags]\n[body]\n")
+    html = text(a_post(excerpt: "In short.", tags: "arts, culture"), :email)
+    assert_includes html, %(<p class="post-excerpt">In short.</p>)
+    assert_includes html, %(<p class="post-tags">arts, culture</p>)
+  end
 end

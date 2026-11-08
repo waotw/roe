@@ -129,6 +129,14 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "article header", 0
   end
 
+  test "[excerpt] and [tags] are parts with their own markup" do
+    site_layout("article", "[excerpt]\n[tags]\n[body]\n")
+    get post_path(a_post(excerpt: "In short.", tags: "arts, culture").url_name)
+    assert_select "p.post-excerpt", "In short."
+    assert_select "ul.post-tags > li.post-tag", 2
+    assert_select "ul.post-tags > li.post-tag", "arts"
+  end
+
   test "a metadata field without a part of its own shows its value" do
     site_layout("article", "[location]\n[body]\n")
     get post_path(a_post(location: "Chicago").url_name)

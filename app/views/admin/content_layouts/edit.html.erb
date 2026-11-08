@@ -44,19 +44,15 @@
          data-action="toggle->remember-open#save">
   <summary class="cursor-pointer select-none px-3 py-1.5 font-mono text-xs font-semibold uppercase text-gray-700 hover:bg-gray-50">Boxes</summary>
   <div class="border-t border-gray-200 px-3 py-2 text-sm">
-    <p class="mb-2 text-xs text-gray-500">Click a box to add it at the caret. A box already in the layout is greyed out.</p>
-    <% [ [ "Parts", @box_choices[:parts] ], [ "Fields", @box_choices[:fields] ] ].each do |heading, choices| %>
-      <% next if choices.empty? %>
-      <div class="mb-1.5 flex flex-wrap items-baseline gap-1.5">
-        <span class="w-14 shrink-0 font-mono text-[0.65rem] uppercase text-gray-500"><%= heading %></span>
-        <% choices.each do |choice| %>
-          <button type="button" title="<%= choice[:help] %>"
-                  class="border border-gray-400 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800 hover:border-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed data-[used=true]:opacity-45"
-                  data-layout-boxes-target="button" data-box="<%= choice[:name] %>"
-                  data-action="layout-boxes#add"><%= choice[:label] %></button>
-        <% end %>
-      </div>
-    <% end %>
+    <p class="mb-2 text-xs text-gray-500">Clicking a box will add it to the layout. A box already in the layout is dimmed.</p>
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <% @box_choices.each do |choice| %>
+        <button type="button" title="<%= choice[:help] %>"
+                class="border border-gray-400 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800 hover:border-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed data-[used=true]:opacity-45"
+                data-layout-boxes-target="button" data-box="<%= choice[:name] %>"
+                data-action="layout-boxes#add"><%= choice[:label] %></button>
+      <% end %>
+    </div>
   </div>
 </details>
 

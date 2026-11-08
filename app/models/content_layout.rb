@@ -39,7 +39,7 @@ class ContentLayout
   # name is shown as a metadata field when the record has a value for it.
   BUILT_PARTS = %w[
     title subtitle date author image feed_links player body subscribe
-    episodes podcast_title release_title buy_button price
+    episodes podcast_title release_title buy_button price excerpt tags
   ].freeze
 
   NAME_RE = /\A[a-z0-9][a-z0-9_-]*\z/

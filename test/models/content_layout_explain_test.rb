@@ -99,27 +99,26 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
     assert_includes markup(explain("story:\n[player]\n[body]\n", "audio")), %(<div class="story">)
   end
 
-  def choices(name) = ContentLayout::Explain.new(name, "").box_choices
+  def choices(name) = ContentLayout::Explain.new(name, "").box_choices.map { |c| c[:name] }
 
-  test "each type offers the parts that draw something for it" do
-    assert_equal %w[title subtitle date author image feed_links body], choices("article")[:parts].map { |c| c[:name] }
-    assert_includes choices("podcast")[:parts].map { |c| c[:name] }, "episodes"
-    assert_equal %w[image title price buy_button body], choices("product")[:parts].map { |c| c[:name] }
-    assert_equal %w[title body], choices("documentation")[:parts].map { |c| c[:name] }
+  test "each type offers its parts first, then its other fields, in one list" do
+    assert_equal %w[title subtitle date author image feed_links excerpt tags body], choices("article")
+    assert_equal %w[image title price buy_button tags body category description variant], choices("product")
+    assert_equal %w[title body], choices("documentation")
+    assert_includes choices("podcast"), "episodes"
   end
 
-  test "fields are the type's metadata worth showing, not settings or parts" do
-    podcast = choices("podcast")[:fields].map { |c| c[:name] }
+  test "fields are the type's metadata worth showing, not settings, and never twice" do
+    podcast = choices("podcast")
     assert_includes podcast, "episode_number"
     assert_not_includes podcast, "status"
-    assert_not_includes podcast, "title", "already a part"
-    assert_not_includes choices("article")[:fields].map { |c| c[:name] }, "episode_number"
-    assert_includes choices("music")[:fields].map { |c| c[:name] }, "track_number"
-    assert_empty choices("documentation")[:fields]
+    assert_equal podcast.uniq, podcast
+    assert_not_includes choices("article"), "episode_number"
+    assert_includes choices("music"), "track_number"
   end
 
   test "a choice is labelled as a box and described like the help panel" do
-    feed = choices("article")[:parts].find { |c| c[:name] == "feed_links" }
+    feed = ContentLayout::Explain.new("article", "").box_choices.find { |c| c[:name] == "feed_links" }
     assert_equal "[feed links]", feed[:label]
     assert_match(/RSS links/, feed[:help])
   end
