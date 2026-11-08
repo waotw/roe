@@ -8,7 +8,7 @@
     <% tags.each do |tag| %>
       <li class="<%= kind %>-tag"><a href="#" class="<%= kind %>-tag-link" data-controller="search-trigger"
          data-search-trigger-scope-value="<%= { tagsInclude: [ tag ] }.to_json %>"
-         data-action="search-trigger#open" title="Search for #<%= tag %>"><%= tag %></a></li>
+         data-action="search-trigger#open" title="Search for <%= tag %>"><%= tag %></a></li>
     <% end %>
   </ul>
 <% end %>
