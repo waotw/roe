@@ -6,9 +6,16 @@ tags: admin
 
 # Layouts
 
-[`Admin → Layouts`](/admin/layouts)
+Edit layouts here: [`Admin → Layouts`](/admin/layouts)
 
-Layouts are all the parts of your site that are not the main content section:
+Roe has two kinds of layouts:
+
+- [Site](#site-layouts)
+- [Content Layouts](#content-layouts)
+
+## Site Layouts
+
+Site Layouts are all the parts of your site that are not the main content section:
 
 - `header` = logo, site links, anything you want at the top of every page
 - `footer` = copyright, extra links, anything you want at the bottom of every page
@@ -83,5 +90,24 @@ When the sidebar holds a `menu` Collection, its links take the orientation that 
 - `vertical` = stack the links in a column.
 
 If your sidebar is the site navigation and should stay on screen, `mobile: top` is the usual choice.
+
+## Content Layouts
+
+Roe uses sensible defaults but if you would like to customize the layout of your pages and posts, you can enable content layouts here: [Settings → Roe → content](http://roe.roe:3000/admin/configs/content/edit)
+
+Content layouts do one thing: they allow you to structure content (pages, posts, etc). There are 2 parts of the layout, blocks and `[boxes]`:
+
+- A block is a group of `[boxes]`. A blank line creates a new block.
+- A `[box]` represents an element in the layout. You can group `[boxes]` by putting them next to each other. This gives them their own `<div>`.
+
+The layout editor has the layout on the left and a preview of the HTML that will be written on the right. The best way to learn how the layouts work is to:
+
+1. Open a layout, perhaps `article.txt`
+2. Click on a line or `[box]` in the editor
+3. The related HTML will be high-lighted in the HTML section oh the right. The information under DETAILS will update and explain what that element is doing.
+4. Move things around and save (you can always go back to the default)
+5. Refresh the article you have open and you'll see the changes
+
+Open the diagram in the DETAILS section for a visual guide.
 
 [^1]: Frontmatter is a block of metadata at the start of a Markdown file, enclosed by `---` at the top/bottom. It provides information about the document that is used by the system but isn't visible when viewing the page/post.
